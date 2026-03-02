@@ -1829,6 +1829,7 @@ export function ChatScreen({
           className={cn(
             'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
             !compact && isAgentViewOpen ? 'min-[1024px]:mr-72' : 'mr-0',
+            (isRealtimeStreaming || hasPendingGeneration()) && 'chat-streaming-glow',
           )}
           style={{
             marginBottom:

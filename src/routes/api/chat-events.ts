@@ -125,6 +125,31 @@ export const Route = createFileRoute('/api/chat-events')({
                   return
                 }
 
+                // Filter internal gateway system messages at SSE boundary —
+                // never forward pre-compaction flushes, heartbeat prompts, etc.
+                if (eventName === 'chat') {
+                  const msgText: string =
+                    typeof rawPayload?.message?.content === 'string'
+                      ? rawPayload.message.content
+                      : Array.isArray(rawPayload?.message?.content)
+                        ? (rawPayload.message.content as any[])
+                            .filter((b: any) => b?.type === 'text')
+                            .map((b: any) => b.text ?? '')
+                            .join('')
+                        : typeof rawPayload?.message === 'string'
+                          ? rawPayload.message
+                          : ''
+                  if (
+                    msgText.includes('Pre-compaction memory flush') ||
+                    msgText.includes('Store durable memories now') ||
+                    msgText.includes('APPEND new content only and do not overwrite') ||
+                    msgText.startsWith('A subagent task') ||
+                    msgText.startsWith('[Queued announce messages')
+                  ) {
+                    return
+                  }
+                }
+
                 // Chat events (messages, state changes)
                 if (eventName === 'chat') {
                   const state = rawPayload?.state

@@ -920,7 +920,29 @@ code {
   }
 }
 
-/* Streaming glow — disabled for simplicity */
+/* Streaming glow — active on chat panel while AI is thinking/streaming */
+@keyframes chat-panel-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--color-accent-500) 30%, transparent),
+                0 0 18px 2px color-mix(in srgb, var(--color-accent-500) 12%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--color-accent-500) 55%, transparent),
+                0 0 28px 4px color-mix(in srgb, var(--color-accent-500) 20%, transparent);
+  }
+}
+
+.chat-streaming-glow {
+  animation: chat-panel-glow-pulse 2.4s ease-in-out infinite;
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-streaming-glow {
+    animation: none;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--color-accent-500) 40%, transparent);
+  }
+}
 
 /* iMessage-style typing dots */
 @keyframes typing-bounce {

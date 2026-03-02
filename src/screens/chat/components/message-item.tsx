@@ -1057,7 +1057,8 @@ function MessageItemComponent({
           isQueued={isUser && isQueued && !isFailed}
           isFailed={isUser && (isFailed || isStuckSending)}
           onRetry={
-            canRetryMessage && (isQueued || isFailed || isStuckSending) && onRetryMessage
+            // Only show Retry for actual failures — never for queued (delivered, just waiting)
+            canRetryMessage && (isFailed || isStuckSending) && onRetryMessage
               ? () => onRetryMessage(message)
               : undefined
           }
