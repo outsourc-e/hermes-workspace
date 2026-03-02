@@ -639,7 +639,10 @@ export function ChatScreen({
     // Restore original order (filtered array order, not sort order).
     const deduped = filtered.filter((msg) => dedupedSet.has(msg))
 
-    if (!isRealtimeStreaming) {
+    // Show thinking placeholder as soon as we're waiting for a response —
+    // not just when SSE streaming has started. This eliminates the blank gap
+    // between message send and first chunk arriving (network RTT + gateway startup).
+    if (!isRealtimeStreaming && !waitingForResponse) {
       return deduped
     }
 
@@ -711,6 +714,7 @@ export function ChatScreen({
   }, [
     activeToolCalls,
     isRealtimeStreaming,
+    waitingForResponse,
     realtimeMessages,
     realtimeStreamingText,
     realtimeStreamingThinking,
