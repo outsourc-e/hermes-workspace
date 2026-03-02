@@ -104,6 +104,28 @@ export function useRealtimeChatHistory({
     enabled: enabled && sessionKey !== 'new',
     onUserMessage: useCallback(
       (message: GatewayMessage, source?: string) => {
+        // Filter internal system messages (pre-compaction flushes, heartbeat
+        // prompts, subagent announcements) — these should never appear in the
+        // chat UI. The gateway-chat-store has its own filter, but this callback
+        // also appends directly to the query cache via appendHistoryMessage,
+        // bypassing the store filter entirely.
+        if (message.role === 'user') {
+          const msgText = extractUserMessageText(message)
+          if (
+            msgText.startsWith('Pre-compaction memory flush') ||
+            msgText.includes('Pre-compaction memory flush') ||
+            msgText.includes('Store durable memories now') ||
+            msgText.includes('APPEND new content only and do not overwrite') ||
+            msgText.startsWith('A subagent task') ||
+            msgText.startsWith('[Queued announce messages') ||
+            msgText.includes('Summarize this naturally for the user') ||
+            (msgText.includes('Stats: runtime') && msgText.includes('sessionKey agent:'))
+          ) {
+            onUserMessage?.(message, source)
+            return
+          }
+        }
+
         // When we receive a user message from an external channel,
         // append it to the query cache immediately for instant display
         if (sessionKey && sessionKey !== 'new') {

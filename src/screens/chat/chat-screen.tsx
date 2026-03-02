@@ -639,10 +639,15 @@ export function ChatScreen({
     // Restore original order (filtered array order, not sort order).
     const deduped = filtered.filter((msg) => dedupedSet.has(msg))
 
-    // Show thinking placeholder as soon as we're waiting for a response —
-    // not just when SSE streaming has started. This eliminates the blank gap
-    // between message send and first chunk arriving (network RTT + gateway startup).
-    if (!isRealtimeStreaming && !waitingForResponse) {
+    // Only inject the streaming placeholder when SSE streaming is actually
+    // active. The ThinkingBubble (in chat-message-list) handles the visual
+    // indicator during the waitingForResponse phase before SSE starts.
+    //
+    // Previous bug: gating on `!waitingForResponse` caused a phantom streaming
+    // placeholder to be injected after `done` cleared streamingState but before
+    // waitingForResponse was cleared, leading to a race where the real response
+    // flashed then disappeared when history refetched.
+    if (!isRealtimeStreaming) {
       return deduped
     }
 
@@ -714,7 +719,6 @@ export function ChatScreen({
   }, [
     activeToolCalls,
     isRealtimeStreaming,
-    waitingForResponse,
     realtimeMessages,
     realtimeStreamingText,
     realtimeStreamingThinking,

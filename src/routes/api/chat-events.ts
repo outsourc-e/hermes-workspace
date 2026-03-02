@@ -128,7 +128,10 @@ export const Route = createFileRoute('/api/chat-events')({
                 // Filter internal gateway system messages at SSE boundary —
                 // never forward pre-compaction flushes, heartbeat prompts, etc.
                 if (eventName === 'chat') {
-                  const msgText: string =
+                  // Extract text using multiple strategies — some gateways
+                  // send the message with a top-level `text` field instead of
+                  // the content array, which the old extraction missed.
+                  let msgText: string =
                     typeof rawPayload?.message?.content === 'string'
                       ? rawPayload.message.content
                       : Array.isArray(rawPayload?.message?.content)
@@ -139,12 +142,25 @@ export const Route = createFileRoute('/api/chat-events')({
                         : typeof rawPayload?.message === 'string'
                           ? rawPayload.message
                           : ''
+                  // Fallback: check top-level text/body/message fields on the
+                  // message object (legacy format / some channel adapters).
+                  if (!msgText && rawPayload?.message && typeof rawPayload.message === 'object') {
+                    for (const key of ['text', 'body', 'message'] as const) {
+                      const val = (rawPayload.message as any)[key]
+                      if (typeof val === 'string' && val.trim().length > 0) {
+                        msgText = val.trim()
+                        break
+                      }
+                    }
+                  }
                   if (
                     msgText.includes('Pre-compaction memory flush') ||
                     msgText.includes('Store durable memories now') ||
                     msgText.includes('APPEND new content only and do not overwrite') ||
                     msgText.startsWith('A subagent task') ||
-                    msgText.startsWith('[Queued announce messages')
+                    msgText.startsWith('[Queued announce messages') ||
+                    msgText.includes('Summarize this naturally for the user') ||
+                    (msgText.includes('Stats: runtime') && msgText.includes('sessionKey agent:'))
                   ) {
                     return
                   }
@@ -206,7 +222,22 @@ export const Route = createFileRoute('/api/chat-events')({
                 // Other message events
                 if (eventName === 'message.received' || eventName === 'chat.message' || eventName === 'channel.message') {
                   const message = rawPayload?.message || rawPayload
+                  // Apply the same system-message filter as the `chat` event handler
                   if (message?.role === 'user') {
+                    const altMsgText = extractTextFromMessage(message)
+                      || (typeof message?.text === 'string' ? message.text : '')
+                      || (typeof message?.body === 'string' ? message.body : '')
+                    if (
+                      altMsgText.includes('Pre-compaction memory flush') ||
+                      altMsgText.includes('Store durable memories now') ||
+                      altMsgText.includes('APPEND new content only and do not overwrite') ||
+                      altMsgText.startsWith('A subagent task') ||
+                      altMsgText.startsWith('[Queued announce messages') ||
+                      altMsgText.includes('Summarize this naturally for the user') ||
+                      (altMsgText.includes('Stats: runtime') && altMsgText.includes('sessionKey agent:'))
+                    ) {
+                      return
+                    }
                     sendEvent('user_message', { message, sessionKey: targetSessionKey, source: rawPayload?.source || rawPayload?.channel || eventName })
                   } else if (message?.role === 'assistant') {
                     sendEvent('message', { message, sessionKey: targetSessionKey })
