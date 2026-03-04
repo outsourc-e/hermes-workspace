@@ -37,6 +37,7 @@ import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
 // QuickActionsRow replaced by inline widget cards on mobile (MOB-5)
 import { TokenUsageHero } from './components/token-usage-hero'
+import { UsageTrendChart } from './components/usage-trend-chart'
 import { type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
@@ -885,6 +886,11 @@ export function DashboardScreen() {
                 </ErrorBoundary>
               </CollapsibleWidget>
 
+              {/* Token Usage Trend Chart */}
+              <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                <UsageTrendChart data={dashboardData} />
+              </ErrorBoundary>
+
               {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
 
               {/* D1: Inline widget control row above grid — replaces header edit button */}
@@ -1048,6 +1054,11 @@ export function DashboardScreen() {
                   </ErrorBoundary>
                 ))}
               </div>
+
+              {/* Usage Trend Chart (desktop) */}
+              <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                <UsageTrendChart data={dashboardData} />
+              </ErrorBoundary>
 
               {desktopLayout.showServices ? (
                 <ErrorBoundary title="Widget Error" description="This widget failed to load.">

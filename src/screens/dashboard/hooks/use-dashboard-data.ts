@@ -268,6 +268,8 @@ export type DashboardData = {
     messagesByDay: Array<{ date: string; count: number }>
     /** Daily active session counts (sessions with usage activity on that date) — up to last 28 days */
     sessionsByDay: Array<{ date: string; count: number }>
+    /** Daily token breakdown — input, output, cache read — up to last 28 days */
+    tokensByDay: Array<{ date: string; input: number; output: number; cacheRead: number; cost: number }>
   }
 }
 
@@ -689,6 +691,29 @@ export function useDashboardData(): UseDashboardDataResult {
       .slice(-28)
       .map(([date, count]) => ({ date, count }))
 
+    // Tokens by day — aggregate dailyBreakdown across all sessions
+    const tokensPerDayMap = new Map<string, { input: number; output: number; cacheRead: number; cost: number }>()
+    for (const session of ssSessions) {
+      const breakdown = Array.isArray(session.usage?.dailyBreakdown) ? session.usage.dailyBreakdown : []
+      for (const entry of breakdown) {
+        const date = readString(entry.date)
+        if (!date) continue
+        const existing = tokensPerDayMap.get(date) ?? { input: 0, output: 0, cacheRead: 0, cost: 0 }
+        existing.input += readNumber(entry.inputTokens)
+        existing.output += readNumber(entry.outputTokens)
+        existing.cost += readNumber(entry.cost)
+        // totalTokens - input - output ≈ cache read tokens
+        const total = readNumber(entry.totalTokens) || readNumber(entry.tokens)
+        const inputOutput = readNumber(entry.inputTokens) + readNumber(entry.outputTokens)
+        if (total > inputOutput) existing.cacheRead += total - inputOutput
+        tokensPerDayMap.set(date, existing)
+      }
+    }
+    const tokensByDay = Array.from(tokensPerDayMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-28)
+      .map(([date, values]) => ({ date, ...values }))
+
     // ── Cron jobs ────────────────────────────────────────────────────────────
     const cronJobs = Array.isArray(cronJobsQuery.data) ? cronJobsQuery.data : []
     let cronInProgress = 0
@@ -828,6 +853,7 @@ export function useDashboardData(): UseDashboardDataResult {
         costByDay,
         messagesByDay,
         sessionsByDay,
+        tokensByDay,
       },
     }
   }, [
