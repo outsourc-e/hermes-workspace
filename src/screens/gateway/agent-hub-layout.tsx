@@ -26,7 +26,7 @@ import { AgentChatPanel } from './components/agent-chat-panel'
 import { CostAnalyticsDashboard } from './components/cost-analytics'
 import { ExportMissionButton } from './components/export-mission'
 import { RemoteAgentsPanel } from './components/remote-agents-panel'
-import { PresenceIndicator } from './components/presence-indicator'
+import { CollaborationPresence } from './components/collaboration-presence'
 import { KanbanBoard } from './components/kanban-board'
 import { saveAsTemplate, type WorkflowTemplate } from './lib/workflow-templates'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
@@ -7616,7 +7616,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   onApprove={handleApprove}
                   onDeny={handleDeny}
                 />
-                <PresenceIndicator currentTab={activeTab} />
               </div>
             </div>
           </header>
@@ -7625,9 +7624,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
       <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
-        <div className="mx-auto w-full max-w-[1600px] overflow-x-auto px-3 sm:px-4">
-          <div className="flex min-w-max items-center">
-            {TAB_DEFS.map((tab) => {
+        <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-4">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1 overflow-x-auto">
+              <div className="flex min-w-max items-center">
+                {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'configure'
             ? approvals.filter(a => a.status === 'pending').length
             : 0
@@ -7664,7 +7665,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               ) : null}
             </button>
           )
-            })}
+                })}
+              </div>
+            </div>
+            <CollaborationPresence />
           </div>
         </div>
 
