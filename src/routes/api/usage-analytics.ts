@@ -189,57 +189,67 @@ function buildAgentBreakdowns(sessions: NormalizedSession[]): AgentBreakdown[] {
   return Array.from(map.values()).sort((a, b) => b.costUsd - a.costUsd)
 }
 
+type SessionUsageData = {
+  costUsd: number
+  inputTokens: number
+  outputTokens: number
+  cacheRead: number
+  cacheWrite: number
+  label: string
+  models: Array<{ model: string; provider: string; costUsd: number; inputTokens: number; outputTokens: number; count: number }>
+}
+
 /**
- * Batch-fetch session.status for a list of session keys.
- * Returns a map of sessionKey → { costUsd, models[], inputTokens, outputTokens, cacheRead, cacheWrite }.
- * Failed fetches are silently skipped (session just won't have cost data).
+ * Fetch all session usage data in a single RPC call via sessions.usage.
+ * Returns a map of sessionKey → usage data with real costs (including cache token pricing).
  */
-async function batchFetchSessionCosts(
-  sessionKeys: string[],
-): Promise<Map<string, { costUsd: number; inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number; models: Array<{ model: string; provider: string; costUsd: number; inputTokens: number; outputTokens: number; count: number }> }>> {
-  const results = new Map<string, { costUsd: number; inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number; models: Array<{ model: string; provider: string; costUsd: number; inputTokens: number; outputTokens: number; count: number }> }>()
+async function fetchAllSessionUsage(): Promise<Map<string, SessionUsageData>> {
+  const results = new Map<string, SessionUsageData>()
 
-  // Fetch in parallel, max 10 at a time to avoid overwhelming the gateway
-  const BATCH_SIZE = 10
-  for (let i = 0; i < sessionKeys.length; i += BATCH_SIZE) {
-    const batch = sessionKeys.slice(i, i + BATCH_SIZE)
-    const promises = batch.map(async (key) => {
-      try {
-        const status = await withTimeout(
-          gatewayRpc<Record<string, unknown>>('session.status', { sessionKey: key }),
-          5000,
-          `session.status timeout for ${key}`,
-        )
-        const s = toRecord(status)
-        const usage = toRecord(s.usage)
-        const modelUsage = Array.isArray(usage.modelUsage) ? usage.modelUsage : []
+  try {
+    const response = await withTimeout(
+      gatewayRpc<Record<string, unknown>>('sessions.usage', { limit: 200 }),
+      REQUEST_TIMEOUT_MS,
+      'sessions.usage request timed out',
+    )
 
-        const models = modelUsage.map((m: unknown) => {
-          const mr = toRecord(m)
-          const totals = toRecord(mr.totals)
-          return {
-            model: readString(mr.model),
-            provider: readString(mr.provider),
-            costUsd: readNumber(totals.totalCost ?? totals.costUsd),
-            inputTokens: readNumber(totals.input ?? totals.inputTokens),
-            outputTokens: readNumber(totals.output ?? totals.outputTokens),
-            count: readNumber(mr.count),
-          }
-        })
+    const sessions = Array.isArray(toRecord(response).sessions) ? (response as any).sessions : []
 
-        results.set(key, {
-          costUsd: readNumber(usage.totalCost ?? s.costUsd),
-          inputTokens: readNumber(usage.input ?? s.inputTokens),
-          outputTokens: readNumber(usage.output ?? s.outputTokens),
-          cacheRead: readNumber(usage.cacheRead),
-          cacheWrite: readNumber(usage.cacheWrite),
-          models,
-        })
-      } catch {
-        // Skip failed fetches — session will use estimated cost
-      }
-    })
-    await Promise.all(promises)
+    for (const s of sessions) {
+      const row = toRecord(s)
+      const key = readString(row.key ?? row.sessionKey ?? '')
+      if (!key) continue
+
+      const usage = toRecord(row.usage)
+      const costUsd = readNumber(usage.totalCost ?? row.costUsd ?? row.totalCost)
+      const label = readString(row.label ?? row.displayName ?? row.friendlyId ?? '')
+
+      const modelUsage = Array.isArray(usage.modelUsage) ? usage.modelUsage : []
+      const models = modelUsage.map((m: unknown) => {
+        const mr = toRecord(m)
+        const totals = toRecord(mr.totals)
+        return {
+          model: readString(mr.model),
+          provider: readString(mr.provider),
+          costUsd: readNumber(totals.totalCost ?? totals.costUsd),
+          inputTokens: readNumber(totals.input ?? totals.inputTokens),
+          outputTokens: readNumber(totals.output ?? totals.outputTokens),
+          count: readNumber(mr.count),
+        }
+      })
+
+      results.set(key, {
+        costUsd,
+        inputTokens: readNumber(usage.input ?? row.inputTokens),
+        outputTokens: readNumber(usage.output ?? row.outputTokens),
+        cacheRead: readNumber(usage.cacheRead),
+        cacheWrite: readNumber(usage.cacheWrite),
+        label,
+        models,
+      })
+    }
+  } catch {
+    // Fall back to estimate-based costs if sessions.usage is unavailable
   }
 
   return results
@@ -254,8 +264,8 @@ export const Route = createFileRoute('/api/usage-analytics')({
         }
 
         try {
-          // Step 1: Fetch cost data and sessions list in parallel
-          const [costPayload, sessionsPayload] = await Promise.all([
+          // Fetch cost data, sessions list, and session usage in parallel
+          const [costPayload, sessionsPayload, sessionUsageMap] = await Promise.all([
             withTimeout(
               gatewayRpc<Record<string, unknown>>('usage.cost', {}),
               REQUEST_TIMEOUT_MS,
@@ -266,30 +276,18 @@ export const Route = createFileRoute('/api/usage-analytics')({
               REQUEST_TIMEOUT_MS,
               'Sessions list request timed out',
             ).catch(() => ({ sessions: [] })),
+            fetchAllSessionUsage(),
           ])
 
           const costRoot = toRecord(costPayload)
 
-          // Build per-session list from sessions.list
+          // Build per-session list from sessions.list (for metadata like model, updatedAt)
           const sessionsRoot = toRecord(sessionsPayload)
           const rawSessionsList = Array.isArray(sessionsRoot.sessions)
             ? sessionsRoot.sessions
             : []
 
-          // Step 2: Batch-fetch session.status for sessions with tokens (real cost data)
-          const activeSessionKeys: string[] = []
-          for (const s of rawSessionsList) {
-            const row = toRecord(s)
-            const key = readString(row.key ?? row.sessionKey ?? '')
-            const totalTokens = readNumber(row.totalTokens) || readNumber(row.inputTokens) + readNumber(row.outputTokens)
-            if (key && totalTokens > 0) {
-              activeSessionKeys.push(key)
-            }
-          }
-
-          const sessionCosts = await batchFetchSessionCosts(activeSessionKeys)
-
-          // Step 3: Build normalized sessions with real costs
+          // Build normalized sessions enriched with real cost from sessions.usage
           const normalizedSessions: NormalizedSession[] = rawSessionsList.map(
             (s: unknown) => {
               const row = toRecord(s)
@@ -299,13 +297,15 @@ export const Route = createFileRoute('/api/usage-analytics')({
                   ? `${row.modelProvider}/${row.model}`
                   : (row.model ?? ''),
               )
-              const sessionCost = sessionCosts.get(sessionKey)
-              const inputTokens = sessionCost?.inputTokens ?? readNumber(row.inputTokens)
-              const outputTokens = sessionCost?.outputTokens ?? readNumber(row.outputTokens)
-              const costUsd = sessionCost?.costUsd ?? estimateCost(model, inputTokens, outputTokens)
 
-              // Build a human-friendly label from available metadata
-              const rawLabel = readString(row.label ?? row.displayName ?? row.friendlyId ?? '')
+              // Get real cost data from sessions.usage (includes cache token pricing)
+              const usageData = sessionUsageMap.get(sessionKey)
+              const inputTokens = usageData?.inputTokens ?? readNumber(row.inputTokens)
+              const outputTokens = usageData?.outputTokens ?? readNumber(row.outputTokens)
+              const costUsd = usageData?.costUsd ?? estimateCost(model, inputTokens, outputTokens)
+
+              // Build a human-friendly label
+              const rawLabel = usageData?.label || readString(row.label ?? row.displayName ?? row.friendlyId ?? '')
               const label = rawLabel || extractAgentName(sessionKey)
 
               return {
@@ -322,15 +322,36 @@ export const Route = createFileRoute('/api/usage-analytics')({
             },
           )
 
-          // Step 4: Build per-model breakdown from session.status model usage (most accurate)
+          // Also include sessions from sessions.usage that aren't in sessions.list
+          // (e.g. sub-agents, cron runs that may not show in sessions.list)
+          const sessionListKeys = new Set(normalizedSessions.map(s => s.sessionKey))
+          for (const [key, usageData] of sessionUsageMap) {
+            if (sessionListKeys.has(key)) continue
+            if (usageData.costUsd <= 0 && usageData.inputTokens + usageData.outputTokens <= 0) continue
+            normalizedSessions.push({
+              sessionKey: key,
+              label: usageData.label || extractAgentName(key),
+              model: usageData.models.length > 0
+                ? `${usageData.models[0].provider}/${usageData.models[0].model}`
+                : 'unknown',
+              agent: extractAgentName(key),
+              inputTokens: usageData.inputTokens,
+              outputTokens: usageData.outputTokens,
+              totalTokens: usageData.inputTokens + usageData.outputTokens,
+              costUsd: usageData.costUsd,
+              lastActiveAt: null,
+            })
+          }
+
+          // Build per-model breakdown from sessions.usage model data (most accurate)
           const modelMap = new Map<
             string,
             { inputTokens: number; outputTokens: number; totalTokens: number; costUsd: number; sessions: number }
           >()
 
-          // First pass: use detailed model usage from session.status
-          for (const [, sessionCost] of sessionCosts) {
-            for (const m of sessionCost.models) {
+          // Primary: use detailed per-model usage from sessions.usage (has real costs incl cache)
+          for (const [, usageData] of sessionUsageMap) {
+            for (const m of usageData.models) {
               const modelKey = m.provider ? `${m.provider}/${m.model}` : m.model
               if (!modelKey) continue
               const existing = modelMap.get(modelKey) || {
@@ -345,9 +366,9 @@ export const Route = createFileRoute('/api/usage-analytics')({
             }
           }
 
-          // Fallback for sessions that didn't have session.status data
+          // Fallback for sessions without sessions.usage data
           for (const s of normalizedSessions) {
-            if (sessionCosts.has(s.sessionKey)) continue // already counted above
+            if (sessionUsageMap.has(s.sessionKey)) continue
             const model = s.model || 'unknown'
             const existing = modelMap.get(model) || {
               inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0, sessions: 0,
