@@ -247,6 +247,8 @@ function normalizeModels(
       )
       return { model, inputTokens, outputTokens, totalTokens, costUsd }
     })
+    // Filter out models with zero tokens and zero cost (delivery-mirror, gateway-injected, etc.)
+    .filter((m) => m.totalTokens > 0 || m.costUsd > 0)
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens)
 }
 
@@ -381,6 +383,8 @@ function normalizeSessions(
         lastActiveAt: toTimestampMs(record.lastActiveAt ?? record.updatedAt),
       } satisfies CostSessionRow
     })
+    // Filter out sessions with no activity
+    .filter((s) => s.totalTokens > 0 || s.costUsd > 0)
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens)
 }
 
