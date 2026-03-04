@@ -1,6 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CheckmarkCircle02Icon, Copy01Icon, ViewIcon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { fetchSessionHistory } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
+
+type RunArtifact = {
+  id: string
+  type: 'file' | 'output' | 'commit'
+  name: string
+  content?: string
+  path?: string
+  timestamp: number
+}
+
+type RunReport = {
+  summary: string
+  keyFindings: string[]
+  duration: string
+  totalTokens: number
+  totalCost: number
+  agentSummaries: Array<{ name: string; tasks: number; tokens: number }>
+}
 
 type RunConsoleProps = {
   runId: string
@@ -20,17 +40,20 @@ type RunConsoleProps = {
   onDeny?: (approvalId: string) => void
   sessionKeys?: string[]
   agentNameMap?: Record<string, string>
+  artifacts?: RunArtifact[]
+  report?: RunReport
 }
 
 type ConsoleTab = 'stream' | 'timeline' | 'artifacts' | 'report'
 type StreamView = 'combined' | 'lanes'
 
-type MockStreamEvent = {
+type LiveStreamEvent = {
   id: string
   timestamp: string
   agentName: string
   eventType: 'status' | 'output' | 'tool' | 'error'
   message: string
+  toolName?: string
 }
 
 const TAB_OPTIONS: Array<{ id: ConsoleTab; label: string }> = [
@@ -47,7 +70,7 @@ const STATUS_STYLES: Record<RunConsoleProps['runStatus'], string> = {
   failed: 'border-red-500/40 bg-red-500/15 text-red-300',
 }
 
-const EVENT_STYLES: Record<MockStreamEvent['eventType'], string> = {
+const EVENT_STYLES: Record<LiveStreamEvent['eventType'], string> = {
   status: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
   output: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
   tool: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
@@ -85,14 +108,6 @@ function formatCost(costEstimate?: number): string {
   return `$${costEstimate.toFixed(2)}`
 }
 
-type LiveStreamEvent = {
-  id: string
-  timestamp: string
-  agentName: string
-  eventType: 'status' | 'output' | 'tool' | 'error'
-  message: string
-}
-
 function roleToEventType(role?: string): LiveStreamEvent['eventType'] {
   if (role === 'assistant') return 'output'
   if (role === 'tool') return 'tool'
@@ -123,6 +138,36 @@ function sanitizeArgsPreview(args?: string): string {
   return `${cleaned.slice(0, 200)}...`
 }
 
+function parseTimestampToSeconds(timestamp: string): number {
+  const parts = timestamp.split(':').map(Number)
+  if (parts.length !== 3 || parts.some((value) => Number.isNaN(value))) return 0
+  const [hours, minutes, seconds] = parts
+  return (hours * 3600) + (minutes * 60) + seconds
+}
+
+function getElapsedLabel(firstSeconds: number, currentSeconds: number): string {
+  let elapsed = currentSeconds - firstSeconds
+  if (elapsed < 0) elapsed += 24 * 3600
+  const hours = Math.floor(elapsed / 3600)
+  const minutes = Math.floor((elapsed % 3600) / 60)
+  const seconds = elapsed % 60
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
+function getEventDotClass(eventType: LiveStreamEvent['eventType']): string {
+  if (eventType === 'error') return 'bg-red-400'
+  if (eventType === 'tool') return 'bg-amber-400'
+  if (eventType === 'output') return 'bg-sky-400'
+  return 'bg-emerald-400'
+}
+
+function getEventPillLabel(event: LiveStreamEvent): string {
+  if (event.eventType === 'tool' && event.toolName) return `TOOL: ${event.toolName}`
+  return event.eventType.toUpperCase()
+}
+
 export function RunConsole({
   runId,
   runTitle,
@@ -141,6 +186,8 @@ export function RunConsole({
   onDeny,
   sessionKeys,
   agentNameMap,
+  artifacts,
+  report,
 }: RunConsoleProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('stream')
   const [streamView, setStreamView] = useState<StreamView>('combined')
@@ -148,6 +195,8 @@ export function RunConsole({
   const [steerInput, setSteerInput] = useState('')
   const [liveEvents, setLiveEvents] = useState<LiveStreamEvent[]>([])
   const [isAutoScroll, setIsAutoScroll] = useState(true)
+  const [copiedArtifactId, setCopiedArtifactId] = useState<string | null>(null)
+  const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(null)
   const streamEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -162,14 +211,16 @@ export function RunConsole({
         const agentName = agentNameMap?.[key] ?? 'Agent'
         for (const msg of msgs) {
           const content = extractContent(msg)
-          if (!content.trim()) continue
+          const toolName = msg.toolName
+          if (!content.trim() && !toolName) continue
           const ts = typeof msg.timestamp === 'number' ? msg.timestamp : Date.now()
           allEvents.push({
             id: `${key}-${ts}-${Math.random().toString(36).slice(2, 6)}`,
             timestamp: formatTs(ts),
             agentName,
             eventType: roleToEventType(msg.role),
-            message: content,
+            message: content || `[${toolName ?? 'tool call'}]`,
+            toolName,
           })
         }
       } catch { /* skip failed fetches */ }
@@ -207,7 +258,7 @@ export function RunConsole({
   const resolvedTokens = typeof tokenCount === 'number' ? tokenCount.toLocaleString() : '0'
   const statusLabel = formatRunStatus(runStatus)
 
-  const mockEvents = useMemo<MockStreamEvent[]>(() => {
+  const mockEvents = useMemo<LiveStreamEvent[]>(() => {
     const primaryAgent = agents[0]?.name || 'Mission Control'
     const secondaryAgent = agents[1]?.name || primaryAgent
     const hasFailure = runStatus === 'failed'
@@ -241,6 +292,28 @@ export function RunConsole({
 
   const displayEvents: Array<{ id: string; timestamp: string; agentName: string; eventType: 'status' | 'output' | 'tool' | 'error'; message: string }> = hasLiveData ? liveEvents : mockEvents
 
+  const timelineBuckets = useMemo(() => {
+    if (displayEvents.length === 0) return []
+    const firstSeconds = parseTimestampToSeconds(displayEvents[0].timestamp)
+    const ordered = [...displayEvents].sort((a, b) => parseTimestampToSeconds(a.timestamp) - parseTimestampToSeconds(b.timestamp))
+    const buckets = new Map<string, { id: string; minuteLabel: string; elapsed: string; events: typeof displayEvents }>()
+    for (const event of ordered) {
+      const minuteLabel = event.timestamp.split(':').slice(0, 2).join(':')
+      const existing = buckets.get(minuteLabel)
+      if (existing) {
+        existing.events.push(event)
+      } else {
+        buckets.set(minuteLabel, {
+          id: `${runId}-bucket-${minuteLabel}`,
+          minuteLabel,
+          elapsed: getElapsedLabel(firstSeconds, parseTimestampToSeconds(event.timestamp)),
+          events: [event],
+        })
+      }
+    }
+    return Array.from(buckets.values())
+  }, [displayEvents, runId])
+
   const eventsByAgent = useMemo(() => {
     const grouped = new Map<string, typeof displayEvents>()
     for (const event of displayEvents) {
@@ -254,6 +327,18 @@ export function RunConsole({
     return Array.from(grouped.entries()).map(([agentName, events]) => ({ agentName, events }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEvents])
+
+  const copyArtifactContent = useCallback(async (artifact: RunArtifact) => {
+    const textToCopy = artifact.content || artifact.path || artifact.name
+    if (!textToCopy || !navigator?.clipboard?.writeText) return
+    try {
+      await navigator.clipboard.writeText(textToCopy)
+      setCopiedArtifactId(artifact.id)
+      setTimeout(() => setCopiedArtifactId((current) => (current === artifact.id ? null : current)), 1500)
+    } catch {
+      /* ignore clipboard errors */
+    }
+  }, [])
 
   return (
     <section className="flex h-full flex-col overflow-hidden bg-[var(--theme-bg,#0b0e14)] text-primary-100 dark:bg-slate-900">
@@ -498,7 +583,7 @@ export function RunConsole({
                           EVENT_STYLES[event.eventType],
                         )}
                       >
-                        {event.eventType}
+                        {getEventPillLabel(event)}
                       </span>
                     </div>
                     <p className="mt-1 whitespace-pre-wrap break-words text-primary-300 line-clamp-3">{event.message}</p>
@@ -543,7 +628,7 @@ export function RunConsole({
                                     EVENT_STYLES[event.eventType],
                                   )}
                                 >
-                                  {event.eventType}
+                                  {getEventPillLabel(event)}
                                 </span>
                               </div>
                               <p className="mt-1 whitespace-pre-wrap break-words text-primary-300 line-clamp-3">{event.message}</p>
@@ -594,7 +679,7 @@ export function RunConsole({
                                     EVENT_STYLES[event.eventType],
                                   )}
                                 >
-                                  {event.eventType}
+                                  {getEventPillLabel(event)}
                                 </span>
                               </div>
                               <p className="mt-1 whitespace-pre-wrap break-words text-primary-300 line-clamp-3">{event.message}</p>
@@ -624,20 +709,186 @@ export function RunConsole({
         ) : null}
 
         {activeTab === 'timeline' ? (
-          <div className="rounded-xl border border-dashed border-primary-700 bg-primary-950/50 px-4 py-6 text-sm text-primary-300">
-            Mission timeline
+          <div className="rounded-xl border border-primary-800/80 bg-primary-950/50 p-4 sm:p-5">
+            {timelineBuckets.length === 0 ? (
+              <p className="text-sm text-primary-300">No timeline events yet</p>
+            ) : (
+              <ol className="space-y-4">
+                {timelineBuckets.map((bucket) => (
+                  <li key={bucket.id} className="grid grid-cols-[84px_minmax(0,1fr)] gap-3">
+                    <div className="space-y-1 pt-0.5 text-right">
+                      <p className="text-[11px] font-semibold text-primary-200">{bucket.elapsed}</p>
+                      <p className="text-[10px] text-primary-400">{bucket.minuteLabel}</p>
+                    </div>
+                    <div className="relative border-l-2 border-primary-700/80 pl-5">
+                      <ol className="space-y-2">
+                        {bucket.events.map((event) => (
+                          <li key={event.id} className="relative rounded-lg border border-primary-800/80 bg-primary-900/60 px-3 py-2">
+                            <span
+                              className={cn(
+                                'absolute -left-[22px] top-3 h-2.5 w-2.5 rounded-full ring-2 ring-primary-950',
+                                getEventDotClass(event.eventType),
+                              )}
+                            />
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                              <span className="text-primary-400">[{event.timestamp}]</span>
+                              <span className="text-primary-200">{event.agentName}</span>
+                              <span
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase',
+                                  EVENT_STYLES[event.eventType],
+                                )}
+                              >
+                                {getEventPillLabel(event)}
+                              </span>
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap break-words text-xs text-primary-300">{event.message}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         ) : null}
 
         {activeTab === 'artifacts' ? (
-          <div className="rounded-xl border border-dashed border-primary-700 bg-primary-950/50 px-4 py-6 text-sm text-primary-300">
-            Artifacts created during this run
+          <div className="rounded-xl border border-primary-800/80 bg-primary-950/50 p-4 sm:p-5">
+            {!artifacts || artifacts.length === 0 ? (
+              <p className="text-sm text-primary-300">No artifacts collected yet</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {artifacts
+                  .slice()
+                  .sort((a, b) => b.timestamp - a.timestamp)
+                  .map((artifact) => {
+                    const isExpanded = expandedArtifactId === artifact.id
+                    const commitHash = artifact.name.split(' ')[0] || artifact.name
+                    const commitMessage = artifact.content || artifact.name.slice(commitHash.length).trim() || 'No commit message'
+                    return (
+                      <article key={artifact.id} className="rounded-lg border border-primary-800/80 bg-primary-900/60 p-3">
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold uppercase tracking-wide text-primary-300">{artifact.type}</p>
+                            <p className="truncate text-sm font-medium text-primary-100">{artifact.name}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void copyArtifactContent(artifact)}
+                            className="inline-flex items-center gap-1 rounded-md border border-primary-700 bg-primary-900/80 px-2 py-1 text-[11px] text-primary-200 transition-colors hover:bg-primary-800"
+                          >
+                            <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={1.8} />
+                            {copiedArtifactId === artifact.id ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+
+                        {artifact.type === 'file' ? (
+                          <div className="space-y-2 text-xs text-primary-300">
+                            <p className="truncate text-primary-200">Path: {artifact.path || 'Unknown path'}</p>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedArtifactId(isExpanded ? null : artifact.id)}
+                              className="inline-flex items-center gap-1 rounded-md border border-primary-700 bg-primary-900/80 px-2 py-1 text-[11px] font-medium text-primary-200 transition-colors hover:bg-primary-800"
+                            >
+                              <HugeiconsIcon icon={ViewIcon} size={12} strokeWidth={1.8} />
+                              View
+                            </button>
+                            {isExpanded ? (
+                              <pre className="max-h-32 overflow-auto rounded-md border border-primary-800 bg-primary-950/80 p-2 text-[11px] text-primary-200">
+                                {artifact.content || artifact.path || 'No file preview available'}
+                              </pre>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {artifact.type === 'output' ? (
+                          <pre className="max-h-32 overflow-auto rounded-md border border-primary-800 bg-primary-950/80 p-2 text-[11px] text-primary-200">
+                            {(artifact.content || 'No output content').slice(0, 200)}
+                            {(artifact.content || '').length > 200 ? '...' : ''}
+                          </pre>
+                        ) : null}
+
+                        {artifact.type === 'commit' ? (
+                          <div className="space-y-1.5 text-xs text-primary-300">
+                            <p className="font-mono text-primary-200">Hash: {commitHash}</p>
+                            <p className="line-clamp-3 break-words">{commitMessage}</p>
+                          </div>
+                        ) : null}
+                      </article>
+                    )
+                  })}
+              </div>
+            )}
           </div>
         ) : null}
 
         {activeTab === 'report' ? (
-          <div className="rounded-xl border border-dashed border-primary-700 bg-primary-950/50 px-4 py-6 text-sm text-primary-300">
-            Run report will be generated on completion
+          <div className="rounded-xl border border-primary-800/80 bg-primary-950/50 p-4 sm:p-5">
+            {!report ? (
+              <p className="text-sm text-primary-300">Report will be generated when the mission completes</p>
+            ) : (
+              <div className="space-y-4">
+                <section className="rounded-lg border border-primary-800/80 bg-primary-900/50 p-3">
+                  <h3 className="text-sm font-semibold text-primary-100">Summary</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-primary-300">{report.summary}</p>
+                </section>
+
+                <section className="rounded-lg border border-primary-800/80 bg-primary-900/50 p-3">
+                  <h3 className="text-sm font-semibold text-primary-100">Key Findings</h3>
+                  {report.keyFindings.length > 0 ? (
+                    <ul className="mt-2 space-y-2">
+                      {report.keyFindings.map((finding, index) => (
+                        <li key={`${finding}-${index}`} className="flex items-start gap-2 text-sm text-primary-300">
+                          <HugeiconsIcon icon={CheckmarkCircle02Icon} size={14} strokeWidth={1.9} className="mt-0.5 text-emerald-300" />
+                          <span>{finding}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-primary-400">No key findings available</p>
+                  )}
+                </section>
+
+                <section className="grid gap-2 rounded-lg border border-primary-800/80 bg-primary-900/50 p-3 text-xs sm:grid-cols-3">
+                  <div className="rounded-md border border-primary-800 bg-primary-950/70 px-2 py-1.5">
+                    <p className="text-primary-400">Duration</p>
+                    <p className="mt-0.5 text-sm font-semibold text-primary-100">{report.duration}</p>
+                  </div>
+                  <div className="rounded-md border border-primary-800 bg-primary-950/70 px-2 py-1.5">
+                    <p className="text-primary-400">Total Tokens</p>
+                    <p className="mt-0.5 text-sm font-semibold text-primary-100">{report.totalTokens.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-md border border-primary-800 bg-primary-950/70 px-2 py-1.5">
+                    <p className="text-primary-400">Total Cost</p>
+                    <p className="mt-0.5 text-sm font-semibold text-primary-100">${report.totalCost.toFixed(2)}</p>
+                  </div>
+                </section>
+
+                <section className="overflow-hidden rounded-lg border border-primary-800/80 bg-primary-900/50">
+                  <h3 className="border-b border-primary-800/80 px-3 py-2 text-sm font-semibold text-primary-100">Agent Breakdown</h3>
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-primary-950/70 text-primary-300">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Agent</th>
+                        <th className="px-3 py-2 font-medium">Tasks Completed</th>
+                        <th className="px-3 py-2 font-medium">Tokens Used</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.agentSummaries.map((agent, index) => (
+                        <tr key={`${agent.name}-${index}`} className="border-t border-primary-800/70 text-primary-200">
+                          <td className="px-3 py-2">{agent.name}</td>
+                          <td className="px-3 py-2">{agent.tasks}</td>
+                          <td className="px-3 py-2">{agent.tokens.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

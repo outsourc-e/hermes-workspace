@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import {
   steerAgent,
   toggleAgentPause,
+  sendToSession,
   fetchGatewayApprovals,
   resolveGatewayApproval,
   killAgentSession,
@@ -35,6 +36,7 @@ import { TemplatePicker } from './components/template-picker'
 import { AgentChatPanel } from './components/agent-chat-panel'
 import { CostAnalyticsDashboard } from './components/cost-analytics'
 import { RunConsole } from './components/run-console'
+import { RunCompare } from './components/run-compare'
 import { ExportMissionButton } from './components/export-mission'
 // import { RemoteAgentsPanel } from './components/remote-agents-panel'
 import { CollaborationPresence } from './components/collaboration-presence'
@@ -3014,6 +3016,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [_view, setView] = useState<'board' | 'timeline'>('board')
   const [missionSubTab, setMissionSubTab] = useState<'all' | 'running' | 'needs_input' | 'complete' | 'failed' | 'kanban'>('all')
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
+  const [isCompareMode, setIsCompareMode] = useState(false)
+  const [compareSelectionIds, setCompareSelectionIds] = useState<string[]>([])
+  const [compareRunIds, setCompareRunIds] = useState<[string, string] | null>(null)
   const [budgetLimit, setBudgetLimit] = useState('120000')
   const [, setActiveMissionBudgetLimit] = useState('')
   const [autoAssign, setAutoAssign] = useState(true)
@@ -7258,6 +7263,26 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       window.location.href = `${basePath}?${params.toString()}`
     }
 
+    function clearCompareSelection() {
+      setCompareSelectionIds([])
+      setCompareRunIds(null)
+    }
+
+    function handleCompareRunClick(runId: string) {
+      setCompareSelectionIds((prev) => {
+        const exists = prev.includes(runId)
+        let next = exists ? prev.filter((id) => id !== runId) : [...prev, runId]
+        if (next.length > 2) {
+          next = next.slice(next.length - 2)
+        }
+        setCompareRunIds(next.length === 2 ? [next[0]!, next[1]!] : null)
+        return next
+      })
+    }
+
+    const compareRunA = compareRunIds ? dedupedEntries.find((entry) => entry.id === compareRunIds[0]) : null
+    const compareRunB = compareRunIds ? dedupedEntries.find((entry) => entry.id === compareRunIds[1]) : null
+
 	    return (
 	      <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
@@ -7285,43 +7310,69 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* ── Filter Bar — scrollable on mobile, full flex on desktop ── */}
           <div className="relative w-full overflow-hidden">
-            <div className="flex w-full items-center gap-2 overflow-x-auto pr-3 scrollbar-none">
-              {filterTabs.map((tab) => {
-                const isActive = missionSubTab === tab.id
-                return (
+            <div className="flex w-full items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-3 scrollbar-none">
+                {filterTabs.map((tab) => {
+                  const isActive = missionSubTab === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setMissionSubTab(tab.id)}
+                      className={cn(
+                        HUB_FILTER_PILL_CLASS,
+                        'gap-1.5',
+                        isActive
+                          ? HUB_FILTER_PILL_ACTIVE_CLASS
+                          : '',
+                      )}
+                    >
+                      <span className="whitespace-nowrap">{tab.label}</span>
+                      {tab.count > 0 && (
+                        <span
+                          className={cn(
+                            'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
+                            isActive
+                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
+                              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300',
+                          )}
+                        >
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isCompareMode) {
+                      setIsCompareMode(false)
+                      clearCompareSelection()
+                      return
+                    }
+                    setIsCompareMode(true)
+                  }}
+                  className={cn(
+                    HUB_FILTER_PILL_CLASS,
+                    isCompareMode && HUB_FILTER_PILL_ACTIVE_CLASS,
+                  )}
+                >
+                  Compare
+                </button>
+                {isCompareMode ? (
                   <button
-                    key={tab.id}
                     type="button"
-                    onClick={() => setMissionSubTab(tab.id)}
-                    className={cn(
-                      HUB_FILTER_PILL_CLASS,
-                      'gap-1.5',
-                      isActive
-                        ? HUB_FILTER_PILL_ACTIVE_CLASS
-                        : '',
-                    )}
+                    onClick={() => clearCompareSelection()}
+                    className={HUB_FILTER_PILL_CLASS}
                   >
-                    <span className="whitespace-nowrap">{tab.label}</span>
-                    {tab.count > 0 && (
-                      <span
-                        className={cn(
-                          'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
-                          isActive
-                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
-                            : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300',
-                        )}
-                      >
-                        {tab.count}
-                      </span>
-                    )}
+                    Clear
                   </button>
-                )
-              })}
+                ) : null}
+              </div>
             </div>
-          <div
-              aria-hidden
-              className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-neutral-900"
-            />
           </div>
 
           {/* ── Compaction Banner ──────────────────────────────────────── */}
@@ -7377,11 +7428,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         className={cn(
                           'border-l-2 border-transparent px-3 py-2 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/70',
                           entry.id === selectedRunId && 'border-l-2 border-orange-500 bg-neutral-100 dark:bg-neutral-800',
+                          isCompareMode && compareSelectionIds.includes(entry.id) && 'border-l-2 border-sky-500 bg-sky-50/60 dark:bg-sky-900/20',
                         )}
                       >
                         <button
                           type="button"
-                          onClick={() => setSelectedRunId(entry.id)}
+                          onClick={() => {
+                            if (isCompareMode) {
+                              handleCompareRunClick(entry.id)
+                              return
+                            }
+                            setSelectedRunId(entry.id)
+                          }}
                           className="w-full text-left"
                         >
                           <div className="flex items-center gap-2">
@@ -7418,7 +7476,39 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               {/* Right: Console or empty state */}
               <div className="flex-1 min-w-0">
-                {selectedRunId ? (() => {
+                {isCompareMode ? (
+                  compareRunA && compareRunB ? (
+                    <RunCompare
+                      runA={{
+                        id: compareRunA.id,
+                        title: compareRunA.title,
+                        status: compareRunA.status,
+                        duration: compareRunA.duration,
+                        tokenCount: 0,
+                        costEstimate: 0,
+                        agents: compareRunA.agents,
+                        startedAt: compareRunA.startedAt,
+                      }}
+                      runB={{
+                        id: compareRunB.id,
+                        title: compareRunB.title,
+                        status: compareRunB.status,
+                        duration: compareRunB.duration,
+                        tokenCount: 0,
+                        costEstimate: 0,
+                        agents: compareRunB.agents,
+                        startedAt: compareRunB.startedAt,
+                      }}
+                      onClose={() => clearCompareSelection()}
+                    />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-3 text-neutral-400 dark:text-neutral-500">
+                      <span className="text-4xl">🆚</span>
+                      <p className="text-sm font-medium">Select 2 runs to compare</p>
+                      <p className="text-xs">{compareSelectionIds.length}/2 selected</p>
+                    </div>
+                  )
+                ) : selectedRunId ? (() => {
                   const selectedEntry = dedupedEntries.find((e) => e.id === selectedRunId)
                   if (!selectedEntry) return <div className="flex h-full items-center justify-center text-sm text-neutral-400">Run not found</div>
                   return (
@@ -7934,6 +8024,62 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {activeTab === 'kanban' && (
             <div className="h-full min-h-0 overflow-auto p-4">
+              <div className="mb-3 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const backlogAssignedTasks = missionTasks.filter((task) => {
+                      const status = task.status as string
+                      return Boolean(task.agentId) && (status === 'inbox' || status === 'backlog')
+                    })
+                    if (backlogAssignedTasks.length === 0) {
+                      toast('No assigned backlog tasks to dispatch', { type: 'error' })
+                      return
+                    }
+
+                    const tasksToDispatch = backlogAssignedTasks.filter((task) => {
+                      if (!task.agentId) return false
+                      return Boolean(agentSessionMap[task.agentId])
+                    })
+                    if (tasksToDispatch.length === 0) {
+                      toast('No assigned agents with active sessions', { type: 'error' })
+                      return
+                    }
+
+                    const dispatchedTaskIds = new Set(tasksToDispatch.map((task) => task.id))
+                    setMissionTasks((prev: HubTask[]) =>
+                      prev.map((task) =>
+                        dispatchedTaskIds.has(task.id)
+                          ? { ...task, status: 'in_progress', updatedAt: Date.now() }
+                          : task,
+                      ),
+                    )
+
+                    void Promise.allSettled(
+                      tasksToDispatch.map((task) => {
+                        const agentId = task.agentId as string
+                        const sessionKey = agentSessionMap[agentId] as string
+                        const message = `New task assigned: ${task.title}\n\nDescription: ${task.description}\n\nPriority: ${task.priority}`
+                        return sendToSession(sessionKey, message)
+                      }),
+                    ).then((results) => {
+                      const successCount = results.filter((result) => result.status === 'fulfilled').length
+                      const failureCount = results.length - successCount
+                      if (successCount > 0) {
+                        toast(`Dispatched ${successCount} tasks to agents`, { type: 'success' })
+                      }
+                      if (failureCount > 0) {
+                        toast(`${failureCount} task dispatches failed`, { type: 'error' })
+                      }
+                    }).catch(() => {
+                      toast('Failed dispatching tasks to agents', { type: 'error' })
+                    })
+                  }}
+                  className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
+                >
+                  Dispatch All
+                </button>
+              </div>
               <KanbanBoard
                 tasks={missionTasks}
                 onUpdateTask={(updatedTask: HubTask) => {
@@ -7947,6 +8093,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 agents={team.map((m) => ({ id: m.id, name: m.name }))}
                 missionId={missionId || undefined}
                 onAssignAgent={(taskId: string, agentId: string) => {
+                  const task = missionTasks.find((entry) => entry.id === taskId)
                   setMissionTasks((prev: HubTask[]) =>
                     prev.map((task) =>
                       task.id === taskId
@@ -7954,6 +8101,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         : task,
                     ),
                   )
+
+                  if (!task) return
+                  const sessionKey = agentSessionMap[agentId]
+                  if (!sessionKey) {
+                    toast('Task assigned, but agent has no active session', { type: 'error' })
+                    return
+                  }
+
+                  const message = `New task assigned: ${task.title}\n\nDescription: ${task.description}\n\nPriority: ${task.priority}`
+                  void sendToSession(sessionKey, message)
+                    .then(() => {
+                      toast('Task dispatched to agent', { type: 'success' })
+                    })
+                    .catch((error: unknown) => {
+                      toast(error instanceof Error ? error.message : 'Failed to dispatch task to agent', { type: 'error' })
+                    })
                 }}
               />
             </div>

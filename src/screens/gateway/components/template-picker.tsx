@@ -11,13 +11,64 @@ type TemplatePickerProps = {
   onClose: () => void
 }
 
+const DEMO_TEMPLATES: WorkflowTemplate[] = [
+  {
+    id: 'tpl-code-review',
+    name: 'Code Review',
+    description: 'Review codebase for bugs, performance issues, and code quality',
+    icon: '🔍',
+    goal: 'Review the codebase for bugs, performance issues, and code quality',
+    tasks: [
+      { title: 'Analyze architecture and key code paths' },
+      { title: 'Identify defects and performance bottlenecks' },
+      { title: 'Summarize prioritized findings' },
+    ],
+    createdAt: 0,
+    updatedAt: 0,
+    isBuiltIn: true,
+  },
+  {
+    id: 'tpl-feature-build',
+    name: 'Feature Build',
+    description: 'Plan and implement a new feature end-to-end',
+    icon: '🏗️',
+    goal: 'Plan, implement, test, and document the new feature',
+    tasks: [
+      { title: 'Break the feature into implementation steps' },
+      { title: 'Build and integrate the feature' },
+      { title: 'Validate behavior and document changes' },
+    ],
+    createdAt: 0,
+    updatedAt: 0,
+    isBuiltIn: true,
+  },
+  {
+    id: 'tpl-audit',
+    name: 'Security Audit',
+    description: 'Audit codebase for security risks and mitigations',
+    icon: '🛡️',
+    goal: 'Perform a security audit: check dependencies, secrets exposure, input validation',
+    tasks: [
+      { title: 'Audit dependencies and known vulnerabilities' },
+      { title: 'Scan for exposed secrets and credentials' },
+      { title: 'Review input validation and sanitization paths' },
+    ],
+    createdAt: 0,
+    updatedAt: 0,
+    isBuiltIn: true,
+  },
+]
+
 export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
   const [search, setSearch] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
 
   const templates = useMemo(() => {
     void refreshKey // Force re-read on delete
-    return getAllTemplates()
+    const allTemplates = [...DEMO_TEMPLATES, ...getAllTemplates()]
+    return allTemplates.filter((template, index, list) => (
+      list.findIndex((candidate) => candidate.id === template.id) === index
+    ))
   }, [refreshKey])
 
   const filtered = useMemo(() => {
