@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
 import { TemplatePicker } from './components/template-picker'
+import { KanbanBoard } from './components/kanban-board'
 import { saveAsTemplate, type WorkflowTemplate } from './lib/workflow-templates'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
@@ -211,12 +212,13 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
-type ActiveTab = 'overview' | 'configure' | 'missions'
+type ActiveTab = 'overview' | 'configure' | 'missions' | 'kanban'
 type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'overview', icon: '🏠', label: 'Overview' },
   { id: 'missions', icon: '🚀', label: 'Missions' },
+  { id: 'kanban', icon: '📋', label: 'Board' },
   { id: 'configure', icon: '⚙️', label: 'Configure' },
 ]
 
@@ -2897,7 +2899,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [newMissionBudgetLimit, setNewMissionBudgetLimit] = useState('120000')
   const [maximizedMissionId, setMaximizedMissionId] = useState<string | null>(null)
   const [_view, setView] = useState<'board' | 'timeline'>('board')
-  const [missionSubTab, setMissionSubTab] = useState<'all' | 'running' | 'needs_input' | 'complete' | 'failed'>('all')
+  const [missionSubTab, setMissionSubTab] = useState<'all' | 'running' | 'needs_input' | 'complete' | 'failed' | 'kanban'>('all')
   const [budgetLimit, setBudgetLimit] = useState('120000')
   const [, setActiveMissionBudgetLimit] = useState('')
   const [autoAssign, setAutoAssign] = useState(true)
@@ -6830,6 +6832,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       { id: 'needs_input', label: 'Needs Input', count: dedupedEntries.filter((e) => e.status === 'needs_input').length },
       { id: 'complete', label: 'Complete', count: dedupedEntries.filter((e) => e.status === 'complete').length },
       { id: 'failed', label: 'Failed', count: dedupedEntries.filter((e) => e.status === 'failed').length },
+      { id: 'kanban', label: '📋 Tasks', count: missionTasks.length },
     ]
 
     const STATUS_BADGE: Record<MissionListStatus, { bg: string; text: string; label: string; pulse?: boolean }> = {
@@ -6909,7 +6912,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           {/* ── Compaction Banner ──────────────────────────────────────── */}
           {renderCompactionBanner()}
 
+          {/* ── Kanban Board (Tasks tab) ──────────────────────────────── */}
+          {missionSubTab === 'kanban' ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <_TaskBoard
+                agents={team.map((m) => ({ id: m.id, name: m.name }))}
+                initialTasks={missionTasks}
+                selectedAgentId={selectedOutputAgentId}
+                activeMissionId={activeMission?.id}
+                onRef={(ref) => { taskBoardRef.current = ref }}
+                onTasksChange={(tasks) => setMissionTasks(tasks)}
+              />
+            </div>
+          ) : null}
+
           {/* ── Mission List ────────────────────────────────────────────── */}
+          {missionSubTab !== 'kanban' ? (
           <div className="min-h-0 flex-1 overflow-auto">
             {filteredEntries.length === 0 ? (
               <div className={cn('flex h-48 items-center justify-center text-center', missionCardCls)}>
@@ -7176,6 +7194,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </div>
             )}
           </div>
+          ) : null}
         </div>
       {/* ── Steer Agent Modal ────────────────────────────────────────────── */}
       {steerAgentId ? (() => {
@@ -7562,6 +7581,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           {activeTab === 'missions' && (
             <div className="h-full min-h-0">
               {renderMissionsTabContent()}
+            </div>
+          )}
+
+          {activeTab === 'kanban' && (
+            <div className="h-full min-h-0 overflow-auto p-4">
+              <KanbanBoard
+                tasks={missionTasks}
+                onUpdateTask={(updatedTask: HubTask) => {
+                  setMissionTasks((prev: HubTask[]) =>
+                    prev.map((t) => (t.id === updatedTask.id ? { ...updatedTask, updatedAt: Date.now() } : t))
+                  )
+                }}
+                onDeleteTask={(taskId: string) => {
+                  setMissionTasks((prev: HubTask[]) => prev.filter((t) => t.id !== taskId))
+                }}
+                agents={team.map((m) => ({ id: m.id, name: m.name }))}
+              />
             </div>
           )}
         </div>
