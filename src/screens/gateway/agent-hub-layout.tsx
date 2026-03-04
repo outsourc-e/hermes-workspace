@@ -21,6 +21,8 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
+import { TemplatePicker } from './components/template-picker'
+import { saveAsTemplate, type WorkflowTemplate } from './lib/workflow-templates'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
   loadMissionHistory,
@@ -2887,6 +2889,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [, setMissionBoardDrafts] = useState<MissionBoardDraft[]>([])
   const [missionBoardModalOpen, setMissionBoardModalOpen] = useState(false)
   const [missionWizardStep, setMissionWizardStep] = useState(0)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [newMissionName, setNewMissionName] = useState('')
   const [newMissionGoal, setNewMissionGoal] = useState('')
   const [newMissionTeamConfigId, setNewMissionTeamConfigId] = useState('__current__')
@@ -7656,6 +7659,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       ) : null}
 
+      {/* ── Template Picker Modal ───────────────────────────────────────── */}
+      {showTemplatePicker && (
+        <TemplatePicker
+          onSelect={(template: WorkflowTemplate) => {
+            setNewMissionName(template.name)
+            setNewMissionGoal(template.goal)
+            // Pre-populate tasks from template
+            if (template.tasks.length > 0) {
+              const templateTasks: HubTask[] = template.tasks.map((t) => ({
+                id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+                title: t.title,
+                description: t.description ?? '',
+                status: 'todo' as TaskStatus,
+                priority: 'normal' as const,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              }))
+              setMissionTasks(templateTasks)
+            }
+            setShowTemplatePicker(false)
+          }}
+          onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
+
       {/* ── New Mission Modal (global — renders on any tab) ───────────────── */}
       {missionBoardModalOpen ? (
           <div
@@ -7712,6 +7740,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {/* Step 0: Scope */}
                 {missionWizardStep === 0 ? (
                   <div className="space-y-4">
+                    {/* Template quick-start button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplatePicker(true)}
+                      className="flex w-full items-center gap-2 rounded-lg border border-dashed border-neutral-300 bg-neutral-50/50 px-3 py-2 text-xs text-neutral-600 transition-colors hover:border-sky-400 hover:bg-sky-50/50 hover:text-sky-700 dark:border-neutral-600 dark:bg-neutral-800/30 dark:text-neutral-400 dark:hover:border-sky-600 dark:hover:bg-sky-950/20 dark:hover:text-sky-400"
+                    >
+                      <span>📋</span>
+                      <span>Use a template to get started...</span>
+                    </button>
                     <label className="block">
                       <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Mission Name</span>
                       <input
@@ -8416,24 +8453,44 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 border-t border-neutral-200 dark:border-neutral-700 px-6 py-3 shrink-0">
+          <div className="flex items-center justify-between border-t border-neutral-200 dark:border-neutral-700 px-6 py-3 shrink-0">
             <button
               type="button"
               onClick={() => {
-                setCompletionReportVisible(false)
-                setSelectedReport(completionReport)
+                saveAsTemplate({
+                  name: completionReport.name || 'Untitled Mission',
+                  description: (completionReport.goal || '').slice(0, 100),
+                  icon: '📋',
+                  goal: completionReport.goal || '',
+                  tasks: completionReport.taskStats.total > 0
+                    ? (completionReport as unknown as { tasks?: Array<{ title: string }> }).tasks?.map((t) => ({ title: t.title })) ?? []
+                    : [],
+                })
+                emitFeedEvent({ type: 'mission_started', message: `Saved "${completionReport.name}" as reusable template` })
               }}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
             >
-              View in History
+              💾 Save as Template
             </button>
-            <button
-              type="button"
-              onClick={() => setCompletionReportVisible(false)}
-              className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-            >
-              Done
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCompletionReportVisible(false)
+                  setSelectedReport(completionReport)
+                }}
+                className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+              >
+                View in History
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompletionReportVisible(false)}
+                className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       </div>
