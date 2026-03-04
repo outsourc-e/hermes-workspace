@@ -2940,6 +2940,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   // ── Approvals state ────────────────────────────────────────────────────────
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(() => loadApprovals())
+  const [runConsoleApprovals, setRunConsoleApprovals] = useState<Array<{ id: string; tool: string; args?: string; agentName?: string }>>([])
   const missionStore = useMissionStore()
   const {
     activeMission,
@@ -3685,6 +3686,36 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // stable — uses setApprovals (setter is stable)
+
+  useEffect(() => {
+    if (missionState !== 'running') return
+    let cancelled = false
+
+    async function pollRunConsoleApprovals() {
+      const response = await fetchGatewayApprovals()
+      if (cancelled) return
+      const raw = response.approvals ?? response.pending ?? []
+      const mapped = raw
+        .filter((entry) => entry.id && (entry.status ?? 'pending') === 'pending')
+        .map((entry) => ({
+          id: entry.id,
+          tool: entry.tool ?? entry.action ?? 'Gateway approval',
+          args: typeof entry.input === 'string' ? entry.input : entry.input ? JSON.stringify(entry.input) : undefined,
+          agentName: entry.agentName,
+        }))
+      setRunConsoleApprovals(mapped)
+    }
+
+    void pollRunConsoleApprovals()
+    const interval = window.setInterval(() => {
+      void pollRunConsoleApprovals()
+    }, 5_000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [missionState])
 
   useEffect(() => {
     if (!wizardOpen || wizardStep !== 'gateway') return
@@ -5538,6 +5569,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       id: missionId,
       goal: trimmedGoal,
       name: launchMissionName,
+      plan: missionPlan.filter((t) => t.enabled),
       processType,
       team: teamWithRuntimeStatus.map((member) => ({ ...member })),
       tasks: createdTasks,
@@ -7369,11 +7401,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       agents={team.length > 0
                         ? team.map((m) => ({ id: m.id, name: m.name, modelId: m.modelId, status: agentSessionStatus[m.id]?.status }))
                         : selectedEntry.agents.map((name, i) => ({ id: String(i), name }))}
+                      pendingApprovals={runConsoleApprovals}
                       duration={selectedEntry.duration}
                       onClose={() => setSelectedRunId(null)}
                       onStopMission={() => stopMissionAndCleanup('aborted')}
                       onKillAgent={(agentId) => void handleKillAgent(agentId)}
                       onSteerAgent={(agentId, msg) => void handleSteerAgent(agentId, msg)}
+                      onApprove={async (id) => {
+                        await resolveGatewayApproval(id, 'approve')
+                        setRunConsoleApprovals((prev) => prev.filter((a) => a.id !== id))
+                      }}
+                      onDeny={async (id) => {
+                        await resolveGatewayApproval(id, 'deny')
+                        setRunConsoleApprovals((prev) => prev.filter((a) => a.id !== id))
+                      }}
                       sessionKeys={selectedEntry.status === 'running' || selectedEntry.status === 'needs_input' ? Object.values(agentSessionMap) : undefined}
                       agentNameMap={Object.fromEntries(Object.entries(agentSessionMap).map(([agentId, sessionKey]) => [sessionKey, team.find(m => m.id === agentId)?.name ?? agentId]))}
                     />

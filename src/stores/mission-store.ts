@@ -30,6 +30,7 @@ export type ActiveMission = {
   id: string
   goal: string
   name: string
+  plan?: Array<{ title: string; description: string; agent?: string; enabled: boolean }>
   state: MissionLifecycleState
   team: TeamMember[]
   tasks: HubTask[]
@@ -222,6 +223,7 @@ export const useMissionStore = create<MissionStore>()(
       startMission: (mission) => {
         const activeMission: ActiveMission = {
           ...mission,
+          plan: mission.plan?.map((task) => ({ ...task })),
           state: 'running',
           agentSessionMap: { ...(mission.agentSessionMap ?? {}) },
           agentSessionModelMap: { ...(mission.agentSessionModelMap ?? {}) },
