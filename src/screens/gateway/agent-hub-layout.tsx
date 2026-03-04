@@ -24,6 +24,7 @@ import { ApprovalsBell } from './components/approvals-bell'
 import { TemplatePicker } from './components/template-picker'
 import { AgentChatPanel } from './components/agent-chat-panel'
 import { CostAnalyticsDashboard } from './components/cost-analytics'
+import { RunConsole } from './components/run-console'
 import { ExportMissionButton } from './components/export-mission'
 // import { RemoteAgentsPanel } from './components/remote-agents-panel'
 import { CollaborationPresence } from './components/collaboration-presence'
@@ -1287,6 +1288,7 @@ function extractPreviewLine(lines: string[]): string {
 
   return 'Agent working...'
 }
+void extractPreviewLine
 
 /**
  * Auto-detect artifacts from agent output text.
@@ -2906,6 +2908,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [maximizedMissionId, setMaximizedMissionId] = useState<string | null>(null)
   const [_view, setView] = useState<'board' | 'timeline'>('board')
   const [missionSubTab, setMissionSubTab] = useState<'all' | 'running' | 'needs_input' | 'complete' | 'failed' | 'kanban'>('all')
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [budgetLimit, setBudgetLimit] = useState('120000')
   const [, setActiveMissionBudgetLimit] = useState('')
   const [autoAssign, setAutoAssign] = useState(true)
@@ -3184,6 +3187,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionActive,
     setMissionTasks,
   ])
+  void stopMissionAndCleanup
 
   // Live template suggestion based on current mission goal input
   const suggestedTemplateName = useMemo(() => {
@@ -6735,7 +6739,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const currentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
     const missionTasksForBoard = missionTasks.length > 0 ? missionTasks : boardTasks
     const runningTaskStats = computeMissionTaskStats(missionTasksForBoard)
-    const runningProgressPct = runningTaskStats.total > 0 ? Math.round((runningTaskStats.completed / runningTaskStats.total) * 100) : 0
     const missionTeamOptions = [
       { id: '__current__', label: currentTeamLabel, team },
       ...teamConfigs.map((config) => ({
@@ -6845,14 +6848,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       { id: 'kanban', label: '📋 Tasks', count: missionTasks.length },
     ]
 
-    const STATUS_BADGE: Record<MissionListStatus, { bg: string; text: string; label: string; pulse?: boolean }> = {
-      running: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', label: 'Running', pulse: true },
-      needs_input: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', label: 'Needs Input', pulse: true },
-      complete: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', label: 'Complete' },
-      failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: 'Failed' },
+    const STATUS_DOT: Record<MissionListStatus, string> = {
+      running: 'bg-emerald-500 animate-pulse',
+      needs_input: 'bg-amber-500',
+      complete: 'bg-sky-500',
+      failed: 'bg-red-500',
     }
 
-	    const missionCardCls = 'relative overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-800 px-4 py-3'
 	    return (
 	      <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
@@ -6913,7 +6915,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 )
               })}
             </div>
-            <div
+          <div
               aria-hidden
               className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-neutral-900"
             />
@@ -6936,288 +6938,85 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           ) : null}
 
-          {/* ── Mission List ────────────────────────────────────────────── */}
+          {/* ── Split View: Run List + Console ─────────────────────────── */}
           {missionSubTab !== 'kanban' ? (
-          <div className="min-h-0 flex-1 overflow-auto">
-            {filteredEntries.length === 0 ? (
-              <div className={cn('flex h-48 items-center justify-center text-center', missionCardCls)}>
-                <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                <div className="max-w-md">
-                  <span className="text-3xl">{missionSubTab === 'all' ? '🚀' : missionSubTab === 'running' ? '⏳' : missionSubTab === 'needs_input' ? '💬' : missionSubTab === 'complete' ? '✅' : '❌'}</span>
-                  <p className="mt-2 text-sm font-medium text-neutral-600 dark:text-neutral-400">
-                    {missionSubTab === 'all'
-                      ? 'No active missions — launch one with New Mission ↑'
-                      : missionSubTab === 'running'
-                        ? 'No missions running right now'
-                        : missionSubTab === 'needs_input'
-                          ? 'No missions waiting for input'
-                          : missionSubTab === 'complete'
-                            ? 'No completed missions yet — finish your first one!'
-                            : 'No failed missions — nice!'}
-                  </p>
-                  {missionSubTab === 'all' && (
-                    <button
-                      type="button"
-                      onClick={() => openNewMissionModal()}
-                    className={cn('mt-3', HUB_PRIMARY_BUTTON_CLASS)}
-                    >
-                      + New Mission
-                    </button>
-                  )}
-                </div>
+            <div className="flex min-h-0 flex-1 gap-0">
+              {/* Left: Run List */}
+              <div className="w-80 shrink-0 overflow-y-auto border-r border-neutral-200 dark:border-neutral-700 lg:w-96">
+                {filteredEntries.length === 0 ? (
+                  <div className="flex h-full min-h-48 flex-col items-center justify-center gap-2 px-4 text-center">
+                    <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                      {missionSubTab === 'all'
+                        ? 'No active missions'
+                        : missionSubTab === 'running'
+                          ? 'No missions running right now'
+                          : missionSubTab === 'needs_input'
+                            ? 'No missions waiting for input'
+                            : missionSubTab === 'complete'
+                              ? 'No completed missions yet'
+                              : 'No failed missions'}
+                    </p>
+                    {missionSubTab === 'all' ? (
+                      <button
+                        type="button"
+                        onClick={() => openNewMissionModal()}
+                        className={HUB_PRIMARY_BUTTON_CLASS}
+                      >
+                        + New Mission
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    {filteredEntries.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        onClick={() => setSelectedRunId(entry.id)}
+                        className={cn(
+                          'w-full border-l-2 border-transparent px-3 py-2 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/70',
+                          entry.id === selectedRunId && 'border-l-2 border-orange-500 bg-neutral-100 dark:bg-neutral-800',
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={cn('h-2 w-2 shrink-0 rounded-full', STATUS_DOT[entry.status])} />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{entry.title}</span>
+                          <span className="shrink-0 text-[10px] tabular-nums text-neutral-500 dark:text-neutral-400">{entry.duration}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                          <span>{entry.agents.length} agent{entry.agents.length !== 1 ? 's' : ''}</span>
+                          <span className="truncate">{timeAgoFromMs(entry.startedAt)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredEntries.map((entry) => {
-                  const badge = STATUS_BADGE[entry.status]
-                  const isLive = entry.status === 'running' || entry.status === 'needs_input'
+
+              {/* Right: Console or empty state */}
+              <div className="flex-1 min-w-0">
+                {selectedRunId ? (() => {
+                  const selectedEntry = dedupedEntries.find((e) => e.id === selectedRunId)
+                  if (!selectedEntry) return <div className="flex h-full items-center justify-center text-sm text-neutral-400">Run not found</div>
                   return (
-                    <article
-                      key={entry.id}
-                      className={cn(
-                        missionCardCls,
-                        'cursor-pointer transition-all hover:shadow-md',
-                        entry.status === 'running' && 'ring-2 ring-blue-400/40 dark:ring-blue-500/30 border-blue-200 dark:border-blue-800/50 bg-blue-50/30 dark:bg-blue-950/20',
-                        entry.status === 'needs_input' && 'ring-2 ring-amber-400/50 dark:ring-amber-500/30 border-amber-200 dark:border-amber-800/50',
-                        entry.status === 'complete' && 'hover:border-emerald-300 dark:hover:border-emerald-700',
-                        entry.status === 'failed' && 'hover:border-red-300 dark:hover:border-red-700',
-                        entry.report && 'hover:border-accent-300 dark:hover:border-accent-700',
-                      )}
-                      onClick={() => {
-                        if (isLive) {
-                          // For running/needs_input: expand agent output panel
-                          setOutputPanelVisible(true)
-                          if (!selectedOutputAgentId && team.length > 0) {
-                            setSelectedOutputAgentId(team[0].id)
-                          }
-                        } else if (entry.report) {
-                          setSelectedReport(entry.report)
-                        }
-                      }}
-                    >
-                      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                      <div className="flex items-center gap-3">
-                        {/* Status Badge */}
-                        <span className={cn(
-                          'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
-                          badge.bg, badge.text,
-                          badge.pulse && 'animate-pulse',
-                        )}>
-                          {badge.label}
-                        </span>
-
-                        {/* Mission Title + Goal + Short ID */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{entry.title}</p>
-                            {/* Short ID hidden on mobile */}
-                            <span className="hidden sm:inline shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-mono text-neutral-400 dark:text-neutral-500">
-                              #{entry.id.slice(-6)}
-                            </span>
-                          </div>
-                          {/* Goal subtitle hidden on mobile */}
-                          {entry.goal !== entry.title && (
-                            <p className="hidden sm:block mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 truncate">{entry.goal}</p>
-                          )}
-                        </div>
-
-                        {/* Agent count + avatars — hidden on mobile */}
-                        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
-                          <div className="flex -space-x-1.5">
-                            {entry.agents.slice(0, 3).map((name, idx) => {
-                              const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-                              return (
-                                <div key={`${entry.id}-agent-${idx}`} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-800 dark:bg-neutral-700 text-[8px] font-bold text-white" title={name}>
-                                  {initials}
-                                </div>
-                              )
-                            })}
-                            {entry.agents.length > 3 && (
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-300 dark:bg-neutral-600 text-[8px] font-bold text-neutral-700 dark:text-neutral-300">
-                                +{entry.agents.length - 3}
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 tabular-nums">{entry.agents.length} agent{entry.agents.length !== 1 ? 's' : ''}</span>
-                        </div>
-
-                        {/* Duration — always shown but smaller on mobile */}
-                        <span className="shrink-0 text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{entry.duration}</span>
-
-                        {/* Started At — hidden on mobile */}
-                        <span className="hidden md:block shrink-0 text-xs text-neutral-400 dark:text-neutral-500">{timeAgoFromMs(entry.startedAt)}</span>
-
-                        {/* Action */}
-                        <div className="shrink-0">
-                          {isLive ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setOutputPanelVisible(true)
-                                if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
-                              }}
-                              className={HUB_SECONDARY_BUTTON_CLASS}
-                            >
-                              <span className="hidden sm:inline">Live Output ↗</span>
-                              <span className="sm:hidden">Live ↗</span>
-                            </button>
-                          ) : entry.report ? (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setSelectedReport(entry.report!) }}
-                              className={HUB_SECONDARY_BUTTON_CLASS}
-                            >
-                              <span className="hidden sm:inline">View Report</span>
-                              <span className="sm:hidden">View</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal }) }}
-                              className={HUB_SECONDARY_BUTTON_CLASS}
-                            >
-                              Re-run
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* ── Inline expansion for running/needs_input missions ── */}
-                      {isLive && (
-                        <div className="mt-3 space-y-3 border-t border-neutral-100 dark:border-neutral-800 pt-3">
-                          {/* Progress bar — prominent */}
-                          <div className="flex items-center gap-3">
-                            <div className="h-2.5 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
-                              <div className="h-2.5 rounded-full bg-accent-500 transition-all duration-500 ease-out" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
-                            </div>
-                            <span className="shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300 tabular-nums">{runningProgressPct}%</span>
-                            <span className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{runningTaskStats.completed}/{runningTaskStats.total}</span>
-                          </div>
-
-                          {/* Agent status rows */}
-                          <div className="divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50">
-                            {agentWorkingRows.map((row) => {
-                              const statusMeta = getAgentStatusMeta(row.status)
-                              const lastOutput = extractPreviewLine(agentOutputLines[row.id] ?? [])
-                              const canSteer = row.status === 'active' || row.status === 'waiting_for_input'
-                              return (
-                                <div key={row.id} className="flex items-center gap-2 px-3 py-2">
-                                  <span className={cn('size-2 shrink-0 rounded-full', statusMeta.dotClassName, statusMeta.pulse && 'animate-pulse')} />
-                                  <span className="text-xs font-semibold text-neutral-900 dark:text-white shrink-0">{row.name}</span>
-                                  <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', statusMeta.className)}>
-                                    {statusMeta.label}
-                                  </span>
-                                  {retryingAgents[row.id] ? (
-                                    <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
-                                      Retrying...
-                                    </span>
-                                  ) : null}
-                                  {lastOutput !== 'Agent working...' ? (
-                                    <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[200px] font-mono">{lastOutput}</span>
-                                  ) : (agentOutputLines[row.id]?.length ?? 0) > 0 ? (
-                                    <span className="ml-auto truncate text-[10px] text-neutral-500 max-w-[200px] font-mono italic">{lastOutput}</span>
-                                  ) : null}
-                                  {/* Per-agent Steer button */}
-                                  {canSteer && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSteerAgentId(row.id)
-                                        setSteerInput('')
-                                      }}
-                                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors"
-                                      title={`Send directive to ${row.name}`}
-                                    >
-                                      ✦ Steer
-                                    </button>
-                                  )}
-                                  {/* Per-agent Chat button */}
-                                  {agentSessionMap[row.id] && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setChatAgentId(row.id)
-                                      }}
-                                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800/50 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors"
-                                      title={`Chat with ${row.name}`}
-                                    >
-                                      💬 Chat
-                                    </button>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-
-                          {/* Warden controls — single source of truth for mission actions */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); void handleMissionPause(false) }}
-                              disabled={missionState === 'running'}
-                              className="min-h-11 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-40"
-                            >
-                              ▶ Resume
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); void handleMissionPause(true) }}
-                              disabled={missionState === 'paused'}
-                              className="min-h-11 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-40"
-                            >
-                              ⏸ Pause
-                            </button>
-                            {/* Steer button — opens inline input for sending a directive to the first active/waiting agent */}
-                            {(missionState === 'running' || agentWorkingRows.some((r) => r.status === 'waiting_for_input')) && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // Pick first active or waiting_for_input agent
-                                  const targetAgent = agentWorkingRows.find((r) => r.status === 'waiting_for_input' || r.status === 'active')
-                                  if (targetAgent) {
-                                    setSteerAgentId(targetAgent.id)
-                                    setSteerInput('')
-                                  } else {
-                                    toast('No active agent to steer', { type: 'warning' })
-                                  }
-                                }}
-                                className="min-h-11 rounded-md bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-600"
-                              >
-                                ✦ Steer
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); stopMissionAndCleanup('aborted') }}
-                              className="min-h-11 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700"
-                            >
-                              ■ Stop
-                            </button>
-                            <div className="flex-1" />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setOutputPanelVisible(true)
-                                if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
-                              }}
-                              className={HUB_SECONDARY_BUTTON_CLASS}
-                            >
-                              Live Output ↗
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </article>
+                    <RunConsole
+                      runId={selectedEntry.id}
+                      runTitle={selectedEntry.title}
+                      runStatus={selectedEntry.status}
+                      agents={selectedEntry.agents.map((name, i) => ({ id: String(i), name }))}
+                      duration={selectedEntry.duration}
+                      onClose={() => setSelectedRunId(null)}
+                    />
                   )
-                })}
+                })() : (
+                  <div className="flex h-full flex-col items-center justify-center gap-3 text-neutral-400 dark:text-neutral-500">
+                    <span className="text-4xl">▶️</span>
+                    <p className="text-sm font-medium">Select a run to view console</p>
+                    <p className="text-xs">Or launch a new mission above</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
           ) : null}
         </div>
       {/* ── Steer Agent Modal ────────────────────────────────────────────── */}
