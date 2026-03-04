@@ -5914,7 +5914,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </section>
 
           {/* ── Remote Agents ────────────────────────────────────────────── */}
-          <section className="mt-6">
+          <section className="relative mx-auto mb-4 w-full max-w-[1600px] shrink-0 px-3 sm:px-4">
             <RemoteAgentsPanel localSessionKeys={Object.values(agentSessionMap)} />
           </section>
       </div>
