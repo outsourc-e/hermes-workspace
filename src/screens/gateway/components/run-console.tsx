@@ -21,6 +21,7 @@ type RunConsoleProps = {
 }
 
 type ConsoleTab = 'stream' | 'timeline' | 'artifacts' | 'report'
+type StreamView = 'combined' | 'lanes'
 
 type MockStreamEvent = {
   id: string
@@ -105,6 +106,7 @@ export function RunConsole({
   onClose,
 }: RunConsoleProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('stream')
+  const [streamView, setStreamView] = useState<StreamView>('combined')
 
   const resolvedDuration = duration || formatDuration(startedAt) || '0s'
   const resolvedTokens = typeof tokenCount === 'number' ? tokenCount.toLocaleString() : '0'
@@ -141,6 +143,19 @@ export function RunConsole({
       },
     ]
   }, [agents, runId, runStatus])
+
+  const eventsByAgent = useMemo(() => {
+    const grouped = new Map<string, MockStreamEvent[]>()
+    for (const event of mockEvents) {
+      const existing = grouped.get(event.agentName)
+      if (existing) {
+        existing.push(event)
+      } else {
+        grouped.set(event.agentName, [event])
+      }
+    }
+    return Array.from(grouped.entries()).map(([agentName, events]) => ({ agentName, events }))
+  }, [mockEvents])
 
   return (
     <section className="flex h-full flex-col overflow-hidden bg-[var(--theme-bg,#0b0e14)] text-primary-100 dark:bg-slate-900">
@@ -217,31 +232,161 @@ export function RunConsole({
       <div className="flex-1 overflow-auto px-4 py-4 sm:px-5">
         {activeTab === 'stream' ? (
           <div className="space-y-3 font-mono text-xs">
-            <p className="text-sm font-medium text-primary-200">
-              Live event stream will appear here
-            </p>
-            <ol className="space-y-2">
-              {mockEvents.map((event) => (
-                <li
-                  key={event.id}
-                  className="rounded-lg border border-primary-800/80 bg-primary-950/60 px-3 py-2"
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-primary-200">Live event stream will appear here</p>
+              <div className="inline-flex items-center rounded-md border border-primary-700 bg-primary-900/60 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setStreamView('combined')}
+                  className={cn(
+                    'rounded px-2 py-1 text-xs transition-colors',
+                    streamView === 'combined'
+                      ? 'bg-primary-800 text-primary-100'
+                      : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
+                  )}
                 >
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-primary-400">[{event.timestamp}]</span>
-                    <span className="text-primary-200">{event.agentName}</span>
-                    <span
-                      className={cn(
-                        'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase',
-                        EVENT_STYLES[event.eventType],
-                      )}
-                    >
-                      {event.eventType}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-primary-300">{event.message}</p>
-                </li>
-              ))}
-            </ol>
+                  Combined
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStreamView('lanes')}
+                  className={cn(
+                    'rounded px-2 py-1 text-xs transition-colors',
+                    streamView === 'lanes'
+                      ? 'bg-primary-800 text-primary-100'
+                      : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
+                  )}
+                >
+                  Lanes
+                </button>
+              </div>
+            </div>
+
+            {streamView === 'combined' ? (
+              <ol className="space-y-2">
+                {mockEvents.map((event) => (
+                  <li
+                    key={event.id}
+                    className="rounded-lg border border-primary-800/80 bg-primary-950/60 px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-primary-400">[{event.timestamp}]</span>
+                      <span className="text-primary-200">{event.agentName}</span>
+                      <span
+                        className={cn(
+                          'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase',
+                          EVENT_STYLES[event.eventType],
+                        )}
+                      >
+                        {event.eventType}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-primary-300">{event.message}</p>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+
+            {streamView === 'lanes' ? (
+              eventsByAgent.length >= 3 ? (
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {eventsByAgent.map((lane) => {
+                    const latestEvent = lane.events[lane.events.length - 1]
+                    const laneDotClass =
+                      latestEvent?.eventType === 'error'
+                        ? 'bg-red-400'
+                        : latestEvent?.eventType === 'tool'
+                          ? 'bg-amber-400'
+                          : latestEvent?.eventType === 'output'
+                            ? 'bg-sky-400'
+                            : 'bg-emerald-400'
+                    return (
+                      <section
+                        key={lane.agentName}
+                        className="min-w-[240px] shrink-0 rounded-lg border border-primary-800/80 bg-primary-950/60 p-3"
+                      >
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className={cn('h-2 w-2 rounded-full', laneDotClass)} />
+                          <h3 className="text-xs font-semibold text-primary-100">{lane.agentName}</h3>
+                        </div>
+                        <ol className="space-y-2">
+                          {lane.events.map((event) => (
+                            <li
+                              key={event.id}
+                              className="rounded-md border border-primary-800/80 bg-primary-900/60 px-2 py-1.5"
+                            >
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="text-primary-400">[{event.timestamp}]</span>
+                                <span
+                                  className={cn(
+                                    'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase',
+                                    EVENT_STYLES[event.eventType],
+                                  )}
+                                >
+                                  {event.eventType}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-primary-300">{event.message}</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </section>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    'grid gap-3',
+                    eventsByAgent.length === 2 ? 'grid-cols-2' : 'grid-cols-1',
+                  )}
+                >
+                  {eventsByAgent.map((lane) => {
+                    const latestEvent = lane.events[lane.events.length - 1]
+                    const laneDotClass =
+                      latestEvent?.eventType === 'error'
+                        ? 'bg-red-400'
+                        : latestEvent?.eventType === 'tool'
+                          ? 'bg-amber-400'
+                          : latestEvent?.eventType === 'output'
+                            ? 'bg-sky-400'
+                            : 'bg-emerald-400'
+                    return (
+                      <section
+                        key={lane.agentName}
+                        className="rounded-lg border border-primary-800/80 bg-primary-950/60 p-3"
+                      >
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className={cn('h-2 w-2 rounded-full', laneDotClass)} />
+                          <h3 className="text-xs font-semibold text-primary-100">{lane.agentName}</h3>
+                        </div>
+                        <ol className="space-y-2">
+                          {lane.events.map((event) => (
+                            <li
+                              key={event.id}
+                              className="rounded-md border border-primary-800/80 bg-primary-900/60 px-2 py-1.5"
+                            >
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="text-primary-400">[{event.timestamp}]</span>
+                                <span
+                                  className={cn(
+                                    'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase',
+                                    EVENT_STYLES[event.eventType],
+                                  )}
+                                >
+                                  {event.eventType}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-primary-300">{event.message}</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </section>
+                    )
+                  })}
+                </div>
+              )
+            ) : null}
           </div>
         ) : null}
 
