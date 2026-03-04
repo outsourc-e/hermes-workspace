@@ -20,7 +20,16 @@ import {
 import { useTaskStore } from '@/stores/task-store'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
+import {
+  steerAgent,
+  toggleAgentPause,
+  fetchGatewayApprovals,
+  resolveGatewayApproval,
+  killAgentSession,
+  fetchModels,
+  fetchSessions,
+  type GatewayModelCatalogEntry,
+} from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
 import { TemplatePicker } from './components/template-picker'
 import { AgentChatPanel } from './components/agent-chat-panel'
@@ -101,6 +110,47 @@ type GatewayModelEntry = {
 type GatewayModelsResponse = {
   ok?: boolean
   models?: GatewayModelEntry[]
+}
+
+type DetectedGatewayAgent = {
+  id: string
+  name: string
+  model: string
+  status: string
+  sessionKey: string
+}
+
+function readGatewayModelId(entry: GatewayModelCatalogEntry): string {
+  if (typeof entry === 'string') return entry.trim()
+  const alias = typeof entry.alias === 'string' ? entry.alias.trim() : ''
+  if (alias) return alias
+  const id = typeof entry.id === 'string' ? entry.id.trim() : ''
+  if (id) return id
+  const provider = typeof entry.provider === 'string' ? entry.provider.trim() : ''
+  const model = typeof entry.model === 'string' ? entry.model.trim() : ''
+  if (provider && model) return `${provider}/${model}`
+  if (model) return model
+  const name = typeof entry.name === 'string' ? entry.name.trim() : ''
+  if (name) return name
+  const label = typeof entry.label === 'string' ? entry.label.trim() : ''
+  if (label) return label
+  const displayName = typeof entry.displayName === 'string' ? entry.displayName.trim() : ''
+  return displayName
+}
+
+function buildDetectedAgentName(
+  session: Record<string, unknown>,
+  fallbackIndex: number,
+): string {
+  const label = typeof session.label === 'string' ? session.label.trim() : ''
+  if (label) return label
+  const title = typeof session.title === 'string' ? session.title.trim() : ''
+  if (title) return title
+  const derivedTitle = typeof session.derivedTitle === 'string' ? session.derivedTitle.trim() : ''
+  if (derivedTitle) return derivedTitle
+  const friendlyId = typeof session.friendlyId === 'string' ? session.friendlyId.trim() : ''
+  if (friendlyId) return friendlyId
+  return `Detected Agent ${fallbackIndex + 1}`
 }
 
 function resolveGatewayModelId(modelId: string): string {
@@ -1790,6 +1840,46 @@ function getAgentAvatarForSlot(index: number): number {
   return normalizeAgentAvatarIndex(index, 0)
 }
 
+const STARTER_TEAM_SPECS: Array<{
+  name: string
+  roleDescription: string
+  modelId: string
+}> = [
+  {
+    name: 'Builder',
+    roleDescription: 'Implements features and ships production-ready code changes.',
+    modelId: 'codex',
+  },
+  {
+    name: 'Researcher',
+    roleDescription: 'Finds references, verifies assumptions, and gathers technical context.',
+    modelId: 'sonnet',
+  },
+  {
+    name: 'Reviewer',
+    roleDescription: 'Reviews changes for correctness, quality, and maintainability.',
+    modelId: 'opus',
+  },
+  {
+    name: 'Runner',
+    roleDescription: 'Executes checks, validates outputs, and reports runtime results.',
+    modelId: 'flash',
+  },
+]
+
+function buildStarterTeam(memberCount = STARTER_TEAM_SPECS.length): TeamMember[] {
+  return STARTER_TEAM_SPECS.slice(0, memberCount).map((entry, index) => ({
+    id: createMemberId(),
+    name: entry.name,
+    avatar: getAgentAvatarForSlot(index),
+    modelId: entry.modelId,
+    roleDescription: entry.roleDescription,
+    goal: '',
+    backstory: '',
+    status: 'available',
+  }))
+}
+
 function resolveAgentAvatarIndex(member: unknown, index: number): number {
   const row = member && typeof member === 'object' && !Array.isArray(member)
     ? (member as Record<string, unknown>)
@@ -2908,6 +2998,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionBoardModalOpen, setMissionBoardModalOpen] = useState(false)
   const [missionWizardStep, setMissionWizardStep] = useState(0)
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [detectedAgentsOpen, setDetectedAgentsOpen] = useState(false)
+  const [detectedAgentsLoading, setDetectedAgentsLoading] = useState(false)
+  const [detectedAgentsError, setDetectedAgentsError] = useState<string | null>(null)
+  const [detectedAgents, setDetectedAgents] = useState<DetectedGatewayAgent[]>([])
   const [newMissionName, setNewMissionName] = useState('')
   const [newMissionGoal, setNewMissionGoal] = useState('')
   const [missionPlan, setMissionPlan] = useState<MissionPlanItem[]>([])
@@ -5311,6 +5405,71 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     })
   }
 
+  const handleDetectFromGateway = useCallback(async () => {
+    setDetectedAgentsOpen(true)
+    setDetectedAgentsLoading(true)
+    setDetectedAgentsError(null)
+
+    try {
+      const [modelsPayload, sessionsPayload] = await Promise.all([
+        fetchModels(),
+        fetchSessions(),
+      ])
+      const modelIds = new Set(
+        (Array.isArray(modelsPayload.models) ? modelsPayload.models : [])
+          .map((entry) => readGatewayModelId(entry))
+          .filter((value) => value.length > 0),
+      )
+      const fallbackModel = modelIds.values().next().value ?? ''
+      const sessions = Array.isArray(sessionsPayload.sessions) ? sessionsPayload.sessions : []
+
+      const nextDetected = sessions.map((session, index) => {
+        const row = session as Record<string, unknown>
+        const sessionKey = typeof row.key === 'string' ? row.key : `session-${index + 1}`
+        const modelFromSession = typeof row.model === 'string' ? row.model.trim() : ''
+        const model = modelFromSession || fallbackModel || 'Unknown model'
+        const status = typeof row.status === 'string' && row.status.trim()
+          ? row.status.trim()
+          : 'unknown'
+        return {
+          id: `${sessionKey}-${index}`,
+          name: buildDetectedAgentName(row, index),
+          model,
+          status,
+          sessionKey,
+        }
+      })
+
+      setDetectedAgents(nextDetected)
+      if (nextDetected.length === 0) {
+        toast('No active gateway sessions detected', { type: 'warning' })
+      }
+    } catch (error) {
+      setDetectedAgents([])
+      setDetectedAgentsError(
+        error instanceof Error ? error.message : 'Failed to detect agents from gateway',
+      )
+    } finally {
+      setDetectedAgentsLoading(false)
+    }
+  }, [])
+
+  const handleImportDetectedAgent = useCallback((agent: DetectedGatewayAgent) => {
+    window.console.log('[AgentDiscovery] import requested', agent)
+    toast(`Import requested for ${agent.name}`, { type: 'success' })
+  }, [])
+
+  const handleCreateStarterTeam = useCallback(() => {
+    if (!window.confirm('Create starter team with Builder, Researcher, Reviewer, and Runner?')) {
+      return
+    }
+    setTeam(buildStarterTeam())
+    setSelectedTeamConfigId('')
+    setSelectedAgentId(undefined)
+    setSelectedOutputAgentId(undefined)
+    toast('Starter team created', { type: 'success' })
+  }, [])
+
   function handleAutoConfigure() {
     const trimmedGoal = missionGoal.trim()
     if (!trimmedGoal) return
@@ -6136,6 +6295,81 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     Edit agent identity, model, role description, and system prompt.
                   </p>
                 </div>
+              </div>
+              <div className="relative flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDetectFromGateway}
+                  disabled={detectedAgentsLoading}
+                  className={cn(
+                    HUB_SECONDARY_BUTTON_CLASS,
+                    'min-h-10 px-3 py-2 text-xs',
+                    detectedAgentsLoading && 'cursor-not-allowed opacity-60',
+                  )}
+                >
+                  {detectedAgentsLoading ? 'Detecting…' : '🔍 Detect from Gateway'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateStarterTeam}
+                  className={cn(HUB_SECONDARY_BUTTON_CLASS, 'min-h-10 px-3 py-2 text-xs')}
+                >
+                  ⚡ Create Starter Team
+                </button>
+
+                {detectedAgentsOpen ? (
+                  <div className="absolute left-0 top-full z-20 mt-2 w-full max-w-xl rounded-xl border border-primary-200 bg-primary-50/95 p-3 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+                        Detected Gateway Agents
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setDetectedAgentsOpen(false)}
+                        className="rounded-md px-2 py-1 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    {detectedAgentsError ? (
+                      <p className="text-xs text-red-500">{detectedAgentsError}</p>
+                    ) : null}
+
+                    {!detectedAgentsLoading && !detectedAgentsError && detectedAgents.length === 0 ? (
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                        No active sessions detected.
+                      </p>
+                    ) : null}
+
+                    {detectedAgents.length > 0 ? (
+                      <div className="space-y-2">
+                        {detectedAgents.map((agent) => (
+                          <div
+                            key={agent.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary-200 bg-white/80 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-800/70"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100">
+                                {agent.name}
+                              </p>
+                              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                {agent.model} · {agent.status}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleImportDetectedAgent(agent)}
+                              className={cn(HUB_SECONDARY_BUTTON_CLASS, 'min-h-9 px-2.5 py-1 text-[11px]')}
+                            >
+                              Import
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               {/* Mobile: compact list, Desktop: card grid */}
