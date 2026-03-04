@@ -569,13 +569,13 @@ function ChatSidebarComponent({
     '/debug',
     '/files',
     '/memory',
+    '/costs',
   ]
   const gatewayRoutes = [
     '/channels',
     '/instances',
     '/sessions',
     '/usage',
-    '/costs',
     '/agents',
     '/nodes',
   ]
@@ -853,6 +853,13 @@ function ChatSidebarComponent({
       label: 'Memory',
       active: isMemoryActive,
     },
+    {
+      kind: 'link',
+      to: '/costs',
+      icon: ChartLineData02Icon,
+      label: 'Cost & Usage',
+      active: isCostsActive,
+    },
   ]
 
   const gatewayItems: NavItemDef[] = [
@@ -883,13 +890,6 @@ function ChatSidebarComponent({
       icon: ChartLineData01Icon,
       label: 'Usage',
       active: isUsageActive,
-    },
-    {
-      kind: 'link',
-      to: '/costs',
-      icon: ChartLineData02Icon,
-      label: 'Costs',
-      active: isCostsActive,
     },
     {
       kind: 'link',
