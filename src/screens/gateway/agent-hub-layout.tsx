@@ -25,7 +25,7 @@ import { TemplatePicker } from './components/template-picker'
 import { AgentChatPanel } from './components/agent-chat-panel'
 import { CostAnalyticsDashboard } from './components/cost-analytics'
 import { ExportMissionButton } from './components/export-mission'
-import { RemoteAgentsPanel } from './components/remote-agents-panel'
+// import { RemoteAgentsPanel } from './components/remote-agents-panel'
 import { CollaborationPresence } from './components/collaboration-presence'
 import { KanbanBoard } from './components/kanban-board'
 import { saveAsTemplate, type WorkflowTemplate } from './lib/workflow-templates'
@@ -5913,10 +5913,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           </section>
 
-          {/* ── Remote Agents ────────────────────────────────────────────── */}
-          <section className="relative mx-auto mb-4 w-full max-w-[1600px] shrink-0 px-3 sm:px-4">
-            <RemoteAgentsPanel localSessionKeys={Object.values(agentSessionMap)} />
-          </section>
+          {/* Remote Agents Panel removed from overview — too noisy with 29+ sessions.
+              Available as a dedicated section if we add a "Sessions" tab later. */}
       </div>
     )
   }
