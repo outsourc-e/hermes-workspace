@@ -585,6 +585,33 @@ function toTitleCase(value: string): string {
     .join(' ')
 }
 
+/**
+ * Fetch the actual chat history for an agent session and extract assistant messages.
+ * Returns cleaned markdown lines from the agent's final responses — NOT raw SSE chunks.
+ */
+async function fetchAgentFinalOutput(sessionKey: string): Promise<string[]> {
+  try {
+    const response = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=100`)
+    if (!response.ok) return []
+    const data = await response.json() as { messages?: Array<{ role?: string; text?: string; content?: string }> }
+    const messages = Array.isArray(data.messages) ? data.messages : []
+    // Extract assistant messages (the actual formatted responses)
+    const assistantMessages = messages
+      .filter((m) => m.role === 'assistant')
+      .map((m) => {
+        const text = m.text || m.content || ''
+        return typeof text === 'string' ? text.trim() : ''
+      })
+      .filter((t) => t.length > 0)
+    // Return the last assistant message split into lines (the final report)
+    // If multiple assistant messages, join the last 3 (covers multi-turn research)
+    const relevant = assistantMessages.slice(-3)
+    return relevant.flatMap((msg) => msg.split('\n'))
+  } catch {
+    return []
+  }
+}
+
 function createMemberId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -4578,30 +4605,48 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const previous = prevMissionStateRef.current
     if (previous === 'running' && missionState === 'stopped') {
       const snapshot = missionCompletionSnapshotRef.current
+      // Capture agentSessionMap before it gets cleared by stopMissionAndCleanup
+      const sessionMapSnapshot = { ...agentSessionMap }
       if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
-        // Auto-detect artifacts from agent output before generating report
-        const autoDetected: MissionArtifact[] = []
-        const existingTitles = new Set(snapshot.artifacts.map((a) => a.title.toLowerCase()))
-        snapshot.agentSummaries.forEach((summary) => {
-          const cleanedLines = cleanAgentOutputLines(summary.lines)
-          detectArtifactsFromText({
-            agentId: summary.agentId,
-            agentName: summary.agentName,
-            lines: cleanedLines,
-          }).forEach((a) => {
-            if (!existingTitles.has(a.title.toLowerCase())) {
-              existingTitles.add(a.title.toLowerCase())
-              autoDetected.push(a)
-            }
-          })
-        })
-        const allArtifacts = [...snapshot.artifacts, ...autoDetected]
+        // Enrich agent summaries with actual chat history (not raw SSE chunks)
+        const enrichAndReport = async () => {
+          // Fetch real chat history for each agent to get their actual formatted responses
+          const enrichedSummaries = await Promise.all(
+            snapshot.agentSummaries.map(async (summary) => {
+              const sessionKey = sessionMapSnapshot[summary.agentId]
+              if (!sessionKey) return summary
+              const historyLines = await fetchAgentFinalOutput(sessionKey)
+              if (historyLines.length > 0) {
+                return { ...summary, lines: historyLines }
+              }
+              return summary
+            }),
+          )
+          const enrichedSnapshot = { ...snapshot, agentSummaries: enrichedSummaries }
 
-        const reportText = generateMissionReport(snapshot)
-        const taskStats = computeMissionTaskStats(snapshot.tasks)
-        const duration = Math.max(0, snapshot.completedAt - snapshot.startedAt)
-        const costEstimate = estimateMissionCost(snapshot.tokenCount)
-        const record: StoredMissionReport = {
+          // Auto-detect artifacts from agent output before generating report
+          const autoDetected: MissionArtifact[] = []
+          const existingTitles = new Set(enrichedSnapshot.artifacts.map((a) => a.title.toLowerCase()))
+          enrichedSnapshot.agentSummaries.forEach((summary) => {
+            const cleanedLines = cleanAgentOutputLines(summary.lines)
+            detectArtifactsFromText({
+              agentId: summary.agentId,
+              agentName: summary.agentName,
+              lines: cleanedLines,
+            }).forEach((a) => {
+              if (!existingTitles.has(a.title.toLowerCase())) {
+                existingTitles.add(a.title.toLowerCase())
+                autoDetected.push(a)
+              }
+            })
+          })
+          const allArtifacts = [...enrichedSnapshot.artifacts, ...autoDetected]
+
+          const reportText = generateMissionReport(enrichedSnapshot)
+          const taskStats = computeMissionTaskStats(enrichedSnapshot.tasks)
+          const duration = Math.max(0, enrichedSnapshot.completedAt - enrichedSnapshot.startedAt)
+          const costEstimate = estimateMissionCost(enrichedSnapshot.tokenCount)
+          const record: StoredMissionReport = {
           id: snapshot.missionId,
           name: snapshot.name,
           goal: snapshot.goal,
@@ -4613,20 +4658,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           })),
           taskStats,
           duration,
-          tokenCount: snapshot.tokenCount,
+          tokenCount: enrichedSnapshot.tokenCount,
           costEstimate,
           artifacts: allArtifacts,
           report: reportText,
-          completedAt: snapshot.completedAt,
+          completedAt: enrichedSnapshot.completedAt,
         }
         setMissionReports(saveStoredMissionReport(record))
-        lastReportedMissionIdRef.current = snapshot.missionId
+        lastReportedMissionIdRef.current = enrichedSnapshot.missionId
         // Auto-show completion report modal
         setCompletionReport(record)
         setCompletionReportVisible(true)
         // Switch to missions tab so user sees the result
         setActiveTab('missions')
         setMissionSubTab('complete')
+        }
+        void enrichAndReport()
       }
       missionCompletionSnapshotRef.current = null
       // Reload mission history to pick up any new checkpoints
