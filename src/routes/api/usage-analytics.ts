@@ -137,37 +137,86 @@ export const Route = createFileRoute('/api/usage-analytics')({
         }
 
         try {
-          const costPayload = await withTimeout(
-            gatewayRpc<Record<string, unknown>>('usage.cost', {}),
-            REQUEST_TIMEOUT_MS,
-            'Usage analytics request timed out',
-          )
+          // Fetch cost data and sessions list in parallel
+          const [costPayload, sessionsPayload] = await Promise.all([
+            withTimeout(
+              gatewayRpc<Record<string, unknown>>('usage.cost', {}),
+              REQUEST_TIMEOUT_MS,
+              'Usage analytics request timed out',
+            ),
+            withTimeout(
+              gatewayRpc<Record<string, unknown>>('sessions.list', {}),
+              REQUEST_TIMEOUT_MS,
+              'Sessions list request timed out',
+            ).catch(() => ({ sessions: [] })),
+          ])
 
-          // usage.cost already includes sessions, models, and daily breakdowns
           const costRoot = toRecord(costPayload)
-          const modelsRoot = toRecord(costRoot.models)
-          const modelRows = Array.isArray(modelsRoot.rows)
-            ? modelsRoot.rows
-            : []
-          const rawSessions = Array.isArray(costRoot.sessions)
-            ? costRoot.sessions
+
+          // Build per-session breakdown from sessions.list (usage.cost doesn't include this)
+          const sessionsRoot = toRecord(sessionsPayload)
+          const rawSessionsList = Array.isArray(sessionsRoot.sessions)
+            ? sessionsRoot.sessions
             : []
 
-          const normalizedSessions: NormalizedSession[] = rawSessions.map(
+          const normalizedSessions: NormalizedSession[] = rawSessionsList.map(
             (s: unknown) => {
               const row = toRecord(s)
-              const sessionKey = readString(row.sessionKey ?? row.key ?? '')
+              const sessionKey = readString(row.key ?? row.sessionKey ?? '')
               return {
                 sessionKey,
-                model: readString(row.model ?? ''),
+                model: readString(
+                  row.modelProvider
+                    ? `${row.modelProvider}/${row.model}`
+                    : (row.model ?? ''),
+                ),
                 agent: extractAgentName(sessionKey),
                 inputTokens: readNumber(row.inputTokens),
                 outputTokens: readNumber(row.outputTokens),
                 totalTokens: readNumber(row.totalTokens),
-                costUsd: readNumber(row.costUsd ?? row.totalCost),
+                costUsd: readNumber(row.costUsd ?? row.totalCost ?? 0),
                 lastActiveAt: toTimestampMs(row.lastActiveAt ?? row.updatedAt),
               }
             },
+          )
+
+          // Aggregate per-model breakdown from sessions (since usage.cost doesn't include models)
+          const modelMap = new Map<
+            string,
+            { inputTokens: number; outputTokens: number; totalTokens: number; costUsd: number; sessions: number }
+          >()
+          for (const s of normalizedSessions) {
+            const model = s.model || 'unknown'
+            const existing = modelMap.get(model) || {
+              inputTokens: 0,
+              outputTokens: 0,
+              totalTokens: 0,
+              costUsd: 0,
+              sessions: 0,
+            }
+            existing.inputTokens += s.inputTokens
+            existing.outputTokens += s.outputTokens
+            existing.totalTokens += s.totalTokens
+            existing.costUsd += s.costUsd
+            existing.sessions += 1
+            modelMap.set(model, existing)
+          }
+
+          const modelRows = Array.from(modelMap.entries())
+            .sort((a, b) => b[1].totalTokens - a[1].totalTokens)
+            .map(([model, data]) => ({
+              model,
+              ...data,
+            }))
+
+          const modelTotals = modelRows.reduce(
+            (acc, r) => ({
+              inputTokens: acc.inputTokens + r.inputTokens,
+              outputTokens: acc.outputTokens + r.outputTokens,
+              totalTokens: acc.totalTokens + r.totalTokens,
+              costUsd: acc.costUsd + r.costUsd,
+            }),
+            { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0 },
           )
 
           const agentBreakdowns = buildAgentBreakdowns(normalizedSessions)
@@ -178,17 +227,8 @@ export const Route = createFileRoute('/api/usage-analytics')({
             agents: agentBreakdowns,
             cost: costRoot.cost ?? costRoot,
             models: {
-              rows: modelRows.map((m: unknown) => {
-                const row = toRecord(m)
-                return {
-                  model: readString(row.model ?? ''),
-                  inputTokens: readNumber(row.inputTokens),
-                  outputTokens: readNumber(row.outputTokens),
-                  totalTokens: readNumber(row.totalTokens),
-                  costUsd: readNumber(row.costUsd ?? row.totalCost),
-                }
-              }),
-              totals: toRecord(modelsRoot.totals),
+              rows: modelRows,
+              totals: modelTotals,
             },
           })
         } catch (error) {
