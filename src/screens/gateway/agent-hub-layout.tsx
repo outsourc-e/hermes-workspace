@@ -883,6 +883,47 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function readNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : 0
+  }
+  return 0
+}
+
+function readSessionTokens(session: SessionRecord): number {
+  const usage = session.usage as Record<string, unknown> | undefined
+  if (usage && typeof usage === 'object') {
+    const total = readNumber(usage.totalTokens)
+    if (total > 0) return total
+    const tokens = readNumber(usage.tokens)
+    if (tokens > 0) return tokens
+  }
+  return 0
+}
+
+function readSessionCost(session: SessionRecord): number {
+  const usage = session.usage as Record<string, unknown> | undefined
+  if (usage && typeof usage === 'object') {
+    const cost = readNumber(usage.cost)
+    if (cost > 0) return cost
+    const totalCost = readNumber(usage.totalCost)
+    if (totalCost > 0) return totalCost
+  }
+  const directCost = readNumber(session.cost)
+  if (directCost > 0) return directCost
+  return 0
+}
+
+function readSessionModel(session: SessionRecord): string {
+  return readString(session.model) || readString(session.agentModel) || ''
+}
+
+function isOAuthModel(model: string): boolean {
+  return model.includes('-oauth') || model.includes('oauth/')
+}
+
 function readSessionId(session: SessionRecord): string {
   return readString(session.key) || readString(session.friendlyId)
 }
@@ -2357,7 +2398,7 @@ function MissionReportDetailModal({
             { label: 'Duration', value: formatDuration(report.duration) },
             { label: 'Tasks', value: `${report.taskStats.completed}/${report.taskStats.total}` },
             { label: 'Tokens', value: report.tokenCount.toLocaleString() },
-            { label: 'Est. Cost', value: `$${report.costEstimate.toFixed(2)}` },
+            { label: 'Cost', value: report.costEstimate === 0 ? 'Free (OAuth)' : `$${report.costEstimate.toFixed(2)}` },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-center dark:border-neutral-700 dark:bg-slate-800/50">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
@@ -2837,6 +2878,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [completionReportVisible, setCompletionReportVisible] = useState(false)
   const [completionReport, setCompletionReport] = useState<StoredMissionReport | null>(null)
   const [missionTokenCount, setMissionTokenCount] = useState(0)
+  const [missionRealTokens, setMissionRealTokens] = useState(0)
+  const [missionRealCost, setMissionRealCost] = useState(0)
+  const [missionAllOAuth, setMissionAllOAuth] = useState(false)
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
   const [steerAgentId, setSteerAgentId] = useState<string | null>(null)
   const [steerInput, setSteerInput] = useState('')
@@ -2997,12 +3041,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       team: teamSnapshot,
       tasks: tasksSnapshot,
       artifacts: artifactsSnapshot,
-      tokenCount: missionTokenCount,
+      tokenCount: missionRealTokens > 0 ? missionRealTokens : missionTokenCount,
       agentSummaries,
       needsEnrichment: true,
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMissionGoal, activeMissionName, artifacts, boardTasks, missionGoal, missionTasks, missionTokenCount])
+  }, [activeMissionGoal, activeMissionName, artifacts, boardTasks, missionGoal, missionRealTokens, missionTasks, missionTokenCount])
 
   const stopMissionAndCleanup = useCallback((reason: 'aborted' | 'completed' = 'aborted') => {
     missionCompletionSnapshotRef.current = buildMissionCompletionSnapshot()
@@ -4906,6 +4950,32 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           }
         }
 
+        // ── Real Token & Cost Aggregation ────────────────────────────────────
+        if (hasSessions && !cancelled) {
+          let totalTokens = 0
+          let totalCost = 0
+          let allOAuth = true
+          let hasAnyModel = false
+
+          for (const session of sessions) {
+            const sessionKey = readSessionId(session)
+            if (!sessionKey || !sessionKeyToAgentId.has(sessionKey)) continue
+
+            totalTokens += readSessionTokens(session)
+            totalCost += readSessionCost(session)
+
+            const model = readSessionModel(session)
+            if (model) {
+              hasAnyModel = true
+              if (!isOAuthModel(model)) allOAuth = false
+            }
+          }
+
+          setMissionRealTokens(totalTokens)
+          setMissionRealCost(totalCost)
+          setMissionAllOAuth(hasAnyModel && allOAuth)
+        }
+
         // ── Activity Feed Events (mission only) ───────────────────────────────
         if (isMissionRunning) {
           const previousMarkers = sessionActivityRef.current
@@ -5001,7 +5071,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           const reportText = generateMissionReport(enrichedSnapshot)
           const taskStats = computeMissionTaskStats(enrichedSnapshot.tasks)
           const duration = Math.max(0, enrichedSnapshot.completedAt - enrichedSnapshot.startedAt)
-          const costEstimate = estimateMissionCost(enrichedSnapshot.tokenCount)
+          const costEstimate = missionRealCost > 0 ? missionRealCost : estimateMissionCost(enrichedSnapshot.tokenCount)
           const record: StoredMissionReport = {
             id: snapshot.missionId,
             missionId: snapshot.missionId,
@@ -5196,6 +5266,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     expectedAgentCountRef.current = teamWithRuntimeStatus.length
     missionCompletionSnapshotRef.current = null
     setMissionTokenCount(0)
+    setMissionRealTokens(0)
+    setMissionRealCost(0)
+    setMissionAllOAuth(false)
     // ── Auto-open Live Output panel: pick first assigned agent, fallback to first team member ──
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId ?? teamWithRuntimeStatus[0]?.id
     setSelectedOutputAgentId(firstAssignedAgentId)
@@ -5355,7 +5428,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function renderOverviewContent() {
     // ── Derived data ───────────────────────────────────────────────────────
-    const runningCost = estimateMissionCost(missionTokenCount)
+    const runningCost = missionRealCost > 0 ? missionRealCost : estimateMissionCost(missionTokenCount)
     const missionElapsed = missionStartedAtRef.current
       ? formatDuration(Date.now() - missionStartedAtRef.current)
       : '0s'
@@ -5651,9 +5724,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </p>
                 </div>
                 <div className={cn(insetCls, 'text-center')}>
-                  <p className="text-[10px] uppercase tracking-wide text-neutral-400 mb-0.5">Est. Cost</p>
+                  <p className="text-[10px] uppercase tracking-wide text-neutral-400 mb-0.5">Cost</p>
                   <p className="text-sm font-bold text-orange-600 dark:text-orange-400">
-                    {todayEstCost > 0 ? `$${todayEstCost.toFixed(2)}` : '$0.00'}
+                    {missionAllOAuth && todayEstCost === 0 ? 'Free' : todayEstCost > 0 ? `$${todayEstCost.toFixed(2)}` : '$0.00'}
                   </p>
                 </div>
               </div>
@@ -7069,9 +7142,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { label: 'Progress', value: isRunning ? `${runningTaskStats.completed} / ${runningTaskStats.total}` : `${reportEntry?.taskStats.completed ?? 0} / ${reportEntry?.taskStats.total ?? 0}` },
-                    { label: 'Est. Cost', value: isRunning ? `$${estimateMissionCost(missionTokenCount).toFixed(2)}` : `$${reportEntry?.costEstimate.toFixed(2) ?? '0.00'}` },
+                    { label: 'Cost', value: isRunning
+                      ? (missionAllOAuth ? 'Free (OAuth)' : missionRealCost > 0 ? `$${missionRealCost.toFixed(4)}` : `~$${estimateMissionCost(missionTokenCount).toFixed(2)}`)
+                      : (reportEntry?.costEstimate === 0 ? 'Free (OAuth)' : `$${reportEntry?.costEstimate.toFixed(2) ?? '0.00'}`)
+                    },
                     { label: 'Elapsed', value: isRunning ? formatDuration(Date.now() - (missionStartedAtRef.current || Date.now())) : formatDuration(reportEntry?.duration ?? 0) },
-                    { label: 'Tokens', value: isRunning ? missionTokenCount.toLocaleString() : (reportEntry?.tokenCount.toLocaleString() ?? '0') },
+                    { label: 'Tokens', value: isRunning
+                      ? (missionRealTokens > 0 ? missionRealTokens.toLocaleString() : missionTokenCount.toLocaleString())
+                      : (reportEntry?.tokenCount.toLocaleString() ?? '0')
+                    },
                   ].map(({ label, value }) => (
                     <div key={label} className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
@@ -7353,7 +7432,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <span className="text-[10px] text-[var(--theme-muted)] font-mono">{getModelDisplayLabel(selectedOutputModelId)}</span>
                     )}
                     <span className="text-[10px] text-[var(--theme-muted)] opacity-40">·</span>
-                    <span className="text-[10px] text-[var(--theme-muted)] font-mono tabular-nums">{missionTokenCount.toLocaleString()} tok</span>
+                    <span className="text-[10px] text-[var(--theme-muted)] font-mono tabular-nums">{(missionRealTokens > 0 ? missionRealTokens : missionTokenCount).toLocaleString()} tok</span>
                   </div>
                 </div>
               </div>
@@ -8144,7 +8223,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               { label: 'Duration', value: formatDuration(completionReport.duration) },
               { label: 'Tasks', value: `${completionReport.taskStats.completed}/${completionReport.taskStats.total}` },
               { label: 'Tokens', value: completionReport.tokenCount.toLocaleString() },
-              { label: 'Est. Cost', value: `$${completionReport.costEstimate.toFixed(2)}` },
+              { label: 'Cost', value: completionReport.costEstimate === 0 ? 'Free (OAuth)' : `$${completionReport.costEstimate.toFixed(2)}` },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-3 text-center">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
