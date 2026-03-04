@@ -1182,42 +1182,6 @@ function extractPreviewLine(lines: string[]): string {
 }
 
 /**
- * Smart truncation: keep intro, any summary/conclusion section, and tail.
- * If ≤ 40 lines, return as-is. Otherwise keep first 15 + detected summary section + last 5.
- */
-function smartTruncate(lines: string[], maxLines = 40): string[] {
-  if (lines.length <= maxLines) return lines
-
-  const head = lines.slice(0, 15)
-  const tail = lines.slice(-5)
-
-  // Try to find a summary/conclusion/key section in the omitted middle
-  const summaryHeaderPattern = /^#{1,3}\s+(Summary|Conclusion|Key Findings|Results|Recommendations)/i
-  let summarySection: string[] | null = null
-  for (let i = 15; i < lines.length - 5; i++) {
-    if (summaryHeaderPattern.test(lines[i].trim())) {
-      const sectionLines: string[] = [lines[i]]
-      for (let j = i + 1; j < lines.length - 5; j++) {
-        // Stop at next heading or end
-        if (/^#{1,3}\s+/.test(lines[j].trim()) && j > i) break
-        sectionLines.push(lines[j])
-        if (sectionLines.length >= 15) break // cap summary section length
-      }
-      summarySection = sectionLines
-      break
-    }
-  }
-
-  const omittedCount = lines.length - 15 - 5 - (summarySection?.length ?? 0)
-  const result = [...head, '', `[... ${omittedCount} lines omitted ...]`, '']
-  if (summarySection) {
-    result.push(...summarySection, '')
-  }
-  result.push(...tail)
-  return result
-}
-
-/**
  * Auto-detect artifacts from agent output text.
  * Finds: fenced code blocks, URLs, markdown tables.
  */
@@ -1393,25 +1357,6 @@ function extractExecutiveSummary(agentSummaries: MissionAgentSummary[]): string 
   const longestOutput = getLongestAgentOutput(agentSummaries)
   if (!longestOutput) return ''
   return longestOutput.length > 500 ? `${longestOutput.slice(0, 500).trimEnd()}…` : longestOutput
-}
-
-/** Truncate text to maxLen characters, ending on a sentence boundary. */
-function truncateOnSentence(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text
-  const truncated = text.slice(0, maxLen)
-  // Find last sentence-ending punctuation
-  const lastSentenceEnd = Math.max(
-    truncated.lastIndexOf('. '),
-    truncated.lastIndexOf('! '),
-    truncated.lastIndexOf('? '),
-    truncated.lastIndexOf('.'),
-    truncated.lastIndexOf('!'),
-    truncated.lastIndexOf('?'),
-  )
-  if (lastSentenceEnd > maxLen * 0.4) {
-    return truncated.slice(0, lastSentenceEnd + 1)
-  }
-  return truncated.trimEnd() + '…'
 }
 
 /**
