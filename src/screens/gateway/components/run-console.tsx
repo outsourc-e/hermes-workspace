@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchSessionHistory } from '@/lib/gateway-api'
 import {
   BrainIcon,
   ComputerTerminal01Icon,
@@ -18,6 +19,8 @@ type RunConsoleProps = {
   tokenCount?: number
   costEstimate?: number
   onClose?: () => void
+  sessionKeys?: string[]
+  agentNameMap?: Record<string, string>
 }
 
 type ConsoleTab = 'stream' | 'timeline' | 'artifacts' | 'report'
@@ -94,6 +97,32 @@ function formatCost(costEstimate?: number): string {
   return `$${costEstimate.toFixed(2)}`
 }
 
+type LiveStreamEvent = {
+  id: string
+  timestamp: string
+  agentName: string
+  eventType: 'status' | 'output' | 'tool' | 'error'
+  message: string
+}
+
+function roleToEventType(role?: string): LiveStreamEvent['eventType'] {
+  if (role === 'assistant') return 'output'
+  if (role === 'tool') return 'tool'
+  if (role === 'system') return 'status'
+  return 'status'
+}
+
+function formatTs(ts: number): string {
+  const d = new Date(ts)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+
+function extractContent(msg: { content?: string; parts?: Array<{ text?: string }> }): string {
+  if (msg.content) return msg.content
+  if (msg.parts?.length) return msg.parts.map(p => p.text ?? '').join('')
+  return ''
+}
+
 export function RunConsole({
   runId,
   runTitle,
@@ -104,9 +133,67 @@ export function RunConsole({
   tokenCount,
   costEstimate,
   onClose,
+  sessionKeys,
+  agentNameMap,
 }: RunConsoleProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('stream')
   const [streamView, setStreamView] = useState<StreamView>('combined')
+  const [liveEvents, setLiveEvents] = useState<LiveStreamEvent[]>([])
+  const [isAutoScroll, setIsAutoScroll] = useState(true)
+  const streamEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Fetch session history for all session keys
+  const fetchAllHistory = useCallback(async () => {
+    if (!sessionKeys?.length) return
+    const allEvents: LiveStreamEvent[] = []
+    for (const key of sessionKeys) {
+      try {
+        const res = await fetchSessionHistory(key)
+        const msgs = res?.messages ?? []
+        const agentName = agentNameMap?.[key] ?? 'Agent'
+        for (const msg of msgs) {
+          const content = extractContent(msg as { content?: string; parts?: Array<{ text?: string }> })
+          if (!content.trim()) continue
+          const ts = typeof msg.timestamp === 'number' ? msg.timestamp : Date.now()
+          allEvents.push({
+            id: `${key}-${ts}-${Math.random().toString(36).slice(2, 6)}`,
+            timestamp: formatTs(ts),
+            agentName,
+            eventType: roleToEventType(msg.role),
+            message: content,
+          })
+        }
+      } catch { /* skip failed fetches */ }
+    }
+    allEvents.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+    setLiveEvents(allEvents)
+  }, [sessionKeys, agentNameMap])
+
+  // Initial fetch + polling when running
+  useEffect(() => {
+    void fetchAllHistory()
+    if (runStatus !== 'running') return
+    const interval = setInterval(() => void fetchAllHistory(), 5000)
+    return () => clearInterval(interval)
+  }, [fetchAllHistory, runStatus])
+
+  // Auto-scroll
+  useEffect(() => {
+    if (isAutoScroll && streamEndRef.current) {
+      streamEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [liveEvents, isAutoScroll])
+
+  const handleStreamScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    setIsAutoScroll(atBottom)
+  }, [])
+
+  // Use live events if available, otherwise fall back to mocks
+  const hasLiveData = sessionKeys?.length && liveEvents.length > 0
 
   const resolvedDuration = duration || formatDuration(startedAt) || '0s'
   const resolvedTokens = typeof tokenCount === 'number' ? tokenCount.toLocaleString() : '0'
@@ -144,9 +231,11 @@ export function RunConsole({
     ]
   }, [agents, runId, runStatus])
 
+  const displayEvents: Array<{ id: string; timestamp: string; agentName: string; eventType: 'status' | 'output' | 'tool' | 'error'; message: string }> = hasLiveData ? liveEvents : mockEvents
+
   const eventsByAgent = useMemo(() => {
-    const grouped = new Map<string, MockStreamEvent[]>()
-    for (const event of mockEvents) {
+    const grouped = new Map<string, typeof displayEvents>()
+    for (const event of displayEvents) {
       const existing = grouped.get(event.agentName)
       if (existing) {
         existing.push(event)
@@ -155,7 +244,8 @@ export function RunConsole({
       }
     }
     return Array.from(grouped.entries()).map(([agentName, events]) => ({ agentName, events }))
-  }, [mockEvents])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayEvents])
 
   return (
     <section className="flex h-full flex-col overflow-hidden bg-[var(--theme-bg,#0b0e14)] text-primary-100 dark:bg-slate-900">
@@ -224,16 +314,21 @@ export function RunConsole({
               )}
             >
               {tab.label}
+              {tab.id === 'stream' && displayEvents.length > 0 && (
+                <span className="ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-primary-700 px-1 text-[9px] font-bold leading-none text-primary-200">
+                  {displayEvents.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </nav>
 
-      <div className="flex-1 overflow-auto px-4 py-4 sm:px-5">
+      <div ref={scrollContainerRef} onScroll={handleStreamScroll} className="flex-1 overflow-auto px-4 py-4 sm:px-5">
         {activeTab === 'stream' ? (
           <div className="space-y-3 font-mono text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium text-primary-200">Live event stream will appear here</p>
+              <p className="text-sm font-medium text-primary-200">{hasLiveData ? `${displayEvents.length} events` : 'Live event stream will appear here'}</p>
               <div className="inline-flex items-center rounded-md border border-primary-700 bg-primary-900/60 p-0.5 text-xs">
                 <button
                   type="button"
@@ -264,7 +359,7 @@ export function RunConsole({
 
             {streamView === 'combined' ? (
               <ol className="space-y-2">
-                {mockEvents.map((event) => (
+                {displayEvents.map((event) => (
                   <li
                     key={event.id}
                     className="rounded-lg border border-primary-800/80 bg-primary-950/60 px-3 py-2"
@@ -387,6 +482,19 @@ export function RunConsole({
                 </div>
               )
             ) : null}
+            <div ref={streamEndRef} />
+            {!isAutoScroll && displayEvents.length > 5 && (
+              <button
+                type="button"
+                onClick={() => {
+                  streamEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+                  setIsAutoScroll(true)
+                }}
+                className="sticky bottom-2 mx-auto flex items-center gap-1 rounded-full border border-primary-700 bg-primary-900/90 px-3 py-1.5 text-[11px] font-medium text-primary-200 shadow-lg backdrop-blur transition-colors hover:bg-primary-800"
+              >
+                ↓ Jump to latest
+              </button>
+            )}
           </div>
         ) : null}
 
