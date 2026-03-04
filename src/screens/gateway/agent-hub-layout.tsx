@@ -2741,6 +2741,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     agentSessionStatus,
     artifacts,
     restoreCheckpoint,
+    beforeUnloadRegistered,
     startMission,
     completeMission,
     abortMission,
@@ -2757,6 +2758,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setArtifacts,
     setActiveMissionMeta,
     saveCheckpoint,
+    markBeforeUnloadRegistered,
   } = missionStore
   const setMissionActive = useCallback((active: boolean) => {
     if (!active) {
@@ -2808,12 +2810,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     expectedAgentCountRef.current = Object.keys(
       restoreCheckpoint.agentSessions || restoreCheckpoint.agentSessionMap || {},
     ).length
+    setRetryingAgents({})
+    agentRetryCountRef.current = {}
+    retriedAgentsRef.current = new Set()
+    pendingAgentRetryRef.current.clear()
+    handledFailedSessionKeysRef.current.clear()
+    agentRetryPayloadRef.current = {}
+    for (const timer of agentRetryTimersRef.current.values()) {
+      window.clearTimeout(timer)
+    }
+    agentRetryTimersRef.current.clear()
     sessionActivityRef.current = new Map()
     restoreGraceUntilRef.current = Date.now() + 20_000 // 20s grace for SSE to reconnect
     setRestoreCheckpoint(null)
     toast('Mission restored: Reconnected to running mission', { type: 'success' })
   }, [missionState, restoreCheckpoint, restoreMission, setRestoreCheckpoint])
   const [spawnState, setSpawnState] = useState<Record<string, 'idle' | 'spawning' | 'ready' | 'error'>>({})
+  const [retryingAgents, setRetryingAgents] = useState<Record<string, boolean>>({})
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('connected')
   const [, setAgentModelNotApplied] = useState<Record<string, boolean>>({})
   const [agentActivity, setAgentActivity] = useState<Record<string, AgentActivityEntry>>({})
@@ -2863,6 +2876,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const pendingMissionBudgetLimitRef = useRef('')
   const missionActiveRef = useRef(missionActive)
   const handleCreateMissionRef = useRef<() => void>(() => {})
+  const scheduleAgentRetryRef = useRef<(agentId: string, sessionKey: string, reason: string) => void>(() => {})
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
   // SSE closures (which can't list missionTasks etc. in their own deps) can call it.
   const buildMissionCompletionSnapshotRef = useRef<() => MissionReportPayload | null>(() => null)
@@ -2871,6 +2885,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const agentSessionsDoneRef = useRef<Set<string>>(new Set())
   // Tracks the number of agents expected to complete for the current mission
   const expectedAgentCountRef = useRef(0)
+  const agentRetryCountRef = useRef<Record<string, number>>({})
+  const retriedAgentsRef = useRef<Set<string>>(new Set())
+  const pendingAgentRetryRef = useRef<Set<string>>(new Set())
+  const agentRetryTimersRef = useRef<Map<string, number>>(new Map())
+  const handledFailedSessionKeysRef = useRef<Set<string>>(new Set())
+  const agentRetryPayloadRef = useRef<Record<string, { tasks: Array<HubTask>; messageText: string }>>({})
 
   teamRef.current = team
   const missionId = activeMission?.id ?? ''
@@ -3017,6 +3037,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setActiveTab('missions')
     // Auto-switch filter tab based on abort/complete reason
     setMissionSubTab(reason === 'aborted' ? 'failed' : 'complete')
+    setRetryingAgents({})
+    agentRetryCountRef.current = {}
+    retriedAgentsRef.current = new Set()
+    pendingAgentRetryRef.current.clear()
+    handledFailedSessionKeysRef.current.clear()
+    agentRetryPayloadRef.current = {}
+    for (const timer of agentRetryTimersRef.current.values()) {
+      window.clearTimeout(timer)
+    }
+    agentRetryTimersRef.current.clear()
     dispatchingRef.current = false
     pendingTaskMovesRef.current = []
     sessionActivityRef.current = new Map()
@@ -3034,8 +3064,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionActive,
     setMissionTasks,
   ])
-
-
 
   // Live template suggestion based on current mission goal input
   const suggestedTemplateName = useMemo(() => {
@@ -3247,16 +3275,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [agentSessionMap, agentSessionModelMap])
 
   useEffect(() => {
-    function handleBeforeUnload() {
+    if (typeof window === 'undefined' || beforeUnloadRegistered) return
+
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
       if (useMissionStore.getState().missionState !== 'running') return
       saveMissionStoreBeforeUnload()
+      event.preventDefault()
+      event.returnValue = ''
     }
 
+    markBeforeUnloadRegistered(true)
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
+      if (useMissionStore.getState().missionState === 'running') {
+        saveMissionStoreBeforeUnload()
+      }
+      markBeforeUnloadRegistered(false)
     }
-  }, [])
+  }, [beforeUnloadRegistered, markBeforeUnloadRegistered])
 
   useEffect(() => {
     if (team.length > 0) return
@@ -3301,9 +3338,27 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       if (teamPanelFlashTimerRef.current !== undefined) {
         window.clearTimeout(teamPanelFlashTimerRef.current)
       }
+      for (const timer of agentRetryTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      agentRetryTimersRef.current.clear()
     },
     [],
   )
+
+  useEffect(() => {
+    if (missionState !== 'stopped') return
+    setRetryingAgents({})
+    agentRetryCountRef.current = {}
+    retriedAgentsRef.current = new Set()
+    pendingAgentRetryRef.current.clear()
+    handledFailedSessionKeysRef.current.clear()
+    agentRetryPayloadRef.current = {}
+    for (const timer of agentRetryTimersRef.current.values()) {
+      window.clearTimeout(timer)
+    }
+    agentRetryTimersRef.current.clear()
+  }, [missionState])
 
   // Mobile viewport detection
   useEffect(() => {
@@ -3674,9 +3729,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       })
       source.addEventListener('open', () => {
         markStreamAlive()
+        handledFailedSessionKeysRef.current.delete(sessionKey)
       })
       source.addEventListener('error', () => {
         markStreamAlive()
+        if (source.readyState !== EventSource.CLOSED) return
+        scheduleAgentRetryRef.current(agentId, sessionKey, 'SSE connection closed')
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3691,9 +3749,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       for (const [sessionKey, source] of streams) {
         const lastAt = lastAtMap.get(sessionKey) ?? 0
         if (now - lastAt > 60_000) {
+          const agentId = Object.entries(agentSessionMap).find(([, key]) => key === sessionKey)?.[0]
           source.close()
           streams.delete(sessionKey)
           lastAtMap.delete(sessionKey)
+          if (agentId) {
+            scheduleAgentRetryRef.current(agentId, sessionKey, 'SSE stream timed out')
+          }
         }
       }
     }, 10_000)
@@ -3707,7 +3769,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       agentStreamsRef.current.clear()
       agentStreamLastAtRef.current.clear()
     }
-  }, [])
+  }, [agentSessionMap])
 
   // Keyboard shortcuts (desktop only): Cmd/Ctrl+Enter → Start Mission; Space → pause/resume mission; Escape → close panel / deselect
   useEffect(() => {
@@ -3888,6 +3950,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (Date.now() < restoreGraceUntilRef.current) return
     const anyWaiting = agentWorkingRows.some((r) => r.status === 'waiting_for_input')
     if (anyWaiting) return // Mission needs human input — don't auto-close
+    const anyRetrying = Object.values(retryingAgents).some(Boolean)
+    if (anyRetrying) return
     const allTerminal = agentWorkingRows.every((r) =>
       r.status === 'idle' || r.status === 'none' || r.status === 'error'
     )
@@ -3899,7 +3963,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       emitFeedEvent({ type: 'mission_started', message: '✓ All agents reached terminal state — mission complete' })
     }, 6000)
     return () => window.clearTimeout(timer)
-  }, [agentWorkingRows, missionActive, missionState])
+  }, [agentWorkingRows, missionActive, missionState, retryingAgents])
 
   // Global agent pool: active team + all agents from saved team configs (deduped by id)
   const allKnownAgents = useMemo(() => {
@@ -3942,30 +4006,98 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     pendingTaskMovesRef.current.push({ taskIds: uniqueTaskIds, status })
   }, [])
 
+  const dispatchAgentTasks = useCallback(async ({
+    sessionKey,
+    agentId,
+    agentTasks,
+    messageText,
+    member,
+  }: {
+    sessionKey: string
+    agentId: string
+    agentTasks: Array<HubTask>
+    messageText: string
+    member?: TeamMember
+  }): Promise<void> => {
+    const modelString = member ? resolveGatewayModelId(member.modelId) : ''
 
+    const response = await fetch('/api/agent-dispatch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionKey,
+        message: messageText,
+        agentId,
+        model: modelString || undefined,
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    })
 
-  const spawnAgentSession = useCallback(async (member: TeamMember): Promise<string> => {
+    if (!response.ok) {
+      const payload = (await response
+        .json()
+        .catch(() => ({}))) as Record<string, unknown>
+      const errorMessage =
+        readString(payload.error) || readString(payload.message) || `HTTP ${response.status}`
+      emitFeedEvent({
+        type: 'system',
+        message: `Failed to dispatch to ${member?.name || agentId}: ${errorMessage}`,
+      })
+      const taskIds = agentTasks.map((task) => task.id)
+      moveTasksToStatus(taskIds, 'done')
+      agentSessionsDoneRef.current.add(sessionKey)
+      setAgentSessionStatus((prev) => ({
+        ...prev,
+        [agentId]: { status: 'error', lastSeen: Date.now(), lastMessage: errorMessage },
+      }))
+      throw new Error(errorMessage)
+    }
+
+    const taskIds = agentTasks.map((task) => task.id)
+    setDispatchedTaskIdsByAgent((previous) => ({
+      ...previous,
+      [agentId]: taskIds,
+    }))
+    moveTasksToStatus(taskIds, 'in_progress')
+
+    agentTasks.forEach((task) => {
+      emitFeedEvent({
+        type: 'agent_active',
+        message: `${member?.name || agentId} started working on: ${task.title}`,
+        agentName: member?.name,
+        taskTitle: task.title,
+      })
+    })
+  }, [moveTasksToStatus, setDispatchedTaskIdsByAgent])
+  const spawnAgentSession = useCallback(async (
+    member: TeamMember,
+    options?: { reuseExisting?: boolean; labelSuffix?: string },
+  ): Promise<string> => {
     const suffix = Math.random().toString(36).slice(2, 8)
     const baseName = member.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
     const friendlyId = `hub-${baseName}-${suffix}`
-    const label = `Mission: ${member.name}`
+    const reuseExisting = options?.reuseExisting !== false
+    const labelSuffix = options?.labelSuffix ? ` (${options.labelSuffix})` : ''
+    const label = `Mission: ${member.name}${labelSuffix}`
 
     // Check if a session with this label already exists — reuse it instead of
     // trying to create a duplicate (gateway enforces unique labels).
-    try {
-      const listResp = await fetch('/api/sessions')
-      if (listResp.ok) {
-        const listData = (await listResp.json()) as { sessions?: Array<Record<string, unknown>> }
-        const existing = (listData.sessions ?? []).find(
-          (s) => typeof s.label === 'string' && s.label === label,
-        )
-        if (existing) {
-          const existingKey = readString(existing.key)
-          if (existingKey) return existingKey
+    if (reuseExisting) {
+      try {
+        const listResp = await fetch('/api/sessions')
+        if (listResp.ok) {
+          const listData = (await listResp.json()) as { sessions?: Array<Record<string, unknown>> }
+          const existing = (listData.sessions ?? []).find(
+            (s) => typeof s.label === 'string' && s.label === label,
+          )
+          if (existing) {
+            const existingKey = readString(existing.key)
+            if (existingKey) return existingKey
+          }
         }
+      } catch {
+        // If the lookup fails, fall through to normal spawn
       }
-    } catch {
-      // If the lookup fails, fall through to normal spawn
     }
 
     const modelString = resolveGatewayModelId(member.modelId)
@@ -4015,6 +4147,190 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     return sessionKey
   }, [])
+
+  const clearRetryingAgent = useCallback((agentId: string) => {
+    setRetryingAgents((prev) => {
+      if (!prev[agentId]) return prev
+      const next = { ...prev }
+      delete next[agentId]
+      return next
+    })
+  }, [])
+
+  const markAgentTasksFailed = useCallback((agentId: string, reason: string) => {
+    const failedStatus = 'failed' as TaskStatus
+    const failedTaskIds = new Set(
+      (agentRetryPayloadRef.current[agentId]?.tasks ?? []).map((task) => task.id),
+    )
+
+    if (failedTaskIds.size > 0) {
+      const markFailed = (tasks: HubTask[]) =>
+        tasks.map((task) =>
+          task.agentId === agentId && failedTaskIds.has(task.id)
+            ? { ...task, status: failedStatus, updatedAt: Date.now() }
+            : task,
+        )
+      setMissionTasks(markFailed)
+      _setBoardTasks(markFailed)
+    }
+
+    clearRetryingAgent(agentId)
+    setSpawnState((prev) => ({ ...prev, [agentId]: 'error' }))
+    setAgentSessionStatus((prev) => ({
+      ...prev,
+      [agentId]: { status: 'error', lastSeen: Date.now(), lastMessage: reason },
+    }))
+    setMissionSubTab('failed')
+    saveCheckpoint()
+  }, [_setBoardTasks, clearRetryingAgent, saveCheckpoint, setMissionTasks])
+
+  const scheduleAgentRetry = useCallback((agentId: string, sessionKey: string, reason: string) => {
+    if (useMissionStore.getState().missionState !== 'running') return
+    if (agentSessionMap[agentId] !== sessionKey) return
+    if (agentSessionsDoneRef.current.has(sessionKey)) return
+    if (handledFailedSessionKeysRef.current.has(sessionKey)) return
+
+    handledFailedSessionKeysRef.current.add(sessionKey)
+    agentSessionsDoneRef.current.delete(sessionKey)
+
+    const member = teamRef.current.find((entry) => entry.id === agentId)
+    const retryPayload = agentRetryPayloadRef.current[agentId]
+    const canRetry = Boolean(member && retryPayload && !retriedAgentsRef.current.has(agentId))
+
+    setAgentSessionStatus((prev) => ({
+      ...prev,
+      [agentId]: { status: 'error', lastSeen: Date.now(), lastMessage: reason },
+    }))
+
+    if (!canRetry) {
+      captureAgentOutput(agentId, `[system] Session failed: ${reason}`)
+      markAgentTasksFailed(agentId, reason)
+      emitFeedEvent({
+        type: 'system',
+        message: `${member?.name ?? agentId} failed: ${reason}`,
+        agentName: member?.name,
+      })
+      return
+    }
+
+    if (pendingAgentRetryRef.current.has(agentId)) return
+
+    retriedAgentsRef.current.add(agentId)
+    pendingAgentRetryRef.current.add(agentId)
+    setRetryingAgents((prev) => ({ ...prev, [agentId]: true }))
+
+    const existingStream = agentStreamsRef.current.get(sessionKey)
+    if (existingStream) {
+      existingStream.close()
+      agentStreamsRef.current.delete(sessionKey)
+    }
+    agentStreamLastAtRef.current.delete(sessionKey)
+
+    setSpawnState((prev) => ({ ...prev, [agentId]: 'spawning' }))
+    setAgentSessionMap((prev) => {
+      if (prev[agentId] !== sessionKey) return prev
+      const next = { ...prev }
+      delete next[agentId]
+      return next
+    })
+
+    captureAgentOutput(
+      agentId,
+      `[system] Session failed: ${reason}\n[system] Auto-retrying in 3s (1/1)`,
+    )
+    emitFeedEvent({
+      type: 'system',
+      message: `${member?.name ?? agentId} failed: ${reason}. Retrying (1/1)`,
+      agentName: member?.name,
+    })
+
+    const retryTimer = window.setTimeout(() => {
+      agentRetryTimersRef.current.delete(agentId)
+
+      if (useMissionStore.getState().missionState !== 'running') {
+        pendingAgentRetryRef.current.delete(agentId)
+        clearRetryingAgent(agentId)
+        return
+      }
+
+      const currentMember = teamRef.current.find((entry) => entry.id === agentId)
+      const payload = agentRetryPayloadRef.current[agentId]
+      if (!currentMember || !payload) {
+        pendingAgentRetryRef.current.delete(agentId)
+        markAgentTasksFailed(agentId, reason)
+        return
+      }
+
+      void (async () => {
+        try {
+          const newSessionKey = await spawnAgentSession(currentMember, {
+            reuseExisting: false,
+            labelSuffix: 'retry-1',
+          })
+          if (useMissionStore.getState().missionState !== 'running') {
+            pendingAgentRetryRef.current.delete(agentId)
+            clearRetryingAgent(agentId)
+            return
+          }
+
+          handledFailedSessionKeysRef.current.delete(newSessionKey)
+          setAgentSessionMap((prev) => ({ ...prev, [agentId]: newSessionKey }))
+          setSpawnState((prev) => ({ ...prev, [agentId]: 'ready' }))
+          setAgentSessionStatus((prev) => ({
+            ...prev,
+            [agentId]: {
+              status: 'active',
+              lastSeen: Date.now(),
+              lastMessage: 'Retry 1/1 started',
+            },
+          }))
+
+          const modelString = resolveGatewayModelId(currentMember.modelId)
+          if (modelString) {
+            setAgentSessionModelMap((prev) => ({ ...prev, [agentId]: modelString }))
+          }
+
+          captureAgentOutput(
+            agentId,
+            '[system] Retry 1/1 session started\n[system] Re-dispatching assigned tasks',
+          )
+          await dispatchAgentTasks({
+            sessionKey: newSessionKey,
+            agentId,
+            agentTasks: payload.tasks,
+            messageText: payload.messageText,
+            member: currentMember,
+          })
+          pendingAgentRetryRef.current.delete(agentId)
+          clearRetryingAgent(agentId)
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          pendingAgentRetryRef.current.delete(agentId)
+          captureAgentOutput(
+            agentId,
+            `[system] Retry 1/1 failed: ${errorMessage}`,
+          )
+          markAgentTasksFailed(agentId, `Retry failed: ${errorMessage}`)
+          emitFeedEvent({
+            type: 'system',
+            message: `Retry 1/1 failed for ${currentMember.name}: ${errorMessage}`,
+            agentName: currentMember.name,
+          })
+        }
+      })()
+    }, 3_000)
+
+    agentRetryTimersRef.current.set(agentId, retryTimer)
+  }, [
+    agentSessionMap,
+    captureAgentOutput,
+    clearRetryingAgent,
+    dispatchAgentTasks,
+    markAgentTasksFailed,
+    setAgentSessionModelMap,
+    spawnAgentSession,
+  ])
+  scheduleAgentRetryRef.current = scheduleAgentRetry
 
 
 
@@ -4359,61 +4675,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       }
 
       const member = teamMembers.find((entry) => entry.id === agentId)
-      const modelString = member ? resolveGatewayModelId(member.modelId) : ''
+      agentRetryPayloadRef.current[agentId] = {
+        tasks: agentTasks.map((task) => ({ ...task })),
+        messageText,
+      }
 
       try {
-        const response = await fetch('/api/agent-dispatch', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            sessionKey,
-            message: messageText,
-            agentId,
-            model: modelString || undefined,
-            idempotencyKey: crypto.randomUUID(),
-          }),
+        await dispatchAgentTasks({
+          sessionKey,
+          agentId,
+          agentTasks,
+          messageText,
+          member,
         })
-
-        if (!response.ok) {
-          const payload = (await response
-            .json()
-            .catch(() => ({}))) as Record<string, unknown>
-          const errorMessage =
-            readString(payload.error) || readString(payload.message) || `HTTP ${response.status}`
-          throw new Error(errorMessage)
-        }
-
+      } catch {
         if (isStaleLaunch()) return
-        const taskIds = agentTasks.map((task) => task.id)
-        setDispatchedTaskIdsByAgent((previous) => ({
-          ...previous,
-          [agentId]: taskIds,
-        }))
-        moveTasksToStatus(taskIds, 'in_progress')
-
-        agentTasks.forEach((task) => {
-          emitFeedEvent({
-            type: 'agent_active',
-            message: `${member?.name || agentId} started working on: ${task.title}`,
-            agentName: member?.name,
-            taskTitle: task.title,
-          })
-        })
-      } catch (error) {
-        if (isStaleLaunch()) return
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        emitFeedEvent({
-          type: 'system',
-          message: `Failed to dispatch to ${member?.name || agentId}: ${errorMessage}`,
-        })
-        // Mark tasks as done so progress counts them (not stuck at 0%)
-        const taskIds = agentTasks.map((task) => task.id)
-        moveTasksToStatus(taskIds, 'done')
-        agentSessionsDoneRef.current.add(sessionKey)
-        setAgentSessionStatus((prev) => ({
-          ...prev,
-          [agentId]: { status: 'error', lastSeen: Date.now() },
-        }))
       }
     }
 
@@ -4491,7 +4767,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const message = [agentContext, body].filter(Boolean).join('\n\n')
       await dispatchToAgent(agentId, agentTasks, message)
     }
-  }, [ensureAgentSessions, moveTasksToStatus])
+  }, [dispatchAgentTasks, ensureAgentSessions])
 
   useEffect(() => {
     const isMissionRunning = missionActive && missionState === 'running'
@@ -4528,6 +4804,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         // ── Session Roster Tracking ───────────────────────────────────────────
         if (hasSessions) {
           const seenAgentIds = new Set<string>()
+          const failedSessionsToRetry: Array<{ agentId: string; sessionKey: string; reason: string }> = []
 
           // Compute status for each matched session
           const matchedEntries: Array<[string, AgentSessionStatusEntry]> = []
@@ -4554,6 +4831,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             let status: AgentSessionStatusEntry['status']
             if (rawStatus === 'error') {
               status = 'error'
+              failedSessionsToRetry.push({
+                agentId,
+                sessionKey,
+                reason: lastMessage || 'Session reported an error state',
+              })
             } else if (ageMs < 30_000) {
               status = 'active'
             } else if (ageMs < 300_000) {
@@ -4593,6 +4875,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 const ageMs = now - lastSeen
                 // Grace period: keep existing status for up to 60s before marking stopped
                 if (!existing || ageMs > 60_000) {
+                  const sessionKey = agentSessionMap[agentId]
+                  if (sessionKey) {
+                    failedSessionsToRetry.push({
+                      agentId,
+                      sessionKey,
+                      reason: 'Session disappeared from gateway roster',
+                    })
+                  }
                   next[agentId] = {
                     status: 'stopped',
                     lastSeen,
@@ -4605,6 +4895,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               return next
             })
+
+            for (const failedSession of failedSessionsToRetry) {
+              scheduleAgentRetryRef.current(
+                failedSession.agentId,
+                failedSession.sessionKey,
+                failedSession.reason,
+              )
+            }
           }
         }
 
@@ -4752,6 +5050,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       sessionActivityRef.current = new Map()
       agentSessionsDoneRef.current = new Set()
       expectedAgentCountRef.current = 0
+      agentRetryCountRef.current = {}
+      retriedAgentsRef.current = new Set()
+      pendingAgentRetryRef.current.clear()
+      for (const timer of agentRetryTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      agentRetryTimersRef.current.clear()
+      handledFailedSessionKeysRef.current.clear()
+      agentRetryPayloadRef.current = {}
     }
     prevMissionStateRef.current = missionState
   }, [agentSessionMap, completeMission, missionState, setMissionActive, setMissionTasks, setDispatchedTaskIdsByAgent])
@@ -4875,6 +5182,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     artifactDedupRef.current = new Set()
     agentOutputLinesRef.current = {}
     setAgentOutputLines({})
+    setRetryingAgents({})
+    agentRetryCountRef.current = {}
+    retriedAgentsRef.current = new Set()
+    pendingAgentRetryRef.current.clear()
+    handledFailedSessionKeysRef.current.clear()
+    agentRetryPayloadRef.current = {}
+    for (const timer of agentRetryTimersRef.current.values()) {
+      window.clearTimeout(timer)
+    }
+    agentRetryTimersRef.current.clear()
     agentSessionsDoneRef.current = new Set()
     expectedAgentCountRef.current = teamWithRuntimeStatus.length
     missionCompletionSnapshotRef.current = null
@@ -6565,6 +6882,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                   <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', statusMeta.className)}>
                                     {statusMeta.label}
                                   </span>
+                                  {retryingAgents[row.id] ? (
+                                    <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                      Retrying...
+                                    </span>
+                                  ) : null}
                                   {lastOutput !== 'Agent working...' ? (
                                     <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[200px] font-mono">{lastOutput}</span>
                                   ) : (agentOutputLines[row.id]?.length ?? 0) > 0 ? (
@@ -6783,6 +7105,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               row.status === 'error' && 'bg-red-100 text-red-700',
                               !['active','idle','paused','error'].includes(row.status) && 'bg-neutral-200 text-neutral-700',
                             )}>{row.status}</span>
+                            {retryingAgents[row.id] ? (
+                              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                Retrying...
+                              </span>
+                            ) : null}
                           </div>
                           <div className="flex items-center gap-2">
                             {/* Output button */}
