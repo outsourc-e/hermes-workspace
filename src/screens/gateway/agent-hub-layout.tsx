@@ -23,6 +23,8 @@ import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayAppr
 import { ApprovalsBell } from './components/approvals-bell'
 import { TemplatePicker } from './components/template-picker'
 import { AgentChatPanel } from './components/agent-chat-panel'
+import { CostAnalyticsDashboard } from './components/cost-analytics'
+import { ExportMissionButton } from './components/export-mission'
 import { KanbanBoard } from './components/kanban-board'
 import { saveAsTemplate, type WorkflowTemplate } from './lib/workflow-templates'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
@@ -213,13 +215,14 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
-type ActiveTab = 'overview' | 'configure' | 'missions' | 'kanban'
+type ActiveTab = 'overview' | 'configure' | 'missions' | 'kanban' | 'analytics'
 type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'overview', icon: '🏠', label: 'Overview' },
   { id: 'missions', icon: '🚀', label: 'Missions' },
   { id: 'kanban', icon: '📋', label: 'Board' },
+  { id: 'analytics', icon: '📊', label: 'Analytics' },
   { id: 'configure', icon: '⚙️', label: 'Configure' },
 ]
 
@@ -7641,6 +7644,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 }}
                 agents={team.map((m) => ({ id: m.id, name: m.name }))}
               />
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="h-full min-h-0">
+              <CostAnalyticsDashboard missionReports={missionReports} />
             </div>
           )}
         </div>
