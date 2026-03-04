@@ -112,10 +112,18 @@ export const Route = createFileRoute('/api/sessions')({
           const requestedModel =
             typeof body.model === 'string' ? body.model.trim() : ''
           const model = requestedModel || undefined
+          const isolated = body.isolated === true
+          const requestedExec =
+            typeof body.exec === 'string' ? body.exec.trim() : ''
+          const exec = requestedExec || undefined
 
-          // Step 1: Create the session using friendlyId directly as the key.
+          // Create the session with its full config in one patch so
+          // subagent settings remain scoped to that session.
           const baseParams: Record<string, unknown> = { key: friendlyId }
           if (label) baseParams.label = label
+          if (model) baseParams.model = model
+          if (isolated) baseParams.isolated = true
+          if (exec) baseParams.exec = exec
 
           const payload = await gatewayRpc<SessionsPatchResponse>(
             'sessions.patch',
@@ -132,20 +140,7 @@ export const Route = createFileRoute('/api/sessions')({
             throw new Error('gateway returned an invalid response')
           }
 
-          // Step 2: Apply model as a separate patch so model errors don't abort spawn.
-          let modelApplied = false
-          if (model) {
-            try {
-              await gatewayRpc<SessionsPatchResponse>('sessions.patch', {
-                key: resolvedSessionKey,
-                model,
-              })
-              modelApplied = true
-            } catch {
-              // Model not supported or invalid — session still usable with gateway default
-              modelApplied = false
-            }
-          }
+          const modelApplied = !model || payload.ok !== false
 
           // Register the friendly id so subsequent lookups resolve quickly.
           await gatewayRpc<SessionsResolveResponse>('sessions.resolve', {

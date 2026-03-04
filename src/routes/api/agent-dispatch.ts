@@ -19,16 +19,20 @@ async function dispatchViaGateway(payload: {
   sessionKey: string
   message: string
   idempotencyKey: string
+  model?: string
 }) {
+  const params: Record<string, unknown> = {
+    sessionKey: payload.sessionKey,
+    message: payload.message,
+    lane: 'subagent',
+    deliver: false,
+    timeoutMs: 120_000,
+    idempotencyKey: payload.idempotencyKey,
+  }
+  if (payload.model) params.model = payload.model
+
   try {
-    return await gatewayRpc<DispatchGatewayResponse>('sessions.send', {
-      sessionKey: payload.sessionKey,
-      message: payload.message,
-      lane: 'subagent',
-      deliver: false,
-      timeoutMs: 120_000,
-      idempotencyKey: payload.idempotencyKey,
-    })
+    return await gatewayRpc<DispatchGatewayResponse>('sessions.send', params)
   } catch (error) {
     if (!looksLikeMethodMissingError(error)) throw error
     // Fallback for gateways that don't support sessions.send with lane param
@@ -60,6 +64,8 @@ export const Route = createFileRoute('/api/agent-dispatch')({
           const sessionKey =
             typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
           const message = String(body.message ?? '').trim()
+          const model =
+            typeof body.model === 'string' ? body.model.trim() : ''
 
           if (!sessionKey) {
             return json(
@@ -84,6 +90,7 @@ export const Route = createFileRoute('/api/agent-dispatch')({
             sessionKey,
             message,
             idempotencyKey,
+            model: model || undefined,
           })
 
           return json({

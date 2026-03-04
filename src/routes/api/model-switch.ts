@@ -29,9 +29,15 @@ export const Route = createFileRoute('/api/model-switch')({
           >
           const rawSessionKey =
             typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
-          const sessionKey = rawSessionKey || 'main'
+          const sessionKey = rawSessionKey
           const model = typeof body.model === 'string' ? body.model.trim() : ''
 
+          if (!sessionKey) {
+            return json(
+              { ok: false, error: 'sessionKey required' },
+              { status: 400 },
+            )
+          }
           if (!model) {
             return json({ ok: false, error: 'model required' }, { status: 400 })
           }

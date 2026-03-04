@@ -167,6 +167,7 @@ type MissionReportPayload = {
   artifacts: MissionArtifact[]
   tokenCount: number
   agentSummaries: MissionAgentSummary[]
+  needsEnrichment: boolean
 }
 
 type StoredMissionReport = {
@@ -589,6 +590,25 @@ function toTitleCase(value: string): string {
  * Fetch the actual chat history for an agent session and extract assistant messages.
  * Returns cleaned markdown lines from the agent's final responses — NOT raw SSE chunks.
  */
+function normalizeHistoryAssistantMessage(value: string): string {
+  return value.replace(/\r\n/g, '\n').trim()
+}
+
+function dedupeProgressiveHistoryMessages(messages: string[]): string[] {
+  const keptNormalized: string[] = []
+  const deduped = [...messages].sort((a, b) => b.length - a.length).filter((message) => {
+    const normalized = normalizeHistoryAssistantMessage(message)
+    if (!normalized) return false
+    const isProgressiveFragment = keptNormalized.some((existing) => existing.includes(normalized))
+    if (isProgressiveFragment) return false
+    keptNormalized.push(normalized)
+    return true
+  })
+
+  const dedupedSet = new Set(deduped.map((message) => normalizeHistoryAssistantMessage(message)))
+  return messages.filter((message) => dedupedSet.has(normalizeHistoryAssistantMessage(message)))
+}
+
 async function fetchAgentFinalOutput(sessionKey: string): Promise<string[]> {
   try {
     const response = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=100`)
@@ -600,13 +620,13 @@ async function fetchAgentFinalOutput(sessionKey: string): Promise<string[]> {
       .filter((m) => m.role === 'assistant')
       .map((m) => {
         const text = m.text || m.content || ''
-        return typeof text === 'string' ? text.trim() : ''
+        return typeof text === 'string' ? normalizeHistoryAssistantMessage(text) : ''
       })
       .filter((t) => t.length > 0)
-    // Return the last assistant message split into lines (the final report)
-    // If multiple assistant messages, join the last 3 (covers multi-turn research)
-    const relevant = assistantMessages.slice(-3)
-    return relevant.flatMap((msg) => msg.split('\n'))
+
+    const completeMessages = dedupeProgressiveHistoryMessages(assistantMessages)
+    const finalMessage = completeMessages.at(-1) ?? ''
+    return finalMessage ? finalMessage.split('\n') : []
   } catch {
     return []
   }
@@ -1090,6 +1110,20 @@ function cleanAgentOutputLines(lines: string[]): string[] {
   return lines.filter((line) => !isMetadataLine(line))
 }
 
+function getAgentOutputMarkdown(lines: string[]): string {
+  return cleanAgentOutputLines(lines).join('\n').trim()
+}
+
+function getLongestAgentOutput(agentSummaries: MissionAgentSummary[]): string {
+  const outputs = agentSummaries
+    .map((summary) => getAgentOutputMarkdown(summary.lines))
+    .filter((output) => output.length > 0)
+
+  if (outputs.length === 0) return ''
+  outputs.sort((a, b) => b.length - a.length)
+  return outputs[0] ?? ''
+}
+
 /**
  * Extract the last meaningful prose line from agent output for card preview.
  * Filters out raw command flags, code snippets, and noise.
@@ -1356,49 +1390,9 @@ function detectArtifactsFromText(params: {
  * Returns up to 200 chars ending on a sentence boundary, or empty string if nothing found.
  */
 function extractExecutiveSummary(agentSummaries: MissionAgentSummary[]): string {
-  // Combine all cleaned output from all agents (primary = first agent)
-  const allLines: string[] = []
-  for (const summary of agentSummaries) {
-    allLines.push(...cleanAgentOutputLines(summary.lines))
-  }
-  if (allLines.length === 0) return ''
-
-  // 1. Check for a dedicated summary/overview section
-  const summaryHeaderPattern = /^#{1,3}\s+(Summary|Overview|Executive Summary)/i
-  for (let i = 0; i < allLines.length; i++) {
-    if (summaryHeaderPattern.test(allLines[i].trim())) {
-      const sectionProse: string[] = []
-      for (let j = i + 1; j < allLines.length; j++) {
-        const trimmed = allLines[j].trim()
-        if (/^#{1,3}\s+/.test(trimmed)) break // next heading
-        if (!trimmed) continue
-        if (/^[-*]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) continue // skip bullets/lists
-        if (trimmed.length < 10) continue
-        sectionProse.push(trimmed)
-        if (sectionProse.join(' ').length >= 200) break
-      }
-      if (sectionProse.length > 0) {
-        return truncateOnSentence(sectionProse.join(' '), 200)
-      }
-    }
-  }
-
-  // 2. Fallback: first 2-3 prose lines (not headers, commands, bullets)
-  const proseLines: string[] = []
-  for (const line of allLines) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    if (/^#{1,6}\s/.test(trimmed)) continue // heading
-    if (/^[-*]\s/.test(trimmed)) continue // bullet
-    if (/^\d+\.\s/.test(trimmed)) continue // numbered list
-    if (/^```/.test(trimmed)) continue // code fence
-    if (/^[>$|]/.test(trimmed)) continue // blockquote, shell, table
-    if (trimmed.length < 15) continue // too short to be prose
-    proseLines.push(trimmed)
-    if (proseLines.length >= 3) break
-  }
-  if (proseLines.length === 0) return ''
-  return truncateOnSentence(proseLines.join(' '), 200)
+  const longestOutput = getLongestAgentOutput(agentSummaries)
+  if (!longestOutput) return ''
+  return longestOutput.length > 500 ? `${longestOutput.slice(0, 500).trimEnd()}…` : longestOutput
 }
 
 /** Truncate text to maxLen characters, ending on a sentence boundary. */
@@ -1425,44 +1419,22 @@ function truncateOnSentence(text: string, maxLen: number): string {
  * Returns up to 5 items, or empty array if nothing meaningful found.
  */
 function extractKeyFindings(agentSummaries: MissionAgentSummary[]): string[] {
-  const allLines: string[] = []
-  for (const summary of agentSummaries) {
-    allLines.push(...cleanAgentOutputLines(summary.lines))
-  }
-  if (allLines.length === 0) return []
-
   const findings: string[] = []
+  const seen = new Set<string>()
 
-  // 1. Look for known heading sections first
-  const keyHeadingPattern = /^#{1,3}\s+(Key Findings|Summary|Recommendations|Conclusion|Results)/i
-  for (let i = 0; i < allLines.length; i++) {
-    if (keyHeadingPattern.test(allLines[i].trim())) {
-      for (let j = i + 1; j < allLines.length && findings.length < 5; j++) {
-        const trimmed = allLines[j].trim()
-        if (/^#{1,3}\s+/.test(trimmed)) break // next heading
-        if (/^[-*]\s+/.test(trimmed)) {
-          findings.push(trimmed)
-        } else if (/^\d+\.\s+/.test(trimmed)) {
-          findings.push(trimmed)
-        }
-      }
-      if (findings.length > 0) return findings.slice(0, 5)
+  for (const summary of agentSummaries) {
+    for (const line of cleanAgentOutputLines(summary.lines)) {
+      const trimmed = line.trim()
+      if (!/^([-*]\s+|\d+\.\s+)/.test(trimmed)) continue
+      const key = trimmed.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      findings.push(trimmed)
+      if (findings.length >= 5) return findings
     }
   }
 
-  // 2. Fallback: collect bullet/numbered items from anywhere, pick top 5 longest (most informative)
-  const candidates: string[] = []
-  for (const line of allLines) {
-    const trimmed = line.trim()
-    if (/^[-*]\s+.{10,}/.test(trimmed) || /^\d+\.\s+.{10,}/.test(trimmed)) {
-      candidates.push(trimmed)
-    }
-  }
-  if (candidates.length === 0) return []
-
-  // Sort by length (longer = more informative) and take top 5
-  candidates.sort((a, b) => b.length - a.length)
-  return candidates.slice(0, 5)
+  return findings
 }
 
 /**
@@ -1549,15 +1521,11 @@ function generateMissionReport(payload: MissionReportPayload): string {
   } else {
     payload.agentSummaries.forEach((summary) => {
       lines.push(`### ${summary.agentName} (${summary.modelId || 'unknown'})`)
-      const cleanedLines = cleanAgentOutputLines(summary.lines)
-      if (cleanedLines.length === 0) {
+      const markdownOutput = getAgentOutputMarkdown(summary.lines)
+      if (!markdownOutput) {
         lines.push('*No output captured*')
       } else {
-        const truncated = smartTruncate(cleanedLines)
-        // Render as markdown content (preserve formatting)
-        truncated.forEach((line) => {
-          lines.push(line)
-        })
+        lines.push(markdownOutput)
       }
       lines.push('')
 
@@ -1565,7 +1533,7 @@ function generateMissionReport(payload: MissionReportPayload): string {
       const detectedFromAgent = detectArtifactsFromText({
         agentId: summary.agentId,
         agentName: summary.agentName,
-        lines: cleanedLines,
+        lines: cleanAgentOutputLines(summary.lines),
       })
       autoDetectedArtifacts.push(...detectedFromAgent)
     })
@@ -2938,6 +2906,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       artifacts: artifactsSnapshot,
       tokenCount: missionTokenCount,
       agentSummaries,
+      needsEnrichment: true,
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMissionGoal, activeMissionName, artifacts, boardTasks, missionGoal, missionTasks, missionTokenCount])
@@ -3927,7 +3896,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     const modelString = resolveGatewayModelId(member.modelId)
-    const requestBody: Record<string, string> = { friendlyId, label }
+    const requestBody: {
+      exec: string
+      friendlyId: string
+      isolated: boolean
+      label: string
+      model?: string
+    } = {
+      friendlyId,
+      label,
+      isolated: true,
+      exec: 'auto',
+    }
     if (modelString) requestBody.model = modelString
 
     const response = await fetch('/api/sessions', {
@@ -4306,6 +4286,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       }
 
       const member = teamMembers.find((entry) => entry.id === agentId)
+      const modelString = member ? resolveGatewayModelId(member.modelId) : ''
 
       try {
         const response = await fetch('/api/agent-dispatch', {
@@ -4315,6 +4296,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             sessionKey,
             message: messageText,
             agentId,
+            model: modelString || undefined,
             idempotencyKey: crypto.randomUUID(),
           }),
         })
@@ -4608,21 +4590,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       // Capture agentSessionMap before it gets cleared by stopMissionAndCleanup
       const sessionMapSnapshot = { ...agentSessionMap }
       if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
-        // Enrich agent summaries with actual chat history (not raw SSE chunks)
         const enrichAndReport = async () => {
-          // Fetch real chat history for each agent to get their actual formatted responses
-          const enrichedSummaries = await Promise.all(
-            snapshot.agentSummaries.map(async (summary) => {
-              const sessionKey = sessionMapSnapshot[summary.agentId]
-              if (!sessionKey) return summary
-              const historyLines = await fetchAgentFinalOutput(sessionKey)
-              if (historyLines.length > 0) {
-                return { ...summary, lines: historyLines }
+          const enrichedSnapshot = snapshot.needsEnrichment
+            ? {
+                ...snapshot,
+                needsEnrichment: false,
+                agentSummaries: await Promise.all(
+                  snapshot.agentSummaries.map(async (summary) => {
+                    const sessionKey = sessionMapSnapshot[summary.agentId]
+                    if (!sessionKey) return summary
+                    const historyLines = await fetchAgentFinalOutput(sessionKey)
+                    if (historyLines.length > 0) {
+                      return { ...summary, lines: historyLines }
+                    }
+                    return summary
+                  }),
+                ),
               }
-              return summary
-            }),
-          )
-          const enrichedSnapshot = { ...snapshot, agentSummaries: enrichedSummaries }
+            : snapshot
 
           // Auto-detect artifacts from agent output before generating report
           const autoDetected: MissionArtifact[] = []
