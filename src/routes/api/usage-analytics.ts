@@ -7,6 +7,66 @@ type UnknownRecord = Record<string, unknown>
 
 const REQUEST_TIMEOUT_MS = 10_000
 
+/**
+ * Model pricing per 1M tokens (input / output / cache_read / cache_write).
+ * Prices in USD. Cache read = 10% of input, cache write = 125% of input.
+ * Updated March 2026.
+ */
+const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
+  // Anthropic
+  'claude-opus-4-6':       { input: 5,    output: 25,   cacheRead: 0.50,  cacheWrite: 6.25 },
+  'claude-opus-4-5':       { input: 5,    output: 25,   cacheRead: 0.50,  cacheWrite: 6.25 },
+  'claude-sonnet-4-6':     { input: 3,    output: 15,   cacheRead: 0.30,  cacheWrite: 3.75 },
+  'claude-sonnet-4-5':     { input: 3,    output: 15,   cacheRead: 0.30,  cacheWrite: 3.75 },
+  'claude-sonnet-4':       { input: 3,    output: 15,   cacheRead: 0.30,  cacheWrite: 3.75 },
+  'claude-haiku-3-5':      { input: 0.25, output: 1.25, cacheRead: 0.025, cacheWrite: 0.3125 },
+  // OpenAI
+  'gpt-4o':                { input: 2.5,  output: 10,   cacheRead: 1.25,  cacheWrite: 2.5 },
+  'gpt-4o-mini':           { input: 0.15, output: 0.6,  cacheRead: 0.075, cacheWrite: 0.15 },
+  'gpt-5.3-codex':         { input: 0,    output: 0,    cacheRead: 0,     cacheWrite: 0 }, // free via OAuth
+  'o3':                    { input: 2,    output: 8,    cacheRead: 1,     cacheWrite: 2 },
+  'o3-mini':               { input: 1.1,  output: 4.4,  cacheRead: 0.55,  cacheWrite: 1.1 },
+  // MiniMax
+  'MiniMax-M2.5':          { input: 0.5,  output: 1.1,  cacheRead: 0.25,  cacheWrite: 0.5 },
+  'MiniMax-M2.5-Lightning':{ input: 0.2,  output: 0.5,  cacheRead: 0.1,   cacheWrite: 0.2 },
+  // Google
+  'gemini-2.5-flash':      { input: 0.15, output: 0.6,  cacheRead: 0.075, cacheWrite: 0.15 },
+  'gemini-2.5-pro':        { input: 1.25, output: 5,    cacheRead: 0.315, cacheWrite: 1.25 },
+  // Local (free)
+  'local':                 { input: 0,    output: 0,    cacheRead: 0,     cacheWrite: 0 },
+}
+
+/** Estimate cost for a given model and token counts */
+function estimateCost(modelString: string, inputTokens: number, outputTokens: number): number {
+  // Try exact match first, then fuzzy match on model name
+  const modelLower = modelString.toLowerCase()
+  let pricing = MODEL_PRICING[modelString]
+  if (!pricing) {
+    // Strip provider prefix (e.g. "anthropic/claude-sonnet-4-6" → "claude-sonnet-4-6")
+    const stripped = modelString.includes('/') ? modelString.split('/').pop() || '' : modelString
+    pricing = MODEL_PRICING[stripped]
+  }
+  if (!pricing) {
+    // Fuzzy: check if model name contains a known key
+    for (const [key, p] of Object.entries(MODEL_PRICING)) {
+      if (modelLower.includes(key.toLowerCase())) {
+        pricing = p
+        break
+      }
+    }
+  }
+  if (!pricing) {
+    // Check for local/ollama models (free)
+    if (modelLower.includes('ollama') || modelLower.includes('lmstudio') || modelLower.includes('local')) {
+      return 0
+    }
+    // Default conservative estimate: $3/$15 (sonnet-level)
+    pricing = { input: 3, output: 15, cacheRead: 0.30, cacheWrite: 3.75 }
+  }
+  // Price per token = price per 1M tokens / 1,000,000
+  return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000
+}
+
 function toRecord(value: unknown): UnknownRecord {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return value as UnknownRecord
@@ -163,24 +223,32 @@ export const Route = createFileRoute('/api/usage-analytics')({
             (s: unknown) => {
               const row = toRecord(s)
               const sessionKey = readString(row.key ?? row.sessionKey ?? '')
+              const model = readString(
+                row.modelProvider
+                  ? `${row.modelProvider}/${row.model}`
+                  : (row.model ?? ''),
+              )
+              const inputTokens = readNumber(row.inputTokens)
+              const outputTokens = readNumber(row.outputTokens)
+              // Use gateway cost if available, otherwise estimate from pricing table
+              const gatewayCost = readNumber(row.costUsd ?? row.totalCost ?? 0)
+              const costUsd = gatewayCost > 0
+                ? gatewayCost
+                : estimateCost(model, inputTokens, outputTokens)
               return {
                 sessionKey,
-                model: readString(
-                  row.modelProvider
-                    ? `${row.modelProvider}/${row.model}`
-                    : (row.model ?? ''),
-                ),
+                model,
                 agent: extractAgentName(sessionKey),
-                inputTokens: readNumber(row.inputTokens),
-                outputTokens: readNumber(row.outputTokens),
-                totalTokens: readNumber(row.totalTokens),
-                costUsd: readNumber(row.costUsd ?? row.totalCost ?? 0),
+                inputTokens,
+                outputTokens,
+                totalTokens: readNumber(row.totalTokens) || inputTokens + outputTokens,
+                costUsd,
                 lastActiveAt: toTimestampMs(row.lastActiveAt ?? row.updatedAt),
               }
             },
           )
 
-          // Aggregate per-model breakdown from sessions (since usage.cost doesn't include models)
+          // Aggregate per-model breakdown from sessions with proper cost calculation
           const modelMap = new Map<
             string,
             { inputTokens: number; outputTokens: number; totalTokens: number; costUsd: number; sessions: number }
@@ -200,6 +268,12 @@ export const Route = createFileRoute('/api/usage-analytics')({
             existing.costUsd += s.costUsd
             existing.sessions += 1
             modelMap.set(model, existing)
+          }
+          // If aggregated model costs are 0 but we have tokens, estimate from pricing table
+          for (const [model, data] of modelMap) {
+            if (data.costUsd === 0 && data.totalTokens > 0) {
+              data.costUsd = estimateCost(model, data.inputTokens, data.outputTokens)
+            }
           }
 
           const modelRows = Array.from(modelMap.entries())
