@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { HubTask, TaskStatus, TaskPriority } from './task-board'
+import { useTaskStore, type Task as StoreTask, type TaskStatus as StoreTaskStatus } from '@/stores/task-store'
 
 type AgentOption = { id: string; name: string }
 
-type KanbanColumnStatus = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
+type KanbanColumnStatus = 'backlog' | 'in_progress' | 'review' | 'done'
 
 type KanbanColumn = {
   key: KanbanColumnStatus
@@ -13,11 +14,9 @@ type KanbanColumn = {
 
 const COLUMNS: KanbanColumn[] = [
   { key: 'backlog', label: 'Backlog' },
-  { key: 'todo', label: 'Todo' },
   { key: 'in_progress', label: 'In Progress' },
-  { key: 'blocked', label: 'Blocked' },
+  { key: 'review', label: 'Review' },
   { key: 'done', label: 'Done' },
-  { key: 'cancelled', label: 'Cancelled' },
 ]
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -41,17 +40,40 @@ function isKanbanColumnStatus(value: string): value is KanbanColumnStatus {
 function mapTaskStatusToColumn(status: TaskStatus): KanbanColumnStatus {
   if (isKanbanColumnStatus(status as string)) return status as unknown as KanbanColumnStatus
   if (status === 'inbox') return 'backlog'
-  if (status === 'assigned') return 'todo'
-  if (status === 'review') return 'blocked'
-  return status === 'done' ? 'done' : 'in_progress'
+  if (status === 'assigned') return 'in_progress'
+  return status === 'done' ? 'done' : status
 }
 
 function mapColumnToTaskStatus(status: KanbanColumnStatus): TaskStatus {
   if (status === 'backlog') return 'inbox'
-  if (status === 'todo') return 'assigned'
-  if (status === 'blocked') return 'review'
-  if (status === 'cancelled') return 'done'
   return status as unknown as TaskStatus
+}
+
+function mapColumnToStoreTaskStatus(status: KanbanColumnStatus): StoreTaskStatus {
+  return status
+}
+
+function mapStoreTaskPriority(priority: StoreTask['priority']): TaskPriority {
+  if (priority === 'P0') return 'urgent'
+  if (priority === 'P1') return 'high'
+  if (priority === 'P2') return 'normal'
+  return 'low'
+}
+
+function mapStoreTaskToHubTask(task: StoreTask): HubTask {
+  const createdAt = Number.isFinite(Date.parse(task.createdAt)) ? Date.parse(task.createdAt) : Date.now()
+  const updatedAt = Number.isFinite(Date.parse(task.updatedAt)) ? Date.parse(task.updatedAt) : createdAt
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status as unknown as TaskStatus,
+    priority: mapStoreTaskPriority(task.priority),
+    agentId: task.assignedAgent,
+    missionId: task.missionId,
+    createdAt,
+    updatedAt,
+  }
 }
 
 function formatTimeInColumn(updatedAt: number): string {
@@ -82,28 +104,45 @@ export type KanbanBoardProps = {
   onUpdateTask: (task: HubTask) => void
   onDeleteTask: (taskId: string) => void
   agents: AgentOption[]
+  missionId?: string
+  onAssignAgent?: (taskId: string, agentId: string) => void
 }
 
-export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, missionId, onAssignAgent }: KanbanBoardProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<KanbanColumnStatus | null>(null)
   const [menuTaskId, setMenuTaskId] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [noteDraft, setNoteDraft] = useState('')
+  const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
+  const missionTasks = useTaskStore((state) => {
+    if (!missionId) return []
+    return state.getTasksByMission(missionId)
+  })
+
+  const mergedTasks = useMemo(() => {
+    if (!missionId) return tasks
+
+    const merged = new Map<string, HubTask>()
+    tasks.forEach((task) => merged.set(task.id, task))
+    missionTasks.forEach((task) => {
+      merged.set(task.id, mapStoreTaskToHubTask(task))
+    })
+
+    return Array.from(merged.values())
+  }, [missionId, missionTasks, tasks])
 
   const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
 
   const tasksByColumn = useMemo(() => {
     const grouped: Record<KanbanColumnStatus, HubTask[]> = {
       backlog: [],
-      todo: [],
       in_progress: [],
-      blocked: [],
+      review: [],
       done: [],
-      cancelled: [],
     }
 
-    tasks.forEach((task) => {
+    mergedTasks.forEach((task) => {
       const key = mapTaskStatusToColumn(task.status)
       grouped[key].push(task)
     })
@@ -113,7 +152,7 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents }: Kanba
     })
 
     return grouped
-  }, [tasks])
+  }, [mergedTasks])
 
   useEffect(() => {
     function handleCloseMenu() {
@@ -127,23 +166,25 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents }: Kanba
   }, [menuTaskId])
 
   function updateTask(taskId: string, updater: (task: HubTask) => HubTask) {
-    const task = tasks.find((entry) => entry.id === taskId)
+    const task = mergedTasks.find((entry) => entry.id === taskId)
     if (!task) return
     onUpdateTask(updater(task))
   }
 
   function moveTask(taskId: string, nextColumn: KanbanColumnStatus) {
+    const nextStoreStatus = mapColumnToStoreTaskStatus(nextColumn)
     updateTask(taskId, (task) => ({
       ...task,
       status: mapColumnToTaskStatus(nextColumn),
       updatedAt: Date.now(),
     }))
+    updateTaskStatus(taskId, nextStoreStatus)
   }
 
   return (
     <div className="h-full min-h-0 bg-[var(--theme-bg)]">
       <div className="h-full min-h-0 overflow-x-auto pb-2">
-        <div className="grid min-h-full w-full min-w-[72rem] grid-cols-6 gap-3 px-3 py-3 lg:min-w-0">
+        <div className="grid min-h-full w-full min-w-[52rem] grid-cols-4 gap-3 px-3 py-3 lg:min-w-0">
           {COLUMNS.map((column) => {
             const columnTasks = tasksByColumn[column.key]
 
@@ -218,6 +259,31 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents }: Kanba
                           </span>
                           <span className="truncate text-[11px] text-[var(--theme-muted)]">{assignee}</span>
                         </div>
+
+                        {onAssignAgent ? (
+                          <div className="mt-2">
+                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)]">Assign</label>
+                            <select
+                              value={task.agentId ?? ''}
+                              onChange={(event) => {
+                                const nextAgentId = event.target.value
+                                if (!nextAgentId) return
+                                onAssignAgent(task.id, nextAgentId)
+                                updateTask(task.id, (currentTask) => ({
+                                  ...currentTask,
+                                  agentId: nextAgentId,
+                                  updatedAt: Date.now(),
+                                }))
+                              }}
+                              className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 text-[11px] text-[var(--theme-text)] outline-none"
+                            >
+                              <option value="">Unassigned</option>
+                              {agents.map((agent) => (
+                                <option key={agent.id} value={agent.id}>{agent.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : null}
 
                         <p className="mt-2 text-[11px] text-[var(--theme-muted)]">{formatTimeInColumn(task.updatedAt)}</p>
                       </article>

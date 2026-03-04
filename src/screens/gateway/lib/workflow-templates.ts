@@ -4,6 +4,7 @@ export type WorkflowTemplate = {
   description: string
   icon: string
   goal: string
+  tags?: string[]
   teamConfigId?: string
   tasks: Array<{
     title: string
@@ -21,9 +22,10 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'tpl-code-review',
     name: 'Code Review',
-    description: 'Review a PR or codebase for bugs, style, and improvements',
+    description: 'Review codebase for bugs, performance issues, and code quality',
     icon: '🔍',
-    goal: 'Review the codebase for bugs, code quality issues, security concerns, and potential improvements. Provide a structured report with findings categorized by severity.',
+    goal: 'Review the codebase for bugs, performance issues, and code quality improvements',
+    tags: ['review', 'quality', 'audit'],
     tasks: [
       { title: 'Read all source files and understand architecture' },
       { title: 'Identify bugs and logic errors' },
@@ -55,9 +57,10 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'tpl-feature-build',
     name: 'Feature Build',
-    description: 'Build a new feature from spec to implementation',
+    description: 'Plan and implement a new feature end-to-end',
     icon: '🏗️',
-    goal: 'Implement the described feature following the existing codebase patterns. Include proper types, error handling, and documentation.',
+    goal: 'Plan, implement, test, and document the new feature',
+    tags: ['build', 'feature', 'implementation'],
     tasks: [
       { title: 'Analyze existing code patterns and architecture' },
       { title: 'Create new files and components' },

@@ -7250,6 +7250,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       failed: 'bg-red-500',
     }
 
+    function openRunDestination(basePath: '/logs' | '/files', runEntryId: string) {
+      const params = new URLSearchParams({
+        mission: runEntryId,
+        run: runEntryId,
+      })
+      window.location.href = `${basePath}?${params.toString()}`
+    }
+
 	    return (
 	      <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
@@ -7364,25 +7372,45 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 ) : (
                   <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
                     {filteredEntries.map((entry) => (
-                      <button
+                      <div
                         key={entry.id}
-                        type="button"
-                        onClick={() => setSelectedRunId(entry.id)}
                         className={cn(
-                          'w-full border-l-2 border-transparent px-3 py-2 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/70',
+                          'border-l-2 border-transparent px-3 py-2 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/70',
                           entry.id === selectedRunId && 'border-l-2 border-orange-500 bg-neutral-100 dark:bg-neutral-800',
                         )}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className={cn('h-2 w-2 shrink-0 rounded-full', STATUS_DOT[entry.status])} />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{entry.title}</span>
-                          <span className="shrink-0 text-[10px] tabular-nums text-neutral-500 dark:text-neutral-400">{entry.duration}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRunId(entry.id)}
+                          className="w-full text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={cn('h-2 w-2 shrink-0 rounded-full', STATUS_DOT[entry.status])} />
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{entry.title}</span>
+                            <span className="shrink-0 text-[10px] tabular-nums text-neutral-500 dark:text-neutral-400">{entry.duration}</span>
+                          </div>
+                          <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                            <span>{entry.agents.length} agent{entry.agents.length !== 1 ? 's' : ''}</span>
+                            <span className="truncate">{timeAgoFromMs(entry.startedAt)}</span>
+                          </div>
+                        </button>
+                        <div className="mt-2 flex items-center gap-3 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => openRunDestination('/logs', entry.id)}
+                            className="font-semibold text-accent-500 transition-colors hover:text-accent-400"
+                          >
+                            View Logs
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openRunDestination('/files', entry.id)}
+                            className="font-semibold text-accent-500 transition-colors hover:text-accent-400"
+                          >
+                            View Files
+                          </button>
                         </div>
-                        <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
-                          <span>{entry.agents.length} agent{entry.agents.length !== 1 ? 's' : ''}</span>
-                          <span className="truncate">{timeAgoFromMs(entry.startedAt)}</span>
-                        </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -7917,6 +7945,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   setMissionTasks((prev: HubTask[]) => prev.filter((t) => t.id !== taskId))
                 }}
                 agents={team.map((m) => ({ id: m.id, name: m.name }))}
+                missionId={missionId || undefined}
+                onAssignAgent={(taskId: string, agentId: string) => {
+                  setMissionTasks((prev: HubTask[]) =>
+                    prev.map((task) =>
+                      task.id === taskId
+                        ? { ...task, agentId, status: task.status === 'inbox' ? 'assigned' : task.status, updatedAt: Date.now() }
+                        : task,
+                    ),
+                  )
+                }}
               />
             </div>
           )}
