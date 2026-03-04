@@ -204,27 +204,18 @@ function readSessionName(session: GatewaySession): string {
 function isAgentSession(session: GatewaySession): boolean {
   const key = readSessionKey(session).toLowerCase()
 
-  // Must be a subagent session (spawned by the orchestrator)
-  if (key.includes('subagent:')) return true
-
-  // Also accept sessions explicitly marked as isolated
-  const kind = readString(session.kind).toLowerCase()
-  if (kind === 'isolated') return true
-
-  // Filter out main sessions, cron jobs, etc.
+  // Always exclude main sessions
   if (key === 'main' || key.includes(':main')) return false
-
   const friendlyId = readString(session.friendlyId).toLowerCase()
   if (friendlyId === 'main') return false
 
-  // Accept Codex agent sessions (agent:codex:UUID but not agent:codex:main or cron)
-  if (key.startsWith('agent:') && !key.includes('cron')) return true
+  // Always exclude cron jobs
+  if (key.includes('cron')) return false
+  const kind = readString(session.kind).toLowerCase()
+  if (kind === 'cron') return false
 
-  // Accept labeled sessions (user-spawned with a label)
-  const label = readString(session.label)
-  if (label.length > 0 && !key.includes('cron')) return true
-
-  return false
+  // Everything else is an agent session — inclusive by default (#37)
+  return true
 }
 
 function readTaskText(session: GatewaySession): string {
