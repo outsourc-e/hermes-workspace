@@ -14,6 +14,7 @@ type RunConsoleProps = {
   runTitle: string
   runStatus: 'running' | 'needs_input' | 'complete' | 'failed'
   agents: Array<{ id: string; name: string; modelId?: string; status?: string }>
+  pendingApprovals?: Array<{ id: string; tool: string; args?: string; agentName?: string }>
   startedAt?: number
   duration?: string
   tokenCount?: number
@@ -123,11 +124,23 @@ function extractContent(msg: { content?: string; parts?: Array<{ text?: string }
   return ''
 }
 
+function sanitizeArgsPreview(args?: string): string {
+  if (!args) return 'No arguments'
+  const cleaned = args
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return 'No arguments'
+  if (cleaned.length <= 200) return cleaned
+  return `${cleaned.slice(0, 200)}...`
+}
+
 export function RunConsole({
   runId,
   runTitle,
   runStatus,
   agents,
+  pendingApprovals,
   startedAt,
   duration,
   tokenCount,
@@ -356,6 +369,56 @@ export function RunConsole({
                 </button>
               </div>
             </div>
+
+            {pendingApprovals && pendingApprovals.length > 0 ? (
+              <section className="sticky top-0 z-10 rounded-lg border border-amber-500/40 bg-amber-500/15 p-3 shadow-lg backdrop-blur">
+                <h3 className="text-sm font-semibold text-amber-200">⚠️ Approval Required</h3>
+                <ol className="mt-2 space-y-2">
+                  {pendingApprovals.map((approval) => (
+                    <li
+                      key={approval.id}
+                      className="rounded-md border border-amber-500/30 bg-primary-950/60 p-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="space-y-1">
+                          <p className="text-xs text-amber-100">
+                            Tool: <span className="font-semibold">{approval.tool}</span>
+                          </p>
+                          <p className="text-xs text-primary-200">
+                            Agent: <span className="font-medium">{approval.agentName || 'Unknown agent'}</span>
+                          </p>
+                          <p className="text-xs text-primary-300 break-all">
+                            Args: {sanitizeArgsPreview(approval.args)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => console.log('approve pending approval', approval.id)}
+                            className="rounded-md border border-amber-500/50 bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-500/30"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => console.log('deny pending approval', approval.id)}
+                            className="rounded-md border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-xs font-medium text-primary-200 transition-colors hover:bg-primary-800"
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
+
+            {runStatus === 'needs_input' && (!pendingApprovals || pendingApprovals.length === 0) ? (
+              <div className="rounded-lg border border-primary-700/80 bg-primary-900/60 px-3 py-2 text-xs text-primary-300">
+                Mission is waiting for input — check the approval queue
+              </div>
+            ) : null}
 
             {streamView === 'combined' ? (
               <ol className="space-y-2">
