@@ -7006,6 +7006,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       agents={selectedEntry.agents.map((name, i) => ({ id: String(i), name }))}
                       duration={selectedEntry.duration}
                       onClose={() => setSelectedRunId(null)}
+                      sessionKeys={selectedEntry.status === 'running' || selectedEntry.status === 'needs_input' ? Object.values(agentSessionMap) : undefined}
+                      agentNameMap={Object.fromEntries(Object.entries(agentSessionMap).map(([agentId, sessionKey]) => [sessionKey, team.find(m => m.id === agentId)?.name ?? agentId]))}
                     />
                   )
                 })() : (
