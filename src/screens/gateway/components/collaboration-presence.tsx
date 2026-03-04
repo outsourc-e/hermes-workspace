@@ -180,6 +180,8 @@ export function CollaborationPresence() {
   const overflowCount = Math.max(users.length - shownUsers.length, 0)
   const isSolo = users.length <= 1
 
+  if (isSolo) return null
+
   return (
     <div className="flex items-center gap-2 rounded-full border border-primary-800/80 bg-primary-900/80 px-2.5 py-1 text-[10px] text-primary-300 shadow-sm backdrop-blur">
       <div className="flex -space-x-1">

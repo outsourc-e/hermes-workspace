@@ -6,6 +6,27 @@ export type RemoteAgentsPanelProps = {
   localSessionKeys: string[]
 }
 
+function shouldHideSession(session: GatewaySession): boolean {
+  const label = session.label ?? ''
+  const title = session.title ?? ''
+  const normalizedLabel = label.toLowerCase()
+  const normalizedTitle = title.toLowerCase()
+
+  if (/^cron[:\s]/i.test(label)) return true
+  if (/^cron[:\s]/i.test(title)) return true
+  if (session.kind === 'cron') return true
+  if (normalizedLabel.includes('untrusted metadata')) return true
+
+  const hasNoiseMarker = [
+    'memory-consolidator',
+    'morning brief',
+    'evening wrap',
+    'weekly',
+  ].some((marker) => normalizedLabel.includes(marker) || normalizedTitle.includes(marker))
+
+  return hasNoiseMarker
+}
+
 function timeAgo(ts: number | string | undefined): string {
   if (!ts) return ''
   const rawTime = typeof ts === 'string' ? new Date(ts).getTime() : ts
@@ -51,7 +72,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
     setError(null)
     try {
       const res = await fetchSessions()
-      const remote = (res.sessions ?? []).filter((s) => s.key && !localSet.has(s.key))
+      const remote = (res.sessions ?? []).filter((s) => s.key && !localSet.has(s.key) && !shouldHideSession(s))
       setSessions(remote)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch sessions')

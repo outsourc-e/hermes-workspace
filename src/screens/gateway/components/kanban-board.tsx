@@ -143,7 +143,7 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents }: Kanba
   return (
     <div className="h-full min-h-0 bg-[var(--theme-bg)]">
       <div className="h-full min-h-0 overflow-x-auto pb-2">
-        <div className="inline-grid min-h-full min-w-max grid-flow-col auto-cols-[minmax(16rem,1fr)] gap-3 px-3 py-3 lg:grid-flow-row lg:auto-cols-auto lg:grid-cols-6 lg:min-w-0">
+        <div className="grid min-h-full w-full min-w-[72rem] grid-cols-6 gap-3 px-3 py-3 lg:min-w-0">
           {COLUMNS.map((column) => {
             const columnTasks = tasksByColumn[column.key]
 
@@ -165,7 +165,7 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents }: Kanba
                   setDragOverColumn(null)
                 }}
                 className={cn(
-                  'flex min-h-0 flex-col rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]',
+                  'flex min-h-0 min-w-0 flex-col rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]',
                   'max-h-[calc(100vh-15rem)] lg:max-h-[calc(100vh-13rem)]',
                   dragOverColumn === column.key && 'border-orange-400/70 bg-[var(--theme-card2)]',
                 )}
