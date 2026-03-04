@@ -17,6 +17,7 @@ import {
   useMissionStore,
   type MissionArtifact,
 } from '@/stores/mission-store'
+import { useTaskStore } from '@/stores/task-store'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
@@ -5390,6 +5391,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     setMissionState('running')
     setView('board')
+
+    // CS-021: Generate tasks from plan on mission launch
+    if (missionPlan.length > 0) {
+      const enabledPlanTasks = missionPlan.filter((t) => t.enabled)
+      if (enabledPlanTasks.length > 0) {
+        const { upsertMissionTasks } = useTaskStore.getState()
+        upsertMissionTasks(enabledPlanTasks.map((t) => ({
+          title: t.title,
+          description: t.description,
+          status: 'backlog' as const,
+          priority: 'P1' as const,
+          missionId: missionId,
+          assignedAgent: t.agent,
+          tags: ['auto-generated', 'from-plan'],
+        })))
+      }
+    }
+
     pendingMissionNameRef.current = ''
     pendingMissionBudgetLimitRef.current = ''
     setBudgetLimit(launchBudgetLimit)
