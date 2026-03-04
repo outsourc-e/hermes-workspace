@@ -214,6 +214,10 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
   const today = startOfDay(new Date())
 
   const monthGrid = useMemo(() => getMonthGrid(cursorDate), [cursorDate])
+  const monthRange = useMemo(
+    () => ({ start: monthGrid.gridStart, end: monthGrid.gridEnd, days: monthGrid.days }),
+    [monthGrid.days, monthGrid.gridEnd, monthGrid.gridStart],
+  )
 
   const weekRange = useMemo(() => {
     const start = startOfWeek(cursorDate)
@@ -222,7 +226,7 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
 
   const dayRange = useMemo(() => ({ start: startOfDay(cursorDate), end: startOfDay(cursorDate), days: [startOfDay(cursorDate)] }), [cursorDate])
 
-  const activeRange = mode === 'month' ? monthGrid : mode === 'week' ? weekRange : dayRange
+  const activeRange = mode === 'month' ? monthRange : mode === 'week' ? weekRange : dayRange
 
   const events = useMemo(() => {
     const rangeStart = startOfDay(activeRange.start)

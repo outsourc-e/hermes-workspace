@@ -5698,11 +5698,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return selected.length >= 3 ? selected : questionPool.slice(0, 5).map((question) => ({ key: question.key, text: question.text }))
   }, [newMissionGoal])
 
-  const generateMockMissionPlan = useCallback(() => {
+  const buildMockMissionPlan = useCallback((): MissionPlanItem[] => {
     const trimmedGoal = newMissionGoal.trim()
     if (!trimmedGoal) {
-      setMissionPlan([])
-      return
+      return []
     }
 
     const loweredGoal = trimmedGoal.toLowerCase()
@@ -5766,14 +5765,213 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
     const teamMembers = selectedConfig?.team ?? team
     const tasksToUse = baseTasks.slice(0, 5)
-    const generatedPlan = tasksToUse.map((task, index) => ({
+    return tasksToUse.map((task, index) => ({
       ...task,
       agent: teamMembers.length > 0 ? teamMembers[index % teamMembers.length]?.name : undefined,
       enabled: true,
     }))
-
-    setMissionPlan(generatedPlan)
   }, [newMissionGoal, newMissionTeamConfigId, team, teamConfigs])
+
+  const formatPlanningAnswers = useCallback((): string => {
+    const lines = planningQuestions.map((question, index) => {
+      const answer = (planAnswers[question.key] ?? '').trim()
+      return `${index + 1}. ${question.text}\nAnswer: ${answer || '(not provided)'}`
+    })
+    return lines.join('\n\n')
+  }, [planAnswers, planningQuestions])
+
+  const extractMessageText = useCallback((message: unknown): string => {
+    if (!message || typeof message !== 'object') return ''
+    const raw = message as Record<string, unknown>
+
+    if (typeof raw.text === 'string' && raw.text.trim().length > 0) {
+      return raw.text.trim()
+    }
+    if (typeof raw.message === 'string' && raw.message.trim().length > 0) {
+      return raw.message.trim()
+    }
+    if (typeof raw.body === 'string' && raw.body.trim().length > 0) {
+      return raw.body.trim()
+    }
+
+    if (Array.isArray(raw.content)) {
+      const text = raw.content
+        .map((part) => {
+          if (!part || typeof part !== 'object') return ''
+          const typedPart = part as Record<string, unknown>
+          return typeof typedPart.text === 'string' ? typedPart.text : ''
+        })
+        .join('')
+        .trim()
+      if (text.length > 0) return text
+    }
+
+    return ''
+  }, [])
+
+  const stripJsonCodeFences = useCallback((text: string): string => {
+    const trimmed = text.trim()
+    const match = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+    return match ? match[1].trim() : trimmed
+  }, [])
+
+  const parsePlannedTasks = useCallback((responseText: string): MissionPlanItem[] => {
+    const cleaned = stripJsonCodeFences(responseText)
+    const parsed = JSON.parse(cleaned) as unknown
+
+    if (!Array.isArray(parsed)) {
+      throw new Error('Planner response was not a JSON array')
+    }
+
+    const tasks = parsed
+      .map((item): MissionPlanItem | null => {
+        if (!item || typeof item !== 'object') return null
+        const candidate = item as Record<string, unknown>
+        const title = typeof candidate.title === 'string' ? candidate.title.trim() : ''
+        if (!title) return null
+        const description = typeof candidate.description === 'string'
+          ? candidate.description.trim()
+          : ''
+        const agent = typeof candidate.agent === 'string' ? candidate.agent.trim() : ''
+        const task: MissionPlanItem = {
+          title,
+          description,
+          enabled: true,
+        }
+        if (agent) {
+          task.agent = agent
+        }
+        return task
+      })
+      .filter((task): task is MissionPlanItem => task !== null)
+
+    if (tasks.length === 0) {
+      throw new Error('Planner response did not include valid tasks')
+    }
+    return tasks
+  }, [stripJsonCodeFences])
+
+  const readPlannerResponseFromSession = useCallback(async (sessionKey: string): Promise<string> => {
+    const maxAttempts = 6
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 800)
+        })
+      }
+
+      const response = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=30`)
+      if (!response.ok) continue
+
+      const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+      const messages = Array.isArray(payload.messages) ? payload.messages : []
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index]
+        if (!message || typeof message !== 'object') continue
+        const role = typeof (message as Record<string, unknown>).role === 'string'
+          ? (message as Record<string, unknown>).role
+          : ''
+        if (role !== 'assistant') continue
+        const text = extractMessageText(message)
+        if (text.length > 0) return text
+      }
+    }
+
+    throw new Error('No planner response received from session')
+  }, [extractMessageText])
+
+  const requestPlanFromApiChat = useCallback(async (prompt: string): Promise<string> => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: prompt }),
+    })
+    if (!response.ok) {
+      throw new Error(`Planning API failed (${response.status})`)
+    }
+
+    const rawText = (await response.text()).trim()
+    if (!rawText) {
+      throw new Error('Planning API returned empty response')
+    }
+
+    try {
+      const parsed = JSON.parse(rawText) as Record<string, unknown>
+      const nestedData =
+        parsed.data && typeof parsed.data === 'object'
+          ? (parsed.data as Record<string, unknown>)
+          : null
+      const candidates: unknown[] = [
+        parsed.response,
+        parsed.message,
+        parsed.text,
+        nestedData?.response,
+        nestedData?.message,
+        nestedData?.text,
+      ]
+      for (const candidate of candidates) {
+        if (typeof candidate === 'string' && candidate.trim().length > 0) {
+          return candidate.trim()
+        }
+      }
+    } catch {
+      // Some handlers may return plain text directly.
+    }
+
+    return rawText
+  }, [])
+
+  const generateMissionPlan = useCallback(async () => {
+    const trimmedGoal = newMissionGoal.trim()
+    if (!trimmedGoal) {
+      setMissionPlan([])
+      return
+    }
+
+    const prompt = `You are a project planner. Given this goal and context, break it down into 3-7 concrete tasks.
+
+Goal: ${trimmedGoal}
+Context from questions:
+${formatPlanningAnswers()}
+
+Respond with ONLY a JSON array, no markdown:
+[{"title": "task title", "description": "what to do", "agent": "suggested agent name"}]`
+
+    setPlanGenerating(true)
+    try {
+      const availableSessionKey = Object.values(agentSessionMap).find(
+        (sessionKey): sessionKey is string =>
+          typeof sessionKey === 'string' && sessionKey.trim().length > 0,
+      )
+
+      const responseText = availableSessionKey
+        ? await (async () => {
+            await sendToSession(availableSessionKey, prompt)
+            return readPlannerResponseFromSession(availableSessionKey)
+          })()
+        : await requestPlanFromApiChat(prompt)
+
+      try {
+        const parsedTasks = parsePlannedTasks(responseText)
+        setMissionPlan(parsedTasks)
+      } catch {
+        toast('Could not parse planner JSON response. Kept existing plan.', { type: 'error' })
+      }
+    } catch {
+      setMissionPlan(buildMockMissionPlan())
+      toast('AI planning failed. Using fallback mission plan.', { type: 'warning' })
+    } finally {
+      setPlanGenerating(false)
+    }
+  }, [
+    agentSessionMap,
+    buildMockMissionPlan,
+    formatPlanningAnswers,
+    newMissionGoal,
+    parsePlannedTasks,
+    readPlannerResponseFromSession,
+    requestPlanFromApiChat,
+  ])
 
 
 
@@ -8408,15 +8606,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
                       <div>
                         <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Draft Mission Plan</p>
-                        <p className="text-[11px] text-neutral-500 dark:text-slate-400">Generate a mock plan from the goal and adjust task toggles before launch.</p>
+                        <p className="text-[11px] text-neutral-500 dark:text-slate-400">Generate a plan from your goal and context, then adjust task toggles before launch.</p>
                       </div>
                       <button
                         type="button"
-                        onClick={generateMockMissionPlan}
-                        disabled={!newMissionGoal.trim()}
-                        className="rounded-lg bg-accent-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-400 disabled:opacity-50"
+                        onClick={() => {
+                          void generateMissionPlan()
+                        }}
+                        disabled={!newMissionGoal.trim() || planGenerating}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-400 disabled:opacity-50"
                       >
-                        Generate Plan
+                        {planGenerating ? <span className="size-3.5 animate-spin rounded-full border border-white/40 border-t-white" aria-hidden /> : null}
+                        {planGenerating ? 'Generating...' : 'Generate Plan'}
                       </button>
                     </div>
 
