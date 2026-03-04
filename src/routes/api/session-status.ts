@@ -9,11 +9,13 @@ const SESSION_STATUS_METHODS = [
   'sessions.status',
 ]
 
-async function trySessionStatus(): Promise<unknown> {
+async function trySessionStatus(sessionKey?: string): Promise<unknown> {
   let lastError: unknown = null
+  const params: Record<string, unknown> = {}
+  if (sessionKey) params.sessionKey = sessionKey
   for (const method of SESSION_STATUS_METHODS) {
     try {
-      return await gatewayRpc(method)
+      return await gatewayRpc(method, params)
     } catch (error) {
       lastError = error
     }
@@ -52,9 +54,14 @@ export const Route = createFileRoute('/api/session-status')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         try {
+          const url = new URL(request.url)
+          const requestedKey = url.searchParams.get('sessionKey')?.trim() || ''
+          // Default to main session so agent hub model changes don't bleed into main chat
+          const sessionKey = requestedKey || 'main'
+
           // Fetch both status and usage data in parallel
           const [statusResult, usageResult] = await Promise.allSettled([
-            trySessionStatus(),
+            trySessionStatus(sessionKey),
             gatewayRpc<any>('sessions.usage', {
               limit: 5,
               includeContextWeight: true,
