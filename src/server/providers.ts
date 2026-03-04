@@ -40,10 +40,40 @@ export function invalidateCache(): void {
  * Strip JS-style comments and trailing commas from a JSON-ish string (JSONC).
  */
 function stripJsonc(raw: string): string {
-  // Remove block comments /* ... */
-  let result = raw.replace(/\/\*[\s\S]*?\*\//g, '')
-  // Remove line comments // ...
-  result = result.replace(/\/\/[^\n\r]*/g, '')
+  // Strip comments while respecting quoted strings.
+  // Walk character-by-character to avoid stripping // inside "https://..." etc.
+  let result = ''
+  let i = 0
+  const len = raw.length
+  while (i < len) {
+    const ch = raw[i]
+    // Skip over strings — preserve contents verbatim
+    if (ch === '"') {
+      let j = i + 1
+      while (j < len) {
+        if (raw[j] === '\\') { j += 2; continue }
+        if (raw[j] === '"') { j++; break }
+        j++
+      }
+      result += raw.slice(i, j)
+      i = j
+      continue
+    }
+    // Block comment /* ... */
+    if (ch === '/' && raw[i + 1] === '*') {
+      const end = raw.indexOf('*/', i + 2)
+      i = end === -1 ? len : end + 2
+      continue
+    }
+    // Line comment // ...
+    if (ch === '/' && raw[i + 1] === '/') {
+      const end = raw.indexOf('\n', i + 2)
+      i = end === -1 ? len : end
+      continue
+    }
+    result += ch
+    i++
+  }
   // Remove trailing commas before } or ]
   result = result.replace(/,(\s*[}\]])/g, '$1')
   return result
