@@ -7438,11 +7438,53 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             {/* Orange top accent — inside the card, flush with rounded corners */}
             <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400" />
             <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-baseline gap-2">
+              <div className="flex min-w-0 items-center gap-3">
                 <h1 className="shrink-0 text-lg font-bold text-ink dark:text-white md:text-xl">Agent Hub</h1>
-                <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
+                <p className="hidden sm:block truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
               </div>
               <div className="flex items-center gap-2">
+                {/* Fleet status badges */}
+                {(() => {
+                  const active = agentWorkingRows.filter((r) => r.status === 'active' || r.status === 'spawning').length
+                  const idle = agentWorkingRows.filter((r) => r.status === 'idle' || r.status === 'ready').length
+                  const errored = agentWorkingRows.filter((r) => r.status === 'error').length
+                  const waiting = agentWorkingRows.filter((r) => r.status === 'waiting_for_input').length
+                  const total = team.length
+                  if (total === 0) return null
+                  return (
+                    <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-medium tabular-nums">
+                      {active > 0 && (
+                        <span className="flex items-center gap-1 rounded-full bg-sky-100 dark:bg-sky-900/40 px-2 py-0.5 text-sky-700 dark:text-sky-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+                          {active} active
+                        </span>
+                      )}
+                      {waiting > 0 && (
+                        <span className="flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-amber-700 dark:text-amber-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          {waiting} waiting
+                        </span>
+                      )}
+                      {errored > 0 && (
+                        <span className="flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-red-700 dark:text-red-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                          {errored} error
+                        </span>
+                      )}
+                      {idle > 0 && !active && !waiting && (
+                        <span className="flex items-center gap-1 rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-neutral-500 dark:text-neutral-400">
+                          {idle} idle
+                        </span>
+                      )}
+                      <span className="text-neutral-400 dark:text-neutral-600">{total} total</span>
+                    </div>
+                  )
+                })()}
+                {approvals.some((a) => a.status === 'pending') && (
+                  <span className="flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                    {approvals.filter((a) => a.status === 'pending').length}
+                  </span>
+                )}
                 <ApprovalsBell
                   approvals={approvals}
                   onApprove={handleApprove}
