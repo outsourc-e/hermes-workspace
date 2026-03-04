@@ -20,6 +20,11 @@ type RunConsoleProps = {
   tokenCount?: number
   costEstimate?: number
   onClose?: () => void
+  onStopMission?: () => void
+  onKillAgent?: (agentId: string) => void
+  onSteerAgent?: (agentId: string, message: string) => void
+  onApprove?: (approvalId: string) => void
+  onDeny?: (approvalId: string) => void
   sessionKeys?: string[]
   agentNameMap?: Record<string, string>
 }
@@ -146,11 +151,18 @@ export function RunConsole({
   tokenCount,
   costEstimate,
   onClose,
+  onStopMission,
+  onKillAgent,
+  onSteerAgent,
+  onApprove,
+  onDeny,
   sessionKeys,
   agentNameMap,
 }: RunConsoleProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('stream')
   const [streamView, setStreamView] = useState<StreamView>('combined')
+  const [steerTarget, setSteerTarget] = useState<string | null>(null)
+  const [steerInput, setSteerInput] = useState('')
   const [liveEvents, setLiveEvents] = useState<LiveStreamEvent[]>([])
   const [isAutoScroll, setIsAutoScroll] = useState(true)
   const streamEndRef = useRef<HTMLDivElement>(null)
@@ -300,15 +312,26 @@ export function RunConsole({
               ))}
             </div>
           </div>
-          {onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 items-center rounded-md border border-primary-700 bg-primary-900/70 px-3 text-xs font-medium text-primary-200 transition-colors hover:border-primary-600 hover:bg-primary-800"
-            >
-              Close
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {runStatus === 'running' && onStopMission ? (
+              <button
+                type="button"
+                onClick={onStopMission}
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-red-500/40 bg-red-500/15 px-3 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/25"
+              >
+                ■ Stop
+              </button>
+            ) : null}
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-8 items-center rounded-md border border-primary-700 bg-primary-900/70 px-3 text-xs font-medium text-primary-200 transition-colors hover:border-primary-600 hover:bg-primary-800"
+              >
+                Close
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -336,6 +359,77 @@ export function RunConsole({
           ))}
         </div>
       </nav>
+
+      {/* Agent control bar */}
+      {(runStatus === 'running' || runStatus === 'needs_input') && agents.length > 0 ? (
+        <div className="border-b border-primary-800/60 px-4 py-2 sm:px-5">
+          <div className="flex flex-wrap items-center gap-2">
+            {agents.map((agent) => (
+              <div key={agent.id} className="inline-flex items-center gap-1.5 rounded-lg border border-primary-700/80 bg-primary-900/50 px-2 py-1">
+                <span className={cn('h-1.5 w-1.5 rounded-full', agent.status === 'active' || agent.status === 'running' ? 'bg-emerald-400 animate-pulse' : agent.status === 'waiting_for_input' ? 'bg-amber-400' : 'bg-primary-500')} />
+                <span className="text-[11px] font-medium text-primary-200">{agent.name}</span>
+                {onSteerAgent ? (
+                  <button
+                    type="button"
+                    onClick={() => setSteerTarget(steerTarget === agent.id ? null : agent.id)}
+                    className="rounded px-1.5 py-0.5 text-[10px] text-primary-400 transition-colors hover:bg-primary-800 hover:text-primary-200"
+                  >
+                    Steer
+                  </button>
+                ) : null}
+                {onKillAgent ? (
+                  <button
+                    type="button"
+                    onClick={() => onKillAgent(agent.id)}
+                    className="rounded px-1.5 py-0.5 text-[10px] text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
+                  >
+                    Kill
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {steerTarget && onSteerAgent ? (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[11px] text-primary-400">→ {agents.find(a => a.id === steerTarget)?.name}:</span>
+              <input
+                type="text"
+                value={steerInput}
+                onChange={(e) => setSteerInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && steerInput.trim()) {
+                    onSteerAgent(steerTarget, steerInput.trim())
+                    setSteerInput('')
+                    setSteerTarget(null)
+                  }
+                }}
+                placeholder="Send directive..."
+                className="flex-1 rounded-md border border-primary-700 bg-primary-950 px-2 py-1 text-xs text-primary-100 placeholder:text-primary-500 focus:border-accent-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (steerInput.trim()) {
+                    onSteerAgent(steerTarget, steerInput.trim())
+                    setSteerInput('')
+                    setSteerTarget(null)
+                  }
+                }}
+                className="rounded-md bg-accent-500/20 px-2 py-1 text-[11px] font-medium text-accent-300 transition-colors hover:bg-accent-500/30"
+              >
+                Send
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSteerTarget(null); setSteerInput('') }}
+                className="text-[11px] text-primary-500 hover:text-primary-300"
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div ref={scrollContainerRef} onScroll={handleStreamScroll} className="flex-1 overflow-auto px-4 py-4 sm:px-5">
         {activeTab === 'stream' ? (
@@ -394,14 +488,14 @@ export function RunConsole({
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => console.log('approve pending approval', approval.id)}
+                            onClick={() => onApprove ? onApprove(approval.id) : console.log('approve pending approval', approval.id)}
                             className="rounded-md border border-amber-500/50 bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-500/30"
                           >
                             Approve
                           </button>
                           <button
                             type="button"
-                            onClick={() => console.log('deny pending approval', approval.id)}
+                            onClick={() => onDeny ? onDeny(approval.id) : console.log('deny pending approval', approval.id)}
                             className="rounded-md border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-xs font-medium text-primary-200 transition-colors hover:bg-primary-800"
                           >
                             Deny

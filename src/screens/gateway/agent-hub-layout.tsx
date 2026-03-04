@@ -7366,9 +7366,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       runId={selectedEntry.id}
                       runTitle={selectedEntry.title}
                       runStatus={selectedEntry.status}
-                      agents={selectedEntry.agents.map((name, i) => ({ id: String(i), name }))}
+                      agents={team.length > 0
+                        ? team.map((m) => ({ id: m.id, name: m.name, modelId: m.modelId, status: agentSessionStatus[m.id]?.status }))
+                        : selectedEntry.agents.map((name, i) => ({ id: String(i), name }))}
                       duration={selectedEntry.duration}
                       onClose={() => setSelectedRunId(null)}
+                      onStopMission={() => stopMissionAndCleanup('aborted')}
+                      onKillAgent={(agentId) => void handleKillAgent(agentId)}
+                      onSteerAgent={(agentId, msg) => void handleSteerAgent(agentId, msg)}
                       sessionKeys={selectedEntry.status === 'running' || selectedEntry.status === 'needs_input' ? Object.values(agentSessionMap) : undefined}
                       agentNameMap={Object.fromEntries(Object.entries(agentSessionMap).map(([agentId, sessionKey]) => [sessionKey, team.find(m => m.id === agentId)?.name ?? agentId]))}
                     />
