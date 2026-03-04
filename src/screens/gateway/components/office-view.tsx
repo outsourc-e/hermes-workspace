@@ -23,6 +23,8 @@ export type OfficeViewProps = {
   selectedOutputAgentId?: string
   activeTemplateName?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
+  companyName?: string
+  agentTasks?: Record<string, string>
   remoteSessions?: RemoteSession[]
   onViewRemoteOutput?: (sessionKey: string, label: string) => void
   /** Fixed pixel height for the office container (compact mode) */
@@ -194,6 +196,34 @@ function getAgentStatusGlowClass(status: AgentWorkingStatus): string {
   }
 }
 
+function getAgentStatusGlowColor(status: AgentWorkingStatus): string {
+  switch (status) {
+    case 'active':
+      return '#10b981'
+    case 'spawning':
+      return '#3b82f6'
+    case 'paused':
+      return '#f59e0b'
+    case 'error':
+      return '#ef4444'
+    default:
+      return '#94a3b8'
+  }
+}
+
+function truncateMonitorText(text: string, max = 30): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+  return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1).trimEnd()}…`
+}
+
+function getDeskMonitorText(agent: AgentWorkingRow, agentTaskTitle?: string): string {
+  const taskTitle = agentTaskTitle?.trim()
+  if (taskTitle) return truncateMonitorText(taskTitle, 30)
+  if (agent.status === 'idle' || agent.status === 'ready') return 'Ready'
+  return getAgentStatusMeta(agent.status).label
+}
+
 function getAgentEmoji(agent: AgentWorkingRow): string | null {
   const row = agent as AgentWorkingRow & { emoji?: string; avatarEmoji?: string }
   const emoji = row.emoji?.trim() || row.avatarEmoji?.trim()
@@ -202,7 +232,21 @@ function getAgentEmoji(agent: AgentWorkingRow): string | null {
 
 // ── SVG Office Furniture ──
 
-function DeskSVG({ x, y, occupied, accent }: { x: number; y: number; occupied: boolean; accent?: string }) {
+function DeskSVG({
+  x,
+  y,
+  occupied,
+  accent,
+  monitorText,
+  monitorGlow,
+}: {
+  x: number
+  y: number
+  occupied: boolean
+  accent?: string
+  monitorText?: string
+  monitorGlow?: string
+}) {
   return (
     <g transform={`translate(${x} ${y})`}>
       {/* Desk surface */}
@@ -213,8 +257,21 @@ function DeskSVG({ x, y, occupied, accent }: { x: number; y: number; occupied: b
       {/* Monitor */}
       {occupied ? (
         <>
-          <rect x="-18" y="-28" width="36" height="22" rx="3" fill="#1e293b" />
-          <rect x="-15" y="-25" width="30" height="16" rx="1.5" fill={accent || '#3b82f6'} opacity="0.8" />
+          <rect x="-20" y="-30" width="40" height="24" rx="3" fill={monitorGlow || '#3b82f6'} opacity="0.2" />
+          <rect x="-18" y="-28" width="36" height="22" rx="3" fill="#0f172a" />
+          <rect x="-15" y="-25" width="30" height="16" rx="1.5" fill="#111827" stroke={monitorGlow || accent || '#3b82f6'} strokeWidth="0.9" />
+          {monitorText ? (
+            <text
+              x="0"
+              y="-14.8"
+              fontSize="4.2"
+              fill="#e2e8f0"
+              textAnchor="middle"
+              fontWeight="600"
+            >
+              {monitorText}
+            </text>
+          ) : null}
           <rect x="-3" y="-6" width="6" height="6" rx="1" fill="#64748b" />
         </>
       ) : (
@@ -365,6 +422,8 @@ export function OfficeView({
   onNewMission,
   selectedOutputAgentId,
   activeTemplateName: _activeTemplateName,
+  companyName = 'Mission Control',
+  agentTasks = {},
   remoteSessions = [],
   onViewRemoteOutput,
   containerHeight,
@@ -659,6 +718,9 @@ export function OfficeView({
           {deskPositions.map((desk, i) => {
             const occupied = i < agentRows.length
             const accent = occupied ? AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length] : undefined
+            const agent = occupied ? agentRows[i] : undefined
+            const monitorText = agent ? getDeskMonitorText(agent, agentTasks[agent.id]) : undefined
+            const monitorGlow = agent ? getAgentStatusGlowColor(agent.status) : undefined
             return (
               <g
                 key={`desk-${i}`}
@@ -668,11 +730,27 @@ export function OfficeView({
                   transition: 'transform 0.5s ease-in-out',
                 }}
               >
-                <DeskSVG x={0} y={0} occupied={occupied} accent={accent?.hex} />
+                <DeskSVG
+                  x={0}
+                  y={0}
+                  occupied={occupied}
+                  accent={accent?.hex}
+                  monitorText={monitorText}
+                  monitorGlow={monitorGlow}
+                />
               </g>
             )
           })}
         </svg>
+
+        {/* Office whiteboard */}
+        <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+          <div className="rounded-md border border-neutral-300/90 bg-[#fdfdf8] px-4 py-2 shadow-[0_2px_8px_rgba(15,23,42,0.15)]">
+            <span className="block whitespace-nowrap text-center text-sm font-bold tracking-wide text-neutral-800 [font-family:'Bradley_Hand','Marker_Felt','Comic_Sans_MS',cursive]">
+              {companyName}
+            </span>
+          </div>
+        </div>
 
         {/* Agent avatars (HTML overlay for interactivity) */}
         {agentRows.map((agent, index) => {
