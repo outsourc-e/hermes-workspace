@@ -581,9 +581,13 @@ export function AgentViewPanel() {
     nowMs,
     lastRefreshedMs,
     activeAgents,
+    missionActiveAgents,
+    nonMissionActiveAgents,
     queuedAgents,
     historyAgents,
     historyOpen,
+    activeMissionName,
+    activeMissionState,
     isLoading,
     isLiveConnected,
     errorMessage,
@@ -626,6 +630,10 @@ export function AgentViewPanel() {
     },
     [activeAgents],
   )
+  const missionSessionIds = useMemo(
+    () => new Set(missionActiveAgents.map((agent) => agent.id)),
+    [missionActiveAgents],
+  )
 
   const activeNodes = useMemo(
     function buildActiveNodes() {
@@ -653,14 +661,22 @@ export function AgentViewPanel() {
           } satisfies AgentNode
         })
         .sort(function sortByProgressDesc(left, right) {
+          const leftMissionRank = missionSessionIds.has(left.id) ? 0 : 1
+          const rightMissionRank = missionSessionIds.has(right.id) ? 0 : 1
+          if (leftMissionRank !== rightMissionRank) {
+            return leftMissionRank - rightMissionRank
+          }
           if (right.progress !== left.progress) {
             return right.progress - left.progress
           }
           return left.name.localeCompare(right.name)
         })
     },
-    [activeAgents, nowMs],
+    [activeAgents, missionSessionIds, nowMs],
   )
+  const missionStateLabel = activeMissionState
+    ? activeMissionState.charAt(0).toUpperCase() + activeMissionState.slice(1)
+    : ''
 
   const queuedNodes = useMemo(
     function buildQueuedNodes() {
@@ -900,6 +916,11 @@ export function AgentViewPanel() {
 
                   <div className="mb-1 flex items-center justify-between">
                     <div>
+                      {activeMissionName ? (
+                        <p className="mb-0.5 text-[10px] font-medium text-accent-400 tabular-nums">
+                          Mission: {activeMissionName} · {missionStateLabel}
+                        </p>
+                      ) : null}
                       <p className="text-[10px] text-primary-600 tabular-nums">
                         {isLoading
                           ? 'syncing...'
@@ -1304,6 +1325,11 @@ export function AgentViewPanel() {
                     </div>
                     {activeNodes.length > 0 ? (
                       <div className="space-y-1.5 p-1">
+                        {missionActiveAgents.length > 0 ? (
+                          <p className="px-1 text-[10px] font-medium uppercase tracking-[0.16em] text-accent-400">
+                            {activeMissionName || 'Mission'} · {missionActiveAgents.length} session{missionActiveAgents.length === 1 ? '' : 's'}
+                          </p>
+                        ) : null}
                         {activeNodes.map((node) => (
                           <div key={node.id} className="rounded-xl border border-primary-300/70 bg-primary-100 p-2">
                             <div className="flex items-center justify-between">
@@ -1311,6 +1337,11 @@ export function AgentViewPanel() {
                               <span className="text-[10px] text-primary-500 tabular-nums">{node.statusBubble.text}</span>
                             </div>
                             <p className="mt-0.5 text-[10px] text-primary-600 line-clamp-2">{node.task}</p>
+                            {missionSessionIds.has(node.id) ? (
+                              <p className="mt-0.5 text-[10px] text-accent-400">Active mission</p>
+                            ) : nonMissionActiveAgents.length > 0 ? (
+                              <p className="mt-0.5 text-[10px] text-primary-500">Outside current mission</p>
+                            ) : null}
                             <div className="mt-1 flex items-center justify-between">
                               <span className="text-[10px] text-primary-500 tabular-nums">{formatRuntimeLabel(node.runtimeSeconds)}</span>
                               <button

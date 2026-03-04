@@ -23,9 +23,6 @@ import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayAppr
 import { ApprovalsBell } from './components/approvals-bell'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
-  loadMissionCheckpoint,
-  clearMissionCheckpoint,
-  archiveMissionToHistory,
   loadMissionHistory,
   type MissionCheckpoint,
 } from './lib/mission-checkpoint'
@@ -4663,7 +4660,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const previous = prevMissionStateRef.current
     if (previous === 'running' && missionState === 'stopped') {
       const snapshot = missionCompletionSnapshotRef.current
-      const currentCp = loadMissionCheckpoint()
       // Capture agentSessionMap before it gets cleared by stopMissionAndCleanup
       const sessionMapSnapshot = { ...agentSessionMap }
       if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
@@ -4729,10 +4725,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           }
           setMissionReports(saveStoredMissionReport(record))
           lastReportedMissionIdRef.current = enrichedSnapshot.missionId
-          if (currentCp) {
-            archiveMissionToHistory({ ...currentCp, status: 'completed', report: reportText })
-            clearMissionCheckpoint()
-          }
           completeMission()
           setMissionHistory(loadMissionHistory())
           // Auto-show completion report modal
@@ -4744,10 +4736,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         }
         void enrichAndReport()
       } else {
-        if (currentCp) {
-          archiveMissionToHistory({ ...currentCp, status: 'completed', report: currentCp.report })
-          clearMissionCheckpoint()
-        }
         completeMission()
         setMissionHistory(loadMissionHistory())
       }

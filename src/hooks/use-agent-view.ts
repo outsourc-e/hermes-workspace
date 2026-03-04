@@ -7,6 +7,7 @@ import type {
 } from '@/lib/gateway-api'
 import { fetchSessions } from '@/lib/gateway-api'
 import { assignPersona } from '@/lib/agent-personas'
+import { useMissionStore } from '@/stores/mission-store'
 
 export type AgentModel = string
 
@@ -472,8 +473,12 @@ export type AgentViewResult = {
   nowMs: number
   lastRefreshedMs: number
   activeAgents: Array<ActiveAgent>
+  missionActiveAgents: Array<ActiveAgent>
+  nonMissionActiveAgents: Array<ActiveAgent>
   queuedAgents: Array<QueuedAgentTask>
   historyAgents: Array<AgentHistoryItem>
+  activeMissionName: string
+  activeMissionState: string | null
   activeCount: number
   isLoading: boolean
   isDemoMode: boolean
@@ -495,6 +500,8 @@ export function useAgentView(): AgentViewResult {
   const toggleOpen = useAgentViewStore((state) => state.toggleOpen)
   const setQueueOpen = useAgentViewStore((state) => state.setQueueOpen)
   const setHistoryOpen = useAgentViewStore((state) => state.setHistoryOpen)
+  const activeMission = useMissionStore((state) => state.activeMission)
+  const missionSessionMap = useMissionStore((state) => state.agentSessionMap)
 
   const [viewportWidth, setViewportWidth] = useState(() => {
     if (typeof window === 'undefined') return AUTO_OPEN_WIDTH
@@ -634,6 +641,24 @@ export function useAgentView(): AgentViewResult {
   const panelVisible = isDesktop && isOpen
   const showFloatingToggle = isDesktop && !isOpen
   const panelOffset = panelVisible ? PANEL_WIDTH_PX : 0
+  const missionSessionKeys = useMemo(
+    () => new Set(Object.values(missionSessionMap)),
+    [missionSessionMap],
+  )
+  const missionActiveAgents = useMemo(
+    () =>
+      activeMission
+        ? activeAgents.filter((agent) => missionSessionKeys.has(agent.id))
+        : [],
+    [activeAgents, activeMission, missionSessionKeys],
+  )
+  const nonMissionActiveAgents = useMemo(
+    () =>
+      activeMission
+        ? activeAgents.filter((agent) => !missionSessionKeys.has(agent.id))
+        : activeAgents,
+    [activeAgents, activeMission, missionSessionKeys],
+  )
 
   function killAgent(agentId: string) {
     setActiveAgents((previous) => {
@@ -678,8 +703,12 @@ export function useAgentView(): AgentViewResult {
       nowMs,
       lastRefreshedMs,
       activeAgents,
+      missionActiveAgents,
+      nonMissionActiveAgents,
       queuedAgents,
       historyAgents,
+      activeMissionName: activeMission?.name || '',
+      activeMissionState: activeMission?.state ?? null,
       activeCount: activeAgents.length,
       isLoading,
       isDemoMode,
@@ -694,6 +723,9 @@ export function useAgentView(): AgentViewResult {
     }),
     [
       activeAgents,
+      activeMission,
+      missionActiveAgents,
+      nonMissionActiveAgents,
       cancelQueueTask,
       errorMessage,
       historyAgents,
