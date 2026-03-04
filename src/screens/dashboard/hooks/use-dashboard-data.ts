@@ -699,13 +699,21 @@ export function useDashboardData(): UseDashboardDataResult {
         const date = readString(entry.date)
         if (!date) continue
         const existing = tokensPerDayMap.get(date) ?? { input: 0, output: 0, cacheRead: 0, cost: 0 }
-        existing.input += readNumber(entry.inputTokens)
-        existing.output += readNumber(entry.outputTokens)
-        existing.cost += readNumber(entry.cost)
-        // totalTokens - input - output ≈ cache read tokens
+        const entryInput = readNumber(entry.inputTokens)
+        const entryOutput = readNumber(entry.outputTokens)
         const total = readNumber(entry.totalTokens) || readNumber(entry.tokens)
-        const inputOutput = readNumber(entry.inputTokens) + readNumber(entry.outputTokens)
-        if (total > inputOutput) existing.cacheRead += total - inputOutput
+        existing.cost += readNumber(entry.cost)
+
+        if (entryInput > 0 || entryOutput > 0) {
+          // Gateway provided a breakdown — use it, remainder is cache
+          existing.input += entryInput
+          existing.output += entryOutput
+          const remainder = total - entryInput - entryOutput
+          if (remainder > 0) existing.cacheRead += remainder
+        } else if (total > 0) {
+          // No input/output split — show as "input" (total tokens used)
+          existing.input += total
+        }
         tokensPerDayMap.set(date, existing)
       }
     }
