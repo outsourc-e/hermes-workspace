@@ -144,6 +144,8 @@ type MissionAgentSummary = {
   agentName: string
   modelId: string
   lines: string[]
+  transcript?: Array<{ role: string; text: string }>
+  transcriptSummary?: string
 }
 
 type MissionReportPayload = {
@@ -621,6 +623,68 @@ async function fetchAgentFinalOutput(sessionKey: string): Promise<string[]> {
     return finalMessage ? finalMessage.split('\n') : []
   } catch {
     return []
+  }
+}
+
+/** Fetch full conversation transcript for an agent session — used for rich mission reports */
+async function fetchAgentFullTranscript(sessionKey: string): Promise<{
+  messages: Array<{ role: string; text: string }>
+  summary: string
+}> {
+  try {
+    const response = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=200`)
+    if (!response.ok) return { messages: [], summary: '' }
+    const data = await response.json() as {
+      messages?: Array<{
+        role?: string
+        text?: string
+        content?: string
+        toolCalls?: Array<{ name?: string; args?: string }>
+      }>
+    }
+    const raw = Array.isArray(data.messages) ? data.messages : []
+    const transcript: Array<{ role: string; text: string }> = []
+
+    for (const msg of raw) {
+      const role = msg.role ?? 'unknown'
+      let text = ''
+
+      if (role === 'assistant') {
+        text = normalizeHistoryAssistantMessage(msg.text || msg.content || '')
+        // Include tool call names for context
+        if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+          const toolNames = msg.toolCalls
+            .map((tc) => tc.name || 'unknown_tool')
+            .filter(Boolean)
+            .join(', ')
+          if (toolNames && !text) {
+            text = `[Used tools: ${toolNames}]`
+          }
+        }
+      } else if (role === 'user') {
+        text = (msg.text || msg.content || '').toString().trim()
+        // Skip system/internal messages
+        if (text.startsWith('[') && text.includes('metadata')) continue
+      } else {
+        continue // Skip tool results etc.
+      }
+
+      if (text) {
+        transcript.push({ role, text })
+      }
+    }
+
+    // Generate a summary from the last 3 assistant messages
+    const assistantMsgs = transcript
+      .filter((m) => m.role === 'assistant' && m.text.length > 20)
+      .slice(-3)
+    const summary = assistantMsgs
+      .map((m) => m.text.split('\n')[0].slice(0, 200))
+      .join(' | ')
+
+    return { messages: transcript, summary }
+  } catch {
+    return { messages: [], summary: '' }
   }
 }
 
@@ -5081,6 +5145,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   snapshot.agentSummaries.map(async (summary) => {
                     const sessionKey = sessionMapSnapshot[summary.agentId]
                     if (!sessionKey) return summary
+
+                    // Fetch full transcript for rich reports
+                    const transcript = await fetchAgentFullTranscript(sessionKey)
+                    if (transcript.messages.length > 0) {
+                      // Use all assistant messages as output lines
+                      const allLines = transcript.messages
+                        .filter((m) => m.role === 'assistant')
+                        .flatMap((m) => m.text.split('\n'))
+                      return {
+                        ...summary,
+                        lines: allLines.length > 0 ? allLines : summary.lines,
+                        transcript: transcript.messages,
+                        transcriptSummary: transcript.summary,
+                      }
+                    }
+
+                    // Fallback to final output only
                     const historyLines = await fetchAgentFinalOutput(sessionKey)
                     if (historyLines.length > 0) {
                       return { ...summary, lines: historyLines }
