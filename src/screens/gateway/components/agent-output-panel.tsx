@@ -4,6 +4,7 @@ import { Markdown } from '@/components/prompt-kit/markdown'
 import type { HubTask } from './task-board'
 import { InlineApprovalCard } from './inline-approval-card'
 import type { ApprovalRequest } from '../lib/approvals-store'
+import { StreamingText } from './streaming-text'
 
 type OutputMessage = {
   role: 'assistant' | 'user' | 'tool'
@@ -450,6 +451,19 @@ export function AgentOutputPanel({
               : 'mt-1 min-h-[300px] flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] text-sm leading-6 text-[var(--theme-text)]',
           )}
         >
+          {(() => {
+            const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp)
+            let lastStreamingAssistantIndex = -1
+            for (let i = sortedMessages.length - 1; i >= 0; i -= 1) {
+              const msg = sortedMessages[i]
+              if (msg.role === 'assistant' && !msg.done) {
+                lastStreamingAssistantIndex = i
+                break
+              }
+            }
+
+            return (
+              <>
           {/* Option A: render parent-captured output lines directly when available */}
           {outputLines && outputLines.length > 0 ? (
             <>
@@ -466,7 +480,7 @@ export function AgentOutputPanel({
             <p className="animate-pulse text-[var(--theme-muted)]">Waiting for response…</p>
           ) : (
             <>
-              {[...messages].sort((a, b) => a.timestamp - b.timestamp).map((msg, index) =>
+              {sortedMessages.map((msg, index) =>
                 msg.role === 'tool' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
@@ -503,9 +517,16 @@ export function AgentOutputPanel({
                     className="my-2"
                   >
                     <span className="text-[var(--theme-muted)] text-[10px] font-mono tabular-nums block mb-0.5">{formatTimestamp(msg.timestamp)}</span>
-                    <Markdown className="text-sm leading-6 text-[var(--theme-text)] [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2 [&_pre]:bg-[var(--theme-card2)] [&_pre]:border-[var(--theme-border)] [&_code]:text-emerald-600 dark:[&_code]:text-emerald-300">
-                      {stripThinkBlocks(msg.content)}
-                    </Markdown>
+                    {index === lastStreamingAssistantIndex ? (
+                      <StreamingText
+                        text={stripThinkBlocks(msg.content)}
+                        isStreaming={!sessionEnded}
+                      />
+                    ) : (
+                      <Markdown className="text-sm leading-6 text-[var(--theme-text)] [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2 [&_pre]:bg-[var(--theme-card2)] [&_pre]:border-[var(--theme-border)] [&_code]:text-emerald-600 dark:[&_code]:text-emerald-300">
+                        {stripThinkBlocks(msg.content)}
+                      </Markdown>
+                    )}
                   </div>
                 ),
               )}
@@ -514,6 +535,9 @@ export function AgentOutputPanel({
               )}
             </>
           )}
+              </>
+            )
+          })()}
         </div>
       ) : (
         // Fallback placeholder when no sessionKey

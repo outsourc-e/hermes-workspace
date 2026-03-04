@@ -103,16 +103,69 @@ export function AgentChatPanel({
     void loadHistory()
   }, [loadHistory])
 
-  // ── Auto-poll for new messages while agent is running ─────────────────────
+  // ── SSE streaming for real-time word-by-word updates ───────────────────────
   useEffect(() => {
-    if (!isRunning || !sessionKey) return
-    pollRef.current = setInterval(() => {
+    if (!sessionKey) return
+    const source = new EventSource('/api/chat-events')
+    let streamingText = ''
+
+    function matchesSession(payload: Record<string, unknown>): boolean {
+      return payload.sessionKey === sessionKey
+    }
+
+    function parsePayload(raw: string): Record<string, unknown> | null {
+      try { const v = JSON.parse(raw); return v && typeof v === 'object' ? v : null } catch { return null }
+    }
+
+    // Streaming chunks — word-by-word text
+    source.addEventListener('chunk', (event) => {
+      if (!(event instanceof MessageEvent)) return
+      const payload = parsePayload(event.data)
+      if (!payload || !matchesSession(payload)) return
+      const text = typeof payload.text === 'string' ? payload.text : ''
+      if (!text) return
+      const fullReplace = payload.fullReplace === true
+      streamingText = fullReplace ? text : streamingText + text
+
+      setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        if (last?.id === 'streaming-assistant') {
+          return [...prev.slice(0, -1), { ...last, content: streamingText }]
+        }
+        return [...prev, { id: 'streaming-assistant', role: 'assistant' as const, content: streamingText }]
+      })
+    })
+
+    // Message complete — finalize
+    source.addEventListener('message', (event) => {
+      if (!(event instanceof MessageEvent)) return
+      const payload = parsePayload(event.data)
+      if (!payload || !matchesSession(payload)) return
+      streamingText = ''
+      // Reload full history to get the finalized message
       void loadHistory()
-    }, 5000)
+    })
+
+    // Done event — session finished
+    source.addEventListener('done', (event) => {
+      if (!(event instanceof MessageEvent)) return
+      const payload = parsePayload(event.data)
+      if (!payload || !matchesSession(payload)) return
+      streamingText = ''
+      void loadHistory()
+    })
+
+    source.onerror = () => {
+      // Fallback to polling if SSE fails
+      if (pollRef.current) clearInterval(pollRef.current)
+      pollRef.current = setInterval(() => void loadHistory(), 5000)
+    }
+
     return () => {
+      source.close()
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [isRunning, sessionKey, loadHistory])
+  }, [sessionKey, loadHistory])
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   useEffect(() => {

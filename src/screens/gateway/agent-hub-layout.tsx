@@ -25,6 +25,8 @@ import { TemplatePicker } from './components/template-picker'
 import { AgentChatPanel } from './components/agent-chat-panel'
 import { CostAnalyticsDashboard } from './components/cost-analytics'
 import { ExportMissionButton } from './components/export-mission'
+import { RemoteAgentsPanel } from './components/remote-agents-panel'
+import { PresenceIndicator } from './components/presence-indicator'
 import { KanbanBoard } from './components/kanban-board'
 import { saveAsTemplate, type WorkflowTemplate } from './lib/workflow-templates'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
@@ -5910,6 +5912,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </article>
 
           </section>
+
+          {/* ── Remote Agents ────────────────────────────────────────────── */}
+          <section className="mt-6">
+            <RemoteAgentsPanel localSessionKeys={Object.values(agentSessionMap)} />
+          </section>
       </div>
     )
   }
@@ -7277,6 +7284,59 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {maximizedMissionId ? (() => {
         const isRunning = maximizedMissionId === 'running'
         const reportEntry = missionReports.find((r) => r.id === maximizedMissionId) ?? null
+        const completedExportSource = reportEntry ?? selectedReport
+        const runningTeamName = teamConfigs.find((config) => config.id === selectedTeamConfigId)?.name
+          ?? (team.length > 0 ? `${team.length}-agent team` : 'Active Team')
+        const runningExportReport = isRunning
+          ? {
+              id: missionId || 'running',
+              name: activeMissionName || 'Active Mission',
+              goal: activeMissionGoal || missionGoal || 'Active mission',
+              teamName: runningTeamName,
+              agents: team.map((member) => ({
+                id: member.id,
+                name: member.name,
+                modelId: member.modelId,
+              })),
+              tokenCount: missionRealTokens > 0 ? missionRealTokens : missionTokenCount,
+              costEstimate: missionAllOAuth ? 0 : (missionRealCost > 0 ? missionRealCost : estimateMissionCost(missionTokenCount)),
+              duration: Math.max(0, Date.now() - (missionStartedAtRef.current || Date.now())),
+              completedAt: Date.now(),
+              report: agentWorkingRows
+                .flatMap((row) =>
+                  (agentOutputLinesRef.current[row.id] ?? []).map((line) => `[${row.name}] ${line}`),
+                )
+                .slice(-200)
+                .join('\n'),
+              artifacts: artifacts.map((artifact) => ({
+                name: artifact.title,
+                type: artifact.type,
+              })),
+            }
+          : null
+        const completedExportReport = completedExportSource
+          ? {
+              id: completedExportSource.id,
+              name: completedExportSource.name,
+              goal: completedExportSource.goal,
+              teamName: completedExportSource.teamName,
+              agents: completedExportSource.agents.map((agent) => ({
+                id: agent.id,
+                name: agent.name,
+                modelId: agent.modelId,
+              })),
+              tokenCount: completedExportSource.tokenCount,
+              costEstimate: completedExportSource.costEstimate,
+              duration: completedExportSource.duration,
+              completedAt: completedExportSource.completedAt,
+              report: completedExportSource.report,
+              artifacts: completedExportSource.artifacts.map((artifact) => ({
+                name: artifact.title,
+                type: artifact.type,
+              })),
+            }
+          : null
+        const exportReportForOverlay = runningExportReport ?? completedExportReport
 
         return (
           <div
@@ -7466,23 +7526,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               </div>
 
-              {/* Footer controls (running only) */}
-              {isRunning && (
-                <div className="border-t border-neutral-200 dark:border-neutral-700 px-6 py-4 flex items-center justify-between gap-3">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Mission running · {agentWorkingRows.filter((r) => r.status === 'active').length} agents active
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMaximizedMissionId(null)}
-                      className={HUB_SECONDARY_BUTTON_CLASS}
-                    >
-                      Close
-                    </button>
-                  </div>
+              {/* Footer controls */}
+              <div className="border-t border-neutral-200 dark:border-neutral-700 px-6 py-4 flex items-center justify-between gap-3">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {isRunning
+                    ? `Mission running · ${agentWorkingRows.filter((r) => r.status === 'active').length} agents active`
+                    : `Mission complete · ${reportEntry?.agents.length ?? 0} agents`}
+                </p>
+                <div className="flex items-center gap-2">
+                  {exportReportForOverlay ? <ExportMissionButton report={exportReportForOverlay} /> : null}
+                  <button
+                    type="button"
+                    onClick={() => setMaximizedMissionId(null)}
+                    className={HUB_SECONDARY_BUTTON_CLASS}
+                  >
+                    Close
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )
@@ -7555,6 +7616,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   onApprove={handleApprove}
                   onDeny={handleDeny}
                 />
+                <PresenceIndicator currentTab={activeTab} />
               </div>
             </div>
           </header>
