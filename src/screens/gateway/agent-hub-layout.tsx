@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
 import { TemplatePicker } from './components/template-picker'
+import { AgentChatPanel } from './components/agent-chat-panel'
 import { KanbanBoard } from './components/kanban-board'
 import { saveAsTemplate, type WorkflowTemplate } from './lib/workflow-templates'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
@@ -2953,6 +2954,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
   const [steerAgentId, setSteerAgentId] = useState<string | null>(null)
   const [steerInput, setSteerInput] = useState('')
+  const [chatAgentId, setChatAgentId] = useState<string | null>(null)
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -7123,6 +7125,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                       ✦ Steer
                                     </button>
                                   )}
+                                  {/* Per-agent Chat button */}
+                                  {agentSessionMap[row.id] && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setChatAgentId(row.id)
+                                      }}
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800/50 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors"
+                                      title={`Chat with ${row.name}`}
+                                    >
+                                      💬 Chat
+                                    </button>
+                                  )}
                                 </div>
                               )
                             })}
@@ -7235,6 +7251,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </div>
             </div>
           </div>
+        )
+      })() : null}
+
+      {/* ── Agent Chat Panel ─────────────────────────────────────────────── */}
+      {chatAgentId ? (() => {
+        const chatMember = team.find((m) => m.id === chatAgentId)
+        const chatSessionKey = agentSessionMap[chatAgentId] ?? null
+        const chatIsRunning = agentSessionStatus[chatAgentId]?.status === 'active' || agentSessionStatus[chatAgentId]?.status === 'waiting_for_input'
+        return (
+          <AgentChatPanel
+            agentName={chatMember?.name ?? chatAgentId}
+            agentId={chatAgentId}
+            sessionKey={chatSessionKey}
+            isRunning={chatIsRunning}
+            onClose={() => setChatAgentId(null)}
+          />
         )
       })() : null}
 
@@ -7361,6 +7393,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             >
                               ✦
                             </button>
+                            {/* Chat with agent */}
+                            {agentSessionMap[row.id] && (
+                              <button
+                                type="button"
+                                onClick={() => { setChatAgentId(row.id); setMaximizedMissionId(null) }}
+                                className="flex size-7 items-center justify-center rounded-lg border border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors text-sm"
+                                title="Chat with agent"
+                              >
+                                💬
+                              </button>
+                            )}
                             {agentSessionMap[row.id] ? (
                               <button
                                 type="button"

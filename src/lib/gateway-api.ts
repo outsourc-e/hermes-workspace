@@ -128,6 +128,80 @@ function isAbortError(error: unknown): boolean {
   )
 }
 
+// ── Session History & Messaging ───────────────────────────────────────────────
+
+export type SessionHistoryMessage = {
+  role: string
+  content?: string | Array<{ type?: string; text?: string }>
+  timestamp?: number
+  toolName?: string
+  toolCallId?: string
+}
+
+export type SessionHistoryResponse = {
+  ok?: boolean
+  messages?: SessionHistoryMessage[]
+  error?: string
+}
+
+export async function fetchSessionHistory(
+  sessionKey: string,
+  opts?: { limit?: number; includeTools?: boolean },
+): Promise<SessionHistoryResponse> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 15000)
+  try {
+    const params = new URLSearchParams({ key: sessionKey })
+    if (opts?.limit) params.set('limit', String(opts.limit))
+    if (opts?.includeTools) params.set('includeTools', 'true')
+    const response = await fetch(makeEndpoint(`/api/session-history?${params}`), {
+      signal: controller.signal,
+    })
+    if (!response.ok) return { ok: false, messages: [], error: await readError(response) }
+    return (await response.json()) as SessionHistoryResponse
+  } catch (error) {
+    if (isAbortError(error)) return { ok: false, messages: [], error: 'Request timed out' }
+    return { ok: false, messages: [], error: String(error) }
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
+export type SendToSessionResponse = {
+  ok?: boolean
+  error?: string
+}
+
+export async function sendToSession(
+  sessionKey: string,
+  message: string,
+): Promise<SendToSessionResponse> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 30000)
+  try {
+    const response = await fetch(makeEndpoint('/api/session-send'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionKey, message }),
+      signal: controller.signal,
+    })
+    const payload = (await response.json().catch(() => ({}))) as SendToSessionResponse
+    if (!response.ok || payload.ok === false) {
+      throw new Error(
+        typeof payload.error === 'string' && payload.error.trim()
+          ? payload.error
+          : response.statusText || 'Failed to send message',
+      )
+    }
+    return payload
+  } catch (error) {
+    if (isAbortError(error)) throw new Error('Request timed out')
+    throw error
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
 export async function fetchSessions(): Promise<GatewaySessionsResponse> {
   const response = await fetch(makeEndpoint('/api/sessions'))
   if (!response.ok) {
