@@ -3009,6 +3009,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [newMissionGoal, setNewMissionGoal] = useState('')
   const [missionPlan, setMissionPlan] = useState<MissionPlanItem[]>([])
   const [planAnswers, setPlanAnswers] = useState<Record<string, string>>({})
+  const [planGenerating, setPlanGenerating] = useState(false)
   const [newMissionTeamConfigId, setNewMissionTeamConfigId] = useState('__current__')
   const [newMissionProcessType, setNewMissionProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [newMissionBudgetLimit, setNewMissionBudgetLimit] = useState('120000')
