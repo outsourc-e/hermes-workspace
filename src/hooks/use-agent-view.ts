@@ -326,7 +326,7 @@ function readStatus(
     const staleness = Date.now() - updatedAt
     const tokens =
       readNumber(session.totalTokens) || readNumber(session.tokenCount)
-    if (tokens > 0 && staleness > 30_000) return 'complete'
+    if (tokens > 0 && staleness > 120_000) return 'complete'
     if (tokens === 0 && staleness > 120_000) return 'idle'
   }
 

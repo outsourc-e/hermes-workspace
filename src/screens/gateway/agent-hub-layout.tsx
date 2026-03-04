@@ -2630,9 +2630,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const cp = loadMissionCheckpoint()
     return cp?.status === 'running' ? cp : null
   })
-  const [restoreDismissed, setRestoreDismissed] = useState(false)
-  void restoreCheckpoint
-  void restoreDismissed
+  const [, setRestoreDismissed] = useState(false)
 
   // ── Existing state ──────────────────────────────────────────────────────────
   const [isMobileHub, setIsMobileHub] = useState(() =>
@@ -2689,6 +2687,45 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       return {}
     }
   })
+
+  useEffect(() => {
+    if (!restoreCheckpoint || restoreCheckpoint.status !== 'running') return
+    if (missionState !== 'stopped') return
+
+    const checkpoint = restoreCheckpoint as MissionCheckpoint & {
+      name?: string
+      goal?: string
+      agentSessions?: Record<string, string>
+    }
+    const restoredGoal = checkpoint.goal || ''
+    const restoredTasks = restoreCheckpoint.tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      description: '',
+      priority: 'normal' as const,
+      status: task.status as TaskStatus,
+      agentId: task.assignedTo,
+      missionId: restoreCheckpoint.id,
+      createdAt: restoreCheckpoint.startedAt,
+      updatedAt: restoreCheckpoint.updatedAt,
+    }))
+
+    setMissionActive(true)
+    setMissionState('running')
+    setActiveMissionName(checkpoint.name || restoreCheckpoint.label || '')
+    setActiveMissionGoal(restoredGoal)
+    setMissionTasks(restoredTasks)
+    setAgentSessionMap(checkpoint.agentSessions || restoreCheckpoint.agentSessionMap || {})
+    setActiveTab('missions')
+    setMissionSubTab('running')
+    missionIdRef.current = restoreCheckpoint.id
+    missionStartedAtRef.current = restoreCheckpoint.startedAt
+    agentSessionsDoneRef.current = new Set()
+    expectedAgentCountRef.current = Object.keys(checkpoint.agentSessions || restoreCheckpoint.agentSessionMap || {}).length
+    sessionActivityRef.current = new Map()
+    setRestoreCheckpoint(null)
+    toast('Mission restored: Reconnected to running mission', { type: 'success' })
+  }, [missionState, restoreCheckpoint])
   const [agentSessionModelMap, setAgentSessionModelMap] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {}
     try {
@@ -2889,9 +2926,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sessionKey }),
-      }).catch(() => {})
-      fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
-        method: 'DELETE',
       }).catch(() => {})
     })
 
