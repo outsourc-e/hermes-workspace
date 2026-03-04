@@ -7612,6 +7612,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 externalStream
                 outputLines={agentOutputLines[selectedOutputAgentId]}
                 enableMessaging={missionState === 'running'}
+                approvals={selectedOutputAgentId ? approvals.filter((a) => a.agentId === selectedOutputAgentId && a.status === 'pending') : []}
+                onApprove={handleApprove}
+                onDeny={handleDeny}
                 onSendMessage={(sk, msg) => {
                   // Clear done state so the agent can resume
                   agentSessionsDoneRef.current.delete(sk)
@@ -8321,6 +8324,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 externalStream
                 outputLines={selectedOutputAgentId ? agentOutputLines[selectedOutputAgentId] : undefined}
                 enableMessaging={missionState === 'running'}
+                approvals={selectedOutputAgentId ? approvals.filter((a) => a.agentId === selectedOutputAgentId && a.status === 'pending') : []}
+                onApprove={handleApprove}
+                onDeny={handleDeny}
                 onSendMessage={(sk, msg) => {
                   agentSessionsDoneRef.current.delete(sk)
                   if (selectedOutputAgentId) {

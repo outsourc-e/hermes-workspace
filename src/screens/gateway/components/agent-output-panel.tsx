@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import type { HubTask } from './task-board'
+import { InlineApprovalCard } from './inline-approval-card'
+import type { ApprovalRequest } from '../lib/approvals-store'
 
 type OutputMessage = {
   role: 'assistant' | 'user' | 'tool'
@@ -48,6 +50,12 @@ export type AgentOutputPanelProps = {
   enableMessaging?: boolean
   /** Callback when user sends a message to this agent */
   onSendMessage?: (sessionKey: string, message: string) => void
+  /** Pending approval requests for this agent — shown as inline cards */
+  approvals?: ApprovalRequest[]
+  /** Called when user approves an inline request */
+  onApprove?: (id: string) => void
+  /** Called when user denies an inline request */
+  onDeny?: (id: string) => void
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -213,6 +221,9 @@ export function AgentOutputPanel({
   outputLines,
   enableMessaging = false,
   onSendMessage,
+  approvals,
+  onApprove,
+  onDeny,
 }: AgentOutputPanelProps) {
   const [messageInput, setMessageInput] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
@@ -515,6 +526,20 @@ export function AgentOutputPanel({
               <p className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</p>
             </>
           )}
+        </div>
+      )}
+
+      {/* Inline approval cards */}
+      {approvals && approvals.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {approvals.map((approval) => (
+            <InlineApprovalCard
+              key={approval.id}
+              approval={approval}
+              onApprove={onApprove ?? (() => {})}
+              onDeny={onDeny ?? (() => {})}
+            />
+          ))}
         </div>
       )}
 
