@@ -1,4 +1,11 @@
 import { useMemo, useState } from 'react'
+import {
+  BrainIcon,
+  ComputerTerminal01Icon,
+  File01Icon,
+  ListViewIcon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { cn } from '@/lib/utils'
 
 type RunConsoleProps = {
@@ -43,6 +50,17 @@ const EVENT_STYLES: Record<MockStreamEvent['eventType'], string> = {
   tool: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
   error: 'border-red-500/40 bg-red-500/10 text-red-300',
 }
+
+const CONSOLE_DEEP_LINKS: Array<{
+  label: string
+  href: string
+  icon: typeof File01Icon
+}> = [
+  { label: 'Logs', href: '/logs', icon: ListViewIcon },
+  { label: 'Files', href: '/files', icon: File01Icon },
+  { label: 'Terminal', href: '/terminal', icon: ComputerTerminal01Icon },
+  { label: 'Memory', href: '/memory', icon: BrainIcon },
+]
 
 function formatRunStatus(status: RunConsoleProps['runStatus']): string {
   switch (status) {
@@ -147,6 +165,21 @@ export function RunConsole({
               <span>Tokens: {resolvedTokens}</span>
               <span>Cost: {formatCost(costEstimate)}</span>
               <span>Agents: {agents.length}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {CONSOLE_DEEP_LINKS.map((link) => (
+                <button
+                  key={link.href}
+                  type="button"
+                  onClick={() => {
+                    window.location.href = link.href
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-1 text-[10px] text-primary-300 transition-colors hover:bg-primary-800/40 hover:text-primary-100"
+                >
+                  <HugeiconsIcon icon={link.icon} size={11} strokeWidth={1.6} />
+                  <span>{link.label}</span>
+                </button>
+              ))}
             </div>
           </div>
           {onClose ? (
