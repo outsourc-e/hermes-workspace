@@ -123,9 +123,10 @@ function formatTs(ts: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
 }
 
-function extractContent(msg: { content?: string; parts?: Array<{ text?: string }> }): string {
-  if (msg.content) return msg.content
-  if (msg.parts?.length) return msg.parts.map(p => p.text ?? '').join('')
+function extractContent(msg: { content?: string | Array<{ type?: string; text?: string }>; text?: string }): string {
+  if (typeof msg.content === 'string') return msg.content
+  if (Array.isArray(msg.content)) return msg.content.map(p => p.text ?? '').join('')
+  if (typeof msg.text === 'string') return msg.text
   return ''
 }
 
@@ -178,7 +179,7 @@ export function RunConsole({
         const msgs = res?.messages ?? []
         const agentName = agentNameMap?.[key] ?? 'Agent'
         for (const msg of msgs) {
-          const content = extractContent(msg as { content?: string; parts?: Array<{ text?: string }> })
+          const content = extractContent(msg)
           if (!content.trim()) continue
           const ts = typeof msg.timestamp === 'number' ? msg.timestamp : Date.now()
           allEvents.push({
@@ -278,7 +279,7 @@ export function RunConsole({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-sm font-semibold text-primary-100 sm:text-base">
+              <h2 className="max-w-[300px] truncate text-sm font-semibold text-primary-100 sm:max-w-[500px] sm:text-base">
                 {runTitle}
               </h2>
               <span
@@ -533,7 +534,7 @@ export function RunConsole({
                         {event.eventType}
                       </span>
                     </div>
-                    <p className="mt-1 text-primary-300">{event.message}</p>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-primary-300 line-clamp-3">{event.message}</p>
                   </li>
                 ))}
               </ol>
@@ -578,7 +579,7 @@ export function RunConsole({
                                   {event.eventType}
                                 </span>
                               </div>
-                              <p className="mt-1 text-primary-300">{event.message}</p>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-primary-300 line-clamp-3">{event.message}</p>
                             </li>
                           ))}
                         </ol>
@@ -629,7 +630,7 @@ export function RunConsole({
                                   {event.eventType}
                                 </span>
                               </div>
-                              <p className="mt-1 text-primary-300">{event.message}</p>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-primary-300 line-clamp-3">{event.message}</p>
                             </li>
                           ))}
                         </ol>
