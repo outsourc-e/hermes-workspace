@@ -3778,6 +3778,47 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       source.addEventListener('error', () => {
         markStreamAlive()
         if (source.readyState !== EventSource.CLOSED) return
+
+        // If the agent already received a 'done' event, this is just the SSE
+        // connection closing after completion — don't retry.
+        if (agentSessionsDoneRef.current.has(sessionKey)) return
+
+        // If the agent has substantial output, treat this as a normal completion
+        // rather than a failure. Many sessions close without a 'done' event.
+        const agentOutput = agentOutputLinesRef.current[agentId] ?? []
+        const hasOutput = agentOutput.length > 3
+
+        if (hasOutput) {
+          // Treat as completion — the agent produced output but SSE closed without 'done'
+          agentSessionsDoneRef.current.add(sessionKey)
+          setAgentSessionStatus((prev) => ({
+            ...prev,
+            [agentId]: { status: 'idle', lastSeen: Date.now() },
+          }))
+          const agentName = teamRef.current.find((m) => m.id === agentId)?.name ?? agentId
+          emitFeedEvent({
+            type: 'agent_active',
+            message: `${agentName} finished (connection closed)`,
+            agentName,
+          })
+
+          // Check auto-completion
+          const doneCount = agentSessionsDoneRef.current.size
+          const expected = expectedAgentCountRef.current
+          if (expected > 0 && doneCount >= expected) {
+            window.setTimeout(() => {
+              missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
+              setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
+              emitFeedEvent({
+                type: 'mission_started',
+                message: `✓ All ${expected} agents completed — mission auto-finished`,
+              })
+            }, 3000)
+          }
+          return
+        }
+
+        // No output = genuine failure — attempt retry
         scheduleAgentRetryRef.current(agentId, sessionKey, 'SSE connection closed')
       })
     }
