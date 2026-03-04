@@ -2723,6 +2723,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     agentSessionsDoneRef.current = new Set()
     expectedAgentCountRef.current = Object.keys(checkpoint.agentSessions || restoreCheckpoint.agentSessionMap || {}).length
     sessionActivityRef.current = new Map()
+    restoreGraceUntilRef.current = Date.now() + 20_000 // 20s grace for SSE to reconnect
     setRestoreCheckpoint(null)
     toast('Mission restored: Reconnected to running mission', { type: 'success' })
   }, [missionState, restoreCheckpoint])
@@ -2784,6 +2785,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // Mission ID for checkpointing
   const missionIdRef = useRef<string>('')
   const missionStartedAtRef = useRef<number>(0)
+  // Grace period after restore — prevents safety net from auto-completing before SSE reconnects
+  const restoreGraceUntilRef = useRef<number>(0)
   // SSE streams for active agents (capped at MAX_AGENT_STREAMS)
   const agentStreamsRef = useRef<Map<string, EventSource>>(new Map())
   const agentStreamLastAtRef = useRef<Map<string, number>>(new Map())
@@ -3798,6 +3801,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   useEffect(() => {
     if (!missionActive || missionState !== 'running') return
     if (agentWorkingRows.length === 0) return
+    // Skip during restore grace period — SSE streams need time to reconnect and populate status
+    if (Date.now() < restoreGraceUntilRef.current) return
     const anyWaiting = agentWorkingRows.some((r) => r.status === 'waiting_for_input')
     if (anyWaiting) return // Mission needs human input — don't auto-close
     const allTerminal = agentWorkingRows.every((r) =>
