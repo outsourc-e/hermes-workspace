@@ -13,6 +13,8 @@ import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type A
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import {
+  saveMissionStoreBeforeUnload,
+  useMissionStore,
   type MissionArtifact,
 } from '@/stores/mission-store'
 import { toast } from '@/components/ui/toast'
@@ -21,7 +23,6 @@ import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayAppr
 import { ApprovalsBell } from './components/approvals-bell'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
-  saveMissionCheckpoint,
   loadMissionCheckpoint,
   clearMissionCheckpoint,
   archiveMissionToHistory,
@@ -2746,7 +2747,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     startMission,
     completeMission,
     abortMission,
-    updateTaskStatus,
     setMissionState,
     restoreMission,
     setMissionGoal,
@@ -2761,6 +2761,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setActiveMissionMeta,
     saveCheckpoint,
   } = missionStore
+  const setMissionActive = useCallback((active: boolean) => {
+    if (!active) {
+      setMissionState('stopped')
+      return
+    }
+    setMissionState((previous) => (previous === 'stopped' ? 'running' : previous))
+  }, [setMissionState])
+  const setActiveMissionName = useCallback((name: string) => {
+    setActiveMissionMeta({ name })
+  }, [setActiveMissionMeta])
+  const setActiveMissionGoal = useCallback((goal: string) => {
+    setActiveMissionMeta({ goal })
+  }, [setActiveMissionMeta])
   const [, setRestoreDismissed] = useState(false)
 
   // ── Existing state ──────────────────────────────────────────────────────────
@@ -2839,6 +2852,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
   const lastReportedMissionIdRef = useRef<string>('')
+  const missionIdRef = useRef(activeMission?.id ?? '')
+  const missionStartedAtRef = useRef(activeMission?.startedAt ?? 0)
   // Grace period after restore — prevents safety net from auto-completing before SSE reconnects
   const restoreGraceUntilRef = useRef<number>(0)
   // SSE streams for active agents (capped at MAX_AGENT_STREAMS)
@@ -2846,8 +2861,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const agentStreamLastAtRef = useRef<Map<string, number>>(new Map())
   // Stable ref for team so feed-event callback always sees latest team
   const teamRef = useRef(team)
+  const missionGoalRef = useRef(missionGoal)
   const pendingMissionNameRef = useRef('')
   const pendingMissionBudgetLimitRef = useRef('')
+  const missionActiveRef = useRef(missionActive)
   const handleCreateMissionRef = useRef<() => void>(() => {})
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
   // SSE closures (which can't list missionTasks etc. in their own deps) can call it.
@@ -2861,6 +2878,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   teamRef.current = team
   const missionId = activeMission?.id ?? ''
   const missionStartedAt = activeMission?.startedAt ?? 0
+  missionIdRef.current = missionId
+  missionStartedAtRef.current = missionStartedAt
+  missionGoalRef.current = missionGoal
+  missionActiveRef.current = missionActive
 
   const appendArtifacts = useCallback((nextArtifacts: MissionArtifact[]) => {
     if (nextArtifacts.length === 0) return
@@ -2989,6 +3010,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       abortMission()
     }
     setMissionState('stopped')
+    setMissionActive(false)
+    setActiveMissionName('')
+    setActiveMissionGoal('')
+    setMissionTasks([])
+    setDispatchedTaskIdsByAgent({})
     setPausedByAgentId({})
     setSelectedOutputAgentId(undefined)
     setActiveTab('missions')
@@ -2998,9 +3024,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     pendingTaskMovesRef.current = []
     sessionActivityRef.current = new Map()
     taskBoardRef.current = null
-    setActiveMissionMeta({ name: '', goal: '' })
     setMissionHistory(loadMissionHistory())
-  }, [abortMission, agentSessionMap, buildMissionCompletionSnapshot, completeMission, setActiveMissionMeta])
+  }, [
+    abortMission,
+    agentSessionMap,
+    buildMissionCompletionSnapshot,
+    completeMission,
+    missionReports,
+    setActiveMissionGoal,
+    setActiveMissionName,
+    setDispatchedTaskIdsByAgent,
+    setMissionActive,
+    setMissionTasks,
+  ])
 
 
 
@@ -3212,6 +3248,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
     window.localStorage.setItem('clawsuite:hub-agent-sessions', JSON.stringify(combined))
   }, [agentSessionMap, agentSessionModelMap])
+
+  useEffect(() => {
+    function handleBeforeUnload() {
+      if (useMissionStore.getState().missionState !== 'running') return
+      saveMissionStoreBeforeUnload()
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
 
   useEffect(() => {
     if (team.length > 0) return
@@ -3586,17 +3634,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         }))
 
         // ── Mark this agent's tasks as done ──────────────────────────────
-        setMissionTasks((prev) => {
-          const updated = prev.map((task) =>
+        setMissionTasks((prev: HubTask[]) => {
+          const updated = prev.map((task: HubTask) =>
             task.agentId === agentId && task.status !== 'done'
               ? { ...task, status: 'done' as TaskStatus, updatedAt: Date.now() }
               : task
           )
           const justCompleted = updated.filter(
-            (t, i) => t.status === 'done' && prev[i]?.status !== 'done',
+            (t: HubTask, i: number) => t.status === 'done' && prev[i]?.status !== 'done',
           )
           if (justCompleted.length > 0) {
-            justCompleted.forEach((task) => {
+            justCompleted.forEach((task: HubTask) => {
               emitFeedEvent({
                 type: 'task_completed',
                 message: `${agentName} completed: ${task.title}`,
@@ -3604,15 +3652,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 taskTitle: task.title,
               })
             })
-            // Persist updated task statuses to checkpoint
-            const currentCp = loadMissionCheckpoint()
-            if (currentCp) {
-              saveMissionCheckpoint({
-                ...currentCp,
-                tasks: updated.map((t) => ({ id: t.id, title: t.title, status: t.status, assignedTo: t.agentId })),
-                updatedAt: Date.now(),
-              })
-            }
+            saveCheckpoint()
           }
           return updated
         })
@@ -3887,28 +3927,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const uniqueTaskIds = Array.from(new Set(taskIds))
     const ids = new Set(uniqueTaskIds)
 
-    setMissionTasks((previous) => {
-      const updated = previous.map((task) => {
+    setMissionTasks((previous: HubTask[]) => {
+      const updated = previous.map((task: HubTask) => {
         if (!ids.has(task.id) || task.status === status) return task
         return { ...task, status, updatedAt: Date.now() }
       })
-
-      // Save checkpoint with updated task statuses
-      const currentCp = loadMissionCheckpoint()
-      if (currentCp) {
-        saveMissionCheckpoint({
-          ...currentCp,
-          tasks: updated.map(t => ({
-            id: t.id,
-            title: t.title,
-            status: t.status,
-            assignedTo: t.agentId,
-          })),
-        })
-      }
-
       return updated
     })
+    saveCheckpoint()
 
     const boardApi = taskBoardRef.current
     if (boardApi) {
@@ -4706,8 +4732,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           if (currentCp) {
             archiveMissionToHistory({ ...currentCp, status: 'completed', report: reportText })
             clearMissionCheckpoint()
-            setMissionHistory(loadMissionHistory())
           }
+          completeMission()
+          setMissionHistory(loadMissionHistory())
           // Auto-show completion report modal
           setCompletionReport(record)
           setCompletionReportVisible(true)
@@ -4716,9 +4743,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           setMissionSubTab('complete')
         }
         void enrichAndReport()
-      } else if (currentCp) {
-        archiveMissionToHistory({ ...currentCp, status: 'completed', report: currentCp.report })
-        clearMissionCheckpoint()
+      } else {
+        if (currentCp) {
+          archiveMissionToHistory({ ...currentCp, status: 'completed', report: currentCp.report })
+          clearMissionCheckpoint()
+        }
+        completeMission()
         setMissionHistory(loadMissionHistory())
       }
       missionCompletionSnapshotRef.current = null
@@ -4732,12 +4762,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       dispatchingRef.current = false
       pendingTaskMovesRef.current = []
       sessionActivityRef.current = new Map()
-      missionIdRef.current = ''
       agentSessionsDoneRef.current = new Set()
       expectedAgentCountRef.current = 0
     }
     prevMissionStateRef.current = missionState
-  }, [missionState])
+  }, [agentSessionMap, completeMission, missionState, setMissionActive, setMissionTasks, setDispatchedTaskIdsByAgent])
 
   function applyTemplate(templateId: TeamTemplateId) {
     setTeam(buildTeamFromTemplate(templateId))
@@ -4829,48 +4858,30 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     dispatchingRef.current = true
 
-    // Save initial checkpoint
     const missionId = newMissionId
-    missionIdRef.current = missionId
-    missionStartedAtRef.current = Date.now()
-    saveMissionCheckpoint({
+    const missionStartedAt = Date.now()
+    const launchMissionName = pendingMissionNameRef.current.trim()
+    const launchBudgetLimit = pendingMissionBudgetLimitRef.current.trim() || budgetLimit.trim()
+    startMission({
       id: missionId,
-      label: truncateMissionGoal(trimmedGoal, 60),
+      goal: trimmedGoal,
+      name: launchMissionName,
       processType,
-      team: teamWithRuntimeStatus.map(m => ({
-        id: m.id,
-        name: m.name,
-        modelId: m.modelId,
-        roleDescription: m.roleDescription,
-        goal: m.goal,
-        backstory: m.backstory,
-      })),
-      tasks: createdTasks.map(t => ({
-        id: t.id,
-        title: t.title,
-        status: t.status,
-        assignedTo: t.agentId,
-      })),
-      agentSessionMap: { ...agentSessionMap },
-      status: 'running',
-      startedAt: missionStartedAtRef.current,
-      updatedAt: missionStartedAtRef.current,
+      team: teamWithRuntimeStatus.map((member) => ({ ...member })),
+      tasks: createdTasks,
+      budgetLimit: launchBudgetLimit,
+      startedAt: missionStartedAt,
     })
     // Dismiss any existing restore banner
     setRestoreCheckpoint(null)
     setRestoreDismissed(true)
 
-    setMissionActive(true)
     setMissionState('running')
     setView('board')
-    setActiveMissionName(pendingMissionNameRef.current.trim())
-    const launchBudgetLimit = pendingMissionBudgetLimitRef.current.trim() || budgetLimit.trim()
     pendingMissionNameRef.current = ''
     pendingMissionBudgetLimitRef.current = ''
     setBudgetLimit(launchBudgetLimit)
     setActiveMissionBudgetLimit(launchBudgetLimit)
-    setActiveMissionGoal(trimmedGoal)
-    setMissionTasks(createdTasks)
     setDispatchedTaskIdsByAgent({})
     setArtifacts([])
     artifactDedupRef.current = new Set()
@@ -4897,7 +4908,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     toast(`Mission started with ${createdTasks.length} tasks`, { type: 'success' })
 
     window.setTimeout(() => {
-      if (missionIdRef.current !== missionId) {
+      if (useMissionStore.getState().activeMission?.id !== missionId) {
         dispatchingRef.current = false
         return
       }
@@ -4908,7 +4919,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         processType,
         missionId,
       ).finally(() => {
-        if (missionIdRef.current !== missionId) return
+        if (useMissionStore.getState().activeMission?.id !== missionId) return
         dispatchingRef.current = false
       })
     }, 0)
