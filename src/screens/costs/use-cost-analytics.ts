@@ -113,6 +113,7 @@ export type CostDayRow = {
 
 export type CostSessionRow = {
   sessionKey: string
+  label: string
   model: string
   agent: string
   inputTokens: number
@@ -333,6 +334,15 @@ function normalizeSessions(
         typeof record.agent === 'string' && record.agent.length > 0
           ? record.agent
           : extractAgentFromSessionKey(sessionKey)
+      const rawLabel =
+        typeof record.label === 'string' && record.label.length > 0
+          ? record.label
+          : typeof record.displayName === 'string' && record.displayName.length > 0
+            ? record.displayName
+            : typeof record.friendlyId === 'string' && record.friendlyId.length > 0
+              ? record.friendlyId
+              : ''
+      const label = rawLabel || agent
       const inputTokens = readNumber(
         record.inputTokens ??
           usage.inputTokens ??
@@ -350,6 +360,7 @@ function normalizeSessions(
         inputTokens + outputTokens
       return {
         sessionKey,
+        label,
         model:
           typeof record.model === 'string' && record.model.length > 0
             ? record.model

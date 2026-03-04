@@ -507,7 +507,7 @@ export function CostsScreen() {
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-primary-200 dark:border-neutral-800 text-left text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
-                      <th className="px-2 py-2 font-medium">Session Key</th>
+                      <th className="px-2 py-2 font-medium">Session</th>
                       <th className="px-2 py-2 font-medium">Agent</th>
                       <th className="px-2 py-2 font-medium">Model</th>
                       <th className="px-2 py-2 font-medium text-right">
@@ -556,9 +556,9 @@ export function CostsScreen() {
                         key={row.sessionKey}
                         className="border-b border-primary-200/80 dark:border-neutral-900/80 hover:bg-primary-50/80 dark:hover:bg-neutral-950/60"
                       >
-                        <td className="px-2 py-2 font-mono text-xs text-primary-700 dark:text-neutral-300">
-                          <div className="max-w-[220px] truncate">
-                            {row.sessionKey}
+                        <td className="px-2 py-2 text-primary-700 dark:text-neutral-300">
+                          <div className="max-w-[220px] truncate text-sm" title={row.sessionKey}>
+                            {row.label || row.sessionKey}
                           </div>
                         </td>
                         <td className="px-2 py-2 text-primary-600 dark:text-neutral-400">

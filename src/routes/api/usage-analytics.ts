@@ -146,6 +146,7 @@ function extractAgentName(sessionKey: string): string {
 
 type NormalizedSession = {
   sessionKey: string
+  label: string
   model: string
   agent: string
   inputTokens: number
@@ -188,6 +189,62 @@ function buildAgentBreakdowns(sessions: NormalizedSession[]): AgentBreakdown[] {
   return Array.from(map.values()).sort((a, b) => b.costUsd - a.costUsd)
 }
 
+/**
+ * Batch-fetch session.status for a list of session keys.
+ * Returns a map of sessionKey → { costUsd, models[], inputTokens, outputTokens, cacheRead, cacheWrite }.
+ * Failed fetches are silently skipped (session just won't have cost data).
+ */
+async function batchFetchSessionCosts(
+  sessionKeys: string[],
+): Promise<Map<string, { costUsd: number; inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number; models: Array<{ model: string; provider: string; costUsd: number; inputTokens: number; outputTokens: number; count: number }> }>> {
+  const results = new Map<string, { costUsd: number; inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number; models: Array<{ model: string; provider: string; costUsd: number; inputTokens: number; outputTokens: number; count: number }> }>()
+
+  // Fetch in parallel, max 10 at a time to avoid overwhelming the gateway
+  const BATCH_SIZE = 10
+  for (let i = 0; i < sessionKeys.length; i += BATCH_SIZE) {
+    const batch = sessionKeys.slice(i, i + BATCH_SIZE)
+    const promises = batch.map(async (key) => {
+      try {
+        const status = await withTimeout(
+          gatewayRpc<Record<string, unknown>>('session.status', { sessionKey: key }),
+          5000,
+          `session.status timeout for ${key}`,
+        )
+        const s = toRecord(status)
+        const usage = toRecord(s.usage)
+        const modelUsage = Array.isArray(usage.modelUsage) ? usage.modelUsage : []
+
+        const models = modelUsage.map((m: unknown) => {
+          const mr = toRecord(m)
+          const totals = toRecord(mr.totals)
+          return {
+            model: readString(mr.model),
+            provider: readString(mr.provider),
+            costUsd: readNumber(totals.totalCost ?? totals.costUsd),
+            inputTokens: readNumber(totals.input ?? totals.inputTokens),
+            outputTokens: readNumber(totals.output ?? totals.outputTokens),
+            count: readNumber(mr.count),
+          }
+        })
+
+        results.set(key, {
+          costUsd: readNumber(usage.totalCost ?? s.costUsd),
+          inputTokens: readNumber(usage.input ?? s.inputTokens),
+          outputTokens: readNumber(usage.output ?? s.outputTokens),
+          cacheRead: readNumber(usage.cacheRead),
+          cacheWrite: readNumber(usage.cacheWrite),
+          models,
+        })
+      } catch {
+        // Skip failed fetches — session will use estimated cost
+      }
+    })
+    await Promise.all(promises)
+  }
+
+  return results
+}
+
 export const Route = createFileRoute('/api/usage-analytics')({
   server: {
     handlers: {
@@ -197,7 +254,7 @@ export const Route = createFileRoute('/api/usage-analytics')({
         }
 
         try {
-          // Fetch cost data and sessions list in parallel
+          // Step 1: Fetch cost data and sessions list in parallel
           const [costPayload, sessionsPayload] = await Promise.all([
             withTimeout(
               gatewayRpc<Record<string, unknown>>('usage.cost', {}),
@@ -213,12 +270,26 @@ export const Route = createFileRoute('/api/usage-analytics')({
 
           const costRoot = toRecord(costPayload)
 
-          // Build per-session breakdown from sessions.list (usage.cost doesn't include this)
+          // Build per-session list from sessions.list
           const sessionsRoot = toRecord(sessionsPayload)
           const rawSessionsList = Array.isArray(sessionsRoot.sessions)
             ? sessionsRoot.sessions
             : []
 
+          // Step 2: Batch-fetch session.status for sessions with tokens (real cost data)
+          const activeSessionKeys: string[] = []
+          for (const s of rawSessionsList) {
+            const row = toRecord(s)
+            const key = readString(row.key ?? row.sessionKey ?? '')
+            const totalTokens = readNumber(row.totalTokens) || readNumber(row.inputTokens) + readNumber(row.outputTokens)
+            if (key && totalTokens > 0) {
+              activeSessionKeys.push(key)
+            }
+          }
+
+          const sessionCosts = await batchFetchSessionCosts(activeSessionKeys)
+
+          // Step 3: Build normalized sessions with real costs
           const normalizedSessions: NormalizedSession[] = rawSessionsList.map(
             (s: unknown) => {
               const row = toRecord(s)
@@ -228,15 +299,18 @@ export const Route = createFileRoute('/api/usage-analytics')({
                   ? `${row.modelProvider}/${row.model}`
                   : (row.model ?? ''),
               )
-              const inputTokens = readNumber(row.inputTokens)
-              const outputTokens = readNumber(row.outputTokens)
-              // Use gateway cost if available, otherwise estimate from pricing table
-              const gatewayCost = readNumber(row.costUsd ?? row.totalCost ?? 0)
-              const costUsd = gatewayCost > 0
-                ? gatewayCost
-                : estimateCost(model, inputTokens, outputTokens)
+              const sessionCost = sessionCosts.get(sessionKey)
+              const inputTokens = sessionCost?.inputTokens ?? readNumber(row.inputTokens)
+              const outputTokens = sessionCost?.outputTokens ?? readNumber(row.outputTokens)
+              const costUsd = sessionCost?.costUsd ?? estimateCost(model, inputTokens, outputTokens)
+
+              // Build a human-friendly label from available metadata
+              const rawLabel = readString(row.label ?? row.displayName ?? row.friendlyId ?? '')
+              const label = rawLabel || extractAgentName(sessionKey)
+
               return {
                 sessionKey,
+                label,
                 model,
                 agent: extractAgentName(sessionKey),
                 inputTokens,
@@ -248,19 +322,35 @@ export const Route = createFileRoute('/api/usage-analytics')({
             },
           )
 
-          // Aggregate per-model breakdown from sessions with proper cost calculation
+          // Step 4: Build per-model breakdown from session.status model usage (most accurate)
           const modelMap = new Map<
             string,
             { inputTokens: number; outputTokens: number; totalTokens: number; costUsd: number; sessions: number }
           >()
+
+          // First pass: use detailed model usage from session.status
+          for (const [, sessionCost] of sessionCosts) {
+            for (const m of sessionCost.models) {
+              const modelKey = m.provider ? `${m.provider}/${m.model}` : m.model
+              if (!modelKey) continue
+              const existing = modelMap.get(modelKey) || {
+                inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0, sessions: 0,
+              }
+              existing.inputTokens += m.inputTokens
+              existing.outputTokens += m.outputTokens
+              existing.totalTokens += m.inputTokens + m.outputTokens
+              existing.costUsd += m.costUsd
+              existing.sessions += 1
+              modelMap.set(modelKey, existing)
+            }
+          }
+
+          // Fallback for sessions that didn't have session.status data
           for (const s of normalizedSessions) {
+            if (sessionCosts.has(s.sessionKey)) continue // already counted above
             const model = s.model || 'unknown'
             const existing = modelMap.get(model) || {
-              inputTokens: 0,
-              outputTokens: 0,
-              totalTokens: 0,
-              costUsd: 0,
-              sessions: 0,
+              inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0, sessions: 0,
             }
             existing.inputTokens += s.inputTokens
             existing.outputTokens += s.outputTokens
@@ -269,15 +359,9 @@ export const Route = createFileRoute('/api/usage-analytics')({
             existing.sessions += 1
             modelMap.set(model, existing)
           }
-          // If aggregated model costs are 0 but we have tokens, estimate from pricing table
-          for (const [model, data] of modelMap) {
-            if (data.costUsd === 0 && data.totalTokens > 0) {
-              data.costUsd = estimateCost(model, data.inputTokens, data.outputTokens)
-            }
-          }
 
           const modelRows = Array.from(modelMap.entries())
-            .sort((a, b) => b[1].totalTokens - a[1].totalTokens)
+            .sort((a, b) => b[1].costUsd - a[1].costUsd || b[1].totalTokens - a[1].totalTokens)
             .map(([model, data]) => ({
               model,
               ...data,
