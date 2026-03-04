@@ -63,7 +63,7 @@ export const Route = createFileRoute('/api/session-status')({
           const [statusResult, usageResult] = await Promise.allSettled([
             trySessionStatus(sessionKey),
             gatewayRpc<any>('sessions.usage', {
-              limit: 5,
+              limit: 200,
               includeContextWeight: true,
             }),
           ])
@@ -128,6 +128,18 @@ export const Route = createFileRoute('/api/session-status')({
               }))
             }
           }
+
+          // Include all sessions for dashboard aggregation (dailyModelUsage, dailyBreakdown, etc.)
+          const allSessions = Array.isArray(usageData?.sessions) ? usageData.sessions : []
+          enriched.sessions = allSessions.map((s: any) => ({
+            key: s.key,
+            agentId: s.agentId ?? s.key,
+            label: s.label ?? s.friendlyId ?? '',
+            model: s.model ?? '',
+            modelProvider: s.modelProvider ?? '',
+            updatedAt: s.updatedAt ?? 0,
+            usage: s.usage ?? {},
+          }))
 
           return json({ ok: true, payload: enriched })
         } catch (err) {
