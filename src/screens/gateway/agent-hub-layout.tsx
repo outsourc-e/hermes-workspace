@@ -7611,6 +7611,27 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 compact
                 externalStream
                 outputLines={agentOutputLines[selectedOutputAgentId]}
+                enableMessaging={missionState === 'running'}
+                onSendMessage={(sk, msg) => {
+                  // Clear done state so the agent can resume
+                  agentSessionsDoneRef.current.delete(sk)
+                  if (selectedOutputAgentId) {
+                    setAgentSessionStatus((prev) => ({
+                      ...prev,
+                      [selectedOutputAgentId]: { status: 'active', lastSeen: Date.now() },
+                    }))
+                  }
+                  fetch('/api/sessions/send', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ sessionKey: sk, message: msg }),
+                  }).catch(() => { /* best effort */ })
+                  emitFeedEvent({
+                    type: 'agent_active',
+                    message: `Sent message to ${selectedOutputAgentName}: "${msg.slice(0, 80)}${msg.length > 80 ? '…' : ''}"`,
+                    agentName: selectedOutputAgentName,
+                  })
+                }}
               />
             </div>
           </div>
@@ -8299,6 +8320,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 statusLabel={selectedOutputStatusLabel}
                 externalStream
                 outputLines={selectedOutputAgentId ? agentOutputLines[selectedOutputAgentId] : undefined}
+                enableMessaging={missionState === 'running'}
+                onSendMessage={(sk, msg) => {
+                  agentSessionsDoneRef.current.delete(sk)
+                  if (selectedOutputAgentId) {
+                    setAgentSessionStatus((prev) => ({
+                      ...prev,
+                      [selectedOutputAgentId]: { status: 'active', lastSeen: Date.now() },
+                    }))
+                  }
+                  fetch('/api/sessions/send', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ sessionKey: sk, message: msg }),
+                  }).catch(() => { /* best effort */ })
+                }}
               />
             </div>
           </div>

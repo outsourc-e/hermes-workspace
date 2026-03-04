@@ -44,6 +44,10 @@ export type AgentOutputPanelProps = {
    * output panel — the parent already has the data, just pass it down.
    */
   outputLines?: string[]
+  /** Enable inline message input at the bottom of the output panel */
+  enableMessaging?: boolean
+  /** Callback when user sends a message to this agent */
+  onSendMessage?: (sessionKey: string, message: string) => void
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -207,7 +211,12 @@ export function AgentOutputPanel({
   compact = false,
   externalStream = false,
   outputLines,
+  enableMessaging = false,
+  onSendMessage,
 }: AgentOutputPanelProps) {
+  const [messageInput, setMessageInput] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const messageInputRef = useRef<HTMLInputElement>(null)
   const cachedInitial = readCachedSessionState(sessionKey)
   const [messages, setMessages] = useState<OutputMessage[]>(cachedInitial?.messages ?? [])
   const [sessionEnded, setSessionEnded] = useState(cachedInitial?.sessionEnded ?? false)
@@ -507,6 +516,55 @@ export function AgentOutputPanel({
             </>
           )}
         </div>
+      )}
+
+      {/* Inline message input */}
+      {enableMessaging && sessionKey && !sessionEnded && (
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const text = messageInput.trim()
+            if (!text || !sessionKey || sendingMessage) return
+            setSendingMessage(true)
+            setMessageInput('')
+            // Add user message to local display immediately
+            setMessages((prev) => [
+              ...prev,
+              { role: 'user', content: text, timestamp: Date.now() },
+            ])
+            // Clear sessionEnded so we show the streaming cursor again
+            setSessionEnded(false)
+            if (onSendMessage) {
+              onSendMessage(sessionKey, text)
+            } else {
+              fetch('/api/sessions/send', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ sessionKey, message: text }),
+              }).catch(() => { /* best effort */ })
+            }
+            setSendingMessage(false)
+            messageInputRef.current?.focus()
+          }}
+        >
+          <input
+            ref={messageInputRef}
+            type="text"
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            placeholder={`Message ${agentName}...`}
+            disabled={sendingMessage}
+            className="flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!messageInput.trim() || sendingMessage}
+            className="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-40"
+          >
+            Send
+          </button>
+        </form>
       )}
     </div>
   )
