@@ -66,6 +66,9 @@ export type TeamMember = {
   goal: string        // What this agent is trying to achieve
   backstory: string   // Persona/context that shapes agent behavior
   status: string
+  memoryPath?: string       // Custom memory/workspace path for this agent
+  skillAllowlist?: string[] // Skills this agent is allowed to use (empty = all)
+  modelOverride?: string    // Runtime model override (takes precedence over modelId)
 }
 
 export type AgentSessionStatusEntry = {

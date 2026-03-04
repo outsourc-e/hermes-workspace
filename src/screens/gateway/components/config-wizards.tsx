@@ -409,6 +409,33 @@ export function AgentWizardModal({
           </div>
         </div>
 
+        {/* Row 3: Memory Path + Skill Allowlist */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <FieldLabel>Memory Path <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
+            <input
+              value={member.memoryPath ?? ''}
+              onChange={(e) => onUpdate({ memoryPath: e.target.value || undefined } as Partial<typeof member>)}
+              className={INPUT_CLS}
+              placeholder="e.g. ~/workspace/agent-memory"
+            />
+            <p className="mt-0.5 text-[9px] text-neutral-400">Custom memory/workspace directory for this agent</p>
+          </div>
+          <div>
+            <FieldLabel>Skill Allowlist <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
+            <input
+              value={(member.skillAllowlist ?? []).join(', ')}
+              onChange={(e) => {
+                const skills = e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean)
+                onUpdate({ skillAllowlist: skills.length > 0 ? skills : undefined } as Partial<typeof member>)
+              }}
+              className={INPUT_CLS}
+              placeholder="web_search, exec, read, write"
+            />
+            <p className="mt-0.5 text-[9px] text-neutral-400">Comma-separated skill names. Empty = all skills allowed.</p>
+          </div>
+        </div>
+
         {/* System Prompt */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
