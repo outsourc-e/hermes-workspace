@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { parse as parseYaml } from 'yaml'
 
 type GatewayConfig = {
   auth?: {
@@ -36,6 +37,74 @@ export function invalidateCache(): void {
 }
 
 /**
+ * Strip JS-style comments and trailing commas from a JSON-ish string (JSONC).
+ */
+function stripJsonc(raw: string): string {
+  // Remove block comments /* ... */
+  let result = raw.replace(/\/\*[\s\S]*?\*\//g, '')
+  // Remove line comments // ...
+  result = result.replace(/\/\/[^\n\r]*/g, '')
+  // Remove trailing commas before } or ]
+  result = result.replace(/,(\s*[}\]])/g, '$1')
+  return result
+}
+
+/**
+ * Read and parse the Gateway config file, supporting JSON, JSONC, YAML, and YML.
+ * Resolution order:
+ *   1. OPENCLAW_CONFIG_PATH env var (if set)
+ *   2. ~/.openclaw/openclaw.json
+ *   3. ~/.openclaw/openclaw.yaml
+ *   4. ~/.openclaw/openclaw.yml
+ * Returns null if no config file is found or parsing fails.
+ */
+function readGatewayConfig(): GatewayConfig | null {
+  const dir = path.join(os.homedir(), '.openclaw')
+
+  // Candidates in priority order
+  const candidates: string[] = []
+
+  const envPath = process.env['OPENCLAW_CONFIG_PATH']
+  if (envPath) {
+    candidates.push(envPath)
+  }
+
+  candidates.push(
+    path.join(dir, 'openclaw.json'),
+    path.join(dir, 'openclaw.yaml'),
+    path.join(dir, 'openclaw.yml'),
+  )
+
+  for (const filePath of candidates) {
+    let raw: string
+    try {
+      raw = fs.readFileSync(filePath, 'utf8')
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT') continue // try next candidate
+      // Unexpected I/O error — surface in dev
+      if (import.meta.env.DEV) console.error(`Failed to read config at ${filePath}:`, err)
+      continue
+    }
+
+    const ext = path.extname(filePath).toLowerCase()
+    try {
+      if (ext === '.yaml' || ext === '.yml') {
+        return parseYaml(raw) as GatewayConfig
+      } else {
+        // .json or unknown — treat as JSONC (strip comments + trailing commas)
+        return JSON.parse(stripJsonc(raw)) as GatewayConfig
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) console.error(`Failed to parse config at ${filePath}:`, err)
+      continue
+    }
+  }
+
+  return null
+}
+
+/**
  * Extract provider name from auth profile key.
  * Example: "anthropic:default" -> "anthropic"
  */
@@ -67,11 +136,9 @@ function modelIdFromScopedKey(scoped: string): string | null {
 export function getConfiguredProviderNames(): Array<string> {
   if (cachedProviderNames && !isCacheStale()) return cachedProviderNames
 
-  const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
-
   try {
-    const raw = fs.readFileSync(configPath, 'utf8')
-    const config = JSON.parse(raw) as GatewayConfig
+    const config = readGatewayConfig()
+    if (!config) return []
 
     const providerNames = new Set<string>()
 
@@ -94,12 +161,8 @@ export function getConfiguredProviderNames(): Array<string> {
     cacheTimestamp = Date.now()
     return cachedProviderNames
   } catch (error) {
-    // Silently return empty when config doesn't exist (e.g. Docker containers)
-    const code = (error as NodeJS.ErrnoException)?.code
-    if (code !== 'ENOENT') {
-      if (import.meta.env.DEV)
-        console.error('Failed to read Gateway config for provider names:', error)
-    }
+    if (import.meta.env.DEV)
+      console.error('Failed to read Gateway config for provider names:', error)
     return []
   }
 }
@@ -118,11 +181,9 @@ export function getConfiguredProviders(): Array<string> {
 export function getConfiguredModelIds(): Set<string> {
   if (cachedModelIds && !isCacheStale()) return cachedModelIds
 
-  const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
-
   try {
-    const raw = fs.readFileSync(configPath, 'utf8')
-    const config = JSON.parse(raw) as GatewayConfig
+    const config = readGatewayConfig()
+    if (!config) return new Set()
 
     const modelIds = new Set<string>()
 
@@ -163,11 +224,8 @@ export function getConfiguredModelIds(): Set<string> {
     cacheTimestamp = Date.now()
     return cachedModelIds
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException)?.code
-    if (code !== 'ENOENT') {
-      if (import.meta.env.DEV)
-        console.error('Failed to read Gateway config for model IDs:', error)
-    }
+    if (import.meta.env.DEV)
+      console.error('Failed to read Gateway config for model IDs:', error)
     return new Set()
   }
 }
@@ -187,11 +245,10 @@ type ConfigModelEntry = {
  * in the model switcher even if the gateway's auto-discovery doesn't return them.
  */
 export function getConfiguredModelsFromConfig(): ConfigModelEntry[] {
-  const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
-
   try {
-    const raw = fs.readFileSync(configPath, 'utf8')
-    const config = JSON.parse(raw) as GatewayConfig
+    const config = readGatewayConfig()
+    if (!config) return []
+
     const results: ConfigModelEntry[] = []
 
     if (config.models?.providers) {
