@@ -217,12 +217,12 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
-type ActiveTab = 'overview' | 'configure' | 'missions' | 'kanban' | 'analytics'
+type ActiveTab = 'overview' | 'configure' | 'runs' | 'kanban' | 'analytics'
 type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'overview', icon: '🏠', label: 'Overview' },
-  { id: 'missions', icon: '🚀', label: 'Missions' },
+  { id: 'runs', icon: '▶️', label: 'Runs' },
   { id: 'kanban', icon: '📋', label: 'Board' },
   { id: 'analytics', icon: '📊', label: 'Analytics' },
   { id: 'configure', icon: '⚙️', label: 'Configure' },
@@ -2920,7 +2920,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (!restoreCheckpoint || restoreCheckpoint.status !== 'running') return
     if (missionState !== 'stopped') return
     restoreMission(restoreCheckpoint)
-    setActiveTab('missions')
+    setActiveTab('runs')
     setMissionSubTab('running')
     agentSessionsDoneRef.current = new Set()
     expectedAgentCountRef.current = Object.keys(
@@ -3154,7 +3154,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setDispatchedTaskIdsByAgent({})
     setPausedByAgentId({})
     setSelectedOutputAgentId(undefined)
-    setActiveTab('missions')
+    setActiveTab('runs')
     // Auto-switch filter tab based on abort/complete reason
     setMissionSubTab(reason === 'aborted' ? 'failed' : 'complete')
     setRetryingAgents({})
@@ -5233,7 +5233,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           setCompletionReport(record)
           setCompletionReportVisible(true)
           // Switch to missions tab so user sees the result
-          setActiveTab('missions')
+          setActiveTab('runs')
           setMissionSubTab('complete')
         }
         void enrichAndReport()
@@ -5410,7 +5410,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
     // ── Auto-switch to Mission tab → Running filter ──
-    setActiveTab('missions')
+    setActiveTab('runs')
     setMissionSubTab('running')
     setWizardOpen(false)
     emitFeedEvent({
@@ -5758,7 +5758,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <h2 className={HUB_CARD_LABEL_CLASS}>Recent Missions</h2>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('missions')}
+                  onClick={() => setActiveTab('runs')}
                   className={HUB_SECONDARY_BUTTON_CLASS}
                 >
                   View All →
@@ -6731,7 +6731,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     )
   }
 
-  function renderMissionsTabContent() {
+  function renderRunsTabContent() {
     const currentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
     const missionTasksForBoard = missionTasks.length > 0 ? missionTasks : boardTasks
     const runningTaskStats = computeMissionTaskStats(missionTasksForBoard)
@@ -7650,7 +7650,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <span aria-hidden className="text-sm leading-none sm:text-base">{tab.icon}</span>
               <span className="shrink-0 whitespace-nowrap">{tab.label}</span>
               {/* Mission tab: animated running indicator */}
-              {tab.id === 'missions' && isMissionRunning ? (
+              {tab.id === 'runs' && isMissionRunning ? (
                 <span className="relative ml-0.5 flex size-1.5">
                   <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
                   <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
@@ -7688,9 +7688,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           )}
 
-          {activeTab === 'missions' && (
+          {activeTab === 'runs' && (
             <div className="h-full min-h-0">
-              {renderMissionsTabContent()}
+              {renderRunsTabContent()}
             </div>
           )}
 
