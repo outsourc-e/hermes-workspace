@@ -12,6 +12,9 @@ import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
+import {
+  type MissionArtifact,
+} from '@/stores/mission-store'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
@@ -132,16 +135,6 @@ type AgentActivityEntry = {
   lastEventType?: 'tool' | 'assistant' | 'system'
 }
 
-type MissionArtifact = {
-  id: string
-  agentId: string
-  agentName: string
-  type: 'html' | 'markdown' | 'code' | 'text'
-  title: string
-  content: string
-  timestamp: number
-}
-
 type MissionTaskStats = {
   total: number
   completed: number
@@ -172,6 +165,7 @@ type MissionReportPayload = {
 
 type StoredMissionReport = {
   id: string
+  missionId?: string
   name?: string
   goal: string
   teamName: string
@@ -1512,6 +1506,40 @@ function generateMissionReport(payload: MissionReportPayload): string {
   return lines.join('\n')
 }
 
+function getStoredMissionReportMissionId(report: StoredMissionReport): string {
+  return report.missionId ?? report.id
+}
+
+function buildStoredMissionReportFromCheckpoint(cp: MissionCheckpoint): StoredMissionReport | null {
+  if (!cp.report) return null
+  const completedTasks = cp.tasks.filter((task) => task.status === 'done' || task.status === 'completed').length
+  const failedTasks = cp.tasks.filter((task) => task.status === 'blocked' || task.status === 'failed').length
+  const completedAt = cp.completedAt ?? cp.updatedAt
+  return {
+    id: cp.id,
+    missionId: cp.id,
+    name: cp.label,
+    goal: cp.label,
+    teamName: cp.team.length > 0 ? `${cp.team.length}-agent team` : 'Archived Mission',
+    agents: cp.team.map((member) => ({
+      id: member.id,
+      name: member.name,
+      modelId: member.modelId,
+    })),
+    taskStats: {
+      total: cp.tasks.length,
+      completed: completedTasks,
+      failed: failedTasks,
+    },
+    duration: Math.max(0, completedAt - cp.startedAt),
+    tokenCount: 0,
+    costEstimate: 0,
+    artifacts: [],
+    report: cp.report,
+    completedAt,
+  }
+}
+
 function loadStoredMissionReports(): StoredMissionReport[] {
   if (typeof window === 'undefined') return []
   try {
@@ -1530,7 +1558,8 @@ function loadStoredMissionReports(): StoredMissionReport[] {
 
 function saveStoredMissionReport(entry: StoredMissionReport): StoredMissionReport[] {
   if (typeof window === 'undefined') return [entry]
-  const next = [entry, ...loadStoredMissionReports().filter((row) => row.id !== entry.id)]
+  const entryMissionId = getStoredMissionReportMissionId(entry)
+  const next = [entry, ...loadStoredMissionReports().filter((row) => getStoredMissionReportMissionId(row) !== entryMissionId)]
     .sort((a, b) => b.completedAt - a.completedAt)
     .slice(0, MAX_MISSION_REPORTS)
   try {
@@ -2284,11 +2313,126 @@ function timeAgoFromMs(ms: number): string {
   return `${days}d ago`
 }
 
-function HistoryView() {
+type HistoryViewProps = {
+  localHistory?: MissionCheckpoint[]
+  onViewReport?: (report: StoredMissionReport) => void
+}
+
+function MissionReportDetailModal({
+  report,
+  onClose,
+  onArtifactPreview,
+}: {
+  report: StoredMissionReport
+  onClose: () => void
+  onArtifactPreview?: (artifact: MissionArtifact) => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="h-1 w-full shrink-0 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400" />
+        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-6 py-4 dark:border-neutral-700">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-bold text-neutral-900 dark:text-white">
+              {report.name || report.goal}
+            </h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              {report.teamName} · {new Date(report.completedAt).toLocaleDateString()}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="grid shrink-0 grid-cols-2 gap-3 border-b border-neutral-200 px-6 py-4 dark:border-neutral-700 sm:grid-cols-4">
+          {[
+            { label: 'Duration', value: formatDuration(report.duration) },
+            { label: 'Tasks', value: `${report.taskStats.completed}/${report.taskStats.total}` },
+            { label: 'Tokens', value: report.tokenCount.toLocaleString() },
+            { label: 'Est. Cost', value: `$${report.costEstimate.toFixed(2)}` },
+          ].map(({ label, value }) => (
+            <div key={label} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-center dark:border-neutral-700 dark:bg-slate-800/50">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
+              <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">{value}</p>
+            </div>
+          ))}
+        </div>
+        {report.agents.length > 0 ? (
+          <div className="shrink-0 px-6 pt-4">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Agents</p>
+            <div className="flex flex-wrap gap-1.5">
+              {report.agents.map((agent) => (
+                <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:bg-slate-800/50 dark:text-neutral-300">
+                  {agent.name}
+                  <span className="text-[10px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {onArtifactPreview && report.artifacts.length > 0 ? (
+          <div className="shrink-0 px-6 pt-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Artifacts</p>
+            <div className="flex flex-wrap gap-1.5">
+              {report.artifacts.map((artifact) => (
+                <button
+                  key={artifact.id}
+                  type="button"
+                  onClick={() => onArtifactPreview(artifact)}
+                  className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-700 transition-colors hover:border-accent-300 dark:border-neutral-700 dark:bg-slate-800/50 dark:text-neutral-300"
+                >
+                  {artifact.type === 'code' ? '📄' : artifact.type === 'html' ? '🌐' : '📝'} {artifact.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <Markdown>{report.report}</Markdown>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-200 px-6 py-3 dark:border-neutral-700">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-accent-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HistoryView({ localHistory: localHistoryProp, onViewReport }: HistoryViewProps = {}) {
   const [sessions, setSessions] = useState<SessionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [localHistory] = useState<MissionCheckpoint[]>(() => loadMissionHistory())
+  const [localHistory] = useState<MissionCheckpoint[]>(() => localHistoryProp ?? loadMissionHistory())
+  const [inlineSelectedReport, setInlineSelectedReport] = useState<StoredMissionReport | null>(null)
+  const storedReportsByMissionId = useMemo(() => {
+    return new Map(loadStoredMissionReports().map((report) => [getStoredMissionReportMissionId(report), report]))
+  }, [])
+  const historyItems = localHistoryProp ?? localHistory
+  const handleViewReport = useCallback((report: StoredMissionReport) => {
+    if (onViewReport) {
+      onViewReport(report)
+      return
+    }
+    setInlineSelectedReport(report)
+  }, [onViewReport])
 
   useEffect(() => {
     let cancelled = false
@@ -2323,7 +2467,7 @@ function HistoryView() {
     }
   }, [])
 
-  const hasLocalHistory = localHistory.length > 0
+  const hasLocalHistory = historyItems.length > 0
   const hasApiSessions = sessions.length > 0
 
   if (loading && !hasLocalHistory) {
@@ -2370,12 +2514,13 @@ function HistoryView() {
       {hasLocalHistory ? (
         <div className="space-y-3">
           <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-700 dark:text-neutral-300">📦 Local Checkpoints</p>
-          {localHistory.map((cp) => {
+          {historyItems.map((cp) => {
             const completedTasks = cp.tasks.filter(t => t.status === 'done' || t.status === 'completed').length
             const totalTasks = cp.tasks.length
             const statusBadge = CHECKPOINT_STATUS_BADGE[cp.status] ?? CHECKPOINT_STATUS_BADGE['completed']!
             const processClass = PROCESS_TYPE_BADGE[cp.processType] ?? ''
             const timeRef = cp.completedAt ?? cp.updatedAt
+            const availableReport = storedReportsByMissionId.get(cp.id) ?? buildStoredMissionReportFromCheckpoint(cp)
 
             return (
               <div
@@ -2418,11 +2563,22 @@ function HistoryView() {
                   </div>
                 ) : null}
 
-                <div className="flex items-center gap-3 font-mono text-[10px] text-neutral-700 dark:text-neutral-400">
-                  {totalTasks > 0 ? (
-                    <span>{completedTasks}/{totalTasks} tasks</span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 font-mono text-[10px] text-neutral-700 dark:text-neutral-400">
+                    {totalTasks > 0 ? (
+                      <span>{completedTasks}/{totalTasks} tasks</span>
+                    ) : null}
+                    {timeRef > 0 ? <span>{timeAgoFromMs(timeRef)}</span> : null}
+                  </div>
+                  {availableReport ? (
+                    <button
+                      type="button"
+                      onClick={() => handleViewReport(availableReport)}
+                      className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                    >
+                      View Report
+                    </button>
                   ) : null}
-                  {timeRef > 0 ? <span>{timeAgoFromMs(timeRef)}</span> : null}
                 </div>
               </div>
             )
@@ -2525,6 +2681,13 @@ function HistoryView() {
           })}
         </div>
       ) : null}
+
+      {inlineSelectedReport ? (
+        <MissionReportDetailModal
+          report={inlineSelectedReport}
+          onClose={() => setInlineSelectedReport(null)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -2564,22 +2727,46 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   // ── Approvals state ────────────────────────────────────────────────────────
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(() => loadApprovals())
-
-  // ── Restore-banner state (from localStorage checkpoint) ───────────────────
-  const [restoreCheckpoint, setRestoreCheckpoint] = useState<MissionCheckpoint | null>(() => {
-    const cp = loadMissionCheckpoint()
-    return cp?.status === 'running' ? cp : null
-  })
+  const missionStore = useMissionStore()
+  const {
+    activeMission,
+    missionActive,
+    missionGoal,
+    activeMissionName,
+    activeMissionGoal,
+    missionState,
+    boardTasks,
+    missionTasks,
+    dispatchedTaskIdsByAgent,
+    agentSessionMap,
+    agentSessionModelMap,
+    agentSessionStatus,
+    artifacts,
+    restoreCheckpoint,
+    startMission,
+    completeMission,
+    abortMission,
+    updateTaskStatus,
+    setMissionState,
+    restoreMission,
+    setMissionGoal,
+    setRestoreCheckpoint,
+    setBoardTasks: _setBoardTasks,
+    setDispatchedTaskIdsByAgent,
+    setMissionTasks,
+    setAgentSessionMap,
+    setAgentSessionModelMap,
+    setAgentSessionStatus,
+    setArtifacts,
+    setActiveMissionMeta,
+    saveCheckpoint,
+  } = missionStore
   const [, setRestoreDismissed] = useState(false)
 
   // ── Existing state ──────────────────────────────────────────────────────────
   const [isMobileHub, setIsMobileHub] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
   )
-  const [missionActive, setMissionActive] = useState(false)
-  const [missionGoal, setMissionGoal] = useState('')
-  const [activeMissionName, setActiveMissionName] = useState('')
-  const [activeMissionGoal, setActiveMissionGoal] = useState('')
   const [, setMissionBoardDrafts] = useState<MissionBoardDraft[]>([])
   const [missionBoardModalOpen, setMissionBoardModalOpen] = useState(false)
   const [missionWizardStep, setMissionWizardStep] = useState(0)
@@ -2591,9 +2778,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [maximizedMissionId, setMaximizedMissionId] = useState<string | null>(null)
   const [_view, setView] = useState<'board' | 'timeline'>('board')
   const [missionSubTab, setMissionSubTab] = useState<'all' | 'running' | 'needs_input' | 'complete' | 'failed'>('all')
-  const [missionState, setMissionState] = useState<'running' | 'paused' | 'stopped'>(
-    'stopped',
-  )
   const [budgetLimit, setBudgetLimit] = useState('120000')
   const [, setActiveMissionBudgetLimit] = useState('')
   const [autoAssign, setAutoAssign] = useState(true)
@@ -2603,93 +2787,26 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
   const [outputPanelVisible, setOutputPanelVisible] = useState(false)
   const [compactionBanner, setCompactionBanner] = useState<string | null>(null)
-  const [boardTasks, _setBoardTasks] = useState<Array<HubTask>>([])
-  const [missionTasks, setMissionTasks] = useState<Array<HubTask>>([])
-  const [dispatchedTaskIdsByAgent, setDispatchedTaskIdsByAgent] = useState<Record<string, Array<string>>>({})
-  const [agentSessionMap, setAgentSessionMap] = useState<Record<string, string>>(() => {
-    if (typeof window === 'undefined') return {}
-    try {
-      const stored = window.localStorage.getItem('clawsuite:hub-agent-sessions')
-      if (!stored) return {}
-      const parsed = JSON.parse(stored) as Record<string, unknown>
-      const result: Record<string, string> = {}
-      for (const [id, value] of Object.entries(parsed)) {
-        if (typeof value === 'string') {
-          // Old format: plain string sessionKey
-          result[id] = value
-        } else if (value && typeof value === 'object' && typeof (value as AgentSessionInfo).sessionKey === 'string') {
-          // New format: { sessionKey, model? }
-          result[id] = (value as AgentSessionInfo).sessionKey
-        }
-      }
-      return result
-    } catch {
-      return {}
-    }
-  })
 
   useEffect(() => {
     if (!restoreCheckpoint || restoreCheckpoint.status !== 'running') return
     if (missionState !== 'stopped') return
-
-    const checkpoint = restoreCheckpoint as MissionCheckpoint & {
-      name?: string
-      goal?: string
-      agentSessions?: Record<string, string>
-    }
-    const restoredGoal = checkpoint.goal || ''
-    const restoredTasks = restoreCheckpoint.tasks.map((task) => ({
-      id: task.id,
-      title: task.title,
-      description: '',
-      priority: 'normal' as const,
-      status: task.status as TaskStatus,
-      agentId: task.assignedTo,
-      missionId: restoreCheckpoint.id,
-      createdAt: restoreCheckpoint.startedAt,
-      updatedAt: restoreCheckpoint.updatedAt,
-    }))
-
-    setMissionActive(true)
-    setMissionState('running')
-    setActiveMissionName(checkpoint.name || restoreCheckpoint.label || '')
-    setActiveMissionGoal(restoredGoal)
-    setMissionTasks(restoredTasks)
-    setAgentSessionMap(checkpoint.agentSessions || restoreCheckpoint.agentSessionMap || {})
+    restoreMission(restoreCheckpoint)
     setActiveTab('missions')
     setMissionSubTab('running')
-    missionIdRef.current = restoreCheckpoint.id
-    missionStartedAtRef.current = restoreCheckpoint.startedAt
     agentSessionsDoneRef.current = new Set()
-    expectedAgentCountRef.current = Object.keys(checkpoint.agentSessions || restoreCheckpoint.agentSessionMap || {}).length
+    expectedAgentCountRef.current = Object.keys(
+      restoreCheckpoint.agentSessions || restoreCheckpoint.agentSessionMap || {},
+    ).length
     sessionActivityRef.current = new Map()
     restoreGraceUntilRef.current = Date.now() + 20_000 // 20s grace for SSE to reconnect
     setRestoreCheckpoint(null)
     toast('Mission restored: Reconnected to running mission', { type: 'success' })
-  }, [missionState, restoreCheckpoint])
-  const [agentSessionModelMap, setAgentSessionModelMap] = useState<Record<string, string>>(() => {
-    if (typeof window === 'undefined') return {}
-    try {
-      const stored = window.localStorage.getItem('clawsuite:hub-agent-sessions')
-      if (!stored) return {}
-      const parsed = JSON.parse(stored) as Record<string, unknown>
-      const result: Record<string, string> = {}
-      for (const [id, value] of Object.entries(parsed)) {
-        if (value && typeof value === 'object' && typeof (value as AgentSessionInfo).model === 'string') {
-          result[id] = (value as AgentSessionInfo).model as string
-        }
-      }
-      return result
-    } catch {
-      return {}
-    }
-  })
+  }, [missionState, restoreCheckpoint, restoreMission, setRestoreCheckpoint])
   const [spawnState, setSpawnState] = useState<Record<string, 'idle' | 'spawning' | 'ready' | 'error'>>({})
-  const [agentSessionStatus, setAgentSessionStatus] = useState<Record<string, AgentSessionStatusEntry>>({})
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('connected')
   const [, setAgentModelNotApplied] = useState<Record<string, boolean>>({})
   const [agentActivity, setAgentActivity] = useState<Record<string, AgentActivityEntry>>({})
-  const [artifacts, setArtifacts] = useState<MissionArtifact[]>([])
   const [missionReports, setMissionReports] = useState<StoredMissionReport[]>(() => loadStoredMissionReports())
   const [missionHistory, setMissionHistory] = useState<MissionCheckpoint[]>(() => loadMissionHistory())
   const [artifactPreview, setArtifactPreview] = useState<MissionArtifact | null>(null)
@@ -2722,9 +2839,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
   const lastReportedMissionIdRef = useRef<string>('')
-  // Mission ID for checkpointing
-  const missionIdRef = useRef<string>('')
-  const missionStartedAtRef = useRef<number>(0)
   // Grace period after restore — prevents safety net from auto-completing before SSE reconnects
   const restoreGraceUntilRef = useRef<number>(0)
   // SSE streams for active agents (capped at MAX_AGENT_STREAMS)
@@ -2732,11 +2846,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const agentStreamLastAtRef = useRef<Map<string, number>>(new Map())
   // Stable ref for team so feed-event callback always sees latest team
   const teamRef = useRef(team)
-  // Stable refs for keyboard shortcut handler
-  const missionGoalRef = useRef(missionGoal)
   const pendingMissionNameRef = useRef('')
   const pendingMissionBudgetLimitRef = useRef('')
-  const missionActiveRef = useRef(missionActive)
   const handleCreateMissionRef = useRef<() => void>(() => {})
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
   // SSE closures (which can't list missionTasks etc. in their own deps) can call it.
@@ -2748,8 +2859,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const expectedAgentCountRef = useRef(0)
 
   teamRef.current = team
-  missionGoalRef.current = missionGoal
-  missionActiveRef.current = missionActive
+  const missionId = activeMission?.id ?? ''
+  const missionStartedAt = activeMission?.startedAt ?? 0
 
   const appendArtifacts = useCallback((nextArtifacts: MissionArtifact[]) => {
     if (nextArtifacts.length === 0) return
@@ -2821,11 +2932,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [appendArtifacts])
 
   const buildMissionCompletionSnapshot = useCallback((): MissionReportPayload | null => {
-    const missionId = missionIdRef.current
     if (!missionId) return null
     const goal = activeMissionGoal || missionGoal || 'Untitled mission'
     const name = activeMissionName.trim() || undefined
-    const startedAt = missionStartedAtRef.current || Date.now()
+    const startedAt = missionStartedAt || Date.now()
     const completedAt = Date.now()
     const teamSnapshot = teamRef.current.map((member) => ({ ...member }))
     const tasksSnapshot = (missionTasks.length > 0 ? missionTasks : boardTasks).map((task) => ({ ...task }))
@@ -2859,12 +2969,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const stopMissionAndCleanup = useCallback((reason: 'aborted' | 'completed' = 'aborted') => {
     missionCompletionSnapshotRef.current = buildMissionCompletionSnapshot()
 
-    const currentCp = loadMissionCheckpoint()
-    if (currentCp) {
-      archiveMissionToHistory({ ...currentCp, status: reason })
-      clearMissionCheckpoint()
-    }
-
     Object.values(agentSessionMap).forEach((sessionKey) => {
       fetch('/api/chat-abort', {
         method: 'POST',
@@ -2879,12 +2983,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('clawsuite:hub-agent-sessions')
     }
+    if (reason === 'completed') {
+      completeMission()
+    } else {
+      abortMission()
+    }
     setMissionState('stopped')
-    setMissionActive(false)
-    setActiveMissionName('')
-    setActiveMissionGoal('')
-    setMissionTasks([])
-    setDispatchedTaskIdsByAgent({})
     setPausedByAgentId({})
     setSelectedOutputAgentId(undefined)
     setActiveTab('missions')
@@ -2894,8 +2998,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     pendingTaskMovesRef.current = []
     sessionActivityRef.current = new Map()
     taskBoardRef.current = null
-    missionIdRef.current = ''
-  }, [agentSessionMap, buildMissionCompletionSnapshot])
+    setActiveMissionMeta({ name: '', goal: '' })
+    setMissionHistory(loadMissionHistory())
+  }, [abortMission, agentSessionMap, buildMissionCompletionSnapshot, completeMission, setActiveMissionMeta])
 
 
 
@@ -4532,6 +4637,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const previous = prevMissionStateRef.current
     if (previous === 'running' && missionState === 'stopped') {
       const snapshot = missionCompletionSnapshotRef.current
+      const currentCp = loadMissionCheckpoint()
       // Capture agentSessionMap before it gets cleared by stopMissionAndCleanup
       const sessionMapSnapshot = { ...agentSessionMap }
       if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
@@ -4577,43 +4683,45 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           const duration = Math.max(0, enrichedSnapshot.completedAt - enrichedSnapshot.startedAt)
           const costEstimate = estimateMissionCost(enrichedSnapshot.tokenCount)
           const record: StoredMissionReport = {
-          id: snapshot.missionId,
-          name: snapshot.name,
-          goal: snapshot.goal,
-          teamName: snapshot.teamName,
-          agents: snapshot.team.map((member) => ({
-            id: member.id,
-            name: member.name,
-            modelId: member.modelId,
-          })),
-          taskStats,
-          duration,
-          tokenCount: enrichedSnapshot.tokenCount,
-          costEstimate,
-          artifacts: allArtifacts,
-          report: reportText,
-          completedAt: enrichedSnapshot.completedAt,
-        }
-        setMissionReports(saveStoredMissionReport(record))
-        lastReportedMissionIdRef.current = enrichedSnapshot.missionId
-        // Auto-show completion report modal
-        setCompletionReport(record)
-        setCompletionReportVisible(true)
-        // Switch to missions tab so user sees the result
-        setActiveTab('missions')
-        setMissionSubTab('complete')
+            id: snapshot.missionId,
+            missionId: snapshot.missionId,
+            name: snapshot.name,
+            goal: snapshot.goal,
+            teamName: snapshot.teamName,
+            agents: snapshot.team.map((member) => ({
+              id: member.id,
+              name: member.name,
+              modelId: member.modelId,
+            })),
+            taskStats,
+            duration,
+            tokenCount: enrichedSnapshot.tokenCount,
+            costEstimate,
+            artifacts: allArtifacts,
+            report: reportText,
+            completedAt: enrichedSnapshot.completedAt,
+          }
+          setMissionReports(saveStoredMissionReport(record))
+          lastReportedMissionIdRef.current = enrichedSnapshot.missionId
+          if (currentCp) {
+            archiveMissionToHistory({ ...currentCp, status: 'completed', report: reportText })
+            clearMissionCheckpoint()
+            setMissionHistory(loadMissionHistory())
+          }
+          // Auto-show completion report modal
+          setCompletionReport(record)
+          setCompletionReportVisible(true)
+          // Switch to missions tab so user sees the result
+          setActiveTab('missions')
+          setMissionSubTab('complete')
         }
         void enrichAndReport()
+      } else if (currentCp) {
+        archiveMissionToHistory({ ...currentCp, status: 'completed', report: currentCp.report })
+        clearMissionCheckpoint()
+        setMissionHistory(loadMissionHistory())
       }
       missionCompletionSnapshotRef.current = null
-      // Reload mission history to pick up any new checkpoints
-      setMissionHistory(loadMissionHistory())
-      // Archive checkpoint and clean up
-      const currentCp = loadMissionCheckpoint()
-      if (currentCp) {
-        archiveMissionToHistory({ ...currentCp, status: 'completed' })
-        clearMissionCheckpoint()
-      }
       // Mark mission as inactive so the card moves from Running to Review column
       setMissionActive(false)
       // Clean up running state: kill sessions, clear maps (mirrors stopMissionAndCleanup)
@@ -6150,7 +6258,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const isComplete = completedTasks >= totalTasks && totalTasks > 0 && cp.status !== 'aborted'
       const completedAt = cp.completedAt ?? cp.updatedAt
       const dur = completedAt > cp.startedAt ? formatDuration(completedAt - cp.startedAt) : '—'
-      const matchingReport = missionReports.find((r) => r.id === cp.id)
+      const matchingReport = missionReports.find((report) => getStoredMissionReportMissionId(report) === cp.id)
+        ?? buildStoredMissionReportFromCheckpoint(cp)
+        ?? undefined
       const agentNames = cp.tasks
         .map((t) => t.assignedTo)
         .filter((name, idx, arr): name is string => Boolean(name) && arr.indexOf(name) === idx)
@@ -7762,91 +7872,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     {/* ── Selected Report Detail Modal (from History) ─────────────────── */}
     {selectedReport ? (
-      <div
-        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-        onClick={() => setSelectedReport(null)}
-      >
-        <div
-          className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden border border-neutral-200 dark:border-slate-700"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
-          <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-6 py-4 shrink-0">
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-neutral-900 dark:text-white truncate">
-                {selectedReport.name || selectedReport.goal}
-              </h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {selectedReport.teamName} · {new Date(selectedReport.completedAt).toLocaleDateString()}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedReport(null)}
-              className="flex size-8 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 transition-colors"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4 border-b border-neutral-200 dark:border-neutral-700 shrink-0">
-            {[
-              { label: 'Duration', value: formatDuration(selectedReport.duration) },
-              { label: 'Tasks', value: `${selectedReport.taskStats.completed}/${selectedReport.taskStats.total}` },
-              { label: 'Tokens', value: selectedReport.tokenCount.toLocaleString() },
-              { label: 'Est. Cost', value: `$${selectedReport.costEstimate.toFixed(2)}` },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-3 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
-                <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">{value}</p>
-              </div>
-            ))}
-          </div>
-          {selectedReport.agents.length > 0 && (
-            <div className="px-6 pt-4 shrink-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-2">Agents</p>
-              <div className="flex flex-wrap gap-1.5">
-                {selectedReport.agents.map((agent) => (
-                  <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    {agent.name}
-                    <span className="text-[10px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {selectedReport.artifacts.length > 0 && (
-            <div className="px-6 pt-3 shrink-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-2">Artifacts</p>
-              <div className="flex flex-wrap gap-1.5">
-                {selectedReport.artifacts.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => setArtifactPreview(a)}
-                    className="inline-flex items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-accent-300 transition-colors"
-                  >
-                    {a.type === 'code' ? '📄' : a.type === 'html' ? '🌐' : '📝'} {a.title}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <Markdown>{selectedReport.report}</Markdown>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 border-t border-neutral-200 dark:border-neutral-700 px-6 py-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => setSelectedReport(null)}
-              className="rounded-lg bg-accent-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent-600 transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
+      <MissionReportDetailModal
+        report={selectedReport}
+        onClose={() => setSelectedReport(null)}
+        onArtifactPreview={setArtifactPreview}
+      />
     ) : null}
 
     </AgentHubErrorBoundary>

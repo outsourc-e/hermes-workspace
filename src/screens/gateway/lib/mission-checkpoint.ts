@@ -3,14 +3,20 @@
 export type MissionCheckpoint = {
   id: string
   label: string
+  name?: string
+  goal?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
   team: Array<{ id: string; name: string; modelId: string; roleDescription: string; goal: string; backstory: string }>
   tasks: Array<{ id: string; title: string; status: string; assignedTo?: string }>
   agentSessionMap: Record<string, string>
+  agentSessions?: Record<string, string>
+  agentSessionModelMap?: Record<string, string>
   status: 'running' | 'paused' | 'completed' | 'aborted'
   startedAt: number
   updatedAt: number
   completedAt?: number
+  budgetLimit?: string
+  report?: string
 }
 
 const CURRENT_KEY = 'clawsuite:mission-checkpoint'
