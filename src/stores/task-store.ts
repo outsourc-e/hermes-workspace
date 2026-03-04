@@ -15,6 +15,8 @@ export type Task = {
   status: TaskStatus
   priority: TaskPriority
   project?: string
+  missionId?: string
+  assignedAgent?: string
   tags: string[]
   dueDate?: string
   reminder?: string
@@ -108,6 +110,10 @@ type TaskStore = {
   ) => Promise<void>
   moveTask: (id: string, status: TaskStatus) => Promise<void>
   deleteTask: (id: string) => Promise<void>
+  // Mission-scoped selectors + actions (CS-020)
+  getTasksByMission: (missionId: string) => Task[]
+  upsertMissionTasks: (tasks: Array<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => void
+  updateTaskStatus: (taskId: string, status: TaskStatus) => void
 }
 
 export const useTaskStore = create<TaskStore>()(
@@ -246,6 +252,27 @@ export const useTaskStore = create<TaskStore>()(
           set((state) => ({ tasks: [previousTask, ...state.tasks] }))
           throw new Error(message)
         }
+      },
+      // CS-020: Mission-scoped selectors
+      getTasksByMission: (missionId: string) => {
+        return get().tasks.filter((t) => t.missionId === missionId)
+      },
+      upsertMissionTasks: (tasks) => {
+        const now = new Date().toISOString()
+        const newTasks: Task[] = tasks.map((t) => ({
+          ...t,
+          id: `mission-${t.missionId ?? 'unknown'}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          createdAt: now,
+          updatedAt: now,
+        }))
+        set((state) => ({
+          tasks: [...state.tasks.filter((existing) => !newTasks.some((n) => n.title === existing.title && n.missionId === existing.missionId)), ...newTasks],
+        }))
+      },
+      updateTaskStatus: (taskId, status) => {
+        set((state) => ({
+          tasks: state.tasks.map((t) => t.id === taskId ? { ...t, status, updatedAt: new Date().toISOString() } : t),
+        }))
       },
     }),
     {

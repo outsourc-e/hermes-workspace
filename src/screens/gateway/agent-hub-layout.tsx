@@ -51,6 +51,13 @@ type AgentHubLayoutProps = {
   }>
 }
 
+type MissionPlanItem = {
+  title: string
+  description: string
+  agent?: string
+  enabled: boolean
+}
+
 const TEAM_STORAGE_KEY = 'clawsuite:hub-team'
 const TEAM_CONFIGS_STORAGE_KEY = 'clawsuite:hub-team-configs'
 const MISSION_REPORTS_STORAGE_KEY = 'clawsuite-mission-reports'
@@ -2902,6 +2909,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [newMissionName, setNewMissionName] = useState('')
   const [newMissionGoal, setNewMissionGoal] = useState('')
+  const [missionPlan, setMissionPlan] = useState<MissionPlanItem[]>([])
+  const [planAnswers, setPlanAnswers] = useState<Record<string, string>>({})
   const [newMissionTeamConfigId, setNewMissionTeamConfigId] = useState('__current__')
   const [newMissionProcessType, setNewMissionProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [newMissionBudgetLimit, setNewMissionBudgetLimit] = useState('120000')
@@ -5450,12 +5459,113 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   // ── Mission tab content ────────────────────────────────────────────────────
 
+  const planningQuestions = useMemo(() => {
+    const goal = newMissionGoal.trim().toLowerCase()
+    const questionPool = [
+      { key: 'output_format', text: 'What is the expected output format?', terms: ['report', 'doc', 'document', 'json', 'markdown', 'summary', 'presentation'] },
+      { key: 'constraints', text: 'Are there any constraints or limitations?', terms: ['constraint', 'limit', 'deadline', 'budget', 'compliance', 'security'] },
+      { key: 'resources', text: 'What files or resources should be consulted?', terms: ['file', 'repo', 'dataset', 'database', 'api', 'resource', 'docs'] },
+      { key: 'success', text: 'What does success look like?', terms: ['success', 'metric', 'kpi', 'goal', 'acceptance'] },
+      { key: 'tools', text: 'Any specific tools or approaches to prefer?', terms: ['tool', 'stack', 'framework', 'library', 'model', 'approach'] },
+    ]
+
+    const scored = questionPool.map((question) => {
+      const score = question.terms.reduce((acc, term) => acc + (goal.includes(term) ? 1 : 0), 0)
+      return { ...question, score }
+    })
+
+    const selected = scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map((question) => ({ key: question.key, text: question.text }))
+
+    return selected.length >= 3 ? selected : questionPool.slice(0, 5).map((question) => ({ key: question.key, text: question.text }))
+  }, [newMissionGoal])
+
+  const generateMockMissionPlan = useCallback(() => {
+    const trimmedGoal = newMissionGoal.trim()
+    if (!trimmedGoal) {
+      setMissionPlan([])
+      return
+    }
+
+    const loweredGoal = trimmedGoal.toLowerCase()
+    const baseTasks = [
+      {
+        title: 'Define mission scope',
+        description: `Turn the goal into a scoped brief with deliverables and constraints: "${trimmedGoal.slice(0, 100)}${trimmedGoal.length > 100 ? '…' : ''}".`,
+      },
+      {
+        title: 'Collect context and inputs',
+        description: 'Gather relevant files, prior decisions, and reference material needed to execute the mission.',
+      },
+      {
+        title: 'Execute core workstream',
+        description: 'Carry out the primary work for the mission and track intermediate outputs.',
+      },
+      {
+        title: 'Validate and review outputs',
+        description: 'Check output quality against success criteria, constraints, and expected format.',
+      },
+      {
+        title: 'Finalize handoff',
+        description: 'Package deliverables, summarize outcomes, and prepare launch-ready artifacts.',
+      },
+    ]
+
+    if (loweredGoal.includes('research') || loweredGoal.includes('analysis') || loweredGoal.includes('benchmark')) {
+      baseTasks[1] = {
+        title: 'Run targeted research sweep',
+        description: 'Compile sources, evaluate findings, and extract insights relevant to the mission objective.',
+      }
+    }
+
+    if (loweredGoal.includes('code') || loweredGoal.includes('bug') || loweredGoal.includes('feature') || loweredGoal.includes('api')) {
+      baseTasks[2] = {
+        title: 'Implement technical changes',
+        description: 'Build the required code updates, keep scope tight, and track any dependencies.',
+      }
+      baseTasks[3] = {
+        title: 'Test and verify behavior',
+        description: 'Run checks and validate that all acceptance criteria are met without regressions.',
+      }
+    }
+
+    if (loweredGoal.includes('content') || loweredGoal.includes('copy') || loweredGoal.includes('blog') || loweredGoal.includes('docs')) {
+      baseTasks[2] = {
+        title: 'Draft and refine content',
+        description: 'Produce first-pass content, iterate for clarity, and align with tone and structure requirements.',
+      }
+    }
+
+    if (loweredGoal.includes('design') || loweredGoal.includes('ui') || loweredGoal.includes('ux')) {
+      baseTasks[2] = {
+        title: 'Create design direction',
+        description: 'Develop UI/UX concepts, align interactions, and document rationale for key decisions.',
+      }
+    }
+
+    const selectedConfig = newMissionTeamConfigId === '__current__'
+      ? null
+      : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
+    const teamMembers = selectedConfig?.team ?? team
+    const tasksToUse = baseTasks.slice(0, 5)
+    const generatedPlan = tasksToUse.map((task, index) => ({
+      ...task,
+      agent: teamMembers.length > 0 ? teamMembers[index % teamMembers.length]?.name : undefined,
+      enabled: true,
+    }))
+
+    setMissionPlan(generatedPlan)
+  }, [newMissionGoal, newMissionTeamConfigId, team, teamConfigs])
 
 
 
   function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
     setNewMissionName(prefill?.name ?? '')
     setNewMissionGoal(prefill?.goal ?? missionGoal)
+    setMissionPlan([])
+    setPlanAnswers({})
     setNewMissionTeamConfigId(prefill?.teamConfigId ?? '__current__')
     setNewMissionProcessType(prefill?.processType ?? processType)
     setNewMissionBudgetLimit(prefill?.budgetLimit ?? budgetLimit)
@@ -7702,7 +7812,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-1">
-                  {['Scope', 'Team', 'Settings', 'Review'].map((stepLabel, stepIdx) => (
+                  {['Scope', 'Planning', 'Team', 'Settings', 'Review'].map((stepLabel, stepIdx) => (
                     <div key={stepLabel} className="flex flex-1 items-center gap-1">
                       <button
                         type="button"
@@ -7724,7 +7834,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       )}>
                         {stepLabel}
                       </span>
-                      {stepIdx < 3 ? <div className="mx-1 h-px flex-1 bg-neutral-200" /> : null}
+                      {stepIdx < 4 ? <div className="mx-1 h-px flex-1 bg-neutral-200" /> : null}
                     </div>
                   ))}
                 </div>
@@ -7766,8 +7876,90 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 ) : null}
 
-                {/* Step 1: Team */}
+                {/* Step 1: Planning */}
                 {missionWizardStep === 1 ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Clarifying Questions</p>
+                      <div className="mt-3 space-y-2">
+                        {planningQuestions.map((question, index) => (
+                          <div
+                            key={question.key}
+                            className="grid grid-cols-1 gap-2 rounded-lg border border-neutral-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-800 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-center"
+                          >
+                            <p className="text-xs text-neutral-700 dark:text-neutral-300">
+                              {index + 1}. {question.text}
+                            </p>
+                            <input
+                              value={planAnswers[question.key] ?? ''}
+                              onChange={(event) => {
+                                const value = event.target.value
+                                setPlanAnswers((prev) => ({ ...prev, [question.key]: value }))
+                              }}
+                              placeholder="Add context..."
+                              className="h-9 w-full rounded-md border border-neutral-200 bg-white px-2.5 text-xs text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                      <div>
+                        <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Draft Mission Plan</p>
+                        <p className="text-[11px] text-neutral-500 dark:text-slate-400">Generate a mock plan from the goal and adjust task toggles before launch.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={generateMockMissionPlan}
+                        disabled={!newMissionGoal.trim()}
+                        className="rounded-lg bg-accent-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-400 disabled:opacity-50"
+                      >
+                        Generate Plan
+                      </button>
+                    </div>
+
+                    {missionPlan.length > 0 ? (
+                      <div className="space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Plan Checklist</p>
+                        {missionPlan.map((task, index) => (
+                          <label
+                            key={`${task.title}-${index}`}
+                            className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={task.enabled}
+                              onChange={(event) => {
+                                const checked = event.target.checked
+                                setMissionPlan((prev) => prev.map((entry, taskIndex) => (
+                                  taskIndex === index
+                                    ? { ...entry, enabled: checked }
+                                    : entry
+                                )))
+                              }}
+                              className="mt-0.5 size-3.5 rounded border-neutral-300 text-accent-500 focus:ring-accent-400"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                                {task.title}
+                                {task.agent ? <span className="font-normal text-neutral-500 dark:text-slate-400"> · {task.agent}</span> : null}
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-neutral-600 dark:text-neutral-300">{task.description}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 px-3 py-4 text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800/30 dark:text-neutral-400">
+                        Generate a plan to preview editable checklist tasks for this mission.
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* Step 2: Team */}
+                {missionWizardStep === 2 ? (
                   <div className="space-y-3">
                     <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Select a team for this mission</p>
                     <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
@@ -7813,8 +8005,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 ) : null}
 
-                {/* Step 2: Settings */}
-                {missionWizardStep === 2 ? (
+                {/* Step 3: Settings */}
+                {missionWizardStep === 3 ? (
                   <div className="space-y-4">
                     <label className="block">
                       <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Process Type</span>
@@ -7855,8 +8047,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 ) : null}
 
-                {/* Step 3: Review & Launch */}
-                {missionWizardStep === 3 ? (
+                {/* Step 4: Review & Launch */}
+                {missionWizardStep === 4 ? (
                   <div className="space-y-4">
                     <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Launch Summary</h4>
@@ -7883,6 +8075,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Goal</p>
                       <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-300">{newMissionGoal || 'No goal set'}</p>
                     </div>
+                    {missionPlan.length > 0 ? (
+                      <div className="rounded-xl border border-neutral-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Plan Tasks</p>
+                        <div className="mt-2 space-y-1">
+                          {missionPlan.filter((task) => task.enabled).map((task, index) => (
+                            <p key={`${task.title}-review-${index}`} className="text-xs text-neutral-700 dark:text-neutral-300">
+                              {index + 1}. {task.title}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Team Lineup</p>
                       <div className="mt-2 space-y-1">
@@ -7911,7 +8115,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   {missionWizardStep === 0 ? 'Cancel' : '← Back'}
                 </button>
                 <div className="flex gap-2">
-                  {missionWizardStep === 3 ? (
+                  {missionWizardStep === 4 ? (
                     <>
                       <button
                         type="button"
@@ -7933,7 +8137,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setMissionWizardStep((s) => Math.min(3, s + 1))}
+                      onClick={() => setMissionWizardStep((s) => Math.min(4, s + 1))}
                       className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
                     >
                       Next →
