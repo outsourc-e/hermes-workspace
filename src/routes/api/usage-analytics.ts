@@ -133,15 +133,57 @@ function readErrorMessage(error: unknown): string {
 function extractAgentName(sessionKey: string): string {
   if (!sessionKey) return 'unknown'
   const parts = sessionKey.split(':')
-  // agent:X:subagent:ID → "subagent (X)"
+  // agent:X:subagent:ID → "subagent"
   if (parts[0] === 'agent' && parts.length >= 3) {
     if (parts[2] === 'subagent') return 'subagent'
-    return parts[2] || parts[1] || 'agent'
+    // agent:main:UUID → "main" (not the UUID)
+    const segment = parts[2] || parts[1] || 'agent'
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)
+    return isUuid ? (parts[1] || 'agent') : segment
   }
   // cron:X → "cron"
   if (parts[0] === 'cron') return 'cron'
   // channel:X → channel name
   return parts[0] || 'unknown'
+}
+
+/** Build a human-readable session label from available data */
+function buildSessionLabel(sessionKey: string, rawLabel: string): string {
+  if (rawLabel && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(rawLabel)) return rawLabel
+
+  // For agent:main:hub-rune-xxx → "Mission: rune-xxx"
+  const parts = sessionKey.split(':')
+  if (parts[0] === 'agent' && parts.length >= 3) {
+    const segment = parts[2] || ''
+    if (segment.startsWith('hub-')) return `Mission: ${segment.slice(4)}`
+    if (segment === 'subagent' && parts[3]) {
+      // agent:main:subagent:UUID → "Sub-agent"
+      return 'Sub-agent'
+    }
+    if (segment === 'main') return 'Main'
+    if (/^[0-9a-f]{8}-/.test(segment)) {
+      // Old session with UUID — use "Session (short-id)"
+      return `Session (${segment.slice(0, 8)})`
+    }
+    return segment
+  }
+  if (parts[0] === 'cron') {
+    const cronName = parts[1] || ''
+    if (/^[0-9a-f]{8}-/.test(cronName)) return `Cron (${cronName.slice(0, 8)})`
+    // cron:name:uuid:run:uuid → "Cron: name"
+    if (cronName.startsWith('mission-')) return `Cron: ${cronName.slice(0, 20)}…`
+    return `Cron: ${cronName}`
+  }
+  if (parts[0] === 'telegram') {
+    const target = parts.slice(1).join(':')
+    return target.startsWith('g-') ? `Telegram: ${target.slice(2)}` : `Telegram: ${target}`
+  }
+  if (parts[0] === 'discord') {
+    const target = parts.slice(1).join(':')
+    return target.startsWith('g-') ? `Discord: ${target.slice(2)}` : `Discord: ${target}`
+  }
+
+  return rawLabel || extractAgentName(sessionKey)
 }
 
 type NormalizedSession = {
@@ -306,7 +348,7 @@ export const Route = createFileRoute('/api/usage-analytics')({
 
               // Build a human-friendly label
               const rawLabel = usageData?.label || readString(row.label ?? row.displayName ?? row.friendlyId ?? '')
-              const label = rawLabel || extractAgentName(sessionKey)
+              const label = buildSessionLabel(sessionKey, rawLabel)
 
               return {
                 sessionKey,
@@ -330,7 +372,7 @@ export const Route = createFileRoute('/api/usage-analytics')({
             if (usageData.costUsd <= 0 && usageData.inputTokens + usageData.outputTokens <= 0) continue
             normalizedSessions.push({
               sessionKey: key,
-              label: usageData.label || extractAgentName(key),
+              label: buildSessionLabel(key, usageData.label),
               model: usageData.models.length > 0
                 ? `${usageData.models[0].provider}/${usageData.models[0].model}`
                 : 'unknown',
