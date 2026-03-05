@@ -194,7 +194,16 @@ export const Route = createFileRoute('/api/chat-events')({
                     return
                   }
                   if (message?.role === 'assistant' && !state) {
-                    sendEvent('message', { message, sessionKey: targetSessionKey })
+                    // DEDUP FIX: Don't emit a separate 'message' event for
+                    // assistant messages. The gateway fires TWO chat events for
+                    // the same response: one with no `state` (bare assistant
+                    // message) and one with state='final' (authoritative done).
+                    // Emitting both causes the store to insert the message
+                    // twice — the 'message' handler adds it first, then 'done'
+                    // adds it again if signatures differ even slightly.
+                    // The 'done' event already carries the full message payload,
+                    // so this bare 'message' event is redundant.
+                    // sendEvent('message', { message, sessionKey: targetSessionKey })
                     return
                   }
                   if (state === 'started' || state === 'thinking') {
@@ -240,7 +249,10 @@ export const Route = createFileRoute('/api/chat-events')({
                     }
                     sendEvent('user_message', { message, sessionKey: targetSessionKey, source: rawPayload?.source || rawPayload?.channel || eventName })
                   } else if (message?.role === 'assistant') {
-                    sendEvent('message', { message, sessionKey: targetSessionKey })
+                    // DEDUP FIX: same as above — don't re-emit assistant
+                    // messages from legacy event names. The 'chat' event with
+                    // state='final' is the authoritative source.
+                    // sendEvent('message', { message, sessionKey: targetSessionKey })
                   }
                 }
               })
