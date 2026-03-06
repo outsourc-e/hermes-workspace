@@ -10,6 +10,8 @@ import { OpenClawStudioIcon } from '@/components/icons/clawsuite';
 export function MobilePromptTrigger() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [isDismissedForSession, setIsDismissedForSession] = useState(false);
   const mountTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -25,7 +27,9 @@ export function MobilePromptTrigger() {
       return;
     }
 
-    const isDismissed = localStorage.getItem('clawsuite-mobile-prompt-dismissed') === 'true';
+    const isDismissed =
+      localStorage.getItem('clawsuite-mobile-access-dismissed') === 'true' ||
+      localStorage.getItem('clawsuite-mobile-prompt-dismissed') === 'true';
     const isSetup = localStorage.getItem('clawsuite-mobile-setup-seen') === 'true';
 
     if (isDismissed || isSetup) {
@@ -41,7 +45,7 @@ export function MobilePromptTrigger() {
       const isDesktop = window.innerWidth > 768;
       const hasBeenOnPageLongEnough = elapsedTime >= 45_000;
 
-      if (isDesktop && hasBeenOnPageLongEnough) {
+      if (isDesktop && hasBeenOnPageLongEnough && !isDismissedForSession) {
         setShowPrompt(true);
       }
     };
@@ -49,22 +53,30 @@ export function MobilePromptTrigger() {
     checkPrompt();
     const interval = window.setInterval(checkPrompt, 5_000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [isDismissedForSession]);
+
+  const persistDismissalPreference = () => {
+    if (dontShowAgain) {
+      localStorage.setItem('clawsuite-mobile-access-dismissed', 'true');
+    }
+  };
 
   const dismissPrompt = () => {
-    localStorage.setItem('clawsuite-mobile-prompt-dismissed', 'true');
+    persistDismissalPreference();
+    setIsDismissedForSession(true);
     setShowPrompt(false);
   };
 
   const openSetup = () => {
+    persistDismissalPreference();
+    setIsDismissedForSession(true);
     setShowPrompt(false);
     setIsModalOpen(true);
   };
 
   const closeSetup = () => {
+    persistDismissalPreference();
     setIsModalOpen(false);
-    // Treat any close (including Finish) as dismissed so it never re-shows
-    localStorage.setItem('clawsuite-mobile-prompt-dismissed', 'true');
   };
 
   return (
@@ -78,7 +90,8 @@ export function MobilePromptTrigger() {
             transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
             className="fixed top-4 left-1/2 z-[9999] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl border border-primary-800/60 bg-primary-950 text-white shadow-2xl shadow-black/40"
           >
-            <div className="flex items-center gap-3 px-4 py-3">
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-3">
               <div className="flex shrink-0 items-center gap-1.5">
                 <OpenClawStudioIcon className="size-8 overflow-hidden rounded-lg" />
                 <span className="text-xs text-primary-600">+</span>
@@ -121,6 +134,17 @@ export function MobilePromptTrigger() {
                   <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
                 </button>
               </div>
+              </div>
+
+              <label className="mt-3 flex items-center gap-2 text-xs text-primary-300">
+                <input
+                  type="checkbox"
+                  checked={dontShowAgain}
+                  onChange={(event) => setDontShowAgain(event.target.checked)}
+                  className="size-3.5 rounded border border-primary-700 bg-primary-900 text-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                />
+                <span>Don&apos;t show this again</span>
+              </label>
             </div>
           </motion.div>
         ) : null}

@@ -192,7 +192,6 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
     }
 
     localStorage.setItem(STORAGE_KEY_SEEN, 'true');
-    localStorage.setItem('clawsuite-mobile-prompt-dismissed', 'true');
     onClose();
   };
 
