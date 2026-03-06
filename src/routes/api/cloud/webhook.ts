@@ -135,7 +135,7 @@ export const Route = createFileRoute('/api/cloud/webhook')({
             return json({ ok: false, error: 'Missing customer email' }, { status: 400 })
           }
 
-          provisionCloudInstance({
+          await provisionCloudInstance({
             email,
             plan,
             polarSubscriptionId,
@@ -158,7 +158,7 @@ export const Route = createFileRoute('/api/cloud/webhook')({
               polarSubscriptionId,
               status: event.data?.subscription?.status === 'canceled' ? 'suspended' : 'active',
             }) ??
-            provisionCloudInstance({
+            await provisionCloudInstance({
               email,
               plan,
               polarSubscriptionId,

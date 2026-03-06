@@ -13,6 +13,8 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
+const CLOUD_API_URL = process.env.CLAWSUITE_CLOUD_API || 'https://cloud.clawsuite.io'
+
 function createGatewayUrl(instanceId: string): string {
   return `https://${instanceId}.gateway.mock.clawsuite.local`
 }
@@ -28,13 +30,45 @@ function getExpiryDate(plan: CloudPlan): string {
   return expiresAt.toISOString()
 }
 
-export function provisionCloudInstance(params: {
+/**
+ * Provision a cloud instance. When CLAWSUITE_CLOUD_API is set, proxies to the
+ * real cloud API (PC2 Docker containers). Otherwise falls back to local mock.
+ */
+export async function provisionCloudInstance(params: {
   email: string
   plan: CloudPlan
   polarSubscriptionId?: string
   expiresAt?: string
-}): CloudInstance {
+}): Promise<CloudInstance> {
   const email = normalizeEmail(params.email)
+
+  // If real cloud API is configured, proxy the request there
+  if (CLOUD_API_URL && !CLOUD_API_URL.includes('mock')) {
+    try {
+      const res = await fetch(`${CLOUD_API_URL}/api/provision/${encodeURIComponent(email)}`)
+      if (res.ok) {
+        const data = (await res.json()) as { url: string; token: string; plan: string; status: string }
+        const instance: CloudInstance = {
+          id: randomUUID(),
+          email,
+          plan: (data.plan as CloudPlan) || params.plan,
+          gatewayUrl: data.url,
+          token: data.token,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          expiresAt: params.expiresAt ?? getExpiryDate(params.plan),
+          polarSubscriptionId: params.polarSubscriptionId ?? null,
+        }
+        cloudInstancesByEmail.set(email, instance)
+        return instance
+      }
+      // If user not found on cloud API (hasn't paid yet), fall through to mock
+    } catch {
+      // Cloud API unreachable, fall through to mock
+    }
+  }
+
+  // Local mock fallback
   const existing = cloudInstancesByEmail.get(email)
   const now = new Date().toISOString()
   const instanceId = existing?.id ?? randomUUID()

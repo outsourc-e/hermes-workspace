@@ -31,7 +31,7 @@ export const Route = createFileRoute('/api/cloud/provision')({
           return json({ ok: false, error: 'Invalid provision request' }, { status: 400 })
         }
 
-        const instance = provisionCloudInstance(parsed.data)
+        const instance = await provisionCloudInstance(parsed.data)
 
         return json({
           gatewayUrl: instance.gatewayUrl,
