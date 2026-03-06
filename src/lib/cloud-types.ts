@@ -26,11 +26,15 @@ export interface PolarWebhookEvent {
     customer?: {
       email?: string
     }
+    productId?: string
+    product_id?: string
     subscription?: {
       id?: string
       status?: string
       currentPeriodEnd?: string
       current_period_end?: string
+      productId?: string
+      product_id?: string
       metadata?: Record<string, unknown>
       customer?: {
         email?: string

@@ -243,6 +243,11 @@ function GatewayStepContent() {
     }
   }
 
+  const POLAR_PRODUCT_IDS: Record<Extract<CloudPlan, 'pro' | 'team'>, string> = {
+    pro: '0cf1fed8-898c-4062-beeb-e38f0cd5bb21', // Pro $20/mo
+    team: 'fb2836ac-2f70-4b2c-9ad6-850b26ffa799', // Team $50/mo
+  }
+
   const openPolarCheckout = (plan: Extract<CloudPlan, 'pro' | 'team'>) => {
     const normalizedEmail = waitlistEmail.trim()
     if (normalizedEmail) {
@@ -252,8 +257,11 @@ function GatewayStepContent() {
 
     if (typeof window === 'undefined') return
 
+    const productId = POLAR_PRODUCT_IDS[plan]
+    const emailParam = normalizedEmail ? `&email=${encodeURIComponent(normalizedEmail)}` : ''
+
     window.open(
-      `https://polar.sh/clawsuite/checkout?product=${plan}`,
+      `https://polar.sh/clawsuite/checkout?productId=${productId}${emailParam}`,
       '_blank',
       'noopener,noreferrer',
     )

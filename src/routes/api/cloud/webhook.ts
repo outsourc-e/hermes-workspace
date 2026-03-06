@@ -11,8 +11,21 @@ import {
 import type { CloudPlan, PolarWebhookEvent } from '@/lib/cloud-types'
 import { requireJsonContentType } from '@/server/rate-limit'
 
+const POLAR_PRODUCT_PLAN_MAP: Record<string, CloudPlan> = {
+  'bd502a21-b846-40a0-8763-b301849b1df5': 'free',
+  '0cf1fed8-898c-4062-beeb-e38f0cd5bb21': 'pro',  // $20/mo
+  '3e482285-2d66-438e-bca2-fd99bc15cc20': 'pro',  // $200/yr
+  'fb2836ac-2f70-4b2c-9ad6-850b26ffa799': 'team', // $50/mo
+  'ba38b3ed-5d85-4268-873f-8293402ab697': 'team', // $500/yr
+}
+
 function normalizePlan(plan: unknown): CloudPlan {
   return plan === 'team' || plan === 'free' ? plan : 'pro'
+}
+
+function planFromProductId(productId: unknown): CloudPlan | undefined {
+  if (typeof productId === 'string') return POLAR_PRODUCT_PLAN_MAP[productId]
+  return undefined
 }
 
 function timingSafeMatch(left: string, right: string): boolean {
@@ -59,6 +72,17 @@ function extractSubscriptionId(event: PolarWebhookEvent): string | undefined {
 }
 
 function extractPlan(event: PolarWebhookEvent): CloudPlan {
+  // First try to resolve from product ID (most reliable)
+  const productId =
+    event.data?.subscription?.productId ??
+    event.data?.subscription?.product_id ??
+    event.data?.productId ??
+    event.data?.product_id
+
+  const planFromProduct = planFromProductId(productId)
+  if (planFromProduct) return planFromProduct
+
+  // Fallback to metadata
   const metadataPlan =
     event.data?.subscription?.metadata?.plan ??
     event.data?.metadata?.plan ??
