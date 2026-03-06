@@ -107,9 +107,12 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
       }
 
       // First run + gateway not working → try auto-discovery
+      let discoveredUrl: string | null = null
       try {
         const discoverRes = await fetch('/api/gateway-discover', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
           signal: AbortSignal.timeout(15000),
         })
         const discoverData = (await discoverRes.json()) as {
@@ -131,6 +134,8 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
           })
           return
         }
+
+        discoveredUrl = discoverData.url || null
       } catch {
         // Auto-discovery failed, fall through to manual wizard
       }
@@ -140,7 +145,7 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
       set({
         isOpen: true,
         step: 'gateway',
-        gatewayUrl: config.url,
+        gatewayUrl: discoveredUrl || config.url,
         gatewayToken: '', // Don't pre-fill token for security
       })
     } catch {

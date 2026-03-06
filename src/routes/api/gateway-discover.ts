@@ -4,7 +4,7 @@ import { writeFile, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-import { discoverGateway } from '../../server/gateway-discovery'
+import { discoverGateway, discoverGatewayUrl } from '../../server/gateway-discovery'
 
 export const Route = createFileRoute('/api/gateway-discover')({
   server: {
@@ -22,11 +22,33 @@ export const Route = createFileRoute('/api/gateway-discover')({
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         try {
+          const body = (await request.json().catch(() => ({}))) as { mode?: string }
+          const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : ''
+
+          if (mode === 'scan') {
+            const scanResult = await discoverGatewayUrl()
+            if (!scanResult.found || !scanResult.url) {
+              return json({
+                ok: false,
+                source: scanResult.source,
+                error: scanResult.error || 'No gateway found',
+              })
+            }
+
+            return json({
+              ok: true,
+              url: scanResult.url,
+              source: scanResult.source,
+            })
+          }
+
           const result = await discoverGateway()
 
           if (!result.found) {
             return json({
               ok: false,
+              url: result.url,
+              source: result.source,
               error: result.error || 'No gateway found',
               portOpen: Boolean(result.url),
             })

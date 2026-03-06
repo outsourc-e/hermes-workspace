@@ -14,16 +14,29 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { exec as execCb } from 'node:child_process'
 import { promisify } from 'node:util'
+import WebSocket from 'ws'
+import type { RawData } from 'ws'
 
 const execAsync = promisify(execCb)
+const DISCOVERY_PORT_START = 18789
+const DISCOVERY_PORT_END = 18800
+const DISCOVERY_CONNECT_TIMEOUT_MS = 1200
+const DISCOVERY_CHALLENGE_TIMEOUT_MS = 1800
 
 export type DiscoveryResult = {
   found: boolean
   url?: string
   token?: string
   password?: string
-  source?: 'config-file' | 'cli' | 'env' | 'none'
+  source?: 'config-file' | 'cli' | 'env' | 'scan' | 'none'
   error?: string
+}
+
+function rawDataToString(data: RawData): string {
+  if (typeof data === 'string') return data
+  if (data instanceof Buffer) return data.toString('utf8')
+  if (Array.isArray(data)) return Buffer.concat(data).toString('utf8')
+  return Buffer.from(new Uint8Array(data)).toString('utf8')
 }
 
 /**
@@ -127,6 +140,91 @@ async function probePort(port: number): Promise<boolean> {
   })
 }
 
+async function probeGatewayChallenge(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false
+    let connectTimer: NodeJS.Timeout | null = null
+    let challengeTimer: NodeJS.Timeout | null = null
+    const gatewayOrigin = (() => {
+      try {
+        const parsed = new URL(url.replace(/^ws/, 'http'))
+        return `${parsed.protocol}//${parsed.host}`
+      } catch {
+        return 'http://127.0.0.1:18789'
+      }
+    })()
+
+    const ws = new WebSocket(url, {
+      origin: gatewayOrigin,
+      headers: { Origin: gatewayOrigin },
+    })
+
+    const finish = (found: boolean) => {
+      if (settled) return
+      settled = true
+      if (connectTimer) clearTimeout(connectTimer)
+      if (challengeTimer) clearTimeout(challengeTimer)
+      ws.removeAllListeners()
+      ws.close()
+      resolve(found)
+    }
+
+    connectTimer = setTimeout(() => finish(false), DISCOVERY_CONNECT_TIMEOUT_MS)
+
+    ws.on('open', () => {
+      challengeTimer = setTimeout(() => finish(false), DISCOVERY_CHALLENGE_TIMEOUT_MS)
+    })
+
+    ws.on('message', (data: RawData) => {
+      try {
+        const frame = JSON.parse(rawDataToString(data)) as {
+          type?: string
+          event?: string
+        }
+        if (
+          (frame.type === 'event' || frame.type === 'evt') &&
+          frame.event === 'connect.challenge'
+        ) {
+          finish(true)
+        }
+      } catch {
+        // Ignore malformed frames while probing.
+      }
+    })
+
+    ws.on('error', () => finish(false))
+    ws.on('close', () => finish(false))
+  })
+}
+
+async function scanLocalGatewayRange(): Promise<DiscoveryResult> {
+  const ports = Array.from(
+    { length: DISCOVERY_PORT_END - DISCOVERY_PORT_START + 1 },
+    (_, index) => DISCOVERY_PORT_START + index,
+  )
+  const results = await Promise.all(
+    ports.map(async (port) => {
+      const url = `ws://127.0.0.1:${port}`
+      return { url, found: await probeGatewayChallenge(url) }
+    }),
+  )
+  const match = results.find((result) => result.found)
+
+  if (!match) {
+    return {
+      found: false,
+      source: 'none',
+      error: 'No local OpenClaw gateway found on localhost ports 18789-18800.',
+    }
+  }
+
+  return {
+    found: true,
+    url: match.url,
+    source: 'scan',
+  }
+}
+
 /**
  * Main discovery function. Tries all methods in order:
  * 1. Existing env vars (already configured)
@@ -157,6 +255,16 @@ export async function discoverGateway(): Promise<DiscoveryResult> {
     return cliResult
   }
 
+  const scanResult = await scanLocalGatewayRange()
+  if (scanResult.found) {
+    return {
+      found: false,
+      url: scanResult.url,
+      source: 'scan',
+      error: 'Gateway detected on localhost, but no auth token was discovered. Enter your token to finish setup.',
+    }
+  }
+
   // 4. Last resort: check if anything is listening on default port
   const portOpen = await probePort(18789)
   if (portOpen) {
@@ -173,4 +281,8 @@ export async function discoverGateway(): Promise<DiscoveryResult> {
     source: 'none',
     error: 'No local OpenClaw gateway found. Please start OpenClaw or enter connection details manually.',
   }
+}
+
+export async function discoverGatewayUrl(): Promise<DiscoveryResult> {
+  return scanLocalGatewayRange()
 }

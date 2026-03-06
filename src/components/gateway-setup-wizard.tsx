@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -26,11 +26,46 @@ function GatewayStepContent() {
     saveAndTest,
     proceed,
   } = useGatewaySetupStore()
+  const [autoDetecting, setAutoDetecting] = useState(false)
+  const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null)
+  const [autoDetectError, setAutoDetectError] = useState<string | null>(null)
 
   const handleSaveAndTest = async () => {
     const ok = await saveAndTest()
     if (ok) {
       setTimeout(() => proceed(), 800)
+    }
+  }
+
+  const handleAutoDetect = async () => {
+    setAutoDetecting(true)
+    setAutoDetectMessage(null)
+    setAutoDetectError(null)
+
+    try {
+      const response = await fetch('/api/gateway-discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'scan' }),
+        signal: AbortSignal.timeout(15000),
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        url?: string
+        error?: string
+      }
+
+      if (!data.ok || !data.url) {
+        setAutoDetectError(data.error || 'No gateway found on localhost ports 18789-18800.')
+        return
+      }
+
+      setGatewayUrl(data.url)
+      setAutoDetectMessage(`Detected gateway at ${data.url}`)
+    } catch {
+      setAutoDetectError('Auto-detect failed. Enter the gateway URL manually.')
+    } finally {
+      setAutoDetecting(false)
     }
   }
 
@@ -74,6 +109,14 @@ function GatewayStepContent() {
           <p className="mt-1 text-xs text-primary-500">
             Default: ws://127.0.0.1:18789 for local OpenClaw (18790 for nanobot)
           </p>
+          <Button
+            variant="outline"
+            onClick={() => void handleAutoDetect()}
+            disabled={autoDetecting}
+            className="mt-3 w-full"
+          >
+            {autoDetecting ? 'Scanning localhost...' : 'Auto-detect Gateway'}
+          </Button>
         </div>
 
         <div>
@@ -104,6 +147,28 @@ function GatewayStepContent() {
             <div>
               <p>{testError}</p>
             </div>
+          </div>
+        )}
+
+        {autoDetectError && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <HugeiconsIcon
+              icon={Alert02Icon}
+              className="mt-0.5 size-4 shrink-0"
+              strokeWidth={2}
+            />
+            <span>{autoDetectError}</span>
+          </div>
+        )}
+
+        {autoDetectMessage && (
+          <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            <HugeiconsIcon
+              icon={CheckmarkCircle02Icon}
+              className="mt-0.5 size-4 shrink-0"
+              strokeWidth={2}
+            />
+            <span>{autoDetectMessage}</span>
           </div>
         )}
 
