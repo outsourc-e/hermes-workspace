@@ -16,7 +16,8 @@ if (!gotTheLock) {
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
-let gatewayProcess: ReturnType<typeof spawn> | null = null
+// @ts-expect-error assigned in IPC handler, read on quit
+let _gatewayProcess: ReturnType<typeof spawn> | null = null
 
 // Gateway detection
 const DEFAULT_GATEWAY_PORT = 18789
@@ -154,7 +155,7 @@ ipcMain.handle('gateway:install', async () => {
 
 ipcMain.handle('gateway:start', async () => {
   return new Promise((resolve) => {
-    gatewayProcess = spawn('openclaw', ['gateway', 'start'], {
+    _gatewayProcess = spawn('openclaw', ['gateway', 'start'], {
       shell: true,
       stdio: 'pipe',
       detached: true,
