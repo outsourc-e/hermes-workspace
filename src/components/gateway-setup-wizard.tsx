@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -16,8 +16,17 @@ import { Input } from '@/components/ui/input'
 import { ProviderSelectStep } from '@/components/onboarding/provider-select-step'
 
 const CLOUD_WAITLIST_STORAGE_KEY = 'clawsuite-cloud-waitlist-email'
+const LOCAL_GATEWAY_URL = 'ws://127.0.0.1:18789'
 
 type SetupOption = 'local' | 'custom' | 'cloud'
+type LocalSetupStatus = 'idle' | 'checking' | 'installing' | 'starting' | 'ready' | 'error'
+
+type LocalSetupEvent = {
+  status: Exclude<LocalSetupStatus, 'idle'>
+  message: string
+  url?: string
+  token?: string
+}
 
 function SetupOptionCard({
   icon,
@@ -88,6 +97,10 @@ function GatewayStepContent() {
   const [setupOption, setSetupOption] = useState<SetupOption>('local')
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistJoined, setWaitlistJoined] = useState(false)
+  const [localSetupStatus, setLocalSetupStatus] = useState<LocalSetupStatus>('idle')
+  const [localSetupMessage, setLocalSetupMessage] = useState<string | null>(null)
+  const [localSetupError, setLocalSetupError] = useState<string | null>(null)
+  const localSetupSourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -108,6 +121,64 @@ function GatewayStepContent() {
     if (ok) {
       setTimeout(() => proceed(), 800)
     }
+  }
+
+  const closeLocalSetupStream = () => {
+    const current = localSetupSourceRef.current
+    if (!current) return
+    current.close()
+    localSetupSourceRef.current = null
+  }
+
+  const runLocalSetup = () => {
+    if (typeof window === 'undefined') return
+
+    closeLocalSetupStream()
+    setLocalSetupStatus('checking')
+    setLocalSetupMessage('Checking for OpenClaw...')
+    setLocalSetupError(null)
+    setAutoDetectMessage(null)
+    setAutoDetectError(null)
+
+    const source = new EventSource('/api/local-setup')
+    let terminalEvent = false
+
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as LocalSetupEvent
+        setLocalSetupStatus(payload.status)
+        setLocalSetupMessage(payload.message)
+
+        if (payload.status === 'ready') {
+          terminalEvent = true
+          closeLocalSetupStream()
+          setGatewayUrl(payload.url || LOCAL_GATEWAY_URL)
+          setGatewayToken(payload.token || '')
+          void handleSaveAndTest()
+          return
+        }
+
+        if (payload.status === 'error') {
+          terminalEvent = true
+          closeLocalSetupStream()
+          setLocalSetupError(payload.message || 'Local setup failed.')
+        }
+      } catch {
+        terminalEvent = true
+        closeLocalSetupStream()
+        setLocalSetupStatus('error')
+        setLocalSetupError('Received an invalid setup event from the server.')
+      }
+    }
+
+    source.onerror = () => {
+      if (terminalEvent) return
+      closeLocalSetupStream()
+      setLocalSetupStatus('error')
+      setLocalSetupError('Local setup was interrupted before it finished.')
+    }
+
+    localSetupSourceRef.current = source
   }
 
   const handleAutoDetect = async () => {
@@ -142,9 +213,55 @@ function GatewayStepContent() {
     }
   }
 
+  const handleSetupOptionChange = (option: SetupOption) => {
+    closeLocalSetupStream()
+    setSetupOption(option)
+    setLocalSetupStatus('idle')
+    setLocalSetupMessage(null)
+    setLocalSetupError(null)
+  }
+
+  useEffect(() => {
+    if (setupOption !== 'local') return
+    if (localSetupStatus !== 'idle') return
+    runLocalSetup()
+  }, [localSetupStatus, setupOption])
+
+  useEffect(() => {
+    return () => {
+      closeLocalSetupStream()
+    }
+  }, [])
+
   const isBusy = testStatus === 'testing' || saving
   const canProceed = testStatus === 'success'
   const showCloudWaitlist = setupOption === 'cloud'
+  const localSetupSteps = [
+    {
+      id: 'checking',
+      label: 'Checking for OpenClaw...',
+    },
+    {
+      id: 'installing',
+      label: 'Installing OpenClaw...',
+    },
+    {
+      id: 'starting',
+      label: 'Starting gateway...',
+    },
+    {
+      id: 'ready',
+      label: 'Connected!',
+    },
+  ] as const
+
+  const currentLocalStepIndex =
+    localSetupStatus === 'idle'
+      ? 0
+      : Math.max(
+          localSetupSteps.findIndex((step) => step.id === localSetupStatus),
+          0,
+        )
 
   return (
     <div className="w-full">
@@ -171,21 +288,21 @@ function GatewayStepContent() {
             title="Local Gateway"
             description="Use the OpenClaw gateway running on this machine."
             selected={setupOption === 'local'}
-            onClick={() => setSetupOption('local')}
+            onClick={() => handleSetupOptionChange('local')}
           />
           <SetupOptionCard
             icon={CloudIcon}
             title="Custom Gateway"
             description="Connect to another self-hosted gateway with your own URL."
             selected={setupOption === 'custom'}
-            onClick={() => setSetupOption('custom')}
+            onClick={() => handleSetupOptionChange('custom')}
           />
           <SetupOptionCard
             icon={CloudIcon}
             title="ClawSuite Cloud"
             description="Managed cloud gateway hosting from ClawSuite."
             selected={showCloudWaitlist}
-            onClick={() => setSetupOption('cloud')}
+            onClick={() => handleSetupOptionChange('cloud')}
             accentLabel={waitlistJoined ? 'Joined' : 'Coming Soon'}
           />
         </div>
@@ -242,6 +359,116 @@ function GatewayStepContent() {
               </form>
             )}
           </div>
+        ) : setupOption === 'local' ? (
+          <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-primary-900">Setting up local gateway</h3>
+              <p className="mt-1 text-sm text-primary-600">
+                ClawSuite is installing and starting OpenClaw in the background.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {localSetupSteps.map((step, index) => {
+                const isComplete =
+                  localSetupStatus === 'ready'
+                    ? true
+                    : localSetupStatus !== 'error' && index < currentLocalStepIndex
+                const isCurrent =
+                  localSetupStatus !== 'error' &&
+                  step.id === localSetupStatus
+
+                return (
+                  <div
+                    key={step.id}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors',
+                      isComplete
+                        ? 'border-green-200 bg-green-50'
+                        : isCurrent
+                          ? 'border-accent-200 bg-accent-50'
+                          : 'border-primary-200 bg-primary-100/60',
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'flex size-7 items-center justify-center rounded-full border',
+                        isComplete
+                          ? 'border-green-300 bg-green-100 text-green-700'
+                          : isCurrent
+                            ? 'border-accent-300 bg-accent-100 text-accent-700'
+                            : 'border-primary-200 bg-primary-50 text-primary-500',
+                      )}
+                    >
+                      {isComplete ? (
+                        <HugeiconsIcon
+                          icon={CheckmarkCircle02Icon}
+                          className="size-4"
+                          strokeWidth={2}
+                        />
+                      ) : (
+                        <span className="text-xs font-semibold">{index + 1}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-primary-900">{step.label}</p>
+                      {isCurrent && localSetupMessage ? (
+                        <p className="mt-0.5 text-xs text-primary-500">{localSetupMessage}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {localSetupError ? (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <HugeiconsIcon
+                  icon={Alert02Icon}
+                  className="mt-0.5 size-4 shrink-0"
+                  strokeWidth={2}
+                />
+                <div className="min-w-0 flex-1">
+                  <p>{localSetupError}</p>
+                </div>
+              </div>
+            ) : null}
+
+            {testError ? (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <HugeiconsIcon
+                  icon={Alert02Icon}
+                  className="mt-0.5 size-4 shrink-0"
+                  strokeWidth={2}
+                />
+                <div className="min-w-0 flex-1">
+                  <p>{testError}</p>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLocalSetupStatus('idle')
+                  setLocalSetupMessage(null)
+                  setLocalSetupError(null)
+                }}
+                disabled={localSetupStatus !== 'error'}
+                className="flex-1"
+              >
+                Retry Setup
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handleSetupOptionChange('custom')}
+                className="flex-1"
+              >
+                Enter Manually
+              </Button>
+            </div>
+          </div>
         ) : (
           <>
             <div>
@@ -262,16 +489,14 @@ function GatewayStepContent() {
               <p className="mt-1 text-xs text-primary-500">
                 Default: ws://127.0.0.1:18789 for local OpenClaw (18790 for nanobot)
               </p>
-              {setupOption === 'local' ? (
-                <Button
-                  variant="outline"
-                  onClick={() => void handleAutoDetect()}
-                  disabled={autoDetecting}
-                  className="mt-3 w-full"
-                >
-                  {autoDetecting ? 'Scanning localhost...' : 'Auto-detect Gateway'}
-                </Button>
-              ) : null}
+              <Button
+                variant="outline"
+                onClick={() => void handleAutoDetect()}
+                disabled={autoDetecting}
+                className="mt-3 w-full"
+              >
+                {autoDetecting ? 'Scanning localhost...' : 'Auto-detect Gateway'}
+              </Button>
             </div>
 
             <div>

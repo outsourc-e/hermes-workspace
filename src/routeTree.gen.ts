@@ -62,6 +62,7 @@ import { Route as ApiOllamaHealthRouteImport } from './routes/api/ollama-health'
 import { Route as ApiNetworkUrlRouteImport } from './routes/api/network-url'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
+import { Route as ApiLocalSetupRouteImport } from './routes/api/local-setup'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiGatewayRestartRouteImport } from './routes/api/gateway-restart'
 import { Route as ApiGatewayDiscoverRouteImport } from './routes/api/gateway-discover'
@@ -381,6 +382,11 @@ const ApiModelSwitchRoute = ApiModelSwitchRouteImport.update({
   path: '/api/model-switch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLocalSetupRoute = ApiLocalSetupRouteImport.update({
+  id: '/api/local-setup',
+  path: '/api/local-setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHistoryRoute = ApiHistoryRouteImport.update({
   id: '/api/history',
   path: '/api/history',
@@ -698,6 +704,7 @@ export interface FileRoutesByFullPath {
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/local-setup': typeof ApiLocalSetupRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/network-url': typeof ApiNetworkUrlRoute
@@ -805,6 +812,7 @@ export interface FileRoutesByTo {
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/local-setup': typeof ApiLocalSetupRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/network-url': typeof ApiNetworkUrlRoute
@@ -914,6 +922,7 @@ export interface FileRoutesById {
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/local-setup': typeof ApiLocalSetupRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/network-url': typeof ApiNetworkUrlRoute
@@ -1024,6 +1033,7 @@ export interface FileRouteTypes {
     | '/api/gateway-discover'
     | '/api/gateway-restart'
     | '/api/history'
+    | '/api/local-setup'
     | '/api/model-switch'
     | '/api/models'
     | '/api/network-url'
@@ -1131,6 +1141,7 @@ export interface FileRouteTypes {
     | '/api/gateway-discover'
     | '/api/gateway-restart'
     | '/api/history'
+    | '/api/local-setup'
     | '/api/model-switch'
     | '/api/models'
     | '/api/network-url'
@@ -1239,6 +1250,7 @@ export interface FileRouteTypes {
     | '/api/gateway-discover'
     | '/api/gateway-restart'
     | '/api/history'
+    | '/api/local-setup'
     | '/api/model-switch'
     | '/api/models'
     | '/api/network-url'
@@ -1348,6 +1360,7 @@ export interface RootRouteChildren {
   ApiGatewayDiscoverRoute: typeof ApiGatewayDiscoverRoute
   ApiGatewayRestartRoute: typeof ApiGatewayRestartRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
+  ApiLocalSetupRoute: typeof ApiLocalSetupRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
   ApiNetworkUrlRoute: typeof ApiNetworkUrlRoute
@@ -1764,6 +1777,13 @@ declare module '@tanstack/react-router' {
       path: '/api/model-switch'
       fullPath: '/api/model-switch'
       preLoaderRoute: typeof ApiModelSwitchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/local-setup': {
+      id: '/api/local-setup'
+      path: '/api/local-setup'
+      fullPath: '/api/local-setup'
+      preLoaderRoute: typeof ApiLocalSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/history': {
@@ -2279,6 +2299,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewayDiscoverRoute: ApiGatewayDiscoverRoute,
   ApiGatewayRestartRoute: ApiGatewayRestartRoute,
   ApiHistoryRoute: ApiHistoryRoute,
+  ApiLocalSetupRoute: ApiLocalSetupRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
   ApiNetworkUrlRoute: ApiNetworkUrlRoute,
