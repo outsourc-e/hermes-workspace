@@ -383,8 +383,10 @@ class GatewayClient {
     })
 
     ws.on('close', (code: number, reason: Buffer) => {
-      console.log(`[gateway] WebSocket closed: code=${code} reason=${reason?.toString() || 'n/a'}`)
-      this.handleDisconnect(new Error(`Gateway connection closed (code=${code})`))
+      const reasonText = reason?.toString() || 'n/a'
+      this.handleDisconnect(
+        new Error(`Gateway connection closed (code=${code}, reason=${reasonText})`),
+      )
     })
 
     ws.on('error', (error: unknown) => {
@@ -518,9 +520,7 @@ class GatewayClient {
 
       try {
         this.ws.ping()
-        console.log('[gateway] ping sent')
       } catch {
-        console.log('[gateway] ping FAILED to send')
         this.handleDisconnect(new Error('Gateway ping failed'))
         return
       }
@@ -531,7 +531,6 @@ class GatewayClient {
 
       this.heartbeatTimeout = setTimeout(() => {
         this.heartbeatTimeout = null
-        console.log('[gateway] PONG TIMEOUT — gateway did not respond in 20s')
         this.handleDisconnect(new Error('Gateway ping timeout'))
       }, HEARTBEAT_TIMEOUT_MS)
     }, HEARTBEAT_INTERVAL_MS)
@@ -646,20 +645,6 @@ function rawDataToString(data: RawData): string {
   return data.toString()
 }
 
-function readyStateName(readyState: number): string {
-  switch (readyState) {
-    case WebSocket.CONNECTING:
-      return 'CONNECTING'
-    case WebSocket.OPEN:
-      return 'OPEN'
-    case WebSocket.CLOSING:
-      return 'CLOSING'
-    case WebSocket.CLOSED:
-    default:
-      return 'CLOSED'
-  }
-}
-
 // Singleton guard: survive Vite SSR module reloads
 const GW_KEY = '__clawsuite_gateway_client__' as const
 declare global {
@@ -669,10 +654,6 @@ declare global {
 const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined
 if (existingClient) {
   const snapshot = existingClient.getConnectionSnapshot()
-  const state = readyStateName(snapshot.readyState)
-  console.log(
-    `[gateway] Reusing singleton — ws.readyState=${state} authenticated=${snapshot.authenticated}`,
-  )
   // Only trigger reconnect if disconnected AND enough time has passed since last attempt.
   // This prevents a race when two Vite SSR workers both load this module simultaneously —
   // both would see a healthy singleton and both would fire ensureConnected(), causing an
@@ -689,14 +670,9 @@ if (existingClient) {
       const message = error instanceof Error ? error.message : String(error)
       console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
     })
-  } else if (!cooledDown) {
-    console.log('[gateway] Skipping reconnect — within cooldown window')
   }
 }
 let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()
-if (!existingClient) {
-  console.log('[gateway] Created NEW GatewayClient (first load)')
-}
 ;(globalThis as any)[GW_KEY] = gatewayClient
 
 export async function gatewayRpc<TPayload = unknown>(

@@ -7,6 +7,7 @@ import {
   type TeamMember,
   type TeamTemplateId,
 } from './team-panel'
+export { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
 
 export type AgentHubLayoutProps = {
   agents: Array<{
@@ -28,7 +29,6 @@ export const TEAM_STORAGE_KEY = 'clawsuite:hub-team'
 export const TEAM_CONFIGS_STORAGE_KEY = 'clawsuite:hub-team-configs'
 export const MISSION_REPORTS_STORAGE_KEY = 'clawsuite-mission-reports'
 export const MAX_MISSION_REPORTS = 10
-export const ROUGH_COST_PER_1K_TOKENS_USD = 0.01
 
 export type SavedTeamConfig = {
   id: string

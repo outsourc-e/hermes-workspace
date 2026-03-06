@@ -541,14 +541,16 @@ export function RunConsole({
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => onApprove ? onApprove(approval.id) : console.log('approve pending approval', approval.id)}
+                            onClick={() => onApprove?.(approval.id)}
+                            disabled={!onApprove}
                             className="rounded-md border border-amber-500/50 bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-500/30"
                           >
                             Approve
                           </button>
                           <button
                             type="button"
-                            onClick={() => onDeny ? onDeny(approval.id) : console.log('deny pending approval', approval.id)}
+                            onClick={() => onDeny?.(approval.id)}
+                            disabled={!onDeny}
                             className="rounded-md border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-xs font-medium text-primary-200 transition-colors hover:bg-primary-800"
                           >
                             Deny

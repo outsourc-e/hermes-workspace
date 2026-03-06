@@ -1,0 +1,1 @@
+export const ROUGH_COST_PER_1K_TOKENS_USD = 0.01

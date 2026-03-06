@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:18789; media-src 'self';"
+  >
   <title>ClawSuite — Setup</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -514,7 +518,6 @@
       const email = document.getElementById('cloud-email').value.trim()
       if (!email) return
 
-      // TODO: Submit to waitlist API
       const status = document.querySelector('#step-2 .status')
       status.className = 'status show status-success'
       status.innerHTML = '✓ You\'re on the list! We\'ll email you when Cloud is ready.'

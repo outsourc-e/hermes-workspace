@@ -83,7 +83,7 @@ const PAUSED_STATUSES = new Set(['paused', 'pause', 'suspended'])
 
 const ACTIVE_HEARTBEAT_MS = 30_000
 
-// TODO: Replace with gateway-backed config once a dedicated agent registry schema is available.
+// Temporary fallback registry until the gateway exposes a dedicated agent registry schema.
 const FALLBACK_AGENT_REGISTRY: Array<AgentDefinition> = [
   {
     id: 'aurora-main',

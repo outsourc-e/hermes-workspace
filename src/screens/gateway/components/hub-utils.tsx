@@ -1,11 +1,11 @@
 import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
+import { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
 import type { MissionCheckpoint } from '../lib/mission-checkpoint'
 import {
   MODEL_PRESET_MAP,
   MODEL_PRESETS,
   MAX_MISSION_REPORTS,
   MISSION_REPORTS_STORAGE_KEY,
-  ROUGH_COST_PER_1K_TOKENS_USD,
   TEMPLATE_DISPLAY_NAMES,
   TEMPLATE_MODEL_SUGGESTIONS,
 

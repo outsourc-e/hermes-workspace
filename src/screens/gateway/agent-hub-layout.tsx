@@ -12,6 +12,7 @@ import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
+import { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
 import {
   saveMissionStoreBeforeUnload,
   useMissionStore,
@@ -74,7 +75,6 @@ const TEAM_STORAGE_KEY = 'clawsuite:hub-team'
 const TEAM_CONFIGS_STORAGE_KEY = 'clawsuite:hub-team-configs'
 const MISSION_REPORTS_STORAGE_KEY = 'clawsuite-mission-reports'
 const MAX_MISSION_REPORTS = 10
-const ROUGH_COST_PER_1K_TOKENS_USD = 0.01
 
 type SavedTeamConfig = {
   id: string
@@ -4688,9 +4688,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   )
 
   const handleMissionPause = useCallback(async (pause: boolean) => {
-    // BUG-5 fix: do NOT set state optimistically before async calls settle.
-    // setMissionState fires AFTER Promise.allSettled confirms all pauses succeeded.
-    // If any settle with 'rejected', revert to the previous state instead.
+    // Avoid optimistic mission state updates until all pause/resume calls settle.
+    // Revert to the previous state if any agent pause/resume fails.
     const previousState: 'running' | 'paused' | 'stopped' = pause ? 'running' : 'paused'
     try {
       const results = await Promise.allSettled(
@@ -5492,7 +5491,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [])
 
   const handleImportDetectedAgent = useCallback((agent: DetectedGatewayAgent) => {
-    window.console.log('[AgentDiscovery] import requested', agent)
     toast(`Import requested for ${agent.name}`, { type: 'success' })
   }, [])
 

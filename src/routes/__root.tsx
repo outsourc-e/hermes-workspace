@@ -21,6 +21,22 @@ import { GatewayRestartProvider } from '@/components/gateway-restart-overlay'
 import { ExecApprovalToast } from '@/components/exec-approval-toast'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 
+const APP_CSP = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' ws: wss: http: https:",
+  "worker-src 'self' blob:",
+  "media-src 'self' blob: data:",
+  "frame-src 'self' http: https:",
+].join('; ')
+
 const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
@@ -295,6 +311,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta httpEquiv="Content-Security-Policy" content={APP_CSP} />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: themeColorScript }} />
