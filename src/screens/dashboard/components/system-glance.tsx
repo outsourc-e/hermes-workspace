@@ -17,6 +17,14 @@ type SystemGlanceProps = {
   compact?: boolean
   /** Optional controls rendered at the bottom of the card (e.g. widget edit buttons) */
   actions?: React.ReactNode
+  /** True while initial data is still loading */
+  loading?: boolean
+}
+
+function ShimmerBlock() {
+  return (
+    <div className="h-6 w-16 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+  )
 }
 
 // ─── Compact mobile variant ───────────────────────────────────────────────────
@@ -107,18 +115,32 @@ export function SystemGlance(props: SystemGlanceProps) {
           />
         </div>
         <div className="flex flex-col items-center justify-center rounded-xl border border-primary-200 bg-primary-50/80 py-3 px-2 dark:border-neutral-700/60 dark:bg-neutral-800/40">
-          <StatBlock
-            label="COST"
-            value={costToday}
-            sublabel="today"
-          />
+          {props.loading ? (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">COST</span>
+              <ShimmerBlock />
+            </div>
+          ) : (
+            <StatBlock
+              label="COST"
+              value={costToday}
+              sublabel="today"
+            />
+          )}
         </div>
         <div className="flex flex-col items-center justify-center rounded-xl border border-primary-200 bg-primary-50/80 py-3 px-2 dark:border-neutral-700/60 dark:bg-neutral-800/40">
-          <StatBlock
-            label="MODEL"
-            value={currentModel || '—'}
-            sublabel="active"
-          />
+          {props.loading ? (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">MODEL</span>
+              <ShimmerBlock />
+            </div>
+          ) : (
+            <StatBlock
+              label="MODEL"
+              value={currentModel || '—'}
+              sublabel="active"
+            />
+          )}
         </div>
       </div>
 

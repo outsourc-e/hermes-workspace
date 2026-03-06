@@ -985,6 +985,7 @@ export function DashboardScreen() {
                   sessionPercent={dashboardData.usage.contextPercent ?? undefined}
                   providers={dashboardData.cost.byProvider}
                   currentModel={dashboardData.model.current}
+                  loading={dashboardData.status === 'loading'}
                   actions={
                     <>
                       <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />

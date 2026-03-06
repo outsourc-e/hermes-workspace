@@ -737,6 +737,25 @@ function SettingsRoute() {
                         ? 'Scanning localhost...'
                         : 'Auto-detect'}
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Clear stale connection state and reload
+                        try {
+                          const keys = Object.keys(localStorage)
+                          for (const key of keys) {
+                            if (key.startsWith('clawsuite-') || key.startsWith('gateway-')) {
+                              localStorage.removeItem(key)
+                            }
+                          }
+                        } catch { /* ignore */ }
+                        window.location.reload()
+                      }}
+                      className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                    >
+                      Reset Connection
+                    </Button>
                   </div>
                 </SettingsRow>
                 {autoDetectError ? (

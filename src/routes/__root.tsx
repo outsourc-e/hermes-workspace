@@ -394,6 +394,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             };
             // Fallback: always dismiss after 8s
             setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 8000);
+            // Fast dismiss: if returning user (has gateway config in localStorage), skip splash quickly
+            try {
+              if (localStorage.getItem('clawsuite-gateway-url') || localStorage.getItem('gateway-url')) {
+                setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 800);
+              }
+            } catch(e) {}
           })()
         `}} />
         <div className="root">{children}</div>
