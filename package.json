@@ -11,7 +11,7 @@
   "homepage": "https://clawsuite.io",
   "private": true,
   "type": "module",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
@@ -75,6 +75,8 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "electron": "^40.8.0",
+    "electron-builder": "^26.8.1",
     "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
     "typescript": "^5.7.2",

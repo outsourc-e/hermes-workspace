@@ -67,7 +67,7 @@ function createWindow() {
     backgroundColor: '#0a0a0f',
     show: false, // Show after ready-to-show
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
+      preload: join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
