@@ -45,3 +45,10 @@ export interface CloudProvisionRequest {
   plan: CloudPlan
   polarSubscriptionId?: string
 }
+
+export interface CloudProvisionResponse {
+  gatewayUrl: string
+  token: string
+  plan: CloudPlan
+  expiresAt: string
+}
