@@ -963,12 +963,16 @@ export function ChatScreen({
   // Sync chat activity to global store for sidebar orchestrator avatar
   const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity)
   useEffect(() => {
-    if (waitingForResponse) {
+    if (liveToolActivity.length > 0) {
+      setLocalActivity('tool-use')
+    } else if (isRealtimeStreaming) {
+      setLocalActivity('responding')
+    } else if (waitingForResponse) {
       setLocalActivity('thinking')
     } else {
       setLocalActivity('idle')
     }
-  }, [waitingForResponse, setLocalActivity])
+  }, [waitingForResponse, isRealtimeStreaming, liveToolActivity, setLocalActivity])
 
   const gatewayStatusQuery = useQuery({
     queryKey: ['gateway', 'status'],

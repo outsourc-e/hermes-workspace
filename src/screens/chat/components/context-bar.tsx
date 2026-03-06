@@ -75,6 +75,9 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
 
   const pct = ctx.contextPercent
   const clampedPct = Math.min(Math.max(pct, 0), 100)
+
+  // Hide entirely when no data has loaded yet
+  if (clampedPct === 0 && ctx.usedTokens === 0) return null
   const isCritical = clampedPct > 90
   const isDanger = clampedPct >= 75 && clampedPct <= 90
   const isWarning = clampedPct >= 50 && clampedPct < 75
@@ -140,7 +143,7 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
       <PreviewCardTrigger className="block w-full cursor-pointer">
         <div
           className={cn(
-            'shrink-0 w-full h-1.5 transition-colors duration-300',
+            'shrink-0 w-full h-2 border-b border-primary-200/50 dark:border-primary-700/30 transition-colors duration-300 relative',
             barBg,
           )}
         >
@@ -151,6 +154,11 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
             )}
             style={{ width: `${clampedPct}%` }}
           />
+          {clampedPct > 15 && (
+            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] font-semibold tabular-nums text-primary-600/70 dark:text-primary-300/70 select-none">
+              {Math.round(clampedPct)}%
+            </span>
+          )}
         </div>
       </PreviewCardTrigger>
 
