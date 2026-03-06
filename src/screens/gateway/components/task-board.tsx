@@ -140,9 +140,11 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
     if (!hydrated || typeof window === 'undefined') return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
   }, [tasks, hydrated])
+  const onTasksChangeRef = useRef(onTasksChange)
+  onTasksChangeRef.current = onTasksChange
   useEffect(() => {
-    onTasksChange?.(tasks)
-  }, [onTasksChange, tasks])
+    onTasksChangeRef.current?.(tasks)
+  }, [tasks])
   const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
 
   // Filter tasks by activeMissionId (unless showAllTasks is on)
@@ -215,9 +217,11 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
     if (!initialTasks || initialTasks.length === 0) return
     addTasks(initialTasks)
   }, [addTasks, initialTasks])
+  const onRefRef = useRef(onRef)
+  onRefRef.current = onRef
   useEffect(() => {
-    onRef?.({ addTasks, moveTasks })
-  }, [addTasks, moveTasks, onRef])
+    onRefRef.current?.({ addTasks, moveTasks })
+  }, [addTasks, moveTasks])
 
   function openTaskDetail(task: HubTask) {
     setExpandedTaskId(task.id)

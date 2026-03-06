@@ -7586,7 +7586,7 @@ Respond with ONLY a JSON array, no markdown:
                 selectedAgentId={selectedOutputAgentId}
                 activeMissionId={activeMission?.id}
                 onRef={(ref) => { taskBoardRef.current = ref }}
-                onTasksChange={(tasks) => setMissionTasks(tasks)}
+                onTasksChange={setMissionTasks}
               />
             </div>
           ) : null}

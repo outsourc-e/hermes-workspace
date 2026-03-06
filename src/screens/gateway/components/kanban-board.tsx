@@ -115,10 +115,11 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, mission
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [noteDraft, setNoteDraft] = useState('')
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
-  const missionTasks = useTaskStore((state) => {
+  const allStoreTasks = useTaskStore((state) => state.tasks)
+  const missionTasks = useMemo(() => {
     if (!missionId) return []
-    return state.getTasksByMission(missionId)
-  })
+    return allStoreTasks.filter((t) => t.missionId === missionId)
+  }, [allStoreTasks, missionId])
 
   const mergedTasks = useMemo(() => {
     if (!missionId) return tasks
