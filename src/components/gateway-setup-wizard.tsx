@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   CloudIcon,
+  ComputerIcon,
   CheckmarkCircle02Icon,
   Alert02Icon,
 } from '@hugeicons/core-free-icons'
@@ -13,6 +14,60 @@ import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ProviderSelectStep } from '@/components/onboarding/provider-select-step'
+
+const CLOUD_WAITLIST_STORAGE_KEY = 'clawsuite-cloud-waitlist-email'
+
+type SetupOption = 'local' | 'custom' | 'cloud'
+
+function SetupOptionCard({
+  icon,
+  title,
+  description,
+  selected,
+  onClick,
+  accentLabel,
+}: {
+  icon: typeof CloudIcon
+  title: string
+  description: string
+  selected: boolean
+  onClick: () => void
+  accentLabel?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group rounded-2xl border bg-primary-50 p-4 text-left shadow-sm transition-all',
+        'hover:border-accent-200 hover:bg-accent-50/60',
+        selected
+          ? 'border-accent-500 bg-accent-50/70 shadow-accent-500/10'
+          : 'border-primary-200',
+      )}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div
+          className={cn(
+            'flex size-11 items-center justify-center rounded-xl border transition-colors',
+            selected
+              ? 'border-accent-200 bg-accent-100 text-accent-700'
+              : 'border-primary-200 bg-primary-100 text-primary-700',
+          )}
+        >
+          <HugeiconsIcon icon={icon} className="size-5" strokeWidth={1.8} />
+        </div>
+        {accentLabel ? (
+          <span className="rounded-full border border-accent-200 bg-accent-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-700">
+            {accentLabel}
+          </span>
+        ) : null}
+      </div>
+      <h3 className="text-sm font-semibold text-primary-900">{title}</h3>
+      <p className="mt-1 text-xs leading-relaxed text-primary-600">{description}</p>
+    </button>
+  )
+}
 
 function GatewayStepContent() {
   const {
@@ -30,6 +85,23 @@ function GatewayStepContent() {
   const [autoDetecting, setAutoDetecting] = useState(false)
   const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null)
   const [autoDetectError, setAutoDetectError] = useState<string | null>(null)
+  const [setupOption, setSetupOption] = useState<SetupOption>('local')
+  const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistJoined, setWaitlistJoined] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const storedEmail = window.localStorage.getItem(CLOUD_WAITLIST_STORAGE_KEY)
+      if (storedEmail) {
+        setWaitlistEmail(storedEmail)
+        setWaitlistJoined(true)
+      }
+    } catch {
+      // Ignore localStorage read failures
+    }
+  }, [])
 
   const handleSaveAndTest = async () => {
     const ok = await saveAndTest()
@@ -56,8 +128,23 @@ function GatewayStepContent() {
     setAutoDetecting(false)
   }
 
+  const handleWaitlistSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const normalizedEmail = waitlistEmail.trim()
+    if (!normalizedEmail || typeof window === 'undefined') return
+
+    try {
+      window.localStorage.setItem(CLOUD_WAITLIST_STORAGE_KEY, normalizedEmail)
+      setWaitlistEmail(normalizedEmail)
+      setWaitlistJoined(true)
+    } catch {
+      // Ignore localStorage write failures
+    }
+  }
+
   const isBusy = testStatus === 'testing' || saving
   const canProceed = testStatus === 'success'
+  const showCloudWaitlist = setupOption === 'cloud'
 
   return (
     <div className="w-full">
@@ -78,120 +165,203 @@ function GatewayStepContent() {
       </div>
 
       <div className="space-y-4">
-        <div>
-          <label
-            htmlFor="gateway-url"
-            className="mb-1.5 block text-sm font-medium text-primary-900"
-          >
-            Gateway URL
-          </label>
-          <Input
-            id="gateway-url"
-            type="text"
-            placeholder="ws://127.0.0.1:18789"
-            value={gatewayUrl}
-            onChange={(e) => setGatewayUrl(e.target.value)}
-            className="h-10"
+        <div className="grid gap-3 md:grid-cols-3">
+          <SetupOptionCard
+            icon={ComputerIcon}
+            title="Local Gateway"
+            description="Use the OpenClaw gateway running on this machine."
+            selected={setupOption === 'local'}
+            onClick={() => setSetupOption('local')}
           />
-          <p className="mt-1 text-xs text-primary-500">
-            Default: ws://127.0.0.1:18789 for local OpenClaw (18790 for nanobot)
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => void handleAutoDetect()}
-            disabled={autoDetecting}
-            className="mt-3 w-full"
-          >
-            {autoDetecting ? 'Scanning localhost...' : 'Auto-detect Gateway'}
-          </Button>
-        </div>
-
-        <div>
-          <label
-            htmlFor="gateway-token"
-            className="mb-1.5 block text-sm font-medium text-primary-900"
-          >
-            Gateway Token{' '}
-            <span className="font-normal text-primary-400">(optional)</span>
-          </label>
-          <Input
-            id="gateway-token"
-            type="password"
-            placeholder="Leave empty if no token is set"
-            value={gatewayToken}
-            onChange={(e) => setGatewayToken(e.target.value)}
-            className="h-10"
+          <SetupOptionCard
+            icon={CloudIcon}
+            title="Custom Gateway"
+            description="Connect to another self-hosted gateway with your own URL."
+            selected={setupOption === 'custom'}
+            onClick={() => setSetupOption('custom')}
+          />
+          <SetupOptionCard
+            icon={CloudIcon}
+            title="ClawSuite Cloud"
+            description="Managed cloud gateway hosting from ClawSuite."
+            selected={showCloudWaitlist}
+            onClick={() => setSetupOption('cloud')}
+            accentLabel={waitlistJoined ? 'Joined' : 'Coming Soon'}
           />
         </div>
 
-        {testError && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            <HugeiconsIcon
-              icon={Alert02Icon}
-              className="mt-0.5 size-4 shrink-0"
-              strokeWidth={2}
-            />
-            <div>
-              <p>{testError}</p>
+        {showCloudWaitlist ? (
+          <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-primary-900">
+                Coming Soon - Join Waitlist
+              </h3>
+              <p className="mt-1 text-sm text-primary-600">
+                Leave your email and we will notify you when ClawSuite Cloud is ready.
+              </p>
             </div>
-          </div>
-        )}
 
-        {autoDetectError && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            <HugeiconsIcon
-              icon={Alert02Icon}
-              className="mt-0.5 size-4 shrink-0"
-              strokeWidth={2}
-            />
-            <span>{autoDetectError}</span>
+            {waitlistJoined ? (
+              <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                <HugeiconsIcon
+                  icon={CheckmarkCircle02Icon}
+                  className="mt-0.5 size-4 shrink-0"
+                  strokeWidth={2}
+                />
+                <span>
+                  You are on the waitlist! We will notify you when Cloud is ready.
+                </span>
+              </div>
+            ) : (
+              <form onSubmit={handleWaitlistSubmit} className="space-y-3">
+                <div>
+                  <label
+                    htmlFor="cloud-waitlist-email"
+                    className="mb-1.5 block text-sm font-medium text-primary-900"
+                  >
+                    Email
+                  </label>
+                  <Input
+                    id="cloud-waitlist-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={waitlistEmail}
+                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    className="h-10"
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="default"
+                  disabled={!waitlistEmail.trim()}
+                  className="w-full bg-accent-500 hover:bg-accent-600"
+                >
+                  Join Waitlist
+                </Button>
+              </form>
+            )}
           </div>
-        )}
+        ) : (
+          <>
+            <div>
+              <label
+                htmlFor="gateway-url"
+                className="mb-1.5 block text-sm font-medium text-primary-900"
+              >
+                Gateway URL
+              </label>
+              <Input
+                id="gateway-url"
+                type="text"
+                placeholder="ws://127.0.0.1:18789"
+                value={gatewayUrl}
+                onChange={(e) => setGatewayUrl(e.target.value)}
+                className="h-10"
+              />
+              <p className="mt-1 text-xs text-primary-500">
+                Default: ws://127.0.0.1:18789 for local OpenClaw (18790 for nanobot)
+              </p>
+              {setupOption === 'local' ? (
+                <Button
+                  variant="outline"
+                  onClick={() => void handleAutoDetect()}
+                  disabled={autoDetecting}
+                  className="mt-3 w-full"
+                >
+                  {autoDetecting ? 'Scanning localhost...' : 'Auto-detect Gateway'}
+                </Button>
+              ) : null}
+            </div>
 
-        {autoDetectMessage && (
-          <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            <HugeiconsIcon
-              icon={CheckmarkCircle02Icon}
-              className="mt-0.5 size-4 shrink-0"
-              strokeWidth={2}
-            />
-            <span>{autoDetectMessage}</span>
-          </div>
-        )}
+            <div>
+              <label
+                htmlFor="gateway-token"
+                className="mb-1.5 block text-sm font-medium text-primary-900"
+              >
+                Gateway Token{' '}
+                <span className="font-normal text-primary-400">(optional)</span>
+              </label>
+              <Input
+                id="gateway-token"
+                type="password"
+                placeholder="Leave empty if no token is set"
+                value={gatewayToken}
+                onChange={(e) => setGatewayToken(e.target.value)}
+                className="h-10"
+              />
+            </div>
 
-        {testStatus === 'success' && (
-          <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            <HugeiconsIcon
-              icon={CheckmarkCircle02Icon}
-              className="mt-0.5 size-4 shrink-0"
-              strokeWidth={2}
-            />
-            <span>Connected to gateway!</span>
-          </div>
-        )}
+            {testError && (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <HugeiconsIcon
+                  icon={Alert02Icon}
+                  className="mt-0.5 size-4 shrink-0"
+                  strokeWidth={2}
+                />
+                <div>
+                  <p>{testError}</p>
+                </div>
+              </div>
+            )}
 
-        <div className="flex gap-3 pt-1">
-          <Button
-            variant="secondary"
-            onClick={() => void handleSaveAndTest()}
-            disabled={isBusy || !gatewayUrl.trim()}
-            className="flex-1"
-          >
-            {saving
-              ? 'Saving...'
-              : testStatus === 'testing'
-                ? 'Testing...'
-                : 'Save & Test Connection'}
-          </Button>
-          <Button
-            variant="default"
-            onClick={proceed}
-            disabled={!canProceed}
-            className="flex-1 bg-accent-500 hover:bg-accent-600"
-          >
-            Continue
-          </Button>
-        </div>
+            {autoDetectError && (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <HugeiconsIcon
+                  icon={Alert02Icon}
+                  className="mt-0.5 size-4 shrink-0"
+                  strokeWidth={2}
+                />
+                <span>{autoDetectError}</span>
+              </div>
+            )}
+
+            {autoDetectMessage && (
+              <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                <HugeiconsIcon
+                  icon={CheckmarkCircle02Icon}
+                  className="mt-0.5 size-4 shrink-0"
+                  strokeWidth={2}
+                />
+                <span>{autoDetectMessage}</span>
+              </div>
+            )}
+
+            {testStatus === 'success' && (
+              <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                <HugeiconsIcon
+                  icon={CheckmarkCircle02Icon}
+                  className="mt-0.5 size-4 shrink-0"
+                  strokeWidth={2}
+                />
+                <span>Connected to gateway!</span>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <Button
+                variant="secondary"
+                onClick={() => void handleSaveAndTest()}
+                disabled={isBusy || !gatewayUrl.trim()}
+                className="flex-1"
+              >
+                {saving
+                  ? 'Saving...'
+                  : testStatus === 'testing'
+                    ? 'Testing...'
+                    : 'Save & Test Connection'}
+              </Button>
+              <Button
+                variant="default"
+                onClick={proceed}
+                disabled={!canProceed}
+                className="flex-1 bg-accent-500 hover:bg-accent-600"
+              >
+                Continue
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
