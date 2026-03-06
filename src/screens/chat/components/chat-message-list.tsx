@@ -83,6 +83,21 @@ function ThinkingBubble({ activeToolCalls = [], liveToolActivity = [] }: Thinkin
 
   const statusLabel = activeToolName ? getToolStatusLabel(activeToolName) : 'Thinking…'
 
+  // Elapsed time counter — resets when the status label changes (new tool)
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    setElapsed(0)
+    const interval = window.setInterval(() => setElapsed((s) => s + 1), 1000)
+    return () => window.clearInterval(interval)
+  }, [statusLabel])
+
+  const elapsedLabel = elapsed >= 60
+    ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+    : `${elapsed}s`
+
+  const isStale = elapsed >= 30
+  const isVeryStale = elapsed >= 60
+
   // Track displayed label with a small delay so we fade between changes
   const [displayedLabel, setDisplayedLabel] = useState(statusLabel)
   const [visible, setVisible] = useState(true)
@@ -120,15 +135,23 @@ function ThinkingBubble({ activeToolCalls = [], liveToolActivity = [] }: Thinkin
             <span className="thinking-dot thinking-dot-3" />
             {/* Dynamic status label with fade transition */}
             <span
-              className="thinking-label ml-1.5 text-xs font-medium text-primary-500 dark:text-primary-500"
-              style={{
-                opacity: visible ? 1 : 0,
-                transition: 'opacity 300ms ease',
-              }}
+              className={cn(
+                "thinking-label ml-1.5 text-xs font-medium transition-opacity duration-300",
+                isStale
+                  ? "text-amber-500 dark:text-amber-400"
+                  : "text-primary-500 dark:text-primary-500"
+              )}
+              style={{ opacity: visible ? 1 : 0 }}
             >
-              {displayedLabel}
+              {displayedLabel} {elapsed >= 3 && <span className="text-[10px] opacity-60">{elapsedLabel}</span>}
             </span>
           </div>
+          {/* Stale warning — shown after 30s */}
+          {isStale && (
+            <span className="text-[11px] text-amber-500 dark:text-amber-400 animate-pulse">
+              {isVeryStale ? 'Still working… this is taking a while' : 'Taking longer than usual…'}
+            </span>
+          )}
           {/* Raw tool name pill — shown when a tool is active */}
           {activeToolName ? (
             <div

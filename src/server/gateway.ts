@@ -173,6 +173,9 @@ class GatewayClient {
   private reconnectAttempts = 0
   private authenticated = false
   private destroyed = false
+  private _lastErrorKind: import('../lib/connection-errors').ConnectionErrorKind | null = null
+
+  get lastErrorKind() { return this._lastErrorKind }
 
   private requestQueue: Array<PendingRequest> = []
   private inflight = new Map<string, InflightRequest>()
@@ -185,10 +188,11 @@ class GatewayClient {
     }
   }
 
-  getConnectionSnapshot(): { readyState: number; authenticated: boolean } {
+  getConnectionSnapshot(): { readyState: number; authenticated: boolean; errorKind: import('../lib/connection-errors').ConnectionErrorKind | null } {
     return {
       readyState: this.ws?.readyState ?? WebSocket.CLOSED,
       authenticated: this.authenticated,
+      errorKind: this._lastErrorKind,
     }
   }
 
@@ -369,9 +373,15 @@ class GatewayClient {
         this.authenticated = true
         this.startHeartbeat()
         this.flushQueue()
+        this._lastErrorKind = null
         return // Success
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
+        // Classify the error for UI display
+        try {
+          const { classifyConnectionError } = require('../lib/connection-errors') as typeof import('../lib/connection-errors')
+          this._lastErrorKind = classifyConnectionError(lastError)
+        } catch { /* module may not be available in all contexts */ }
         if (this.ws) {
           this.ws.terminate()
           this.ws = null
