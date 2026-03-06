@@ -297,27 +297,40 @@ class GatewayClient {
         this.ws = ws
         this.authenticated = false
 
-        // Wait for connect.challenge to get nonce
+        // Wait for connect.challenge to get nonce.
+        // Capture nonce via a flag instead of swapping listeners to avoid
+        // a race condition where the challenge event fires during listener
+        // transition and is lost (causes "missing nonce" rejection).
+        let challengeNonce: string | undefined
+        let challengeResolved = false
         const nonce = await new Promise<string | undefined>((resolve) => {
-          const challengeHandler = (data: RawData) => {
+          const originalHandler = (data: RawData) => {
             try {
               const f = JSON.parse(rawDataToString(data))
               if ((f.type === 'event' || f.type === 'evt') && f.event === 'connect.challenge') {
-                ws.removeListener('message', challengeHandler)
-                resolve(f.payload?.nonce || undefined)
+                challengeNonce = f.payload?.nonce || undefined
+                if (!challengeResolved) {
+                  challengeResolved = true
+                  resolve(challengeNonce)
+                }
                 return
               }
             } catch { /* ignore */ }
+            // Forward non-challenge messages to normal handler
+            this.handleMessage(data)
           }
+          // Replace with a handler that captures challenge AND forwards others
           ws.removeAllListeners('message')
-          ws.on('message', challengeHandler)
-          // Fallback if no challenge (older gateway)
+          ws.on('message', originalHandler)
+          // Fallback if no challenge (older gateway without protocol 3)
           setTimeout(() => {
-            ws.removeListener('message', challengeHandler)
-            resolve(undefined)
+            if (!challengeResolved) {
+              challengeResolved = true
+              resolve(undefined)
+            }
           }, 3000)
         })
-        // Re-attach the normal message handler
+        // Re-attach the normal message handler (challenge phase done)
         ws.removeAllListeners('message')
         ws.on('message', (data: RawData) => { this.handleMessage(data) })
 
