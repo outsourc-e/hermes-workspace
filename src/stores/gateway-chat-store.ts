@@ -299,6 +299,10 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
               })
             : -1
 
+        // Plain-text extraction for content-based dedup (catches identical
+        // replies that arrive with different IDs from different channels).
+        const newPlainText = extractMessageText(normalizedMessage)
+
         const duplicateIndex = sessionMessages.findIndex((existing) => {
           if (existing.role !== normalizedMessage.role) return false
           const existingId = getMessageId(existing)
@@ -309,10 +313,25 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             return true
           }
 
-          return (
+          if (
             newMultipartSignature.length > 0 &&
             newMultipartSignature === messageMultipartSignature(existing)
-          )
+          ) {
+            return true
+          }
+
+          // Content-text dedup: identical assistant text within the same
+          // session should never appear twice, even if message IDs differ
+          // (e.g. same reply routed from Telegram + ClawSuite).
+          if (
+            normalizedMessage.role === 'assistant' &&
+            newPlainText.length > 20 &&
+            newPlainText === extractMessageText(existing)
+          ) {
+            return true
+          }
+
+          return false
         })
 
         // Mark user messages from external sources
