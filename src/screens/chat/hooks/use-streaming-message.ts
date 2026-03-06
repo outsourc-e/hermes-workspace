@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 import type { GatewayAttachment, GatewayMessage } from '../types'
 
 type StreamingState = {
@@ -40,6 +41,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const frameRef = useRef<number | null>(null)
   const finishedRef = useRef(false)
   const thinkingRef = useRef<string>('')
+  const activeRunIdRef = useRef<string | null>(null)
+
+  const registerSendStreamRun = useGatewayChatStore((s) => s.registerSendStreamRun)
+  const unregisterSendStreamRun = useGatewayChatStore((s) => s.unregisterSendStreamRun)
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {
@@ -67,6 +72,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       finishedRef.current = true
       eventSourceRef.current = null
       stopFrame()
+      if (activeRunIdRef.current) {
+        unregisterSendStreamRun(activeRunIdRef.current)
+        activeRunIdRef.current = null
+      }
       setState((prev) => ({
         ...prev,
         isStreaming: false,
@@ -74,7 +83,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }))
       onError?.(message)
     },
-    [onError, stopFrame],
+    [onError, stopFrame, unregisterSendStreamRun],
   )
 
   const pushTargetText = useCallback(
@@ -130,6 +139,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       finishedRef.current = true
       eventSourceRef.current = null
       stopFrame()
+      // Unregister runId — chat-events can now process events freely again
+      if (activeRunIdRef.current) {
+        unregisterSendStreamRun(activeRunIdRef.current)
+        activeRunIdRef.current = null
+      }
 
       const finalText = fullTextRef.current
       const thinking = thinkingRef.current
@@ -155,7 +169,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       onComplete?.(message)
     },
-    [onComplete, stopFrame],
+    [onComplete, stopFrame, unregisterSendStreamRun],
   )
 
   const processEvent = useCallback(
@@ -164,6 +178,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       switch (event) {
         case 'started': {
+          // Register runId so chat-events skips duplicate chunks for this run
+          const runId = payload.runId as string | undefined
+          if (runId) {
+            activeRunIdRef.current = runId
+            registerSendStreamRun(runId)
+          }
           break
         }
         case 'assistant': {

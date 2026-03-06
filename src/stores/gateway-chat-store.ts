@@ -69,6 +69,11 @@ type GatewayChatState = {
   streamingState: Map<string, StreamingState>
   /** Timestamp of last received event */
   lastEventAt: number
+  /**
+   * RunIds currently being handled by send-stream (the active send SSE).
+   * chat-events must skip chunk/done events for these runIds to avoid duplicates.
+   */
+  sendStreamRunIds: Set<string>
 
   // Actions
   setConnectionState: (state: ConnectionState, error?: string) => void
@@ -83,6 +88,12 @@ type GatewayChatState = {
     sessionKey: string,
     historyMessages: Array<GatewayMessage>,
   ) => Array<GatewayMessage>
+  /** Register a runId as being handled by send-stream — chat-events will skip it */
+  registerSendStreamRun: (runId: string) => void
+  /** Unregister a runId when send-stream completes */
+  unregisterSendStreamRun: (runId: string) => void
+  /** Check if a runId is being handled by send-stream */
+  isSendStreamRun: (runId: string | undefined) => boolean
 }
 
 const createEmptyStreamingState = (): StreamingState => ({
@@ -236,15 +247,44 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
   realtimeMessages: new Map(),
   streamingState: new Map(),
   lastEventAt: 0,
+  sendStreamRunIds: new Set(),
 
   setConnectionState: (connectionState, error) => {
     set({ connectionState, lastError: error ?? null })
+  },
+
+  registerSendStreamRun: (runId) => {
+    const next = new Set(get().sendStreamRunIds)
+    next.add(runId)
+    set({ sendStreamRunIds: next })
+  },
+
+  unregisterSendStreamRun: (runId) => {
+    const next = new Set(get().sendStreamRunIds)
+    next.delete(runId)
+    set({ sendStreamRunIds: next })
+  },
+
+  isSendStreamRun: (runId) => {
+    if (!runId) return false
+    return get().sendStreamRunIds.has(runId)
   },
 
   processEvent: (event) => {
     const state = get()
     const sessionKey = event.sessionKey
     const now = Date.now()
+
+    // Skip chunk/thinking/tool/done events for runs being handled by send-stream.
+    // send-stream is the authoritative handler for active sends — chat-events
+    // fires the same events in parallel, causing duplicate messages.
+    if (
+      (event.type === 'chunk' || event.type === 'thinking' || event.type === 'tool' || event.type === 'done') &&
+      event.runId &&
+      get().sendStreamRunIds.has(event.runId)
+    ) {
+      return
+    }
 
     switch (event.type) {
       case 'message':
