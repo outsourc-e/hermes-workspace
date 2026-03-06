@@ -24,6 +24,7 @@ function GatewayStepContent() {
     setGatewayUrl,
     setGatewayToken,
     saveAndTest,
+    autoDetectGateway,
     proceed,
   } = useGatewaySetupStore()
   const [autoDetecting, setAutoDetecting] = useState(false)
@@ -42,31 +43,17 @@ function GatewayStepContent() {
     setAutoDetectMessage(null)
     setAutoDetectError(null)
 
-    try {
-      const response = await fetch('/api/gateway-discover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'scan' }),
-        signal: AbortSignal.timeout(15000),
-      })
-      const data = (await response.json()) as {
-        ok?: boolean
-        url?: string
-        error?: string
-      }
-
-      if (!data.ok || !data.url) {
-        setAutoDetectError(data.error || 'No gateway found on localhost ports 18789-18800.')
-        return
-      }
-
-      setGatewayUrl(data.url)
-      setAutoDetectMessage(`Detected gateway at ${data.url}`)
-    } catch {
-      setAutoDetectError('Auto-detect failed. Enter the gateway URL manually.')
-    } finally {
+    const result = await autoDetectGateway()
+    if (!result.ok || !result.url) {
+      setAutoDetectError(
+        result.error || 'No gateway found on localhost ports 18789-18800.',
+      )
       setAutoDetecting(false)
+      return
     }
+
+    setAutoDetectMessage(`Detected gateway at ${result.url}`)
+    setAutoDetecting(false)
   }
 
   const isBusy = testStatus === 'testing' || saving

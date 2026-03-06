@@ -75,12 +75,16 @@ function sanitizeOptionalDefaultModel(value: unknown): string | null {
 export const Route = createFileRoute('/api/gateway-config')({
   server: {
     handlers: {
-      // GET: return current gateway config (non-sensitive)
-      GET: async () => {
+      // GET: return current gateway config for the authenticated settings UI
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const url = process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+          const token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim() || ''
           const hasToken = Boolean(process.env.CLAWDBOT_GATEWAY_TOKEN?.trim())
-          return json({ ok: true, url, hasToken })
+          return json({ ok: true, url, token, hasToken })
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
           const isValidationError =

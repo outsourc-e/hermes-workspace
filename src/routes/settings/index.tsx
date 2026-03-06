@@ -253,18 +253,33 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 function SettingsRoute() {
   usePageTitle('Settings')
   const { settings, updateSettings } = useSettings()
-  const gatewaySetup = useGatewaySetupStore()
-  const [gatewayUrlInput, setGatewayUrlInput] = useState(settings.gatewayUrl)
-  const [connectionStatus, setConnectionStatus] = useState<
-    'idle' | 'testing' | 'connected' | 'failed'
-  >('idle')
+  const gatewayUrl = useGatewaySetupStore((state) => state.gatewayUrl)
+  const gatewayToken = useGatewaySetupStore((state) => state.gatewayToken)
+  const gatewayTestStatus = useGatewaySetupStore((state) => state.testStatus)
+  const gatewayTestError = useGatewaySetupStore((state) => state.testError)
+  const gatewaySaving = useGatewaySetupStore((state) => state.saving)
+  const loadCurrentGatewayConfig = useGatewaySetupStore(
+    (state) => state.loadCurrentConfig,
+  )
+  const setGatewayUrl = useGatewaySetupStore((state) => state.setGatewayUrl)
+  const setGatewayToken = useGatewaySetupStore((state) => state.setGatewayToken)
+  const saveAndTestGateway = useGatewaySetupStore((state) => state.saveAndTest)
+  const testGatewayConnection = useGatewaySetupStore(
+    (state) => state.testConnection,
+  )
+  const autoDetectGateway = useGatewaySetupStore(
+    (state) => state.autoDetectGateway,
+  )
+  const openGatewayWizard = useGatewaySetupStore((state) => state.open)
+  const [autoDetectingGateway, setAutoDetectingGateway] = useState(false)
+  const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null)
+  const [autoDetectError, setAutoDetectError] = useState<string | null>(null)
 
   // Phase 4.2: Fetch models for preferred model dropdowns
   const [availableModels, setAvailableModels] = useState<
     Array<{ id: string; label: string }>
   >([])
   const [modelsError, setModelsError] = useState(false)
-  const [urlError, setUrlError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchModels() {
@@ -291,42 +306,30 @@ function SettingsRoute() {
   }, [])
 
   useEffect(() => {
-    setGatewayUrlInput(settings.gatewayUrl)
-  }, [settings.gatewayUrl])
-
-  async function handleTestConnection() {
-    setConnectionStatus('testing')
-
-    try {
-      // Test via ClawSuite's server-side /api/ping which does the real
-      // WebSocket handshake to the gateway. Can't hit gateway directly
-      // from browser — it's a WS server, not HTTP.
-      const response = await fetch('/api/ping', {
-        signal: AbortSignal.timeout(8000),
-      })
-      const data = (await response.json()) as { ok?: boolean }
-      setConnectionStatus(data.ok ? 'connected' : 'failed')
-    } catch {
-      setConnectionStatus('failed')
+    async function initializeGatewayConnectionSettings() {
+      await loadCurrentGatewayConfig()
+      await testGatewayConnection()
     }
-  }
 
-  function validateGatewayUrl(value: string): string | null {
-    const trimmed = value.trim()
-    if (!trimmed) return null
-    try {
-      new URL(trimmed)
-      return null
-    } catch {
-      return 'Invalid URL format'
+    void initializeGatewayConnectionSettings()
+  }, [loadCurrentGatewayConfig, testGatewayConnection])
+
+  async function handleAutoDetectGateway() {
+    setAutoDetectingGateway(true)
+    setAutoDetectMessage(null)
+    setAutoDetectError(null)
+
+    const result = await autoDetectGateway()
+    if (!result.ok || !result.url) {
+      setAutoDetectError(
+        result.error || 'No gateway found on localhost ports 18789-18800.',
+      )
+      setAutoDetectingGateway(false)
+      return
     }
-  }
 
-  function persistGatewayUrl(value: string) {
-    const error = validateGatewayUrl(value)
-    setUrlError(error)
-    if (error) return
-    updateSettings({ gatewayUrl: value.trim() })
+    setAutoDetectMessage(`Detected gateway at ${result.url}`)
+    setAutoDetectingGateway(false)
   }
 
   function handleThemeChange(value: string) {
@@ -354,9 +357,9 @@ function SettingsRoute() {
   }
 
   function getConnectionDotClass(): string {
-    if (connectionStatus === 'connected') return 'bg-green-500'
-    if (connectionStatus === 'failed') return 'bg-red-500'
-    if (connectionStatus === 'testing') return 'bg-accent-500'
+    if (gatewayTestStatus === 'success') return 'bg-green-500'
+    if (gatewayTestStatus === 'error') return 'bg-red-500'
+    if (gatewayTestStatus === 'testing') return 'bg-accent-500'
     return 'bg-primary-500'
   }
 
@@ -631,119 +634,127 @@ function SettingsRoute() {
             <>
               <SettingsSection
                 title="Gateway Connection"
-                description="Set your gateway endpoint and verify connectivity."
+                description="Edit the saved gateway connection, reconnect, and rerun setup if needed."
                 icon={CloudIcon}
               >
                 <SettingsRow
                   label="Gateway URL"
-                  description="Used by ClawSuite for provider connectivity checks."
+                  description="Saved gateway WebSocket endpoint."
                 >
                   <div className="w-full md:max-w-md">
-                    <input
+                    <Input
                       type="url"
-                      placeholder="https://api.openclaw.ai"
-                      value={gatewayUrlInput}
-                      onChange={(e) => {
-                        const nextValue = e.target.value
-                        setGatewayUrlInput(nextValue)
-                        if (urlError) {
-                          setUrlError(validateGatewayUrl(nextValue))
-                        }
-                      }}
-                      onBlur={(e) => persistGatewayUrl(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'Enter') return
-                        e.preventDefault()
-                        persistGatewayUrl((e.target as HTMLInputElement).value)
-                        ;(e.target as HTMLInputElement).blur()
-                      }}
-                      className="h-9 w-full rounded-lg border border-primary-200 dark:border-gray-600 bg-primary-50 dark:bg-gray-800 px-3 text-sm text-primary-900 dark:text-gray-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
+                      placeholder="ws://127.0.0.1:18789"
+                      value={gatewayUrl}
+                      onChange={(e) => setGatewayUrl(e.target.value)}
+                      className="h-9 w-full"
                       aria-label="Gateway URL"
-                      aria-invalid={!!urlError}
-                      aria-describedby={
-                        urlError ? 'gateway-url-error' : undefined
-                      }
                     />
-                    {urlError && (
-                      <p
-                        id="gateway-url-error"
-                        className="mt-1 text-xs text-red-600"
-                        role="alert"
-                      >
-                        {urlError}
-                      </p>
-                    )}
                   </div>
                 </SettingsRow>
                 <SettingsRow
                   label="Gateway Token"
-                  description="Authentication token for your gateway (optional)."
+                  description="Saved token for the gateway connection."
                 >
                   <div className="w-full md:max-w-md">
-                    <input
+                    <Input
                       type="password"
-                      placeholder="Enter your gateway token..."
-                      value={settings.gatewayToken}
-                      onChange={(e) =>
-                        updateSettings({ gatewayToken: e.target.value })
-                      }
-                      className="h-9 w-full rounded-lg border border-primary-200 dark:border-gray-600 bg-primary-50 dark:bg-gray-800 px-3 text-sm text-primary-900 dark:text-gray-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
+                      placeholder="Leave empty if no token is set"
+                      value={gatewayToken}
+                      onChange={(e) => setGatewayToken(e.target.value)}
+                      className="h-9 w-full"
                       aria-label="Gateway Token"
                     />
                   </div>
                 </SettingsRow>
                 <SettingsRow
                   label="Connection status"
-                  description="Current gateway reachability check state."
+                  description="Current gateway reachability."
                 >
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium',
-                      connectionStatus === 'connected' &&
-                        'border-green-500/35 bg-green-500/10 text-green-600',
-                      connectionStatus === 'failed' &&
-                        'border-red-500/35 bg-red-500/10 text-red-600',
-                      connectionStatus === 'testing' &&
-                        'border-accent-500/35 bg-accent-500/10 text-accent-600',
-                      connectionStatus === 'idle' &&
-                        'border-primary-300 bg-primary-100 text-primary-700',
-                    )}
-                  >
+                  <div className="flex w-full flex-col items-start gap-2 md:w-auto">
                     <span
                       className={cn(
-                        'size-2 rounded-full',
-                        getConnectionDotClass(),
+                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium',
+                        gatewayTestStatus === 'success' &&
+                          'border-green-500/35 bg-green-500/10 text-green-600',
+                        gatewayTestStatus === 'error' &&
+                          'border-red-500/35 bg-red-500/10 text-red-600',
+                        gatewayTestStatus === 'testing' &&
+                          'border-accent-500/35 bg-accent-500/10 text-accent-600',
+                        gatewayTestStatus === 'idle' &&
+                          'border-primary-300 bg-primary-100 text-primary-700',
                       )}
-                    />
-                    {connectionStatus === 'idle' ? 'Not tested' : null}
-                    {connectionStatus === 'testing' ? 'Testing...' : null}
-                    {connectionStatus === 'connected' ? 'Connected' : null}
-                    {connectionStatus === 'failed' ? 'Failed' : null}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void handleTestConnection()}
-                    disabled={connectionStatus === 'testing' || !!urlError}
-                  >
-                    <HugeiconsIcon
-                      icon={CheckmarkCircle02Icon}
-                      size={20}
-                      strokeWidth={1.5}
-                    />
-                    Test
-                  </Button>
+                    >
+                      <span
+                        className={cn(
+                          'size-2 rounded-full',
+                          getConnectionDotClass(),
+                        )}
+                      />
+                      {gatewayTestStatus === 'idle' ? 'Disconnected' : null}
+                      {gatewayTestStatus === 'testing' ? 'Reconnecting...' : null}
+                      {gatewayTestStatus === 'success' ? 'Connected' : null}
+                      {gatewayTestStatus === 'error' ? 'Disconnected' : null}
+                    </span>
+                    {gatewayTestError ? (
+                      <p className="text-xs text-red-600">{gatewayTestError}</p>
+                    ) : null}
+                  </div>
                 </SettingsRow>
                 <SettingsRow
+                  label="Actions"
+                  description="Save changes, reconnect, or scan localhost ports 18789-18800."
+                >
+                  <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void saveAndTestGateway()}
+                      disabled={
+                        gatewaySaving ||
+                        gatewayTestStatus === 'testing' ||
+                        !gatewayUrl.trim()
+                      }
+                    >
+                      <HugeiconsIcon
+                        icon={CheckmarkCircle02Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                      {gatewaySaving
+                        ? 'Saving...'
+                        : gatewayTestStatus === 'testing'
+                          ? 'Reconnecting...'
+                          : 'Save & Reconnect'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleAutoDetectGateway()}
+                      disabled={autoDetectingGateway || gatewaySaving}
+                    >
+                      {autoDetectingGateway
+                        ? 'Scanning localhost...'
+                        : 'Auto-detect'}
+                    </Button>
+                  </div>
+                </SettingsRow>
+                {autoDetectError ? (
+                  <p className="text-sm text-red-600">{autoDetectError}</p>
+                ) : null}
+                {autoDetectMessage ? (
+                  <p className="text-sm text-green-600">{autoDetectMessage}</p>
+                ) : null}
+                <SettingsRow
                   label="Setup wizard"
-                  description="Re-run the gateway configuration wizard."
+                  description="Open the full setup wizard again."
                 >
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => gatewaySetup.open()}
+                    onClick={() => void openGatewayWizard()}
                   >
-                    Reconfigure Gateway
+                    Run Setup Wizard
                   </Button>
                 </SettingsRow>
               </SettingsSection>

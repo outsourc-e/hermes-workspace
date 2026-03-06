@@ -12,12 +12,14 @@ type GatewaySetupState = {
   saving: boolean
   _initialized: boolean
   initialize: () => Promise<void>
+  loadCurrentConfig: () => Promise<void>
   setGatewayUrl: (url: string) => void
   setGatewayToken: (token: string) => void
   /** Save URL/token to server .env, then test connection */
   saveAndTest: () => Promise<boolean>
   /** Just test current server connection (no save) */
   testConnection: () => Promise<boolean>
+  autoDetectGateway: () => Promise<{ ok: boolean; url?: string; error?: string }>
   proceed: () => void
   skipProviderSetup: () => void
   completeSetup: () => void
@@ -25,7 +27,7 @@ type GatewaySetupState = {
   open: () => void
 }
 
-async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
+export async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
   try {
     const response = await fetch('/api/ping', {
       signal: AbortSignal.timeout(8000),
@@ -37,15 +39,27 @@ async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
   }
 }
 
-async function fetchCurrentConfig(): Promise<{ url: string; hasToken: boolean }> {
+export async function fetchCurrentConfig(): Promise<{
+  url: string
+  token: string
+  hasToken: boolean
+}> {
   try {
     const response = await fetch('/api/gateway-config', {
       signal: AbortSignal.timeout(5000),
     })
-    const data = (await response.json()) as { url?: string; hasToken?: boolean }
-    return { url: data.url || 'ws://127.0.0.1:18789', hasToken: Boolean(data.hasToken) }
+    const data = (await response.json()) as {
+      url?: string
+      token?: string
+      hasToken?: boolean
+    }
+    return {
+      url: data.url || 'ws://127.0.0.1:18789',
+      token: data.token || '',
+      hasToken: Boolean(data.hasToken),
+    }
   } catch {
-    return { url: 'ws://127.0.0.1:18789', hasToken: false }
+    return { url: 'ws://127.0.0.1:18789', token: '', hasToken: false }
   }
 }
 
@@ -64,6 +78,40 @@ async function saveConfig(url: string, token: string): Promise<{ ok: boolean; er
     return { ok: Boolean(data.ok), error: data.error }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Failed to save config' }
+  }
+}
+
+export async function autoDetectGateway(): Promise<{
+  ok: boolean
+  url?: string
+  error?: string
+}> {
+  try {
+    const response = await fetch('/api/gateway-discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'scan' }),
+      signal: AbortSignal.timeout(15000),
+    })
+    const data = (await response.json()) as {
+      ok?: boolean
+      url?: string
+      error?: string
+    }
+
+    if (!data.ok || !data.url) {
+      return {
+        ok: false,
+        error: data.error || 'No gateway found on localhost ports 18789-18800.',
+      }
+    }
+
+    return { ok: true, url: data.url }
+  } catch {
+    return {
+      ok: false,
+      error: 'Auto-detect failed. Enter the gateway URL manually.',
+    }
   }
 }
 
@@ -146,11 +194,21 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
         isOpen: true,
         step: 'gateway',
         gatewayUrl: discoveredUrl || config.url,
-        gatewayToken: '', // Don't pre-fill token for security
+        gatewayToken: config.token,
       })
     } catch {
       // Ignore init errors
     }
+  },
+
+  loadCurrentConfig: async () => {
+    const config = await fetchCurrentConfig()
+    set({
+      gatewayUrl: config.url,
+      gatewayToken: config.token,
+      testStatus: 'idle',
+      testError: null,
+    })
   },
 
   setGatewayUrl: (url) => set({ gatewayUrl: url, testStatus: 'idle', testError: null }),
@@ -201,6 +259,20 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
     return false
   },
 
+  autoDetectGateway: async () => {
+    const result = await autoDetectGateway()
+    if (!result.ok || !result.url) {
+      return result
+    }
+
+    set({
+      gatewayUrl: result.url,
+      testStatus: 'idle',
+      testError: null,
+    })
+    return result
+  },
+
   proceed: () => set({ step: 'provider' }),
 
   skipProviderSetup: () => {
@@ -231,7 +303,7 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
       isOpen: true,
       step: 'gateway',
       gatewayUrl: config.url,
-      gatewayToken: '',
+      gatewayToken: config.token,
       testStatus: 'idle',
       testError: null,
     })
