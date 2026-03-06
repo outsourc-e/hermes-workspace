@@ -107,6 +107,9 @@ import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
 import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
 import { Route as ApiCronListRouteImport } from './routes/api/cron/list'
 import { Route as ApiCronDeleteRouteImport } from './routes/api/cron/delete'
+import { Route as ApiCloudWebhookRouteImport } from './routes/api/cloud/webhook'
+import { Route as ApiCloudStatusRouteImport } from './routes/api/cloud/status'
+import { Route as ApiCloudProvisionRouteImport } from './routes/api/cloud/provision'
 import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
 import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/status'
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
@@ -607,6 +610,21 @@ const ApiCronDeleteRoute = ApiCronDeleteRouteImport.update({
   path: '/delete',
   getParentRoute: () => ApiCronRoute,
 } as any)
+const ApiCloudWebhookRoute = ApiCloudWebhookRouteImport.update({
+  id: '/api/cloud/webhook',
+  path: '/api/cloud/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCloudStatusRoute = ApiCloudStatusRouteImport.update({
+  id: '/api/cloud/status',
+  path: '/api/cloud/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCloudProvisionRoute = ApiCloudProvisionRouteImport.update({
+  id: '/api/cloud/provision',
+  path: '/api/cloud/provision',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBrowserTabsRoute = ApiBrowserTabsRouteImport.update({
   id: '/tabs',
   path: '/tabs',
@@ -738,6 +756,9 @@ export interface FileRoutesByFullPath {
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cloud/provision': typeof ApiCloudProvisionRoute
+  '/api/cloud/status': typeof ApiCloudStatusRoute
+  '/api/cloud/webhook': typeof ApiCloudWebhookRoute
   '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
@@ -846,6 +867,9 @@ export interface FileRoutesByTo {
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cloud/provision': typeof ApiCloudProvisionRoute
+  '/api/cloud/status': typeof ApiCloudStatusRoute
+  '/api/cloud/webhook': typeof ApiCloudWebhookRoute
   '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
@@ -956,6 +980,9 @@ export interface FileRoutesById {
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cloud/provision': typeof ApiCloudProvisionRoute
+  '/api/cloud/status': typeof ApiCloudStatusRoute
+  '/api/cloud/webhook': typeof ApiCloudWebhookRoute
   '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
@@ -1067,6 +1094,9 @@ export interface FileRouteTypes {
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
+    | '/api/cloud/provision'
+    | '/api/cloud/status'
+    | '/api/cloud/webhook'
     | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
@@ -1175,6 +1205,9 @@ export interface FileRouteTypes {
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
+    | '/api/cloud/provision'
+    | '/api/cloud/status'
+    | '/api/cloud/webhook'
     | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
@@ -1284,6 +1317,9 @@ export interface FileRouteTypes {
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
+    | '/api/cloud/provision'
+    | '/api/cloud/status'
+    | '/api/cloud/webhook'
     | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
@@ -1388,6 +1424,9 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiCloudProvisionRoute: typeof ApiCloudProvisionRoute
+  ApiCloudStatusRoute: typeof ApiCloudStatusRoute
+  ApiCloudWebhookRoute: typeof ApiCloudWebhookRoute
   ApiDebugReconnectRoute: typeof ApiDebugReconnectRoute
   ApiDebugStatusRoute: typeof ApiDebugStatusRoute
   ApiGatewayAgentsRoute: typeof ApiGatewayAgentsRoute
@@ -2094,6 +2133,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronDeleteRouteImport
       parentRoute: typeof ApiCronRoute
     }
+    '/api/cloud/webhook': {
+      id: '/api/cloud/webhook'
+      path: '/api/cloud/webhook'
+      fullPath: '/api/cloud/webhook'
+      preLoaderRoute: typeof ApiCloudWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cloud/status': {
+      id: '/api/cloud/status'
+      path: '/api/cloud/status'
+      fullPath: '/api/cloud/status'
+      preLoaderRoute: typeof ApiCloudStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cloud/provision': {
+      id: '/api/cloud/provision'
+      path: '/api/cloud/provision'
+      fullPath: '/api/cloud/provision'
+      preLoaderRoute: typeof ApiCloudProvisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/browser/tabs': {
       id: '/api/browser/tabs'
       path: '/tabs'
@@ -2327,6 +2387,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiCloudProvisionRoute: ApiCloudProvisionRoute,
+  ApiCloudStatusRoute: ApiCloudStatusRoute,
+  ApiCloudWebhookRoute: ApiCloudWebhookRoute,
   ApiDebugReconnectRoute: ApiDebugReconnectRoute,
   ApiDebugStatusRoute: ApiDebugStatusRoute,
   ApiGatewayAgentsRoute: ApiGatewayAgentsRoute,
