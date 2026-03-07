@@ -90,9 +90,35 @@ function detectRemote(repoPath: string): string {
   return 'origin'
 }
 
+function isGitRepo(dir: string): boolean {
+  try {
+    const fs = require('node:fs')
+    return fs.existsSync(path.join(dir, '.git'))
+  } catch {
+    return false
+  }
+}
+
 function checkForUpdates(): UpdateCheckResult {
   const repoPath = path.resolve(process.cwd())
   const pkgVersion = readPackageVersion(repoPath)
+
+  // Non-git installs (packaged .dmg/.exe) — no update check possible
+  if (!isGitAvailable() || !isGitRepo(repoPath)) {
+    return {
+      updateAvailable: false,
+      localVersion: pkgVersion,
+      remoteVersion: pkgVersion,
+      localCommit: 'packaged',
+      remoteCommit: 'packaged',
+      localDate: '',
+      remoteDate: '',
+      behindBy: 0,
+      repoPath,
+      changelog: [],
+    }
+  }
+
   const remote = detectRemote(repoPath)
 
   // Fetch latest from remote (quiet, won't fail if offline)
