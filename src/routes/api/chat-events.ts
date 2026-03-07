@@ -45,6 +45,7 @@ export const Route = createFileRoute('/api/chat-events')({
         let streamClosed = false
         let cleanupListener: (() => void) | null = null
         let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+        const chunkSourceByRun = new Map<string, 'agent' | 'chat'>()
 
         const stream = new ReadableStream({
           async start(controller) {
@@ -59,9 +60,27 @@ export const Route = createFileRoute('/api/chat-events')({
             const closeStream = () => {
               if (streamClosed) return
               streamClosed = true
+              chunkSourceByRun.clear()
               if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
               if (cleanupListener) { cleanupListener(); cleanupListener = null }
               try { controller.close() } catch { /* ignore */ }
+            }
+
+            const claimChunkSource = (
+              runId: unknown,
+              source: 'agent' | 'chat',
+            ): boolean => {
+              if (typeof runId !== 'string' || runId.length === 0) return true
+              const existingSource = chunkSourceByRun.get(runId)
+              if (existingSource && existingSource !== source) return false
+              chunkSourceByRun.set(runId, source)
+              return true
+            }
+
+            const clearChunkSource = (runId: unknown) => {
+              if (typeof runId === 'string' && runId.length > 0) {
+                chunkSourceByRun.delete(runId)
+              }
             }
 
             try {
@@ -96,6 +115,7 @@ export const Route = createFileRoute('/api/chat-events')({
                   const runId = rawPayload?.runId
 
                   if (stream === 'assistant' && data?.text) {
+                    if (!claimChunkSource(runId, 'agent')) return
                     sendEvent('chunk', { text: data.text, runId, sessionKey: targetSessionKey })
                   } else if (stream === 'thinking' && data?.text) {
                     sendEvent('thinking', { text: data.text, runId, sessionKey: targetSessionKey })
@@ -179,19 +199,23 @@ export const Route = createFileRoute('/api/chat-events')({
                   const runId = activeRunId
 
                   if (state === 'delta' && message) {
+                    if (!claimChunkSource(runId, 'chat')) return
                     const text = extractTextFromMessage(message)
                     if (text) sendEvent('chunk', { text, runId, sessionKey: targetSessionKey, fullReplace: true })
                     return
                   }
                   if (state === 'final') {
+                    clearChunkSource(runId)
                     sendEvent('done', { state: 'final', runId, sessionKey: targetSessionKey, message })
                     return
                   }
                   if (state === 'error') {
+                    clearChunkSource(runId)
                     sendEvent('done', { state: 'error', errorMessage: rawPayload?.errorMessage, runId, sessionKey: targetSessionKey })
                     return
                   }
                   if (state === 'aborted') {
+                    clearChunkSource(runId)
                     sendEvent('done', { state: 'aborted', runId, sessionKey: targetSessionKey })
                     return
                   }
@@ -276,6 +300,7 @@ export const Route = createFileRoute('/api/chat-events')({
           },
           cancel() {
             streamClosed = true
+            chunkSourceByRun?.clear?.()
             if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
             if (cleanupListener) { cleanupListener(); cleanupListener = null }
           },

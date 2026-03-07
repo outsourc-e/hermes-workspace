@@ -203,6 +203,7 @@ function isRetryableQueuedMessage(message: GatewayMessage): boolean {
   if ((message.role || '') !== 'user') return false
   const raw = message as Record<string, unknown>
   const status = normalizeMessageValue(raw.status)
+  if (status === 'queued') return false
   const optimisticId = normalizeMessageValue(raw.__optimisticId)
   return status === 'sending' || status === 'error' || optimisticId.length > 0
 }
