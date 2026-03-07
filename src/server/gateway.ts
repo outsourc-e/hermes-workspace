@@ -731,6 +731,44 @@ export function hasActiveSendRun(runId: string | null | undefined): boolean {
   return activeSendStreamRuns.has(runId)
 }
 
+/**
+ * Completed run dedup — prevents the same 'done' event from being emitted
+ * to multiple SSE connections. Each SSE listener has its own scope, but the
+ * gateway fires one event that fans out to ALL listeners. Without this shared
+ * guard, N open SSE connections = N duplicate 'done' emissions.
+ */
+const COMPLETED_RUNS_KEY = '__clawsuite_completed_runs__' as const
+const completedRuns: Set<string> =
+  (globalThis as any)[COMPLETED_RUNS_KEY] as Set<string> | undefined
+  ?? new Set<string>()
+;(globalThis as any)[COMPLETED_RUNS_KEY] = completedRuns
+
+const COMPLETED_RUNS_MAX = 200
+const COMPLETED_RUNS_EXPIRY_MS = 120_000
+const completedRunTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+export function markRunCompleted(runId: string): boolean {
+  if (!runId) return true
+  if (completedRuns.has(runId)) return false // already completed — duplicate
+  completedRuns.add(runId)
+  // Auto-expire after 2 minutes to prevent unbounded growth
+  const timer = setTimeout(() => {
+    completedRuns.delete(runId)
+    completedRunTimers.delete(runId)
+  }, COMPLETED_RUNS_EXPIRY_MS)
+  completedRunTimers.set(runId, timer)
+  // Safety cap
+  if (completedRuns.size > COMPLETED_RUNS_MAX) {
+    const oldest = completedRuns.values().next().value
+    if (oldest) {
+      completedRuns.delete(oldest)
+      const t = completedRunTimers.get(oldest)
+      if (t) { clearTimeout(t); completedRunTimers.delete(oldest) }
+    }
+  }
+  return true // first time — allow
+}
+
 export async function gatewayConnectCheck(): Promise<void> {
   await gatewayClient.ensureConnected()
 }

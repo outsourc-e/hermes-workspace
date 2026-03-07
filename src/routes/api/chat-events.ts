@@ -3,6 +3,7 @@ import {
   onGatewayEvent,
   gatewayConnectCheck,
   hasActiveSendRun,
+  markRunCompleted,
 } from '../../server/gateway'
 import type { GatewayFrame } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -46,7 +47,6 @@ export const Route = createFileRoute('/api/chat-events')({
         let cleanupListener: (() => void) | null = null
         let heartbeatTimer: ReturnType<typeof setInterval> | null = null
         const chunkSourceByRun = new Map<string, 'agent' | 'chat'>()
-        const completedRunIds = new Set<string>()
 
         const stream = new ReadableStream({
           async start(controller) {
@@ -62,7 +62,6 @@ export const Route = createFileRoute('/api/chat-events')({
               if (streamClosed) return
               streamClosed = true
               chunkSourceByRun.clear()
-              completedRunIds.clear()
               if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
               if (cleanupListener) { cleanupListener(); cleanupListener = null }
               try { controller.close() } catch { /* ignore */ }
@@ -208,25 +207,22 @@ export const Route = createFileRoute('/api/chat-events')({
                   }
                   if (state === 'final') {
                     clearChunkSource(runId)
-                    // Deduplicate: only emit one 'done' per runId. The gateway may fire
-                    // multiple 'final' chat events for the same run (e.g. one per delivery
-                    // surface — Telegram, ClawSuite, etc.). Only the first one through wins.
-                    if (runId && completedRunIds.has(runId)) return
-                    if (runId) completedRunIds.add(runId)
+                    // Deduplicate: only emit one 'done' per runId across ALL SSE connections.
+                    // The gateway fires one WebSocket event that fans out to every listener.
+                    // Without this shared guard, N connections = N duplicate done events.
+                    if (runId && !markRunCompleted(runId)) return
                     sendEvent('done', { state: 'final', runId, sessionKey: targetSessionKey, message })
                     return
                   }
                   if (state === 'error') {
                     clearChunkSource(runId)
-                    if (runId && completedRunIds.has(runId)) return
-                    if (runId) completedRunIds.add(runId)
+                    if (runId && !markRunCompleted(runId)) return
                     sendEvent('done', { state: 'error', errorMessage: rawPayload?.errorMessage, runId, sessionKey: targetSessionKey })
                     return
                   }
                   if (state === 'aborted') {
                     clearChunkSource(runId)
-                    if (runId && completedRunIds.has(runId)) return
-                    if (runId) completedRunIds.add(runId)
+                    if (runId && !markRunCompleted(runId)) return
                     sendEvent('done', { state: 'aborted', runId, sessionKey: targetSessionKey })
                     return
                   }
@@ -312,7 +308,6 @@ export const Route = createFileRoute('/api/chat-events')({
           cancel() {
             streamClosed = true
             chunkSourceByRun?.clear?.()
-            completedRunIds?.clear?.()
             if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
             if (cleanupListener) { cleanupListener(); cleanupListener = null }
           },
