@@ -203,9 +203,10 @@ function isRetryableQueuedMessage(message: GatewayMessage): boolean {
   if ((message.role || '') !== 'user') return false
   const raw = message as Record<string, unknown>
   const status = normalizeMessageValue(raw.status)
-  if (status === 'queued') return false
-  const optimisticId = normalizeMessageValue(raw.__optimisticId)
-  return status === 'sending' || status === 'error' || optimisticId.length > 0
+  // Only retry on explicit failure states. 'queued' = delivered, '' = confirmed.
+  // Previously also triggered on __optimisticId presence, which caused false
+  // Retry when history refetch cleared the status field on delivered messages.
+  return status === 'sending' || status === 'error'
 }
 
 function getMessageRetryAttachments(
@@ -610,12 +611,11 @@ export function ChatScreen({
 
       if (seen.has(primaryKey)) continue
 
-      // Text-based dedup for user messages: the optimistic message uses a
-      // content array while the SSE echo may use a top-level text field, and
-      // timestamps differ (client vs server).  This causes both the ID-based
-      // and fallback-signature dedup to miss.  A normalised text key catches
-      // the overlap regardless of message shape.
-      if (msg.role === 'user') {
+      // Text-based dedup for ALL messages: the realtime version (from SSE done
+      // event) and the history version (from API refetch) may have different IDs
+      // or no IDs at all, causing ID-based dedup to miss. Normalised text
+      // catches the overlap regardless of message shape or ID availability.
+      {
         const text = textFromMessage(msg).trim()
         if (text.length > 0) {
           // Normalize all whitespace (newlines, tabs, multiple spaces) to a
@@ -623,7 +623,7 @@ export function ChatScreen({
           // spaces when echoing back, causing the optimistic (with newlines)
           // and the echo (with spaces) to have different raw text.
           const normalizedText = text.replace(/\s+/g, ' ')
-          const textKey = `user:text:${normalizedText}`
+          const textKey = `${msg.role}:text:${normalizedText}`
           if (seen.has(textKey)) continue
           seen.add(textKey)
         }
