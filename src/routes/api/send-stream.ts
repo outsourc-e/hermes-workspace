@@ -1,10 +1,18 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
-import { gatewayRpc, onGatewayEvent, gatewayConnectCheck } from '../../server/gateway'
+import {
+  gatewayRpc,
+  onGatewayEvent,
+  gatewayConnectCheck,
+  registerActiveSendRun,
+  unregisterActiveSendRun,
+} from '../../server/gateway'
 import type { GatewayFrame } from '../../server/gateway'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
+
+const SEND_STREAM_RUN_TIMEOUT_MS = 180_000
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -163,6 +171,11 @@ export const Route = createFileRoute('/api/send-stream')({
         const encoder = new TextEncoder()
         let streamClosed = false
         let cleanupListener: (() => void) | null = null
+        let activeRunId: string | null = null
+        let unregisterTimer: ReturnType<typeof setTimeout> | null = null
+        let closeStream = () => {
+          streamClosed = true
+        }
 
         const stream = new ReadableStream({
           async start(controller) {
@@ -172,9 +185,17 @@ export const Route = createFileRoute('/api/send-stream')({
               controller.enqueue(encoder.encode(payload))
             }
 
-            const closeStream = () => {
+            closeStream = () => {
               if (streamClosed) return
               streamClosed = true
+              if (unregisterTimer) {
+                clearTimeout(unregisterTimer)
+                unregisterTimer = null
+              }
+              if (activeRunId) {
+                unregisterActiveSendRun(activeRunId)
+                activeRunId = null
+              }
               if (cleanupListener) {
                 cleanupListener()
                 cleanupListener = null
@@ -198,6 +219,13 @@ export const Route = createFileRoute('/api/send-stream')({
 
                 if (eventName === 'agent') {
                   const agentPayload = payload as any
+                  if (
+                    activeRunId &&
+                    agentPayload?.runId &&
+                    agentPayload.runId !== activeRunId
+                  ) {
+                    return
+                  }
                   const stream = agentPayload?.stream
                   const data = agentPayload?.data
 
@@ -222,6 +250,13 @@ export const Route = createFileRoute('/api/send-stream')({
                   }
                 } else if (eventName === 'chat') {
                   const chatPayload = payload as any
+                  if (
+                    activeRunId &&
+                    chatPayload?.runId &&
+                    chatPayload.runId !== activeRunId
+                  ) {
+                    return
+                  }
                   const state = chatPayload?.state
                   if (
                     state === 'final' ||
@@ -253,6 +288,17 @@ export const Route = createFileRoute('/api/send-stream')({
               )
 
               // Send initial event with runId
+              if (typeof sendResult.runId === 'string' && sendResult.runId.trim()) {
+                activeRunId = sendResult.runId
+                registerActiveSendRun(activeRunId)
+                unregisterTimer = setTimeout(() => {
+                  if (activeRunId) {
+                    unregisterActiveSendRun(activeRunId)
+                    activeRunId = null
+                  }
+                }, SEND_STREAM_RUN_TIMEOUT_MS)
+              }
+
               sendEvent('started', {
                 runId: sendResult.runId,
                 sessionKey,
@@ -264,7 +310,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   sendEvent('error', { message: 'Stream timeout' })
                   closeStream()
                 }
-              }, 180_000) // 3 minute timeout
+              }, SEND_STREAM_RUN_TIMEOUT_MS)
             } catch (err) {
               const errorMsg = err instanceof Error ? err.message : String(err)
               sendEvent('error', { message: errorMsg })
@@ -272,11 +318,7 @@ export const Route = createFileRoute('/api/send-stream')({
             }
           },
           cancel() {
-            streamClosed = true
-            if (cleanupListener) {
-              cleanupListener()
-              cleanupListener = null
-            }
+            closeStream()
           },
         })
 

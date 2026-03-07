@@ -72,7 +72,8 @@ type GatewayChatState = {
   lastEventAt: number
   /**
    * RunIds currently being handled by send-stream (the active send SSE).
-   * chat-events must skip chunk/done events for these runIds to avoid duplicates.
+   * Server-side dedup is the primary defense. This client-side set remains as
+   * a fallback in case a stale event slips through after transport issues.
    */
   sendStreamRunIds: Set<string>
 

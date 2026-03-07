@@ -670,9 +670,12 @@ function rawDataToString(data: RawData): string {
 
 // Singleton guard: survive Vite SSR module reloads
 const GW_KEY = '__clawsuite_gateway_client__' as const
+const ACTIVE_SEND_RUNS_KEY = '__clawsuite_active_send_stream_runs__' as const
 declare global {
   // eslint-disable-next-line no-var
   var __clawsuite_gateway_client__: GatewayClient | undefined
+  // eslint-disable-next-line no-var
+  var __clawsuite_active_send_stream_runs__: Set<string> | undefined
 }
 const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined
 if (existingClient) {
@@ -697,6 +700,10 @@ if (existingClient) {
 }
 let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()
 ;(globalThis as any)[GW_KEY] = gatewayClient
+const activeSendStreamRuns =
+  (globalThis as any)[ACTIVE_SEND_RUNS_KEY] as Set<string> | undefined
+  ?? new Set<string>()
+;(globalThis as any)[ACTIVE_SEND_RUNS_KEY] = activeSendStreamRuns
 
 export async function gatewayRpc<TPayload = unknown>(
   method: string,
@@ -707,6 +714,21 @@ export async function gatewayRpc<TPayload = unknown>(
 
 export function onGatewayEvent(handler: GatewayEventHandler): () => void {
   return gatewayClient.onEvent(handler)
+}
+
+export function registerActiveSendRun(runId: string): void {
+  if (!runId) return
+  activeSendStreamRuns.add(runId)
+}
+
+export function unregisterActiveSendRun(runId: string): void {
+  if (!runId) return
+  activeSendStreamRuns.delete(runId)
+}
+
+export function hasActiveSendRun(runId: string | null | undefined): boolean {
+  if (!runId) return false
+  return activeSendStreamRuns.has(runId)
 }
 
 export async function gatewayConnectCheck(): Promise<void> {

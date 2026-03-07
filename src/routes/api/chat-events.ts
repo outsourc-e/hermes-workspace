@@ -1,5 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { onGatewayEvent, gatewayConnectCheck } from '../../server/gateway'
+import {
+  onGatewayEvent,
+  gatewayConnectCheck,
+  hasActiveSendRun,
+} from '../../server/gateway'
 import type { GatewayFrame } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
 
@@ -77,6 +81,8 @@ export const Route = createFileRoute('/api/chat-events')({
                 const eventName = (frame as any).event
                 const rawPayload = (frame as any).payload ?? ((frame as any).payloadJSON ? (() => { try { return JSON.parse((frame as any).payloadJSON) } catch { return null } })() : null)
                 if (!rawPayload) return
+                const activeRunId = typeof rawPayload?.runId === 'string' ? rawPayload.runId : undefined
+                if (hasActiveSendRun(activeRunId)) return
 
                 const eventSessionKey = rawPayload?.sessionKey || rawPayload?.context?.sessionKey
                 if (sessionKeyParam && eventSessionKey && eventSessionKey !== sessionKeyParam) return
@@ -170,7 +176,7 @@ export const Route = createFileRoute('/api/chat-events')({
                 if (eventName === 'chat') {
                   const state = rawPayload?.state
                   const message = rawPayload?.message
-                  const runId = rawPayload?.runId
+                  const runId = activeRunId
 
                   if (state === 'delta' && message) {
                     const text = extractTextFromMessage(message)
