@@ -8,7 +8,7 @@ import type {
 } from '../screens/chat/types'
 
 export type ChatStreamEvent =
-  | { type: 'message'; message: GatewayMessage; sessionKey: string }
+  | { type: 'message'; message: GatewayMessage; sessionKey: string; runId?: string }
   | {
       type: 'chunk'
       text: string
@@ -39,6 +39,7 @@ export type ChatStreamEvent =
       message: GatewayMessage
       sessionKey: string
       source?: string
+      runId?: string
     }
 
 export type ConnectionState =
@@ -275,11 +276,12 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     const sessionKey = event.sessionKey
     const now = Date.now()
 
-    // Skip chunk/thinking/tool/done events for runs being handled by send-stream.
+    // Skip ALL events for runs being handled by send-stream.
     // send-stream is the authoritative handler for active sends — chat-events
     // fires the same events in parallel, causing duplicate messages.
+    // Previously only covered chunk/thinking/tool/done — missing 'message'
+    // was the root cause of the persistent duplication bug.
     if (
-      (event.type === 'chunk' || event.type === 'thinking' || event.type === 'tool' || event.type === 'done') &&
       event.runId &&
       get().sendStreamRunIds.has(event.runId)
     ) {

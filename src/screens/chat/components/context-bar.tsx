@@ -154,11 +154,7 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
             )}
             style={{ width: `${clampedPct}%` }}
           />
-          {clampedPct > 15 && (
-            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] font-semibold tabular-nums text-primary-600/70 dark:text-primary-300/70 select-none">
-              {Math.round(clampedPct)}%
-            </span>
-          )}
+          {/* % label removed — shown only in popup on hover/click */}
         </div>
       </PreviewCardTrigger>
 
