@@ -530,6 +530,14 @@ function ChatSidebarComponent({
     [],
   )
 
+  // Detect Electron for macOS traffic-light padding
+  const isElectron = useMemo(
+    () =>
+      typeof navigator !== 'undefined' &&
+      /Electron/.test(navigator.userAgent),
+    [],
+  )
+
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
   const isAgentSwarmActive = pathname === '/agent-swarm'
@@ -949,7 +957,8 @@ function ChatSidebarComponent({
       <motion.div
         layout
         transition={{ layout: transition }}
-        className="relative flex h-12 items-center px-2"
+        className={cn("relative flex h-12 items-center px-2", isElectron && "mt-9")}
+        style={isElectron ? { WebkitAppRegion: 'drag' } as React.CSSProperties : undefined}
       >
         <AnimatePresence initial={false}>
           {!isVisuallyCollapsed ? (
