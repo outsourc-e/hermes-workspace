@@ -19,6 +19,7 @@ import {
   PuzzleIcon,
   Search01Icon,
   ApiIcon,
+  Folder01Icon,
   Settings01Icon,
   ServerStack01Icon,
   SmartPhone01Icon,
@@ -540,6 +541,7 @@ function ChatSidebarComponent({
   const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
   const isTasksActive = pathname === '/tasks'
+  const isProjectsActive = pathname.startsWith('/projects')
   // Gateway
   const isCronActive = pathname === '/cron'
   const isChannelsActive = pathname === '/channels'
@@ -560,6 +562,7 @@ function ChatSidebarComponent({
   const suiteRoutes = [
     '/dashboard',
     '/agent-swarm',
+    '/projects',
     '/new',
     '/browser',
     '/terminal',
@@ -788,6 +791,13 @@ function ChatSidebarComponent({
       label: 'Agent Hub',
       active: isAgentSwarmActive,
       dataTour: 'agent-hub',
+    },
+    {
+      kind: 'link',
+      to: '/projects',
+      icon: Folder01Icon,
+      label: 'Projects',
+      active: isProjectsActive,
     },
     {
       kind: 'link',
