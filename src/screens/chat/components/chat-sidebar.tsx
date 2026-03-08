@@ -947,13 +947,7 @@ function ChatSidebarComponent({
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
-      {/* Electron: draggable title bar spacer above sidebar header */}
-      {typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent) && (
-        <div
-          className="h-9 shrink-0"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        />
-      )}
+      {/* Electron title bar is rendered at shell level (workspace-shell.tsx) */}
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
         layout

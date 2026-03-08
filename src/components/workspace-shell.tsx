@@ -306,8 +306,17 @@ export function WorkspaceShell() {
         className="relative flex flex-col overflow-hidden theme-bg theme-text"
         style={{ height: 'var(--vvh, 100dvh)' }}
       >
+        {/* Electron: full-width title bar with centered label */}
+        {isElectron && (
+          <div
+            className="flex h-9 shrink-0 items-center justify-center border-b border-primary-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-sm z-40"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          >
+            <span className="text-xs font-semibold text-primary-500 dark:text-primary-400 tracking-wide select-none">ClawSuite</span>
+          </div>
+        )}
         <div className={cn(
-          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
+          "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
         )}>
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
@@ -349,12 +358,7 @@ export function WorkspaceShell() {
             data-tour="chat-area"
           >
             <div className="flex h-full min-h-0 flex-col">
-              {isElectron ? (
-                <div
-                  className="h-9 shrink-0"
-                  style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-                />
-              ) : null}
+              {null /* Electron title bar is rendered at shell level */}
               <div
                 className={['page-transition min-h-0 flex-1', slideClass]
                   .filter(Boolean)
