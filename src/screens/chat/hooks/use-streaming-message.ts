@@ -23,10 +23,11 @@ type UseStreamingMessageOptions = {
   onError?: (error: string) => void
   onThinking?: (thinking: string) => void
   onTool?: (tool: unknown) => void
+  onMessageAccepted?: (sessionKey: string, friendlyId: string, clientId: string) => void
 }
 
 export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
-  const { onStarted, onChunk, onComplete, onError, onThinking, onTool } = options
+  const { onStarted, onChunk, onComplete, onError, onThinking, onTool, onMessageAccepted } = options
 
   const [state, setState] = useState<StreamingState>({
     isStreaming: false,
@@ -362,6 +363,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (!response.ok) {
           const errorText = await response.text()
           throw new Error(errorText || 'Stream request failed')
+        }
+
+        // HTTP 200 — message accepted by gateway. Clear optimistic "sending"
+        // status so the Retry timer never fires. The gateway does NOT echo
+        // user messages via SSE, so this is the only confirmation we get.
+        if (params.idempotencyKey && onMessageAccepted) {
+          onMessageAccepted(params.sessionKey, params.friendlyId, params.idempotencyKey)
         }
 
         const reader = response.body?.getReader()

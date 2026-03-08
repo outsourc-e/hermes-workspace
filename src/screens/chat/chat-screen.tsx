@@ -1113,6 +1113,22 @@ export function ChatScreen({
       },
       [navigate, queryClient],
     ),
+    onMessageAccepted: useCallback(
+      (_sessionKey: string, friendlyId: string, clientId: string) => {
+        // HTTP 200 received — gateway accepted the message. Clear "sending"
+        // status immediately so the Retry timer never fires. This is the
+        // primary confirmation path since the gateway does NOT echo user
+        // messages back via SSE.
+        updateHistoryMessageByClientId(
+          queryClient,
+          friendlyId,
+          _sessionKey,
+          clientId,
+          (message) => ({ ...message, status: 'queued' }),
+        )
+      },
+      [queryClient],
+    ),
   })
 
   const handleSwitchModel = useCallback(async () => {
