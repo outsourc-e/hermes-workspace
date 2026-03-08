@@ -63,6 +63,11 @@ export function useGatewayChatStream(
   onDoneRef.current = onDone
   onApprovalRequestRef.current = onApprovalRequest
 
+  const dispatchSSEDroppedEvent = useCallback(() => {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(new CustomEvent('clawsuite:sse-dropped'))
+  }, [])
+
   const clearStreamTimeout = useCallback((sessionKey: string) => {
     const timeoutId = streamTimeoutsRef.current.get(sessionKey)
     if (!timeoutId) return
@@ -131,6 +136,7 @@ export function useGatewayChatStream(
       clearAllStreamTimeouts()
       clearAllStreaming()
       setConnectionState('disconnected')
+      dispatchSSEDroppedEvent()
       scheduleReconnect()
     })
 
@@ -141,6 +147,7 @@ export function useGatewayChatStream(
         clearAllStreamTimeouts()
         clearAllStreaming()
         setConnectionState('disconnected')
+        dispatchSSEDroppedEvent()
         scheduleReconnect()
       }
       // Don't set 'connecting' on transient errors — EventSource auto-reconnects
@@ -341,6 +348,7 @@ export function useGatewayChatStream(
     clearAllStreaming,
     clearAllStreamTimeouts,
     clearStreamTimeout,
+    dispatchSSEDroppedEvent,
     touchStreamTimeout,
   ])
 

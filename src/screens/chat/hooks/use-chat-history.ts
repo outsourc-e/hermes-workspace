@@ -16,6 +16,7 @@ type UseChatHistoryInput = {
   activeExists: boolean
   sessionsReady: boolean
   queryClient: QueryClient
+  historyRefetchInterval?: number
 }
 
 function normalizeSessionCandidate(value: string | undefined): string {
@@ -116,6 +117,7 @@ export function useChatHistory({
   activeExists,
   sessionsReady,
   queryClient,
+  historyRefetchInterval,
 }: UseChatHistoryInput) {
   const explicitRouteSessionKey = useMemo(() => {
     const normalizedFriendlyId = normalizeSessionCandidate(activeFriendlyId)
@@ -177,6 +179,7 @@ export function useChatHistory({
       return queryClient.getQueryData(historyKey)
     },
     refetchOnWindowFocus: true,
+    refetchInterval: historyRefetchInterval,
     gcTime: 1000 * 60 * 10,
     structuralSharing: true,
     notifyOnChangeProps: ['data', 'error', 'isError'],

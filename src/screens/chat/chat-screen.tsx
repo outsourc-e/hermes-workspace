@@ -77,6 +77,7 @@ import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
+import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
@@ -337,6 +338,7 @@ export function ChatScreen({
     (state) => state.panelHeight,
   )
   const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
+  const sseConnectionState = useGatewayChatStore((s) => s.connectionState)
 
   const {
     sessionsQuery,
@@ -367,6 +369,7 @@ export function ChatScreen({
     activeExists,
     sessionsReady: sessionsQuery.isSuccess,
     queryClient,
+    historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
   })
 
   // Wire SSE realtime stream for instant message delivery
@@ -1009,11 +1012,19 @@ export function ChatScreen({
   const gatewayStatusError =
     !isNewChat && connectionState !== 'connected' &&
     (gatewayStatusQuery.error instanceof Error
-      ? gatewayStatusQuery.error.message
+      ? {
+          message: gatewayStatusQuery.error.message,
+          status: (gatewayStatusQuery.error as Error & { status?: number })
+            .status,
+        }
       : gatewayStatusQuery.data && !gatewayStatusQuery.data.ok
-        ? gatewayStatusQuery.data.error || 'Gateway unavailable'
+        ? {
+            message: gatewayStatusQuery.data.error || 'Gateway unavailable',
+            status: gatewayStatusQuery.data.status,
+          }
         : null)
-  const gatewayError = gatewayStatusError ?? sessionsError ?? historyError
+  const gatewayError = gatewayStatusError?.message ?? sessionsError ?? historyError
+  const gatewayErrorStatus = gatewayStatusError?.status
   const showErrorNotice = Boolean(gatewayError) && !isNewChat
   const handleGatewayRefetch = useCallback(() => {
     void gatewayStatusQuery.refetch()
@@ -1032,6 +1043,26 @@ export function ChatScreen({
     window.addEventListener('clawsuite:chat-refresh', handleRefreshRequest)
     return () => {
       window.removeEventListener('clawsuite:chat-refresh', handleRefreshRequest)
+    }
+  }, [historyQuery])
+
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') {
+        void historyQuery.refetch()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [historyQuery])
+
+  useEffect(() => {
+    function handleSSEDrop() {
+      void historyQuery.refetch()
+    }
+    window.addEventListener('clawsuite:sse-dropped', handleSSEDrop)
+    return () => {
+      window.removeEventListener('clawsuite:sse-dropped', handleSSEDrop)
     }
   }, [historyQuery])
 
@@ -1785,10 +1816,11 @@ export function ChatScreen({
       <GatewayStatusMessage
         state="error"
         error={gatewayError}
+        status={gatewayErrorStatus}
         onRetry={handleGatewayRefetch}
       />
     )
-  }, [gatewayError, handleGatewayRefetch, showErrorNotice])
+  }, [gatewayError, gatewayErrorStatus, handleGatewayRefetch, showErrorNotice])
 
   const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
     connectionState === 'connected'
