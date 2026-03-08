@@ -12,7 +12,7 @@ import { createCheckpointsRouter } from "./routes/checkpoints";
 import { createPhasesRouter } from "./routes/phases";
 import { createDecomposeRouter } from "./routes/decompose";
 
-const PORT = Number(process.env.PORT ?? 3001);
+const PORT = Number(process.env.PORT ?? 3002);
 
 export function createServer(): { app: express.Express; tracker: Tracker; orchestrator: Orchestrator } {
   const app = express();

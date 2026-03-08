@@ -10,6 +10,8 @@ import type {
   CreateProjectInput,
   CreateTaskInput,
   Mission,
+  MissionProgressEvent,
+  MissionStatus,
   MissionWithProjectContext,
   Phase,
   Project,
@@ -269,8 +271,18 @@ export class Tracker extends EventEmitter {
   }
 
   setTaskStatus(id: string, status: TaskStatus): Task | null {
+    const current = this.getTask(id);
+    if (!current) {
+      return null;
+    }
+
     this.db.prepare("UPDATE tasks SET status = ? WHERE id = ?").run(status, id);
-    return this.getTask(id);
+    const task = this.getTask(id);
+    if (task && task.status !== current.status) {
+      this.emitSse("task.updated", task);
+      this.emitMissionProgress(task.mission_id);
+    }
+    return task;
   }
 
   refreshMissionTaskStatuses(missionId: string): TaskWithRelations[] {
@@ -406,10 +418,10 @@ export class Tracker extends EventEmitter {
     return this.db.prepare("SELECT * FROM run_events ORDER BY id DESC LIMIT 200").all() as RunEvent[];
   }
 
-  createCheckpoint(taskRunId: string, summary: string | null, diffStat: Record<string, unknown> | null): Checkpoint {
+  createCheckpoint(taskRunId: string, summary: string | null, diffStat: string | null): Checkpoint {
     const checkpoint = this.db
       .prepare("INSERT INTO checkpoints (task_run_id, summary, diff_stat) VALUES (?, ?, ?) RETURNING *")
-      .get(taskRunId, summary, diffStat ? JSON.stringify(diffStat) : null) as Checkpoint;
+      .get(taskRunId, summary, diffStat) as Checkpoint;
     this.emitSse("checkpoint.created", checkpoint);
     return checkpoint;
   }
@@ -433,6 +445,10 @@ export class Tracker extends EventEmitter {
       this.emitSse("checkpoint.updated", checkpoint);
     }
     return checkpoint;
+  }
+
+  approveCheckpoint(id: string, reviewerNotes?: string): Checkpoint | null {
+    return this.updateCheckpointStatus(id, "approved", reviewerNotes);
   }
 
   listAgents(): AgentRecord[] {
@@ -495,11 +511,97 @@ export class Tracker extends EventEmitter {
     return { agent, activeTaskRun };
   }
 
+  getMissionStatus(id: string): MissionStatus | null {
+    const mission = this.getMission(id);
+    if (!mission) {
+      return null;
+    }
+
+    const taskBreakdown = this.db
+      .prepare(
+        `SELECT
+           tasks.id,
+           tasks.name,
+           tasks.status,
+           tasks.agent_id,
+           latest_run.started_at,
+           latest_run.completed_at
+         FROM tasks
+         LEFT JOIN (
+           SELECT tr1.task_id, tr1.started_at, tr1.completed_at
+           FROM task_runs tr1
+           INNER JOIN (
+             SELECT task_id, MAX(id) AS max_id
+             FROM task_runs
+             GROUP BY task_id
+           ) latest ON latest.max_id = tr1.id
+         ) AS latest_run ON latest_run.task_id = tasks.id
+         WHERE tasks.mission_id = ?
+         ORDER BY tasks.sort_order ASC, tasks.created_at ASC`,
+      )
+      .all(id) as MissionStatus["task_breakdown"];
+
+    const totalCount = taskBreakdown.length;
+    const completedCount = taskBreakdown.filter((task) => task.status === "completed").length;
+    const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    this.db.prepare("UPDATE missions SET progress = ? WHERE id = ?").run(progress, id);
+
+    const runningAgents = this.db
+      .prepare(
+        `SELECT DISTINCT COALESCE(agents.name, task_runs.agent_id) AS agent_name
+         FROM task_runs
+         JOIN tasks ON tasks.id = task_runs.task_id
+         LEFT JOIN agents ON agents.id = task_runs.agent_id
+         WHERE tasks.mission_id = ? AND task_runs.status = 'running'
+         ORDER BY agent_name ASC`,
+      )
+      .all(id) as Array<{ agent_name: string | null }>;
+
+    const averageTiming = this.db
+      .prepare(
+        `SELECT AVG((julianday(task_runs.completed_at) - julianday(task_runs.started_at)) * 86400000.0) AS avg_ms
+         FROM task_runs
+         JOIN tasks ON tasks.id = task_runs.task_id
+         WHERE tasks.mission_id = ?
+           AND task_runs.started_at IS NOT NULL
+           AND task_runs.completed_at IS NOT NULL
+           AND task_runs.status = 'completed'`,
+      )
+      .get(id) as { avg_ms: number | null } | undefined;
+
+    const remainingCount = Math.max(totalCount - completedCount, 0);
+    const estimatedCompletion =
+      averageTiming?.avg_ms && remainingCount > 0
+        ? new Date(Date.now() + averageTiming.avg_ms * remainingCount).toISOString()
+        : null;
+
+    const updatedMission = this.getMission(id);
+    if (!updatedMission) {
+      return null;
+    }
+
+    return {
+      mission: {
+        id: updatedMission.id,
+        name: updatedMission.name,
+        status: updatedMission.status,
+        progress: updatedMission.progress,
+      },
+      task_breakdown: taskBreakdown,
+      running_agents: runningAgents.flatMap((row) => (row.agent_name ? [row.agent_name] : [])),
+      completed_count: completedCount,
+      total_count: totalCount,
+      estimated_completion: estimatedCompletion,
+    };
+  }
+
   startMission(id: string): boolean {
     const result = this.db.prepare("UPDATE missions SET status = 'running' WHERE id = ?").run(id);
     this.db.prepare("UPDATE tasks SET status = 'pending' WHERE mission_id = ? AND status = 'paused'").run(id);
     if (result.changes > 0) {
       this.refreshMissionTaskStatuses(id);
+      this.emitMissionProgress(id);
     }
     return result.changes > 0;
   }
@@ -507,6 +609,9 @@ export class Tracker extends EventEmitter {
   pauseMission(id: string): boolean {
     const result = this.db.prepare("UPDATE missions SET status = 'paused' WHERE id = ?").run(id);
     this.db.prepare("UPDATE tasks SET status = 'paused' WHERE mission_id = ? AND status IN ('pending', 'ready', 'running')").run(id);
+    if (result.changes > 0) {
+      this.emitMissionProgress(id);
+    }
     return result.changes > 0;
   }
 
@@ -515,6 +620,7 @@ export class Tracker extends EventEmitter {
     this.db.prepare("UPDATE tasks SET status = 'pending' WHERE mission_id = ? AND status = 'paused'").run(id);
     if (result.changes > 0) {
       this.refreshMissionTaskStatuses(id);
+      this.emitMissionProgress(id);
     }
     return result.changes > 0;
   }
@@ -522,6 +628,9 @@ export class Tracker extends EventEmitter {
   stopMission(id: string): boolean {
     const result = this.db.prepare("UPDATE missions SET status = 'stopped' WHERE id = ?").run(id);
     this.db.prepare("UPDATE tasks SET status = 'stopped' WHERE mission_id = ? AND status != 'completed'").run(id);
+    if (result.changes > 0) {
+      this.emitMissionProgress(id);
+    }
     return result.changes > 0;
   }
 
@@ -538,5 +647,20 @@ export class Tracker extends EventEmitter {
       event,
       data: payload,
     });
+  }
+
+  private emitMissionProgress(missionId: string): void {
+    const status = this.getMissionStatus(missionId);
+    if (!status) {
+      return;
+    }
+
+    const event: MissionProgressEvent = {
+      mission_id: missionId,
+      progress: status.mission.progress,
+      completed_count: status.completed_count,
+      total_count: status.total_count,
+    };
+    this.emitSse("mission.progress", event);
   }
 }

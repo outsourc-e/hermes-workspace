@@ -77,6 +77,31 @@ export interface MissionWithProjectContext extends Mission {
   project_spec: string | null;
 }
 
+export interface MissionStatusTask {
+  id: string;
+  name: string;
+  status: TaskStatus;
+  agent_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface MissionProgressEvent {
+  mission_id: string;
+  progress: number;
+  completed_count: number;
+  total_count: number;
+}
+
+export interface MissionStatus {
+  mission: Pick<Mission, "id" | "name" | "status" | "progress">;
+  task_breakdown: MissionStatusTask[];
+  running_agents: string[];
+  completed_count: number;
+  total_count: number;
+  estimated_completion: string | null;
+}
+
 export interface Task {
   id: string;
   mission_id: string;
@@ -189,6 +214,13 @@ export interface WorkflowHooks {
   before_run?: string[];
   after_run?: string[];
   after_create?: string[];
+}
+
+export interface WorkspaceInfo {
+  path: string;
+  createdNow: boolean;
+  hooks: WorkflowHooks;
+  git_worktree: boolean;
 }
 
 export interface WorkflowConfig {

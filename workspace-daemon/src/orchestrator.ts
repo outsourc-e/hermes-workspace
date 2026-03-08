@@ -153,7 +153,7 @@ export class Orchestrator extends EventEmitter {
         const checkpoint = this.tracker.createCheckpoint(
           taskRun.id,
           result.checkpointSummary ?? result.summary,
-          result.diffStat ? { ...result.diffStat } : null,
+          result.diffStat ? JSON.stringify(result.diffStat) : null,
         );
         const autoApprove = getWorkflowConfig(project.path).autoApprove;
         if (autoApprove) {

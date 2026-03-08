@@ -27,6 +27,15 @@ export function createMissionsRouter(tracker: Tracker): Router {
     res.status(201).json(mission);
   });
 
+  router.get("/:id/status", (req, res) => {
+    const status = tracker.getMissionStatus(req.params.id);
+    if (!status) {
+      res.status(404).json({ error: "Mission not found" });
+      return;
+    }
+    res.json(status);
+  });
+
   router.post("/:id/start", (req, res) => {
     const ok = tracker.startMission(req.params.id);
     if (!ok) {
