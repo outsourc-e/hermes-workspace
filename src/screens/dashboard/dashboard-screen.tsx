@@ -49,7 +49,6 @@ import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { DashboardOverflowPanel } from '@/components/dashboard-overflow-panel'
-import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/hooks/use-settings'
 import {
@@ -139,7 +138,6 @@ export function DashboardScreen() {
     useVisibleWidgets()
   const { order: widgetOrder, moveWidget, resetOrder } = useWidgetReorder()
   const theme = useSettingsStore((state) => state.settings.theme)
-  const showSystemMetricsFooter = useSettingsStore((state) => state.settings.showSystemMetricsFooter)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   const [isMobile, setIsMobile] = useState(false)
   const [mobileEditMode, setMobileEditMode] = useState(false)
@@ -1147,8 +1145,6 @@ export function DashboardScreen() {
           )}
         </section>
       </main>
-
-      {showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
 
       <SettingsDialog
         open={dashSettingsOpen}

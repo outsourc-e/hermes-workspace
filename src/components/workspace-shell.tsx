@@ -304,19 +304,18 @@ export function WorkspaceShell() {
   return (
     <>
       <div
-        className="relative overflow-hidden theme-bg theme-text"
+        className="relative flex flex-col overflow-hidden theme-bg theme-text"
         style={{ height: 'var(--vvh, 100dvh)' }}
       >
         {/* Electron: invisible drag bar for window movement */}
         {isElectron && (
           <div
-            className="absolute inset-x-0 top-0 z-50 h-9"
+            className="h-9 shrink-0"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           />
         )}
         <div className={cn(
-          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]",
-          isElectron && "pt-9"
+          "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
         )}>
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
@@ -349,7 +348,9 @@ export function WorkspaceShell() {
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
                 ? 'pb-[calc(var(--tabbar-h,120px)+0.5rem)]'
-                : !isMobile && !isOnChatRoute
+                : !isMobile &&
+                    !isOnChatRoute &&
+                    settings.showSystemMetricsFooter
                   ? 'pb-[calc(1.5rem+1.75rem)]'
                   : '',
             ].join(' ')}

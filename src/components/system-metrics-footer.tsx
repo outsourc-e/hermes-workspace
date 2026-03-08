@@ -80,7 +80,7 @@ export function SystemMetricsFooter() {
       className={[
         'fixed bottom-0 left-0 right-0 z-40',
         'h-7 hidden md:flex items-center',
-        'bg-neutral-900/95 backdrop-blur-sm border-t border-neutral-800',
+        'bg-neutral-900/95 backdrop-blur-sm',
         'text-neutral-400 text-[10px] font-mono',
         'px-3 gap-4 select-none',
       ].join(' ')}
