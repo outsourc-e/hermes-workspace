@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGatewayChatStore } from '../stores/gateway-chat-store'
 import {
   CHAT_STREAM_DONE_EVENT,
@@ -8,6 +8,37 @@ import {
 } from './use-gateway-chat-stream'
 
 const EMPTY_TOOL_CALLS: never[] = []
+const researchTimelineCache = new Map<
+  string,
+  { steps: ResearchStep[]; collapsed: boolean }
+>()
+
+// Dev helper: trigger a fake research card demo from the browser console.
+// Usage: __triggerResearchDemo() or __triggerResearchDemo('agent:main:main')
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  ;(window as any).__triggerResearchDemo = (sessionKey = 'agent:main:main') => {
+    const tools = [
+      { name: 'memory_search', args: '{"query":"test"}', delay: 0, duration: 800 },
+      { name: 'Read', args: '{"path":"MEMORY.md"}', delay: 200, duration: 1200 },
+      { name: 'exec', args: '{"command":"git log --oneline -5"}', delay: 500, duration: 2000 },
+      { name: 'web_search', args: '{"query":"openclaw latest"}', delay: 1000, duration: 1500 },
+      { name: 'Edit', args: '{"path":"src/app.tsx"}', delay: 1500, duration: 900 },
+    ]
+    tools.forEach((tool, i) => {
+      const toolCallId = `demo-${i}-${Date.now()}`
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent(CHAT_TOOL_CALL_EVENT, {
+          detail: { sessionKey, toolCallId, name: tool.name, args: tool.args, phase: 'calling' }
+        }))
+      }, tool.delay)
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent(CHAT_TOOL_RESULT_EVENT, {
+          detail: { sessionKey, toolCallId, name: tool.name, phase: 'done' }
+        }))
+      }, tool.delay + tool.duration)
+    })
+  }
+}
 
 export type ResearchStep = {
   id: string
@@ -125,78 +156,103 @@ export function useResearchCard({
   resetKey,
 }: UseResearchCardOptions = {}) {
   const effectiveSessionKey = sessionKey || 'main'
+  const timelineKey = `${effectiveSessionKey}:${String(resetKey ?? 'default')}`
   const streamingToolCalls = useGatewayChatStore(
     (state) => state.streamingState.get(effectiveSessionKey)?.toolCalls ?? EMPTY_TOOL_CALLS,
   )
-  const [steps, setSteps] = useState<ResearchStep[]>([])
-  const [collapsed, setCollapsed] = useState(false)
+  const [steps, setSteps] = useState<ResearchStep[]>(
+    () => researchTimelineCache.get(timelineKey)?.steps ?? [],
+  )
+  const [collapsed, setCollapsed] = useState(
+    () => researchTimelineCache.get(timelineKey)?.collapsed ?? false,
+  )
   const [now, setNow] = useState(() => Date.now())
   const seenToolIdsRef = useRef<Set<string>>(new Set())
+  const stepsRef = useRef(steps)
 
-  const upsertStep = useMemo(
-    () =>
-      (
-        toolId: string,
-        toolName: string,
-        args: unknown,
-        status: ResearchStep['status'],
-        currentTime = Date.now(),
-      ) => {
-        setNow(currentTime)
-        setSteps((prevSteps) => {
-          const existingIndex = prevSteps.findIndex((step) => step.id === toolId)
+  useEffect(() => {
+    stepsRef.current = steps
+  }, [steps])
 
-          if (existingIndex >= 0) {
-            const existing = prevSteps[existingIndex]
-            const nextDuration =
-              status === 'running' ? undefined : currentTime - existing.startedAt
-            const nextLabel = buildToolLabel(toolName, args)
-
-            if (
-              existing.toolName === toolName &&
-              existing.label === nextLabel &&
-              existing.status === status &&
-              existing.durationMs === nextDuration
-            ) {
-              return prevSteps
-            }
-
-            const nextSteps = [...prevSteps]
-            nextSteps[existingIndex] = {
-              ...existing,
-              toolName,
-              label: nextLabel,
-              status,
-              durationMs: nextDuration,
-            }
-            return nextSteps
-          }
-
-          if (seenToolIdsRef.current.has(toolId)) return prevSteps
-
-          seenToolIdsRef.current.add(toolId)
-          return [
-            ...prevSteps,
-            {
-              id: toolId,
-              toolName,
-              label: buildToolLabel(toolName, args),
-              status,
-              startedAt: currentTime,
-              durationMs: status === 'running' ? undefined : 0,
-            },
-          ]
-        })
-      },
-    [],
+  const writeTimelineSnapshot = useCallback(
+    (nextSteps: ResearchStep[], nextCollapsed: boolean) => {
+      researchTimelineCache.set(timelineKey, {
+        steps: nextSteps,
+        collapsed: nextCollapsed,
+      })
+    },
+    [timelineKey],
   )
 
-  // Reset when session or resetKey changes
   useEffect(() => {
-    setSteps([])
-    setCollapsed(false)
-    seenToolIdsRef.current.clear()
-  }, [resetKey, sessionKey])
+    const cached = researchTimelineCache.get(timelineKey)
+    const nextSteps = cached?.steps ?? []
+    const nextCollapsed = cached?.collapsed ?? false
+    setSteps(nextSteps)
+    setCollapsed(nextCollapsed)
+    seenToolIdsRef.current = new Set(nextSteps.map((step) => step.id))
+  }, [timelineKey])
+
+  useEffect(() => {
+    writeTimelineSnapshot(steps, collapsed)
+  }, [collapsed, steps, writeTimelineSnapshot])
+
+  const upsertStep = useCallback(
+    (
+      toolId: string,
+      toolName: string,
+      args: unknown,
+      status: ResearchStep['status'],
+      currentTime = Date.now(),
+    ) => {
+      setNow(currentTime)
+      setSteps((prevSteps) => {
+        const existingIndex = prevSteps.findIndex((step) => step.id === toolId)
+
+        if (existingIndex >= 0) {
+          const existing = prevSteps[existingIndex]
+          const nextDuration =
+            status === 'running' ? undefined : currentTime - existing.startedAt
+          const nextLabel = buildToolLabel(toolName, args)
+
+          if (
+            existing.toolName === toolName &&
+            existing.label === nextLabel &&
+            existing.status === status &&
+            existing.durationMs === nextDuration
+          ) {
+            return prevSteps
+          }
+
+          const nextSteps = [...prevSteps]
+          nextSteps[existingIndex] = {
+            ...existing,
+            toolName,
+            label: nextLabel,
+            status,
+            durationMs: nextDuration,
+          }
+          return nextSteps
+        }
+
+        if (seenToolIdsRef.current.has(toolId)) return prevSteps
+
+        seenToolIdsRef.current.add(toolId)
+        return [
+          ...prevSteps,
+          {
+            id: toolId,
+            toolName,
+            label: buildToolLabel(toolName, args),
+            status,
+            startedAt: currentTime,
+            durationMs: status === 'running' ? undefined : 0,
+          },
+        ]
+      })
+    },
+    [],
+  )
 
   // Auto-collapse when streaming ends
   useEffect(() => {
@@ -207,11 +263,11 @@ export function useResearchCard({
 
   // Tick timer for duration display
   useEffect(() => {
-    if (!isStreaming || steps.length === 0) return
+    if (!steps.some((step) => step.status === 'running')) return
     setNow(Date.now())
     const intervalId = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(intervalId)
-  }, [isStreaming, steps.length])
+  }, [steps])
 
   // Mirror the active tool-call array from the store into a persistent
   // timeline so completed steps still render after streaming state clears.
@@ -273,7 +329,7 @@ export function useResearchCard({
     const handleStreamDone = (event: Event) => {
       const detail = (event as CustomEvent<{ sessionKey?: string }>).detail
       if (detail.sessionKey !== effectiveSessionKey) return
-      setCollapsed((current) => (steps.length > 0 ? true : current))
+      setCollapsed((current) => (stepsRef.current.length > 0 ? true : current))
     }
 
     window.addEventListener(CHAT_TOOL_CALL_EVENT, handleToolCall as EventListener)
@@ -300,7 +356,7 @@ export function useResearchCard({
         handleStreamDone as EventListener,
       )
     }
-  }, [effectiveSessionKey, steps.length, upsertStep])
+  }, [effectiveSessionKey, upsertStep])
 
   const totalDurationMs = useMemo(() => {
     if (steps.length === 0) return 0
@@ -313,8 +369,7 @@ export function useResearchCard({
     return Math.max(0, endedAt - startedAt)
   }, [isStreaming, now, steps])
 
-  const isActive =
-    isStreaming && steps.some((step) => step.status === 'running')
+  const isActive = steps.some((step) => step.status === 'running')
 
   return {
     steps,
