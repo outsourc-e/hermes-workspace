@@ -11,7 +11,7 @@
  * Chat routes get the full ChatScreen treatment.
  * Non-chat routes show the sub-page content.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { RefreshIcon } from '@hugeicons/core-free-icons'
@@ -56,12 +56,6 @@ export function WorkspaceShell() {
   })
 
   const { settings } = useSettings()
-  const isElectron = useMemo(
-    () =>
-      typeof navigator !== 'undefined' &&
-      /Electron/.test(navigator.userAgent),
-    [],
-  )
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
@@ -307,15 +301,8 @@ export function WorkspaceShell() {
         className="relative flex flex-col overflow-hidden theme-bg theme-text"
         style={{ height: 'var(--vvh, 100dvh)' }}
       >
-        {/* Electron: invisible drag bar for window movement */}
-        {isElectron && (
-          <div
-            className="h-9 shrink-0"
-            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-          />
-        )}
         <div className={cn(
-          "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
+          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
         )}>
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
