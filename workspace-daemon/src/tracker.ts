@@ -437,13 +437,27 @@ export class Tracker extends EventEmitter {
     return checkpoint;
   }
 
-  listCheckpoints(status?: string): Checkpoint[] {
-    if (status) {
-      return this.db
-        .prepare("SELECT * FROM checkpoints WHERE status = ? ORDER BY created_at DESC")
-        .all(status) as Checkpoint[];
-    }
-    return this.db.prepare("SELECT * FROM checkpoints ORDER BY created_at DESC").all() as Checkpoint[];
+  listCheckpoints(status?: string): Array<Checkpoint & { task_name?: string; mission_name?: string; project_name?: string; agent_name?: string }> {
+    const query = `
+      SELECT c.*,
+        t.name AS task_name,
+        m.name AS mission_name,
+        p.name AS project_name,
+        a.name AS agent_name
+      FROM checkpoints c
+      LEFT JOIN task_runs tr ON c.task_run_id = tr.id
+      LEFT JOIN tasks t ON tr.task_id = t.id
+      LEFT JOIN missions m ON t.mission_id = m.id
+      LEFT JOIN phases ph ON m.phase_id = ph.id
+      LEFT JOIN projects p ON ph.project_id = p.id
+      LEFT JOIN agents a ON tr.agent_id = a.id
+      ${status ? "WHERE c.status = ?" : ""}
+      ORDER BY c.created_at DESC
+    `;
+    return (status
+      ? this.db.prepare(query).all(status)
+      : this.db.prepare(query).all()
+    ) as Array<Checkpoint & { task_name?: string; mission_name?: string; project_name?: string; agent_name?: string }>;
   }
 
   updateCheckpointStatus(id: string, status: Checkpoint["status"], reviewerNotes?: string): Checkpoint | null {
