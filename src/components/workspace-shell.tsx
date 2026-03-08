@@ -25,6 +25,7 @@ import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
+import { GatewayConnectionBanner } from '@/components/gateway-connection-banner'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -337,6 +338,7 @@ export function WorkspaceShell() {
             <div className="w-[78px] shrink-0" />
           </div>
         )}
+        <GatewayConnectionBanner />
         <div className={cn(
           "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
         )}>

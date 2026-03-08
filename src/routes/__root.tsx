@@ -13,8 +13,6 @@ import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrig
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
-import { GatewaySetupWizard } from '@/components/gateway-setup-wizard'
-import { GatewayReconnectBanner } from '@/components/gateway-reconnect-banner'
 import { CompactionNotifier } from '@/components/compaction-notifier'
 import { FallbackBanner } from '@/components/fallback-banner'
 import { GatewayRestartProvider } from '@/components/gateway-restart-overlay'
@@ -286,7 +284,6 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GatewayRestartProvider>
-      <GatewayReconnectBanner />
       <CompactionNotifier />
       <FallbackBanner />
       <GlobalShortcutListener />
@@ -299,7 +296,6 @@ function RootLayout() {
       <ExecApprovalToast />
       <WorkspaceShell />
       <SearchModal />
-      <GatewaySetupWizard />
       <OnboardingTour />
       <KeyboardShortcutsModal />
       </GatewayRestartProvider>

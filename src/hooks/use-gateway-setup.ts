@@ -4,6 +4,7 @@ const SETUP_STORAGE_KEY = 'clawsuite-gateway-configured'
 
 type GatewaySetupState = {
   isOpen: boolean
+  setupConfigured: boolean
   step: 'gateway' | 'provider' | 'complete'
   gatewayUrl: string
   gatewayToken: string
@@ -184,6 +185,7 @@ async function trySilentConnection(config: SavedGatewayConfig): Promise<boolean>
 
 export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
   isOpen: false,
+  setupConfigured: false,
   step: 'gateway',
   gatewayUrl: 'ws://127.0.0.1:18789',
   gatewayToken: '',
@@ -205,7 +207,12 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
       const forceWizard = params.get('wizard')
       if (forceWizard) {
         const step = forceWizard === 'provider' ? 'provider' : 'gateway'
-        set({ isOpen: true, step, gatewayUrl: 'ws://127.0.0.1:18789' })
+        set({
+          isOpen: true,
+          setupConfigured: configured,
+          step,
+          gatewayUrl: 'ws://127.0.0.1:18789',
+        })
         return
       }
 
@@ -220,12 +227,14 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
 
         if (await trySilentConnection(savedConfig)) {
           localStorage.setItem(SETUP_STORAGE_KEY, 'true')
+          set({ setupConfigured: true })
           return
         }
       } else {
         const { ok } = await pingGateway()
         if (ok) {
           localStorage.setItem(SETUP_STORAGE_KEY, 'true')
+          set({ setupConfigured: true })
           return
         }
       }
@@ -246,6 +255,7 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
         if (discoverData.ok) {
           localStorage.setItem(SETUP_STORAGE_KEY, 'true')
           set({
+            setupConfigured: true,
             gatewayUrl: discoverData.url || savedConfig?.url || 'ws://127.0.0.1:18789',
             gatewayToken: discoverData.token || savedConfig?.token || '',
             testStatus: 'success',
@@ -260,7 +270,8 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
 
       const config = await fetchCurrentConfig()
       set({
-        isOpen: true,
+        isOpen: false,
+        setupConfigured: configured,
         step: 'gateway',
         gatewayUrl: savedConfig?.url || config.url,
         gatewayToken: savedConfig?.token || config.token,
@@ -274,7 +285,8 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
         hasToken: false,
       }))
       set({
-        isOpen: true,
+        isOpen: false,
+        setupConfigured: false,
         step: 'gateway',
         gatewayUrl: config.url,
         gatewayToken: config.token,
@@ -326,7 +338,9 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
     set({ saving: false })
 
     if (ok) {
+      localStorage.setItem(SETUP_STORAGE_KEY, 'true')
       set({ testStatus: 'success', testError: null })
+      set({ setupConfigured: true })
       return true
     }
 
@@ -367,18 +381,19 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
 
   skipProviderSetup: () => {
     localStorage.setItem(SETUP_STORAGE_KEY, 'true')
-    set({ isOpen: false, step: 'complete' })
+    set({ isOpen: false, setupConfigured: true, step: 'complete' })
   },
 
   completeSetup: () => {
     localStorage.setItem(SETUP_STORAGE_KEY, 'true')
-    set({ isOpen: false, step: 'complete' })
+    set({ isOpen: false, setupConfigured: true, step: 'complete' })
   },
 
   reset: () => {
     localStorage.removeItem(SETUP_STORAGE_KEY)
     set({
       isOpen: true,
+      setupConfigured: false,
       step: 'gateway',
       gatewayUrl: 'ws://127.0.0.1:18789',
       gatewayToken: '',
