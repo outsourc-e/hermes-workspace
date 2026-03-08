@@ -2,6 +2,8 @@ import type { Dispatch, SetStateAction } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGatewayChatStore } from '../stores/gateway-chat-store'
 
+const EMPTY_TOOL_CALLS: never[] = []
+
 export type ResearchStep = {
   id: string
   toolName: string
@@ -111,7 +113,7 @@ export function useResearchCard({
 }: UseResearchCardOptions = {}) {
   const effectiveSessionKey = sessionKey || 'main'
   const streamingToolCalls = useGatewayChatStore(
-    (state) => state.streamingState.get(effectiveSessionKey)?.toolCalls ?? [],
+    (state) => state.streamingState.get(effectiveSessionKey)?.toolCalls ?? EMPTY_TOOL_CALLS,
   )
   const [steps, setSteps] = useState<ResearchStep[]>([])
   const [collapsed, setCollapsed] = useState(false)
