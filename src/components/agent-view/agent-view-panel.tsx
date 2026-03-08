@@ -23,6 +23,7 @@ import type {
 } from './agent-card'
 import type { ActiveAgent } from '@/hooks/use-agent-view'
 import { AgentChatModal } from '@/components/agent-chat/AgentChatModal'
+import { AgentCard as MiniAgentCard, type AgentCardStatus } from '@/components/agent-card'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -83,6 +84,12 @@ function formatRuntimeLabel(runtimeSeconds: number): string {
     String(minutes).padStart(2, '0'),
     String(seconds).padStart(2, '0'),
   ].join(':')
+}
+
+function getMiniAgentCardStatus(status: string): AgentCardStatus {
+  if (status === 'complete' || status === 'finished') return 'completed'
+  if (status === 'failed') return 'failed'
+  return 'running'
 }
 
 const AGENT_NAME_KEY = 'clawsuite-agent-name'
@@ -1331,28 +1338,29 @@ export function AgentViewPanel() {
                           </p>
                         ) : null}
                         {activeNodes.map((node) => (
-                          <div key={node.id} className="rounded-xl border border-primary-300/70 bg-primary-100 p-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-primary-900 truncate">{node.name}</span>
-                              <span className="text-[10px] text-primary-500 tabular-nums">{node.statusBubble.text}</span>
-                            </div>
-                            <p className="mt-0.5 text-[10px] text-primary-600 line-clamp-2">{node.task}</p>
-                            {missionSessionIds.has(node.id) ? (
-                              <p className="mt-0.5 text-[10px] text-accent-400">Active mission</p>
-                            ) : nonMissionActiveAgents.length > 0 ? (
-                              <p className="mt-0.5 text-[10px] text-primary-500">Outside current mission</p>
-                            ) : null}
-                            <div className="mt-1 flex items-center justify-between">
-                              <span className="text-[10px] text-primary-500 tabular-nums">{formatRuntimeLabel(node.runtimeSeconds)}</span>
-                              <button
-                                type="button"
-                                onClick={() => killAgent(node.id)}
-                                className="text-[10px] text-red-500 hover:text-red-700 font-medium"
-                              >
-                                Kill
-                              </button>
-                            </div>
-                          </div>
+                          <MiniAgentCard
+                            key={node.id}
+                            sessionLabel={node.name}
+                            model={node.task || 'unknown'}
+                            status={getMiniAgentCardStatus(node.statusBubble.text)}
+                            runtimeSeconds={node.runtimeSeconds}
+                            footer={
+                              <div className="flex items-center justify-between">
+                                {missionSessionIds.has(node.id) ? (
+                                  <span className="text-[10px] text-accent-400">Active mission</span>
+                                ) : nonMissionActiveAgents.length > 0 ? (
+                                  <span className="text-[10px] text-primary-500">Outside mission</span>
+                                ) : <span />}
+                                <button
+                                  type="button"
+                                  onClick={() => killAgent(node.id)}
+                                  className="text-[10px] text-red-500 hover:text-red-700 font-medium"
+                                >
+                                  Kill
+                                </button>
+                              </div>
+                            }
+                          />
                         ))}
                       </div>
                     ) : null}
@@ -1370,19 +1378,23 @@ export function AgentViewPanel() {
                       {historyOpen ? (
                         <div className="mt-1.5 space-y-1">
                           {historyAgents.map((agent) => (
-                            <div key={agent.id} className="flex items-center justify-between rounded-lg bg-primary-100/60 px-2 py-1.5">
-                              <div className="min-w-0">
-                                <span className="text-[11px] font-medium text-primary-800 truncate block">{agent.name}</span>
-                                <span className="text-[10px] text-primary-500">{agent.status}</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedAgentChat({ sessionKey: agent.id, agentName: agent.name, statusLabel: agent.status })}
-                                className="text-[10px] text-accent-600 hover:text-accent-800 font-medium"
-                              >
-                                View
-                              </button>
-                            </div>
+                            <MiniAgentCard
+                              key={agent.id}
+                              sessionLabel={agent.name}
+                              model={agent.status || 'unknown'}
+                              status={getMiniAgentCardStatus(agent.status)}
+                              footer={
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedAgentChat({ sessionKey: agent.id, agentName: agent.name, statusLabel: agent.status })}
+                                    className="text-[10px] text-accent-600 hover:text-accent-800 font-medium"
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              }
+                            />
                           ))}
                         </div>
                       ) : null}
