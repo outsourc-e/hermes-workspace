@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { AgentHubErrorBoundary } from './components/agent-hub-error-boundary'
 import { useQuery } from '@tanstack/react-query'
 import { TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
@@ -2941,7 +2942,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Approvals state ────────────────────────────────────────────────────────
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(() => loadApprovals())
   const [runConsoleApprovals, setRunConsoleApprovals] = useState<Array<{ id: string; tool: string; args?: string; agentName?: string }>>([])
-  const missionStore = useMissionStore()
   const {
     activeMission,
     missionActive,
@@ -2975,7 +2975,40 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setActiveMissionMeta,
     saveCheckpoint,
     markBeforeUnloadRegistered,
-  } = missionStore
+  } = useMissionStore(useShallow((state) => ({
+    activeMission: state.activeMission,
+    missionActive: state.missionActive,
+    missionGoal: state.missionGoal,
+    activeMissionName: state.activeMissionName,
+    activeMissionGoal: state.activeMissionGoal,
+    missionState: state.missionState,
+    boardTasks: state.boardTasks,
+    missionTasks: state.missionTasks,
+    dispatchedTaskIdsByAgent: state.dispatchedTaskIdsByAgent,
+    agentSessionMap: state.agentSessionMap,
+    agentSessionModelMap: state.agentSessionModelMap,
+    agentSessionStatus: state.agentSessionStatus,
+    artifacts: state.artifacts,
+    restoreCheckpoint: state.restoreCheckpoint,
+    beforeUnloadRegistered: state.beforeUnloadRegistered,
+    startMission: state.startMission,
+    completeMission: state.completeMission,
+    abortMission: state.abortMission,
+    setMissionState: state.setMissionState,
+    restoreMission: state.restoreMission,
+    setMissionGoal: state.setMissionGoal,
+    setRestoreCheckpoint: state.setRestoreCheckpoint,
+    setBoardTasks: state.setBoardTasks,
+    setDispatchedTaskIdsByAgent: state.setDispatchedTaskIdsByAgent,
+    setMissionTasks: state.setMissionTasks,
+    setAgentSessionMap: state.setAgentSessionMap,
+    setAgentSessionModelMap: state.setAgentSessionModelMap,
+    setAgentSessionStatus: state.setAgentSessionStatus,
+    setArtifacts: state.setArtifacts,
+    setActiveMissionMeta: state.setActiveMissionMeta,
+    saveCheckpoint: state.saveCheckpoint,
+    markBeforeUnloadRegistered: state.markBeforeUnloadRegistered,
+  })))
   const setMissionActive = useCallback((active: boolean) => {
     if (!active) {
       setMissionState('stopped')
@@ -3508,7 +3541,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [agentSessionMap, agentSessionModelMap])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || beforeUnloadRegistered) return
+    if (typeof window === 'undefined') return
 
     function handleBeforeUnload(event: BeforeUnloadEvent) {
       if (useMissionStore.getState().missionState !== 'running') return
@@ -3517,16 +3550,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       event.returnValue = ''
     }
 
-    markBeforeUnloadRegistered(true)
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
       if (useMissionStore.getState().missionState === 'running') {
         saveMissionStoreBeforeUnload()
       }
-      markBeforeUnloadRegistered(false)
     }
-  }, [beforeUnloadRegistered, markBeforeUnloadRegistered])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // mount-only — beforeUnloadRegistered in deps caused infinite re-render loop
 
   useEffect(() => {
     if (team.length > 0) return
