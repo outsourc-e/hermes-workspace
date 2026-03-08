@@ -330,11 +330,9 @@ export class Tracker extends EventEmitter {
     const completedTaskIds = new Set(
       (this.db.prepare("SELECT id FROM tasks WHERE status = 'completed'").all() as Array<{ id: string }>).map((row) => row.id),
     );
-    const pendingById = new Map(pendingTasks.map((task) => [task.id, task]));
-
     for (const task of pendingTasks) {
       const dependencies = parseJsonOrDefault<string[]>(task.depends_on, []);
-      const isReady = dependencies.every((dependencyId) => completedTaskIds.has(dependencyId) || !pendingById.has(dependencyId));
+      const isReady = dependencies.length === 0 || dependencies.every((dependencyId) => completedTaskIds.has(dependencyId));
       if (isReady) {
         this.setTaskStatus(task.id, "ready");
         alreadyReady.push({ ...task, status: "ready" });
