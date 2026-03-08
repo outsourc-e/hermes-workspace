@@ -1,55 +1,168 @@
 "use strict";
 /**
  * ClawSuite Electron Main Process
- * Wraps the Vite-built web app in a native desktop window
+ * Wraps the Vite-built web app in a native desktop window.
+ *
+ * Production mode starts a local HTTP server that serves the built client
+ * files and proxies /api/* requests to the OpenClaw gateway.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = require("path");
 const fs_1 = require("fs");
+const http_1 = require("http");
 const child_process_1 = require("child_process");
+
 // Prevent multiple instances
 const gotTheLock = electron_1.app.requestSingleInstanceLock();
 if (!gotTheLock) {
     electron_1.app.quit();
 }
+
 let mainWindow = null;
 let tray = null;
 let gatewayProcess = null;
+let localServer = null;
+let localServerPort = 0;
+
 // Gateway detection
 const DEFAULT_GATEWAY_PORT = 18789;
 const DEV_PORT = 3000;
+
+// ── MIME types for static file serving ────────────────────────────────────
+const MIME_TYPES = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+    '.map': 'application/json',
+    '.wasm': 'application/wasm',
+};
+
 function getGatewayUrl() {
     try {
-        // Check if gateway is already running
-        (0, child_process_1.execSync)(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${DEFAULT_GATEWAY_PORT}/api/health`, {
-            timeout: 3000,
-        });
+        (0, child_process_1.execSync)(
+            `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${DEFAULT_GATEWAY_PORT}/api/health`,
+            { timeout: 3000 }
+        );
         return `http://127.0.0.1:${DEFAULT_GATEWAY_PORT}`;
-    }
-    catch {
+    } catch {
         return null;
     }
 }
+
 function isOpenClawInstalled() {
     try {
         (0, child_process_1.execSync)('which openclaw || where openclaw', { timeout: 5000 });
         return true;
-    }
-    catch {
+    } catch {
         return false;
     }
 }
+
+// ── Local HTTP server for production mode ─────────────────────────────────
+// Serves dist/client/ static files and reverse-proxies /api/* to the gateway.
+function startLocalServer(gatewayUrl) {
+    return new Promise((resolve, reject) => {
+        const clientDir = (0, path_1.join)(__dirname, '..', 'dist', 'client');
+
+        const server = (0, http_1.createServer)((req, res) => {
+            const url = new URL(req.url || '/', `http://localhost`);
+            const pathname = url.pathname;
+
+            // ── Proxy /api/* to gateway ───────────────────────────────────
+            if (pathname.startsWith('/api/') || pathname.startsWith('/api?')) {
+                const target = `${gatewayUrl}${req.url}`;
+                const proxyReq = http_1.request(target, {
+                    method: req.method,
+                    headers: { ...req.headers, host: new URL(gatewayUrl).host },
+                }, (proxyRes) => {
+                    res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+                    proxyRes.pipe(res, { end: true });
+                });
+                proxyReq.on('error', () => {
+                    res.writeHead(502, { 'Content-Type': 'text/plain' });
+                    res.end('Gateway unavailable');
+                });
+                req.pipe(proxyReq, { end: true });
+                return;
+            }
+
+            // ── SSE endpoint proxy ────────────────────────────────────────
+            if (pathname.startsWith('/events') || pathname.startsWith('/sse')) {
+                const target = `${gatewayUrl}${req.url}`;
+                const proxyReq = http_1.request(target, {
+                    method: req.method,
+                    headers: { ...req.headers, host: new URL(gatewayUrl).host },
+                }, (proxyRes) => {
+                    res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+                    proxyRes.pipe(res, { end: true });
+                });
+                proxyReq.on('error', () => {
+                    res.writeHead(502, { 'Content-Type': 'text/plain' });
+                    res.end('Gateway unavailable');
+                });
+                req.pipe(proxyReq, { end: true });
+                return;
+            }
+
+            // ── Serve static files ────────────────────────────────────────
+            let filePath = (0, path_1.join)(clientDir, pathname === '/' ? 'index.html' : pathname);
+
+            // SPA fallback: if file doesn't exist, serve index.html
+            if (!(0, fs_1.existsSync)(filePath) || (0, fs_1.statSync)(filePath).isDirectory()) {
+                filePath = (0, path_1.join)(clientDir, 'index.html');
+            }
+
+            const ext = (0, path_1.extname)(filePath).toLowerCase();
+            const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+
+            try {
+                const content = (0, fs_1.readFileSync)(filePath);
+                res.writeHead(200, { 'Content-Type': mimeType });
+                res.end(content);
+            } catch {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Not found');
+            }
+        });
+
+        // Pick a random available port
+        server.listen(0, '127.0.0.1', () => {
+            const addr = server.address();
+            localServerPort = typeof addr === 'object' ? addr.port : 0;
+            localServer = server;
+            console.log(`[ClawSuite] Local server started on port ${localServerPort}`);
+            resolve(localServerPort);
+        });
+
+        server.on('error', reject);
+    });
+}
+
 function getAppUrl() {
-    // In dev, use Vite dev server
     if (process.env.NODE_ENV === 'development') {
         return `http://localhost:${DEV_PORT}`;
     }
-    // In production, serve the built files
-    return `file://${(0, path_1.join)(__dirname, '../dist/client/index.html')}`;
+    // In production, use the local server
+    if (localServerPort > 0) {
+        return `http://127.0.0.1:${localServerPort}`;
+    }
+    // Fallback (should not happen)
+    return `file://${(0, path_1.join)(__dirname, '..', 'dist', 'client', 'index.html')}`;
 }
-function createWindow() {
-    const iconPath = (0, path_1.join)(__dirname, '../assets/icon.png');
+
+async function createWindow() {
+    const iconPath = (0, path_1.join)(__dirname, '..', 'assets', 'icon.png');
     mainWindow = new electron_1.BrowserWindow({
         width: 1400,
         height: 900,
@@ -57,10 +170,10 @@ function createWindow() {
         minHeight: 600,
         title: 'ClawSuite',
         icon: (0, fs_1.existsSync)(iconPath) ? iconPath : undefined,
-        titleBarStyle: 'hiddenInset', // macOS native title bar
+        titleBarStyle: 'hiddenInset',
         trafficLightPosition: { x: 16, y: 16 },
         backgroundColor: '#0a0a0f',
-        show: false, // Show after ready-to-show
+        show: false,
         webPreferences: {
             preload: (0, path_1.join)(__dirname, 'preload.cjs'),
             nodeIntegration: false,
@@ -68,38 +181,45 @@ function createWindow() {
             sandbox: true,
         },
     });
-    // Graceful show
+
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
         mainWindow?.focus();
     });
-    // Check if we need onboarding or go straight to dashboard
+
     const gatewayUrl = getGatewayUrl();
     if (gatewayUrl) {
-        // Gateway found — load the app directly
+        // Gateway found — start local server to serve UI + proxy API
+        if (process.env.NODE_ENV !== 'development') {
+            try {
+                await startLocalServer(gatewayUrl);
+            } catch (err) {
+                console.error('[ClawSuite] Failed to start local server:', err);
+            }
+        }
         const appUrl = getAppUrl();
+        console.log(`[ClawSuite] Loading: ${appUrl}`);
         mainWindow.loadURL(appUrl);
-    }
-    else {
+    } else {
         // No gateway — show onboarding wizard
-        mainWindow.loadFile((0, path_1.join)(__dirname, '../electron/onboarding/index.html'));
+        mainWindow.loadFile((0, path_1.join)(__dirname, '..', 'electron', 'onboarding', 'index.html'));
     }
-    // Open external links in default browser
+
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (url.startsWith('http')) {
             electron_1.shell.openExternal(url);
         }
         return { action: 'deny' };
     });
-    // Cleanup
+
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
 }
+
 function createTray() {
-    const iconPath = (0, path_1.join)(__dirname, '../assets/tray-icon.png');
-    if (!(0, fs_1.existsSync)(iconPath))
-        return;
+    const iconPath = (0, path_1.join)(__dirname, '..', 'assets', 'tray-icon.png');
+    if (!(0, fs_1.existsSync)(iconPath)) return;
     tray = new electron_1.Tray(electron_1.nativeImage.createFromPath(iconPath));
     tray.setToolTip('ClawSuite');
     const contextMenu = electron_1.Menu.buildFromTemplate([
@@ -112,10 +232,12 @@ function createTray() {
     tray.setContextMenu(contextMenu);
     tray.on('click', () => mainWindow?.show());
 }
+
 // IPC handlers for onboarding wizard
 electron_1.ipcMain.handle('gateway:check', () => {
     return { url: getGatewayUrl(), installed: isOpenClawInstalled() };
 });
+
 electron_1.ipcMain.handle('gateway:install', async () => {
     return new Promise((resolve, reject) => {
         try {
@@ -124,20 +246,18 @@ electron_1.ipcMain.handle('gateway:install', async () => {
                 stdio: 'pipe',
             });
             let output = '';
-            install.stdout?.on('data', (data) => { output += data.toString(); });
-            install.stderr?.on('data', (data) => { output += data.toString(); });
+            install.stdout?.on('data', (d) => { output += d.toString(); });
+            install.stderr?.on('data', (d) => { output += d.toString(); });
             install.on('close', (code) => {
-                if (code === 0)
-                    resolve({ success: true, output });
-                else
-                    reject(new Error(`Install failed with code ${code}: ${output}`));
+                if (code === 0) resolve({ success: true, output });
+                else reject(new Error(`Install failed (${code}): ${output}`));
             });
-        }
-        catch (err) {
+        } catch (err) {
             reject(err);
         }
     });
 });
+
 electron_1.ipcMain.handle('gateway:start', async () => {
     return new Promise((resolve) => {
         gatewayProcess = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
@@ -145,32 +265,39 @@ electron_1.ipcMain.handle('gateway:start', async () => {
             stdio: 'pipe',
             detached: true,
         });
-        // Give it a few seconds to boot
         setTimeout(() => {
             const url = getGatewayUrl();
             resolve({ success: !!url, url });
         }, 5000);
     });
 });
+
 electron_1.ipcMain.handle('gateway:connect', async (_event, url) => {
     try {
         (0, child_process_1.execSync)(`curl -s -o /dev/null -w "%{http_code}" ${url}/api/health`, { timeout: 3000 });
         return { success: true, url };
-    }
-    catch {
+    } catch {
         return { success: false, error: 'Could not connect to gateway' };
     }
 });
+
 electron_1.ipcMain.handle('onboarding:complete', async (_event, config) => {
-    // Store config and load the main app
     if (mainWindow) {
+        // Start local server with the configured gateway
+        if (process.env.NODE_ENV !== 'development' && !localServer) {
+            try {
+                await startLocalServer(config.gatewayUrl);
+            } catch (err) {
+                console.error('[ClawSuite] Failed to start local server:', err);
+            }
+        }
         const appUrl = getAppUrl();
-        // Pass gateway URL as query param
         const url = new URL(appUrl);
         url.searchParams.set('gateway', config.gatewayUrl);
         mainWindow.loadURL(url.toString());
     }
 });
+
 // App lifecycle
 electron_1.app.whenReady().then(() => {
     createWindow();
@@ -181,14 +308,19 @@ electron_1.app.whenReady().then(() => {
         }
     });
 });
+
 electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         electron_1.app.quit();
     }
 });
+
 electron_1.app.on('before-quit', () => {
-    // Don't kill gateway — it should persist
     tray?.destroy();
+    if (localServer) {
+        localServer.close();
+        localServer = null;
+    }
 });
-// Set app name
+
 electron_1.app.setName('ClawSuite');
