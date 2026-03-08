@@ -11,6 +11,7 @@ electron_1.contextBridge.exposeInMainWorld('clawsuite', {
         check: () => electron_1.ipcRenderer.invoke('gateway:check'),
         install: () => electron_1.ipcRenderer.invoke('gateway:install'),
         start: () => electron_1.ipcRenderer.invoke('gateway:start'),
+        restart: () => electron_1.ipcRenderer.invoke('gateway:restart'),
         connect: (url) => electron_1.ipcRenderer.invoke('gateway:connect', url),
     },
     // Onboarding

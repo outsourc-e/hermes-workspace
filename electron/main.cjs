@@ -220,22 +220,32 @@ async function createWindow() {
     });
 
     const gatewayUrl = getGatewayUrl();
-    if (gatewayUrl) {
-        // Gateway found — start local server to serve UI + proxy API
-        if (process.env.NODE_ENV !== 'development') {
-            try {
-                await startLocalServer(gatewayUrl);
-            } catch (err) {
-                console.error('[ClawSuite] Failed to start local server:', err);
-            }
+    if (!gatewayUrl && isOpenClawInstalled()) {
+        console.log('[ClawSuite] Gateway not running, auto-starting...');
+        try {
+            gatewayProcess = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
+                shell: true,
+                stdio: 'ignore',
+                detached: true,
+            });
+            gatewayProcess.unref();
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+        } catch (err) {
+            console.error('[ClawSuite] Failed to auto-start gateway:', err);
         }
-        const appUrl = getAppUrl();
-        console.log(`[ClawSuite] Loading: ${appUrl}`);
-        mainWindow.loadURL(appUrl);
-    } else {
-        // No gateway — show onboarding wizard
-        mainWindow.loadFile((0, path_1.join)(__dirname, '..', 'electron', 'onboarding', 'index.html'));
     }
+
+    if (process.env.NODE_ENV !== 'development') {
+        try {
+            await startLocalServer(getGatewayUrl());
+        } catch (err) {
+            console.error('[ClawSuite] Failed to start local server:', err);
+        }
+    }
+
+    const appUrl = getAppUrl();
+    console.log(`[ClawSuite] Loading: ${appUrl}`);
+    mainWindow.loadURL(appUrl);
 
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (url.startsWith('http')) {
@@ -356,6 +366,26 @@ electron_1.ipcMain.handle('gateway:start', async () => {
             stdio: 'pipe',
             detached: true,
         });
+        gatewayProcess.unref();
+        setTimeout(() => {
+            const url = getGatewayUrl();
+            resolve({ success: !!url, url });
+        }, 5000);
+    });
+});
+
+electron_1.ipcMain.handle('gateway:restart', async () => {
+    try {
+        (0, child_process_1.execSync)('openclaw gateway stop', { timeout: 5000 });
+    } catch { /* may not be running */ }
+
+    return new Promise((resolve) => {
+        gatewayProcess = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
+            shell: true,
+            stdio: 'pipe',
+            detached: true,
+        });
+        gatewayProcess.unref();
         setTimeout(() => {
             const url = getGatewayUrl();
             resolve({ success: !!url, url });
@@ -412,6 +442,10 @@ electron_1.app.on('before-quit', () => {
     if (appProcess) {
         appProcess.kill();
         appProcess = null;
+    }
+    if (gatewayProcess) {
+        gatewayProcess.kill();
+        gatewayProcess = null;
     }
 });
 
