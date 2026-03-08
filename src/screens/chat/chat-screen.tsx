@@ -78,6 +78,7 @@ import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { useGatewayChatStore } from '@/stores/gateway-chat-store'
+import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
@@ -303,6 +304,7 @@ export function ChatScreen({
     [],
   )
   const [isCompacting, setIsCompacting] = useState(false)
+  const [researchResetKey, setResearchResetKey] = useState(0)
   // Per-session thinking level — stored in sessionStorage keyed by session
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
     if (typeof window === 'undefined') return 'low'
@@ -1245,6 +1247,7 @@ export function ChatScreen({
       const enrichedBody = body + textBlocks.join('')
 
       let optimisticClientId = existingClientId
+      setResearchResetKey((current) => current + 1)
       if (!skipOptimistic) {
         const { clientId, optimisticMessage } = createOptimisticMessage(
           body,
@@ -1841,6 +1844,11 @@ export function ChatScreen({
         : sending || waitingForResponse
           ? 'sending'
           : 'idle'
+  const researchCard = useResearchCard({
+    sessionKey: activeCanonicalKey,
+    isStreaming: derivedStreamingInfo.isStreaming,
+    resetKey: `${activeCanonicalKey ?? 'main'}:${researchResetKey}`,
+  })
 
   // Pull-to-refresh offset removed
 
@@ -2015,6 +2023,7 @@ export function ChatScreen({
               hideSystemMessages={isMobile}
               activeToolCalls={activeToolCalls}
               liveToolActivity={liveToolActivity}
+              researchCard={researchCard}
               sending={sending}
             />
           )}

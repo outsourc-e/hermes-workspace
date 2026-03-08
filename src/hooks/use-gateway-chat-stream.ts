@@ -3,6 +3,10 @@ import { useGatewayChatStore } from '../stores/gateway-chat-store'
 import type { StreamingState } from '../stores/gateway-chat-store'
 import type { GatewayMessage } from '../screens/chat/types'
 
+export const CHAT_TOOL_CALL_EVENT = 'clawsuite:chat-tool-call'
+export const CHAT_TOOL_RESULT_EVENT = 'clawsuite:chat-tool-result'
+export const CHAT_STREAM_DONE_EVENT = 'clawsuite:chat-stream-done'
+
 type UseGatewayChatStreamOptions = {
   /** Session key to filter events for (optional - receives all if not specified) */
   sessionKey?: string
@@ -66,6 +70,22 @@ export function useGatewayChatStream(
   const dispatchSSEDroppedEvent = useCallback(() => {
     if (typeof window === 'undefined') return
     window.dispatchEvent(new CustomEvent('clawsuite:sse-dropped'))
+  }, [])
+
+  const dispatchChatToolEvent = useCallback(
+    (
+      eventName: typeof CHAT_TOOL_CALL_EVENT | typeof CHAT_TOOL_RESULT_EVENT,
+      detail: Record<string, unknown>,
+    ) => {
+      if (typeof window === 'undefined') return
+      window.dispatchEvent(new CustomEvent(eventName, { detail }))
+    },
+    [],
+  )
+
+  const dispatchChatStreamDoneEvent = useCallback((detail: Record<string, unknown>) => {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(new CustomEvent(CHAT_STREAM_DONE_EVENT, { detail }))
   }, [])
 
   const clearStreamTimeout = useCallback((sessionKey: string) => {
@@ -205,6 +225,11 @@ export function useGatewayChatStream(
         }
         processEvent({ type: 'tool', ...data, result: data.result } as any)
         touchStreamTimeout(data.sessionKey)
+        if (data.phase === 'done' || data.phase === 'error') {
+          dispatchChatToolEvent(CHAT_TOOL_RESULT_EVENT, data)
+        } else if (data.phase === 'calling' || data.phase === 'start') {
+          dispatchChatToolEvent(CHAT_TOOL_CALL_EVENT, data)
+        }
       } catch {
         // Ignore parse errors
       }
@@ -232,6 +257,14 @@ export function useGatewayChatStream(
           sessionKey: data.sessionKey,
         })
         touchStreamTimeout(data.sessionKey)
+        dispatchChatToolEvent(CHAT_TOOL_CALL_EVENT, {
+          phase: 'calling',
+          name: data.name ?? 'tool',
+          toolCallId: data.toolCallId ?? data.id,
+          args: data.args ?? data.arguments,
+          runId: data.runId,
+          sessionKey: data.sessionKey,
+        })
       } catch {
         // Ignore parse errors
       }
@@ -258,6 +291,15 @@ export function useGatewayChatStream(
           sessionKey: data.sessionKey,
         })
         touchStreamTimeout(data.sessionKey)
+        dispatchChatToolEvent(CHAT_TOOL_RESULT_EVENT, {
+          phase: data.isError || data.error ? 'error' : 'done',
+          name: data.name ?? 'tool',
+          toolCallId: data.toolCallId ?? data.id,
+          runId: data.runId,
+          sessionKey: data.sessionKey,
+          isError: data.isError,
+          error: data.error,
+        })
       } catch {
         // Ignore parse errors
       }
@@ -307,6 +349,7 @@ export function useGatewayChatStream(
           useGatewayChatStore.getState().streamingState.get(data.sessionKey) ?? null
         processEvent({ type: 'done', ...data })
         clearStreamTimeout(data.sessionKey)
+        dispatchChatStreamDoneEvent(data)
         onDoneRef.current?.(data.state, data.sessionKey, streamingSnapshot)
       } catch {
         // Ignore parse errors
@@ -348,6 +391,8 @@ export function useGatewayChatStream(
     clearAllStreaming,
     clearAllStreamTimeouts,
     clearStreamTimeout,
+    dispatchChatStreamDoneEvent,
+    dispatchChatToolEvent,
     dispatchSSEDroppedEvent,
     touchStreamTimeout,
   ])

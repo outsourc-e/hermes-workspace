@@ -24,6 +24,8 @@ import {
 } from '@/components/prompt-kit/chat-container'
 import { AssistantAvatar } from '@/components/avatars'
 import { cn } from '@/lib/utils'
+import { ResearchCard } from './research-card'
+import type { UseResearchCardResult } from '@/hooks/use-research-card'
 
 /** Duration (ms) the thinking indicator stays visible after waitingForResponse
  *  clears, giving the first response message time to render before the
@@ -266,6 +268,7 @@ type ChatMessageListProps = {
   bottomOffset?: number | string
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   liveToolActivity?: Array<{ name: string; timestamp: number }>
+  researchCard?: UseResearchCardResult
   hideSystemMessages?: boolean
   /** True while the HTTP send request is in-flight (before waitingForResponse
    *  can confirm the gateway received it). Keeps the thinking indicator visible
@@ -295,6 +298,7 @@ function ChatMessageListComponent({
   bottomOffset = 0,
   activeToolCalls = [],
   liveToolActivity = [],
+  researchCard,
   hideSystemMessages = false,
   sending = false,
 }: ChatMessageListProps) {
@@ -758,9 +762,16 @@ function ChatMessageListComponent({
     return true
   })()
 
+  const showResearchCard = Boolean(
+    researchCard &&
+      researchCard.steps.length > 0 &&
+      (isStreaming || researchCard.collapsed),
+  )
+
   const shouldBottomPin =
     displayMessages.length > 0 ||
     showToolOnlyNotice ||
+    showResearchCard ||
     showTypingIndicator ||
     liveToolActivity.length > 0 ||
     (isStreaming && !streamingText) ||
@@ -1343,6 +1354,7 @@ function ChatMessageListComponent({
             </>
           )}
           {showTypingIndicator ||
+          showResearchCard ||
           liveToolActivity.length > 0 ||
           (isStreaming && !streamingText) ||
           (isStreaming && activeToolCalls.length > 0) ? (
@@ -1351,7 +1363,23 @@ function ChatMessageListComponent({
               role="status"
               aria-live="polite"
             >
-              {liveToolActivity.length > 0 ? (
+              {showResearchCard && researchCard ? (
+                <>
+                  <ResearchCard
+                    steps={researchCard.steps}
+                    isActive={researchCard.isActive}
+                    totalDurationMs={researchCard.totalDurationMs}
+                    onToggle={() => researchCard.setCollapsed(!researchCard.collapsed)}
+                    collapsed={researchCard.collapsed}
+                  />
+                  {isStreaming ? (
+                    <ThinkingBubble
+                      activeToolCalls={activeToolCalls}
+                      liveToolActivity={liveToolActivity}
+                    />
+                  ) : null}
+                </>
+              ) : liveToolActivity.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-1.5">
                   {liveToolActivity.map((tool, index) => (
                     <span
@@ -1511,6 +1539,7 @@ function areChatMessageListEqual(
     prev.bottomOffset === next.bottomOffset &&
     prev.activeToolCalls === next.activeToolCalls &&
     prev.liveToolActivity === next.liveToolActivity &&
+    prev.researchCard === next.researchCard &&
     prev.hideSystemMessages === next.hideSystemMessages &&
     prev.sending === next.sending
   )
