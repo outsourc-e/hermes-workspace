@@ -364,21 +364,14 @@ export function WorkspaceShell() {
             ].join(' ')}
             data-tour="chat-area"
           >
-            <div className="flex h-full min-h-0 flex-col">
-
-              <div
-                className={['page-transition min-h-0 flex-1', slideClass]
-                  .filter(Boolean)
-                  .join(' ')}
+            <div className={['page-transition h-full', slideClass].filter(Boolean).join(' ')}>
+              <ErrorBoundary
+                className="h-full"
+                title="Something went wrong"
+                description="This page failed to render. Reload to try again."
               >
-                <ErrorBoundary
-                  className="h-full"
-                  title="Something went wrong"
-                  description="This page failed to render. Reload to try again."
-                >
-                  <Outlet />
-                </ErrorBoundary>
-              </div>
+                <Outlet />
+              </ErrorBoundary>
             </div>
           </main>
 
