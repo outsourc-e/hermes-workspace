@@ -242,7 +242,7 @@ function GatewayStepContent() {
     }
 
     setGatewayUrl(result.url)
-    if (result.token) setGatewayToken(result.token)
+    setGatewayToken(result.token || '')
     setAutoDetectMessage(`Detected gateway at ${result.url}`)
     setAutoDetecting(false)
   }
@@ -390,14 +390,20 @@ function GatewayStepContent() {
   return (
     <div className="w-full">
       <div className="mb-6 flex flex-col items-center text-center">
-        <div className="mb-4 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-500 to-accent-600 text-white shadow-lg">
-          <HugeiconsIcon icon={CloudIcon} className="size-10" strokeWidth={1.5} />
+        <div className="mb-4 flex size-20 items-center justify-center rounded-2xl shadow-lg">
+          <img
+            src="/logo-icon.png"
+            alt="ClawSuite logo"
+            width={64}
+            height={64}
+            className="size-16"
+          />
         </div>
         <h2 className="mb-2 text-2xl font-semibold text-primary-900">
-          Connect to Gateway
+          Welcome to ClawSuite
         </h2>
         <p className="max-w-md text-sm leading-relaxed text-primary-600">
-          Choose how you want to get started.
+          Your AI command center
         </p>
       </div>
 
@@ -730,13 +736,12 @@ function GatewayStepContent() {
                 htmlFor="gateway-token"
                 className="mb-1.5 block text-sm font-medium text-primary-900"
               >
-                Gateway Token{' '}
-                <span className="font-normal text-primary-400">(optional)</span>
+                Gateway Token
               </label>
               <Input
                 id="gateway-token"
                 type="password"
-                placeholder="Leave empty if no token is set"
+                placeholder="Paste your gateway token here"
                 value={gatewayToken}
                 onChange={(e) => setGatewayToken(e.target.value)}
                 className="h-10"

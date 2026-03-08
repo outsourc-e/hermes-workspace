@@ -33,6 +33,20 @@ type SavedGatewayConfig = {
   token: string
 }
 
+function normalizeGatewayUrl(url: string): string {
+  const trimmedUrl = url.trim()
+
+  if (trimmedUrl.startsWith('http://')) {
+    return `ws://${trimmedUrl.slice('http://'.length)}`
+  }
+
+  if (trimmedUrl.startsWith('https://')) {
+    return `wss://${trimmedUrl.slice('https://'.length)}`
+  }
+
+  return trimmedUrl
+}
+
 export async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
   try {
     const response = await fetch('/api/ping', {
@@ -70,11 +84,13 @@ export async function fetchCurrentConfig(): Promise<{
 }
 
 async function saveConfig(url: string, token: string): Promise<{ ok: boolean; error?: string }> {
+  const normalizedUrl = normalizeGatewayUrl(url)
+
   try {
     const response = await fetch('/api/gateway-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, token }),
+      body: JSON.stringify({ url: normalizedUrl, token }),
       signal: AbortSignal.timeout(15000),
     })
     const data = (await response.json()) as { ok?: boolean; connected?: boolean; error?: string }
@@ -283,10 +299,16 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
 
   saveAndTest: async () => {
     const { gatewayUrl, gatewayToken } = get()
+    const normalizedGatewayUrl = normalizeGatewayUrl(gatewayUrl)
+
+    if (normalizedGatewayUrl !== gatewayUrl) {
+      set({ gatewayUrl: normalizedGatewayUrl })
+    }
+
     set({ saving: true, testStatus: 'testing', testError: null })
 
     // 1. Save to .env via server API
-    const saveResult = await saveConfig(gatewayUrl, gatewayToken)
+    const saveResult = await saveConfig(normalizedGatewayUrl, gatewayToken)
     if (!saveResult.ok) {
       set({
         saving: false,
