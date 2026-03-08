@@ -309,14 +309,14 @@ export function WorkspaceShell() {
         {/* Electron: native-style title bar */}
         {isElectron && (
           <div
-            className="flex h-10 shrink-0 items-center bg-gradient-to-r from-[#f97316] to-[#fb923c] dark:from-[#c2410c] dark:to-[#ea580c] z-40"
+            className="flex h-10 shrink-0 items-center border-b border-primary-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 z-40"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           >
             {/* Traffic light spacer (left ~78px for macOS buttons) */}
             <div className="w-[78px] shrink-0" />
             {/* Centered title */}
             <div className="flex-1 text-center">
-              <span className="text-sm font-semibold text-white/90 select-none tracking-wide">ClawSuite</span>
+              <span className="text-[13px] font-medium text-primary-600 dark:text-primary-400 select-none">ClawSuite</span>
             </div>
             {/* Right spacer to balance */}
             <div className="w-[78px] shrink-0" />
@@ -365,7 +365,7 @@ export function WorkspaceShell() {
             data-tour="chat-area"
           >
             <div className="flex h-full min-h-0 flex-col">
-              {null /* Electron title bar is rendered at shell level */}
+
               <div
                 className={['page-transition min-h-0 flex-1', slideClass]
                   .filter(Boolean)
