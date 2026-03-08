@@ -56,6 +56,12 @@ export function WorkspaceShell() {
   })
 
   const { settings } = useSettings()
+  const isElectron = useMemo(
+    () =>
+      typeof navigator !== 'undefined' &&
+      /Electron/.test(navigator.userAgent),
+    [],
+  )
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
@@ -294,13 +300,6 @@ export function WorkspaceShell() {
   if (authState.authRequired && !authState.authenticated) {
     return <LoginScreen />
   }
-
-  const isElectron = useMemo(
-    () =>
-      typeof navigator !== 'undefined' &&
-      /Electron/.test(navigator.userAgent),
-    [],
-  )
 
   return (
     <>
