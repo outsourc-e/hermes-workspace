@@ -19,6 +19,7 @@ import {
   PuzzleIcon,
   Search01Icon,
   ApiIcon,
+  CheckmarkCircle02Icon,
   Folder01Icon,
   Settings01Icon,
   ServerStack01Icon,
@@ -86,7 +87,11 @@ function ThemeToggleMini() {
       className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
+      <HugeiconsIcon
+        icon={isDark ? Sun02Icon : Moon02Icon}
+        size={16}
+        strokeWidth={1.5}
+      />
     </button>
   )
 }
@@ -502,11 +507,8 @@ function ChatSidebarComponent({
   sessionsError,
   onRetrySessions,
 }: ChatSidebarProps) {
-  const {
-    settingsOpen,
-    setSettingsOpen,
-    handleOpenSettings,
-  } = useSidebarSettings()
+  const { settingsOpen, setSettingsOpen, handleOpenSettings } =
+    useSidebarSettings()
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
@@ -531,8 +533,6 @@ function ChatSidebarComponent({
     [],
   )
 
-
-
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
   const isAgentSwarmActive = pathname === '/agent-swarm'
@@ -542,6 +542,7 @@ function ChatSidebarComponent({
   const isTerminalActive = pathname === '/terminal'
   const isTasksActive = pathname === '/tasks'
   const isProjectsActive = pathname.startsWith('/projects')
+  const isReviewActive = pathname.startsWith('/review')
   // Gateway
   const isCronActive = pathname === '/cron'
   const isChannelsActive = pathname === '/channels'
@@ -563,6 +564,7 @@ function ChatSidebarComponent({
     '/dashboard',
     '/agent-swarm',
     '/projects',
+    '/review',
     '/new',
     '/browser',
     '/terminal',
@@ -801,6 +803,13 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/review',
+      icon: CheckmarkCircle02Icon,
+      label: 'Review Queue',
+      active: isReviewActive,
+    },
+    {
+      kind: 'link',
       to: '/browser',
       icon: GlobeIcon,
       label: 'Browser',
@@ -942,10 +951,19 @@ function ChatSidebarComponent({
       }}
       initial={false}
       animate={{
-        width: isVisuallyCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
+        width: isVisuallyCollapsed
+          ? isMobile
+            ? 0
+            : 48
+          : isMobile
+            ? '85vw'
+            : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
+      className={cn(
+        asideProps.className,
+        isMobile && isCollapsed && 'pointer-events-none overflow-hidden',
+      )}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
       onMouseEnter={() => {
@@ -993,7 +1011,9 @@ function ChatSidebarComponent({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                  aria-label={
+                    isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'
+                  }
                   className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
                   data-tour="sidebar-collapse-toggle"
                 >
@@ -1169,10 +1189,12 @@ function ChatSidebarComponent({
       {/* ── Footer with User Menu ─────────────────────────────────── */}
       <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
         {/* User card + actions */}
-        <div className={cn(
-          'flex items-center rounded-lg transition-colors',
-          isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
-        )}>
+        <div
+          className={cn(
+            'flex items-center rounded-lg transition-colors',
+            isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
+          )}
+        >
           {/* User menu trigger */}
           <MenuRoot>
             <MenuTrigger
@@ -1249,7 +1271,11 @@ function ChatSidebarComponent({
                 className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >
-                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
+                <HugeiconsIcon
+                  icon={Settings01Icon}
+                  size={16}
+                  strokeWidth={1.5}
+                />
               </button>
               <ThemeToggleMini />
             </div>

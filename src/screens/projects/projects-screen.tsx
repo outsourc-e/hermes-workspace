@@ -2,14 +2,30 @@ import {
   Add01Icon,
   ArrowDown01Icon,
   ArrowRight01Icon,
+  Cancel01Icon,
+  CheckmarkCircle02Icon,
   Folder01Icon,
   PlayCircleIcon,
   Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  formatCheckpointStatus,
+  formatCheckpointTimestamp,
+  getCheckpointActionButtonClass,
+  getCheckpointDiffStat,
+  getCheckpointStatusBadgeClass,
+  getCheckpointSummary,
+  isCheckpointReviewable,
+  listWorkspaceCheckpoints,
+  matchesCheckpointProject,
+  submitCheckpointReview,
+  type WorkspaceCheckpoint,
+} from '@/lib/workspace-checkpoints'
 import {
   DialogClose,
   DialogContent,
@@ -92,7 +108,9 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function asString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value : undefined
+  return typeof value === 'string' && value.trim().length > 0
+    ? value
+    : undefined
 }
 
 function asNumber(value: unknown): number | undefined {
@@ -110,7 +128,8 @@ function normalizeStatus(value: unknown): WorkspaceStatus {
 function normalizeTask(value: unknown): WorkspaceTask {
   const record = asRecord(value)
   return {
-    id: asString(record?.id) ?? asString(record?.task_id) ?? crypto.randomUUID(),
+    id:
+      asString(record?.id) ?? asString(record?.task_id) ?? crypto.randomUUID(),
     mission_id: asString(record?.mission_id),
     name: asString(record?.name) ?? asString(record?.title) ?? 'Untitled task',
     description: asString(record?.description),
@@ -123,7 +142,10 @@ function normalizeTask(value: unknown): WorkspaceTask {
 function normalizeMission(value: unknown): WorkspaceMission {
   const record = asRecord(value)
   return {
-    id: asString(record?.id) ?? asString(record?.mission_id) ?? crypto.randomUUID(),
+    id:
+      asString(record?.id) ??
+      asString(record?.mission_id) ??
+      crypto.randomUUID(),
     phase_id: asString(record?.phase_id),
     name: asString(record?.name) ?? 'Untitled mission',
     status: normalizeStatus(record?.status),
@@ -134,7 +156,8 @@ function normalizeMission(value: unknown): WorkspaceMission {
 function normalizePhase(value: unknown): WorkspacePhase {
   const record = asRecord(value)
   return {
-    id: asString(record?.id) ?? asString(record?.phase_id) ?? crypto.randomUUID(),
+    id:
+      asString(record?.id) ?? asString(record?.phase_id) ?? crypto.randomUUID(),
     project_id: asString(record?.project_id),
     name: asString(record?.name) ?? 'Untitled phase',
     sort_order: asNumber(record?.sort_order),
@@ -146,15 +169,22 @@ function normalizeProject(value: unknown): WorkspaceProject {
   const record = asRecord(value)
   const phases = asArray(record?.phases).map(normalizePhase)
   return {
-    id: asString(record?.id) ?? asString(record?.project_id) ?? crypto.randomUUID(),
+    id:
+      asString(record?.id) ??
+      asString(record?.project_id) ??
+      crypto.randomUUID(),
     name: asString(record?.name) ?? 'Untitled project',
     path: asString(record?.path),
     spec: asString(record?.spec),
     status: normalizeStatus(record?.status),
     phases,
     phase_count: asNumber(record?.phase_count) ?? phases.length,
-    mission_count: asNumber(record?.mission_count) ?? getMissionCount({ phases } as WorkspaceProject),
-    task_count: asNumber(record?.task_count) ?? getTaskCount({ phases } as WorkspaceProject),
+    mission_count:
+      asNumber(record?.mission_count) ??
+      getMissionCount({ phases } as WorkspaceProject),
+    task_count:
+      asNumber(record?.task_count) ??
+      getTaskCount({ phases } as WorkspaceProject),
   }
 }
 
@@ -174,7 +204,8 @@ function extractProjects(payload: unknown): Array<WorkspaceProject> {
 }
 
 function extractProject(payload: unknown): WorkspaceProject | null {
-  if (Array.isArray(payload)) return payload[0] ? normalizeProject(payload[0]) : null
+  if (Array.isArray(payload))
+    return payload[0] ? normalizeProject(payload[0]) : null
 
   const record = asRecord(payload)
   const projectValue = record?.project ?? record?.data ?? payload
@@ -198,14 +229,20 @@ function extractTasks(payload: unknown): Array<WorkspaceTask> {
 }
 
 function getMissionCount(project: WorkspaceProject): number {
-  return project.phases.reduce((count, phase) => count + phase.missions.length, 0)
+  return project.phases.reduce(
+    (count, phase) => count + phase.missions.length,
+    0,
+  )
 }
 
 function getTaskCount(project: WorkspaceProject): number {
   return project.phases.reduce(
     (count, phase) =>
       count +
-      phase.missions.reduce((missionCount, mission) => missionCount + mission.tasks.length, 0),
+      phase.missions.reduce(
+        (missionCount, mission) => missionCount + mission.tasks.length,
+        0,
+      ),
     0,
   )
 }
@@ -267,7 +304,9 @@ async function apiRequest(input: string, init?: RequestInit): Promise<unknown> {
   return payload
 }
 
-async function loadMissionTasks(missionId: string): Promise<Array<WorkspaceTask>> {
+async function loadMissionTasks(
+  missionId: string,
+): Promise<Array<WorkspaceTask>> {
   const payload = await apiRequest(
     `/api/workspace-tasks?mission_id=${encodeURIComponent(missionId)}`,
   )
@@ -345,14 +384,22 @@ function FieldLabel({
 
 export function ProjectsScreen() {
   const [projects, setProjects] = useState<Array<WorkspaceProject>>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [projectDetail, setProjectDetail] = useState<WorkspaceProject | null>(null)
-  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  )
+  const [projectDetail, setProjectDetail] = useState<WorkspaceProject | null>(
+    null,
+  )
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>(
+    {},
+  )
   const [listLoading, setListLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
-  const [phaseProject, setPhaseProject] = useState<WorkspaceProject | null>(null)
+  const [phaseProject, setPhaseProject] = useState<WorkspaceProject | null>(
+    null,
+  )
   const [missionPhase, setMissionPhase] = useState<WorkspacePhase | null>(null)
   const [taskMission, setTaskMission] = useState<WorkspaceMission | null>(null)
   const [submittingKey, setSubmittingKey] = useState<string | null>(null)
@@ -368,6 +415,7 @@ export function ProjectsScreen() {
     description: '',
     dependsOn: '',
   })
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     let cancelled = false
@@ -383,7 +431,10 @@ export function ProjectsScreen() {
         setProjects(nextProjects)
 
         setSelectedProjectId((current) => {
-          if (current && nextProjects.some((project) => project.id === current)) {
+          if (
+            current &&
+            nextProjects.some((project) => project.id === current)
+          ) {
             return current
           }
           return nextProjects[0]?.id ?? null
@@ -421,7 +472,9 @@ export function ProjectsScreen() {
       setDetailLoading(true)
 
       try {
-        const payload = await apiRequest(`/api/workspace/projects/${selectedProjectId}`)
+        const payload = await apiRequest(
+          `/api/workspace/projects/${selectedProjectId}`,
+        )
         const detail = extractProject(payload)
 
         if (!detail) {
@@ -439,7 +492,9 @@ export function ProjectsScreen() {
 
         if (cancelled) return
 
-        const taskMap = new Map(taskEntries.map((entry) => [entry.missionId, entry.tasks]))
+        const taskMap = new Map(
+          taskEntries.map((entry) => [entry.missionId, entry.tasks]),
+        )
         const hydratedDetail: WorkspaceProject = {
           ...detail,
           phases: detail.phases
@@ -512,6 +567,54 @@ export function ProjectsScreen() {
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
   )
+  const projectCheckpointsQuery = useQuery({
+    queryKey: ['workspace', 'checkpoints', 'projects'],
+    queryFn: () => listWorkspaceCheckpoints(),
+    enabled: Boolean(selectedSummary),
+  })
+  const projectCheckpointMutation = useMutation({
+    mutationFn: ({
+      checkpointId,
+      action,
+    }: {
+      checkpointId: string
+      action: 'approve' | 'reject'
+    }) => submitCheckpointReview(checkpointId, action),
+    onSuccess: (_checkpoint, variables) => {
+      toast(
+        variables.action === 'approve'
+          ? 'Checkpoint approved'
+          : 'Checkpoint rejected',
+        { type: 'success' },
+      )
+      void queryClient.invalidateQueries({
+        queryKey: ['workspace', 'checkpoints'],
+      })
+    },
+    onError: (error) => {
+      toast(
+        error instanceof Error ? error.message : 'Failed to update checkpoint',
+        { type: 'error' },
+      )
+    },
+  })
+  const projectCheckpoints = useMemo(() => {
+    const items = projectCheckpointsQuery.data ?? []
+    const projectName = projectDetail?.name ?? selectedSummary?.name
+    const filtered = items.filter((checkpoint) =>
+      matchesCheckpointProject(checkpoint, projectName),
+    )
+
+    if (filtered.length > 0) return filtered
+    return items
+  }, [projectCheckpointsQuery.data, projectDetail?.name, selectedSummary?.name])
+  const pendingProjectCheckpoints = useMemo(
+    () =>
+      projectCheckpoints.filter((checkpoint) =>
+        isCheckpointReviewable(checkpoint),
+      ),
+    [projectCheckpoints],
+  )
 
   function triggerRefresh() {
     setRefreshToken((value) => value + 1)
@@ -542,9 +645,12 @@ export function ProjectsScreen() {
       setProjectForm({ name: '', path: '', spec: '' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to create project', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to create project',
+        {
+          type: 'error',
+        },
+      )
     } finally {
       setSubmittingKey(null)
     }
@@ -666,9 +772,12 @@ export function ProjectsScreen() {
       toast('Mission started', { type: 'success' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to start mission', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to start mission',
+        {
+          type: 'error',
+        },
+      )
     } finally {
       setSubmittingKey(null)
     }
@@ -694,7 +803,8 @@ export function ProjectsScreen() {
                 Projects
               </h1>
               <p className="text-sm text-primary-400">
-                Track specs, phases, missions, and execution work across your workspace.
+                Track specs, phases, missions, and execution work across your
+                workspace.
               </p>
             </div>
           </div>
@@ -720,7 +830,9 @@ export function ProjectsScreen() {
         {listLoading && projects.length === 0 ? (
           <div className="rounded-2xl border border-primary-800 bg-primary-900/70 px-6 py-16 text-center">
             <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-            <p className="text-sm text-primary-400">Loading workspace projects...</p>
+            <p className="text-sm text-primary-400">
+              Loading workspace projects...
+            </p>
           </div>
         ) : projects.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
@@ -731,7 +843,8 @@ export function ProjectsScreen() {
               No projects yet
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
-              Create your first project to organize phases, missions, and task execution for an agent workflow.
+              Create your first project to organize phases, missions, and task
+              execution for an agent workflow.
             </p>
             <Button
               onClick={() => setProjectDialogOpen(true)}
@@ -825,11 +938,17 @@ export function ProjectsScreen() {
                             ),
                           )}
                         >
-                          {formatStatus(projectDetail?.status ?? selectedSummary.status)}
+                          {formatStatus(
+                            projectDetail?.status ?? selectedSummary.status,
+                          )}
                         </span>
                       </div>
                       <div className="space-y-1 text-sm text-primary-400">
-                        <p>{projectDetail?.path || selectedSummary.path || 'No path configured'}</p>
+                        <p>
+                          {projectDetail?.path ||
+                            selectedSummary.path ||
+                            'No path configured'}
+                        </p>
                         {(projectDetail?.spec || selectedSummary.spec) && (
                           <p className="max-w-3xl whitespace-pre-wrap text-primary-300">
                             {projectDetail?.spec || selectedSummary.spec}
@@ -844,7 +963,11 @@ export function ProjectsScreen() {
                       }
                       className="bg-accent-500 text-white hover:bg-accent-400"
                     >
-                      <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
+                      <HugeiconsIcon
+                        icon={Add01Icon}
+                        size={16}
+                        strokeWidth={1.6}
+                      />
                       Add Phase
                     </Button>
                   </div>
@@ -852,7 +975,9 @@ export function ProjectsScreen() {
                   {detailLoading ? (
                     <div className="py-14 text-center">
                       <div className="mb-3 inline-block h-9 w-9 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-                      <p className="text-sm text-primary-400">Loading project detail...</p>
+                      <p className="text-sm text-primary-400">
+                        Loading project detail...
+                      </p>
                     </div>
                   ) : projectDetail && projectDetail.phases.length > 0 ? (
                     <div className="mt-5 space-y-4">
@@ -899,7 +1024,11 @@ export function ProjectsScreen() {
                                   Add Mission
                                 </Button>
                                 <HugeiconsIcon
-                                  icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
+                                  icon={
+                                    expanded
+                                      ? ArrowDown01Icon
+                                      : ArrowRight01Icon
+                                  }
                                   size={16}
                                   strokeWidth={1.7}
                                   className="text-primary-400"
@@ -928,7 +1057,9 @@ export function ProjectsScreen() {
                                             <span
                                               className={cn(
                                                 'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                                                getStatusBadgeClass(mission.status),
+                                                getStatusBadgeClass(
+                                                  mission.status,
+                                                ),
                                               )}
                                             >
                                               {formatStatus(mission.status)}
@@ -936,7 +1067,9 @@ export function ProjectsScreen() {
                                           </div>
                                           <p className="text-xs text-primary-400">
                                             {mission.tasks.length} task
-                                            {mission.tasks.length === 1 ? '' : 's'}
+                                            {mission.tasks.length === 1
+                                              ? ''
+                                              : 's'}
                                           </p>
                                         </div>
 
@@ -945,9 +1078,12 @@ export function ProjectsScreen() {
                                           mission.status !== 'completed' ? (
                                             <Button
                                               size="sm"
-                                              onClick={() => handleStartMission(mission.id)}
+                                              onClick={() =>
+                                                handleStartMission(mission.id)
+                                              }
                                               disabled={
-                                                submittingKey === `start:${mission.id}`
+                                                submittingKey ===
+                                                `start:${mission.id}`
                                               }
                                               className="bg-accent-500 text-white hover:bg-accent-400"
                                             >
@@ -962,7 +1098,9 @@ export function ProjectsScreen() {
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => setTaskMission(mission)}
+                                            onClick={() =>
+                                              setTaskMission(mission)
+                                            }
                                           >
                                             <HugeiconsIcon
                                               icon={Task01Icon}
@@ -990,7 +1128,9 @@ export function ProjectsScreen() {
                                                   <span
                                                     className={cn(
                                                       'mt-0.5 size-2.5 shrink-0 rounded-full',
-                                                      getTaskDotClass(task.status),
+                                                      getTaskDotClass(
+                                                        task.status,
+                                                      ),
                                                     )}
                                                   />
                                                   <p className="truncate text-sm font-medium text-primary-100">
@@ -1004,7 +1144,8 @@ export function ProjectsScreen() {
                                                 ) : null}
                                                 {task.depends_on.length > 0 ? (
                                                   <p className="mt-2 text-[11px] text-primary-500">
-                                                    Depends on: {task.depends_on.join(', ')}
+                                                    Depends on:{' '}
+                                                    {task.depends_on.join(', ')}
                                                   </p>
                                                 ) : null}
                                               </div>
@@ -1034,6 +1175,149 @@ export function ProjectsScreen() {
                       </p>
                     </div>
                   )}
+
+                  <section className="mt-6 border-t border-primary-800 pt-5">
+                    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-primary-100">
+                          Checkpoints
+                        </h3>
+                        <p className="text-sm text-primary-400">
+                          Review pending handoffs tied to this project.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => projectCheckpointsQuery.refetch()}
+                        disabled={projectCheckpointsQuery.isFetching}
+                      >
+                        Refresh Checkpoints
+                      </Button>
+                    </div>
+
+                    {projectCheckpointsQuery.isLoading ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {Array.from({ length: 2 }).map((_, index) => (
+                          <div
+                            key={index}
+                            className="rounded-2xl border border-primary-800 bg-primary-800/30 p-4"
+                          >
+                            <div className="h-4 w-32 animate-shimmer rounded bg-primary-800/80" />
+                            <div className="mt-3 h-5 w-3/4 animate-shimmer rounded bg-primary-800/70" />
+                            <div className="mt-2 h-4 w-full animate-shimmer rounded bg-primary-800/60" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : projectCheckpoints.length > 0 ? (
+                      <div className="space-y-3">
+                        {projectCheckpoints.map(
+                          (checkpoint: WorkspaceCheckpoint) => (
+                            <article
+                              key={checkpoint.id}
+                              className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4"
+                            >
+                              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded-full border border-primary-700 bg-primary-900/70 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-300">
+                                      Run {checkpoint.task_run_id}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                                        getCheckpointStatusBadgeClass(
+                                          checkpoint.status,
+                                        ),
+                                      )}
+                                    >
+                                      {formatCheckpointStatus(
+                                        checkpoint.status,
+                                      )}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-semibold text-primary-100">
+                                    {getCheckpointSummary(checkpoint)}
+                                  </p>
+                                  <p className="text-sm text-primary-400">
+                                    {getCheckpointDiffStat(checkpoint)} ·{' '}
+                                    {formatCheckpointTimestamp(
+                                      checkpoint.created_at,
+                                    )}
+                                  </p>
+                                </div>
+
+                                {isCheckpointReviewable(checkpoint) ? (
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        projectCheckpointMutation.mutate({
+                                          checkpointId: checkpoint.id,
+                                          action: 'approve',
+                                        })
+                                      }
+                                      className={getCheckpointActionButtonClass(
+                                        'approve',
+                                      )}
+                                      disabled={
+                                        projectCheckpointMutation.isPending
+                                      }
+                                    >
+                                      <HugeiconsIcon
+                                        icon={CheckmarkCircle02Icon}
+                                        size={16}
+                                        strokeWidth={1.8}
+                                      />
+                                      Approve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        projectCheckpointMutation.mutate({
+                                          checkpointId: checkpoint.id,
+                                          action: 'reject',
+                                        })
+                                      }
+                                      className={getCheckpointActionButtonClass(
+                                        'reject',
+                                      )}
+                                      disabled={
+                                        projectCheckpointMutation.isPending
+                                      }
+                                    >
+                                      <HugeiconsIcon
+                                        icon={Cancel01Icon}
+                                        size={16}
+                                        strokeWidth={1.8}
+                                      />
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </article>
+                          ),
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-800/25 px-6 py-10 text-center">
+                        <p className="text-sm text-primary-300">
+                          No checkpoints for this project yet.
+                        </p>
+                        <p className="mt-1 text-sm text-primary-500">
+                          Pending reviews will show up here once task runs
+                          create them.
+                        </p>
+                      </div>
+                    )}
+
+                    {pendingProjectCheckpoints.length > 0 ? (
+                      <p className="mt-3 text-xs uppercase tracking-[0.14em] text-primary-500">
+                        {pendingProjectCheckpoints.length} pending checkpoint
+                        {pendingProjectCheckpoints.length === 1 ? '' : 's'}
+                      </p>
+                    ) : null}
+                  </section>
                 </>
               ) : (
                 <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-primary-700 bg-primary-800/20 px-6 text-center">
@@ -1042,7 +1326,8 @@ export function ProjectsScreen() {
                       Pick a project
                     </p>
                     <p className="mt-2 text-sm text-primary-400">
-                      Select a project from the list to inspect phases, missions, and tasks.
+                      Select a project from the list to inspect phases,
+                      missions, and tasks.
                     </p>
                   </div>
                 </div>
