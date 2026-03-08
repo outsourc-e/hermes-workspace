@@ -311,26 +311,26 @@ export class Tracker extends EventEmitter {
   }
 
   resolveReadyTasks(limit: number): TaskWithRelations[] {
-    const tasks = this.listTasks({ status: "pending" });
-    const byId = new Map(tasks.map((task) => [task.id, task]));
+    // Collect tasks that are already ready
+    const alreadyReady = this.listTasks({ status: "ready" });
+
+    // Promote pending tasks whose dependencies are satisfied
+    const pendingTasks = this.listTasks({ status: "pending" });
     const completedTaskIds = new Set(
       (this.db.prepare("SELECT id FROM tasks WHERE status = 'completed'").all() as Array<{ id: string }>).map((row) => row.id),
     );
-    const ready: TaskWithRelations[] = [];
+    const pendingById = new Map(pendingTasks.map((task) => [task.id, task]));
 
-    for (const task of tasks) {
+    for (const task of pendingTasks) {
       const dependencies = parseJsonOrDefault<string[]>(task.depends_on, []);
-      const isReady = dependencies.every((dependencyId) => completedTaskIds.has(dependencyId) || !byId.has(dependencyId));
+      const isReady = dependencies.every((dependencyId) => completedTaskIds.has(dependencyId) || !pendingById.has(dependencyId));
       if (isReady) {
         this.setTaskStatus(task.id, "ready");
-        ready.push({ ...task, status: "ready" });
-      }
-      if (ready.length >= limit) {
-        break;
+        alreadyReady.push({ ...task, status: "ready" });
       }
     }
 
-    return ready;
+    return alreadyReady.slice(0, limit);
   }
 
   createTaskRun(taskId: string, agentId: string | null, workspacePath: string | null, attempt: number): TaskRun {
