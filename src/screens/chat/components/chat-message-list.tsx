@@ -767,6 +767,13 @@ function ChatMessageListComponent({
       researchCard.steps.length > 0,
   )
 
+  // DEBUG: temporary floating badge — remove after confirming research card works
+  const debugBadge = researchCard ? (
+    <div className="fixed bottom-2 left-2 z-[9999] rounded bg-black/80 px-2 py-1 text-[10px] text-white font-mono">
+      RC: steps={researchCard.steps.length} active={String(researchCard.isActive)} show={String(showResearchCard)}
+    </div>
+  ) : null
+
   const shouldBottomPin =
     displayMessages.length > 0 ||
     showToolOnlyNotice ||
@@ -1121,6 +1128,8 @@ function ChatMessageListComponent({
 
   return (
     // mt-2 is to fix the prompt-input cut off
+    <>
+    {debugBadge}
     <ChatContainerRoot
       className="h-full flex-1 min-h-0"
       stickToBottom={stickToBottomRef.current}
@@ -1424,6 +1433,7 @@ function ChatMessageListComponent({
         </ChatContainerContent>
       </div>
     </ChatContainerRoot>
+    </>
   )
 }
 
