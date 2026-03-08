@@ -8,15 +8,28 @@ import type {
 } from '../screens/chat/types'
 
 export type ChatStreamEvent =
-  | { type: 'message'; message: GatewayMessage; sessionKey: string; runId?: string }
+  | {
+      type: 'message'
+      message: GatewayMessage
+      sessionKey: string
+      runId?: string
+      transport?: 'chat-events' | 'send-stream'
+    }
   | {
       type: 'chunk'
       text: string
       runId?: string
       sessionKey: string
       fullReplace?: boolean
+      transport?: 'chat-events' | 'send-stream'
     }
-  | { type: 'thinking'; text: string; runId?: string; sessionKey: string }
+  | {
+      type: 'thinking'
+      text: string
+      runId?: string
+      sessionKey: string
+      transport?: 'chat-events' | 'send-stream'
+    }
   | {
       type: 'tool'
       phase: string
@@ -25,6 +38,7 @@ export type ChatStreamEvent =
       args?: unknown
       runId?: string
       sessionKey: string
+      transport?: 'chat-events' | 'send-stream'
     }
   | {
       type: 'done'
@@ -33,6 +47,7 @@ export type ChatStreamEvent =
       runId?: string
       sessionKey: string
       message?: GatewayMessage
+      transport?: 'chat-events' | 'send-stream'
     }
   | {
       type: 'user_message'
@@ -40,6 +55,7 @@ export type ChatStreamEvent =
       sessionKey: string
       source?: string
       runId?: string
+      transport?: 'chat-events' | 'send-stream'
     }
 
 export type ConnectionState =
@@ -283,6 +299,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     // Previously only covered chunk/thinking/tool/done — missing 'message'
     // was the root cause of the persistent duplication bug.
     if (
+      event.transport !== 'send-stream' &&
       event.runId &&
       get().sendStreamRunIds.has(event.runId)
     ) {

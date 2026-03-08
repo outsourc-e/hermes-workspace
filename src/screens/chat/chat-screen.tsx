@@ -41,6 +41,7 @@ import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
+import { useStreamingMessage } from './hooks/use-streaming-message'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
@@ -206,10 +207,7 @@ function isRetryableQueuedMessage(message: GatewayMessage): boolean {
   if ((message.role || '') !== 'user') return false
   const raw = message as Record<string, unknown>
   const status = normalizeMessageValue(raw.status)
-  // Only retry on explicit failure states. 'queued' = delivered, '' = confirmed.
-  // Previously also triggered on __optimisticId presence, which caused false
-  // Retry when history refetch cleared the status field on delivered messages.
-  return status === 'sending' || status === 'error'
+  return status === 'error'
 }
 
 function getMessageRetryAttachments(
@@ -219,6 +217,87 @@ function getMessageRetryAttachments(
   return message.attachments.filter((attachment) => {
     return Boolean(attachment) && typeof attachment === 'object'
   })
+}
+
+function getMessageStatusValue(message: GatewayMessage): string {
+  return normalizeMessageValue((message as Record<string, unknown>).status)
+}
+
+function getMessageTimestampValue(message: GatewayMessage): number | null {
+  const raw = message as Record<string, unknown>
+  const candidates = [
+    raw.timestamp,
+    raw.__createdAt,
+    raw.createdAt,
+    raw.created_at,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate < 1_000_000_000_000 ? candidate * 1000 : candidate
+    }
+    if (typeof candidate === 'string') {
+      const parsed = Date.parse(candidate)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+  }
+
+  return null
+}
+
+function getMessageAttachmentSignature(message: GatewayMessage): string {
+  if (!Array.isArray(message.attachments) || message.attachments.length === 0) {
+    return ''
+  }
+
+  return message.attachments
+    .map((attachment) => {
+      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const size = typeof attachment?.size === 'number' ? String(attachment.size) : ''
+      const type =
+        typeof attachment?.contentType === 'string'
+          ? attachment.contentType
+          : ''
+      return `${name}:${size}:${type}`
+    })
+    .sort()
+    .join('|')
+}
+
+function isOptimisticUserMessage(message: GatewayMessage): boolean {
+  const raw = message as Record<string, unknown>
+  return (
+    normalizeMessageValue(raw.__optimisticId).length > 0 ||
+    ['sending', 'sent', 'done'].includes(getMessageStatusValue(message))
+  )
+}
+
+function shouldCollapseTextDuplicate(
+  existing: GatewayMessage,
+  candidate: GatewayMessage,
+): boolean {
+  if (existing.role !== candidate.role) return false
+
+  if (candidate.role === 'assistant') {
+    return true
+  }
+
+  if (candidate.role !== 'user') return false
+
+  const existingOptimistic = isOptimisticUserMessage(existing)
+  const candidateOptimistic = isOptimisticUserMessage(candidate)
+  if (existingOptimistic === candidateOptimistic) return false
+
+  const existingTs = getMessageTimestampValue(existing)
+  const candidateTs = getMessageTimestampValue(candidate)
+  if (existingTs !== null && candidateTs !== null) {
+    if (Math.abs(existingTs - candidateTs) > 15_000) return false
+  }
+
+  return (
+    getMessageAttachmentSignature(existing) ===
+    getMessageAttachmentSignature(candidate)
+  )
 }
 
 function stripQueuedWrapperFromUserMessage(message: GatewayMessage): GatewayMessage {
@@ -293,7 +372,6 @@ export function ChatScreen({
     Array<{ name: string; timestamp: number }>
   >([])
   const streamTimer = useRef<number | null>(null)
-  const streamIdleTimer = useRef<number | null>(null)
   const failsafeTimerRef = useRef<number | null>(null)
   const lastAssistantSignature = useRef('')
   const refreshHistoryRef = useRef<() => void>(() => {})
@@ -321,6 +399,11 @@ export function ChatScreen({
   // Idempotency guard prevents duplicate sends on paste/attach double-fire.
   const lastSendKeyRef = useRef('')
   const lastSendAtRef = useRef(0)
+  const activeSendRef = useRef<{
+    sessionKey: string
+    friendlyId: string
+    clientId: string
+  } | null>(null)
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
     const stored = localStorage.getItem('clawsuite-file-explorer-collapsed')
@@ -606,6 +689,7 @@ export function ChatScreen({
       return 0
     })
     const seen = new Set<string>()
+    const seenByText = new Map<string, GatewayMessage>()
     const dedupedSet = new Set<GatewayMessage>()
     for (const msg of sortedForDedup) {
       const raw = msg as Record<string, unknown>
@@ -640,14 +724,18 @@ export function ChatScreen({
       {
         const text = stripQueuedWrapper(textFromMessage(msg)).trim()
         if (text.length > 0) {
-          // Normalize all whitespace (newlines, tabs, multiple spaces) to a
-          // single space before comparing.  The gateway may collapse \n to
-          // spaces when echoing back, causing the optimistic (with newlines)
-          // and the echo (with spaces) to have different raw text.
           const normalizedText = text.replace(/\s+/g, ' ')
           const textKey = `${msg.role}:text:${normalizedText}`
-          if (seen.has(textKey)) continue
-          seen.add(textKey)
+          const existingTextMatch = seenByText.get(textKey)
+          if (
+            existingTextMatch &&
+            shouldCollapseTextDuplicate(existingTextMatch, msg)
+          ) {
+            continue
+          }
+          if (!existingTextMatch) {
+            seenByText.set(textKey, msg)
+          }
         }
       }
 
@@ -775,10 +863,6 @@ export function ChatScreen({
     if (streamTimer.current) {
       window.clearTimeout(streamTimer.current)
       streamTimer.current = null
-    }
-    if (streamIdleTimer.current) {
-      window.clearTimeout(streamIdleTimer.current)
-      streamIdleTimer.current = null
     }
   }, [])
 
@@ -959,6 +1043,76 @@ export function ChatScreen({
       content: textFromMessage(m),
     })) as any,
     availableModels: availableModelIds,
+  })
+
+  const { startStreaming } = useStreamingMessage({
+    onStarted: useCallback(
+      ({ runId }: { runId: string | null }) => {
+        const activeSend = activeSendRef.current
+        if (!activeSend?.clientId) return
+        updateHistoryMessageByClientId(
+          queryClient,
+          activeSend.friendlyId,
+          activeSend.sessionKey,
+          activeSend.clientId,
+          (message) => ({
+            ...message,
+            status: 'sent',
+            runId: runId ?? message.runId,
+          }),
+        )
+        setSending(false)
+      },
+      [queryClient],
+    ),
+    onComplete: useCallback(() => {
+      const activeSend = activeSendRef.current
+      if (activeSend?.clientId) {
+        updateHistoryMessageByClientId(
+          queryClient,
+          activeSend.friendlyId,
+          activeSend.sessionKey,
+          activeSend.clientId,
+          (message) => ({ ...message, status: 'done' }),
+        )
+      }
+      activeSendRef.current = null
+      refreshHistoryRef.current()
+      setSending(false)
+    }, [queryClient]),
+    onError: useCallback(
+      (messageText: string) => {
+        const activeSend = activeSendRef.current
+        if (
+          activeSend?.clientId &&
+          !isMissingGatewayAuth(messageText)
+        ) {
+          updateHistoryMessageByClientId(
+            queryClient,
+            activeSend.friendlyId,
+            activeSend.sessionKey,
+            activeSend.clientId,
+            (message) => ({ ...message, status: 'error' }),
+          )
+        }
+        activeSendRef.current = null
+        setSending(false)
+        if (isMissingGatewayAuth(messageText)) {
+          try {
+            navigate({ to: '/connect', replace: true })
+          } catch {
+            /* router not ready */
+          }
+          return
+        }
+        const errorMessage = `Failed to send message. ${messageText}`
+        setError(errorMessage)
+        toast('Failed to send message', { type: 'error' })
+        setPendingGeneration(false)
+        setWaitingForResponse(false)
+      },
+      [navigate, queryClient],
+    ),
   })
 
   const handleSwitchModel = useCallback(async () => {
@@ -1272,6 +1426,11 @@ export function ChatScreen({
       setSending(true)
       setError(null)
       setWaitingForResponse(true)
+      activeSendRef.current = {
+        sessionKey,
+        friendlyId,
+        clientId: optimisticClientId,
+      }
 
       // Failsafe: clear waitingForResponse after 120s no matter what
       // Prevents infinite spinner if SSE/idle detection both fail
@@ -1319,89 +1478,30 @@ export function ChatScreen({
         }
       })
 
-      fetch('/api/send', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          sessionKey,
-          friendlyId,
-          message: enrichedBody,
-          attachments:
-            payloadAttachments.length > 0 ? payloadAttachments : undefined,
-          thinking: currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
-          idempotencyKey: optimisticClientId || crypto.randomUUID(),
-          clientId: optimisticClientId || undefined,
-        }),
+      try {
+        streamStart()
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          console.warn('[chat] streamStart error (non-fatal):', e)
+        }
+      }
+
+      void startStreaming({
+        sessionKey,
+        friendlyId,
+        message: enrichedBody,
+        attachments:
+          payloadAttachments.length > 0 ? payloadAttachments : undefined,
+        thinking: currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
+        idempotencyKey: optimisticClientId || crypto.randomUUID(),
+      }).catch((err: unknown) => {
+        const messageText = err instanceof Error ? err.message : String(err)
+        if (import.meta.env.DEV) {
+          console.warn('[chat] send-stream failed', messageText)
+        }
       })
-        .then(async (res) => {
-          if (!res.ok) {
-            let errorText = `HTTP ${res.status}`
-            try {
-              errorText = await readError(res)
-            } catch {
-              /* ignore parse errors */
-            }
-            throw new Error(errorText)
-          }
-          // Stream setup is separate — don't let it trigger send failure
-          try {
-            streamStart()
-          } catch (e) {
-            if (import.meta.env.DEV)
-              console.warn('[chat] streamStart error (non-fatal):', e)
-          }
-          if (failsafeTimerRef.current) {
-            window.clearTimeout(failsafeTimerRef.current)
-            failsafeTimerRef.current = null
-          }
-          // Message successfully delivered to gateway — mark as queued so
-          // isStuckSending doesn't fire a false "Retry" while waiting for response.
-          if (optimisticClientId) {
-            updateHistoryMessageByClientId(
-              queryClient,
-              friendlyId,
-              sessionKey,
-              optimisticClientId,
-              (message) => ({ ...message, status: 'queued' }),
-            )
-          }
-          setSending(false)
-        })
-        .catch((err: unknown) => {
-          if (failsafeTimerRef.current) {
-            window.clearTimeout(failsafeTimerRef.current)
-            failsafeTimerRef.current = null
-          }
-          setSending(false)
-          const messageText = err instanceof Error ? err.message : String(err)
-          if (isMissingGatewayAuth(messageText)) {
-            try {
-              navigate({ to: '/connect', replace: true })
-            } catch {
-              /* router not ready */
-            }
-            return
-          }
-          // Only mark as failed for actual network/API errors
-          if (optimisticClientId) {
-            updateHistoryMessageByClientId(
-              queryClient,
-              friendlyId,
-              sessionKey,
-              optimisticClientId,
-              function markFailed(message) {
-                return { ...message, status: 'error' }
-              },
-            )
-          }
-          const errorMessage = `Failed to send message. ${messageText}`
-          setError(errorMessage)
-          toast('Failed to send message', { type: 'error' })
-          setPendingGeneration(false)
-          setWaitingForResponse(false)
-        })
     },
-    [navigate, queryClient, setLocalActivity, streamFinish, streamStart],
+    [queryClient, setLocalActivity, startStreaming, streamFinish, streamStart],
   )
 
   useLayoutEffect(() => {

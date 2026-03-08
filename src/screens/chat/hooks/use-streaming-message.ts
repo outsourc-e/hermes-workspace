@@ -17,6 +17,7 @@ type StreamChunk = {
 }
 
 type UseStreamingMessageOptions = {
+  onStarted?: (payload: { runId: string | null }) => void
   onChunk?: (text: string, fullText: string) => void
   onComplete?: (message: GatewayMessage) => void
   onError?: (error: string) => void
@@ -25,7 +26,7 @@ type UseStreamingMessageOptions = {
 }
 
 export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
-  const { onChunk, onComplete, onError, onThinking, onTool } = options
+  const { onStarted, onChunk, onComplete, onError, onThinking, onTool } = options
 
   const [state, setState] = useState<StreamingState>({
     isStreaming: false,
@@ -42,9 +43,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const finishedRef = useRef(false)
   const thinkingRef = useRef<string>('')
   const activeRunIdRef = useRef<string | null>(null)
+  const activeSessionKeyRef = useRef<string>('main')
 
   const registerSendStreamRun = useGatewayChatStore((s) => s.registerSendStreamRun)
   const unregisterSendStreamRun = useGatewayChatStore((s) => s.unregisterSendStreamRun)
+  const processStoreEvent = useGatewayChatStore((s) => s.processEvent)
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {
@@ -184,11 +187,26 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             activeRunIdRef.current = runId
             registerSendStreamRun(runId)
           }
+          processStoreEvent({
+            type: 'chunk',
+            text: '',
+            runId: runId ?? undefined,
+            sessionKey: activeSessionKeyRef.current,
+            transport: 'send-stream',
+          })
+          onStarted?.({ runId: runId ?? null })
           break
         }
         case 'assistant': {
           const text = (payload as { text?: string }).text ?? ''
           if (text) {
+            processStoreEvent({
+              type: 'chunk',
+              text,
+              runId: activeRunIdRef.current ?? undefined,
+              sessionKey: activeSessionKeyRef.current,
+              transport: 'send-stream',
+            })
             pushTargetText(text)
           }
           break
@@ -209,11 +227,32 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             ''
           if (thinking) {
             thinkingRef.current = thinking
+            processStoreEvent({
+              type: 'thinking',
+              text: thinking,
+              runId: activeRunIdRef.current ?? undefined,
+              sessionKey: activeSessionKeyRef.current,
+              transport: 'send-stream',
+            })
             onThinking?.(thinking)
           }
           break
         }
         case 'tool': {
+          processStoreEvent({
+            type: 'tool',
+            phase:
+              typeof payload.phase === 'string' ? payload.phase : 'calling',
+            name: typeof payload.name === 'string' ? payload.name : 'tool',
+            toolCallId:
+              typeof payload.toolCallId === 'string'
+                ? payload.toolCallId
+                : undefined,
+            args: payload.args,
+            runId: activeRunIdRef.current ?? undefined,
+            sessionKey: activeSessionKeyRef.current,
+            transport: 'send-stream',
+          })
           onTool?.(payload)
           break
         }
@@ -221,6 +260,14 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const doneState = (payload as { state?: string }).state
           const errorMessage = (payload as { errorMessage?: string })
             .errorMessage
+          processStoreEvent({
+            type: 'done',
+            state: doneState ?? 'final',
+            errorMessage,
+            runId: activeRunIdRef.current ?? undefined,
+            sessionKey: activeSessionKeyRef.current,
+            transport: 'send-stream',
+          })
           if (doneState === 'error' && errorMessage) {
             markFailed(errorMessage)
             break
@@ -252,7 +299,16 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
       }
     },
-    [finishStream, markFailed, onThinking, onTool, pushTargetText],
+    [
+      finishStream,
+      markFailed,
+      onStarted,
+      onThinking,
+      onTool,
+      processStoreEvent,
+      pushTargetText,
+      registerSendStreamRun,
+    ],
   )
 
   const startStreaming = useCallback(
@@ -262,6 +318,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       message: string
       thinking?: string
       attachments?: Array<GatewayAttachment>
+      idempotencyKey?: string
     }) => {
       if (eventSourceRef.current) {
         eventSourceRef.current.abort()
@@ -275,6 +332,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       renderedTextRef.current = ''
       targetTextRef.current = ''
       thinkingRef.current = ''
+      activeRunIdRef.current = null
+      activeSessionKeyRef.current = params.sessionKey
 
       const messageId = `streaming-${Date.now()}`
 
@@ -295,7 +354,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             message: params.message,
             thinking: params.thinking,
             attachments: params.attachments,
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: params.idempotencyKey ?? crypto.randomUUID(),
           }),
           signal: abortController.signal,
         })
@@ -348,7 +407,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           }
         }
 
-        finishStream()
+        if (!finishedRef.current) {
+          finishStream()
+        }
       } catch (err) {
         if ((err as Error).name === 'AbortError') return
         const errorMessage = err instanceof Error ? err.message : String(err)
