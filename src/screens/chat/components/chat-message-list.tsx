@@ -26,6 +26,7 @@ import { AssistantAvatar } from '@/components/avatars'
 import { cn } from '@/lib/utils'
 import { ResearchCard } from './research-card'
 import type { UseResearchCardResult } from '@/hooks/use-research-card'
+import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 
 /** Duration (ms) the thinking indicator stays visible after waitingForResponse
  *  clears, giving the first response message time to render before the
@@ -768,9 +769,12 @@ function ChatMessageListComponent({
   )
 
   // DEBUG: temporary floating badge — remove after confirming research card works
+  const storeKeys = typeof window !== 'undefined'
+    ? Array.from(useGatewayChatStore.getState().streamingState.keys()).join(',')
+    : ''
   const debugBadge = researchCard ? (
-    <div className="fixed bottom-2 left-2 z-[9999] rounded bg-black/80 px-2 py-1 text-[10px] text-white font-mono">
-      RC: steps={researchCard.steps.length} active={String(researchCard.isActive)} show={String(showResearchCard)}
+    <div className="fixed bottom-2 left-2 z-[9999] rounded bg-black/80 px-2 py-1 text-[10px] text-white font-mono max-w-[300px] break-all">
+      RC: steps={researchCard.steps.length} show={String(showResearchCard)} key={sessionKey || 'none'} store=[{storeKeys || 'empty'}]
     </div>
   ) : null
 
