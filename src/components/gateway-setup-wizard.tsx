@@ -14,6 +14,7 @@ import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ProviderSelectStep } from '@/components/onboarding/provider-select-step'
+import { getConnectionErrorInfo } from '@/lib/connection-errors'
 
 const LOCAL_GATEWAY_URL = 'ws://127.0.0.1:18789'
 
@@ -98,6 +99,9 @@ function GatewayStepContent() {
   const [localSetupMessage, setLocalSetupMessage] = useState<string | null>(null)
   const [localSetupError, setLocalSetupError] = useState<string | null>(null)
   const localSetupSourceRef = useRef<EventSource | null>(null)
+  const localSetupErrorInfo = getConnectionErrorInfo(localSetupError)
+  const testErrorInfo = getConnectionErrorInfo(testError)
+  const autoDetectErrorInfo = getConnectionErrorInfo(autoDetectError)
 
   const handleSaveAndTest = async () => {
     const ok = await saveAndTest()
@@ -366,7 +370,14 @@ function GatewayStepContent() {
                   strokeWidth={2}
                 />
                 <div className="min-w-0 flex-1">
-                  <p>{localSetupError}</p>
+                  <p className="font-medium">{localSetupErrorInfo.title}</p>
+                  <p className="mt-0.5">{localSetupErrorInfo.description}</p>
+                  {localSetupErrorInfo.action ? (
+                    <p className="mt-1 font-medium">{localSetupErrorInfo.action}</p>
+                  ) : null}
+                  {localSetupErrorInfo.details ? (
+                    <p className="mt-1 text-xs text-red-700">{localSetupErrorInfo.details}</p>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -379,7 +390,14 @@ function GatewayStepContent() {
                   strokeWidth={2}
                 />
                 <div className="min-w-0 flex-1">
-                  <p>{testError}</p>
+                  <p className="font-medium">{testErrorInfo.title}</p>
+                  <p className="mt-0.5">{testErrorInfo.description}</p>
+                  {testErrorInfo.action ? (
+                    <p className="mt-1 font-medium">{testErrorInfo.action}</p>
+                  ) : null}
+                  {testErrorInfo.details ? (
+                    <p className="mt-1 text-xs text-red-700">{testErrorInfo.details}</p>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -462,7 +480,14 @@ function GatewayStepContent() {
                   strokeWidth={2}
                 />
                 <div>
-                  <p>{testError}</p>
+                  <p className="font-medium">{testErrorInfo.title}</p>
+                  <p className="mt-0.5">{testErrorInfo.description}</p>
+                  {testErrorInfo.action ? (
+                    <p className="mt-1 font-medium">{testErrorInfo.action}</p>
+                  ) : null}
+                  {testErrorInfo.details ? (
+                    <p className="mt-1 text-xs text-red-700">{testErrorInfo.details}</p>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -474,7 +499,16 @@ function GatewayStepContent() {
                   className="mt-0.5 size-4 shrink-0"
                   strokeWidth={2}
                 />
-                <span>{autoDetectError}</span>
+                <div>
+                  <p className="font-medium">{autoDetectErrorInfo.title}</p>
+                  <p className="mt-0.5">{autoDetectErrorInfo.description}</p>
+                  {autoDetectErrorInfo.action ? (
+                    <p className="mt-1 font-medium">{autoDetectErrorInfo.action}</p>
+                  ) : null}
+                  {autoDetectErrorInfo.details ? (
+                    <p className="mt-1 text-xs text-red-700">{autoDetectErrorInfo.details}</p>
+                  ) : null}
+                </div>
               </div>
             )}
 

@@ -35,6 +35,7 @@ import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
+import { getConnectionErrorInfo } from '@/lib/connection-errors'
 // useWorkspaceStore removed — hamburger eliminated on mobile
 
 export const Route = createFileRoute('/settings/')({
@@ -258,6 +259,7 @@ function SettingsRoute() {
   const gatewayTestStatus = useGatewaySetupStore((state) => state.testStatus)
   const gatewayTestError = useGatewaySetupStore((state) => state.testError)
   const gatewaySaving = useGatewaySetupStore((state) => state.saving)
+  const gatewayErrorInfo = getConnectionErrorInfo(gatewayTestError)
   const loadCurrentGatewayConfig = useGatewaySetupStore(
     (state) => state.loadCurrentConfig,
   )
@@ -697,7 +699,20 @@ function SettingsRoute() {
                       {gatewayTestStatus === 'error' ? 'Disconnected' : null}
                     </span>
                     {gatewayTestError ? (
-                      <p className="text-xs text-red-600">{gatewayTestError}</p>
+                      <div className="text-xs text-red-600">
+                        <p className="font-medium">{gatewayErrorInfo.title}</p>
+                        <p className="mt-0.5">{gatewayErrorInfo.description}</p>
+                        {gatewayErrorInfo.action ? (
+                          <p className="mt-1 font-medium text-red-700">
+                            {gatewayErrorInfo.action}
+                          </p>
+                        ) : null}
+                        {gatewayErrorInfo.details ? (
+                          <p className="mt-1 text-[11px] text-red-500">
+                            {gatewayErrorInfo.details}
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 </SettingsRow>

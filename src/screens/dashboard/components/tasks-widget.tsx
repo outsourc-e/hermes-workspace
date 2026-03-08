@@ -161,7 +161,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
           </div>
         ) : tasks.length === 0 ? (
           <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
-            No tasks yet
+            No tasks yet. Create one to track follow-ups here.
           </div>
         ) : (
           <div className="space-y-2.5">

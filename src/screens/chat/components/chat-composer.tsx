@@ -49,6 +49,7 @@ import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 import { toast } from '@/components/ui/toast'
+import { getConnectionErrorInfo } from '@/lib/connection-errors'
 
 type ChatComposerAttachment = {
   id: string
@@ -786,6 +787,7 @@ function ChatComposerComponent({
   // Don't show "Gateway disconnected" for models query failures - it's confusing
   // since the main gateway connection might be fine. Show a subtler message instead.
   const modelAvailabilityLabel = modelsUnavailable ? 'Click to configure' : null
+  const modelConnectionError = getConnectionErrorInfo()
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1936,8 +1938,15 @@ function ChatComposerComponent({
                       </div>
                       {groupedModels.length === 0 && modelsUnavailable ? (
                         <div className="p-4 text-center text-sm text-primary-500">
-                          <p className="font-medium text-primary-700 mb-1">Gateway not connected</p>
-                          <p className="text-xs">Make sure OpenClaw is running and the gateway URL is configured.</p>
+                          <p className="mb-1 font-medium text-primary-700">
+                            {modelConnectionError.title}
+                          </p>
+                          <p className="text-xs">{modelConnectionError.description}</p>
+                          {modelConnectionError.action ? (
+                            <p className="mt-2 text-xs font-medium text-primary-700">
+                              {modelConnectionError.action}
+                            </p>
+                          ) : null}
                         </div>
                       ) : groupedModels.length === 0 ? (
                         <div className="p-4 text-center text-sm text-primary-500">
@@ -2155,12 +2164,14 @@ function ChatComposerComponent({
                       {groupedModels.length === 0 && modelsUnavailable ? (
                         <div className="p-4 text-center text-sm text-primary-500">
                           <p className="font-medium text-primary-700 mb-1">
-                            Gateway not connected
+                            {modelConnectionError.title}
                           </p>
-                          <p className="text-xs">
-                            Make sure OpenClaw is running and the gateway URL is
-                            configured.
-                          </p>
+                          <p className="text-xs">{modelConnectionError.description}</p>
+                          {modelConnectionError.action ? (
+                            <p className="mt-2 text-xs font-medium text-primary-700">
+                              {modelConnectionError.action}
+                            </p>
+                          ) : null}
                         </div>
                       ) : groupedModels.length === 0 ? (
                         <div className="p-4 text-center text-sm text-primary-500">

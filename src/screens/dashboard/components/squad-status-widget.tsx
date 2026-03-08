@@ -140,7 +140,7 @@ export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
       ) : visibleAgents.length === 0 ? (
         <div className="flex h-[150px] flex-col items-center justify-center gap-1 rounded-xl border border-neutral-200 bg-neutral-100/50 text-center dark:border-neutral-800 dark:bg-neutral-900/40">
           <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">No agents yet</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Agent sessions will appear here</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Launch or connect an agent to see live sessions here.</p>
         </div>
       ) : (
         <div className="space-y-1.5">

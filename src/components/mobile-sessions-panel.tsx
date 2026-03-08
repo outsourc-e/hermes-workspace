@@ -106,6 +106,9 @@ export function MobileSessionsPanel({
               <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-primary-500">
                 <HugeiconsIcon icon={Chat01Icon} size={24} strokeWidth={1.6} />
                 <p className="text-sm">No sessions yet.</p>
+                <p className="text-xs text-primary-400">
+                  Start a conversation to see it here.
+                </p>
               </div>
             ) : (
               <div className="space-y-1">

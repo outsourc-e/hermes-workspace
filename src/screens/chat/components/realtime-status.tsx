@@ -9,6 +9,7 @@ import {
   useGatewayChatStore,
   type ConnectionState,
 } from '../../../stores/gateway-chat-store'
+import { getConnectionErrorInfo } from '@/lib/connection-errors'
 import { cn } from '@/lib/utils'
 
 type RealtimeStatusProps = {
@@ -53,6 +54,8 @@ export function RealtimeStatus({
   showLabel = false,
 }: RealtimeStatusProps) {
   const connectionState = useGatewayChatStore((s) => s.connectionState)
+  const lastError = useGatewayChatStore((s) => s.lastError)
+  const errorInfo = useMemo(() => getConnectionErrorInfo(lastError), [lastError])
 
   const config = useMemo(() => {
     return STATUS_CONFIG[connectionState]
@@ -65,7 +68,11 @@ export function RealtimeStatus({
         config.color,
         className,
       )}
-      title={`Realtime: ${config.label}`}
+      title={
+        connectionState === 'error'
+          ? `Realtime: ${errorInfo.title}. ${errorInfo.description}`
+          : `Realtime: ${config.label}`
+      }
     >
       <HugeiconsIcon
         icon={config.icon}

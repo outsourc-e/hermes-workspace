@@ -144,7 +144,7 @@ export function RecentSessionsWidget({
         <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950">
           <p className="text-sm font-semibold text-primary-900 dark:text-neutral-100">No sessions yet</p>
           <p className="text-xs text-primary-500 dark:text-neutral-400">
-            Start a conversation to see recent sessions here
+            Start a conversation to see it here.
           </p>
         </div>
       ) : (

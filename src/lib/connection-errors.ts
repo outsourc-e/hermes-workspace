@@ -1,6 +1,7 @@
 export type ConnectionErrorKind =
   | 'clawsuite_auth_required'
   | 'gateway_auth_rejected'
+  | 'gateway_pairing_required'
   | 'gateway_unreachable'
   | 'handshake_failed'
   | 'handshake_timeout'
@@ -8,16 +9,36 @@ export type ConnectionErrorKind =
   | 'unknown'
 
 export function classifyConnectionError(
-  error: string | Error,
+  error?: string | Error | null,
+  status?: number | null,
 ): ConnectionErrorKind {
-  const msg = typeof error === 'string' ? error : error.message
+  const msg = typeof error === 'string' ? error : error?.message ?? ''
   const lower = msg.toLowerCase()
-  if (lower.includes('unauthorized') || lower.includes('forbidden'))
+  if (!lower && !status) return 'gateway_unreachable'
+  if (status === 401) return 'clawsuite_auth_required'
+  if (
+    status === 403 ||
+    lower.includes('pair') ||
+    lower.includes('not paired')
+  ) {
+    return 'gateway_pairing_required'
+  }
+  if (
+    lower.includes('missing gateway auth') ||
+    lower.includes('gateway auth') ||
+    lower.includes('token') ||
+    lower.includes('forbidden') ||
+    lower.includes('unauthorized')
+  ) {
     return 'gateway_auth_rejected'
+  }
   if (
     lower.includes('econnrefused') ||
     lower.includes('unreachable') ||
-    lower.includes('getaddrinfo')
+    lower.includes('getaddrinfo') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('not reachable')
   )
     return 'gateway_unreachable'
   if (
@@ -51,40 +72,76 @@ export function getConnectionErrorMessage(
       }
     case 'gateway_auth_rejected':
       return {
-        title: 'Gateway Auth Failed',
+        title: 'Authentication required',
         description:
-          'The gateway rejected your credentials. Check your token or password.',
-        action: 'Update credentials in Settings',
+          'The gateway rejected this connection.',
+        action: 'Update your gateway token in Settings and try again.',
+      }
+    case 'gateway_pairing_required':
+      return {
+        title: 'Pair this device first',
+        description:
+          'This device is not paired with the gateway yet.',
+        action: 'Run `openclaw pair` on the gateway machine, then reconnect.',
       }
     case 'gateway_unreachable':
       return {
-        title: 'Gateway Unreachable',
-        description: 'Cannot reach the OpenClaw gateway. Is it running?',
-        action: 'Check that OpenClaw is running and the URL is correct',
+        title: 'Gateway unreachable',
+        description: 'ClawSuite cannot reach the configured OpenClaw gateway.',
+        action: 'Check that OpenClaw is running and the gateway URL is correct.',
       }
     case 'handshake_failed':
       return {
-        title: 'Handshake Failed',
+        title: 'Connection could not be verified',
         description:
-          'Connection handshake error. This usually fixes itself on retry.',
-        action: 'Try refreshing the page',
+          'The gateway responded, but the secure connection handshake did not complete.',
+        action: 'Try reconnecting. If it keeps failing, check gateway pairing and auth.',
       }
     case 'handshake_timeout':
       return {
-        title: 'Connection Timeout',
-        description: 'Gateway did not respond in time.',
-        action: 'Check network and try again',
+        title: 'Connection timed out',
+        description: 'The gateway did not respond in time.',
+        action: 'Check your network and try again.',
       }
     case 'disconnected':
       return {
-        title: 'Disconnected',
-        description: 'Lost connection to gateway. Reconnecting…',
+        title: 'Connection lost',
+        description: 'The connection to the gateway was interrupted.',
+        action: 'Wait a moment, then retry if it does not reconnect.',
       }
     case 'unknown':
       return {
-        title: 'Connection Error',
-        description: 'Something went wrong connecting to the gateway.',
-        action: 'Check logs for details',
+        title: 'Connection error',
+        description: 'Something went wrong while connecting to the gateway.',
+        action: 'Try again, or review the gateway settings.',
       }
+  }
+}
+
+export function getConnectionErrorInfo(
+  error?: string | Error | null,
+  status?: number | null,
+): ConnectionErrorInfo & { kind: ConnectionErrorKind; details?: string } {
+  const kind = classifyConnectionError(error, status)
+  const base = getConnectionErrorMessage(kind)
+  const details =
+    typeof error === 'string'
+      ? error.trim()
+      : error?.message?.trim() ?? ''
+
+  const showDetails =
+    details.length > 0 &&
+    ![
+      'unauthorized',
+      'forbidden',
+      'failed to fetch',
+      'gateway not reachable',
+      'could not reach clawsuite server',
+    ].includes(details.toLowerCase())
+
+  return {
+    kind,
+    ...base,
+    details: showDetails ? details : undefined,
   }
 }

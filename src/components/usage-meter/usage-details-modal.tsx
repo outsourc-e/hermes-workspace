@@ -387,7 +387,7 @@ export function UsageDetailsModal({
               <div className="grid gap-2">
                 {usage.models.length === 0 ? (
                   <div className="text-sm text-primary-500">
-                    No model usage reported yet.
+                    No model usage reported yet. Send a message to start tracking usage here.
                   </div>
                 ) : (
                   usage.models.map((model) => (
@@ -418,7 +418,7 @@ export function UsageDetailsModal({
               <div className="grid gap-2">
                 {usage.sessions.length === 0 ? (
                   <div className="text-sm text-primary-500">
-                    No sessions reported yet.
+                    No sessions reported yet. Start a chat to see session history here.
                   </div>
                 ) : (
                   usage.sessions.map((session) => (
@@ -487,11 +487,10 @@ export function UsageDetailsModal({
               {providerUsage.length === 0 ? (
                 <div className="rounded-2xl border border-primary-200 bg-white/70 p-6 text-center">
                   <div className="text-sm font-medium text-primary-700">
-                    No providers connected
+                    No providers connected. Add a provider in Settings to start chatting.
                   </div>
                   <div className="mt-1 text-xs text-primary-500">
-                    Authenticate with Claude CLI or set API keys for
-                    OpenAI/OpenRouter to see usage data.
+                    Open Settings -{'>'} Providers to connect Claude CLI or add an API key.
                   </div>
                 </div>
               ) : (

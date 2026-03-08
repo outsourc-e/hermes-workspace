@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert02Icon, Cancel01Icon, Settings02Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
+import { getConnectionErrorInfo } from '@/lib/connection-errors'
 import { cn } from '@/lib/utils'
 
 const BANNER_STORAGE_KEY = 'clawsuite-gateway-banner-dismissed'
@@ -34,6 +35,7 @@ export function GatewayReconnectBanner() {
   const [isFadingOut, setIsFadingOut] = useState(false)
   const { open: openSetupWizard } = useGatewaySetupStore()
   const isVisibleRef = useRef(isVisible)
+  const errorInfo = getConnectionErrorInfo('Gateway not reachable')
 
   useEffect(() => {
     isVisibleRef.current = isVisible
@@ -152,12 +154,17 @@ export function GatewayReconnectBanner() {
           className="shrink-0 text-red-600"
           strokeWidth={1.5}
         />
-        <p className="text-xs font-medium text-red-900">
-          Gateway connection lost.{' '}
-          <span className="font-normal text-red-700 text-pretty">
-            Check your connection or reconfigure in settings.
-          </span>
-        </p>
+        <div className="min-w-0 flex-1 text-xs">
+          <p className="font-medium text-red-900">{errorInfo.title}</p>
+          <p className="mt-0.5 text-red-700 text-pretty">
+            {errorInfo.description}
+          </p>
+          {errorInfo.action ? (
+            <p className="mt-1 font-medium text-red-800 text-pretty">
+              {errorInfo.action}
+            </p>
+          ) : null}
+        </div>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <Button
