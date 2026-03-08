@@ -11,7 +11,7 @@
  * Chat routes get the full ChatScreen treatment.
  * Non-chat routes show the sub-page content.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { RefreshIcon } from '@hugeicons/core-free-icons'
@@ -54,6 +54,11 @@ export function WorkspaceShell() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const isElectron = useMemo(
+    () =>
+      typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent),
+    [],
+  )
 
   const { settings } = useSettings()
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
@@ -343,14 +348,26 @@ export function WorkspaceShell() {
             ].join(' ')}
             data-tour="chat-area"
           >
-            <div className={['page-transition h-full', slideClass].filter(Boolean).join(' ')}>
-              <ErrorBoundary
-                className="h-full"
-                title="Something went wrong"
-                description="This page failed to render. Reload to try again."
+            <div className="flex h-full min-h-0 flex-col">
+              {isElectron ? (
+                <div
+                  className="h-9 shrink-0"
+                  style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+                />
+              ) : null}
+              <div
+                className={['page-transition min-h-0 flex-1', slideClass]
+                  .filter(Boolean)
+                  .join(' ')}
               >
-                <Outlet />
-              </ErrorBoundary>
+                <ErrorBoundary
+                  className="h-full"
+                  title="Something went wrong"
+                  description="This page failed to render. Reload to try again."
+                >
+                  <Outlet />
+                </ErrorBoundary>
+              </div>
             </div>
           </main>
 
