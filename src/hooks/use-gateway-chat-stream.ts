@@ -26,6 +26,10 @@ type UseGatewayChatStreamOptions = {
   ) => void
   /** Callback when a tool approval is requested */
   onApprovalRequest?: (approval: Record<string, unknown>) => void
+  /** Callback when the SSE connection reconnects after a prior open */
+  onReconnect?: () => void
+  /** Callback when the stream stays silent for too long */
+  onSilentTimeout?: (silentForMs: number) => void
 }
 
 export function useGatewayChatStream(
@@ -38,6 +42,8 @@ export function useGatewayChatStream(
     onThinking,
     onDone,
     onApprovalRequest,
+    onReconnect,
+    onSilentTimeout,
   } = options
 
   const connectionState = useGatewayChatStore((s) => s.connectionState)
@@ -54,6 +60,11 @@ export function useGatewayChatStream(
   >(new Map())
   const reconnectAttempts = useRef(0)
   const mountedRef = useRef(true)
+  const hasConnectedOnceRef = useRef(false)
+  const lastActivityAtRef = useRef(0)
+  const silenceProbeRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const handlingSilenceRef = useRef(false)
+  const scheduleReconnectRef = useRef<() => void>(() => {})
 
   // Store callbacks in refs to avoid reconnecting when they change
   const onUserMessageRef = useRef(onUserMessage)
@@ -61,11 +72,15 @@ export function useGatewayChatStream(
   const onThinkingRef = useRef(onThinking)
   const onDoneRef = useRef(onDone)
   const onApprovalRequestRef = useRef(onApprovalRequest)
+  const onReconnectRef = useRef(onReconnect)
+  const onSilentTimeoutRef = useRef(onSilentTimeout)
   onUserMessageRef.current = onUserMessage
   onChunkRef.current = onChunk
   onThinkingRef.current = onThinking
   onDoneRef.current = onDone
   onApprovalRequestRef.current = onApprovalRequest
+  onReconnectRef.current = onReconnect
+  onSilentTimeoutRef.current = onSilentTimeout
 
   const dispatchSSEDroppedEvent = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -114,6 +129,37 @@ export function useGatewayChatStream(
     streamTimeoutsRef.current.clear()
   }, [])
 
+  const clearSilenceProbe = useCallback(() => {
+    if (!silenceProbeRef.current) return
+    clearInterval(silenceProbeRef.current)
+    silenceProbeRef.current = null
+  }, [])
+
+  const markActivity = useCallback(() => {
+    lastActivityAtRef.current = Date.now()
+    handlingSilenceRef.current = false
+  }, [])
+
+  const startSilenceProbe = useCallback(() => {
+    clearSilenceProbe()
+    lastActivityAtRef.current = Date.now()
+    silenceProbeRef.current = setInterval(() => {
+      if (!mountedRef.current) return
+      if (eventSourceRef.current?.readyState !== EventSource.OPEN) return
+      const silentForMs = Date.now() - lastActivityAtRef.current
+      if (silentForMs < 30_000) return
+      if (handlingSilenceRef.current) return
+      handlingSilenceRef.current = true
+      onSilentTimeoutRef.current?.(silentForMs)
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+      setConnectionState('disconnected')
+      scheduleReconnectRef.current()
+    }, 15_000)
+  }, [clearSilenceProbe, setConnectionState])
+
   const connect = useCallback(() => {
     if (!enabled || !mountedRef.current) return
 
@@ -140,19 +186,28 @@ export function useGatewayChatStream(
     // Native open event fires on initial connect AND every auto-reconnect
     eventSource.onopen = () => {
       if (!mountedRef.current) return
+      const wasConnectedBefore = hasConnectedOnceRef.current
+      hasConnectedOnceRef.current = true
       reconnectAttempts.current = 0
+      markActivity()
+      startSilenceProbe()
       // Mark connected immediately — don't wait for custom 'connected' event
       setConnectionState('connected')
+      if (wasConnectedBefore) {
+        onReconnectRef.current?.()
+      }
     }
 
     eventSource.addEventListener('connected', () => {
       if (!mountedRef.current) return
       reconnectAttempts.current = 0
+      markActivity()
       setConnectionState('connected')
     })
 
     eventSource.addEventListener('disconnected', () => {
       if (!mountedRef.current) return
+      clearSilenceProbe()
       clearAllStreamTimeouts()
       clearAllStreaming()
       setConnectionState('disconnected')
@@ -164,6 +219,7 @@ export function useGatewayChatStream(
       if (!mountedRef.current) return
 
       if (eventSource.readyState === EventSource.CLOSED) {
+        clearSilenceProbe()
         clearAllStreamTimeouts()
         clearAllStreaming()
         setConnectionState('disconnected')
@@ -176,6 +232,7 @@ export function useGatewayChatStream(
 
     eventSource.addEventListener('heartbeat', () => {
       // Keep-alive received, connection is healthy
+      markActivity()
     })
 
     // Chat event handlers
@@ -188,6 +245,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'chunk', ...data })
+        markActivity()
         touchStreamTimeout(data.sessionKey)
         onChunkRef.current?.(data.text, data.sessionKey)
       } catch {
@@ -204,6 +262,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'thinking', ...data })
+        markActivity()
         touchStreamTimeout(data.sessionKey)
         onThinkingRef.current?.(data.text, data.sessionKey)
       } catch {
@@ -224,6 +283,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'tool', ...data, result: data.result } as any)
+        markActivity()
         touchStreamTimeout(data.sessionKey)
         if (data.phase === 'done' || data.phase === 'error') {
           dispatchChatToolEvent(CHAT_TOOL_RESULT_EVENT, data)
@@ -256,6 +316,7 @@ export function useGatewayChatStream(
           runId: data.runId,
           sessionKey: data.sessionKey,
         })
+        markActivity()
         touchStreamTimeout(data.sessionKey)
         dispatchChatToolEvent(CHAT_TOOL_CALL_EVENT, {
           phase: 'calling',
@@ -290,6 +351,7 @@ export function useGatewayChatStream(
           runId: data.runId,
           sessionKey: data.sessionKey,
         })
+        markActivity()
         touchStreamTimeout(data.sessionKey)
         dispatchChatToolEvent(CHAT_TOOL_RESULT_EVENT, {
           phase: data.isError || data.error ? 'error' : 'done',
@@ -314,6 +376,7 @@ export function useGatewayChatStream(
           source?: string
         }
         processEvent({ type: 'user_message', ...data })
+        markActivity()
         onUserMessageRef.current?.(data.message, data.source)
       } catch {
         // Ignore parse errors
@@ -329,6 +392,7 @@ export function useGatewayChatStream(
         }
         // debug: console.log(`[SSE] message event received: role=${data.message?.role} sessionKey=${data.sessionKey}`)
         processEvent({ type: 'message', ...data })
+        markActivity()
       } catch {
         // Ignore parse errors
       }
@@ -348,6 +412,7 @@ export function useGatewayChatStream(
         const streamingSnapshot =
           useGatewayChatStore.getState().streamingState.get(data.sessionKey) ?? null
         processEvent({ type: 'done', ...data })
+        markActivity()
         clearStreamTimeout(data.sessionKey)
         dispatchChatStreamDoneEvent(data)
         onDoneRef.current?.(data.state, data.sessionKey, streamingSnapshot)
@@ -368,6 +433,7 @@ export function useGatewayChatStream(
         }
         if (data.state === 'started' && data.sessionKey && data.runId) {
           processEvent({ type: 'chunk', text: '', runId: data.runId, sessionKey: data.sessionKey })
+          markActivity()
           touchStreamTimeout(data.sessionKey)
         }
       } catch {
@@ -390,10 +456,13 @@ export function useGatewayChatStream(
     processEvent,
     clearAllStreaming,
     clearAllStreamTimeouts,
+    clearSilenceProbe,
     clearStreamTimeout,
     dispatchChatStreamDoneEvent,
     dispatchChatToolEvent,
     dispatchSSEDroppedEvent,
+    markActivity,
+    startSilenceProbe,
     touchStreamTimeout,
   ])
 
@@ -413,8 +482,10 @@ export function useGatewayChatStream(
       connect()
     }, delay)
   }, [enabled, connect])
+  scheduleReconnectRef.current = scheduleReconnect
 
   const disconnect = useCallback(() => {
+    clearSilenceProbe()
     clearAllStreamTimeouts()
 
     if (eventSourceRef.current) {
@@ -429,7 +500,7 @@ export function useGatewayChatStream(
 
     clearAllStreaming()
     setConnectionState('disconnected')
-  }, [clearAllStreaming, clearAllStreamTimeouts, setConnectionState])
+  }, [clearAllStreaming, clearAllStreamTimeouts, clearSilenceProbe, setConnectionState])
 
   const reconnect = useCallback(() => {
     disconnect()

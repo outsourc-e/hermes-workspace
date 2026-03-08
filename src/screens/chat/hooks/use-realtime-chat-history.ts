@@ -98,10 +98,31 @@ export function useRealtimeChatHistory({
   const completedStreamingTextRef = useRef<string>('')
   const completedStreamingThinkingRef = useRef<string>('')
   const lastCompactionSignalRef = useRef<string>('')
+  const isBackfillingRef = useRef(false)
+
+  const backfillHistory = useCallback(async () => {
+    if (!sessionKey || sessionKey === 'new') return
+    if (isBackfillingRef.current) return
+
+    isBackfillingRef.current = true
+    try {
+      const key = chatQueryKeys.history(friendlyId, sessionKey)
+      await queryClient.invalidateQueries({ queryKey: key, exact: true })
+      await queryClient.refetchQueries({ queryKey: key, exact: true, type: 'active' })
+    } finally {
+      isBackfillingRef.current = false
+    }
+  }, [friendlyId, queryClient, sessionKey])
 
   const { connectionState, lastError, reconnect } = useGatewayChatStream({
     sessionKey: sessionKey === 'new' ? undefined : sessionKey,
     enabled: enabled && sessionKey !== 'new',
+    onReconnect: useCallback(() => {
+      void backfillHistory()
+    }, [backfillHistory]),
+    onSilentTimeout: useCallback((_silentForMs: number) => {
+      void backfillHistory()
+    }, [backfillHistory]),
     onUserMessage: useCallback(
       (message: GatewayMessage, source?: string) => {
         // Filter internal system messages (pre-compaction flushes, heartbeat
