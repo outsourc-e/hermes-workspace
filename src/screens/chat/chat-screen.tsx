@@ -1845,9 +1845,9 @@ export function ChatScreen({
           ? 'sending'
           : 'idle'
   const researchCard = useResearchCard({
-    sessionKey: activeCanonicalKey,
+    sessionKey: resolvedSessionKey || activeCanonicalKey,
     isStreaming: derivedStreamingInfo.isStreaming,
-    resetKey: `${activeCanonicalKey ?? 'main'}:${researchResetKey}`,
+    resetKey: `${resolvedSessionKey || activeCanonicalKey || 'main'}:${researchResetKey}`,
   })
 
   // Pull-to-refresh offset removed

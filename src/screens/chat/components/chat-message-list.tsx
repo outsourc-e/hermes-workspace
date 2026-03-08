@@ -6,7 +6,11 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Robot01Icon } from '@hugeicons/core-free-icons'
+import {
+  ArrowExpand01Icon,
+  ArrowUp01Icon,
+  Robot01Icon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { hapticTap } from '@/lib/haptics'
 import {
@@ -26,7 +30,6 @@ import { AssistantAvatar } from '@/components/avatars'
 import { cn } from '@/lib/utils'
 import { ResearchCard } from './research-card'
 import type { UseResearchCardResult } from '@/hooks/use-research-card'
-import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 
 /** Duration (ms) the thinking indicator stays visible after waitingForResponse
  *  clears, giving the first response message time to render before the
@@ -63,6 +66,7 @@ function getToolStatusLabel(toolName: string): string {
 type ThinkingBubbleProps = {
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   liveToolActivity?: Array<{ name: string; timestamp: number }>
+  researchCard?: UseResearchCardResult
 }
 
 /**
@@ -70,7 +74,11 @@ type ThinkingBubbleProps = {
  * with three bouncing dots, a gradient shimmer sweep, and a dynamic status
  * label that reflects what's actually happening (tool calls, etc.).
  */
-function ThinkingBubble({ activeToolCalls = [], liveToolActivity = [] }: ThinkingBubbleProps) {
+function ThinkingBubble({
+  activeToolCalls = [],
+  liveToolActivity = [],
+  researchCard,
+}: ThinkingBubbleProps) {
   // Derive the most recent active tool name
   const activeToolName = useMemo(() => {
     // liveToolActivity is ordered newest-first
@@ -100,6 +108,11 @@ function ThinkingBubble({ activeToolCalls = [], liveToolActivity = [] }: Thinkin
 
   const isStale = elapsed >= 30
   const isVeryStale = elapsed >= 60
+  const canExpandResearch = Boolean(researchCard && researchCard.steps.length > 0)
+  const expandedResearchCard = canExpandResearch ? researchCard : null
+  const completedResearchSteps = researchCard
+    ? researchCard.steps.filter((step) => step.status === 'done').length
+    : 0
 
   // Track displayed label with a small delay so we fade between changes
   const [displayedLabel, setDisplayedLabel] = useState(statusLabel)
@@ -126,36 +139,63 @@ function ThinkingBubble({ activeToolCalls = [], liveToolActivity = [] }: Thinkin
       </div>
 
       {/* Chat bubble */}
-      <div className="relative overflow-hidden rounded-2xl rounded-bl-sm border border-primary-200 dark:border-primary-200/20 bg-primary-100 dark:bg-primary-100 px-4 py-3 thinking-shimmer-bubble">
+      <div className="relative overflow-hidden rounded-2xl rounded-bl-sm border border-primary-200 dark:border-primary-200/20 bg-primary-100 dark:bg-primary-100 thinking-shimmer-bubble">
         {/* Shimmer overlay */}
         <div className="thinking-shimmer-sweep pointer-events-none absolute inset-0" aria-hidden="true" />
 
-        {/* Three bouncing dots + dynamic status label */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-1.5">
-            <span className="thinking-dot thinking-dot-1" />
-            <span className="thinking-dot thinking-dot-2" />
-            <span className="thinking-dot thinking-dot-3" />
-            {/* Dynamic status label with fade transition */}
-            <span
-              className={cn(
-                "thinking-label ml-1.5 text-xs font-medium transition-opacity duration-300",
-                isStale
-                  ? "text-amber-500 dark:text-amber-400"
-                  : "text-primary-500 dark:text-primary-500"
-              )}
-              style={{ opacity: visible ? 1 : 0 }}
-            >
-              {displayedLabel} {elapsed >= 3 && <span className="text-[10px] opacity-60">{elapsedLabel}</span>}
-            </span>
+        <div className="relative flex flex-col gap-1 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="thinking-dot thinking-dot-1" />
+                <span className="thinking-dot thinking-dot-2" />
+                <span className="thinking-dot thinking-dot-3" />
+                <span
+                  className={cn(
+                    'thinking-label ml-1.5 text-xs font-medium transition-opacity duration-300',
+                    isStale
+                      ? 'text-amber-500 dark:text-amber-400'
+                      : 'text-primary-500 dark:text-primary-500',
+                  )}
+                  style={{ opacity: visible ? 1 : 0 }}
+                >
+                  {displayedLabel}{' '}
+                  {elapsed >= 3 ? (
+                    <span className="text-[10px] opacity-60">{elapsedLabel}</span>
+                  ) : null}
+                </span>
+              </div>
+              {canExpandResearch ? (
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-primary-500 dark:text-primary-400">
+                  <span>{completedResearchSteps}/{expandedResearchCard?.steps.length ?? 0} tools</span>
+                  <span aria-hidden="true" className="opacity-40">•</span>
+                  <span>{expandedResearchCard?.isActive ? 'Live timeline' : 'Timeline ready'}</span>
+                </div>
+              ) : null}
+            </div>
+            {canExpandResearch ? (
+              <button
+                type="button"
+                onClick={() => expandedResearchCard?.setCollapsed((collapsed) => !collapsed)}
+                className="relative z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-primary-200/80 bg-primary-50/90 text-primary-500 transition-colors hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/80 dark:text-primary-300 dark:hover:bg-primary-800"
+                aria-label={expandedResearchCard?.collapsed ? 'Expand research timeline' : 'Collapse research timeline'}
+                title={expandedResearchCard?.collapsed ? 'Expand research timeline' : 'Collapse research timeline'}
+              >
+                <HugeiconsIcon
+                  icon={expandedResearchCard?.collapsed ? ArrowExpand01Icon : ArrowUp01Icon}
+                  size={14}
+                  strokeWidth={1.8}
+                />
+              </button>
+            ) : null}
           </div>
-          {/* Stale warning — shown after 30s */}
-          {isStale && (
+
+          {isStale ? (
             <span className="text-[11px] text-amber-500 dark:text-amber-400 animate-pulse">
               {isVeryStale ? 'Still working… this is taking a while' : 'Taking longer than usual…'}
             </span>
-          )}
-          {/* Raw tool name pill — shown when a tool is active */}
+          ) : null}
+
           {activeToolName ? (
             <div
               style={{
@@ -169,63 +209,17 @@ function ThinkingBubble({ activeToolCalls = [], liveToolActivity = [] }: Thinkin
             </div>
           ) : null}
         </div>
+
+        {expandedResearchCard && !expandedResearchCard.collapsed ? (
+          <ResearchCard
+            steps={expandedResearchCard.steps}
+            isActive={expandedResearchCard.isActive}
+            totalDurationMs={expandedResearchCard.totalDurationMs}
+          />
+        ) : null}
       </div>
     </div>
   )
-}
-
-const TOOL_ICONS: Record<string, string> = {
-  web_search: '🔍',
-  web_fetch: '🌐',
-  Read: '📄',
-  read: '📄',
-  Write: '✏️',
-  write: '✏️',
-  Edit: '✏️',
-  edit: '✏️',
-  exec: '⚡',
-  browser: '🖥️',
-  memory_search: '🧠',
-  memory_get: '🧠',
-  image: '🖼️',
-  sessions_spawn: '🔀',
-  message: '💬',
-  tts: '🔊',
-  cron: '⏰',
-  gateway: '🔧',
-  nodes: '📡',
-}
-
-const TOOL_LABELS: Record<string, string> = {
-  web_search: 'Searching the web',
-  web_fetch: 'Fetching page',
-  Read: 'Reading file',
-  read: 'Reading file',
-  Write: 'Writing file',
-  write: 'Writing file',
-  Edit: 'Editing file',
-  edit: 'Editing file',
-  exec: 'Running command',
-  browser: 'Using browser',
-  memory_search: 'Searching memory',
-  memory_get: 'Reading memory',
-  image: 'Analyzing image',
-  sessions_spawn: 'Spawning sub-agent',
-  message: 'Sending message',
-  tts: 'Generating speech',
-  cron: 'Managing cron job',
-  gateway: 'Gateway operation',
-  nodes: 'Node operation',
-}
-
-function getToolIcon(name: string): string {
-  return TOOL_ICONS[name] || '🔧'
-}
-
-function getToolLabel(name: string, phase: string): string {
-  const label = TOOL_LABELS[name] || `Running ${name}`
-  if (phase === 'result') return `${label} ✓`
-  return `${label}...`
 }
 
 const VIRTUAL_ROW_HEIGHT = 136
@@ -768,16 +762,6 @@ function ChatMessageListComponent({
       researchCard.steps.length > 0,
   )
 
-  // DEBUG: temporary floating badge — remove after confirming research card works
-  const storeKeys = typeof window !== 'undefined'
-    ? Array.from(useGatewayChatStore.getState().streamingState.keys()).join(',')
-    : ''
-  const debugBadge = researchCard ? (
-    <div className="fixed bottom-2 left-2 z-[9999] rounded bg-black/80 px-2 py-1 text-[10px] text-white font-mono max-w-[300px] break-all">
-      RC: steps={researchCard.steps.length} show={String(showResearchCard)} key={sessionKey || 'none'} store=[{storeKeys || 'empty'}]
-    </div>
-  ) : null
-
   const shouldBottomPin =
     displayMessages.length > 0 ||
     showToolOnlyNotice ||
@@ -1133,7 +1117,6 @@ function ChatMessageListComponent({
   return (
     // mt-2 is to fix the prompt-input cut off
     <>
-    {debugBadge}
     <ChatContainerRoot
       className="h-full flex-1 min-h-0"
       stickToBottom={stickToBottomRef.current}
@@ -1375,61 +1358,11 @@ function ChatMessageListComponent({
               role="status"
               aria-live="polite"
             >
-              {showResearchCard && researchCard ? (
-                <>
-                  <ResearchCard
-                    steps={researchCard.steps}
-                    isActive={researchCard.isActive}
-                    totalDurationMs={researchCard.totalDurationMs}
-                    onToggle={() => researchCard.setCollapsed(!researchCard.collapsed)}
-                    collapsed={researchCard.collapsed}
-                  />
-                  {isStreaming || researchCard.isActive ? (
-                    <ThinkingBubble
-                      activeToolCalls={activeToolCalls}
-                      liveToolActivity={liveToolActivity}
-                    />
-                  ) : null}
-                </>
-              ) : liveToolActivity.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {liveToolActivity.map((tool, index) => (
-                    <span
-                      key={tool.name}
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                        index === 0
-                          ? 'animate-pulse border-accent-200 bg-accent-50 text-accent-700 dark:border-accent-800 dark:bg-accent-950/40 dark:text-accent-400'
-                          : 'border-neutral-200 bg-neutral-100 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
-                      )}
-                    >
-                      {getToolIcon(tool.name)} {tool.name}
-                      {index === 0 ? (
-                        <span className="ml-0.5 opacity-60">···</span>
-                      ) : null}
-                    </span>
-                  ))}
-                </div>
-              ) : activeToolCalls.length > 0 ? (
-                activeToolCalls.map((tool) => (
-                  <div key={tool.id} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <div className="size-5 rounded-full bg-accent-100 flex items-center justify-center shrink-0">
-                      <span className="text-[10px]">{getToolIcon(tool.name)}</span>
-                    </div>
-                    <span className="text-xs text-accent-600 font-medium">
-                      {getToolLabel(tool.name, tool.phase)}
-                    </span>
-                    {tool.phase !== 'result' && (
-                      <span className="inline-block size-1.5 rounded-full bg-accent-400 animate-pulse" />
-                    )}
-                  </div>
-                ))
-              ) : (
-                <ThinkingBubble
-                  activeToolCalls={activeToolCalls}
-                  liveToolActivity={liveToolActivity}
-                />
-              )}
+              <ThinkingBubble
+                activeToolCalls={activeToolCalls}
+                liveToolActivity={liveToolActivity}
+                researchCard={researchCard}
+              />
             </div>
           ) : null}
           {notice && noticePosition === 'end' ? notice : null}

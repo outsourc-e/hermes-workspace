@@ -78,7 +78,6 @@ export function useGatewayChatStream(
       detail: Record<string, unknown>,
     ) => {
       if (typeof window === 'undefined') return
-      console.log('[research-card-debug]', eventName, detail.name, detail.phase)
       window.dispatchEvent(new CustomEvent(eventName, { detail }))
     },
     [],

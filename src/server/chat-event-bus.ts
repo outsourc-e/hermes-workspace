@@ -177,7 +177,6 @@ function processGatewayFrame(frame: GatewayFrame): void {
     const stream = rawPayload?.stream
     const data = rawPayload?.data
     const runId = rawPayload?.runId
-    console.log(`[chat-bus] agent event: stream=${stream} phase=${data?.phase} name=${data?.name} session=${targetSessionKey}`)
 
     if (stream === 'assistant' && data?.text) {
       if (!claimChunkSource(runId, 'agent')) return

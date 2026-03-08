@@ -101,16 +101,18 @@ function buildToolLabel(toolName: string, args: unknown): string {
 }
 
 /**
- * Research card hook that reads directly from the gateway chat store
- * instead of relying on CustomEvents. This is more reliable because
- * the store is already proven to receive tool events (the thinking
- * bubble uses the same data path).
+ * Research card hook that reads directly from the same gateway chat
+ * store selector path used by the thinking bubble.
  */
 export function useResearchCard({
   sessionKey,
   isStreaming = false,
   resetKey,
 }: UseResearchCardOptions = {}) {
+  const effectiveSessionKey = sessionKey || 'main'
+  const streamingToolCalls = useGatewayChatStore(
+    (state) => state.streamingState.get(effectiveSessionKey)?.toolCalls ?? [],
+  )
   const [steps, setSteps] = useState<ResearchStep[]>([])
   const [collapsed, setCollapsed] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -138,64 +140,71 @@ export function useResearchCard({
     return () => window.clearInterval(intervalId)
   }, [isStreaming, steps.length])
 
-  // Subscribe to store changes — this is the key difference from the
-  // CustomEvent approach. We poll the store's streamingState for tool
-  // calls and build the timeline from that.
+  // Mirror the active tool-call array from the store into a persistent
+  // timeline so completed steps still render after streaming state clears.
   useEffect(() => {
-    const unsubscribe = useGatewayChatStore.subscribe((state) => {
-      const key = sessionKey || 'main'
-      const streaming = state.streamingState.get(key)
-      if (!streaming?.toolCalls?.length) return
+    if (streamingToolCalls.length === 0) return
 
-      const currentTime = Date.now()
-      setNow(currentTime)
+    const currentTime = Date.now()
+    setNow(currentTime)
 
-      setSteps((prevSteps) => {
-        let changed = false
-        const nextSteps = [...prevSteps]
+    setSteps((prevSteps) => {
+      let changed = false
+      const nextSteps = [...prevSteps]
 
-        for (const toolCall of streaming.toolCalls) {
-          const toolId = toolCall.id
-          const isDone = toolCall.phase === 'done' || toolCall.phase === 'result'
-          const isError = toolCall.phase === 'error'
+      for (const toolCall of streamingToolCalls) {
+        const toolId = toolCall.id
+        const isDone = toolCall.phase === 'done' || toolCall.phase === 'result'
+        const isError = toolCall.phase === 'error'
+        const nextStatus: ResearchStep['status'] = isError
+          ? 'error'
+          : isDone
+            ? 'done'
+            : 'running'
 
-          const existingIndex = nextSteps.findIndex((s) => s.id === toolId)
+        const existingIndex = nextSteps.findIndex((step) => step.id === toolId)
 
-          if (existingIndex >= 0) {
-            // Update existing step
-            const existing = nextSteps[existingIndex]
-            const newStatus = isError ? 'error' : isDone ? 'done' : 'running'
-            if (existing.status !== newStatus) {
-              nextSteps[existingIndex] = {
-                ...existing,
-                status: newStatus,
-                durationMs: (isDone || isError) ? currentTime - existing.startedAt : undefined,
-              }
-              changed = true
-            }
-          } else if (!seenToolIdsRef.current.has(toolId)) {
-            // New tool call
-            seenToolIdsRef.current.add(toolId)
-            nextSteps.push({
-              id: toolId,
+        if (existingIndex >= 0) {
+          const existing = nextSteps[existingIndex]
+          const nextDuration =
+            isDone || isError ? currentTime - existing.startedAt : undefined
+          if (
+            existing.status !== nextStatus ||
+            existing.label !== buildToolLabel(toolCall.name, toolCall.args) ||
+            existing.toolName !== toolCall.name ||
+            existing.durationMs !== nextDuration
+          ) {
+            nextSteps[existingIndex] = {
+              ...existing,
               toolName: toolCall.name,
               label: buildToolLabel(toolCall.name, toolCall.args),
-              status: isError ? 'error' : isDone ? 'done' : 'running',
-              startedAt: currentTime,
-              durationMs: (isDone || isError) ? 0 : undefined,
-            })
+              status: nextStatus,
+              durationMs: nextDuration,
+            }
             changed = true
           }
+          continue
         }
 
-        return changed ? nextSteps : prevSteps
-      })
+        if (seenToolIdsRef.current.has(toolId)) continue
 
-      setCollapsed(false)
+        seenToolIdsRef.current.add(toolId)
+        nextSteps.push({
+          id: toolId,
+          toolName: toolCall.name,
+          label: buildToolLabel(toolCall.name, toolCall.args),
+          status: nextStatus,
+          startedAt: currentTime,
+          durationMs: isDone || isError ? 0 : undefined,
+        })
+        changed = true
+      }
+
+      return changed ? nextSteps : prevSteps
     })
 
-    return unsubscribe
-  }, [sessionKey])
+    setCollapsed(false)
+  }, [streamingToolCalls])
 
   const totalDurationMs = useMemo(() => {
     if (steps.length === 0) return 0
@@ -208,7 +217,8 @@ export function useResearchCard({
     return Math.max(0, endedAt - startedAt)
   }, [isStreaming, now, steps])
 
-  const isActive = isStreaming && steps.length > 0
+  const isActive =
+    isStreaming && steps.some((step) => step.status === 'running')
 
   return {
     steps,
