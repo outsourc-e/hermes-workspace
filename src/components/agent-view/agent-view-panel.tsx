@@ -1117,15 +1117,15 @@ export function AgentViewPanel() {
                           </motion.div>
                         ) : null}
                       </motion.div>
-                    ) : (
+                    ) : cliAgents.length > 0 ? null : (
                       <p
                         ref={
                           networkLayerRef as React.RefObject<HTMLParagraphElement>
                         }
                         className="text-[11px] text-pretty text-primary-600 py-1"
                       >
-                        No active subagents. Spawn agents from chat to see them
-                        here.
+                        No active agents. Spawn agents from chat or CLI to see
+                        them here.
                       </p>
                     )}
                   </LayoutGroup>
@@ -1148,7 +1148,7 @@ export function AgentViewPanel() {
                             size={20}
                             strokeWidth={1.5}
                           />
-                          ⚡ CLI Agents
+                          ⚡ Active Agents
                         </CollapsibleTrigger>
                         <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
                           {cliAgents.length}
