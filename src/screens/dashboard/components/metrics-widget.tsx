@@ -27,6 +27,8 @@ type MetricsWidgetProps = {
   chartData?: Array<{ date: string; value: number }>
   /** Accent bar color class for the latest bar in the chart */
   chartAccentClass?: string
+  /** Show shimmer skeleton instead of values */
+  loading?: boolean
 }
 
 const METRIC_COLOR_CLASSES: Record<
@@ -177,6 +179,7 @@ type MetricCardProps = {
   chartAccentClass?: string
   onPress: () => void
   anchorRef: RefObject<HTMLButtonElement | null>
+  loading?: boolean
 }
 
 function MetricCard({
@@ -192,6 +195,7 @@ function MetricCard({
   chartAccentClass,
   onPress,
   anchorRef,
+  loading = false,
 }: MetricCardProps) {
   const trend = getTrendUi(trendPct, trendInverted)
 
@@ -211,9 +215,13 @@ function MetricCard({
         {label}
       </p>
 
+      {loading ? (
+        <div className="mt-2 h-7 w-20 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+      ) : (
       <p className="mt-1 truncate font-mono text-2xl sm:text-3xl font-semibold leading-none tabular-nums text-primary-900 dark:text-neutral-100">
         {formatMetricValue(value)}
       </p>
+      )}
 
       {chartData && chartData.length > 0 ? (
         <div className="mt-2">
@@ -258,6 +266,7 @@ export function MetricsWidget({
   rawValue,
   chartData,
   chartAccentClass,
+  loading = false,
 }: MetricsWidgetProps) {
   const metricId = useMemo(() => toMetricId(title), [title])
   const cardRef = useRef<HTMLButtonElement>(null)
@@ -295,7 +304,7 @@ export function MetricsWidget({
     setSelectedMetricId(null)
   }
 
-  const displayValue = isError ? '—' : value
+  const displayValue = loading ? '—' : isError ? '—' : value
   const rawMetricValue = rawValue ?? formatMetricValue(value)
   const metricDescription = description
   const accentBarClass = chartAccentClass ?? CHART_ACCENT_DEFAULTS[accent]
@@ -318,6 +327,7 @@ export function MetricsWidget({
           chartAccentClass={chartAccentClass}
           onPress={openMobilePopover}
           anchorRef={cardRef}
+          loading={loading}
         />
 
         {mobilePopoverOpen ? (
@@ -398,6 +408,13 @@ export function MetricsWidget({
       >
         <div className="flex h-full flex-col justify-between">
           <div>
+            {loading ? (
+              <>
+                <div className="h-7 w-20 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                <div className="mt-2 h-3 w-28 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+              </>
+            ) : (
+            <>
             <p
               className={cn(
                 'truncate font-mono text-2xl font-semibold leading-none tabular-nums',
@@ -415,6 +432,8 @@ export function MetricsWidget({
                 {trendLabel ? ` ${trendLabel}` : ''}
               </p>
             ) : null}
+            </>
+            )}
           </div>
 
           {chartData && chartData.length > 0 ? (

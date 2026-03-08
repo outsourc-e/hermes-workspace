@@ -155,6 +155,7 @@ export function DashboardScreen() {
 
   // ── Dashboard data (single hook, all queries + computed values) ────────────
   const { data: dashboardData, refetch } = useDashboardData()
+  const isDashboardLoading = dashboardData.status === 'loading'
 
   // ── Pull-to-refresh (mobile) ───────────────────────────────────────────────
   const { isPulling, pullDistance, threshold } = usePullToRefresh(
@@ -272,6 +273,7 @@ export function DashboardScreen() {
               rawValue={`${dashboardData.sessions.total} sessions`}
               chartData={sessionsChartData}
               chartAccentClass="bg-cyan-500"
+              loading={isDashboardLoading}
             />
           ),
         },
@@ -287,6 +289,7 @@ export function DashboardScreen() {
               accent="orange"
               description="Agents currently running or processing work."
               rawValue={`${dashboardData.agents.active} active agents`}
+              loading={isDashboardLoading}
             />
           ),
         },
@@ -307,6 +310,7 @@ export function DashboardScreen() {
               rawValue={costTodayDisplay}
               chartData={costChartData}
               chartAccentClass="bg-emerald-500"
+              loading={isDashboardLoading}
             />
           ),
         },
@@ -322,6 +326,7 @@ export function DashboardScreen() {
               accent="purple"
               description="Total messages exchanged today across all sessions."
               rawValue={`${dashboardData.usage.messages.total} messages`}
+              loading={isDashboardLoading}
             />
           ),
         },
