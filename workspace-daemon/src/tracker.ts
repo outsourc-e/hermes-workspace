@@ -390,6 +390,41 @@ export class Tracker extends EventEmitter {
     return (this.db.prepare("SELECT * FROM task_runs WHERE id = ?").get(id) as TaskRun | undefined) ?? null;
   }
 
+  getTaskRunApprovalContext(id: string): (TaskRun & {
+    task_name: string;
+    task_id: string;
+    project_id: string;
+    project_name: string;
+    project_path: string | null;
+  }) | null {
+    return (
+      (this.db
+        .prepare(
+          `SELECT tr.*,
+            t.id AS task_id,
+            t.name AS task_name,
+            p.id AS project_id,
+            p.name AS project_name,
+            p.path AS project_path
+           FROM task_runs tr
+           JOIN tasks t ON t.id = tr.task_id
+           JOIN missions m ON m.id = t.mission_id
+           JOIN phases ph ON ph.id = m.phase_id
+           JOIN projects p ON p.id = ph.project_id
+           WHERE tr.id = ?`,
+        )
+        .get(id) as
+        | (TaskRun & {
+            task_name: string;
+            task_id: string;
+            project_id: string;
+            project_name: string;
+            project_path: string | null;
+          })
+        | undefined) ?? null
+    );
+  }
+
   getRunningTaskRuns(): TaskRun[] {
     return this.db.prepare("SELECT * FROM task_runs WHERE status = 'running'").all() as TaskRun[];
   }
@@ -442,6 +477,10 @@ export class Tracker extends EventEmitter {
     return checkpoint;
   }
 
+  getCheckpoint(id: string): Checkpoint | null {
+    return (this.db.prepare("SELECT * FROM checkpoints WHERE id = ?").get(id) as Checkpoint | undefined) ?? null;
+  }
+
   listCheckpoints(status?: string): Array<Checkpoint & { task_name?: string; mission_name?: string; project_name?: string; agent_name?: string }> {
     const query = `
       SELECT c.*,
@@ -477,7 +516,18 @@ export class Tracker extends EventEmitter {
     return checkpoint;
   }
 
-  approveCheckpoint(id: string, reviewerNotes?: string): Checkpoint | null {
+  approveCheckpoint(id: string, reviewerNotes?: string, commitHash?: string | null): Checkpoint | null {
+    if (commitHash !== undefined) {
+      this.db
+        .prepare("UPDATE checkpoints SET status = 'approved', reviewer_notes = ?, commit_hash = ? WHERE id = ?")
+        .run(reviewerNotes ?? null, commitHash, id);
+      const checkpoint = this.getCheckpoint(id);
+      if (checkpoint) {
+        this.emitSse("checkpoint.updated", checkpoint);
+      }
+      return checkpoint;
+    }
+
     return this.updateCheckpointStatus(id, "approved", reviewerNotes);
   }
 

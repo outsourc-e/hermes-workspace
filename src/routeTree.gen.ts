@@ -131,6 +131,7 @@ import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents
 import { Route as ApiWorkspaceMissionsIdStartRouteImport } from './routes/api/workspace/missions.$id.start'
 import { Route as ApiWorkspaceCheckpointsIdReviseRouteImport } from './routes/api/workspace/checkpoints.$id.revise'
 import { Route as ApiWorkspaceCheckpointsIdRejectRouteImport } from './routes/api/workspace/checkpoints.$id.reject'
+import { Route as ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-merge'
 import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
@@ -749,6 +750,12 @@ const ApiWorkspaceCheckpointsIdRejectRoute =
     path: '/$id/reject',
     getParentRoute: () => ApiWorkspaceCheckpointsRoute,
   } as any)
+const ApiWorkspaceCheckpointsIdApproveAndMergeRoute =
+  ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport.update({
+    id: '/$id/approve-and-merge',
+    path: '/$id/approve-and-merge',
+    getParentRoute: () => ApiWorkspaceCheckpointsRoute,
+  } as any)
 const ApiWorkspaceCheckpointsIdApproveRoute =
   ApiWorkspaceCheckpointsIdApproveRouteImport.update({
     id: '/$id/approve',
@@ -884,6 +891,7 @@ export interface FileRoutesByFullPath {
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
+  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
@@ -1009,6 +1017,7 @@ export interface FileRoutesByTo {
   '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
+  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
@@ -1136,6 +1145,7 @@ export interface FileRoutesById {
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
+  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
@@ -1264,6 +1274,7 @@ export interface FileRouteTypes {
     | '/api/gateway/approvals/'
     | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
+    | '/api/workspace/checkpoints/$id/approve-and-merge'
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/missions/$id/start'
@@ -1389,6 +1400,7 @@ export interface FileRouteTypes {
     | '/api/gateway/approvals'
     | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
+    | '/api/workspace/checkpoints/$id/approve-and-merge'
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/missions/$id/start'
@@ -1515,6 +1527,7 @@ export interface FileRouteTypes {
     | '/api/gateway/approvals/'
     | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
+    | '/api/workspace/checkpoints/$id/approve-and-merge'
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/missions/$id/start'
@@ -2477,6 +2490,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceCheckpointsIdRejectRouteImport
       parentRoute: typeof ApiWorkspaceCheckpointsRoute
     }
+    '/api/workspace/checkpoints/$id/approve-and-merge': {
+      id: '/api/workspace/checkpoints/$id/approve-and-merge'
+      path: '/$id/approve-and-merge'
+      fullPath: '/api/workspace/checkpoints/$id/approve-and-merge'
+      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport
+      parentRoute: typeof ApiWorkspaceCheckpointsRoute
+    }
     '/api/workspace/checkpoints/$id/approve': {
       id: '/api/workspace/checkpoints/$id/approve'
       path: '/$id/approve'
@@ -2587,6 +2607,7 @@ const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
 
 interface ApiWorkspaceCheckpointsRouteChildren {
   ApiWorkspaceCheckpointsIdApproveRoute: typeof ApiWorkspaceCheckpointsIdApproveRoute
+  ApiWorkspaceCheckpointsIdApproveAndMergeRoute: typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
   ApiWorkspaceCheckpointsIdRejectRoute: typeof ApiWorkspaceCheckpointsIdRejectRoute
   ApiWorkspaceCheckpointsIdReviseRoute: typeof ApiWorkspaceCheckpointsIdReviseRoute
 }
@@ -2595,6 +2616,8 @@ const ApiWorkspaceCheckpointsRouteChildren: ApiWorkspaceCheckpointsRouteChildren
   {
     ApiWorkspaceCheckpointsIdApproveRoute:
       ApiWorkspaceCheckpointsIdApproveRoute,
+    ApiWorkspaceCheckpointsIdApproveAndMergeRoute:
+      ApiWorkspaceCheckpointsIdApproveAndMergeRoute,
     ApiWorkspaceCheckpointsIdRejectRoute: ApiWorkspaceCheckpointsIdRejectRoute,
     ApiWorkspaceCheckpointsIdReviseRoute: ApiWorkspaceCheckpointsIdReviseRoute,
   }

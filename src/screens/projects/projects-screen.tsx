@@ -17,6 +17,7 @@ import {
   formatCheckpointStatus,
   formatCheckpointTimestamp,
   getCheckpointActionButtonClass,
+  getCheckpointCommitHashLabel,
   getCheckpointDiffStat,
   getCheckpointStatusBadgeClass,
   getCheckpointSummary,
@@ -1211,11 +1212,15 @@ export function ProjectsScreen() {
                     ) : projectCheckpoints.length > 0 ? (
                       <div className="space-y-3">
                         {projectCheckpoints.map(
-                          (checkpoint: WorkspaceCheckpoint) => (
-                            <article
-                              key={checkpoint.id}
-                              className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4"
-                            >
+                          (checkpoint: WorkspaceCheckpoint) => {
+                            const commitHashLabel =
+                              getCheckpointCommitHashLabel(checkpoint)
+
+                            return (
+                              <article
+                                key={checkpoint.id}
+                                className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4"
+                              >
                               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                                 <div className="space-y-2">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -1244,6 +1249,11 @@ export function ProjectsScreen() {
                                       checkpoint.created_at,
                                     )}
                                   </p>
+                                  {commitHashLabel ? (
+                                    <code className="inline-flex items-center rounded-md border border-primary-700 bg-primary-900/80 px-2 py-1 font-mono text-xs text-primary-200 tabular-nums">
+                                      {commitHashLabel}
+                                    </code>
+                                  ) : null}
                                 </div>
 
                                 {isCheckpointReviewable(checkpoint) ? (
@@ -1295,8 +1305,9 @@ export function ProjectsScreen() {
                                   </div>
                                 ) : null}
                               </div>
-                            </article>
-                          ),
+                              </article>
+                            )
+                          },
                         )}
                       </div>
                     ) : (

@@ -12,6 +12,7 @@ import {
   formatCheckpointStatus,
   formatCheckpointTimestamp,
   getCheckpointActionButtonClass,
+  getCheckpointCommitHashLabel,
   getCheckpointDiffStat,
   getCheckpointReviewSubmitLabel,
   getCheckpointReviewSuccessMessage,
@@ -90,6 +91,7 @@ function ReviewRow({
 }) {
   const isComposerOpen = composer?.checkpointId === checkpoint.id
   const canReview = isCheckpointReviewable(checkpoint)
+  const commitHashLabel = getCheckpointCommitHashLabel(checkpoint)
 
   return (
     <article className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4 md:p-5">
@@ -128,6 +130,20 @@ function ReviewRow({
               <p className="mt-1 text-sm text-primary-200">
                 {getCheckpointDiffStat(checkpoint)}
               </p>
+            </div>
+            <div className="rounded-xl border border-primary-800 bg-primary-800/40 px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
+                Commit
+              </p>
+              <div className="mt-1">
+                {commitHashLabel ? (
+                  <code className="inline-flex items-center rounded-md border border-primary-700 bg-primary-900/80 px-2 py-1 font-mono text-xs text-primary-200 tabular-nums">
+                    {commitHashLabel}
+                  </code>
+                ) : (
+                  <p className="text-sm text-primary-400">pending</p>
+                )}
+              </div>
             </div>
             <div className="rounded-xl border border-primary-800 bg-primary-800/40 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">

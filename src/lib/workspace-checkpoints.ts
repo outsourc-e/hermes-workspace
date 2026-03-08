@@ -16,11 +16,12 @@ export type WorkspaceCheckpoint = {
   diff_stat: string | null
   status: CheckpointStatus
   reviewer_notes: string | null
+  commit_hash: string | null
   created_at: string
-  task_name?: string
-  mission_name?: string
-  project_name?: string
-  agent_name?: string
+  task_name: string | null
+  mission_name: string | null
+  project_name: string | null
+  agent_name: string | null
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -77,11 +78,13 @@ function normalizeCheckpoint(value: unknown): WorkspaceCheckpoint {
     status: asString(record?.status) ?? 'pending',
     reviewer_notes:
       typeof record?.reviewer_notes === 'string' ? record.reviewer_notes : null,
+    commit_hash:
+      typeof record?.commit_hash === 'string' ? record.commit_hash : null,
     created_at: asString(record?.created_at) ?? new Date().toISOString(),
-    task_name: asString(record?.task_name),
-    mission_name: asString(record?.mission_name),
-    project_name: asString(record?.project_name),
-    agent_name: asString(record?.agent_name),
+    task_name: asString(record?.task_name) ?? null,
+    mission_name: asString(record?.mission_name) ?? null,
+    project_name: asString(record?.project_name) ?? null,
+    agent_name: asString(record?.agent_name) ?? null,
   }
 }
 
@@ -120,8 +123,10 @@ export async function submitCheckpointReview(
   action: CheckpointReviewAction,
   reviewerNotes?: string,
 ): Promise<WorkspaceCheckpoint> {
+  const actionPath =
+    action === 'approve' ? 'approve-and-merge' : action
   const payload = await workspaceRequestJson(
-    `/api/workspace/checkpoints/${encodeURIComponent(id)}/${action}`,
+    `/api/workspace/checkpoints/${encodeURIComponent(id)}/${actionPath}`,
     {
       method: 'POST',
       headers: {
@@ -201,6 +206,13 @@ export function getCheckpointSummary(checkpoint: WorkspaceCheckpoint): string {
 
 export function getCheckpointDiffStat(checkpoint: WorkspaceCheckpoint): string {
   return checkpoint.diff_stat?.trim() || 'No diff stat reported'
+}
+
+export function getCheckpointCommitHashLabel(
+  checkpoint: WorkspaceCheckpoint,
+): string | null {
+  const commitHash = checkpoint.commit_hash?.trim()
+  return commitHash ? commitHash.slice(0, 7) : null
 }
 
 export function getCheckpointReviewSuccessMessage(
