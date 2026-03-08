@@ -834,6 +834,14 @@ function ChatMessageListComponent({
     const isActiveMatch =
       isSearchMatch && searchMatchIndex === activeSearchMatchIndex
 
+    // If this is a user message and an assistant reply exists after it,
+    // the send obviously succeeded — never show Retry.
+    const hasAssistantReply =
+      chatMessage.role === 'user' &&
+      realIndex + 1 < displayMessages.length &&
+      displayMessages[realIndex + 1]?.role === 'assistant'
+    const effectiveOnRetry = hasAssistantReply ? undefined : onRetryMessage
+
     // For the live streaming placeholder: wrap in a stable div whose key never
     // changes for the lifetime of the stream. The div's opacity toggles between
     // 0 (no text yet) and 1 (text flowing) without unmounting the inner
@@ -854,7 +862,7 @@ function ChatMessageListComponent({
         >
           <MessageItem
             message={chatMessage}
-            onRetryMessage={onRetryMessage}
+            onRetryMessage={effectiveOnRetry}
             toolResultsByCallId={hasToolCalls ? toolResultsByCallId : undefined}
             forceActionsVisible={forceActionsVisible}
             wrapperClassName={spacingClass}
@@ -881,7 +889,7 @@ function ChatMessageListComponent({
       <MessageItem
         key={stableId}
         message={chatMessage}
-        onRetryMessage={onRetryMessage}
+        onRetryMessage={effectiveOnRetry}
         toolResultsByCallId={hasToolCalls ? toolResultsByCallId : undefined}
         forceActionsVisible={forceActionsVisible}
         wrapperClassName={spacingClass}
