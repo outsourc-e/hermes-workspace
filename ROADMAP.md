@@ -4,25 +4,29 @@ _Source: 4 external audits + internal punch list_
 
 ## ✅ Done (2026-03-07)
 - [x] Chat duplication fix — singleton event bus + text-based dedup (`e939e97`, `075b473`)
-- [x] False Retry fix — removed optimistic ID trigger (`075b473`)
+- [x] False Retry fix — never show when assistant already replied (`4d4bb59`)
 - [x] Update check crash on packaged installs (`fe95ac1`)
 - [x] Session friendly names — `agent:main:cron:UUID` → "Cron Task" (`a01747d`)
 - [x] Model name humanizer — `anthropic/claude-sonnet-4-5` → "Claude Sonnet 4.5" (`a01747d`)
-- [x] Audit docs saved to `docs/` (`a01747d`)
+- [x] Dashboard loading skeletons on metric cards (`c8b1519`)
+- [x] Chat status language — "Queued"→"Sent", "Offline"→"Updates paused" (`5acaca2`)
+- [x] Agent sidebar unification — CLI agents visible, no false "No agents" (`2bd71ef`)
+- [x] Queued message wrapper stripped from chat UI (`ab9c2d9`)
+- [x] Duplicate "Sent" label removed from actions bar (`ab9c2d9`)
+- [x] Audit docs + ROADMAP saved to repo
 
 ## 🔴 P0 — Ship Blockers
-- [ ] **Dashboard loading skeletons** — stale "0" tokens, "—" model on first load
-- [ ] **Auth default hardening** — open access when no password set (file ops, terminal, updates exposed)
-- [ ] **First-run wizard rewrite** — outcome-first, not gateway-first
-- [ ] **Agent sidebar unification** — merge gateway sessions + CLI agents into one list
+- [ ] **First-run wizard rewrite** — outcome-first ("Use this Mac" / "Connect" / "Cloud"), see TASK-02 in docs/TASK-SPECS.md
+- [ ] **Auth default hardening** — localhost-only for sensitive endpoints when no password set, see TASK-04
 
 ## 🟠 P1 — Critical UX
-- [ ] **Chat status language** — "Queued"→"Sent", "Offline"→"Reconnecting", hide Retry unless failed
-- [ ] **Mission state persistence** — move from React useState to Zustand+persist (missions die on nav)
+- [ ] **formatModelName across all surfaces** — usage modal, agents screen, remote panel, hub layout, see TASK-05
+- [ ] **Connection error taxonomy** — plain-language gateway errors, see TASK-03
+- [ ] **Mission state persistence** — Zustand+persist instead of React useState (missions die on nav)
 - [ ] **Stop deleting sessions on mission complete** — patch status instead of DELETE
-- [ ] **Connection error taxonomy** — clear states: auth required, rejected, pairing, unreachable
 - [ ] **6 redundant EventSource connections** — consolidate to shared singleton client-side
 - [ ] **Usage sidebar UX** — human-readable labels, progress bars, contextual help
+- [ ] **Empty states with action steps** — see TASK-06
 
 ## 🔵 P2 — Polish
 - [ ] **Break up agent-hub-layout.tsx** (8,756 lines → extract by domain)
