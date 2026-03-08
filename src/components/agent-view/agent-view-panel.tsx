@@ -809,7 +809,7 @@ export function AgentViewPanel() {
           animate={{ x: panelVisible ? 0 : panelWidth }}
           transition={{ duration: 0.22, ease: 'easeInOut' }}
           className={cn(
-            'fixed inset-y-0 right-0 z-40 w-72 border-l border-primary-300/70 bg-primary-100/92 backdrop-blur-xl',
+            'fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] z-40 w-72 border-l border-primary-300/70 bg-primary-100/92 backdrop-blur-xl',
             panelVisible ? 'pointer-events-auto' : 'pointer-events-none',
           )}
         >

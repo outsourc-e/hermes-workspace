@@ -193,7 +193,7 @@ export function AgentStreamPanel({ sessionKey, agentName, agentColor, onClose }:
   return (
     <>
       <button type="button" aria-label="Close live stream panel" className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <aside className="fixed inset-x-0 bottom-0 z-50 h-[70vh] rounded-t-2xl border-t border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-900 md:inset-y-0 md:right-0 md:left-auto md:h-auto md:w-[400px] md:rounded-none md:border-t-0 md:border-l">
+      <aside className="fixed inset-x-0 bottom-0 z-50 h-[70vh] rounded-t-2xl border-t border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-900 md:right-0 md:bottom-0 md:left-auto md:top-[var(--titlebar-h,0px)] md:h-auto md:w-[400px] md:rounded-none md:border-t-0 md:border-l">
         <div className="flex h-full min-h-0 flex-col">
           <div className="sticky top-0 z-10 border-b border-neutral-200 bg-white/95 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
             <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700 md:hidden" />

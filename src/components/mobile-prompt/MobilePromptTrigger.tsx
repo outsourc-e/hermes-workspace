@@ -88,7 +88,7 @@ export function MobilePromptTrigger() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -50, scale: 0.95 }}
             transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-            className="fixed top-4 left-1/2 z-[9999] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl border border-primary-800/60 bg-primary-950 text-white shadow-2xl shadow-black/40"
+            className="fixed left-1/2 z-[9999] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl border border-primary-800/60 bg-primary-950 text-white shadow-2xl shadow-black/40 top-[calc(var(--titlebar-h,0px)+1rem)]"
           >
             <div className="px-4 py-3">
               <div className="flex items-center gap-3">

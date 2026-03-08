@@ -142,7 +142,7 @@ export function ChatPanel() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="fixed inset-y-0 right-0 h-[100dvh] max-h-[100dvh] w-[420px] max-w-[100vw] border-l border-primary-200 bg-surface overflow-hidden flex flex-col z-20 shadow-xl"
+            className="fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] h-[calc(100dvh-var(--titlebar-h,0px))] max-h-[calc(100dvh-var(--titlebar-h,0px))] w-[420px] max-w-[100vw] border-l border-primary-200 bg-surface overflow-hidden flex flex-col z-20 shadow-xl"
           >
             {/* Panel header */}
             <div className="flex items-center justify-between h-10 px-3 border-b border-primary-200 shrink-0">

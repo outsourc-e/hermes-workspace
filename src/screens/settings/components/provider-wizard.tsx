@@ -326,7 +326,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
 
   return (
     <DialogRoot open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="left-auto right-0 top-0 h-[100dvh] w-screen translate-x-0 translate-y-0 overflow-hidden rounded-none border-primary-200 bg-primary-50/95 backdrop-blur-sm duration-300 ease-out sm:w-[min(860px,100vw)] sm:rounded-l-2xl data-[state=open]:scale-100 data-[state=closed]:scale-100 data-[state=open]:translate-x-0 data-[state=closed]:translate-x-full">
+      <DialogContent className="left-auto right-0 top-[var(--titlebar-h,0px)] h-[calc(100dvh-var(--titlebar-h,0px))] w-screen translate-x-0 translate-y-0 overflow-hidden rounded-none border-primary-200 bg-primary-50/95 backdrop-blur-sm duration-300 ease-out sm:w-[min(860px,100vw)] sm:rounded-l-2xl data-[state=open]:scale-100 data-[state=closed]:scale-100 data-[state=open]:translate-x-0 data-[state=closed]:translate-x-full">
         <div className="flex h-full min-h-0 flex-col">
           <div className="border-b border-primary-200 p-4 sm:p-5">
             <div className="flex items-start justify-between gap-4">

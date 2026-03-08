@@ -74,7 +74,7 @@ export function Toaster() {
   if (!toasts.length) return null
 
   return createPortal(
-    <div className="pointer-events-none fixed top-4 left-2 right-2 z-[9999] flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-auto">
+    <div className="pointer-events-none fixed left-2 right-2 z-[9999] flex flex-col gap-2 top-[calc(var(--titlebar-h,0px)+1rem)] sm:left-auto sm:right-4 sm:w-auto">
       {toasts.map((t) => (
         <div
           key={t.id}

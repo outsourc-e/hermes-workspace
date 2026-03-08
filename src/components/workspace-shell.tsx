@@ -36,7 +36,7 @@ import type { SessionMeta } from '@/screens/chat/types'
 
 type SessionsListResponse = Array<SessionMeta>
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
-  'fixed inset-y-0 left-0 w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
 
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
@@ -188,6 +188,15 @@ export function WorkspaceShell() {
     return () => media.removeEventListener('change', update)
   }, [])
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const titlebarHeight = isElectron ? '40px' : '0px'
+    document.documentElement.style.setProperty('--titlebar-h', titlebarHeight)
+    return () => {
+      document.documentElement.style.removeProperty('--titlebar-h')
+    }
+  }, [isElectron])
+
   // Keep mobile sidebar state closed after resize and route changes.
   useEffect(() => {
     if (!isMobile) return
@@ -300,11 +309,17 @@ export function WorkspaceShell() {
     return <LoginScreen />
   }
 
+  const shellStyle: React.CSSProperties & Record<'--titlebar-h', string> = {
+    height: 'var(--vvh, 100dvh)',
+    paddingTop: isElectron ? 40 : 0,
+    '--titlebar-h': isElectron ? '40px' : '0px',
+  }
+
   return (
     <>
       <div
         className="relative overflow-hidden theme-bg theme-text"
-        style={{ height: 'var(--vvh, 100dvh)', paddingTop: isElectron ? 40 : 0 }}
+        style={shellStyle}
       >
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (

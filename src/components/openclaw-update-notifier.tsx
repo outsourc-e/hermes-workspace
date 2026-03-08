@@ -166,7 +166,7 @@ export function OpenClawUpdateNotifier() {
           exit={{ opacity: 0, y: -50, scale: 0.95 }}
           transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
           className={cn(
-            'fixed top-4 left-1/2 -translate-x-1/2 z-[9998]',
+            'fixed left-1/2 -translate-x-1/2 z-[9998] top-[calc(var(--titlebar-h,0px)+1rem)]',
             'flex flex-col rounded-2xl overflow-hidden',
             'bg-primary-950 text-white',
             'shadow-2xl shadow-black/40',
