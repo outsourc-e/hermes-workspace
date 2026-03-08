@@ -47,8 +47,14 @@ export class Tracker extends EventEmitter {
     this.db = db;
   }
 
-  listProjects(): Project[] {
-    return this.db.prepare("SELECT * FROM projects ORDER BY created_at DESC").all() as Project[];
+  listProjects(): Array<Project & { phase_count: number; mission_count: number; task_count: number }> {
+    return this.db.prepare(`
+      SELECT p.*,
+        (SELECT COUNT(*) FROM phases WHERE project_id = p.id) AS phase_count,
+        (SELECT COUNT(*) FROM missions m JOIN phases ph ON m.phase_id = ph.id WHERE ph.project_id = p.id) AS mission_count,
+        (SELECT COUNT(*) FROM tasks t JOIN missions m ON t.mission_id = m.id JOIN phases ph ON m.phase_id = ph.id WHERE ph.project_id = p.id) AS task_count
+      FROM projects p ORDER BY p.created_at DESC
+    `).all() as Array<Project & { phase_count: number; mission_count: number; task_count: number }>;
   }
 
   createProject(input: CreateProjectInput): Project {

@@ -61,6 +61,9 @@ type WorkspaceProject = {
   spec?: string
   status: WorkspaceStatus
   phases: Array<WorkspacePhase>
+  phase_count: number
+  mission_count: number
+  task_count: number
 }
 
 type ProjectFormState = {
@@ -141,13 +144,17 @@ function normalizePhase(value: unknown): WorkspacePhase {
 
 function normalizeProject(value: unknown): WorkspaceProject {
   const record = asRecord(value)
+  const phases = asArray(record?.phases).map(normalizePhase)
   return {
     id: asString(record?.id) ?? asString(record?.project_id) ?? crypto.randomUUID(),
     name: asString(record?.name) ?? 'Untitled project',
     path: asString(record?.path),
     spec: asString(record?.spec),
     status: normalizeStatus(record?.status),
-    phases: asArray(record?.phases).map(normalizePhase),
+    phases,
+    phase_count: asNumber(record?.phase_count) ?? phases.length,
+    mission_count: asNumber(record?.mission_count) ?? getMissionCount({ phases } as WorkspaceProject),
+    task_count: asNumber(record?.task_count) ?? getTaskCount({ phases } as WorkspaceProject),
   }
 }
 
@@ -480,6 +487,27 @@ export function ProjectsScreen() {
     }
   }, [selectedProjectId, refreshToken])
 
+  // Poll for live updates when any mission is running
+  useEffect(() => {
+    if (!projectDetail) return
+
+    const hasRunning = projectDetail.phases.some((phase) =>
+      phase.missions.some(
+        (mission) =>
+          mission.status === 'running' ||
+          mission.tasks.some((task) => task.status === 'running'),
+      ),
+    )
+
+    if (!hasRunning) return
+
+    const interval = setInterval(() => {
+      triggerRefresh()
+    }, 4000)
+
+    return () => clearInterval(interval)
+  }, [projectDetail])
+
   const selectedSummary = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
@@ -752,7 +780,7 @@ export function ProjectsScreen() {
                     <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-xl border border-primary-800 bg-primary-800/80 px-2 py-2">
                         <p className="text-lg font-semibold text-primary-100">
-                          {project.phases.length}
+                          {project.phase_count}
                         </p>
                         <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                           Phases
@@ -760,7 +788,7 @@ export function ProjectsScreen() {
                       </div>
                       <div className="rounded-xl border border-primary-800 bg-primary-800/80 px-2 py-2">
                         <p className="text-lg font-semibold text-primary-100">
-                          {getMissionCount(project)}
+                          {project.mission_count}
                         </p>
                         <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                           Missions
@@ -768,7 +796,7 @@ export function ProjectsScreen() {
                       </div>
                       <div className="rounded-xl border border-primary-800 bg-primary-800/80 px-2 py-2">
                         <p className="text-lg font-semibold text-primary-100">
-                          {getTaskCount(project)}
+                          {project.task_count}
                         </p>
                         <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                           Tasks
