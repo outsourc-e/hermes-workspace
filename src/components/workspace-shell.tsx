@@ -11,11 +11,12 @@
  * Chat routes get the full ChatScreen treatment.
  * Non-chat routes show the sub-page content.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { RefreshIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { cn } from '@/lib/utils'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -294,13 +295,30 @@ export function WorkspaceShell() {
     return <LoginScreen />
   }
 
+  const isElectron = useMemo(
+    () =>
+      typeof navigator !== 'undefined' &&
+      /Electron/.test(navigator.userAgent),
+    [],
+  )
+
   return (
     <>
       <div
         className="relative overflow-hidden theme-bg theme-text"
         style={{ height: 'var(--vvh, 100dvh)' }}
       >
-        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
+        {/* Electron: invisible drag bar for window movement */}
+        {isElectron && (
+          <div
+            className="absolute inset-x-0 top-0 z-50 h-9"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          />
+        )}
+        <div className={cn(
+          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]",
+          isElectron && "pt-9"
+        )}>
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
           {!isMobile && (

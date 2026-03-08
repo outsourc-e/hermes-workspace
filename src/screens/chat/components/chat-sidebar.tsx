@@ -530,13 +530,7 @@ function ChatSidebarComponent({
     [],
   )
 
-  // Detect Electron for macOS traffic-light padding
-  const isElectron = useMemo(
-    () =>
-      typeof navigator !== 'undefined' &&
-      /Electron/.test(navigator.userAgent),
-    [],
-  )
+
 
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
@@ -941,7 +935,7 @@ function ChatSidebarComponent({
         width: isVisuallyCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden', isElectron && 'pt-9')}
+      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
       onMouseEnter={() => {
@@ -958,7 +952,6 @@ function ChatSidebarComponent({
         layout
         transition={{ layout: transition }}
         className="relative flex h-12 items-center px-2"
-        style={isElectron ? { WebkitAppRegion: 'drag' } as React.CSSProperties : undefined}
       >
         <AnimatePresence initial={false}>
           {!isVisuallyCollapsed ? (
