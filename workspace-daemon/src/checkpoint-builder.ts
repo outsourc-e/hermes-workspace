@@ -34,14 +34,27 @@ export async function buildCheckpoint(
     return checkpoint;
   }
 
-  const [diffStat, diffNames, logLine] = await Promise.all([
-    gitExec(["diff", "--stat"], workspacePath),
-    gitExec(["diff", "--name-only"], workspacePath),
-    gitExec(["log", "--oneline", "-1"], workspacePath),
+  // Stage all changes first so we capture untracked files in diff
+  await gitExec(["add", "-A"], workspacePath);
+
+  const [diffStat, diffNames] = await Promise.all([
+    gitExec(["diff", "--cached", "--stat"], workspacePath),
+    gitExec(["diff", "--cached", "--name-only"], workspacePath),
   ]);
 
   const changedFiles = diffNames.split("\n").filter(Boolean);
-  const summary = logLine || diffStat || "No changes detected";
+
+  if (changedFiles.length === 0) {
+    const checkpoint = tracker.createCheckpoint(taskRunId, "No changes detected", null);
+    if (autoApprove) {
+      tracker.approveCheckpoint(checkpoint.id);
+    }
+    return checkpoint;
+  }
+
+  const summary = changedFiles.length <= 5
+    ? `Changed: ${changedFiles.join(", ")}`
+    : `${changedFiles.length} files changed`;
   const diffStatJson = JSON.stringify({
     raw: diffStat,
     changed_files: changedFiles,
@@ -51,9 +64,11 @@ export async function buildCheckpoint(
   const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson);
 
   if (autoApprove) {
-    await gitExec(["add", "-A"], workspacePath);
     await gitExec(["commit", "-m", `chore(workspace): auto-apply task run ${taskRunId}`], workspacePath);
     tracker.approveCheckpoint(checkpoint.id);
+  } else {
+    // Unstage so reviewer can inspect before approval
+    await gitExec(["reset", "HEAD"], workspacePath);
   }
 
   return checkpoint;
