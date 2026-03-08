@@ -1,6 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGatewayChatStore } from '../stores/gateway-chat-store'
+import {
+  CHAT_STREAM_DONE_EVENT,
+  CHAT_TOOL_CALL_EVENT,
+  CHAT_TOOL_RESULT_EVENT,
+} from './use-gateway-chat-stream'
 
 const EMPTY_TOOL_CALLS: never[] = []
 
@@ -25,6 +30,14 @@ type UseResearchCardOptions = {
   sessionKey?: string
   isStreaming?: boolean
   resetKey?: string | number
+}
+
+type ToolEventDetail = {
+  sessionKey?: string
+  toolCallId?: string
+  name?: string
+  phase?: string
+  args?: unknown
 }
 
 function basename(path: string): string {
@@ -120,6 +133,64 @@ export function useResearchCard({
   const [now, setNow] = useState(() => Date.now())
   const seenToolIdsRef = useRef<Set<string>>(new Set())
 
+  const upsertStep = useMemo(
+    () =>
+      (
+        toolId: string,
+        toolName: string,
+        args: unknown,
+        status: ResearchStep['status'],
+        currentTime = Date.now(),
+      ) => {
+        setNow(currentTime)
+        setSteps((prevSteps) => {
+          const existingIndex = prevSteps.findIndex((step) => step.id === toolId)
+
+          if (existingIndex >= 0) {
+            const existing = prevSteps[existingIndex]
+            const nextDuration =
+              status === 'running' ? undefined : currentTime - existing.startedAt
+            const nextLabel = buildToolLabel(toolName, args)
+
+            if (
+              existing.toolName === toolName &&
+              existing.label === nextLabel &&
+              existing.status === status &&
+              existing.durationMs === nextDuration
+            ) {
+              return prevSteps
+            }
+
+            const nextSteps = [...prevSteps]
+            nextSteps[existingIndex] = {
+              ...existing,
+              toolName,
+              label: nextLabel,
+              status,
+              durationMs: nextDuration,
+            }
+            return nextSteps
+          }
+
+          if (seenToolIdsRef.current.has(toolId)) return prevSteps
+
+          seenToolIdsRef.current.add(toolId)
+          return [
+            ...prevSteps,
+            {
+              id: toolId,
+              toolName,
+              label: buildToolLabel(toolName, args),
+              status,
+              startedAt: currentTime,
+              durationMs: status === 'running' ? undefined : 0,
+            },
+          ]
+        })
+      },
+    [],
+  )
+
   // Reset when session or resetKey changes
   useEffect(() => {
     setSteps([])
@@ -148,65 +219,88 @@ export function useResearchCard({
     if (streamingToolCalls.length === 0) return
 
     const currentTime = Date.now()
-    setNow(currentTime)
+    for (const toolCall of streamingToolCalls) {
+      const isDone = toolCall.phase === 'done' || toolCall.phase === 'result'
+      const isError = toolCall.phase === 'error'
+      const nextStatus: ResearchStep['status'] = isError
+        ? 'error'
+        : isDone
+          ? 'done'
+          : 'running'
 
-    setSteps((prevSteps) => {
-      let changed = false
-      const nextSteps = [...prevSteps]
-
-      for (const toolCall of streamingToolCalls) {
-        const toolId = toolCall.id
-        const isDone = toolCall.phase === 'done' || toolCall.phase === 'result'
-        const isError = toolCall.phase === 'error'
-        const nextStatus: ResearchStep['status'] = isError
-          ? 'error'
-          : isDone
-            ? 'done'
-            : 'running'
-
-        const existingIndex = nextSteps.findIndex((step) => step.id === toolId)
-
-        if (existingIndex >= 0) {
-          const existing = nextSteps[existingIndex]
-          const nextDuration =
-            isDone || isError ? currentTime - existing.startedAt : undefined
-          if (
-            existing.status !== nextStatus ||
-            existing.label !== buildToolLabel(toolCall.name, toolCall.args) ||
-            existing.toolName !== toolCall.name ||
-            existing.durationMs !== nextDuration
-          ) {
-            nextSteps[existingIndex] = {
-              ...existing,
-              toolName: toolCall.name,
-              label: buildToolLabel(toolCall.name, toolCall.args),
-              status: nextStatus,
-              durationMs: nextDuration,
-            }
-            changed = true
-          }
-          continue
-        }
-
-        if (seenToolIdsRef.current.has(toolId)) continue
-
-        seenToolIdsRef.current.add(toolId)
-        nextSteps.push({
-          id: toolId,
-          toolName: toolCall.name,
-          label: buildToolLabel(toolCall.name, toolCall.args),
-          status: nextStatus,
-          startedAt: currentTime,
-          durationMs: isDone || isError ? 0 : undefined,
-        })
-        changed = true
-      }
-
-      return changed ? nextSteps : prevSteps
-    })
+      upsertStep(
+        toolCall.id,
+        toolCall.name,
+        toolCall.args,
+        nextStatus,
+        currentTime,
+      )
+    }
 
     setCollapsed(false)
-  }, [streamingToolCalls])
+  }, [streamingToolCalls, upsertStep])
+
+  // Track tool activity directly from SSE tool events so quick runs still
+  // populate the timeline even if streamingState is cleared before a render.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleToolCall = (event: Event) => {
+      const detail = (event as CustomEvent<ToolEventDetail>).detail
+      if (detail.sessionKey !== effectiveSessionKey) return
+      const toolId = detail.toolCallId?.trim()
+      const toolName = detail.name?.trim()
+      if (!toolId || !toolName) return
+      upsertStep(toolId, toolName, detail.args, 'running')
+      setCollapsed(false)
+    }
+
+    const handleToolResult = (event: Event) => {
+      const detail = (event as CustomEvent<ToolEventDetail>).detail
+      if (detail.sessionKey !== effectiveSessionKey) return
+      const toolId = detail.toolCallId?.trim()
+      const toolName = detail.name?.trim()
+      if (!toolId || !toolName) return
+      upsertStep(
+        toolId,
+        toolName,
+        detail.args,
+        detail.phase === 'error' ? 'error' : 'done',
+      )
+      setCollapsed(false)
+    }
+
+    const handleStreamDone = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionKey?: string }>).detail
+      if (detail.sessionKey !== effectiveSessionKey) return
+      setCollapsed((current) => (steps.length > 0 ? true : current))
+    }
+
+    window.addEventListener(CHAT_TOOL_CALL_EVENT, handleToolCall as EventListener)
+    window.addEventListener(
+      CHAT_TOOL_RESULT_EVENT,
+      handleToolResult as EventListener,
+    )
+    window.addEventListener(
+      CHAT_STREAM_DONE_EVENT,
+      handleStreamDone as EventListener,
+    )
+
+    return () => {
+      window.removeEventListener(
+        CHAT_TOOL_CALL_EVENT,
+        handleToolCall as EventListener,
+      )
+      window.removeEventListener(
+        CHAT_TOOL_RESULT_EVENT,
+        handleToolResult as EventListener,
+      )
+      window.removeEventListener(
+        CHAT_STREAM_DONE_EVENT,
+        handleStreamDone as EventListener,
+      )
+    }
+  }, [effectiveSessionKey, steps.length, upsertStep])
 
   const totalDurationMs = useMemo(() => {
     if (steps.length === 0) return 0
