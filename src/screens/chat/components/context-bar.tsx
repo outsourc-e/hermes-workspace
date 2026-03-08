@@ -154,14 +154,7 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
             )}
             style={{ width: `${clampedPct}%` }}
           />
-          {clampedPct >= 25 && (
-            <span className={cn(
-              'absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-semibold tabular-nums leading-none opacity-70',
-              textColor,
-            )}>
-              {Math.round(clampedPct)}%
-            </span>
-          )}
+          {/* % shown on hover via popup only */}
         </div>
       </PreviewCardTrigger>
 
