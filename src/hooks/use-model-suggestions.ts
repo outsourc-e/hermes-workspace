@@ -158,7 +158,24 @@ function isSessionDismissed(sessionKey: string): boolean {
   return dismissals.some((d) => d.sessionKey === sessionKey)
 }
 
-export function useModelSuggestions({
+export function useModelSuggestions(_opts: {
+  currentModel: string
+  sessionKey: string
+  messages: Message[]
+  availableModels: string[]
+}) {
+  // DISABLED: was causing infinite re-render loop (Maximum update depth exceeded)
+  // TODO: fix the dependency array / memoization and re-enable
+  return {
+    suggestion: null as Suggestion | null,
+    dismiss: () => {},
+    dismissForSession: () => {},
+  }
+}
+
+// @ts-expect-error -- disabled, will re-enable after fixing deps
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _useModelSuggestionsDisabled({
   currentModel,
   sessionKey,
   messages,
