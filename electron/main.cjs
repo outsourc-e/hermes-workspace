@@ -220,17 +220,76 @@ async function createWindow() {
 function createTray() {
     const iconPath = (0, path_1.join)(__dirname, '..', 'assets', 'tray-icon.png');
     if (!(0, fs_1.existsSync)(iconPath)) return;
-    tray = new electron_1.Tray(electron_1.nativeImage.createFromPath(iconPath));
+
+    const trayIcon = electron_1.nativeImage.createFromPath(iconPath);
+    // macOS tray icons should be 22px (template for dark/light auto-switch)
+    trayIcon.setTemplateImage(true);
+    tray = new electron_1.Tray(trayIcon.resize({ width: 22, height: 22 }));
     tray.setToolTip('ClawSuite');
-    const contextMenu = electron_1.Menu.buildFromTemplate([
-        { label: 'Open ClawSuite', click: () => mainWindow?.show() },
-        { type: 'separator' },
-        { label: 'Gateway Status', enabled: false },
-        { type: 'separator' },
-        { label: 'Quit', click: () => electron_1.app.quit() },
-    ]);
-    tray.setContextMenu(contextMenu);
-    tray.on('click', () => mainWindow?.show());
+
+    function buildTrayMenu() {
+        const gatewayUrl = getGatewayUrl();
+        const isConnected = !!gatewayUrl;
+
+        const contextMenu = electron_1.Menu.buildFromTemplate([
+            {
+                label: 'Open ClawSuite',
+                click: () => { mainWindow?.show(); mainWindow?.focus(); },
+                accelerator: 'CommandOrControl+Shift+C',
+            },
+            { type: 'separator' },
+            {
+                label: 'Quick Chat',
+                click: () => {
+                    if (mainWindow) {
+                        mainWindow.show();
+                        mainWindow.focus();
+                        // Navigate to chat
+                        mainWindow.webContents.executeJavaScript(
+                            `window.location.hash = ''; window.location.pathname = '/';`
+                        ).catch(() => {});
+                    }
+                },
+            },
+            { type: 'separator' },
+            {
+                label: 'Navigate',
+                submenu: [
+                    { label: '📊 Dashboard', click: () => navigateTo('/dashboard') },
+                    { label: '🤖 Agent Hub', click: () => navigateTo('/agent-swarm') },
+                    { label: '📋 Tasks', click: () => navigateTo('/tasks') },
+                    { label: '⏰ Cron', click: () => navigateTo('/cron') },
+                    { label: '💰 Costs', click: () => navigateTo('/costs') },
+                    { label: '⚙️ Settings', click: () => navigateTo('/settings') },
+                ],
+            },
+            { type: 'separator' },
+            {
+                label: `Gateway: ${isConnected ? '● Connected' : '○ Disconnected'}`,
+                enabled: false,
+            },
+            { type: 'separator' },
+            { label: 'Quit ClawSuite', click: () => electron_1.app.quit() },
+        ]);
+
+        tray.setContextMenu(contextMenu);
+    }
+
+    function navigateTo(path) {
+        if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+            const base = localServerPort > 0
+                ? `http://127.0.0.1:${localServerPort}`
+                : `http://localhost:${DEV_PORT}`;
+            mainWindow.loadURL(`${base}${path}`);
+        }
+    }
+
+    buildTrayMenu();
+    // Refresh tray menu every 30s to update gateway status
+    setInterval(buildTrayMenu, 30000);
+    tray.on('click', () => { mainWindow?.show(); mainWindow?.focus(); });
 }
 
 // IPC handlers for onboarding wizard
