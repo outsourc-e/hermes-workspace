@@ -85,6 +85,13 @@ export function getSessionTokenFromCookie(
   return null
 }
 
+function isLocalRequest(request: Request): boolean {
+  const forwarded = request.headers.get('x-forwarded-for')
+  const ip = forwarded?.split(',')[0]?.trim() || '127.0.0.1'
+  const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1']
+  return localIPs.includes(ip)
+}
+
 /**
  * Check if the request is authenticated.
  * Returns true if:
@@ -106,6 +113,14 @@ export function isAuthenticated(request: Request): boolean {
   }
 
   return isValidSessionToken(token)
+}
+
+export function requireLocalOrAuth(request: Request): boolean {
+  if (!isPasswordProtectionEnabled()) {
+    return isLocalRequest(request)
+  }
+
+  return isAuthenticated(request)
 }
 
 /**

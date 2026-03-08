@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import net from 'node:net'
-import { isAuthenticated } from '@/server/auth-middleware'
+import { requireLocalOrAuth } from '@/server/auth-middleware'
 
 const DEFAULT_GATEWAY_PORT = 18789
 const DEFAULT_GATEWAY_URL = `ws://127.0.0.1:${DEFAULT_GATEWAY_PORT}`
@@ -190,7 +190,7 @@ export const Route = createFileRoute('/api/local-setup')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
+        if (!requireLocalOrAuth(request)) {
           return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' },

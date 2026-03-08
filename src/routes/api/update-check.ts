@@ -2,7 +2,10 @@ import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  isAuthenticated,
+  requireLocalOrAuth,
+} from '../../server/auth-middleware'
 import {
   getClientIp,
   rateLimit,
@@ -241,7 +244,7 @@ export const Route = createFileRoute('/api/update-check')({
         }
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
+        if (!requireLocalOrAuth(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         const csrfCheck = requireJsonContentType(request)

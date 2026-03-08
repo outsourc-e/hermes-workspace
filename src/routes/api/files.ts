@@ -5,7 +5,10 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  isAuthenticated,
+  requireLocalOrAuth,
+} from '../../server/auth-middleware'
 import {
   getClientIp,
   rateLimit,
@@ -352,6 +355,9 @@ export const Route = createFileRoute('/api/files')({
           }
 
           if (action === 'delete') {
+            if (!requireLocalOrAuth(request)) {
+              return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+            }
             const targetPath = ensureWorkspacePath(String(body.path || ''))
             try {
               // Try macOS trash command first
