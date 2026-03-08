@@ -344,7 +344,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const newClientNonce = getClientNonce(normalizedMessage)
         const newMultipartSignature = messageMultipartSignature(normalizedMessage)
 
-        const optimisticIndex =
+        const optimisticIndexByNonce =
           newClientNonce.length > 0
             ? sessionMessages.findIndex((existing) => {
                 if (existing.role !== normalizedMessage.role) return false
@@ -358,6 +358,17 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
                 )
               })
             : -1
+
+        const optimisticIndex =
+          optimisticIndexByNonce >= 0
+            ? optimisticIndexByNonce
+            : normalizedMessage.role === 'user'
+              ? sessionMessages.findIndex((existing) => {
+                  if (existing.role !== 'user') return false
+                  if (normalizeString((existing as any).status) !== 'sending') return false
+                  return extractMessageText(existing) === extractMessageText(normalizedMessage)
+                })
+              : -1
 
         // Plain-text extraction for content-based dedup (catches identical
         // replies that arrive with different IDs from different channels).
@@ -406,6 +417,8 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           sessionMessages[optimisticIndex] = {
             ...sessionMessages[optimisticIndex],
             ...incomingMessage,
+            __optimisticId: undefined,
+            status: undefined,
           }
           messages.set(sessionKey, sessionMessages)
           set({ realtimeMessages: messages, lastEventAt: now })

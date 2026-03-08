@@ -677,7 +677,7 @@ function MessageItemComponent({
     }
     const ts = rawTimestamp(message)
     const elapsed = ts ? Date.now() - ts : 0
-    const remaining = Math.max(0, 30_000 - elapsed)
+    const remaining = Math.max(0, 10_000 - elapsed)
     // Already past 30s threshold
     if (remaining === 0) {
       setIsStuckSending(true)
