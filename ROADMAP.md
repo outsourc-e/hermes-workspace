@@ -62,3 +62,12 @@ _Source: 4 external audits + internal punch list_
 - [ ] Enforce design system (dark-only docs but light mode exists)
 - [ ] Add test coverage for privileged + stateful flows
 - [ ] Clean up Tauri scaffold (unused, Electron is active path)
+
+## 🎯 Next Up (TASK-08)
+- [ ] **Research Card** — live action timeline in chat showing every tool step, collapses to summary pill when done. Same pattern as ChatGPT deep research but for all Aurora activity. Spec in docs/TASK-SPECS.md.
+
+## 🏢 Future: Virtual Office Sidebar (post Research Card)
+- Extend right sidebar to show Aurora's current task at top of agent panel
+- Each spawned Codex agent gets its own "desk" card with live process log
+- Clicking a desk opens that agent's output
+- Ties Research Card (chat inline) + agent sidebar together into one coherent office view
