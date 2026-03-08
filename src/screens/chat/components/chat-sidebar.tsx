@@ -941,7 +941,7 @@ function ChatSidebarComponent({
         width: isVisuallyCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
+      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden', isElectron && 'pt-9')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
       onMouseEnter={() => {
@@ -957,7 +957,7 @@ function ChatSidebarComponent({
       <motion.div
         layout
         transition={{ layout: transition }}
-        className={cn("relative flex h-12 items-center px-2", isElectron && "mt-9")}
+        className="relative flex h-12 items-center px-2"
         style={isElectron ? { WebkitAppRegion: 'drag' } as React.CSSProperties : undefined}
       >
         <AnimatePresence initial={false}>
