@@ -8,6 +8,7 @@ import {
   ComputerIcon,
   CheckmarkCircle02Icon,
   Alert02Icon,
+  Cancel01Icon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
@@ -859,7 +860,7 @@ function ProviderStepContent() {
 }
 
 export function GatewaySetupWizard() {
-  const { isOpen, step, initialize } = useGatewaySetupStore()
+  const { isOpen, step, initialize, close } = useGatewaySetupStore()
 
   useEffect(() => {
     void initialize()
@@ -876,6 +877,7 @@ export function GatewaySetupWizard() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[110] flex items-center justify-center bg-ink/80 backdrop-blur-sm"
+          onClick={close}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -883,10 +885,20 @@ export function GatewaySetupWizard() {
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="relative w-[min(620px,92vw)] min-w-[320px] overflow-hidden rounded-2xl border border-primary-200 bg-primary-50 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent-500/5 via-transparent to-transparent" />
 
             <div className="relative px-8 pb-8 pt-8">
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Dismiss gateway setup wizard"
+                className="absolute right-4 top-4 rounded-lg border border-primary-200 bg-primary-100 p-2 text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-900"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} className="size-4" strokeWidth={2} />
+              </button>
+
               {/* Step dots */}
               <div className="mb-6 flex items-center justify-center gap-2">
                 {(['gateway', 'provider'] as const).map((s) => (

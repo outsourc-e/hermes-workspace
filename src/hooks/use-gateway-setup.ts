@@ -25,6 +25,12 @@ type GatewaySetupState = {
   completeSetup: () => void
   reset: () => void
   open: () => void
+  close: () => void
+}
+
+type SavedGatewayConfig = {
+  url: string
+  token: string
 }
 
 export async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
@@ -117,6 +123,49 @@ export async function autoDetectGateway(): Promise<{
   }
 }
 
+function readSavedGatewayConfig(): SavedGatewayConfig | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const settingsRaw = localStorage.getItem('openclaw-settings')
+    if (settingsRaw) {
+      const parsed = JSON.parse(settingsRaw) as {
+        state?: { settings?: { gatewayUrl?: string; gatewayToken?: string } }
+      }
+      const url = parsed.state?.settings?.gatewayUrl?.trim()
+      const token = parsed.state?.settings?.gatewayToken?.trim() || ''
+
+      if (url) {
+        return { url, token }
+      }
+    }
+  } catch {
+    // Ignore invalid persisted settings and fall back to legacy keys.
+  }
+
+  const url =
+    localStorage.getItem('clawsuite-gateway-url')?.trim() ||
+    localStorage.getItem('gateway-url')?.trim() ||
+    ''
+  const token =
+    localStorage.getItem('clawsuite-gateway-token')?.trim() ||
+    localStorage.getItem('gateway-token')?.trim() ||
+    ''
+
+  return url ? { url, token } : null
+}
+
+async function trySilentConnection(config: SavedGatewayConfig): Promise<boolean> {
+  const saveResult = await saveConfig(config.url, config.token)
+  if (!saveResult.ok) {
+    return false
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 500))
+  const { ok } = await pingGateway()
+  return ok
+}
+
 export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
   isOpen: false,
   step: 'gateway',
@@ -144,20 +193,27 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
         return
       }
 
-      // Check if gateway is already working
-      const { ok } = await pingGateway()
-      if (ok) {
-        localStorage.setItem(SETUP_STORAGE_KEY, 'true')
-        return
+      const savedConfig = readSavedGatewayConfig()
+      if (savedConfig) {
+        set({
+          gatewayUrl: savedConfig.url,
+          gatewayToken: savedConfig.token,
+          testStatus: 'idle',
+          testError: null,
+        })
+
+        if (await trySilentConnection(savedConfig)) {
+          localStorage.setItem(SETUP_STORAGE_KEY, 'true')
+          return
+        }
+      } else {
+        const { ok } = await pingGateway()
+        if (ok) {
+          localStorage.setItem(SETUP_STORAGE_KEY, 'true')
+          return
+        }
       }
 
-      if (configured) {
-        // Was configured but now down — banner handles this, not wizard
-        return
-      }
-
-      // First run + gateway not working → try auto-discovery
-      let discoveredUrl: string | null = null
       try {
         const discoverRes = await fetch('/api/gateway-discover', {
           method: 'POST',
@@ -168,38 +224,47 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
         const discoverData = (await discoverRes.json()) as {
           ok?: boolean
           url?: string
-          source?: string
-          error?: string
+          token?: string
         }
 
         if (discoverData.ok) {
-          // Auto-discovery succeeded — connected!
           localStorage.setItem(SETUP_STORAGE_KEY, 'true')
-          // Skip gateway step, go straight to provider setup
           set({
-            isOpen: true,
-            step: 'provider',
-            gatewayUrl: discoverData.url || 'ws://127.0.0.1:18789',
+            gatewayUrl: discoverData.url || savedConfig?.url || 'ws://127.0.0.1:18789',
+            gatewayToken: discoverData.token || savedConfig?.token || '',
             testStatus: 'success',
+            testError: null,
+            isOpen: false,
           })
           return
         }
-
-        discoveredUrl = discoverData.url || null
       } catch {
-        // Auto-discovery failed, fall through to manual wizard
+        // Discovery failed, fall through to manual wizard.
       }
 
-      // Auto-discovery failed → show manual wizard
       const config = await fetchCurrentConfig()
       set({
         isOpen: true,
         step: 'gateway',
-        gatewayUrl: discoveredUrl || config.url,
-        gatewayToken: config.token,
+        gatewayUrl: savedConfig?.url || config.url,
+        gatewayToken: savedConfig?.token || config.token,
+        testStatus: configured ? 'idle' : get().testStatus,
+        testError: null,
       })
     } catch {
-      // Ignore init errors
+      const config = await fetchCurrentConfig().catch(() => ({
+        url: 'ws://127.0.0.1:18789',
+        token: '',
+        hasToken: false,
+      }))
+      set({
+        isOpen: true,
+        step: 'gateway',
+        gatewayUrl: config.url,
+        gatewayToken: config.token,
+        testStatus: 'idle',
+        testError: null,
+      })
     }
   },
 
@@ -310,5 +375,9 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
       testStatus: 'idle',
       testError: null,
     })
+  },
+
+  close: () => {
+    set({ isOpen: false })
   },
 }))

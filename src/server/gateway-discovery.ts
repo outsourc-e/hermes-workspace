@@ -193,7 +193,15 @@ async function probeGatewayChallenge(url: string): Promise<boolean> {
     })
 
     ws.on('error', () => finish(false))
-    ws.on('close', () => finish(false))
+    ws.on('close', (code) => {
+      // Newer gateways reject anonymous probes before sending connect.challenge.
+      // A 1008 close still proves a real OpenClaw gateway is listening.
+      if (code === 1008) {
+        finish(true)
+        return
+      }
+      finish(false)
+    })
   })
 }
 
