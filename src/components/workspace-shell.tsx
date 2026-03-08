@@ -303,13 +303,13 @@ export function WorkspaceShell() {
   return (
     <>
       <div
-        className="relative flex flex-col overflow-hidden theme-bg theme-text"
-        style={{ height: 'var(--vvh, 100dvh)' }}
+        className="relative overflow-hidden theme-bg theme-text"
+        style={{ height: 'var(--vvh, 100dvh)', paddingTop: isElectron ? 40 : 0 }}
       >
-        {/* Electron: native-style title bar */}
+        {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div
-            className="flex h-10 shrink-0 items-center border-b border-primary-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 z-40"
+            className="absolute inset-x-0 top-0 flex h-10 items-center border-b border-primary-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 z-40"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           >
             {/* Traffic light spacer (left ~78px for macOS buttons) */}
@@ -323,7 +323,7 @@ export function WorkspaceShell() {
           </div>
         )}
         <div className={cn(
-          "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
+          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
         )}>
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
