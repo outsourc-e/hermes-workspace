@@ -5,8 +5,13 @@ import type {
   ActivityLogEntry,
   AgentRecord,
   Checkpoint,
+  CreateMissionInput,
+  CreatePhaseInput,
   CreateProjectInput,
   CreateTaskInput,
+  Mission,
+  MissionWithProjectContext,
+  Phase,
   Project,
   ProjectDetail,
   RegisterAgentInput,
@@ -56,6 +61,53 @@ export class Tracker extends EventEmitter {
     }) as Project;
     this.logActivity("created", "project", project.id, null, project);
     return project;
+  }
+
+  createPhase(input: CreatePhaseInput): Phase {
+    const phase = this.db
+      .prepare(
+        "INSERT INTO phases (project_id, name, sort_order) VALUES (@project_id, @name, @sort_order) RETURNING *",
+      )
+      .get({
+        project_id: input.project_id,
+        name: input.name,
+        sort_order: input.sort_order ?? 0,
+      }) as Phase;
+    this.logActivity("created", "phase", phase.id, null, phase);
+    return phase;
+  }
+
+  createMission(input: CreateMissionInput): Mission {
+    const mission = this.db
+      .prepare("INSERT INTO missions (phase_id, name) VALUES (@phase_id, @name) RETURNING *")
+      .get({
+        phase_id: input.phase_id,
+        name: input.name,
+      }) as Mission;
+    this.logActivity("created", "mission", mission.id, null, mission);
+    return mission;
+  }
+
+  getPhase(id: string): Phase | null {
+    return (this.db.prepare("SELECT * FROM phases WHERE id = ?").get(id) as Phase | undefined) ?? null;
+  }
+
+  getMission(id: string): Mission | null {
+    return (this.db.prepare("SELECT * FROM missions WHERE id = ?").get(id) as Mission | undefined) ?? null;
+  }
+
+  getMissionWithProjectContext(id: string): MissionWithProjectContext | null {
+    return (
+      (this.db
+        .prepare(
+          `SELECT missions.*, phases.project_id, projects.path AS project_path, projects.spec AS project_spec
+           FROM missions
+           JOIN phases ON phases.id = missions.phase_id
+           JOIN projects ON projects.id = phases.project_id
+           WHERE missions.id = ?`,
+        )
+        .get(id) as MissionWithProjectContext | undefined) ?? null
+    );
   }
 
   getProject(id: string): Project | null {
@@ -219,6 +271,31 @@ export class Tracker extends EventEmitter {
   setTaskStatus(id: string, status: TaskStatus): Task | null {
     this.db.prepare("UPDATE tasks SET status = ? WHERE id = ?").run(status, id);
     return this.getTask(id);
+  }
+
+  refreshMissionTaskStatuses(missionId: string): TaskWithRelations[] {
+    const tasks = this.listTasks({ mission_id: missionId });
+    const completedTaskIds = new Set(
+      tasks.filter((task) => task.status === "completed").map((task) => task.id),
+    );
+    const ready: TaskWithRelations[] = [];
+
+    for (const task of tasks) {
+      if (task.status !== "pending") {
+        continue;
+      }
+
+      const dependencies = parseJsonOrDefault<string[]>(task.depends_on, []);
+      const isReady = dependencies.every((dependencyId) => completedTaskIds.has(dependencyId));
+      if (!isReady) {
+        continue;
+      }
+
+      const updated = this.setTaskStatus(task.id, "ready");
+      ready.push(updated ? { ...task, status: updated.status } : { ...task, status: "ready" });
+    }
+
+    return ready;
   }
 
   resolveReadyTasks(limit: number): TaskWithRelations[] {
@@ -421,6 +498,9 @@ export class Tracker extends EventEmitter {
   startMission(id: string): boolean {
     const result = this.db.prepare("UPDATE missions SET status = 'running' WHERE id = ?").run(id);
     this.db.prepare("UPDATE tasks SET status = 'pending' WHERE mission_id = ? AND status = 'paused'").run(id);
+    if (result.changes > 0) {
+      this.refreshMissionTaskStatuses(id);
+    }
     return result.changes > 0;
   }
 
@@ -433,6 +513,9 @@ export class Tracker extends EventEmitter {
   resumeMission(id: string): boolean {
     const result = this.db.prepare("UPDATE missions SET status = 'running' WHERE id = ?").run(id);
     this.db.prepare("UPDATE tasks SET status = 'pending' WHERE mission_id = ? AND status = 'paused'").run(id);
+    if (result.changes > 0) {
+      this.refreshMissionTaskStatuses(id);
+    }
     return result.changes > 0;
   }
 

@@ -71,6 +71,12 @@ export interface Mission {
   progress: number;
 }
 
+export interface MissionWithProjectContext extends Mission {
+  project_id: string;
+  project_path: string | null;
+  project_spec: string | null;
+}
+
 export interface Task {
   id: string;
   mission_id: string;
@@ -279,6 +285,17 @@ export interface CreateProjectInput {
   spec?: string | null;
 }
 
+export interface CreatePhaseInput {
+  project_id: string;
+  name: string;
+  sort_order?: number;
+}
+
+export interface CreateMissionInput {
+  phase_id: string;
+  name: string;
+}
+
 export interface CreateTaskInput {
   mission_id: string;
   name: string;
@@ -305,4 +322,24 @@ export interface RegisterAgentInput {
   adapter_config?: Record<string, unknown>;
   model?: string | null;
   capabilities?: Record<string, unknown>;
+}
+
+export interface DecomposerContext {
+  project_path?: string | null;
+  project_spec?: string | null;
+  existing_files?: string[];
+}
+
+export interface DecomposedTask {
+  name: string;
+  description: string;
+  estimated_minutes: number;
+  depends_on: string[];
+  suggested_agent_type: AgentAdapterType | null;
+}
+
+export interface DecomposeResult {
+  tasks: DecomposedTask[];
+  rawResponse: string;
+  parsed: boolean;
 }

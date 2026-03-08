@@ -9,6 +9,8 @@ import { createAgentsRouter } from "./routes/agents";
 import { createMissionsRouter } from "./routes/missions";
 import { registerEventsRoutes } from "./routes/events";
 import { createCheckpointsRouter } from "./routes/checkpoints";
+import { createPhasesRouter } from "./routes/phases";
+import { createDecomposeRouter } from "./routes/decompose";
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -25,10 +27,12 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
   });
 
   app.use("/api/projects", createProjectsRouter(tracker));
+  app.use("/api/phases", createPhasesRouter(tracker));
   app.use("/api/tasks", createTasksRouter(tracker, orchestrator));
   app.use("/api/agents", createAgentsRouter(tracker));
-  app.use("/api/missions", createMissionsRouter(tracker, orchestrator));
+  app.use("/api/missions", createMissionsRouter(tracker));
   app.use("/api/checkpoints", createCheckpointsRouter(tracker));
+  app.use("/api/decompose", createDecomposeRouter(tracker));
 
   const eventsRouter = Router();
   registerEventsRoutes(eventsRouter, tracker);

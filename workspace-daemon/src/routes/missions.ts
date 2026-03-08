@@ -1,17 +1,38 @@
 import { Router } from "express";
 import { Tracker } from "../tracker";
-import { Orchestrator } from "../orchestrator";
 
-export function createMissionsRouter(tracker: Tracker, orchestrator: Orchestrator): Router {
+export function createMissionsRouter(tracker: Tracker): Router {
   const router = Router();
 
-  router.post("/:id/start", async (req, res) => {
+  router.post("/", (req, res) => {
+    const { phase_id, name } = req.body as {
+      phase_id?: string;
+      name?: string;
+    };
+
+    if (!phase_id || !name || name.trim().length === 0) {
+      res.status(400).json({ error: "phase_id and name are required" });
+      return;
+    }
+
+    if (!tracker.getPhase(phase_id)) {
+      res.status(404).json({ error: "Phase not found" });
+      return;
+    }
+
+    const mission = tracker.createMission({
+      phase_id,
+      name: name.trim(),
+    });
+    res.status(201).json(mission);
+  });
+
+  router.post("/:id/start", (req, res) => {
     const ok = tracker.startMission(req.params.id);
     if (!ok) {
       res.status(404).json({ error: "Mission not found" });
       return;
     }
-    await orchestrator.tick();
     res.json({ ok: true });
   });
 
@@ -24,13 +45,12 @@ export function createMissionsRouter(tracker: Tracker, orchestrator: Orchestrato
     res.json({ ok: true });
   });
 
-  router.post("/:id/resume", async (req, res) => {
+  router.post("/:id/resume", (req, res) => {
     const ok = tracker.resumeMission(req.params.id);
     if (!ok) {
       res.status(404).json({ error: "Mission not found" });
       return;
     }
-    await orchestrator.tick();
     res.json({ ok: true });
   });
 
