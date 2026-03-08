@@ -4,6 +4,8 @@ import {
   AlertDiamondIcon,
   ArrowTurnBackwardIcon,
 } from '@hugeicons/core-free-icons'
+import { formatSessionKey } from '../../lib/format-session-name'
+import { formatModelName } from '../../lib/format-model-name'
 
 type SessionEntry = {
   key: string
@@ -166,7 +168,7 @@ export function SessionsScreen() {
                   >
                     <td className="py-3">
                       <div className="font-medium text-ink truncate max-w-[280px]">
-                        {s.label || s.displayName || s.key}
+                        {s.label || s.displayName || formatSessionKey(s.key)}
                       </div>
                       <div className="text-[11px] text-primary-500 truncate max-w-[280px]">
                         {s.key}
@@ -175,7 +177,7 @@ export function SessionsScreen() {
                     <td className="py-3">
                       <KindBadge kind={s.kind} />
                     </td>
-                    <td className="py-3 text-primary-700">{s.model || '—'}</td>
+                    <td className="py-3 text-primary-700">{formatModelName(s.model) || '—'}</td>
                     <td className="py-3 text-primary-600">
                       {s.origin?.surface || '—'}
                     </td>
