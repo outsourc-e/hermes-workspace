@@ -16,6 +16,14 @@ function readSchemaSql(): string {
   return fs.readFileSync(schemaPath, "utf8");
 }
 
+function ensureCheckpointCommitHashColumn(db: Database.Database): void {
+  const columns = db.prepare("PRAGMA table_info(checkpoints)").all() as Array<{ name: string }>;
+  const hasCommitHash = columns.some((column) => column.name === "commit_hash");
+  if (!hasCommitHash) {
+    db.exec("ALTER TABLE checkpoints ADD COLUMN commit_hash TEXT");
+  }
+}
+
 export function getDatabase(dbPath = process.env.WORKSPACE_DAEMON_DB_PATH ?? DEFAULT_DB_PATH): Database.Database {
   if (dbInstance) {
     return dbInstance;
@@ -26,6 +34,7 @@ export function getDatabase(dbPath = process.env.WORKSPACE_DAEMON_DB_PATH ?? DEF
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(readSchemaSql());
+  ensureCheckpointCommitHashColumn(db);
   dbInstance = db;
   return db;
 }

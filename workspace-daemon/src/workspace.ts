@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getWorkflowConfig } from "./config";
+import { cleanupWorktree, getWorktreeBranch } from "./git-ops";
 import type { Project, Task, WorkflowHooks, WorkspaceInfo } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -30,12 +31,8 @@ function hasGitDirectory(projectPath: string | null): boolean {
 }
 
 export class WorkspaceManager {
-  getWorktreeBranch(taskId: string): string {
-    return `task/${sanitizeSegment(taskId)}`;
-  }
-
   private async createGitWorktree(projectPath: string, workspacePath: string, taskId: string): Promise<void> {
-    await execFileAsync("git", ["worktree", "add", workspacePath, "-b", this.getWorktreeBranch(taskId)], {
+    await execFileAsync("git", ["worktree", "add", workspacePath, "-b", getWorktreeBranch(taskId)], {
       cwd: projectPath,
     });
   }
@@ -84,20 +81,17 @@ export class WorkspaceManager {
     return this.prepare(project, task);
   }
 
-  async cleanup(project: Project, task: Task, workspace: WorkspaceInfo): Promise<void> {
-    if (!workspace.git_worktree || !project.path || !fs.existsSync(project.path)) {
+  async cleanup(project: Project, task: Task): Promise<void> {
+    if (!project.path || !fs.existsSync(project.path)) {
       return;
     }
 
-    try {
-      await execFileAsync("git", ["worktree", "remove", workspace.path], { cwd: project.path });
-    } finally {
-      try {
-        await execFileAsync("git", ["branch", "-D", this.getWorktreeBranch(task.id)], { cwd: project.path });
-      } catch {
-        // Ignore branch cleanup failures if the branch was never created or already removed.
-      }
-    }
+    const workflowConfig = getWorkflowConfig(project.path);
+    const projectKey = sanitizeSegment(project.name || project.id);
+    const taskKey = sanitizeSegment(task.name || task.id);
+    const workspacePath = path.join(workflowConfig.workspaceRoot, projectKey, `${task.id}-${taskKey}`);
+
+    await cleanupWorktree(project.path, workspacePath, getWorktreeBranch(task.id));
   }
 
   async runBeforeRunHooks(workspacePath: string, hooks: WorkflowHooks): Promise<void> {

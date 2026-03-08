@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   diff_stat TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   reviewer_notes TEXT,
+  commit_hash TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

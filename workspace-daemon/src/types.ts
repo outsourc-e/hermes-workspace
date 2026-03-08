@@ -145,6 +145,7 @@ export interface Checkpoint {
   diff_stat: string | null;
   status: CheckpointStatus;
   reviewer_notes: string | null;
+  commit_hash: string | null;
   created_at: string;
 }
 
@@ -304,6 +305,13 @@ export interface AgentExecutionResult {
   checkpointSummary?: string;
   diffStat?: DiffStat;
   error?: string;
+}
+
+export interface TaskRunOutcome {
+  result: AgentExecutionResult;
+  workspacePath: string;
+  checkpoint: Checkpoint | null;
+  autoApproved: boolean;
 }
 
 export interface SseEvent {

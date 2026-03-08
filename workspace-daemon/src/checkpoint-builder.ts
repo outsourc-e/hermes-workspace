@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { getWorktreeBranch, mergeWorktreeToMain } from "./git-ops";
 import type { Tracker } from "./tracker";
 import type { Checkpoint } from "./types";
 
@@ -12,9 +13,13 @@ function isGitDir(workspacePath: string): boolean {
 }
 
 async function gitExec(args: string[], cwd: string): Promise<string> {
+  const { stdout } = await execFileAsync("git", args, { cwd, timeout: 10_000 });
+  return stdout.trim();
+}
+
+async function tryGitExec(args: string[], cwd: string): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", args, { cwd, timeout: 10_000 });
-    return stdout.trim();
+    return await gitExec(args, cwd);
   } catch {
     return "";
   }
@@ -22,12 +27,15 @@ async function gitExec(args: string[], cwd: string): Promise<string> {
 
 export async function buildCheckpoint(
   workspacePath: string,
+  projectPath: string | null,
+  taskId: string,
+  taskName: string,
   taskRunId: string,
   tracker: Tracker,
   autoApprove: boolean,
 ): Promise<Checkpoint> {
   if (!isGitDir(workspacePath)) {
-    const checkpoint = tracker.createCheckpoint(taskRunId, "No git info available", null);
+    const checkpoint = tracker.createCheckpoint(taskRunId, "No git info available", null, null);
     if (autoApprove) {
       tracker.approveCheckpoint(checkpoint.id);
     }
@@ -38,14 +46,14 @@ export async function buildCheckpoint(
   await gitExec(["add", "-A"], workspacePath);
 
   const [diffStat, diffNames] = await Promise.all([
-    gitExec(["diff", "--cached", "--stat"], workspacePath),
-    gitExec(["diff", "--cached", "--name-only"], workspacePath),
+    tryGitExec(["diff", "--cached", "--stat"], workspacePath),
+    tryGitExec(["diff", "--cached", "--name-only"], workspacePath),
   ]);
 
   const changedFiles = diffNames.split("\n").filter(Boolean);
 
   if (changedFiles.length === 0) {
-    const checkpoint = tracker.createCheckpoint(taskRunId, "No changes detected", null);
+    const checkpoint = tracker.createCheckpoint(taskRunId, "No changes detected", null, null);
     if (autoApprove) {
       tracker.approveCheckpoint(checkpoint.id);
     }
@@ -61,15 +69,18 @@ export async function buildCheckpoint(
     files_changed: changedFiles.length,
   });
 
-  const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson);
-
   if (autoApprove) {
     await gitExec(["commit", "-m", `chore(workspace): auto-apply task run ${taskRunId}`], workspacePath);
+    const commitHash = projectPath
+      ? await mergeWorktreeToMain(projectPath, getWorktreeBranch(taskId), taskName)
+      : null;
+    const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, commitHash);
     tracker.approveCheckpoint(checkpoint.id);
+    return checkpoint;
   } else {
+    const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, null);
     // Unstage so reviewer can inspect before approval
     await gitExec(["reset", "HEAD"], workspacePath);
+    return checkpoint;
   }
-
-  return checkpoint;
 }

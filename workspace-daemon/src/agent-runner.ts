@@ -2,10 +2,11 @@ import { CodexAdapter } from "./adapters/codex";
 import { ClaudeAdapter } from "./adapters/claude";
 import { OpenClawAdapter } from "./adapters/openclaw";
 import type { AgentAdapter } from "./adapters/types";
+import { buildCheckpoint } from "./checkpoint-builder";
 import { getWorkflowConfig, loadWorkflowDefinition, renderTaskPrompt } from "./config";
 import { WorkspaceManager } from "./workspace";
 import { Tracker } from "./tracker";
-import type { AgentExecutionResult, AgentRecord, Project, Task, TaskRun } from "./types";
+import type { AgentRecord, Project, Task, TaskRun, TaskRunOutcome } from "./types";
 
 export class AgentRunner {
   private readonly adapters: Map<string, AgentAdapter>;
@@ -37,7 +38,7 @@ export class AgentRunner {
     agent: AgentRecord;
     attempt: number;
     signal?: AbortSignal;
-  }): Promise<{ result: AgentExecutionResult; workspacePath: string }> {
+  }): Promise<TaskRunOutcome> {
     const workflow = loadWorkflowDefinition(input.project.path);
     const workflowConfig = getWorkflowConfig(input.project.path);
     const workspace = await this.workspaceManager.ensureWorkspace(input.project, input.task);
@@ -80,9 +81,28 @@ export class AgentRunner {
 
     await this.workspaceManager.runAfterRunHooks(workspace.path, workspace.hooks);
 
+    const autoApproved = workflowConfig.autoApprove && result.status === "completed";
+    const checkpoint = result.status === "completed"
+      ? await buildCheckpoint(
+          workspace.path,
+          input.project.path,
+          input.task.id,
+          input.task.name,
+          input.taskRun.id,
+          this.tracker,
+          workflowConfig.autoApprove,
+        )
+      : null;
+
+    if (autoApproved && workspace.git_worktree) {
+      await this.workspaceManager.cleanup(input.project, input.task);
+    }
+
     return {
       result,
       workspacePath: workspace.path,
+      checkpoint,
+      autoApproved,
     };
   }
 }

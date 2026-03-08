@@ -427,10 +427,17 @@ export class Tracker extends EventEmitter {
     return this.db.prepare("SELECT * FROM run_events ORDER BY id DESC LIMIT 200").all() as RunEvent[];
   }
 
-  createCheckpoint(taskRunId: string, summary: string | null, diffStat: string | null): Checkpoint {
+  createCheckpoint(
+    taskRunId: string,
+    summary: string | null,
+    diffStat: string | null,
+    commitHash?: string | null,
+  ): Checkpoint {
     const checkpoint = this.db
-      .prepare("INSERT INTO checkpoints (task_run_id, summary, diff_stat) VALUES (?, ?, ?) RETURNING *")
-      .get(taskRunId, summary, diffStat) as Checkpoint;
+      .prepare(
+        "INSERT INTO checkpoints (task_run_id, summary, diff_stat, commit_hash) VALUES (?, ?, ?, ?) RETURNING *",
+      )
+      .get(taskRunId, summary, diffStat, commitHash ?? null) as Checkpoint;
     this.emitSse("checkpoint.created", checkpoint);
     return checkpoint;
   }

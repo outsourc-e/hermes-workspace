@@ -129,7 +129,7 @@ export class Orchestrator extends EventEmitter {
     this.emit("dispatch", { taskId: task.id, runId: taskRun.id });
 
     try {
-      const { result, workspacePath } = await this.agentRunner.runTask({
+      const { result, workspacePath, checkpoint, autoApproved } = await this.agentRunner.runTask({
         project,
         task,
         taskRun,
@@ -150,14 +150,7 @@ export class Orchestrator extends EventEmitter {
       });
 
       if (result.status === "completed") {
-        const checkpoint = this.tracker.createCheckpoint(
-          taskRun.id,
-          result.checkpointSummary ?? result.summary,
-          result.diffStat ? JSON.stringify(result.diffStat) : null,
-        );
-        const autoApprove = getWorkflowConfig(project.path).autoApprove;
-        if (autoApprove) {
-          this.tracker.updateCheckpointStatus(checkpoint.id, "approved");
+        if (autoApproved && checkpoint) {
           this.tracker.setTaskStatus(task.id, "completed");
           this.tracker.updateTaskRun(taskRun.id, {
             status: "completed",
