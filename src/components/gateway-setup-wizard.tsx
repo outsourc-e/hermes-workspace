@@ -11,15 +11,13 @@ import {
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ProviderSelectStep } from '@/components/onboarding/provider-select-step'
-import type { CloudPlan, CloudProvisionResponse } from '@/lib/cloud-types'
 
-const CLOUD_WAITLIST_STORAGE_KEY = 'clawsuite-cloud-waitlist-email'
 const LOCAL_GATEWAY_URL = 'ws://127.0.0.1:18789'
 
-type SetupOption = 'local' | 'custom' | 'cloud'
+type SetupMode = 'local' | 'remote' | 'cloud'
 type LocalSetupStatus = 'idle' | 'checking' | 'installing' | 'starting' | 'ready' | 'error'
 
 type LocalSetupEvent = {
@@ -29,39 +27,7 @@ type LocalSetupEvent = {
   token?: string
 }
 
-type CloudProvisionStatus = 'idle' | 'provisioning' | 'success' | 'error'
-
-const CLOUD_PLAN_OPTIONS: Array<{
-  plan: CloudPlan
-  name: string
-  price: string
-  description: string
-  cta: string
-}> = [
-  {
-    plan: 'free',
-    name: 'Free',
-    price: '$0/mo',
-    description: 'Try ClawSuite Cloud with free AI models',
-    cta: 'Start Free',
-  },
-  {
-    plan: 'pro',
-    name: 'Pro',
-    price: '$20/mo',
-    description: 'Managed AI models, priority support',
-    cta: 'Subscribe',
-  },
-  {
-    plan: 'team',
-    name: 'Team',
-    price: '$50/mo',
-    description: 'Multi-user, shared workspace, team billing',
-    cta: 'Subscribe',
-  },
-]
-
-function SetupOptionCard({
+function SetupModeCard({
   icon,
   title,
   description,
@@ -127,29 +93,11 @@ function GatewayStepContent() {
   const [autoDetecting, setAutoDetecting] = useState(false)
   const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null)
   const [autoDetectError, setAutoDetectError] = useState<string | null>(null)
-  const [setupOption, setSetupOption] = useState<SetupOption>('local')
-  const [waitlistEmail, setWaitlistEmail] = useState('')
-  const [cloudProvisionStatus, setCloudProvisionStatus] =
-    useState<CloudProvisionStatus>('idle')
-  const [cloudProvisionError, setCloudProvisionError] = useState<string | null>(null)
-  const [cloudCredentials, setCloudCredentials] = useState<CloudProvisionResponse | null>(null)
+  const [setupMode, setSetupMode] = useState<SetupMode | null>(null)
   const [localSetupStatus, setLocalSetupStatus] = useState<LocalSetupStatus>('idle')
   const [localSetupMessage, setLocalSetupMessage] = useState<string | null>(null)
   const [localSetupError, setLocalSetupError] = useState<string | null>(null)
   const localSetupSourceRef = useRef<EventSource | null>(null)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    try {
-      const storedEmail = window.localStorage.getItem(CLOUD_WAITLIST_STORAGE_KEY)
-      if (storedEmail) {
-        setWaitlistEmail(storedEmail)
-      }
-    } catch {
-      // Ignore localStorage read failures
-    }
-  }, [])
 
   const handleSaveAndTest = async () => {
     const ok = await saveAndTest()
@@ -234,109 +182,21 @@ function GatewayStepContent() {
     setAutoDetecting(false)
   }
 
-  const persistCloudEmail = (email: string) => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(CLOUD_WAITLIST_STORAGE_KEY, email)
-    } catch {
-      // Ignore localStorage write failures
-    }
-  }
-
-  const POLAR_PRODUCT_IDS: Record<Extract<CloudPlan, 'pro' | 'team'>, string> = {
-    pro: '0cf1fed8-898c-4062-beeb-e38f0cd5bb21', // Pro $20/mo
-    team: 'fb2836ac-2f70-4b2c-9ad6-850b26ffa799', // Team $50/mo
-  }
-
-  const openPolarCheckout = (plan: Extract<CloudPlan, 'pro' | 'team'>) => {
-    const normalizedEmail = waitlistEmail.trim()
-    if (normalizedEmail) {
-      persistCloudEmail(normalizedEmail)
-      setWaitlistEmail(normalizedEmail)
-    }
-
-    if (typeof window === 'undefined') return
-
-    const productId = POLAR_PRODUCT_IDS[plan]
-    const emailParam = normalizedEmail ? `&email=${encodeURIComponent(normalizedEmail)}` : ''
-
-    window.open(
-      `https://polar.sh/clawsuite/checkout?productId=${productId}${emailParam}`,
-      '_blank',
-      'noopener,noreferrer',
-    )
-  }
-
-  const handleFreeProvision = async () => {
-    const normalizedEmail = waitlistEmail.trim()
-    if (!normalizedEmail) {
-      setCloudProvisionStatus('error')
-      setCloudProvisionError('Enter your email to provision a ClawSuite Cloud gateway.')
-      return
-    }
-
-    persistCloudEmail(normalizedEmail)
-    setWaitlistEmail(normalizedEmail)
-    setCloudProvisionStatus('provisioning')
-    setCloudProvisionError(null)
-    setCloudCredentials(null)
-
-    try {
-      const response = await fetch('/api/cloud/provision', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, plan: 'free' }),
-      })
-
-      const data = (await response.json().catch(() => null)) as
-        | (CloudProvisionResponse & { error?: string })
-        | { ok?: boolean; error?: string }
-        | null
-
-      if (!response.ok || !data || !('gatewayUrl' in data) || !('token' in data)) {
-        const errorMessage =
-          data && 'error' in data && typeof data.error === 'string'
-            ? data.error
-            : 'Failed to provision your free ClawSuite Cloud gateway.'
-        setCloudProvisionStatus('error')
-        setCloudProvisionError(errorMessage)
-        return
-      }
-
-      setCloudCredentials(data)
-      setGatewayUrl(data.gatewayUrl)
-      setGatewayToken(data.token)
-
-      const saveResult = await saveAndTest()
-      if (!saveResult) {
-        setCloudProvisionStatus('error')
-        setCloudProvisionError('Provisioned gateway, but the connection test failed.')
-        return
-      }
-
-      setCloudProvisionStatus('success')
-    } catch {
-      setCloudProvisionStatus('error')
-      setCloudProvisionError('Failed to provision your free ClawSuite Cloud gateway.')
-    }
-  }
-
-  const handleSetupOptionChange = (option: SetupOption) => {
+  const handleSetupModeChange = (mode: SetupMode) => {
     closeLocalSetupStream()
-    setSetupOption(option)
+    setSetupMode(mode)
     setLocalSetupStatus('idle')
     setLocalSetupMessage(null)
     setLocalSetupError(null)
-    setCloudProvisionStatus('idle')
-    setCloudProvisionError(null)
-    setCloudCredentials(null)
+    setAutoDetectMessage(null)
+    setAutoDetectError(null)
   }
 
   useEffect(() => {
-    if (setupOption !== 'local') return
+    if (setupMode !== 'local') return
     if (localSetupStatus !== 'idle') return
     runLocalSetup()
-  }, [localSetupStatus, setupOption])
+  }, [localSetupStatus, setupMode])
 
   useEffect(() => {
     return () => {
@@ -346,7 +206,6 @@ function GatewayStepContent() {
 
   const isBusy = testStatus === 'testing' || saving
   const canProceed = testStatus === 'success'
-  const showCloudWaitlist = setupOption === 'cloud'
   const localSetupSteps = [
     {
       id: 'checking',
@@ -384,185 +243,60 @@ function GatewayStepContent() {
           Connect to Gateway
         </h2>
         <p className="max-w-md text-sm leading-relaxed text-primary-600">
-          Enter your OpenClaw gateway URL and token. The token can be found by
-          running:{' '}
-          <code className="rounded bg-primary-100 px-1.5 py-0.5 text-xs font-medium">
-            openclaw config get gateway.auth.token
-          </code>
+          Choose how you want to get started.
         </p>
       </div>
 
       <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-3">
-          <SetupOptionCard
+        <div className="grid gap-3">
+          <SetupModeCard
             icon={ComputerIcon}
-            title="Local Gateway"
-            description="Use the OpenClaw gateway running on this machine."
-            selected={setupOption === 'local'}
-            onClick={() => handleSetupOptionChange('local')}
+            title="Use this computer"
+            description="Install and run everything locally. Best for personal use."
+            selected={setupMode === 'local'}
+            onClick={() => handleSetupModeChange('local')}
           />
-          <SetupOptionCard
+          <SetupModeCard
             icon={CloudIcon}
-            title="Custom Gateway"
-            description="Connect to another self-hosted gateway with your own URL."
-            selected={setupOption === 'custom'}
-            onClick={() => handleSetupOptionChange('custom')}
+            title="Connect another machine"
+            description="Connect to OpenClaw running on a server, Pi, or another computer."
+            selected={setupMode === 'remote'}
+            onClick={() => handleSetupModeChange('remote')}
           />
-          <SetupOptionCard
+          <SetupModeCard
             icon={CloudIcon}
             title="ClawSuite Cloud"
-            description="Managed cloud gateway hosting from ClawSuite."
-            selected={showCloudWaitlist}
-            onClick={() => handleSetupOptionChange('cloud')}
-            accentLabel="Managed"
+            description="No setup needed. Managed hosting with one click. (Coming soon)"
+            selected={setupMode === 'cloud'}
+            onClick={() => handleSetupModeChange('cloud')}
+            accentLabel="Soon"
           />
         </div>
 
-        {showCloudWaitlist ? (
+        {setupMode === 'cloud' ? (
           <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4 shadow-sm">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-primary-900">
-                  ClawSuite Cloud Plans
-                </h3>
-                <p className="mt-1 text-sm text-primary-600">
-                  Use this email as your Cloud login, then start free or continue to
-                  Polar checkout.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="default"
-                onClick={() => openPolarCheckout('pro')}
-                className="bg-accent-500 hover:bg-accent-600"
+            <h3 className="text-base font-semibold text-primary-900">
+              ClawSuite Cloud is coming soon
+            </h3>
+            <p className="mt-1 text-sm text-primary-600">
+              Managed hosting isn&apos;t available yet. Join the waitlist and
+              we&apos;ll let you know when it launches.
+            </p>
+            <div className="mt-4">
+              <a
+                href="https://clawsuite.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  buttonVariants({ variant: 'default' }),
+                  'bg-accent-500 hover:bg-accent-600',
+                )}
               >
-                Get Started
-              </Button>
+                Join Waitlist
+              </a>
             </div>
-
-            <div className="mb-4">
-              <label
-                htmlFor="cloud-waitlist-email"
-                className="mb-1.5 block text-sm font-medium text-primary-900"
-              >
-                Cloud Email
-              </label>
-              <Input
-                id="cloud-waitlist-email"
-                type="email"
-                placeholder="you@example.com"
-                value={waitlistEmail}
-                onChange={(e) => setWaitlistEmail(e.target.value)}
-                className="h-10"
-                required
-              />
-              <p className="mt-1 text-xs text-primary-500">
-                This email is used for free provisioning and stored for checkout.
-              </p>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {CLOUD_PLAN_OPTIONS.map((plan) => (
-                <div
-                  key={plan.plan}
-                  className={cn(
-                    'rounded-2xl border border-primary-200 bg-primary-100/60 p-4',
-                    plan.plan === 'pro' && 'border-accent-300 bg-accent-50/60',
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-primary-900">{plan.name}</h4>
-                      <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-accent-600">
-                        {plan.price}
-                      </p>
-                    </div>
-                    {plan.plan === 'pro' ? (
-                      <span className="rounded-full border border-accent-200 bg-accent-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-700">
-                        Popular
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 min-h-10 text-sm leading-relaxed text-primary-600">
-                    {plan.description}
-                  </p>
-                  <Button
-                    type="button"
-                    variant={plan.plan === 'free' ? 'secondary' : 'default'}
-                    onClick={() =>
-                      plan.plan === 'free'
-                        ? void handleFreeProvision()
-                        : openPolarCheckout(plan.plan)
-                    }
-                    disabled={
-                      cloudProvisionStatus === 'provisioning' ||
-                      (plan.plan === 'free' && !waitlistEmail.trim())
-                    }
-                    className={cn(
-                      'mt-4 w-full',
-                      plan.plan !== 'free' && 'bg-accent-500 hover:bg-accent-600',
-                    )}
-                  >
-                    {plan.plan === 'free' && cloudProvisionStatus === 'provisioning'
-                      ? 'Provisioning...'
-                      : plan.cta}
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {cloudProvisionError ? (
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                <HugeiconsIcon
-                  icon={Alert02Icon}
-                  className="mt-0.5 size-4 shrink-0"
-                  strokeWidth={2}
-                />
-                <span>{cloudProvisionError}</span>
-              </div>
-            ) : null}
-
-            {cloudCredentials ? (
-              <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 p-4">
-                <div className="flex items-start gap-2 text-sm text-green-800">
-                  <HugeiconsIcon
-                    icon={CheckmarkCircle02Icon}
-                    className="mt-0.5 size-4 shrink-0"
-                    strokeWidth={2}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">
-                      Free Cloud gateway provisioned and loaded into the setup form.
-                    </p>
-                    <p className="mt-1 text-xs text-green-700">
-                      {testStatus === 'success'
-                        ? 'Connection test passed.'
-                        : 'Connection details saved. Review them below if needed.'}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-3">
-                  <div>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-[0.14em] text-green-700">
-                      Gateway URL
-                    </p>
-                    <code className="block overflow-x-auto rounded-lg bg-primary-950 px-3 py-2 text-xs text-primary-100">
-                      {cloudCredentials.gatewayUrl}
-                    </code>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-[0.14em] text-green-700">
-                      Gateway Token
-                    </p>
-                    <code className="block overflow-x-auto rounded-lg bg-primary-950 px-3 py-2 text-xs text-primary-100">
-                      {cloudCredentials.token}
-                    </code>
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
-        ) : setupOption === 'local' ? (
+        ) : setupMode === 'local' ? (
           <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4 shadow-sm">
             <div className="mb-4">
               <h3 className="text-base font-semibold text-primary-900">Setting up local gateway</h3>
@@ -665,14 +399,14 @@ function GatewayStepContent() {
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => handleSetupOptionChange('custom')}
+                onClick={() => handleSetupModeChange('remote')}
                 className="flex-1"
               >
                 Enter Manually
               </Button>
             </div>
           </div>
-        ) : (
+        ) : setupMode === 'remote' ? (
           <>
             <div>
               <label
@@ -789,7 +523,7 @@ function GatewayStepContent() {
               </Button>
             </div>
           </>
-        )}
+        ) : null}
       </div>
     </div>
   )
