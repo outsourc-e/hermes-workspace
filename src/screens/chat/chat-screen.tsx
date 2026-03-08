@@ -60,6 +60,7 @@ import type {
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { GatewayAttachment, GatewayMessage, SessionMeta } from './types'
+import { stripQueuedWrapper } from '@/lib/strip-queued-wrapper'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 import { hapticTap } from '@/lib/haptics'
@@ -216,6 +217,22 @@ function getMessageRetryAttachments(
   return message.attachments.filter((attachment) => {
     return Boolean(attachment) && typeof attachment === 'object'
   })
+}
+
+function stripQueuedWrapperFromUserMessage(message: GatewayMessage): GatewayMessage {
+  if (message.role !== 'user') return message
+
+  const text = textFromMessage(message)
+  const cleanedText = stripQueuedWrapper(text)
+  if (cleanedText === text) return message
+
+  return {
+    ...message,
+    content: [{ type: 'text', text: cleanedText }],
+    text: cleanedText,
+    body: cleanedText,
+    message: cleanedText,
+  }
 }
 
 function CompactingOverlay({ onDismiss }: { onDismiss: () => void }) {
@@ -537,7 +554,7 @@ export function ChatScreen({
     // Rebuild display filter on merged messages
     const filtered = realtimeMessages.filter((msg) => {
       if (msg.role === 'user') {
-        const text = textFromMessage(msg)
+        const text = stripQueuedWrapper(textFromMessage(msg))
         if (text.startsWith('A subagent task')) return false
         return true
       }
@@ -616,7 +633,7 @@ export function ChatScreen({
       // or no IDs at all, causing ID-based dedup to miss. Normalised text
       // catches the overlap regardless of message shape or ID availability.
       {
-        const text = textFromMessage(msg).trim()
+        const text = stripQueuedWrapper(textFromMessage(msg)).trim()
         if (text.length > 0) {
           // Normalize all whitespace (newlines, tabs, multiple spaces) to a
           // single space before comparing.  The gateway may collapse \n to
@@ -638,7 +655,9 @@ export function ChatScreen({
       dedupedSet.add(msg)
     }
     // Restore original order (filtered array order, not sort order).
-    const deduped = filtered.filter((msg) => dedupedSet.has(msg))
+    const deduped = filtered
+      .filter((msg) => dedupedSet.has(msg))
+      .map((msg) => stripQueuedWrapperFromUserMessage(msg))
 
     // Only inject the streaming placeholder when SSE streaming is actually
     // active. The ThinkingBubble (in chat-message-list) handles the visual

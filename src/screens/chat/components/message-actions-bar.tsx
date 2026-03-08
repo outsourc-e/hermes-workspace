@@ -3,7 +3,6 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Copy01Icon,
   Tick02Icon,
-  Clock02Icon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
 import { MessageTimestamp } from './message-timestamp'
@@ -68,27 +67,6 @@ export function MessageActionsBar({
               <span className="text-[11px] font-medium">Retry</span>
             </TooltipTrigger>
             <TooltipContent side="top">Resend failed message</TooltipContent>
-          </TooltipRoot>
-        </TooltipProvider>
-      )}
-      {isQueued && (
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger
-              type="button"
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-primary-500 cursor-default"
-            >
-              <HugeiconsIcon
-                icon={Clock02Icon}
-                size={14}
-                strokeWidth={1.6}
-                className="opacity-70"
-              />
-              <span className="text-[11px] font-medium">Sent</span>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Message delivered, agent is working
-            </TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
       )}
