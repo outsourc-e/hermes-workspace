@@ -181,6 +181,7 @@ export function useResearchCard({
   useEffect(() => {
     function handleToolCall(event: Event) {
       const detail = (event as CustomEvent<ToolEventDetail>).detail
+      console.log('[research-card-debug] handleToolCall', detail.name, detail.sessionKey, 'match:', matchesSession(detail.sessionKey, sessionKey), 'hook sessionKey:', sessionKey)
       if (!matchesSession(detail.sessionKey, sessionKey)) return
 
       const toolName = detail.name ?? 'tool'
