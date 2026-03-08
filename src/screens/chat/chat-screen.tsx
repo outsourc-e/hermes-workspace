@@ -1010,19 +1010,20 @@ export function ChatScreen({
   })
   // Don't show gateway errors for new chats or when SSE is connected (proves gateway works)
   const gatewayStatusError =
-    !isNewChat && connectionState !== 'connected' &&
-    (gatewayStatusQuery.error instanceof Error
-      ? {
-          message: gatewayStatusQuery.error.message,
-          status: (gatewayStatusQuery.error as Error & { status?: number })
-            .status,
-        }
-      : gatewayStatusQuery.data && !gatewayStatusQuery.data.ok
+    !isNewChat && connectionState !== 'connected'
+      ? gatewayStatusQuery.error instanceof Error
         ? {
-            message: gatewayStatusQuery.data.error || 'Gateway unavailable',
-            status: gatewayStatusQuery.data.status,
+            message: gatewayStatusQuery.error.message,
+            status: (gatewayStatusQuery.error as Error & { status?: number })
+              .status,
           }
-        : null)
+        : gatewayStatusQuery.data && !gatewayStatusQuery.data.ok
+          ? {
+              message: gatewayStatusQuery.data.error || 'Gateway unavailable',
+              status: gatewayStatusQuery.data.status,
+            }
+          : null
+      : null
   const gatewayError = gatewayStatusError?.message ?? sessionsError ?? historyError
   const gatewayErrorStatus = gatewayStatusError?.status
   const showErrorNotice = Boolean(gatewayError) && !isNewChat
@@ -1119,7 +1120,8 @@ export function ChatScreen({
       if (error) setError(null)
       return
     }
-    const messageText = sessionsError ?? historyError ?? gatewayStatusError
+    const messageText =
+      sessionsError ?? historyError ?? gatewayStatusError?.message
     if (!messageText) {
       if (error?.startsWith('Failed to load')) {
         setError(null)
@@ -1134,7 +1136,7 @@ export function ChatScreen({
       : historyError
         ? `Failed to load history. ${historyError}`
         : gatewayStatusError
-          ? `Gateway unavailable. ${gatewayStatusError}`
+          ? `Gateway unavailable. ${gatewayStatusError.message}`
           : null
     if (message) setError(message)
   }, [

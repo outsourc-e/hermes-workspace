@@ -10,6 +10,7 @@ import type {
 type GatewayStatusResponse = {
   ok: boolean
   error?: string
+  status?: number
 }
 
 function normalizeId(value: unknown): string {
@@ -79,8 +80,18 @@ export async function fetchGatewayStatus(): Promise<GatewayStatusResponse> {
 
   try {
     const res = await fetch('/api/ping', { signal: controller.signal })
-    if (!res.ok) throw new Error(await readError(res))
-    return (await res.json()) as GatewayStatusResponse
+    if (!res.ok) {
+      const error = new Error(await readError(res)) as Error & {
+        status?: number
+      }
+      error.status = res.status
+      throw error
+    }
+    const payload = (await res.json()) as GatewayStatusResponse
+    return {
+      ...payload,
+      status: res.status,
+    }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error('Gateway check timed out')

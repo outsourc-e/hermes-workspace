@@ -1,26 +1,92 @@
 import { useEffect, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert02Icon, WifiDisconnected01Icon } from '@hugeicons/core-free-icons'
-import { getConnectionErrorInfo } from '@/lib/connection-errors'
 import { cn } from '@/lib/utils'
 
 type GatewayStatusMessageProps = {
   state: 'checking' | 'error'
   error?: string | null
+  status?: number | null
   onRetry?: () => void
   className?: string
+}
+
+function classifyConnectionError(
+  error?: string | null,
+  status?: number | null,
+): {
+  title: string
+  description: string
+  action: string
+} {
+  const normalizedError = error?.trim()
+  const lower = normalizedError?.toLowerCase() ?? ''
+
+  if (!normalizedError && !status) {
+    return {
+      title: 'Not connected',
+      description: "ClawSuite can't reach the gateway.",
+      action: 'Check that OpenClaw is running, then try again.',
+    }
+  }
+
+  if (
+    status === 401 ||
+    lower.includes('auth') ||
+    lower.includes('token') ||
+    lower.includes('unauthorized')
+  ) {
+    return {
+      title: 'Authentication required',
+      description: 'The gateway rejected the connection token.',
+      action: 'Go to Settings -> Advanced -> Gateway to update your token.',
+    }
+  }
+
+  if (
+    status === 403 ||
+    lower.includes('pair') ||
+    lower.includes('not paired')
+  ) {
+    return {
+      title: 'Pairing required',
+      description: "This device isn't paired with the gateway yet.",
+      action: 'Run "openclaw pair" on the gateway machine.',
+    }
+  }
+
+  if (
+    lower.includes('econnrefused') ||
+    lower.includes('fetch') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('timed out') ||
+    lower.includes('timeout')
+  ) {
+    return {
+      title: 'Gateway unreachable',
+      description: "Can't connect to the gateway at the configured URL.",
+      action: 'Make sure OpenClaw is running and the URL is correct.',
+    }
+  }
+
+  return {
+    title: 'Connection error',
+    description: normalizedError || 'Something went wrong.',
+    action: 'Try refreshing or check Settings -> Advanced -> Gateway.',
+  }
 }
 
 export function GatewayStatusMessage({
   state,
   error,
+  status,
   onRetry,
   className,
 }: GatewayStatusMessageProps) {
   const isChecking = state === 'checking'
   const [visible, setVisible] = useState(true)
   const [fadingOut, setFadingOut] = useState(false)
-  const errorInfo = getConnectionErrorInfo(error)
+  const errorInfo = classifyConnectionError(error, status)
 
   // Auto-dismiss when gateway comes back
   useEffect(() => {
@@ -63,12 +129,7 @@ export function GatewayStatusMessage({
           {!isChecking ? (
             <>
               <p className="mt-0.5 text-amber-700">{errorInfo.description}</p>
-              {errorInfo.action ? (
-                <p className="mt-1 font-medium text-amber-800">{errorInfo.action}</p>
-              ) : null}
-              {errorInfo.details ? (
-                <p className="mt-1 text-[11px] text-amber-600">{errorInfo.details}</p>
-              ) : null}
+              <p className="mt-1 font-medium text-amber-800">{errorInfo.action}</p>
             </>
           ) : null}
         </div>
