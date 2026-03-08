@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { formatModelName } from '@/lib/format-model-name'
 
 type ModelUsage = {
   model: string
@@ -395,7 +396,7 @@ export function UsageDetailsModal({
                       className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-white px-3 py-2 text-sm"
                     >
                       <div className="font-medium text-primary-800">
-                        {model.model}
+                        {formatModelName(model.model)}
                       </div>
                       <div className="text-primary-600">
                         {formatTokens(model.inputTokens)} in ·{' '}
@@ -430,7 +431,7 @@ export function UsageDetailsModal({
                           {session.id}
                         </div>
                         <div className="text-xs text-primary-500">
-                          {session.model}
+                          {formatModelName(session.model)}
                         </div>
                       </div>
                       <div className="text-primary-600">

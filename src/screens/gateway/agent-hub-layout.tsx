@@ -13,6 +13,7 @@ import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type A
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
+import { formatModelName } from '@/lib/format-model-name'
 import {
   saveMissionStoreBeforeUnload,
   useMissionStore,
@@ -165,9 +166,8 @@ function resolveGatewayModelId(modelId: string): string {
 function getModelDisplayLabel(modelId: string): string {
   if (!modelId) return 'Unknown'
   const preset = MODEL_PRESETS.find((entry) => entry.id === modelId)
-  if (preset) return preset.label
-  const parts = modelId.split('/')
-  return parts[parts.length - 1] || modelId
+  if (preset) return formatModelName(resolveGatewayModelId(preset.id))
+  return formatModelName(modelId)
 }
 
 function getModelDisplayLabelFromLookup(
@@ -191,9 +191,7 @@ function getModelShortLabel(
   if (preset) return OFFICE_MODEL_LABEL[preset.id]
   const gatewayModel = gatewayModelLabelById?.get(modelId)
   if (gatewayModel?.label) return gatewayModel.label
-
-  const parts = modelId.split('/')
-  return parts[parts.length - 1] || modelId
+  return formatModelName(modelId)
 }
 
 type AgentActivityEntry = {
@@ -6588,7 +6586,7 @@ Respond with ONLY a JSON array, no markdown:
                                 {agent.name}
                               </p>
                               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                                {agent.model} · {agent.status}
+                                {formatModelName(agent.model)} · {agent.status}
                               </p>
                             </div>
                             <button

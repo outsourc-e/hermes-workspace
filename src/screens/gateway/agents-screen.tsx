@@ -6,6 +6,7 @@ import {
   type AgentRegistryCardData,
   type AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
+import { formatModelName } from '@/lib/format-model-name'
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
 import { AgentHubLayout } from './agent-hub-layout'
@@ -452,6 +453,10 @@ function getSessionTokenCount(session: SessionEntry): number {
         : 0
 
   return Number.isFinite(rawValue) ? rawValue : 0
+}
+
+function getSessionModelName(session: SessionEntry): string {
+  return readString(session.model) || readString(session.agentModel)
 }
 
 function formatTokenCount(value: number): string {
@@ -1043,6 +1048,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                     {unmatchedSessions.map((session, index) => {
                       const sessionKey = readString(session.key)
                       const sessionTarget = getSessionFriendlyId(session) || sessionKey
+                      const sessionModel = getSessionModelName(session)
 
                       return (
                         <div
@@ -1066,6 +1072,13 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                           </div>
 
                           <div className="mt-3 flex items-center justify-between gap-3 text-xs text-primary-300">
+                            {sessionModel ? (
+                              <span className="truncate">
+                                {formatModelName(sessionModel)}
+                              </span>
+                            ) : (
+                              <span />
+                            )}
                             <span>{formatTokenCount(getSessionTokenCount(session))} tokens</span>
                             <span>{formatRelativeTime(session.updatedAt)}</span>
                           </div>
@@ -1120,6 +1133,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
               <div className="max-h-[48vh] space-y-2 overflow-auto">
                 {selectedHistoryAgent.matchedSessions.slice(0, 8).map((session, index) => {
                   const friendlyId = getSessionFriendlyId(session)
+                  const sessionModel = getSessionModelName(session)
                   return (
                     <div
                       key={`${readString(session.key)}-${readString(session.friendlyId)}-${index}`}
@@ -1136,7 +1150,9 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
                       <div className="mt-1 flex items-center justify-between">
                         <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300">
-                          {readString(session.status) || 'unknown'}
+                          {sessionModel
+                            ? `${readString(session.status) || 'unknown'} · ${formatModelName(sessionModel)}`
+                            : readString(session.status) || 'unknown'}
                         </span>
                         {friendlyId ? (
                           <button

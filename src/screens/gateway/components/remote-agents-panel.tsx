@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatModelName } from '@/lib/format-model-name'
 import { cn } from '@/lib/utils'
 import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
 
@@ -138,7 +139,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
 
               {s.model && (
                 <span className="inline-block rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 mb-2">
-                  {s.model.split('/').pop() ?? s.model}
+                  {formatModelName(s.model)}
                 </span>
               )}
 
