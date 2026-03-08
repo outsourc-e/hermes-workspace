@@ -21,7 +21,6 @@ import type {
   RunEventType,
   Task,
   TaskRun,
-  TaskRunStatus,
   TaskRunWithRelations,
   TaskStatus,
   TaskWithRelations,
