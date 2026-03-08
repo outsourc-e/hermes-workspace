@@ -2957,7 +2957,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     agentSessionStatus,
     artifacts,
     restoreCheckpoint,
-    beforeUnloadRegistered,
     startMission,
     completeMission,
     abortMission,
@@ -2974,7 +2973,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setArtifacts,
     setActiveMissionMeta,
     saveCheckpoint,
-    markBeforeUnloadRegistered,
   } = useMissionStore(useShallow((state) => ({
     activeMission: state.activeMission,
     missionActive: state.missionActive,
@@ -2990,7 +2988,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     agentSessionStatus: state.agentSessionStatus,
     artifacts: state.artifacts,
     restoreCheckpoint: state.restoreCheckpoint,
-    beforeUnloadRegistered: state.beforeUnloadRegistered,
     startMission: state.startMission,
     completeMission: state.completeMission,
     abortMission: state.abortMission,
@@ -3007,7 +3004,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setArtifacts: state.setArtifacts,
     setActiveMissionMeta: state.setActiveMissionMeta,
     saveCheckpoint: state.saveCheckpoint,
-    markBeforeUnloadRegistered: state.markBeforeUnloadRegistered,
   })))
   const setMissionActive = useCallback((active: boolean) => {
     if (!active) {

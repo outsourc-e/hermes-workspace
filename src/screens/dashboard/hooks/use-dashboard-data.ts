@@ -491,7 +491,8 @@ export function useDashboardData(): UseDashboardDataResult {
     }
 
     // ── Current model ────────────────────────────────────────────────────────
-    const mainSession = ssSessions[0]
+    // Prefer the "main" session (not cron/heartbeat agents which use cheaper models)
+    const mainSession = ssSessions.find((s) => readString(s.key) === 'main') ?? ssSessions[0]
     const rawModel =
       readString(mainSession?.model) ||
       readString(ssPayload?.model) ||
