@@ -764,8 +764,7 @@ function ChatMessageListComponent({
 
   const showResearchCard = Boolean(
     researchCard &&
-      researchCard.steps.length > 0 &&
-      (isStreaming || researchCard.collapsed),
+      researchCard.steps.length > 0,
   )
 
   const shouldBottomPin =
@@ -1372,7 +1371,7 @@ function ChatMessageListComponent({
                     onToggle={() => researchCard.setCollapsed(!researchCard.collapsed)}
                     collapsed={researchCard.collapsed}
                   />
-                  {isStreaming ? (
+                  {isStreaming || researchCard.isActive ? (
                     <ThinkingBubble
                       activeToolCalls={activeToolCalls}
                       liveToolActivity={liveToolActivity}
