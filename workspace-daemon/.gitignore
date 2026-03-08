@@ -1,0 +1,8 @@
+.data/
+node_modules/
+dist/
+*.sqlite
+*.sqlite-journal
+
+.workspaces/
+.data/
