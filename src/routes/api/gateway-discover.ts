@@ -26,12 +26,23 @@ export const Route = createFileRoute('/api/gateway-discover')({
           const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : ''
 
           if (mode === 'scan') {
+            // Try full discovery first (config file + CLI = gets token too)
+            const fullResult = await discoverGateway()
+            if (fullResult.found && fullResult.url) {
+              return json({
+                ok: true,
+                url: fullResult.url,
+                token: fullResult.token,
+                source: fullResult.source,
+              })
+            }
+            // Fall back to port scan
             const scanResult = await discoverGatewayUrl()
             if (!scanResult.found || !scanResult.url) {
               return json({
                 ok: false,
-                source: scanResult.source,
-                error: scanResult.error || 'No gateway found',
+                source: scanResult.source || fullResult.source,
+                error: scanResult.error || fullResult.error || 'No gateway found',
               })
             }
 

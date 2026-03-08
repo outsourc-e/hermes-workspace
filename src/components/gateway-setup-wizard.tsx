@@ -211,10 +211,16 @@ function GatewayStepContent() {
     }
 
     source.onerror = () => {
+      // Stream close after 'ready' or 'error' is expected — ignore it
       if (terminalEvent) return
-      closeLocalSetupStream()
-      setLocalSetupStatus('error')
-      setLocalSetupError('Local setup was interrupted before it finished.')
+      // Small delay: the server closes the stream right after emitting 'ready',
+      // so onerror can fire before onmessage processes the final event.
+      setTimeout(() => {
+        if (terminalEvent) return
+        closeLocalSetupStream()
+        setLocalSetupStatus('error')
+        setLocalSetupError('Local setup was interrupted before it finished.')
+      }, 500)
     }
 
     localSetupSourceRef.current = source
@@ -234,6 +240,8 @@ function GatewayStepContent() {
       return
     }
 
+    setGatewayUrl(result.url)
+    if (result.token) setGatewayToken(result.token)
     setAutoDetectMessage(`Detected gateway at ${result.url}`)
     setAutoDetecting(false)
   }

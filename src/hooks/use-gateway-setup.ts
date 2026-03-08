@@ -19,7 +19,7 @@ type GatewaySetupState = {
   saveAndTest: () => Promise<boolean>
   /** Just test current server connection (no save) */
   testConnection: () => Promise<boolean>
-  autoDetectGateway: () => Promise<{ ok: boolean; url?: string; error?: string }>
+  autoDetectGateway: () => Promise<{ ok: boolean; url?: string; token?: string; error?: string }>
   proceed: () => void
   skipProviderSetup: () => void
   completeSetup: () => void
@@ -84,6 +84,7 @@ async function saveConfig(url: string, token: string): Promise<{ ok: boolean; er
 export async function autoDetectGateway(): Promise<{
   ok: boolean
   url?: string
+  token?: string
   error?: string
 }> {
   try {
@@ -96,6 +97,7 @@ export async function autoDetectGateway(): Promise<{
     const data = (await response.json()) as {
       ok?: boolean
       url?: string
+      token?: string
       error?: string
     }
 
@@ -106,7 +108,7 @@ export async function autoDetectGateway(): Promise<{
       }
     }
 
-    return { ok: true, url: data.url }
+    return { ok: true, url: data.url, token: data.token }
   } catch {
     return {
       ok: false,
@@ -267,6 +269,7 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
 
     set({
       gatewayUrl: result.url,
+      gatewayToken: result.token || get().gatewayToken,
       testStatus: 'idle',
       testError: null,
     })
