@@ -948,9 +948,9 @@ function MessageItemComponent({
                   <span>Working...</span>
                 </div>
               ) : null}
-              {/* Queued indicator — message delivered, waiting for response */}
+              {/* Sent indicator — message delivered, waiting for response */}
               {isUser && isQueued && (
-                <span className="text-[10px] text-white/60 self-end">Queued</span>
+                <span className="text-[10px] text-white/60 self-end">Sent</span>
               )}
 
               {effectiveIsStreaming && !hasRevealedText && (

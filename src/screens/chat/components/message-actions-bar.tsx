@@ -84,10 +84,10 @@ export function MessageActionsBar({
                 strokeWidth={1.6}
                 className="opacity-70"
               />
-              <span className="text-[11px] font-medium">Queued</span>
+              <span className="text-[11px] font-medium">Sent</span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              Waiting for agent to process
+              Message delivered, agent is working
             </TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
@@ -103,7 +103,7 @@ export function MessageActionsBar({
               <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
               <span className="text-[11px] font-medium">Retry</span>
             </TooltipTrigger>
-            <TooltipContent side="top">Resend queued message</TooltipContent>
+            <TooltipContent side="top">Resend message</TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
       )}

@@ -27,23 +27,23 @@ const STATUS_CONFIG: Record<
 > = {
   connected: {
     icon: WifiConnected01Icon,
-    label: 'Live',
+    label: 'Connected',
     color: 'text-green-500',
   },
   connecting: {
     icon: Loading03Icon,
-    label: 'Connecting...',
+    label: 'Reconnecting…',
     color: 'text-yellow-500',
     animate: true,
   },
   disconnected: {
     icon: WifiDisconnected01Icon,
-    label: 'Offline',
+    label: 'Updates paused',
     color: 'text-neutral-400',
   },
   error: {
     icon: WifiDisconnected01Icon,
-    label: 'Error',
+    label: 'Connection issue',
     color: 'text-red-500',
   },
 }
