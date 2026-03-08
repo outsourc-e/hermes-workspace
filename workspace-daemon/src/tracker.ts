@@ -313,8 +313,14 @@ export class Tracker extends EventEmitter {
     // Collect tasks that are already ready
     const alreadyReady = this.listTasks({ status: "ready" });
 
-    // Promote pending tasks whose dependencies are satisfied
-    const pendingTasks = this.listTasks({ status: "pending" });
+    // Only promote pending tasks whose parent mission is explicitly running
+    const runningMissionIds = new Set(
+      (this.db.prepare("SELECT id FROM missions WHERE status = 'running'").all() as Array<{ id: string }>).map((row) => row.id),
+    );
+
+    const pendingTasks = this.listTasks({ status: "pending" }).filter(
+      (task) => runningMissionIds.has(task.mission_id),
+    );
     const completedTaskIds = new Set(
       (this.db.prepare("SELECT id FROM tasks WHERE status = 'completed'").all() as Array<{ id: string }>).map((row) => row.id),
     );
