@@ -1161,6 +1161,13 @@ function areMessagesEqual(
   if (prevAttachments.length !== nextAttachments.length) {
     return false
   }
+  // Check message status — required so that optimistic "sending" → "queued"
+  // transitions re-render the component and clear the isStuckSending timer.
+  const prevStatus = (prevProps.message as Record<string, unknown>).status
+  const nextStatus = (nextProps.message as Record<string, unknown>).status
+  if (prevStatus !== nextStatus) {
+    return false
+  }
   // No need to check settings here as the hook will cause a re-render
   // and areMessagesEqual is for props only.
   // However, memo components with hooks will re-render if the hook state changes.
