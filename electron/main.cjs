@@ -10,7 +10,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = require("path");
 const fs_1 = require("fs");
-const http_1 = require("http");
 const child_process_1 = require("child_process");
 
 // Prevent multiple instances
@@ -29,31 +28,15 @@ let localServerPort = 0;
 const DEFAULT_GATEWAY_PORT = 18789;
 const DEV_PORT = 3000;
 
-// ── MIME types for static file serving ────────────────────────────────────
-const MIME_TYPES = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.map': 'application/json',
-    '.wasm': 'application/wasm',
-};
+// ── Production app server ─────────────────────────────────────────────────
 
 function getGatewayUrl() {
     try {
-        (0, child_process_1.execSync)(
-            `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${DEFAULT_GATEWAY_PORT}/api/health`,
+        const code = (0, child_process_1.execSync)(
+            `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${DEFAULT_GATEWAY_PORT}/health`,
             { timeout: 3000 }
-        );
+        ).toString().trim();
+        if (code !== '200') throw new Error('not 200');
         return `http://127.0.0.1:${DEFAULT_GATEWAY_PORT}`;
     } catch {
         return null;
@@ -69,83 +52,132 @@ function isOpenClawInstalled() {
     }
 }
 
-// ── Local HTTP server for production mode ─────────────────────────────────
-// Serves dist/client/ static files and reverse-proxies /api/* to the gateway.
-function startLocalServer(gatewayUrl) {
-    return new Promise((resolve, reject) => {
-        const clientDir = (0, path_1.join)(__dirname, '..', 'dist', 'client');
+// ── Find or start ClawSuite server ────────────────────────────────────────
+// Checks common ports for a running ClawSuite dev/preview server.
+// If none found, starts `pnpm dev` from the repo directory.
+let appProcess = null;
+const CLAWSUITE_PORTS = [3000, 3003, 3001, 3002];
 
-        const server = (0, http_1.createServer)((req, res) => {
-            const url = new URL(req.url || '/', `http://localhost`);
-            const pathname = url.pathname;
-
-            // ── Proxy /api/* to gateway ───────────────────────────────────
-            if (pathname.startsWith('/api/') || pathname.startsWith('/api?')) {
-                const target = `${gatewayUrl}${req.url}`;
-                const proxyReq = http_1.request(target, {
-                    method: req.method,
-                    headers: { ...req.headers, host: new URL(gatewayUrl).host },
-                }, (proxyRes) => {
-                    res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
-                    proxyRes.pipe(res, { end: true });
-                });
-                proxyReq.on('error', () => {
-                    res.writeHead(502, { 'Content-Type': 'text/plain' });
-                    res.end('Gateway unavailable');
-                });
-                req.pipe(proxyReq, { end: true });
-                return;
+function findRunningServer() {
+    for (const port of CLAWSUITE_PORTS) {
+        try {
+            const code = (0, child_process_1.execSync)(
+                `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/api/session-status`,
+                { timeout: 2000 }
+            ).toString().trim();
+            if (code === '200' || code === '401' || code === '503') {
+                return port;
             }
+        } catch { /* not running on this port */ }
+    }
+    return null;
+}
 
-            // ── SSE endpoint proxy ────────────────────────────────────────
-            if (pathname.startsWith('/events') || pathname.startsWith('/sse')) {
-                const target = `${gatewayUrl}${req.url}`;
-                const proxyReq = http_1.request(target, {
-                    method: req.method,
-                    headers: { ...req.headers, host: new URL(gatewayUrl).host },
-                }, (proxyRes) => {
-                    res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
-                    proxyRes.pipe(res, { end: true });
-                });
-                proxyReq.on('error', () => {
-                    res.writeHead(502, { 'Content-Type': 'text/plain' });
-                    res.end('Gateway unavailable');
-                });
-                req.pipe(proxyReq, { end: true });
-                return;
-            }
-
-            // ── Serve static files ────────────────────────────────────────
-            let filePath = (0, path_1.join)(clientDir, pathname === '/' ? 'index.html' : pathname);
-
-            // SPA fallback: if file doesn't exist, serve index.html
-            if (!(0, fs_1.existsSync)(filePath) || (0, fs_1.statSync)(filePath).isDirectory()) {
-                filePath = (0, path_1.join)(clientDir, 'index.html');
-            }
-
-            const ext = (0, path_1.extname)(filePath).toLowerCase();
-            const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
-
+function findRepoDir() {
+    // Common locations for the ClawSuite repo
+    const candidates = [
+        (0, path_1.join)(process.env.HOME || '', '.openclaw', 'workspace', 'clawsuite'),
+        (0, path_1.join)(process.env.HOME || '', 'clawsuite'),
+        (0, path_1.join)(__dirname, '..'),
+    ];
+    for (const dir of candidates) {
+        if ((0, fs_1.existsSync)((0, path_1.join)(dir, 'package.json'))) {
             try {
-                const content = (0, fs_1.readFileSync)(filePath);
-                res.writeHead(200, { 'Content-Type': mimeType });
-                res.end(content);
-            } catch {
-                res.writeHead(404, { 'Content-Type': 'text/plain' });
-                res.end('Not found');
+                const pkg = JSON.parse((0, fs_1.readFileSync)((0, path_1.join)(dir, 'package.json'), 'utf-8'));
+                if (pkg.name === 'clawsuite' || pkg.name === '@clawsuite/app') return dir;
+            } catch { /* skip */ }
+        }
+    }
+    return null;
+}
+
+function startLocalServer(_gatewayUrl) {
+    return new Promise((resolve, reject) => {
+        // First check if a server is already running
+        const existingPort = findRunningServer();
+        if (existingPort) {
+            localServerPort = existingPort;
+            console.log(`[ClawSuite] Found running server on port ${existingPort}`);
+            return resolve(existingPort);
+        }
+
+        // Try to start one from the repo
+        const repoDir = findRepoDir();
+        if (!repoDir) {
+            console.error('[ClawSuite] Could not find ClawSuite repo directory');
+            return reject(new Error('ClawSuite repo not found'));
+        }
+
+        console.log(`[ClawSuite] Starting server from ${repoDir}...`);
+        const port = 3003;
+
+        appProcess = (0, child_process_1.spawn)('pnpm', ['dev', '--port', String(port)], {
+            cwd: repoDir,
+            shell: true,
+            stdio: 'pipe',
+            env: { ...process.env, NODE_ENV: 'development', PORT: String(port) },
+            detached: true,
+        });
+
+        let started = false;
+        const timeout = setTimeout(() => {
+            if (!started) {
+                started = true;
+                // Try polling the port
+                const poll = setInterval(() => {
+                    const found = findRunningServer();
+                    if (found) {
+                        clearInterval(poll);
+                        localServerPort = found;
+                        resolve(found);
+                    }
+                }, 1000);
+                // Give up after 15s total
+                setTimeout(() => {
+                    clearInterval(poll);
+                    if (!localServerPort) {
+                        localServerPort = port;
+                        resolve(port);
+                    }
+                }, 10000);
+            }
+        }, 5000);
+
+        appProcess.stdout?.on('data', (data) => {
+            const output = data.toString();
+            console.log('[dev]', output.trim());
+            if (!started && output.includes('Local:')) {
+                started = true;
+                clearTimeout(timeout);
+                // Extract actual port from output
+                const match = output.match(/:(\d{4})\//);
+                localServerPort = match ? parseInt(match[1], 10) : port;
+                console.log(`[ClawSuite] Dev server started on port ${localServerPort}`);
+                resolve(localServerPort);
             }
         });
 
-        // Pick a random available port
-        server.listen(0, '127.0.0.1', () => {
-            const addr = server.address();
-            localServerPort = typeof addr === 'object' ? addr.port : 0;
-            localServer = server;
-            console.log(`[ClawSuite] Local server started on port ${localServerPort}`);
-            resolve(localServerPort);
+        appProcess.stderr?.on('data', (data) => {
+            const output = data.toString();
+            console.error('[dev-err]', output.trim());
+            // pnpm outputs to stderr sometimes
+            if (!started && output.includes('Local:')) {
+                started = true;
+                clearTimeout(timeout);
+                const match = output.match(/:(\d{4})\//);
+                localServerPort = match ? parseInt(match[1], 10) : port;
+                resolve(localServerPort);
+            }
         });
 
-        server.on('error', reject);
+        appProcess.on('error', (err) => {
+            console.error('[ClawSuite] Dev server failed:', err);
+            if (!started) {
+                started = true;
+                clearTimeout(timeout);
+                reject(err);
+            }
+        });
     });
 }
 
@@ -333,7 +365,8 @@ electron_1.ipcMain.handle('gateway:start', async () => {
 
 electron_1.ipcMain.handle('gateway:connect', async (_event, url) => {
     try {
-        (0, child_process_1.execSync)(`curl -s -o /dev/null -w "%{http_code}" ${url}/api/health`, { timeout: 3000 });
+        const code = (0, child_process_1.execSync)(`curl -s -o /dev/null -w "%{http_code}" ${url}/health`, { timeout: 3000 }).toString().trim();
+        if (code !== '200') throw new Error('not 200');
         return { success: true, url };
     } catch {
         return { success: false, error: 'Could not connect to gateway' };
@@ -376,9 +409,9 @@ electron_1.app.on('window-all-closed', () => {
 
 electron_1.app.on('before-quit', () => {
     tray?.destroy();
-    if (localServer) {
-        localServer.close();
-        localServer = null;
+    if (appProcess) {
+        appProcess.kill();
+        appProcess = null;
     }
 });
 
