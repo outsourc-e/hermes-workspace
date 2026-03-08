@@ -247,9 +247,9 @@ function GatewayStepContent() {
     }
   }
 
-  const POLAR_PRODUCT_IDS: Record<Extract<CloudPlan, 'pro' | 'team'>, string> = {
-    pro: '0cf1fed8-898c-4062-beeb-e38f0cd5bb21',
-    team: 'fb2836ac-2f70-4b2c-9ad6-850b26ffa799',
+  const POLAR_CHECKOUT_LINKS: Record<Extract<CloudPlan, 'pro' | 'team'>, string> = {
+    pro: 'https://buy.polar.sh/polar_cl_suIyJn1xrlUaOwAuVexASQRNyHaw0SWlH0bE62qh63q',
+    team: 'https://buy.polar.sh/polar_cl_iFQjUWj8PaBrTUXxKW4jHkDerEnOTKB46ge7m23ge7z',
   }
 
   const openPolarCheckout = (plan: Extract<CloudPlan, 'pro' | 'team'>) => {
@@ -261,11 +261,10 @@ function GatewayStepContent() {
 
     if (typeof window === 'undefined') return
 
-    const productId = POLAR_PRODUCT_IDS[plan]
-    const emailParam = normalizedEmail ? `&email=${encodeURIComponent(normalizedEmail)}` : ''
+    const checkoutUrl = POLAR_CHECKOUT_LINKS[plan]
 
     window.open(
-      `https://polar.sh/clawsuite/checkout?productId=${productId}${emailParam}`,
+      checkoutUrl,
       '_blank',
       'noopener,noreferrer',
     )
