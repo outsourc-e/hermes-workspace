@@ -306,13 +306,20 @@ export function WorkspaceShell() {
         className="relative flex flex-col overflow-hidden theme-bg theme-text"
         style={{ height: 'var(--vvh, 100dvh)' }}
       >
-        {/* Electron: full-width title bar with centered label */}
+        {/* Electron: native-style title bar */}
         {isElectron && (
           <div
-            className="flex h-9 shrink-0 items-center justify-center border-b border-primary-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-sm z-40"
+            className="flex h-10 shrink-0 items-center bg-gradient-to-r from-[#f97316] to-[#fb923c] dark:from-[#c2410c] dark:to-[#ea580c] z-40"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           >
-            <span className="text-xs font-semibold text-primary-500 dark:text-primary-400 tracking-wide select-none">ClawSuite</span>
+            {/* Traffic light spacer (left ~78px for macOS buttons) */}
+            <div className="w-[78px] shrink-0" />
+            {/* Centered title */}
+            <div className="flex-1 text-center">
+              <span className="text-sm font-semibold text-white/90 select-none tracking-wide">ClawSuite</span>
+            </div>
+            {/* Right spacer to balance */}
+            <div className="w-[78px] shrink-0" />
           </div>
         )}
         <div className={cn(

@@ -203,7 +203,7 @@ async function createWindow() {
         title: 'ClawSuite',
         icon: (0, fs_1.existsSync)(iconPath) ? iconPath : undefined,
         titleBarStyle: 'hiddenInset',
-        trafficLightPosition: { x: 16, y: 16 },
+        trafficLightPosition: { x: 16, y: 12 },
         backgroundColor: '#0a0a0f',
         show: false,
         webPreferences: {
