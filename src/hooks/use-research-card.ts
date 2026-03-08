@@ -1,10 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { useEffect, useMemo, useState } from 'react'
-import {
-  CHAT_STREAM_DONE_EVENT,
-  CHAT_TOOL_CALL_EVENT,
-  CHAT_TOOL_RESULT_EVENT,
-} from './use-gateway-chat-stream'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useGatewayChatStore } from '../stores/gateway-chat-store'
 
 export type ResearchStep = {
   id: string
@@ -23,51 +19,10 @@ export type UseResearchCardResult = {
   setCollapsed: Dispatch<SetStateAction<boolean>>
 }
 
-type ToolEventDetail = {
-  phase?: string
-  name?: string
-  toolCallId?: string
-  args?: unknown
-  runId?: string
-  sessionKey?: string
-  isError?: boolean
-  error?: string
-}
-
-type DoneEventDetail = {
-  state?: string
-  sessionKey?: string
-}
-
 type UseResearchCardOptions = {
   sessionKey?: string
   isStreaming?: boolean
   resetKey?: string | number
-}
-
-function matchesSession(eventSessionKey: string | undefined, sessionKey: string | undefined): boolean {
-  if (!sessionKey || sessionKey === 'new') return true
-  return eventSessionKey === sessionKey
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
-function readString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function readFirstString(input: unknown, keys: string[]): string {
-  const record = asRecord(input)
-  if (!record) return ''
-  for (const key of keys) {
-    const value = readString(record[key])
-    if (value) return value
-  }
-  return ''
 }
 
 function basename(path: string): string {
@@ -78,43 +33,35 @@ function basename(path: string): string {
 }
 
 function extractFileTarget(args: unknown): string {
+  if (!args) return ''
+
   if (typeof args === 'string') {
-    const trimmed = args.trim()
-    if (!trimmed) return ''
-
     try {
-      const parsed = JSON.parse(trimmed) as unknown
-      const fromParsed = extractFileTarget(parsed)
-      if (fromParsed) return fromParsed
+      const parsed = JSON.parse(args) as unknown
+      return extractFileTarget(parsed)
     } catch {
-      // Plain string tool args are common; fall through to text heuristics.
+      // Not JSON — try regex
+      const patterns = [
+        /"(?:path|file_path|file|filepath)"\s*:\s*"([^"]+)"/i,
+        /path=([^\s,]+)/i,
+      ]
+      for (const pattern of patterns) {
+        const match = pattern.exec(args)
+        if (match?.[1]) return basename(match[1])
+      }
+      return ''
     }
-
-    const patterns = [
-      /"path"\s*:\s*"([^"]+)"/i,
-      /"file(?:name|path)?"\s*:\s*"([^"]+)"/i,
-      /path=([^\s,]+)/i,
-      /file=([^\s,]+)/i,
-    ]
-    for (const pattern of patterns) {
-      const match = pattern.exec(trimmed)
-      if (match?.[1]) return basename(match[1])
-    }
-    return ''
   }
 
-  const direct =
-    readFirstString(args, ['path', 'filePath', 'filepath', 'filename', 'file', 'target_file']) ||
-    readFirstString(asRecord(args)?.target, ['path', 'filePath', 'filepath', 'filename', 'file']) ||
-    readFirstString(asRecord(args)?.input, ['path', 'filePath', 'filepath', 'filename', 'file'])
-  return direct ? basename(direct) : ''
-}
+  if (typeof args === 'object' && args !== null) {
+    const record = args as Record<string, unknown>
+    for (const key of ['path', 'filePath', 'file_path', 'filepath', 'filename', 'file', 'target_file']) {
+      const val = record[key]
+      if (typeof val === 'string' && val.trim()) return basename(val.trim())
+    }
+  }
 
-function capitalizeLabel(toolName: string): string {
-  if (!toolName) return 'Working'
-  return toolName
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+  return ''
 }
 
 function buildToolLabel(toolName: string, args: unknown): string {
@@ -147,10 +94,18 @@ function buildToolLabel(toolName: string, args: unknown): string {
     case 'image':
       return 'Analyzing image'
     default:
-      return capitalizeLabel(toolName)
+      return toolName
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase())
   }
 }
 
+/**
+ * Research card hook that reads directly from the gateway chat store
+ * instead of relying on CustomEvents. This is more reliable because
+ * the store is already proven to receive tool events (the thinking
+ * bubble uses the same data path).
+ */
 export function useResearchCard({
   sessionKey,
   isStreaming = false,
@@ -159,18 +114,23 @@ export function useResearchCard({
   const [steps, setSteps] = useState<ResearchStep[]>([])
   const [collapsed, setCollapsed] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const seenToolIdsRef = useRef<Set<string>>(new Set())
 
+  // Reset when session or resetKey changes
   useEffect(() => {
     setSteps([])
     setCollapsed(false)
+    seenToolIdsRef.current.clear()
   }, [resetKey, sessionKey])
 
+  // Auto-collapse when streaming ends
   useEffect(() => {
     if (!isStreaming && steps.length > 0) {
       setCollapsed(true)
     }
   }, [isStreaming, steps.length])
 
+  // Tick timer for duration display
   useEffect(() => {
     if (!isStreaming || steps.length === 0) return
     setNow(Date.now())
@@ -178,105 +138,72 @@ export function useResearchCard({
     return () => window.clearInterval(intervalId)
   }, [isStreaming, steps.length])
 
+  // Subscribe to store changes — this is the key difference from the
+  // CustomEvent approach. We poll the store's streamingState for tool
+  // calls and build the timeline from that.
   useEffect(() => {
-    function handleToolCall(event: Event) {
-      const detail = (event as CustomEvent<ToolEventDetail>).detail
-      console.log('[research-card-debug] handleToolCall', detail.name, detail.sessionKey, 'match:', matchesSession(detail.sessionKey, sessionKey), 'hook sessionKey:', sessionKey)
-      if (!matchesSession(detail.sessionKey, sessionKey)) return
+    const unsubscribe = useGatewayChatStore.subscribe((state) => {
+      const key = sessionKey || 'main'
+      const streaming = state.streamingState.get(key)
+      if (!streaming?.toolCalls?.length) return
 
-      const toolName = detail.name ?? 'tool'
-      const stepId =
-        detail.toolCallId ??
-        `${toolName}-${detail.runId ?? detail.sessionKey ?? 'main'}-${Date.now()}`
-      const startedAt = Date.now()
-      setNow(startedAt)
+      const currentTime = Date.now()
+      setNow(currentTime)
 
-      setSteps((current) => {
-        const existingIndex = current.findIndex((step) => step.id === stepId)
-        const nextStep: ResearchStep = {
-          id: stepId,
-          toolName,
-          label: buildToolLabel(toolName, detail.args),
-          status: 'running',
-          startedAt,
-        }
+      setSteps((prevSteps) => {
+        let changed = false
+        const nextSteps = [...prevSteps]
 
-        if (existingIndex >= 0) {
-          const next = [...current]
-          next[existingIndex] = {
-            ...next[existingIndex],
-            ...nextStep,
-            startedAt: next[existingIndex].startedAt,
+        for (const toolCall of streaming.toolCalls) {
+          const toolId = toolCall.id
+          const isDone = toolCall.phase === 'done' || toolCall.phase === 'result'
+          const isError = toolCall.phase === 'error'
+
+          const existingIndex = nextSteps.findIndex((s) => s.id === toolId)
+
+          if (existingIndex >= 0) {
+            // Update existing step
+            const existing = nextSteps[existingIndex]
+            const newStatus = isError ? 'error' : isDone ? 'done' : 'running'
+            if (existing.status !== newStatus) {
+              nextSteps[existingIndex] = {
+                ...existing,
+                status: newStatus,
+                durationMs: (isDone || isError) ? currentTime - existing.startedAt : undefined,
+              }
+              changed = true
+            }
+          } else if (!seenToolIdsRef.current.has(toolId)) {
+            // New tool call
+            seenToolIdsRef.current.add(toolId)
+            nextSteps.push({
+              id: toolId,
+              toolName: toolCall.name,
+              label: buildToolLabel(toolCall.name, toolCall.args),
+              status: isError ? 'error' : isDone ? 'done' : 'running',
+              startedAt: currentTime,
+              durationMs: (isDone || isError) ? 0 : undefined,
+            })
+            changed = true
           }
-          return next
         }
 
-        return [...current, nextStep]
+        return changed ? nextSteps : prevSteps
       })
+
       setCollapsed(false)
-    }
+    })
 
-    function handleToolResult(event: Event) {
-      const detail = (event as CustomEvent<ToolEventDetail>).detail
-      if (!matchesSession(detail.sessionKey, sessionKey)) return
-
-      const toolName = detail.name ?? 'tool'
-      const stepId = detail.toolCallId
-      const finishedAt = Date.now()
-      setNow(finishedAt)
-
-      setSteps((current) => {
-        if (!stepId) {
-          return [
-            ...current,
-            {
-              id: `${toolName}-${detail.runId ?? detail.sessionKey ?? 'main'}-${finishedAt}`,
-              toolName,
-              label: buildToolLabel(toolName, detail.args),
-              status: detail.isError || detail.error ? 'error' : 'done',
-              startedAt: finishedAt,
-              durationMs: 0,
-            },
-          ]
-        }
-
-        const existingIndex = current.findIndex((step) => step.id === stepId)
-        if (existingIndex === -1) return current
-
-        const next = [...current]
-        const existing = next[existingIndex]
-        next[existingIndex] = {
-          ...existing,
-          status: detail.isError || detail.error ? 'error' : 'done',
-          durationMs: Math.max(0, finishedAt - existing.startedAt),
-        }
-        return next
-      })
-    }
-
-    function handleDone(event: Event) {
-      const detail = (event as CustomEvent<DoneEventDetail>).detail
-      if (!matchesSession(detail.sessionKey, sessionKey)) return
-      setNow(Date.now())
-      setCollapsed(true)
-    }
-
-    window.addEventListener(CHAT_TOOL_CALL_EVENT, handleToolCall as EventListener)
-    window.addEventListener(CHAT_TOOL_RESULT_EVENT, handleToolResult as EventListener)
-    window.addEventListener(CHAT_STREAM_DONE_EVENT, handleDone as EventListener)
-
-    return () => {
-      window.removeEventListener(CHAT_TOOL_CALL_EVENT, handleToolCall as EventListener)
-      window.removeEventListener(CHAT_TOOL_RESULT_EVENT, handleToolResult as EventListener)
-      window.removeEventListener(CHAT_STREAM_DONE_EVENT, handleDone as EventListener)
-    }
+    return unsubscribe
   }, [sessionKey])
 
   const totalDurationMs = useMemo(() => {
     if (steps.length === 0) return 0
     const startedAt = Math.min(...steps.map((step) => step.startedAt))
     const endedAt = Math.max(
-          ...steps.map((step) => step.startedAt + (step.durationMs ?? (isStreaming ? now - step.startedAt : 0))),
+      ...steps.map((step) =>
+        step.startedAt + (step.durationMs ?? (isStreaming ? now - step.startedAt : 0)),
+      ),
     )
     return Math.max(0, endedAt - startedAt)
   }, [isStreaming, now, steps])
