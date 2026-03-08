@@ -327,7 +327,7 @@ export function useGatewayChatStream(
           message: GatewayMessage
           sessionKey: string
         }
-        console.log(`[SSE] message event received: role=${data.message?.role} sessionKey=${data.sessionKey}`)
+        // debug: console.log(`[SSE] message event received: role=${data.message?.role} sessionKey=${data.sessionKey}`)
         processEvent({ type: 'message', ...data })
       } catch {
         // Ignore parse errors
@@ -344,7 +344,7 @@ export function useGatewayChatStream(
           sessionKey: string
           message?: GatewayMessage
         }
-        console.log(`[SSE] done event received: runId=${data.runId} state=${data.state} sessionKey=${data.sessionKey}`)
+        // debug: console.log(`[SSE] done event received: runId=${data.runId} state=${data.state} sessionKey=${data.sessionKey}`)
         const streamingSnapshot =
           useGatewayChatStore.getState().streamingState.get(data.sessionKey) ?? null
         processEvent({ type: 'done', ...data })

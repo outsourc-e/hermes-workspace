@@ -132,10 +132,7 @@ function clearChunkSource(runId: unknown): void {
 
 function broadcast(event: string, data: Record<string, unknown>): void {
   const bus = getBus()
-  const subscriberCount = bus.subscribers.size
-  if (event === 'done' || event === 'chunk' || event === 'message' || event === 'user_message') {
-    console.log(`[chat-bus] broadcast: event=${event} runId=${data.runId ?? 'none'} subscribers=${subscriberCount} sessionKey=${data.sessionKey}`)
-  }
+  // const subscriberCount = bus.subscribers.size
   const evt: ChatSSEEvent = { event, data }
   for (const sub of bus.subscribers) {
     try {
@@ -152,11 +149,7 @@ function processGatewayFrame(frame: GatewayFrame): void {
   if (frame.type !== 'event' && frame.type !== 'evt') return
 
   const eventName = (frame as any).event
-  // Debug: log all gateway events to find what's being received
-  const debugPayload = (frame as any).payload
-  if (eventName === 'chat') {
-    console.log(`[chat-bus] gateway chat event: state=${debugPayload?.state} runId=${debugPayload?.runId} role=${debugPayload?.message?.role}`)
-  }
+  
   const rawPayload =
     (frame as any).payload ??
     ((frame as any).payloadJSON
@@ -310,7 +303,7 @@ export async function ensureBusStarted(): Promise<void> {
   }
 
   bus.cleanupListener = onGatewayEvent(processGatewayFrame)
-  console.log(`[chat-bus] singleton gateway listener started`)
+  // debug: console.log(`[chat-bus] singleton gateway listener started`)
 }
 
 /**

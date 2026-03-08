@@ -2020,7 +2020,7 @@ export function ChatScreen({
                 completedStreamingThinking.current ||
                 undefined
               }
-              hideSystemMessages={isMobile}
+              hideSystemMessages
               activeToolCalls={activeToolCalls}
               liveToolActivity={liveToolActivity}
               researchCard={researchCard}
