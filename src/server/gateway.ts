@@ -53,6 +53,14 @@ type InflightRequest = {
   reject: (reason?: unknown) => void
 }
 
+type SocketHandlers = {
+  ws: WebSocket
+  onMessage: (data: RawData) => void
+  onPong: () => void
+  onClose: (code: number, reason: Buffer) => void
+  onError: (error: unknown) => void
+}
+
 // ── Device Identity (Ed25519) ─────────────────────────────────────
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
 
@@ -100,7 +108,7 @@ function signPayload(privPem: string, payload: string): string {
 }
 
 // ── Constants ─────────────────────────────────────────────────────
-const RECONNECT_DELAYS_MS = [1000, 2000, 4000]
+const INITIAL_RECONNECT_DELAY_MS = 1000
 const MAX_RECONNECT_DELAY_MS = 30000
 const HEARTBEAT_INTERVAL_MS = 30000
 const HEARTBEAT_TIMEOUT_MS = 20000
@@ -194,6 +202,7 @@ class GatewayClient {
   private authenticated = false
   private destroyed = false
   private _lastErrorKind: import('../lib/connection-errors').ConnectionErrorKind | null = null
+  private socketHandlers: SocketHandlers | null = null
 
   get lastErrorKind() { return this._lastErrorKind }
 
@@ -277,6 +286,10 @@ class GatewayClient {
     this.ws = null
     this.authenticated = false
 
+    if (ws) {
+      this.detachSocket(ws)
+    }
+
     const closePromise = ws ? this.closeSocket(ws) : Promise.resolve()
 
     this.rejectQueuedRequests(new Error('Gateway client is shut down'))
@@ -306,6 +319,11 @@ class GatewayClient {
             return `${parsed.protocol}//${parsed.host}`
           } catch { return 'http://127.0.0.1:18789' }
         })()
+        if (this.ws) {
+          this.detachSocket(this.ws)
+          this.ws.terminate()
+          this.ws = null
+        }
         const ws = new WebSocket(url, { origin: gatewayOrigin, headers: { Origin: gatewayOrigin } })
 
         this.clearReconnectTimer()
@@ -327,8 +345,9 @@ class GatewayClient {
         // transition and is lost (causes "missing nonce" rejection).
         let challengeNonce: string | undefined
         let challengeResolved = false
+        let challengeHandler: ((data: RawData) => void) | null = null
         const nonce = await new Promise<string | undefined>((resolve) => {
-          const originalHandler = (data: RawData) => {
+          challengeHandler = (data: RawData) => {
             try {
               const f = JSON.parse(rawDataToString(data))
               if ((f.type === 'event' || f.type === 'evt') && f.event === 'connect.challenge') {
@@ -340,23 +359,20 @@ class GatewayClient {
                 return
               }
             } catch { /* ignore */ }
-            // Forward non-challenge messages to normal handler
-            this.handleMessage(data)
           }
-          // Replace with a handler that captures challenge AND forwards others
-          ws.removeAllListeners('message')
-          ws.on('message', originalHandler)
+          ws.on('message', challengeHandler)
           // Fallback if no challenge (older gateway without protocol 3)
           setTimeout(() => {
-            if (!challengeResolved) {
+            if (!challengeResolved && challengeHandler) {
               challengeResolved = true
+              ws.off('message', challengeHandler)
               resolve(undefined)
             }
           }, 3000)
         })
-        // Re-attach the normal message handler (challenge phase done)
-        ws.removeAllListeners('message')
-        ws.on('message', (data: RawData) => { this.handleMessage(data) })
+        if (challengeHandler) {
+          ws.off('message', challengeHandler)
+        }
 
         const connectId = randomUUID()
         const connectReq: GatewayFrame = {
@@ -391,6 +407,7 @@ class GatewayClient {
         })
 
         this.authenticated = true
+        this.reconnectAttempts = 0
         this.startHeartbeat()
         this.flushQueue()
         this._lastErrorKind = null
@@ -403,6 +420,7 @@ class GatewayClient {
           this._lastErrorKind = classifyConnectionError(lastError)
         } catch { /* module may not be available in all contexts */ }
         if (this.ws) {
+          this.detachSocket(this.ws)
           this.ws.terminate()
           this.ws = null
         }
@@ -414,28 +432,53 @@ class GatewayClient {
   }
 
   private attachSocket(ws: WebSocket) {
-    ws.on('message', (data: RawData) => {
-      this.handleMessage(data)
-    })
+    if (this.socketHandlers && this.socketHandlers.ws !== ws) {
+      this.detachSocket(this.socketHandlers.ws)
+    }
+    this.detachSocket(ws)
 
-    ws.on('pong', () => {
+    const onMessage = (data: RawData) => {
+      this.handleMessage(data)
+    }
+
+    const onPong = () => {
       if (this.heartbeatTimeout) {
         clearTimeout(this.heartbeatTimeout)
         this.heartbeatTimeout = null
       }
-    })
+    }
 
-    ws.on('close', (code: number, reason: Buffer) => {
+    const onClose = (code: number, reason: Buffer) => {
       const reasonText = reason?.toString() || 'n/a'
       this.handleDisconnect(
+        ws,
         new Error(`Gateway connection closed (code=${code}, reason=${reasonText})`),
       )
-    })
+    }
 
-    ws.on('error', (error: unknown) => {
+    const onError = (error: unknown) => {
       const err = error instanceof Error ? error : new Error(String(error))
-      this.handleDisconnect(err)
-    })
+      this.handleDisconnect(ws, err)
+    }
+
+    ws.on('message', onMessage)
+    ws.on('pong', onPong)
+    ws.on('close', onClose)
+    ws.on('error', onError)
+
+    this.socketHandlers = { ws, onMessage, onPong, onClose, onError }
+  }
+
+  private detachSocket(ws: WebSocket) {
+    if (!this.socketHandlers || this.socketHandlers.ws !== ws) {
+      return
+    }
+
+    ws.off('message', this.socketHandlers.onMessage)
+    ws.off('pong', this.socketHandlers.onPong)
+    ws.off('close', this.socketHandlers.onClose)
+    ws.off('error', this.socketHandlers.onError)
+    this.socketHandlers = null
   }
 
   private handleMessage(data: RawData) {
@@ -473,8 +516,13 @@ class GatewayClient {
     pending.reject(new Error(frame.error?.message ?? 'gateway error'))
   }
 
-  private handleDisconnect(error: Error) {
-    const ws = this.ws
+  private handleDisconnect(ws: WebSocket, error: Error) {
+    if (ws !== this.ws) {
+      this.detachSocket(ws)
+      return
+    }
+
+    this.detachSocket(ws)
     this.ws = null
     this.authenticated = false
     this.stopHeartbeat()
@@ -538,8 +586,10 @@ class GatewayClient {
       return
     }
 
+    const attempt = this.reconnectAttempts + 1
     const delay = nextReconnectDelayMs(this.reconnectAttempts)
-    this.reconnectAttempts += 1
+    this.reconnectAttempts = attempt
+    console.warn(`[gateway] Reconnect attempt ${attempt} scheduled in ${delay}ms`)
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
@@ -564,7 +614,7 @@ class GatewayClient {
       try {
         this.ws.ping()
       } catch {
-        this.handleDisconnect(new Error('Gateway ping failed'))
+        this.handleDisconnect(this.ws, new Error('Gateway ping failed'))
         return
       }
 
@@ -574,7 +624,9 @@ class GatewayClient {
 
       this.heartbeatTimeout = setTimeout(() => {
         this.heartbeatTimeout = null
-        this.handleDisconnect(new Error('Gateway ping timeout'))
+        if (this.ws) {
+          this.handleDisconnect(this.ws, new Error('Gateway ping timeout'))
+        }
       }, HEARTBEAT_TIMEOUT_MS)
     }, HEARTBEAT_INTERVAL_MS)
   }
@@ -673,13 +725,15 @@ class GatewayClient {
 }
 
 function nextReconnectDelayMs(attempt: number) {
-  if (attempt < RECONNECT_DELAYS_MS.length) {
-    return RECONNECT_DELAYS_MS[attempt]
-  }
-
-  const doubled =
-    RECONNECT_DELAYS_MS[RECONNECT_DELAYS_MS.length - 1] * 2 ** (attempt - 2)
-  return Math.min(doubled, MAX_RECONNECT_DELAY_MS)
+  const exponentialDelay = Math.min(
+    INITIAL_RECONNECT_DELAY_MS * 2 ** attempt,
+    MAX_RECONNECT_DELAY_MS,
+  )
+  const jitterFloor = Math.max(
+    INITIAL_RECONNECT_DELAY_MS,
+    Math.floor(exponentialDelay * 0.5),
+  )
+  return jitterFloor + Math.floor(Math.random() * (exponentialDelay - jitterFloor + 1))
 }
 
 function rawDataToString(data: RawData): string {
