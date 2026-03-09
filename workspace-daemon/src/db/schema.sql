@@ -6,6 +6,10 @@ CREATE TABLE IF NOT EXISTS projects (
   name TEXT NOT NULL,
   path TEXT,
   spec TEXT,
+  auto_approve INTEGER DEFAULT 0,
+  max_concurrent INTEGER DEFAULT 2,
+  required_checks TEXT DEFAULT 'tsc',
+  allowed_tools TEXT DEFAULT 'git,shell',
   status TEXT NOT NULL DEFAULT 'active',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))

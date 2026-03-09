@@ -21,7 +21,6 @@ import { DashboardProjectCards } from './dashboard-project-cards'
 import { DashboardReviewInbox } from './dashboard-review-inbox'
 import { CheckpointDetailModal } from './checkpoint-detail-modal'
 import {
-  CreateProjectDialog,
   WorkspaceEntityDialog,
   WorkspaceFieldLabel,
 } from './create-project-dialog'
@@ -38,7 +37,6 @@ import {
   type MissionFormState,
   type MissionLaunchState,
   type PhaseFormState,
-  type ProjectFormState,
   type ReviewRiskFilter,
   type ReviewVerificationFilter,
   type TaskFormState,
@@ -104,25 +102,28 @@ async function loadMissionTasks(missionId: string) {
 
 export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   const [projects, setProjects] = useState<Array<WorkspaceProject>>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [projectDetail, setProjectDetail] = useState<WorkspaceProject | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  )
+  const [projectDetail, setProjectDetail] = useState<WorkspaceProject | null>(
+    null,
+  )
   const [projectSpecDraft, setProjectSpecDraft] = useState('')
   const [projectSpecOpen, setProjectSpecOpen] = useState(false)
-  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>(
+    {},
+  )
   const [listLoading, setListLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
-  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
-  const [phaseProject, setPhaseProject] = useState<WorkspaceProject | null>(null)
+  const [phaseProject, setPhaseProject] = useState<WorkspaceProject | null>(
+    null,
+  )
   const [missionPhase, setMissionPhase] = useState<WorkspacePhase | null>(null)
-  const [missionLauncher, setMissionLauncher] = useState<MissionLaunchState | null>(null)
+  const [missionLauncher, setMissionLauncher] =
+    useState<MissionLaunchState | null>(null)
   const [taskMission, setTaskMission] = useState<WorkspaceMission | null>(null)
   const [submittingKey, setSubmittingKey] = useState<string | null>(null)
-  const [projectForm, setProjectForm] = useState<ProjectFormState>({
-    name: '',
-    path: '',
-    spec: '',
-  })
   const [phaseForm, setPhaseForm] = useState<PhaseFormState>({ name: '' })
   const [missionForm, setMissionForm] = useState<MissionFormState>({ name: '' })
   const [taskForm, setTaskForm] = useState<TaskFormState>({
@@ -133,14 +134,15 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   const [reviewProjectFilter, setReviewProjectFilter] = useState('all')
   const [reviewVerificationFilter, setReviewVerificationFilter] =
     useState<ReviewVerificationFilter>('all')
-  const [reviewRiskFilter, setReviewRiskFilter] = useState<ReviewRiskFilter>('all')
+  const [reviewRiskFilter, setReviewRiskFilter] =
+    useState<ReviewRiskFilter>('all')
   const [batchApproving, setBatchApproving] = useState(false)
   const [expandedDecomposeDescriptions, setExpandedDecomposeDescriptions] =
     useState<Record<string, boolean>>({})
-  const [selectedCheckpoint, setSelectedCheckpoint] = useState<WorkspaceCheckpoint | null>(null)
-  const [pendingReviewCheckpoint, setPendingReviewCheckpoint] = useState<WorkspaceCheckpoint | null>(
-    null,
-  )
+  const [selectedCheckpoint, setSelectedCheckpoint] =
+    useState<WorkspaceCheckpoint | null>(null)
+  const [pendingReviewCheckpoint, setPendingReviewCheckpoint] =
+    useState<WorkspaceCheckpoint | null>(null)
   const queryClient = useQueryClient()
   const detailSectionRef = useRef<HTMLElement | null>(null)
   const navigate = useNavigate()
@@ -151,20 +153,28 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     async function fetchProjects() {
       setListLoading(true)
       try {
-        const nextProjects = extractProjects(await apiRequest('/api/workspace/projects'))
+        const nextProjects = extractProjects(
+          await apiRequest('/api/workspace/projects'),
+        )
         if (cancelled) return
         setProjects(nextProjects)
         setSelectedProjectId((current) => {
-          if (current && nextProjects.some((project) => project.id === current)) {
+          if (
+            current &&
+            nextProjects.some((project) => project.id === current)
+          ) {
             return current
           }
           return nextProjects[0]?.id ?? null
         })
       } catch (error) {
         if (!cancelled) {
-          toast(error instanceof Error ? error.message : 'Failed to load projects', {
-            type: 'error',
-          })
+          toast(
+            error instanceof Error ? error.message : 'Failed to load projects',
+            {
+              type: 'error',
+            },
+          )
         }
       } finally {
         if (!cancelled) setListLoading(false)
@@ -204,7 +214,9 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
         )
         if (cancelled) return
 
-        const taskMap = new Map(taskEntries.map((entry) => [entry.missionId, entry.tasks]))
+        const taskMap = new Map(
+          taskEntries.map((entry) => [entry.missionId, entry.tasks]),
+        )
         const hydratedDetail: WorkspaceProject = {
           ...detail,
           phases: detail.phases
@@ -230,7 +242,9 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       } catch (error) {
         if (!cancelled) {
           toast(
-            error instanceof Error ? error.message : 'Failed to load project detail',
+            error instanceof Error
+              ? error.message
+              : 'Failed to load project detail',
             { type: 'error' },
           )
         }
@@ -271,30 +285,44 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     const spec = projectDetail?.spec ?? selectedSummary?.spec ?? ''
     setProjectSpecDraft(spec)
     setProjectSpecOpen(spec.trim().length > 0)
-  }, [projectDetail?.id, projectDetail?.spec, selectedSummary?.id, selectedSummary?.spec])
+  }, [
+    projectDetail?.id,
+    projectDetail?.spec,
+    selectedSummary?.id,
+    selectedSummary?.spec,
+  ])
 
   const statsQuery = useQuery({
     queryKey: ['workspace', 'stats'],
-    queryFn: async () => normalizeStats(await apiRequest('/api/workspace/stats')),
+    queryFn: async () =>
+      normalizeStats(await apiRequest('/api/workspace/stats')),
   })
 
   const agentsQuery = useQuery({
     queryKey: ['workspace', 'agents'],
-    queryFn: async () => extractAgents(await apiRequest('/api/workspace/agents')),
+    queryFn: async () =>
+      extractAgents(await apiRequest('/api/workspace/agents')),
   })
 
   const projectSnapshotsQuery = useQuery({
-    queryKey: ['workspace', 'project-snapshots', projects.map((project) => project.id).join(',')],
+    queryKey: [
+      'workspace',
+      'project-snapshots',
+      projects.map((project) => project.id).join(','),
+    ],
     enabled: projects.length > 0,
     queryFn: async () => {
       const entries = await Promise.all(
         projects.map(async (project) => ({
           id: project.id,
-          detail: extractProject(await apiRequest(`/api/workspace/projects/${project.id}`)),
+          detail: extractProject(
+            await apiRequest(`/api/workspace/projects/${project.id}`),
+          ),
         })),
       )
       return entries.filter(
-        (entry): entry is { id: string; detail: WorkspaceProject } => Boolean(entry.detail),
+        (entry): entry is { id: string; detail: WorkspaceProject } =>
+          Boolean(entry.detail),
       )
     },
   })
@@ -327,15 +355,20 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       reviewerNotes?: string
     }) => submitCheckpointReview(checkpointId, action, reviewerNotes),
     onSuccess: (_checkpoint, variables) => {
-      toast(getCheckpointReviewSuccessMessage(variables.action), { type: 'success' })
+      toast(getCheckpointReviewSuccessMessage(variables.action), {
+        type: 'success',
+      })
       setSelectedCheckpoint(null)
       void queryClient.invalidateQueries({ queryKey: ['workspace'] })
       triggerRefresh()
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to update checkpoint', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to update checkpoint',
+        {
+          type: 'error',
+        },
+      )
     },
   })
 
@@ -344,17 +377,30 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   const activityEvents = activityEventsQuery.data ?? []
   const pendingCheckpoints = useMemo(
     () =>
-      sortCheckpointsNewestFirst(allCheckpoints.filter((checkpoint) => checkpoint.status === 'pending')),
+      sortCheckpointsNewestFirst(
+        allCheckpoints.filter((checkpoint) => checkpoint.status === 'pending'),
+      ),
     [allCheckpoints],
   )
   const projectSnapshotMap = useMemo(
-    () => new Map((projectSnapshotsQuery.data ?? []).map((entry) => [entry.id, entry.detail])),
+    () =>
+      new Map(
+        (projectSnapshotsQuery.data ?? []).map((entry) => [
+          entry.id,
+          entry.detail,
+        ]),
+      ),
     [projectSnapshotsQuery.data],
   )
   const projectOverviews = useMemo(
     () =>
       projects.map((project) =>
-        buildProjectOverview(project, projectSnapshotMap.get(project.id), pendingCheckpoints, agents),
+        buildProjectOverview(
+          project,
+          projectSnapshotMap.get(project.id),
+          pendingCheckpoints,
+          agents,
+        ),
       ),
     [agents, pendingCheckpoints, projectSnapshotMap, projects],
   )
@@ -372,7 +418,10 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   const reviewInboxItems = useMemo(
     () =>
       pendingCheckpoints.filter((checkpoint) => {
-        if (reviewProjectFilter !== 'all' && checkpoint.project_name !== reviewProjectFilter) {
+        if (
+          reviewProjectFilter !== 'all' &&
+          checkpoint.project_name !== reviewProjectFilter
+        ) {
           return false
         }
         const verified = isCheckpointVerified(checkpoint)
@@ -382,10 +431,16 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
         if (reviewRiskFilter === 'high' && !risk.high) return false
         return true
       }),
-    [pendingCheckpoints, reviewProjectFilter, reviewRiskFilter, reviewVerificationFilter],
+    [
+      pendingCheckpoints,
+      reviewProjectFilter,
+      reviewRiskFilter,
+      reviewVerificationFilter,
+    ],
   )
   const verifiedReviewItems = useMemo(
-    () => reviewInboxItems.filter((checkpoint) => isCheckpointVerified(checkpoint)),
+    () =>
+      reviewInboxItems.filter((checkpoint) => isCheckpointVerified(checkpoint)),
     [reviewInboxItems],
   )
   const projectCheckpoints = useMemo(() => {
@@ -396,17 +451,26 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     )
   }, [allCheckpoints, projectDetail?.name, selectedSummary?.name])
   const pendingProjectCheckpoints = useMemo(
-    () => projectCheckpoints.filter((checkpoint) => checkpoint.status === 'pending'),
+    () =>
+      projectCheckpoints.filter(
+        (checkpoint) => checkpoint.status === 'pending',
+      ),
     [projectCheckpoints],
   )
   const selectedCheckpointProject = useMemo(() => {
     if (!selectedCheckpoint) return null
     return (
-      projects.find((project) => project.name === selectedCheckpoint.project_name) ?? null
+      projects.find(
+        (project) => project.name === selectedCheckpoint.project_name,
+      ) ?? null
     )
   }, [projects, selectedCheckpoint])
   const missionLaunchMinutes = useMemo(
-    () => missionLauncher?.tasks.reduce((total, task) => total + task.estimated_minutes, 0) ?? 0,
+    () =>
+      missionLauncher?.tasks.reduce(
+        (total, task) => total + task.estimated_minutes,
+        0,
+      ) ?? 0,
     [missionLauncher],
   )
   const missionLaunchWaves = useMemo(
@@ -415,7 +479,13 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   )
 
   const decomposeMutation = useMutation({
-    mutationFn: async ({ goal, projectId }: { goal: string; projectId?: string }) =>
+    mutationFn: async ({
+      goal,
+      projectId,
+    }: {
+      goal: string
+      projectId?: string
+    }) =>
       extractDecomposeResponse(
         await apiRequest('/api/workspace/decompose', {
           method: 'POST',
@@ -437,9 +507,12 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       setExpandedDecomposeDescriptions({})
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to decompose goal', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to decompose goal',
+        {
+          type: 'error',
+        },
+      )
     },
   })
 
@@ -451,18 +524,26 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   function focusProject(projectId: string) {
     setSelectedProjectId(projectId)
     window.requestAnimationFrame(() => {
-      detailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      detailSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
     })
   }
 
   function focusCheckpointReview(checkpoint: WorkspaceCheckpoint) {
-    const project = projects.find((item) => item.name === checkpoint.project_name)
+    const project = projects.find(
+      (item) => item.name === checkpoint.project_name,
+    )
     if (project && project.id !== selectedProjectId) {
       setPendingReviewCheckpoint(checkpoint)
       setSelectedCheckpoint(null)
       setSelectedProjectId(project.id)
       window.requestAnimationFrame(() => {
-        detailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        detailSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
       })
       return
     }
@@ -488,7 +569,10 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     decomposeMutation.reset()
   }
 
-  function handleTaskDraftChange(taskId: string, updates: Partial<DecomposedTaskDraft>) {
+  function handleTaskDraftChange(
+    taskId: string,
+    updates: Partial<DecomposedTaskDraft>,
+  ) {
     setMissionLauncher((current) => {
       if (!current) return current
       const previousTask = current.tasks.find((task) => task.id === taskId)
@@ -549,11 +633,18 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       toast('Each task needs a name', { type: 'warning' })
       return
     }
-    if (new Set(cleanedTasks.map((task) => task.name)).size !== cleanedTasks.length) {
-      toast('Task names must be unique so dependencies can be mapped', { type: 'warning' })
+    if (
+      new Set(cleanedTasks.map((task) => task.name)).size !==
+      cleanedTasks.length
+    ) {
+      toast('Task names must be unique so dependencies can be mapped', {
+        type: 'warning',
+      })
       return
     }
-    setMissionLauncher((current) => (current ? { ...current, tasks: cleanedTasks } : current))
+    setMissionLauncher((current) =>
+      current ? { ...current, tasks: cleanedTasks } : current,
+    )
     void navigate({
       to: '/plan-review',
       search: {
@@ -578,7 +669,9 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
 
   useEffect(() => {
     if (!replanSearch?.checkpointId) return
-    const checkpoint = allCheckpoints.find((entry) => entry.id === replanSearch.checkpointId)
+    const checkpoint = allCheckpoints.find(
+      (entry) => entry.id === replanSearch.checkpointId,
+    )
     if (!checkpoint) return
     focusCheckpointReview(checkpoint)
     void navigate({
@@ -606,7 +699,9 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
 
   useEffect(() => {
     if (!replanSearch?.phaseId || !replanSearch.goal || !projectDetail) return
-    const phase = projectDetail.phases.find((entry) => entry.id === replanSearch.phaseId)
+    const phase = projectDetail.phases.find(
+      (entry) => entry.id === replanSearch.phaseId,
+    )
     if (!phase) return
     setMissionLauncher((current) => {
       if (
@@ -653,41 +748,16 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       )
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to approve checkpoints', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error
+          ? error.message
+          : 'Failed to approve checkpoints',
+        {
+          type: 'error',
+        },
+      )
     } finally {
       setBatchApproving(false)
-    }
-  }
-
-  async function handleCreateProject(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!projectForm.name.trim()) {
-      toast('Project name is required', { type: 'warning' })
-      return
-    }
-    setSubmittingKey('project')
-    try {
-      await apiRequest('/api/workspace/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: projectForm.name.trim(),
-          path: projectForm.path.trim() || undefined,
-          spec: projectForm.spec.trim() || undefined,
-        }),
-      })
-      toast('Project created', { type: 'success' })
-      setProjectDialogOpen(false)
-      setProjectForm({ name: '', path: '', spec: '' })
-      triggerRefresh()
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to create project', {
-        type: 'error',
-      })
-    } finally {
-      setSubmittingKey(null)
     }
   }
 
@@ -713,7 +783,9 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       setPhaseForm({ name: '' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to add phase', { type: 'error' })
+      toast(error instanceof Error ? error.message : 'Failed to add phase', {
+        type: 'error',
+      })
     } finally {
       setSubmittingKey(null)
     }
@@ -730,7 +802,10 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       await apiRequest('/api/workspace/missions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phase_id: missionPhase.id, name: missionForm.name.trim() }),
+        body: JSON.stringify({
+          phase_id: missionPhase.id,
+          name: missionForm.name.trim(),
+        }),
       })
       toast('Mission added', { type: 'success' })
       setMissionPhase(null)
@@ -772,7 +847,9 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       setTaskForm({ name: '', description: '', dependsOn: '' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to add task', { type: 'error' })
+      toast(error instanceof Error ? error.message : 'Failed to add task', {
+        type: 'error',
+      })
     } finally {
       setSubmittingKey(null)
     }
@@ -789,9 +866,12 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       toast('Mission started', { type: 'success' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to start mission', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to start mission',
+        {
+          type: 'error',
+        },
+      )
     } finally {
       setSubmittingKey(null)
     }
@@ -808,9 +888,12 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       toast('Mission paused', { type: 'success' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to pause mission', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to pause mission',
+        {
+          type: 'error',
+        },
+      )
     } finally {
       setSubmittingKey(null)
     }
@@ -827,9 +910,12 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       toast('Mission resumed', { type: 'success' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to resume mission', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to resume mission',
+        {
+          type: 'error',
+        },
+      )
     } finally {
       setSubmittingKey(null)
     }
@@ -861,19 +947,26 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     setSubmittingKey('project-spec')
     try {
       const updatedProject = extractProject(
-        await apiRequest(`/api/workspace/projects/${encodeURIComponent(activeProject.id)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ spec: specValue.trim() ? specValue : null }),
-        }),
+        await apiRequest(
+          `/api/workspace/projects/${encodeURIComponent(activeProject.id)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ spec: specValue.trim() ? specValue : null }),
+          },
+        ),
       )
       if (updatedProject) {
         setProjectDetail((current) =>
-          current?.id === updatedProject.id ? { ...current, ...updatedProject } : current,
+          current?.id === updatedProject.id
+            ? { ...current, ...updatedProject }
+            : current,
         )
         setProjects((current) =>
           current.map((project) =>
-            project.id === updatedProject.id ? { ...project, ...updatedProject } : project,
+            project.id === updatedProject.id
+              ? { ...project, ...updatedProject }
+              : project,
           ),
         )
         setProjectSpecDraft(updatedProject.spec ?? '')
@@ -882,9 +975,12 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       toast('Project spec saved', { type: 'success' })
       triggerRefresh()
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to save project spec', {
-        type: 'error',
-      })
+      toast(
+        error instanceof Error ? error.message : 'Failed to save project spec',
+        {
+          type: 'error',
+        },
+      )
     } finally {
       setSubmittingKey(null)
     }
@@ -899,19 +995,26 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
               <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.6} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-primary-900">Projects</h1>
+              <h1 className="text-base font-semibold text-primary-900">
+                Projects
+              </h1>
               <p className="text-sm text-primary-500">
-                Mission control for workspace execution, review handoffs, and agent load.
+                Mission control for workspace execution, review handoffs, and
+                agent load.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={triggerRefresh} disabled={listLoading || detailLoading}>
+            <Button
+              variant="outline"
+              onClick={triggerRefresh}
+              disabled={listLoading || detailLoading}
+            >
               Refresh
             </Button>
             <Button
-              onClick={() => setProjectDialogOpen(true)}
+              onClick={() => void navigate({ to: '/new-project' })}
               className="bg-accent-500 text-white hover:bg-accent-400"
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
@@ -923,20 +1026,24 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
         {listLoading && projects.length === 0 ? (
           <div className="rounded-xl border border-primary-200 bg-white px-6 py-16 text-center shadow-sm">
             <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-            <p className="text-sm text-primary-500">Loading workspace projects...</p>
+            <p className="text-sm text-primary-500">
+              Loading workspace projects...
+            </p>
           </div>
         ) : projects.length === 0 ? (
           <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
               <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
             </div>
-            <h2 className="text-lg font-semibold text-primary-900">No projects yet</h2>
+            <h2 className="text-lg font-semibold text-primary-900">
+              No projects yet
+            </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
-              Create your first project to organize phases, missions, and task execution for an
-              agent workflow.
+              Create your first project to organize phases, missions, and task
+              execution for an agent workflow.
             </p>
             <Button
-              onClick={() => setProjectDialogOpen(true)}
+              onClick={() => void navigate({ to: '/new-project' })}
               className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
@@ -1018,13 +1125,22 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
                 onSaveSpec={(value) => void handleSaveProjectSpec(value)}
                 onAddPhase={setPhaseProject}
                 onTogglePhase={(phaseId) =>
-                  setExpandedPhases((current) => ({ ...current, [phaseId]: !current[phaseId] }))
+                  setExpandedPhases((current) => ({
+                    ...current,
+                    [phaseId]: !current[phaseId],
+                  }))
                 }
                 onAddMission={setMissionPhase}
                 onOpenMissionLauncher={openMissionLauncher}
-                onStartMission={(missionId) => void handleStartMission(missionId)}
-                onPauseMission={(missionId) => void handlePauseMission(missionId)}
-                onResumeMission={(missionId) => void handleResumeMission(missionId)}
+                onStartMission={(missionId) =>
+                  void handleStartMission(missionId)
+                }
+                onPauseMission={(missionId) =>
+                  void handlePauseMission(missionId)
+                }
+                onResumeMission={(missionId) =>
+                  void handleResumeMission(missionId)
+                }
                 onStopMission={(missionId) => void handleStopMission(missionId)}
                 onAddTask={setTaskMission}
                 onRefreshCheckpoints={() => void checkpointsQuery.refetch()}
@@ -1036,7 +1152,10 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
                   })
                 }
                 onCheckpointReject={(checkpointId) =>
-                  projectCheckpointMutation.mutate({ checkpointId, action: 'reject' })
+                  projectCheckpointMutation.mutate({
+                    checkpointId,
+                    action: 'reject',
+                  })
                 }
                 onRefreshActivity={() => void activityEventsQuery.refetch()}
               />
@@ -1055,37 +1174,34 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
             if (!open) setSelectedCheckpoint(null)
           }}
           onApprove={(checkpointId, notes, mode) =>
-            projectCheckpointMutation.mutateAsync({
-              checkpointId,
-              action: mode ?? 'approve-and-commit',
-              reviewerNotes: notes,
-            }).then(() => undefined)
+            projectCheckpointMutation
+              .mutateAsync({
+                checkpointId,
+                action: mode ?? 'approve-and-commit',
+                reviewerNotes: notes,
+              })
+              .then(() => undefined)
           }
           onRevise={(checkpointId, notes) =>
-            projectCheckpointMutation.mutateAsync({
-              checkpointId,
-              action: 'revise',
-              reviewerNotes: notes,
-            }).then(() => undefined)
+            projectCheckpointMutation
+              .mutateAsync({
+                checkpointId,
+                action: 'revise',
+                reviewerNotes: notes,
+              })
+              .then(() => undefined)
           }
           onReject={(checkpointId, notes) =>
-            projectCheckpointMutation.mutateAsync({
-              checkpointId,
-              action: 'reject',
-              reviewerNotes: notes,
-            }).then(() => undefined)
+            projectCheckpointMutation
+              .mutateAsync({
+                checkpointId,
+                action: 'reject',
+                reviewerNotes: notes,
+              })
+              .then(() => undefined)
           }
         />
       ) : null}
-
-      <CreateProjectDialog
-        open={projectDialogOpen}
-        submitting={submittingKey === 'project'}
-        form={projectForm}
-        onOpenChange={setProjectDialogOpen}
-        onFormChange={setProjectForm}
-        onSubmit={handleCreateProject}
-      />
 
       <WorkspaceEntityDialog
         open={phaseProject !== null}
@@ -1154,7 +1270,12 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
         <WorkspaceFieldLabel label="Task Name">
           <input
             value={taskForm.name}
-            onChange={(event) => setTaskForm((current) => ({ ...current, name: event.target.value }))}
+            onChange={(event) =>
+              setTaskForm((current) => ({
+                ...current,
+                name: event.target.value,
+              }))
+            }
             className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
             placeholder="Implement workspace project routes"
             autoFocus
@@ -1164,7 +1285,10 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
           <textarea
             value={taskForm.description}
             onChange={(event) =>
-              setTaskForm((current) => ({ ...current, description: event.target.value }))
+              setTaskForm((current) => ({
+                ...current,
+                description: event.target.value,
+              }))
             }
             rows={4}
             className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
@@ -1175,7 +1299,10 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
           <input
             value={taskForm.dependsOn}
             onChange={(event) =>
-              setTaskForm((current) => ({ ...current, dependsOn: event.target.value }))
+              setTaskForm((current) => ({
+                ...current,
+                dependsOn: event.target.value,
+              }))
             }
             className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
             placeholder="task-1, task-2"
@@ -1197,14 +1324,21 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
           if (!open) resetMissionLauncher()
         }}
         onGoalChange={(goal) =>
-          setMissionLauncher((current) => (current ? { ...current, goal } : current))
+          setMissionLauncher((current) =>
+            current ? { ...current, goal } : current,
+          )
         }
         onTaskDraftChange={handleTaskDraftChange}
         onDescriptionToggle={(taskId, open) =>
-          setExpandedDecomposeDescriptions((current) => ({ ...current, [taskId]: open }))
+          setExpandedDecomposeDescriptions((current) => ({
+            ...current,
+            [taskId]: open,
+          }))
         }
         onBack={() =>
-          setMissionLauncher((current) => (current ? { ...current, step: 'input' } : current))
+          setMissionLauncher((current) =>
+            current ? { ...current, step: 'input' } : current,
+          )
         }
         onDecomposeSubmit={handleDecomposeSubmit}
         onReview={handleReviewMission}

@@ -43,6 +43,10 @@ export type WorkspaceProject = {
   name: string
   path?: string
   spec?: string
+  auto_approve?: number
+  max_concurrent?: number
+  required_checks?: string
+  allowed_tools?: string
   status: WorkspaceStatus
   phases: Array<WorkspacePhase>
   phase_count: number
@@ -325,6 +329,10 @@ export function normalizeProject(value: unknown): WorkspaceProject {
     name: asString(record?.name) ?? 'Untitled project',
     path: asString(record?.path),
     spec: asString(record?.spec),
+    auto_approve: asNumber(record?.auto_approve),
+    max_concurrent: asNumber(record?.max_concurrent),
+    required_checks: asString(record?.required_checks),
+    allowed_tools: asString(record?.allowed_tools),
     status: normalizeStatus(record?.status),
     phases,
     phase_count: asNumber(record?.phase_count) ?? phases.length,
@@ -332,7 +340,8 @@ export function normalizeProject(value: unknown): WorkspaceProject {
       asNumber(record?.mission_count) ??
       getMissionCount({ phases } as WorkspaceProject),
     task_count:
-      asNumber(record?.task_count) ?? getTaskCount({ phases } as WorkspaceProject),
+      asNumber(record?.task_count) ??
+      getTaskCount({ phases } as WorkspaceProject),
   }
 }
 
@@ -469,7 +478,12 @@ export function extractTaskRuns(payload: unknown): Array<WorkspaceTaskRun> {
   if (Array.isArray(payload)) return payload.map(normalizeTaskRun)
 
   const record = asRecord(payload)
-  const candidates = [record?.task_runs, record?.runs, record?.data, record?.items]
+  const candidates = [
+    record?.task_runs,
+    record?.runs,
+    record?.data,
+    record?.items,
+  ]
 
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
@@ -484,7 +498,12 @@ export function extractRunEvents(payload: unknown): Array<WorkspaceRunEvent> {
   if (Array.isArray(payload)) return payload.map(normalizeRunEvent)
 
   const record = asRecord(payload)
-  const candidates = [record?.run_events, record?.events, record?.data, record?.items]
+  const candidates = [
+    record?.run_events,
+    record?.events,
+    record?.data,
+    record?.items,
+  ]
 
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
