@@ -744,6 +744,17 @@ if (!(globalThis as any)[GW_UHR_KEY]) {
     // Re-throw non-gateway rejections so they're visible
     console.error('[unhandledRejection]', reason)
   })
+
+  // Graceful shutdown: clean up WebSocket on SIGTERM/SIGINT so the process
+  // exits cleanly instead of hanging on an open socket.
+  const shutdownHandler = () => {
+    console.warn('[gateway] Received shutdown signal — cleaning up')
+    gatewayClient.shutdown().catch(() => {}).finally(() => {
+      process.exit(0)
+    })
+  }
+  process.on('SIGTERM', shutdownHandler)
+  process.on('SIGINT', shutdownHandler)
 }
 const activeSendStreamRuns =
   (globalThis as any)[ACTIVE_SEND_RUNS_KEY] as Set<string> | undefined
