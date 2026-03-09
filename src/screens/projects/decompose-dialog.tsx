@@ -36,7 +36,7 @@ type DecomposeDialogProps = {
   onDescriptionToggle: (taskId: string, open: boolean) => void
   onBack: () => void
   onDecomposeSubmit: (event: React.FormEvent<HTMLFormElement>) => void
-  onLaunch: (startMission: boolean) => void
+  onReview: () => void
 }
 
 export function DecomposeDialog({
@@ -55,7 +55,7 @@ export function DecomposeDialog({
   onDescriptionToggle,
   onBack,
   onDecomposeSubmit,
-  onLaunch,
+  onReview,
 }: DecomposeDialogProps) {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
@@ -287,18 +287,11 @@ export function DecomposeDialog({
                   }
                 />
                 <Button
-                  variant="outline"
-                  onClick={() => onLaunch(false)}
-                  disabled={launchPending}
-                >
-                  {launchPending ? 'Saving...' : 'Save as Draft'}
-                </Button>
-                <Button
-                  onClick={() => onLaunch(true)}
+                  onClick={onReview}
                   disabled={launchPending}
                   className="bg-accent-500 text-white hover:bg-accent-400"
                 >
-                  {launchPending ? 'Launching...' : 'Launch Mission'}
+                  Review in Plan Screen
                 </Button>
               </div>
             </div>

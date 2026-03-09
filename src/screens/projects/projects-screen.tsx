@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router'
 import { Add01Icon, Folder01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -32,9 +33,7 @@ import {
   extractProject,
   extractProjects,
   extractTasks,
-  normalizeMission,
   normalizeStats,
-  normalizeTask,
   type DecomposedTaskDraft,
   type MissionFormState,
   type MissionLaunchState,
@@ -49,11 +48,20 @@ import {
 } from './lib/workspace-types'
 import {
   buildProjectOverview,
+  calculateExecutionWaves,
   deriveCheckpointRisk,
-  getExecutionWaveCount,
   isCheckpointVerified,
 } from './lib/workspace-utils'
 import { ProjectDetailView } from './project-detail-view'
+
+type ProjectsScreenProps = {
+  replanSearch?: {
+    goal?: string
+    phaseId?: string
+    phaseName?: string
+    projectId?: string
+  }
+}
 
 async function readPayload(response: Response): Promise<unknown> {
   const text = await response.text()
@@ -92,7 +100,7 @@ async function loadMissionTasks(missionId: string) {
   return extractTasks(payload)
 }
 
-export function ProjectsScreen() {
+export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   const [projects, setProjects] = useState<Array<WorkspaceProject>>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [projectDetail, setProjectDetail] = useState<WorkspaceProject | null>(null)
@@ -133,6 +141,7 @@ export function ProjectsScreen() {
   )
   const queryClient = useQueryClient()
   const detailSectionRef = useRef<HTMLElement | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     let cancelled = false
@@ -399,7 +408,7 @@ export function ProjectsScreen() {
     [missionLauncher],
   )
   const missionLaunchWaves = useMemo(
-    () => getExecutionWaveCount(missionLauncher?.tasks ?? []),
+    () => calculateExecutionWaves(missionLauncher?.tasks ?? []).length,
     [missionLauncher],
   )
 
@@ -427,81 +436,6 @@ export function ProjectsScreen() {
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to decompose goal', {
-        type: 'error',
-      })
-    },
-  })
-
-  const launchMissionMutation = useMutation({
-    mutationFn: async ({
-      phase,
-      tasks,
-      startMission,
-    }: {
-      phase: WorkspacePhase
-      tasks: DecomposedTaskDraft[]
-      startMission: boolean
-    }) => {
-      const missionName = tasks[0]?.name ? `${phase.name}: ${tasks[0].name}` : `${phase.name} Mission`
-      const missionPayload = normalizeMission(
-        await apiRequest('/api/workspace/missions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phase_id: phase.id, name: missionName }),
-        }),
-      )
-      const createdTasks = await Promise.all(
-        tasks.map(async (task, index) =>
-          normalizeTask(
-            await apiRequest('/api/workspace-tasks', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                mission_id: missionPayload.id,
-                name: task.name.trim(),
-                description: task.description.trim(),
-                sort_order: index,
-                depends_on: [],
-              }),
-            }),
-          ),
-        ),
-      )
-      const idByName = new Map(
-        createdTasks.map((task, index) => [tasks[index]?.name, task.id] as const),
-      )
-      await Promise.all(
-        createdTasks.map(async (createdTask, index) => {
-          const dependencyIds = (tasks[index]?.depends_on ?? [])
-            .map((dependency) => idByName.get(dependency))
-            .filter((dependencyId): dependencyId is string => typeof dependencyId === 'string')
-          if (dependencyIds.length === 0) return
-          await apiRequest(`/api/workspace-tasks/${encodeURIComponent(createdTask.id)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ depends_on: dependencyIds }),
-          })
-        }),
-      )
-      if (startMission) {
-        await apiRequest(`/api/workspace/missions/${encodeURIComponent(missionPayload.id)}/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        })
-      }
-      return { mission: missionPayload }
-    },
-    onSuccess: (_result, variables) => {
-      toast(variables.startMission ? 'Mission launched' : 'Mission saved as draft', {
-        type: 'success',
-      })
-      setMissionLauncher(null)
-      setExpandedDecomposeDescriptions({})
-      triggerRefresh()
-    },
-    onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to launch mission', {
         type: 'error',
       })
     },
@@ -550,7 +484,6 @@ export function ProjectsScreen() {
     setMissionLauncher(null)
     setExpandedDecomposeDescriptions({})
     decomposeMutation.reset()
-    launchMissionMutation.reset()
   }
 
   function handleTaskDraftChange(taskId: string, updates: Partial<DecomposedTaskDraft>) {
@@ -594,16 +527,20 @@ export function ProjectsScreen() {
     })
   }
 
-  function handleLaunchMission(startMission: boolean) {
-    if (!missionLauncher) return
-    const cleanedTasks = missionLauncher.tasks.map((task) => ({
+  function getCleanMissionTasks(tasks: DecomposedTaskDraft[]) {
+    return tasks.map((task) => ({
       ...task,
       name: task.name.trim(),
       description: task.description.trim(),
       depends_on: task.depends_on.filter(Boolean),
     }))
+  }
+
+  function handleReviewMission() {
+    if (!missionLauncher) return
+    const cleanedTasks = getCleanMissionTasks(missionLauncher.tasks)
     if (cleanedTasks.length === 0) {
-      toast('Add at least one task before launching', { type: 'warning' })
+      toast('Add at least one task before reviewing', { type: 'warning' })
       return
     }
     if (cleanedTasks.some((task) => task.name.length === 0)) {
@@ -615,12 +552,58 @@ export function ProjectsScreen() {
       return
     }
     setMissionLauncher((current) => (current ? { ...current, tasks: cleanedTasks } : current))
-    launchMissionMutation.mutate({
-      phase: missionLauncher.phase,
-      tasks: cleanedTasks,
-      startMission,
+    void navigate({
+      to: '/plan-review',
+      search: {
+        plan: JSON.stringify({
+          goal: missionLauncher.goal,
+          projectId: projectDetail?.id ?? selectedSummary?.id ?? null,
+          projectName: projectDetail?.name ?? selectedSummary?.name ?? null,
+          phaseId: missionLauncher.phase.id,
+          phaseName: missionLauncher.phase.name,
+          tasks: cleanedTasks,
+        }),
+      },
     })
   }
+
+  useEffect(() => {
+    if (replanSearch?.projectId && replanSearch.projectId !== selectedProjectId) {
+      setSelectedProjectId(replanSearch.projectId)
+    }
+  }, [replanSearch?.projectId, selectedProjectId])
+
+  useEffect(() => {
+    if (!replanSearch?.phaseId || !replanSearch.goal || !projectDetail) return
+    const phase = projectDetail.phases.find((entry) => entry.id === replanSearch.phaseId)
+    if (!phase) return
+    setMissionLauncher((current) => {
+      if (
+        current &&
+        current.phase.id === phase.id &&
+        current.goal === replanSearch.goal
+      ) {
+        return current
+      }
+      return {
+        phase,
+        goal: replanSearch.goal ?? '',
+        step: 'input',
+        tasks: [],
+      }
+    })
+    setExpandedDecomposeDescriptions({})
+    void navigate({
+      to: '/projects',
+      replace: true,
+      search: {
+        goal: undefined,
+        phaseId: undefined,
+        phaseName: undefined,
+        projectId: undefined,
+      },
+    })
+  }, [navigate, projectDetail, replanSearch?.goal, replanSearch?.phaseId])
 
   async function handleApproveVerified() {
     if (verifiedReviewItems.length === 0) {
@@ -1116,7 +1099,7 @@ export function ProjectsScreen() {
         missionLaunchMinutes={missionLaunchMinutes}
         missionLaunchWaves={missionLaunchWaves}
         decomposePending={decomposeMutation.isPending}
-        launchPending={launchMissionMutation.isPending}
+        launchPending={false}
         onOpenChange={(open) => {
           if (!open) resetMissionLauncher()
         }}
@@ -1131,7 +1114,7 @@ export function ProjectsScreen() {
           setMissionLauncher((current) => (current ? { ...current, step: 'input' } : current))
         }
         onDecomposeSubmit={handleDecomposeSubmit}
-        onLaunch={handleLaunchMission}
+        onReview={handleReviewMission}
       />
     </main>
   )

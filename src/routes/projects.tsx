@@ -3,9 +3,15 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { ProjectsScreen } from '@/screens/projects/projects-screen'
 
 export const Route = createFileRoute('/projects')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    projectId: typeof search.projectId === 'string' ? search.projectId : undefined,
+    phaseId: typeof search.phaseId === 'string' ? search.phaseId : undefined,
+    phaseName: typeof search.phaseName === 'string' ? search.phaseName : undefined,
+    goal: typeof search.goal === 'string' ? search.goal : undefined,
+  }),
   component: function ProjectsRoute() {
     usePageTitle('Projects')
-    return <ProjectsScreen />
+    return <ProjectsScreen replanSearch={Route.useSearch()} />
   },
   errorComponent: function ProjectsError({ error }) {
     return (

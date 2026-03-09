@@ -445,35 +445,62 @@ export function formatMinutes(minutes: number): string {
   return `${minutes}m`
 }
 
+export function isHighRiskTask(task: Pick<DecomposedTaskDraft, 'name' | 'description'>): boolean {
+  const text = `${task.name} ${task.description}`.toLowerCase()
+  return (
+    text.includes('auth') ||
+    text.includes('security') ||
+    text.includes('payment') ||
+    text.includes('payments') ||
+    text.includes('jwt') ||
+    text.includes('token') ||
+    text.includes('db migration') ||
+    text.includes('database migration')
+  )
+}
+
+export function deriveMissionName(goal: string): string {
+  const normalized = goal.replace(/\s+/g, ' ').trim()
+  if (normalized.length === 0) return 'Untitled mission'
+  if (normalized.length <= 60) return normalized
+  return `${normalized.slice(0, 57).trimEnd()}...`
+}
+
 export function getExecutionWaveCount(tasks: DecomposedTaskDraft[]): number {
-  if (tasks.length === 0) return 0
+  return calculateExecutionWaves(tasks).length
+}
 
-  const taskNames = new Set(tasks.map((task) => task.name))
-  const levelByName = new Map<string, number>()
+export function calculateExecutionWaves(tasks: DecomposedTaskDraft[]): DecomposedTaskDraft[][] {
+  if (tasks.length === 0) return []
+  const taskMap = new Map(tasks.map((task) => [task.name, task] as const))
+  const remaining = new Set(tasks.map((task) => task.name))
+  const completed = new Set<string>()
+  const waves: DecomposedTaskDraft[][] = []
 
-  const visit = (taskName: string, stack = new Set<string>()): number => {
-    const cached = levelByName.get(taskName)
-    if (cached) return cached
-    if (stack.has(taskName)) return 1
+  while (remaining.size > 0) {
+    const wave = tasks.filter(
+      (task) =>
+        remaining.has(task.name) &&
+        task.depends_on.every(
+          (dependency) => !taskMap.has(dependency) || completed.has(dependency),
+        ),
+    )
 
-    const task = tasks.find((entry) => entry.name === taskName)
-    if (!task) return 1
+    if (wave.length === 0) {
+      waves.push(
+        tasks.filter((task) => remaining.has(task.name)),
+      )
+      break
+    }
 
-    stack.add(taskName)
-    const level =
-      1 +
-      task.depends_on
-        .filter((dependency) => taskNames.has(dependency))
-        .reduce(
-          (maxLevel, dependency) =>
-            Math.max(maxLevel, visit(dependency, new Set(stack))),
-          0,
-        )
-    levelByName.set(taskName, level)
-    return level
+    waves.push(wave)
+    for (const task of wave) {
+      remaining.delete(task.name)
+      completed.add(task.name)
+    }
   }
 
-  return Math.max(...tasks.map((task) => visit(task.name)))
+  return waves
 }
 
 export function getAgentBadgeLabel(agentType: string | null): string {
