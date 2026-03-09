@@ -1,8 +1,18 @@
 import { EventEmitter } from "node:events";
 import { AgentRunner } from "./agent-runner";
+import { Scheduler } from "./scheduler";
 import { Tracker } from "./tracker";
 import { getWorkflowConfig } from "./config";
-import type { AgentRecord, OrchestratorState, RetryEntry, RunningEntry, TaskRunStatus, TaskWithRelations } from "./types";
+import type {
+  AgentAdapterType,
+  AgentRecord,
+  OrchestratorState,
+  ProviderConcurrencyConfig,
+  RetryEntry,
+  RunningEntry,
+  TaskRunStatus,
+  TaskWithRelations,
+} from "./types";
 
 const MAX_RETRIES = 3;
 const BASE_RETRY_MS = 10_000;
@@ -19,6 +29,7 @@ function computeRetryDelay(attempt: number): number {
 export class Orchestrator extends EventEmitter {
   private readonly tracker: Tracker;
   private readonly agentRunner: AgentRunner;
+  private readonly scheduler: Scheduler;
   private readonly abortControllers: Map<string, AbortController>;
   private readonly controlRequests: Map<string, { status: Extract<TaskRunStatus, "paused" | "stopped">; reason: string }>;
   private timer: NodeJS.Timeout | null = null;
@@ -28,12 +39,14 @@ export class Orchestrator extends EventEmitter {
     super();
     this.tracker = tracker;
     this.agentRunner = agentRunner;
+    this.scheduler = new Scheduler();
     this.abortControllers = new Map();
     this.controlRequests = new Map();
     const workflowConfig = getWorkflowConfig();
     this.state = {
       pollIntervalMs: workflowConfig.pollIntervalMs,
       maxConcurrentAgents: workflowConfig.maxConcurrentAgents,
+      providerConcurrency: this.resolveProviderConcurrency(workflowConfig.maxConcurrentAgents),
       running: new Map(),
       claimed: new Set(),
       retryAttempts: new Map(),
@@ -102,8 +115,14 @@ export class Orchestrator extends EventEmitter {
       return;
     }
 
-    const readyTasks = this.tracker.resolveReadyTasks(availableSlots * 2);
-    for (const task of readyTasks) {
+    this.state.providerConcurrency = this.resolveProviderConcurrency(this.state.maxConcurrentAgents);
+    this.tracker.refreshReadyTasks();
+    const runnableTasks = this.attachResolvedAdapterTypes(
+      this.tracker.listTasks({}).filter((task) => task.mission_status === "running" || task.status === "completed"),
+    );
+    const dispatchableTasks = this.getDispatchableTasks(runnableTasks).slice(0, availableSlots);
+
+    for (const task of dispatchableTasks) {
       if (this.state.running.size >= this.state.maxConcurrentAgents) {
         break;
       }
@@ -152,6 +171,7 @@ export class Orchestrator extends EventEmitter {
       attempt,
       workspacePath: "",
       agentId: agent.id,
+      adapterType: agent.adapter_type,
       startedAt: nowIso(),
       session: null,
     };
@@ -257,6 +277,96 @@ export class Orchestrator extends EventEmitter {
       adapter_type: workflowConfig.defaultAdapter,
       role: "coder",
     });
+  }
+
+  private getDispatchableTasks(tasks: TaskWithRelations[]): TaskWithRelations[] {
+    const tasksByProject = new Map<string, TaskWithRelations[]>();
+
+    for (const task of tasks) {
+      const projectTasks = tasksByProject.get(task.project_id);
+      if (projectTasks) {
+        projectTasks.push(task);
+      } else {
+        tasksByProject.set(task.project_id, [task]);
+      }
+    }
+
+    const dispatchable: TaskWithRelations[] = [];
+    const plannedRunning = new Map(this.state.running);
+    const orderedProjectIds = [...tasksByProject.keys()].sort();
+
+    for (const projectId of orderedProjectIds) {
+      const projectTasks = tasksByProject.get(projectId);
+      if (!projectTasks) {
+        continue;
+      }
+
+      const projectDispatchable = this.scheduler.getDispatchable(
+        projectTasks,
+        plannedRunning,
+        this.state.providerConcurrency,
+      );
+      dispatchable.push(...projectDispatchable);
+
+      for (const task of projectDispatchable) {
+        plannedRunning.set(task.id, {
+          taskId: task.id,
+          runId: `planned:${task.id}`,
+          attempt: 0,
+          workspacePath: "",
+          agentId: task.agent_id,
+          adapterType: task.resolved_adapter_type ?? task.agent_adapter_type ?? null,
+          startedAt: nowIso(),
+          session: null,
+        });
+      }
+    }
+
+    return dispatchable.sort((left, right) => {
+      const leftWave = left.wave ?? Number.MAX_SAFE_INTEGER;
+      const rightWave = right.wave ?? Number.MAX_SAFE_INTEGER;
+      if (leftWave !== rightWave) {
+        return leftWave - rightWave;
+      }
+      if (left.sort_order !== right.sort_order) {
+        return left.sort_order - right.sort_order;
+      }
+
+      return left.created_at.localeCompare(right.created_at);
+    });
+  }
+
+  private attachResolvedAdapterTypes(tasks: TaskWithRelations[]): TaskWithRelations[] {
+    return tasks.map((task) => {
+      if (task.agent_adapter_type) {
+        return {
+          ...task,
+          resolved_adapter_type: task.agent_adapter_type,
+        };
+      }
+
+      const workflowConfig = getWorkflowConfig(task.project_path ?? null);
+      return {
+        ...task,
+        resolved_adapter_type: workflowConfig.defaultAdapter as AgentAdapterType,
+      };
+    });
+  }
+
+  private resolveProviderConcurrency(fallbackLimit: number): ProviderConcurrencyConfig {
+    const limits: ProviderConcurrencyConfig = {};
+
+    for (const entry of this.tracker.listAgentDirectory()) {
+      const nextLimit = entry.limits.concurrency_limit || fallbackLimit;
+      const currentLimit = limits[entry.adapter_type];
+      limits[entry.adapter_type] = currentLimit === undefined ? nextLimit : Math.min(currentLimit, nextLimit);
+    }
+
+    if (Object.keys(limits).length === 0) {
+      limits.codex = fallbackLimit;
+    }
+
+    return limits;
   }
 
   private queueRetry(taskId: string, currentAttempt: number, error: string): void {

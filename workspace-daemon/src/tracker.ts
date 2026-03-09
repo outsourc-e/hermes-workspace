@@ -420,11 +420,19 @@ export class Tracker extends EventEmitter {
 
     return this.db
       .prepare(
-        `SELECT tasks.*, missions.name AS mission_name, phases.id AS phase_id, projects.id AS project_id, projects.name AS project_name
+        `SELECT tasks.*,
+                missions.name AS mission_name,
+                missions.status AS mission_status,
+                phases.id AS phase_id,
+                projects.id AS project_id,
+                projects.name AS project_name,
+                projects.path AS project_path,
+                agents.adapter_type AS agent_adapter_type
          FROM tasks
          JOIN missions ON missions.id = tasks.mission_id
          JOIN phases ON phases.id = missions.phase_id
          JOIN projects ON projects.id = phases.project_id
+         LEFT JOIN agents ON agents.id = tasks.agent_id
          ${whereSql}
          ORDER BY tasks.sort_order ASC, tasks.created_at ASC`,
       )
@@ -583,10 +591,7 @@ export class Tracker extends EventEmitter {
     return ready;
   }
 
-  resolveReadyTasks(limit: number): TaskWithRelations[] {
-    // Collect tasks that are already ready
-    const alreadyReady = this.listTasks({ status: "ready" });
-
+  refreshReadyTasks(): TaskWithRelations[] {
     // Only promote pending tasks whose parent mission is explicitly running
     const runningMissionIds = new Set(
       (this.db.prepare("SELECT id FROM missions WHERE status = 'running'").all() as Array<{ id: string }>).map((row) => row.id),
@@ -603,11 +608,10 @@ export class Tracker extends EventEmitter {
       const isReady = dependencies.length === 0 || dependencies.every((dependencyId) => completedTaskIds.has(dependencyId));
       if (isReady) {
         this.setTaskStatus(task.id, "ready");
-        alreadyReady.push({ ...task, status: "ready" });
       }
     }
 
-    return alreadyReady.slice(0, limit);
+    return this.listTasks({ status: "ready" });
   }
 
   createTaskRun(taskId: string, agentId: string | null, workspacePath: string | null, attempt: number): TaskRun {

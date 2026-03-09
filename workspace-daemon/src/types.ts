@@ -45,6 +45,10 @@ export type RunEventType =
 
 export type AgentAdapterType = "codex" | "claude" | "openclaw" | "ollama";
 
+export interface ProviderConcurrencyConfig {
+  [adapterType: string]: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -111,6 +115,7 @@ export interface Task {
   status: TaskStatus;
   sort_order: number;
   depends_on: string | null;
+  wave?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -245,9 +250,13 @@ export interface ProjectDetail extends Project {
 
 export interface TaskWithRelations extends Task {
   mission_name: string;
+  mission_status?: EntityStatus;
   phase_id: string;
   project_id: string;
   project_name: string;
+  project_path?: string | null;
+  agent_adapter_type?: AgentAdapterType | null;
+  resolved_adapter_type?: AgentAdapterType | null;
 }
 
 export interface TaskRunWithRelations extends TaskRun {
@@ -323,6 +332,7 @@ export interface RunningEntry {
   attempt: number;
   workspacePath: string;
   agentId: string | null;
+  adapterType: AgentAdapterType | null;
   startedAt: string;
   session: LiveSession | null;
 }
@@ -330,6 +340,7 @@ export interface RunningEntry {
 export interface OrchestratorState {
   pollIntervalMs: number;
   maxConcurrentAgents: number;
+  providerConcurrency: ProviderConcurrencyConfig;
   running: Map<string, RunningEntry>;
   claimed: Set<string>;
   retryAttempts: Map<string, RetryEntry>;
