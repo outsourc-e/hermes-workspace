@@ -1,23 +1,70 @@
 import { spawn } from "node:child_process";
 import type { AgentAdapter, AgentAdapterContext } from "./types";
-import type { AgentExecutionRequest, AgentExecutionResult } from "../types";
+import type { AgentExecutionRequest, AgentExecutionResult, AdapterStreamEvent } from "../types";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const FORCE_KILL_DELAY_MS = 5_000;
 
-function parseAdapterConfig(config: string | null): Record<string, unknown> {
+interface ClaudeAdapterConfig {
+  command?: string;
+  args?: string[];
+  timeoutMs?: number;
+  env?: Record<string, string>;
+  model?: string;
+}
+
+function parseAdapterConfig(config: string | null): ClaudeAdapterConfig {
   if (!config || config.trim().length === 0) {
     return {};
   }
 
   try {
-    return JSON.parse(config) as Record<string, unknown>;
+    return JSON.parse(config) as ClaudeAdapterConfig;
   } catch {
     return {};
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function toPositiveNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function summarizeText(value: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "Completed";
+  }
+
+  if (normalized.length <= 280) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 277).trimEnd()}...`;
+}
+
+function buildFailureResult(
+  summarySource: string,
+  inputTokens: number,
+  outputTokens: number,
+  error: string,
+): AgentExecutionResult {
+  return {
+    status: "failed",
+    summary: summarizeText(summarySource || error || "Claude execution failed"),
+    checkpointSummary: summarySource || undefined,
+    inputTokens,
+    outputTokens,
+    costCents: 0,
+    error,
+  };
+}
+
+function createDataEvent(type: AdapterStreamEvent["type"], data: Record<string, unknown>): AdapterStreamEvent {
+  return { type, data };
 }
 
 function extractTokenUsage(output: string): { inputTokens: number; outputTokens: number } {
@@ -25,7 +72,6 @@ function extractTokenUsage(output: string): { inputTokens: number; outputTokens:
     inputTokens: 0,
     outputTokens: 0,
   };
-
   const normalized = output.replace(/\r/g, "");
   const patterns: Array<{ key: "inputTokens" | "outputTokens"; regex: RegExp }> = [
     { key: "inputTokens", regex: /\b(?:input|prompt)[ _-]?tokens?\b[^0-9]{0,20}(\d[\d,]*)/i },
@@ -49,33 +95,6 @@ function extractTokenUsage(output: string): { inputTokens: number; outputTokens:
   return usage;
 }
 
-function summarizeResponse(response: string): string {
-  const normalized = response.trim();
-  if (!normalized) {
-    return "Completed";
-  }
-
-  const singleLine = normalized.replace(/\s+/g, " ").trim();
-  if (singleLine.length <= 280) {
-    return singleLine;
-  }
-
-  return `${singleLine.slice(0, 277).trimEnd()}...`;
-}
-
-function getFailureMessage(stderr: string, code: number | null, timedOut: boolean): string {
-  const trimmed = stderr.trim();
-  if (trimmed) {
-    return trimmed;
-  }
-
-  if (timedOut) {
-    return "Claude execution timed out";
-  }
-
-  return `Process exited with code ${code ?? -1}`;
-}
-
 export class ClaudeAdapter implements AgentAdapter {
   readonly type = "claude";
 
@@ -83,30 +102,45 @@ export class ClaudeAdapter implements AgentAdapter {
     return new Promise<AgentExecutionResult>((resolve) => {
       const parsedConfig = parseAdapterConfig(request.agent.adapter_config);
       const command = typeof parsedConfig.command === "string" && parsedConfig.command.trim().length > 0 ? parsedConfig.command : "claude";
+      const baseArgs = Array.isArray(parsedConfig.args) && parsedConfig.args.every((value) => typeof value === "string")
+        ? parsedConfig.args
+        : ["--print", "--permission-mode", "bypassPermissions"];
       const timeoutMs = toPositiveNumber(parsedConfig.timeoutMs) ?? DEFAULT_TIMEOUT_MS;
-      const taskPrompt = request.prompt;
-      const proc = spawn(command, ["--print", "--permission-mode", "bypassPermissions", "-p", taskPrompt], {
+      const model =
+        typeof parsedConfig.model === "string" && parsedConfig.model.trim().length > 0
+          ? parsedConfig.model
+          : request.agent.model;
+      const env =
+        parsedConfig.env && isRecord(parsedConfig.env)
+          ? {
+              ...process.env,
+              ...Object.fromEntries(
+                Object.entries(parsedConfig.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+              ),
+            }
+          : process.env;
+      const args = [...baseArgs];
+      if (model && !args.includes("--model")) {
+        args.push("--model", model);
+      }
+      args.push("-p", request.prompt);
+
+      const proc = spawn(command, args, {
         cwd: request.workspacePath,
         stdio: ["pipe", "pipe", "pipe"],
-        env: process.env,
+        env,
       });
 
+      let settled = false;
       let stdout = "";
       let stderr = "";
-      let settled = false;
-      let timedOut = false;
+      let outputBuffer = "";
+      let inputTokens = 0;
+      let outputTokens = 0;
       let forceKillHandle: NodeJS.Timeout | null = null;
 
       const timeoutHandle = setTimeout(() => {
-        timedOut = true;
-        context.onEvent({
-          type: "status",
-          message: `Claude execution timed out after ${Math.round(timeoutMs / 1000)}s`,
-        });
-        proc.kill("SIGTERM");
-        forceKillHandle = setTimeout(() => {
-          proc.kill("SIGKILL");
-        }, 5000);
+        void abortRun(`Claude execution timed out after ${Math.round(timeoutMs / 1000)}s`, "failed");
       }, timeoutMs);
 
       const cleanup = (): void => {
@@ -115,6 +149,7 @@ export class ClaudeAdapter implements AgentAdapter {
           clearTimeout(forceKillHandle);
           forceKillHandle = null;
         }
+
         context.signal?.removeEventListener("abort", handleAbort);
       };
 
@@ -128,19 +163,71 @@ export class ClaudeAdapter implements AgentAdapter {
         resolve(result);
       };
 
-      const handleAbort = (): void => {
-        proc.kill("SIGTERM");
-        forceKillHandle = setTimeout(() => {
-          proc.kill("SIGKILL");
-        }, 5000);
+      const updateTokenUsage = (): void => {
+        const usage = extractTokenUsage(stdout);
+        inputTokens = usage.inputTokens;
+        outputTokens = usage.outputTokens;
+      };
+
+      const teardownProcess = (): void => {
+        if (!proc.killed) {
+          proc.kill("SIGTERM");
+          forceKillHandle = setTimeout(() => {
+            proc.kill("SIGKILL");
+          }, FORCE_KILL_DELAY_MS);
+        }
+      };
+
+      const completeSuccess = (): void => {
+        updateTokenUsage();
+        const checkpointSummary = stdout.trim() || undefined;
         settle({
-          status: "stopped",
-          summary: "Run aborted",
-          inputTokens: 0,
-          outputTokens: 0,
+          status: "completed",
+          summary: summarizeText(checkpointSummary ?? ""),
+          checkpointSummary,
+          inputTokens,
+          outputTokens,
           costCents: 0,
-          error: "Aborted",
         });
+      };
+
+      const abortRun = async (message: string, status: AgentExecutionResult["status"]): Promise<void> => {
+        context.onEvent({ type: "status", message });
+        teardownProcess();
+        updateTokenUsage();
+
+        if (status === "stopped") {
+          settle({
+            status,
+            summary: "Run aborted",
+            checkpointSummary: stdout.trim() || undefined,
+            inputTokens,
+            outputTokens,
+            costCents: 0,
+            error: "Aborted",
+          });
+          return;
+        }
+
+        settle(buildFailureResult(stdout.trim(), inputTokens, outputTokens, message));
+      };
+
+      const handleAbort = (): void => {
+        void abortRun("Run aborted", "stopped");
+      };
+
+      const flushOutputLines = (): void => {
+        while (true) {
+          const newlineIndex = outputBuffer.indexOf("\n");
+          if (newlineIndex === -1) {
+            break;
+          }
+
+          const line = outputBuffer.slice(0, newlineIndex + 1);
+          outputBuffer = outputBuffer.slice(newlineIndex + 1);
+          context.onEvent({ type: "agent_message", message: line });
+          context.onEvent({ type: "output", message: line });
+        }
       };
 
       context.signal?.addEventListener("abort", handleAbort, { once: true });
@@ -148,59 +235,60 @@ export class ClaudeAdapter implements AgentAdapter {
       proc.stdout.setEncoding("utf8");
       proc.stdout.on("data", (chunk: string) => {
         stdout += chunk;
-        context.onEvent({
-          type: "output",
-          message: chunk,
-        });
+        outputBuffer += chunk;
+        updateTokenUsage();
+        flushOutputLines();
+        context.onEvent(createDataEvent("status", { inputTokens, outputTokens }));
       });
 
       proc.stderr.setEncoding("utf8");
       proc.stderr.on("data", (chunk: string) => {
         stderr += chunk;
-        context.onEvent({
-          type: "error",
-          message: chunk,
-        });
+        context.onEvent({ type: "error", message: chunk });
       });
 
       proc.on("error", (error) => {
-        const usage = extractTokenUsage(stdout);
-        settle({
-          status: "failed",
-          summary: summarizeResponse(stdout) || "Claude execution failed",
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          costCents: 0,
-          error: error.message,
-        });
+        updateTokenUsage();
+        settle(buildFailureResult(stdout.trim(), inputTokens, outputTokens, error instanceof Error ? error.message : String(error)));
+      });
+
+      proc.on("spawn", () => {
+        context.onEvent(
+          createDataEvent("status", {
+            command,
+            args,
+            workspacePath: request.workspacePath,
+          }),
+        );
       });
 
       proc.on("close", (code) => {
-        const response = stdout.trim();
-        const usage = extractTokenUsage(stdout);
-
-        if (code === 0 && !timedOut) {
-          const summary = summarizeResponse(response);
-          settle({
-            status: "completed",
-            summary,
-            checkpointSummary: response || summary,
-            inputTokens: usage.inputTokens,
-            outputTokens: usage.outputTokens,
-            costCents: 0,
-          });
+        if (settled) {
           return;
         }
 
-        settle({
-          status: "failed",
-          summary: summarizeResponse(response) || "Claude execution failed",
-          checkpointSummary: response || undefined,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          costCents: 0,
-          error: getFailureMessage(stderr, code, timedOut),
-        });
+        if (outputBuffer.length > 0) {
+          context.onEvent({ type: "agent_message", message: outputBuffer });
+          context.onEvent({ type: "output", message: outputBuffer });
+          outputBuffer = "";
+        }
+
+        updateTokenUsage();
+
+        if (code === 0 && stdout.trim().length > 0) {
+          context.onEvent({
+            type: "turn.completed",
+            data: {
+              inputTokens,
+              outputTokens,
+            },
+          });
+          completeSuccess();
+          return;
+        }
+
+        const failureMessage = stderr.trim() || `Process exited with code ${code ?? -1}`;
+        settle(buildFailureResult(stdout.trim(), inputTokens, outputTokens, failureMessage));
       });
     });
   }
