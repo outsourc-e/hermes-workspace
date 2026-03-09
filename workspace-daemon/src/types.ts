@@ -169,6 +169,49 @@ export interface AgentRecord {
   created_at: string;
 }
 
+export interface AgentDirectoryCapabilities {
+  repo_write: boolean;
+  shell_commands: boolean;
+  git_operations: boolean;
+  browser: boolean;
+  network: boolean;
+}
+
+export interface AgentDirectoryLimits {
+  max_tokens: number;
+  cost_label: string;
+  concurrency_limit: number;
+  memory_scope: string;
+}
+
+export interface AgentDirectoryRecord {
+  id: string;
+  name: string;
+  role: string;
+  adapter_type: AgentAdapterType;
+  model: string | null;
+  provider: string;
+  status: "online" | "away" | "offline";
+  avatar: string;
+  avatar_tone: "accent" | "green" | "yellow" | "primary";
+  description: string;
+  system_prompt: string;
+  prompt_updated_at: string;
+  limits: AgentDirectoryLimits;
+  capabilities: AgentDirectoryCapabilities;
+  assigned_projects: string[];
+  skills: string[];
+}
+
+export interface AgentDirectoryStats {
+  agent_id: string;
+  runs_today: number;
+  tokens_today: number;
+  cost_cents_today: number;
+  success_rate: number;
+  avg_response_ms: number | null;
+}
+
 export interface ActivityLogEntry {
   id: number;
   action: string;

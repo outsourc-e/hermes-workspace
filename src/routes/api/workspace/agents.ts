@@ -24,9 +24,14 @@ export const Route = createFileRoute('/api/workspace/agents')({
         }
 
         try {
+          const url = new URL(request.url)
+          const statsFor = url.searchParams.get('stats_for')?.trim()
+
           return await forwardWorkspaceRequest({
             request,
-            path: '/agents',
+            path: statsFor
+              ? `/agents/${encodeURIComponent(statsFor)}/stats`
+              : '/agents',
           })
         } catch (error) {
           return json(

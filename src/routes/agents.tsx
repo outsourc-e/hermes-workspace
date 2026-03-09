@@ -1,26 +1,26 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { AgentsScreen } from '@/screens/gateway/agents-screen'
+import { AgentsScreen } from '@/screens/agents/agents-screen'
 
 export const Route = createFileRoute('/agents')({
   component: function AgentsRoute() {
     usePageTitle('Agents')
-    return <AgentsScreen variant="registry" />
+    return <AgentsScreen />
   },
   errorComponent: function AgentsError({ error }) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
-        <h2 className="text-xl font-semibold text-primary-900 mb-3">
+      <div className="flex h-full flex-col items-center justify-center bg-primary-950 p-6 text-center">
+        <h2 className="mb-3 text-xl font-semibold text-primary-100">
           Failed to Load Agents
         </h2>
-        <p className="text-sm text-primary-600 mb-4 max-w-md">
+        <p className="mb-4 max-w-md text-sm text-primary-400">
           {error instanceof Error
             ? error.message
             : 'An unexpected error occurred'}
         </p>
         <button
           onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+          className="rounded-lg bg-accent-500 px-4 py-2 text-primary-950 transition-colors hover:bg-accent-400"
         >
           Reload Page
         </button>
@@ -29,10 +29,10 @@ export const Route = createFileRoute('/agents')({
   },
   pendingComponent: function AgentsPending() {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center bg-primary-950">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-3" />
-          <p className="text-sm text-primary-500">Loading agents...</p>
+          <div className="mb-3 inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
+          <p className="text-sm text-primary-400">Loading agents...</p>
         </div>
       </div>
     )

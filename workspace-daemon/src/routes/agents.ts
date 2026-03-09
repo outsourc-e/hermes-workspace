@@ -5,7 +5,16 @@ export function createAgentsRouter(tracker: Tracker): Router {
   const router = Router();
 
   router.get("/", (_req, res) => {
-    res.json(tracker.listAgents());
+    res.json({ agents: tracker.listAgentDirectory() });
+  });
+
+  router.get("/:id/stats", (req, res) => {
+    const stats = tracker.getAgentDirectoryStats(req.params.id);
+    if (!stats) {
+      res.status(404).json({ error: "Agent not found" });
+      return;
+    }
+    res.json({ stats });
   });
 
   router.post("/", (req, res) => {

@@ -16,6 +16,7 @@ import {
   ListViewIcon,
   Notification03Icon,
   PencilEdit02Icon,
+  PlayCircleIcon,
   PuzzleIcon,
   Search01Icon,
   ApiIcon,
@@ -543,6 +544,7 @@ function ChatSidebarComponent({
   const isTasksActive = pathname === '/tasks'
   const isProjectsActive = pathname.startsWith('/projects')
   const isReviewActive = pathname.startsWith('/review')
+  const isRunsActive = pathname.startsWith('/runs')
   // Gateway
   const isCronActive = pathname === '/cron'
   const isChannelsActive = pathname === '/channels'
@@ -565,6 +567,8 @@ function ChatSidebarComponent({
     '/agent-swarm',
     '/projects',
     '/review',
+    '/agents',
+    '/runs',
     '/new',
     '/browser',
     '/terminal',
@@ -583,7 +587,6 @@ function ChatSidebarComponent({
     '/instances',
     '/sessions',
     '/usage',
-    '/agents',
     '/nodes',
   ]
 
@@ -818,6 +821,20 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/agents',
+      icon: UserGroupIcon,
+      label: 'Agents',
+      active: isAgentsActive,
+    },
+    {
+      kind: 'link',
+      to: '/runs',
+      icon: PlayCircleIcon,
+      label: 'Runs',
+      active: isRunsActive,
+    },
+    {
+      kind: 'link',
       to: '/browser',
       icon: GlobeIcon,
       label: 'Browser',
@@ -911,13 +928,6 @@ function ChatSidebarComponent({
       icon: ChartLineData01Icon,
       label: 'Usage',
       active: isUsageActive,
-    },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: isAgentsActive,
     },
     {
       kind: 'link',

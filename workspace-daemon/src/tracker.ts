@@ -4,6 +4,8 @@ import { getDatabase } from "./db";
 import type {
   ActivityLogEntry,
   ActivityEvent,
+  AgentDirectoryRecord,
+  AgentDirectoryStats,
   AgentRecord,
   Checkpoint,
   CreateMissionInput,
@@ -38,6 +40,212 @@ function parseJsonOrDefault<T>(value: string | null | undefined, fallback: T): T
   } catch {
     return fallback;
   }
+}
+
+const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
+  {
+    id: "codex-backend",
+    name: "Codex",
+    role: "Backend",
+    adapter_type: "codex",
+    model: "gpt-5.4",
+    provider: "OpenAI",
+    status: "online",
+    avatar: "🤖",
+    avatar_tone: "green",
+    description: "Primary backend implementation agent for multi-file TypeScript work.",
+    system_prompt: [
+      "# Codex",
+      "",
+      "You are the backend implementation agent for ClawSuite workspaces.",
+      "",
+      "Rules:",
+      "- Read all relevant files before editing.",
+      "- Make coherent multi-file changes when needed.",
+      "- Run TypeScript validation before handing work back.",
+      "- Prefer concrete fixes over speculative refactors.",
+    ].join("\n"),
+    prompt_updated_at: "2026-03-08T10:00:00.000Z",
+    limits: {
+      max_tokens: 200_000,
+      cost_label: "ChatGPT Pro",
+      concurrency_limit: 2,
+      memory_scope: "Global + Project",
+    },
+    capabilities: {
+      repo_write: true,
+      shell_commands: true,
+      git_operations: true,
+      browser: true,
+      network: true,
+    },
+    assigned_projects: ["ClawSuite", "Workspace Daemon"],
+    skills: ["TypeScript", "API routes", "Refactors", "Validation"],
+  },
+  {
+    id: "claude-sonnet-fullstack",
+    name: "Claude Sonnet",
+    role: "Full-stack",
+    adapter_type: "claude",
+    model: "sonnet-4.6",
+    provider: "Anthropic",
+    status: "online",
+    avatar: "🧠",
+    avatar_tone: "primary",
+    description: "Full-stack implementation agent for UI polish and product flows.",
+    system_prompt: [
+      "# Claude Sonnet",
+      "",
+      "You are the full-stack execution agent.",
+      "",
+      "Focus:",
+      "- End-to-end UI changes that stay consistent with the existing design system.",
+      "- Clean handoffs between frontend and backend work.",
+      "- Clear status reporting and low-churn edits.",
+    ].join("\n"),
+    prompt_updated_at: "2026-03-08T10:15:00.000Z",
+    limits: {
+      max_tokens: 200_000,
+      cost_label: "Anthropic API",
+      concurrency_limit: 2,
+      memory_scope: "Project scoped",
+    },
+    capabilities: {
+      repo_write: true,
+      shell_commands: true,
+      git_operations: true,
+      browser: true,
+      network: true,
+    },
+    assigned_projects: ["ClawSuite", "Client Portal"],
+    skills: ["React", "UX polish", "State flows", "Docs"],
+  },
+  {
+    id: "qa-agent-reviewer",
+    name: "QA Agent",
+    role: "Reviewer",
+    adapter_type: "claude",
+    model: "sonnet-4.6",
+    provider: "Anthropic",
+    status: "online",
+    avatar: "🔍",
+    avatar_tone: "primary",
+    description: "Review-focused agent for checkpoint triage and regression hunting.",
+    system_prompt: [
+      "# QA Agent",
+      "",
+      "You review changes for correctness and regression risk.",
+      "",
+      "Priorities:",
+      "- Catch missing validation.",
+      "- Verify acceptance criteria and edge cases.",
+      "- Push for explicit evidence when behavior changes.",
+    ].join("\n"),
+    prompt_updated_at: "2026-03-08T10:30:00.000Z",
+    limits: {
+      max_tokens: 120_000,
+      cost_label: "Anthropic API",
+      concurrency_limit: 1,
+      memory_scope: "Project + Review queue",
+    },
+    capabilities: {
+      repo_write: false,
+      shell_commands: true,
+      git_operations: false,
+      browser: true,
+      network: true,
+    },
+    assigned_projects: ["ClawSuite"],
+    skills: ["Code review", "Regression checks", "Acceptance testing"],
+  },
+  {
+    id: "aurora-orchestrator",
+    name: "Aurora",
+    role: "Orchestrator",
+    adapter_type: "claude",
+    model: "opus-4.6",
+    provider: "Anthropic",
+    status: "online",
+    avatar: "⚡",
+    avatar_tone: "accent",
+    description: "Orchestrator for planning, delegation, and multi-agent coordination.",
+    system_prompt: [
+      "# Aurora",
+      "",
+      "You coordinate the workspace and route work to the right agents.",
+      "",
+      "Directives:",
+      "- Maintain a coherent plan.",
+      "- Keep execution parallel where it is safe.",
+      "- Resolve blockers with the minimum viable coordination overhead.",
+    ].join("\n"),
+    prompt_updated_at: "2026-03-08T10:45:00.000Z",
+    limits: {
+      max_tokens: 200_000,
+      cost_label: "Anthropic API",
+      concurrency_limit: 4,
+      memory_scope: "Global workspace",
+    },
+    capabilities: {
+      repo_write: true,
+      shell_commands: true,
+      git_operations: true,
+      browser: true,
+      network: true,
+    },
+    assigned_projects: ["ClawSuite", "LuxeLab", "Client Portal"],
+    skills: ["Planning", "Delegation", "Risk triage", "Coordination"],
+  },
+  {
+    id: "forge-pc1",
+    name: "Forge (PC1)",
+    role: "Heavy builds",
+    adapter_type: "ollama",
+    model: "qwen3.5-35b",
+    provider: "Ollama",
+    status: "offline",
+    avatar: "🔧",
+    avatar_tone: "yellow",
+    description: "Local heavyweight execution node for long-running builds and batch work.",
+    system_prompt: [
+      "# Forge",
+      "",
+      "You handle large local build and validation jobs.",
+      "",
+      "Rules:",
+      "- Prefer deterministic command execution.",
+      "- Surface build logs clearly.",
+      "- Avoid network-dependent workflows unless explicitly requested.",
+    ].join("\n"),
+    prompt_updated_at: "2026-03-08T11:00:00.000Z",
+    limits: {
+      max_tokens: 64_000,
+      cost_label: "Local inference",
+      concurrency_limit: 1,
+      memory_scope: "Project scoped",
+    },
+    capabilities: {
+      repo_write: true,
+      shell_commands: true,
+      git_operations: true,
+      browser: false,
+      network: false,
+    },
+    assigned_projects: ["Workspace Daemon"],
+    skills: ["Builds", "Compiles", "Bulk verification"],
+  },
+];
+
+function normalizeDirectoryStatus(status: string | null | undefined): AgentDirectoryRecord["status"] {
+  const value = (status ?? "").toLowerCase();
+  if (value === "running" || value === "active" || value === "completed") return "online";
+  if (value === "idle" || value === "paused" || value === "pending" || value === "ready") return "away";
+  if (value === "online" || value === "away" || value === "offline") return value;
+  return "offline";
+}
+
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
 export class Tracker extends EventEmitter {
@@ -727,6 +935,181 @@ export class Tracker extends EventEmitter {
 
   listAgents(): AgentRecord[] {
     return this.db.prepare("SELECT * FROM agents ORDER BY created_at DESC").all() as AgentRecord[];
+  }
+
+  listAgentDirectory(): AgentDirectoryRecord[] {
+    const storedAgents = this.listAgents();
+    const agentsByKey = new Map<string, AgentRecord>();
+
+    for (const agent of storedAgents) {
+      agentsByKey.set(normalizeKey(agent.id), agent);
+      agentsByKey.set(normalizeKey(agent.name), agent);
+    }
+
+    const mergedDefaults = DEFAULT_AGENT_DIRECTORY.map((seed) => {
+      const stored =
+        agentsByKey.get(normalizeKey(seed.id)) ??
+        agentsByKey.get(normalizeKey(seed.name)) ??
+        null;
+      if (!stored) return seed;
+
+      const parsedCapabilities = parseJsonOrDefault<Partial<AgentDirectoryRecord["capabilities"]>>(
+        stored.capabilities,
+        {},
+      );
+
+      return {
+        ...seed,
+        name: stored.name || seed.name,
+        role: stored.role || seed.role,
+        adapter_type: stored.adapter_type || seed.adapter_type,
+        model: stored.model ?? seed.model,
+        status: normalizeDirectoryStatus(stored.status || seed.status),
+        capabilities: {
+          ...seed.capabilities,
+          ...parsedCapabilities,
+        },
+      };
+    });
+
+    const knownNames = new Set(mergedDefaults.map((agent) => normalizeKey(agent.name)));
+    const extras = storedAgents
+      .filter((agent) => !knownNames.has(normalizeKey(agent.name)))
+      .map((agent) => {
+        const capabilities = parseJsonOrDefault<Partial<AgentDirectoryRecord["capabilities"]>>(
+          agent.capabilities,
+          {},
+        );
+        return {
+          id: agent.id,
+          name: agent.name,
+          role: agent.role,
+          adapter_type: agent.adapter_type,
+          model: agent.model,
+          provider:
+            agent.adapter_type === "codex"
+              ? "OpenAI"
+              : agent.adapter_type === "claude"
+                ? "Anthropic"
+                : agent.adapter_type === "ollama"
+                  ? "Ollama"
+                  : "OpenClaw",
+          status: normalizeDirectoryStatus(agent.status),
+          avatar: "🛰️",
+          avatar_tone: "primary" as const,
+          description: `${agent.role} agent registered in the workspace daemon.`,
+          system_prompt: "# Custom agent\n\nThis agent was registered in the workspace daemon.",
+          prompt_updated_at: agent.created_at,
+          limits: {
+            max_tokens: 64_000,
+            cost_label: "Workspace default",
+            concurrency_limit: 1,
+            memory_scope: "Project scoped",
+          },
+          capabilities: {
+            repo_write: capabilities.repo_write ?? true,
+            shell_commands: capabilities.shell_commands ?? true,
+            git_operations: capabilities.git_operations ?? true,
+            browser: capabilities.browser ?? false,
+            network: capabilities.network ?? false,
+          },
+          assigned_projects: [],
+          skills: [],
+        };
+      });
+
+    return [...mergedDefaults, ...extras];
+  }
+
+  getAgentDirectoryStats(id: string): AgentDirectoryStats | null {
+    const agent = this.listAgentDirectory().find((entry) => entry.id === id);
+    if (!agent) return null;
+
+    const exactMatch = this.db
+      .prepare(
+        `SELECT
+            COUNT(*) AS run_count,
+            COALESCE(SUM(CASE WHEN date(COALESCE(tr.started_at, tr.completed_at)) = date('now')
+              THEN COALESCE(tr.input_tokens, 0) + COALESCE(tr.output_tokens, 0)
+              ELSE 0 END), 0) AS tokens_today,
+            COALESCE(SUM(CASE WHEN date(COALESCE(tr.started_at, tr.completed_at)) = date('now')
+              THEN COALESCE(tr.cost_cents, 0)
+              ELSE 0 END), 0) AS cost_cents_today,
+            COALESCE(SUM(CASE WHEN date(COALESCE(tr.started_at, tr.completed_at)) = date('now') THEN 1 ELSE 0 END), 0) AS runs_today,
+            COALESCE(SUM(CASE WHEN tr.status IN ('completed', 'awaiting_review') THEN 1 ELSE 0 END), 0) AS success_count,
+            COALESCE(SUM(CASE WHEN tr.status IN ('completed', 'awaiting_review', 'failed', 'stopped') THEN 1 ELSE 0 END), 0) AS finished_count,
+            AVG(CASE
+              WHEN tr.started_at IS NOT NULL
+               AND tr.completed_at IS NOT NULL
+               AND tr.status IN ('completed', 'awaiting_review')
+              THEN (julianday(tr.completed_at) - julianday(tr.started_at)) * 86400000.0
+              ELSE NULL
+            END) AS avg_response_ms
+         FROM task_runs tr
+         LEFT JOIN agents a ON a.id = tr.agent_id
+         WHERE a.name = ? OR a.id = ?`,
+      )
+      .get(agent.name, agent.id) as
+      | {
+          run_count: number | null;
+          tokens_today: number | null;
+          cost_cents_today: number | null;
+          runs_today: number | null;
+          success_count: number | null;
+          finished_count: number | null;
+          avg_response_ms: number | null;
+        }
+      | undefined;
+
+    const shouldFallback = !exactMatch || (exactMatch.run_count ?? 0) === 0;
+    const fallbackAggregate = this.db
+      .prepare(
+        `SELECT
+            COUNT(*) AS run_count,
+            COALESCE(SUM(CASE WHEN date(COALESCE(tr.started_at, tr.completed_at)) = date('now')
+              THEN COALESCE(tr.input_tokens, 0) + COALESCE(tr.output_tokens, 0)
+              ELSE 0 END), 0) AS tokens_today,
+            COALESCE(SUM(CASE WHEN date(COALESCE(tr.started_at, tr.completed_at)) = date('now')
+              THEN COALESCE(tr.cost_cents, 0)
+              ELSE 0 END), 0) AS cost_cents_today,
+            COALESCE(SUM(CASE WHEN date(COALESCE(tr.started_at, tr.completed_at)) = date('now') THEN 1 ELSE 0 END), 0) AS runs_today,
+            COALESCE(SUM(CASE WHEN tr.status IN ('completed', 'awaiting_review') THEN 1 ELSE 0 END), 0) AS success_count,
+            COALESCE(SUM(CASE WHEN tr.status IN ('completed', 'awaiting_review', 'failed', 'stopped') THEN 1 ELSE 0 END), 0) AS finished_count,
+            AVG(CASE
+              WHEN tr.started_at IS NOT NULL
+               AND tr.completed_at IS NOT NULL
+               AND tr.status IN ('completed', 'awaiting_review')
+              THEN (julianday(tr.completed_at) - julianday(tr.started_at)) * 86400000.0
+              ELSE NULL
+            END) AS avg_response_ms
+         FROM task_runs tr
+         LEFT JOIN agents a ON a.id = tr.agent_id
+         WHERE a.adapter_type = ?`,
+      )
+      .get(agent.adapter_type) as
+      | {
+          run_count: number | null;
+          tokens_today: number | null;
+          cost_cents_today: number | null;
+          runs_today: number | null;
+          success_count: number | null;
+          finished_count: number | null;
+          avg_response_ms: number | null;
+        }
+      | undefined;
+    const aggregate = shouldFallback ? fallbackAggregate : exactMatch;
+
+    const finishedCount = aggregate?.finished_count ?? 0;
+    const successRate = finishedCount > 0 ? ((aggregate?.success_count ?? 0) / finishedCount) * 100 : 0;
+
+    return {
+      agent_id: agent.id,
+      runs_today: aggregate?.runs_today ?? 0,
+      tokens_today: aggregate?.tokens_today ?? 0,
+      cost_cents_today: aggregate?.cost_cents_today ?? 0,
+      success_rate: Number.isFinite(successRate) ? successRate : 0,
+      avg_response_ms: aggregate?.avg_response_ms ?? null,
+    };
   }
 
   getAgent(id: string): AgentRecord | null {
