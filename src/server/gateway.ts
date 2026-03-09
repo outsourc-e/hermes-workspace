@@ -720,6 +720,31 @@ if (existingClient) {
 }
 let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()
 ;(globalThis as any)[GW_KEY] = gatewayClient
+
+// Prevent gateway WebSocket errors from crashing the Vite dev server.
+// Unhandled rejections from in-flight RPC calls during disconnect would
+// otherwise kill the Node process.
+const GW_UHR_KEY = '__clawsuite_gateway_uhr_installed__' as const
+if (!(globalThis as any)[GW_UHR_KEY]) {
+  ;(globalThis as any)[GW_UHR_KEY] = true
+  process.on('unhandledRejection', (reason: unknown) => {
+    const msg = reason instanceof Error ? reason.message : String(reason)
+    // Only swallow gateway-related rejections — let others propagate
+    if (
+      msg.includes('gateway') ||
+      msg.includes('Gateway') ||
+      msg.includes('WebSocket') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('ECONNRESET') ||
+      msg.includes('unknown method')
+    ) {
+      console.warn(`[gateway] Swallowed unhandled rejection: ${msg}`)
+      return
+    }
+    // Re-throw non-gateway rejections so they're visible
+    console.error('[unhandledRejection]', reason)
+  })
+}
 const activeSendStreamRuns =
   (globalThis as any)[ACTIVE_SEND_RUNS_KEY] as Set<string> | undefined
   ?? new Set<string>()

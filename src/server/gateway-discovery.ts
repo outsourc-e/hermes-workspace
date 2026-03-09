@@ -109,11 +109,14 @@ function discoverFromEnv(): DiscoveryResult {
   const token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim()
   const password = process.env.CLAWDBOT_GATEWAY_PASSWORD?.trim()
 
-  if (token || password) {
+  if (token) {
+    // Only short-circuit if we actually have a token.
+    // Password-only should fall through to config file discovery
+    // so we can pick up the token from ~/.openclaw/openclaw.json.
     return {
       found: true,
       url: url || 'ws://127.0.0.1:18789',
-      token: token || undefined,
+      token,
       password: password || undefined,
       source: 'env',
     }
