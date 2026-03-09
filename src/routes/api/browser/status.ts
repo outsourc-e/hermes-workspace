@@ -17,6 +17,7 @@ const UNSUPPORTED_MESSAGE =
   'Browser control available when gateway supports browser RPC'
 const NO_ACTIVE_SESSION_MESSAGE = 'No active browser session'
 const BROWSER_STATUS_METHODS = [
+  'browser',           // Current OpenClaw API — single method with action param
   'browser.status',
   'browser_status',
   'browser.get_status',
@@ -63,7 +64,8 @@ async function callBrowserStatus(): Promise<unknown> {
   let lastError: unknown = null
   for (const method of BROWSER_STATUS_METHODS) {
     try {
-      return await gatewayRpc(method)
+      const params = method === 'browser' ? { action: 'status' } : undefined
+      return await gatewayRpc(method, params)
     } catch (error) {
       lastError = error
     }

@@ -5,6 +5,7 @@ import { gatewayRpc } from '../../../server/gateway'
 import { requireJsonContentType } from '../../../server/rate-limit'
 
 const BROWSER_NAVIGATE_METHODS = [
+  'browser',           // Current OpenClaw API — single method with action param
   'browser.navigate',
   'browser_navigate',
   'browser.go',
@@ -21,7 +22,10 @@ async function callBrowserNavigate(params: { url: string }): Promise<unknown> {
   let lastError: unknown = null
   for (const method of BROWSER_NAVIGATE_METHODS) {
     try {
-      return await gatewayRpc(method, params)
+      const rpcParams = method === 'browser'
+        ? { action: 'navigate', ...params }
+        : params
+      return await gatewayRpc(method, rpcParams)
     } catch (error) {
       lastError = error
     }
