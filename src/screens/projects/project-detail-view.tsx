@@ -10,6 +10,7 @@ import {
   Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -25,6 +26,7 @@ import {
   getCheckpointStatusBadgeClass,
   getCheckpointSummary,
   isCheckpointReviewable,
+  workspaceRequestJson,
   type WorkspaceCheckpoint,
 } from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
@@ -42,7 +44,22 @@ import {
   getStatusBadgeClass,
   getTaskDotClass,
 } from './lib/workspace-utils'
-import { useMemo } from 'react'
+import {
+  formatRunDuration,
+  formatRunStatus,
+  formatRunTimestamp,
+  getConsoleLineClass,
+  getRunEventMessage,
+  getRunStatusClass,
+  sortRunsNewestFirst,
+} from '../runs/lib/runs-utils'
+import {
+  extractRunEvents,
+  extractTaskRuns,
+  type WorkspaceRunEvent,
+  type WorkspaceTaskRun,
+} from '../runs/lib/runs-types'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type ProjectDetailViewProps = {
   selectedSummary: WorkspaceProject | null
@@ -76,6 +93,46 @@ type ProjectDetailViewProps = {
   onRefreshActivity: () => void
 }
 
+function RunLog({
+  events,
+}: {
+  events: Array<WorkspaceRunEvent>
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const node = containerRef.current
+    if (!node) return
+    node.scrollTop = node.scrollHeight
+  }, [events])
+
+  return (
+    <div
+      ref={containerRef}
+      className="max-h-80 overflow-y-auto rounded-xl border border-primary-200 bg-white p-4 font-mono text-xs"
+    >
+      {events.length > 0 ? (
+        <div className="space-y-2">
+          {events.map((event) => (
+            <div key={event.id} className="grid grid-cols-[72px_1fr] gap-3">
+              <span className="text-primary-500">
+                {new Date(event.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })}
+              </span>
+              <p className={getConsoleLineClass(event)}>{getRunEventMessage(event)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-primary-500">No run output yet.</p>
+      )}
+    </div>
+  )
+}
+
 export function ProjectDetailView({
   selectedSummary,
   projectDetail,
@@ -107,6 +164,7 @@ export function ProjectDetailView({
   onCheckpointReject,
   onRefreshActivity,
 }: ProjectDetailViewProps) {
+  const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
   const taskNameById = useMemo(() => {
     const source = projectDetail ?? selectedSummary
     if (!source) return new Map<string, string>()
@@ -119,6 +177,57 @@ export function ProjectDetailView({
       ),
     )
   }, [projectDetail, selectedSummary])
+  const activeProjectId = projectDetail?.id ?? selectedSummary?.id ?? null
+  const checkpointByRunId = useMemo(
+    () => new Map(checkpoints.map((checkpoint) => [checkpoint.task_run_id, checkpoint])),
+    [checkpoints],
+  )
+  const runsQuery = useQuery({
+    queryKey: ['workspace', 'task-runs', 'project', activeProjectId],
+    enabled: Boolean(activeProjectId),
+    queryFn: async () => {
+      if (!activeProjectId) return []
+      const payload = await workspaceRequestJson(
+        `/api/workspace/task-runs?project_id=${encodeURIComponent(activeProjectId)}`,
+      )
+      return extractTaskRuns(payload)
+    },
+    staleTime: 1_000,
+    refetchInterval: (query) => {
+      const runs = query.state.data as Array<WorkspaceTaskRun> | undefined
+      return runs?.some((run) => run.status === 'running') ? 5_000 : false
+    },
+  })
+  const projectRuns = useMemo(
+    () => [...(runsQuery.data ?? [])].sort(sortRunsNewestFirst),
+    [runsQuery.data],
+  )
+  const expandedRunIdList = useMemo(
+    () => Object.entries(expandedRunIds).flatMap(([id, expanded]) => (expanded ? [id] : [])),
+    [expandedRunIds],
+  )
+  const runEventQueries = useQueries({
+    queries: expandedRunIdList.map((runId) => ({
+      queryKey: ['workspace', 'task-runs', runId, 'events'],
+      queryFn: async () =>
+        extractRunEvents(await workspaceRequestJson(`/api/workspace/task-runs/${runId}/events`)),
+      staleTime: 1_000,
+      refetchInterval: projectRuns.some((run) => run.id === runId && run.status === 'running')
+        ? 5_000
+        : false,
+    })),
+  })
+  const runEventsById = useMemo(() => {
+    const map = new Map<string, Array<WorkspaceRunEvent>>()
+    expandedRunIdList.forEach((runId, index) => {
+      map.set(runId, runEventQueries[index]?.data ?? [])
+    })
+    return map
+  }, [expandedRunIdList, runEventQueries])
+
+  useEffect(() => {
+    setExpandedRunIds({})
+  }, [activeProjectId])
 
   if (!selectedSummary) {
     return (
@@ -537,6 +646,197 @@ export function ProjectDetailView({
             {pendingCheckpointCount === 1 ? '' : 's'}
           </p>
         ) : null}
+      </section>
+
+      <section className="mt-6 border-t border-primary-200 pt-5">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-primary-900">Run History</h3>
+            <p className="text-sm text-primary-500">
+              Task execution history for this project, including logs and checkpoint handoffs.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => void runsQuery.refetch()} disabled={runsQuery.isFetching}>
+            Refresh Runs
+          </Button>
+        </div>
+
+        {runsQuery.isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
+              >
+                <div className="h-4 w-36 animate-shimmer rounded bg-primary-200/80" />
+                <div className="mt-3 h-4 w-full animate-shimmer rounded bg-primary-200/60" />
+              </div>
+            ))}
+          </div>
+        ) : projectRuns.length > 0 ? (
+          <div className="space-y-3">
+            <div className="hidden rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3 text-xs uppercase tracking-[0.18em] text-primary-500 md:grid md:grid-cols-[minmax(0,1.8fr)_1fr_0.9fr_0.8fr_0.9fr_0.9fr_1fr_auto] md:items-center">
+              <span>Task</span>
+              <span>Agent</span>
+              <span>Status</span>
+              <span>Duration</span>
+              <span>Started</span>
+              <span>Completed</span>
+              <span>Checkpoint</span>
+              <span />
+            </div>
+
+            {projectRuns.map((run) => {
+              const expanded = Boolean(expandedRunIds[run.id])
+              const checkpoint = checkpointByRunId.get(run.id) ?? null
+              const events = runEventsById.get(run.id) ?? []
+
+              return (
+                <article
+                  key={run.id}
+                  className="rounded-xl border border-primary-200 bg-white shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedRunIds((current) => ({
+                        ...current,
+                        [run.id]: !current[run.id],
+                      }))
+                    }
+                    className="flex w-full flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-50 md:grid md:grid-cols-[minmax(0,1.8fr)_1fr_0.9fr_0.8fr_0.9fr_0.9fr_1fr_auto] md:items-center"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-primary-900">
+                        {run.task_name}
+                      </p>
+                      <p className="mt-1 text-xs text-primary-500">
+                        {run.mission_name ?? 'Unknown mission'}
+                      </p>
+                    </div>
+                    <p className="text-sm text-primary-600">
+                      {run.agent_name ?? 'Unknown agent'}
+                    </p>
+                    <div>
+                      <span
+                        className={cn(
+                          'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium',
+                          getRunStatusClass(run.status),
+                        )}
+                      >
+                        {formatRunStatus(run.status)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-primary-600">{formatRunDuration(run)}</p>
+                    <p className="text-sm text-primary-600">{formatRunTimestamp(run.started_at ?? null)}</p>
+                    <p className="text-sm text-primary-600">
+                      {formatRunTimestamp(run.completed_at ?? null)}
+                    </p>
+                    <div className="min-w-0">
+                      {checkpoint ? (
+                        <span
+                          className={cn(
+                            'inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-medium',
+                            getCheckpointStatusBadgeClass(checkpoint.status),
+                          )}
+                        >
+                          {formatCheckpointStatus(checkpoint.status)}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-primary-500">None</span>
+                      )}
+                    </div>
+                    <HugeiconsIcon
+                      icon={ArrowDown01Icon}
+                      size={16}
+                      strokeWidth={1.7}
+                      className={cn(
+                        'text-primary-500 transition-transform',
+                        expanded ? 'rotate-180' : '',
+                      )}
+                    />
+                  </button>
+
+                  {expanded ? (
+                    <div className="space-y-4 border-t border-primary-200 px-4 py-4">
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Run ID</p>
+                          <p className="mt-1 truncate font-mono text-sm text-primary-900">{run.id}</p>
+                        </div>
+                        <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Attempt</p>
+                          <p className="mt-1 text-sm text-primary-900">{run.attempt}</p>
+                        </div>
+                        <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Workspace</p>
+                          <p className="mt-1 truncate text-sm text-primary-900">
+                            {run.workspace_path ?? 'No workspace recorded'}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Error</p>
+                          <p className="mt-1 text-sm text-primary-900">
+                            {run.error ?? 'No error recorded'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {checkpoint ? (
+                        <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-4">
+                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={cn(
+                                    'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium',
+                                    getCheckpointStatusBadgeClass(checkpoint.status),
+                                  )}
+                                >
+                                  {formatCheckpointStatus(checkpoint.status)}
+                                </span>
+                                {checkpoint.agent_name ? (
+                                  <span className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-xs text-primary-600">
+                                    {checkpoint.agent_name}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="text-sm font-semibold text-primary-900">
+                                {getCheckpointSummary(checkpoint)}
+                              </p>
+                              <p className="text-xs text-primary-500">
+                                {formatCheckpointTimestamp(checkpoint.created_at)}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                onCheckpointReview(checkpoint)
+                              }}
+                            >
+                              Open Checkpoint
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <RunLog events={events} />
+                    </div>
+                  ) : null}
+                </article>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-10 text-center">
+            <p className="text-sm text-primary-600">No runs for this project yet.</p>
+            <p className="mt-1 text-sm text-primary-500">
+              Task execution logs will appear here after the first mission starts.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="mt-6 border-t border-primary-200 pt-5">

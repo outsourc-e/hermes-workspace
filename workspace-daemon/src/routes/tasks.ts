@@ -69,7 +69,7 @@ export function createTasksRouter(tracker: Tracker, orchestrator: Orchestrator):
   });
 
   router.get("/:id/runs", (req, res) => {
-    res.json(tracker.listTaskRuns(req.params.id));
+    res.json(tracker.listTaskRuns({ taskId: req.params.id }));
   });
 
   return router;

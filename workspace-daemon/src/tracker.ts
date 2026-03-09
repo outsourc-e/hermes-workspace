@@ -701,8 +701,21 @@ export class Tracker extends EventEmitter {
     return this.db.prepare("SELECT * FROM task_runs WHERE status = 'running'").all() as TaskRun[];
   }
 
-  listTaskRuns(taskId?: string): TaskRunWithRelations[] {
-    const clause = taskId ? "WHERE task_runs.task_id = ?" : "";
+  listTaskRuns(filters: { taskId?: string; projectId?: string } = {}): TaskRunWithRelations[] {
+    const clauses: string[] = [];
+    const params: string[] = [];
+
+    if (filters.taskId) {
+      clauses.push("task_runs.task_id = ?");
+      params.push(filters.taskId);
+    }
+
+    if (filters.projectId) {
+      clauses.push("phases.project_id = ?");
+      params.push(filters.projectId);
+    }
+
+    const clause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     return this.db
       .prepare(
         `SELECT task_runs.*,
@@ -721,7 +734,7 @@ export class Tracker extends EventEmitter {
          ${clause}
          ORDER BY task_runs.started_at DESC`,
       )
-      .all(...(taskId ? [taskId] : [])) as TaskRunWithRelations[];
+      .all(...params) as TaskRunWithRelations[];
   }
 
   appendRunEvent(taskRunId: string, type: RunEventType, data: Record<string, unknown> | null): RunEvent {

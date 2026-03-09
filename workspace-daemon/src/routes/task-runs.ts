@@ -5,8 +5,9 @@ import { Tracker } from "../tracker";
 export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrator): Router {
   const router = Router();
 
-  router.get("/", (_req, res) => {
-    res.json(tracker.listTaskRuns());
+  router.get("/", (req, res) => {
+    const projectId = typeof req.query.project_id === "string" ? req.query.project_id : undefined;
+    res.json(tracker.listTaskRuns({ projectId }));
   });
 
   router.get("/:id/events", (req, res) => {
