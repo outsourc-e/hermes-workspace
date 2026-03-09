@@ -509,6 +509,8 @@ export function NewProjectWizard() {
             phaseName: phase.name,
             tasks: decomposeResult.tasks,
           }),
+          missionId: undefined,
+          projectId: undefined,
         },
       })
     } catch (error) {
@@ -554,21 +556,31 @@ export function NewProjectWizard() {
                   ? 'active'
                   : 'pending'
 
+            const isClickable = state === 'done'
+
             return (
-              <div
+              <button
                 key={entry.id}
+                type="button"
+                onClick={() => {
+                  if (isClickable) goToStep(entry.id)
+                }}
+                disabled={!isClickable}
+                aria-current={state === 'active' ? 'step' : undefined}
                 className={cn(
-                  'rounded-2xl border px-4 py-3 transition-colors',
+                  'rounded-2xl border px-4 py-3 text-left transition-colors',
                   state === 'done' &&
-                    'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+                    'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:border-emerald-400/40 hover:bg-emerald-500/15',
                   state === 'active' &&
                     'border-accent-500/40 bg-accent-500/10 text-accent-300',
                   state === 'pending' &&
                     'border-primary-800 bg-primary-900/60 text-primary-500',
+                  !isClickable && 'cursor-default',
+                  isClickable && 'cursor-pointer',
                 )}
               >
                 <div className="flex items-center gap-2 text-sm font-semibold">
-                  <span>{entry.id}.</span>
+                  <span>{state === 'done' ? '✓' : `${entry.id}.`}</span>
                   <span>{entry.label}</span>
                   {state === 'done' ? (
                     <HugeiconsIcon
@@ -578,7 +590,7 @@ export function NewProjectWizard() {
                     />
                   ) : null}
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>

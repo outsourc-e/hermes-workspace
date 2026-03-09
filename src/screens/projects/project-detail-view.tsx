@@ -49,6 +49,7 @@ import {
   calculateExecutionWaves,
   getActivityEventDescription,
   getActivityEventTone,
+  isMissionInPlanReview,
   getStatusBadgeClass,
   getTaskDotClass,
 } from './lib/workspace-utils'
@@ -92,6 +93,7 @@ type ProjectDetailViewProps = {
   onTogglePhase: (phaseId: string) => void
   onAddMission: (phase: WorkspacePhase) => void
   onOpenMissionLauncher: (phase: WorkspacePhase) => void
+  onOpenPlanReview: (missionId: string, projectId: string) => void
   onStartMission: (missionId: string) => void
   onPauseMission: (missionId: string) => void
   onResumeMission: (missionId: string) => void
@@ -167,6 +169,7 @@ export function ProjectDetailView({
   onTogglePhase,
   onAddMission,
   onOpenMissionLauncher,
+  onOpenPlanReview,
   onStartMission,
   onPauseMission,
   onResumeMission,
@@ -511,6 +514,8 @@ export function ProjectDetailView({
                     ) : (
                       phase.missions.map((mission) => {
                         const missionWaves = getMissionExecutionWaves(mission.tasks)
+                        const canReviewPlan =
+                          Boolean(activeProjectId) && isMissionInPlanReview(mission)
 
                         return (
                           <article
@@ -539,6 +544,21 @@ export function ProjectDetailView({
                             </div>
 
                               <div className="flex flex-wrap items-center gap-2">
+                              {canReviewPlan && activeProjectId ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onOpenPlanReview(mission.id, activeProjectId)}
+                                  className="border-accent-500/30 bg-accent-500/10 text-accent-400 hover:bg-accent-500/15"
+                                >
+                                  <HugeiconsIcon
+                                    icon={Task01Icon}
+                                    size={16}
+                                    strokeWidth={1.6}
+                                  />
+                                  Plan Review
+                                </Button>
+                              ) : null}
                               {mission.status === 'pending' ||
                               mission.status === 'ready' ? (
                                 <Button

@@ -48,6 +48,7 @@ import {
   buildProjectOverview,
   calculateExecutionWaves,
   deriveCheckpointRisk,
+  findPlanReviewMission,
   isCheckpointVerified,
 } from './lib/workspace-utils'
 import { ProjectDetailView } from './project-detail-view'
@@ -401,8 +402,21 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
           pendingCheckpoints,
           agents,
         ),
-      ),
+    ),
     [agents, pendingCheckpoints, projectSnapshotMap, projects],
+  )
+  const planReviewMissionIdsByProjectId = useMemo(
+    () =>
+      projects.reduce<Record<string, string>>((accumulator, project) => {
+        const mission = findPlanReviewMission(
+          projectSnapshotMap.get(project.id) ?? (projectDetail?.id === project.id ? projectDetail : project),
+        )
+        if (mission) {
+          accumulator[project.id] = mission.id
+        }
+        return accumulator
+      }, {}),
+    [projectDetail, projectSnapshotMap, projects],
   )
   const reviewProjectOptions = useMemo(
     () =>
@@ -563,6 +577,17 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     setExpandedDecomposeDescriptions({})
   }
 
+  function openPlanReview(missionId: string, projectId: string) {
+    void navigate({
+      to: '/plan-review',
+      search: {
+        plan: undefined,
+        missionId,
+        projectId,
+      },
+    })
+  }
+
   function resetMissionLauncher() {
     setMissionLauncher(null)
     setExpandedDecomposeDescriptions({})
@@ -656,6 +681,8 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
           phaseName: missionLauncher.phase.name,
           tasks: cleanedTasks,
         }),
+        missionId: undefined,
+        projectId: undefined,
       },
     })
   }
@@ -1062,8 +1089,10 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
             <DashboardProjectCards
               projectOverviews={projectOverviews}
               selectedProjectId={selectedProjectId}
+              planReviewMissionIdsByProjectId={planReviewMissionIdsByProjectId}
               onSelect={focusProject}
               onResume={(missionId) => void handleStartMission(missionId)}
+              onReviewPlan={openPlanReview}
               submittingKey={submittingKey}
             />
 
@@ -1132,6 +1161,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
                 }
                 onAddMission={setMissionPhase}
                 onOpenMissionLauncher={openMissionLauncher}
+                onOpenPlanReview={openPlanReview}
                 onStartMission={(missionId) =>
                   void handleStartMission(missionId)
                 }

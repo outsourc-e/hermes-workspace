@@ -64,6 +64,24 @@ export function flattenProjectMissions(
   )
 }
 
+export function isMissionInPlanReview(mission: WorkspaceMission): boolean {
+  const hasDraftTasks = mission.tasks.some((task) =>
+    ['draft', 'plan_review'].includes(task.status),
+  )
+  const hasPendingReviewTasks = mission.tasks.some((task) =>
+    ['pending', 'ready', 'draft', 'plan_review'].includes(task.status),
+  )
+
+  return hasDraftTasks || (mission.status === 'plan_review' && hasPendingReviewTasks)
+}
+
+export function findPlanReviewMission(
+  project?: WorkspaceProject | null,
+): WorkspaceMission | null {
+  const missions = flattenProjectMissions(project)
+  return missions.find(({ mission }) => isMissionInPlanReview(mission))?.mission ?? null
+}
+
 export function getStatusBadgeClass(status: WorkspaceStatus): string {
   if (status === 'ready') {
     return 'border-blue-500/30 bg-blue-500/10 text-blue-300'

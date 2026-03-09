@@ -869,11 +869,10 @@ export function MissionConsoleScreen({
             Mission Console
           </p>
           <h1 className="mt-3 text-2xl font-semibold text-primary-100">
-            Select an active mission
+            No mission selected
           </h1>
           <p className="mt-3 text-sm text-primary-300">
-            Open this screen from a running mission in Projects, or use a
-            `/mission-console?missionId=...&projectId=...` link.
+            Open a project, start a mission, then click Open Console
           </p>
           <Link
             to="/projects"
@@ -882,7 +881,7 @@ export function MissionConsoleScreen({
               'mt-6 inline-flex bg-accent-500 text-primary-950 hover:bg-accent-400',
             )}
           >
-            Open Projects
+            Go to Projects
           </Link>
         </div>
       </div>

@@ -1,7 +1,8 @@
-import { useNavigate } from '@tanstack/react-router'
-import { useMutation } from '@tanstack/react-query'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   ArrowDown01Icon,
+  ArrowRight01Icon,
   ArrowUp01Icon,
   CheckmarkCircle02Icon,
   PencilEdit02Icon,
@@ -14,9 +15,14 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import type { DecomposedTaskDraft } from '@/screens/projects/lib/workspace-types'
 import {
+  extractProject,
+  extractTasks,
   normalizeDecomposedTask,
   normalizeMission,
   normalizeTask,
+  type WorkspaceMission,
+  type WorkspaceProject,
+  type WorkspaceTask,
 } from '@/screens/projects/lib/workspace-types'
 import {
   calculateExecutionWaves,
@@ -29,6 +35,8 @@ import {
 
 type PlanReviewScreenProps = {
   plan: string
+  missionId?: string
+  projectId?: string
 }
 
 type PlanReviewState = {
@@ -37,6 +45,8 @@ type PlanReviewState = {
   phaseName: string
   projectId?: string | null
   projectName?: string | null
+  missionId?: string | null
+  missionName?: string | null
   tasks: DecomposedTaskDraft[]
 }
 
@@ -94,11 +104,51 @@ function parsePlanState(plan: string): PlanReviewState | null {
       phaseName,
       projectId: typeof record.projectId === 'string' ? record.projectId : null,
       projectName: typeof record.projectName === 'string' ? record.projectName : null,
+      missionId: null,
+      missionName: null,
       tasks,
     }
   } catch {
     return null
   }
+}
+
+async function loadMissionTasks(missionId: string) {
+  return extractTasks(
+    await apiRequest(`/api/workspace-tasks?mission_id=${encodeURIComponent(missionId)}`),
+  )
+}
+
+function getMissionFromProject(
+  project: WorkspaceProject | null | undefined,
+  missionId: string,
+): { mission: WorkspaceMission; phaseName: string; phaseId: string } | null {
+  if (!project) return null
+
+  for (const phase of project.phases) {
+    const mission = phase.missions.find((entry) => entry.id === missionId)
+    if (mission) {
+      return {
+        mission,
+        phaseName: phase.name,
+        phaseId: phase.id,
+      }
+    }
+  }
+
+  return null
+}
+
+function toTaskDrafts(tasks: WorkspaceTask[]): DecomposedTaskDraft[] {
+  const taskNameById = new Map(tasks.map((task) => [task.id, task.name]))
+  return tasks.map((task) => ({
+    id: task.id,
+    name: task.name,
+    description: task.description ?? '',
+    estimated_minutes: 0,
+    depends_on: task.depends_on.map((dependencyId) => taskNameById.get(dependencyId) ?? dependencyId),
+    suggested_agent_type: null,
+  }))
 }
 
 function getAgentSummary(tasks: DecomposedTaskDraft[]) {
@@ -123,16 +173,50 @@ function reorderTasks(
   return next
 }
 
-export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
+export function PlanReviewScreen({
+  plan,
+  missionId = '',
+  projectId = '',
+}: PlanReviewScreenProps) {
   const navigate = useNavigate()
   const parsedPlan = useMemo(() => parsePlanState(plan), [plan])
-  const [tasks, setTasks] = useState<DecomposedTaskDraft[]>(() => parsedPlan?.tasks ?? [])
+  const projectQuery = useQuery({
+    queryKey: ['workspace', 'plan-review', 'project', projectId],
+    enabled: Boolean(missionId && projectId),
+    queryFn: async () =>
+      extractProject(
+        await apiRequest(`/api/workspace/projects/${encodeURIComponent(projectId)}`),
+      ),
+  })
+  const missionTasksQuery = useQuery({
+    queryKey: ['workspace', 'plan-review', 'mission-tasks', missionId],
+    enabled: Boolean(missionId),
+    queryFn: async () => loadMissionTasks(missionId),
+  })
+  const missionPlan = useMemo(() => {
+    if (!missionId || !projectQuery.data) return null
+    const missionContext = getMissionFromProject(projectQuery.data, missionId)
+    if (!missionContext) return null
+
+    return {
+      goal: missionContext.mission.name,
+      phaseId: missionContext.phaseId,
+      phaseName: missionContext.phaseName,
+      projectId: projectQuery.data.id,
+      projectName: projectQuery.data.name,
+      missionId,
+      missionName: missionContext.mission.name,
+      tasks: toTaskDrafts(missionTasksQuery.data ?? missionContext.mission.tasks),
+    } satisfies PlanReviewState
+  }, [missionId, missionTasksQuery.data, projectQuery.data])
+  const resolvedPlan = parsedPlan ?? missionPlan
+  const [tasks, setTasks] = useState<DecomposedTaskDraft[]>(() => resolvedPlan?.tasks ?? [])
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
-    setTasks(parsedPlan?.tasks ?? [])
-  }, [parsedPlan])
+    setTasks(resolvedPlan?.tasks ?? [])
+  }, [resolvedPlan])
 
   useEffect(() => {
     if (!editingTaskId) return
@@ -141,8 +225,10 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
   }, [editingTaskId])
 
   const missionName = useMemo(
-    () => deriveMissionName(parsedPlan?.goal ?? ''),
-    [parsedPlan?.goal],
+    () =>
+      resolvedPlan?.missionName?.trim() ||
+      deriveMissionName(resolvedPlan?.goal ?? ''),
+    [resolvedPlan?.goal, resolvedPlan?.missionName],
   )
   const waves = useMemo(() => calculateExecutionWaves(tasks), [tasks])
   const totalMinutes = useMemo(
@@ -155,7 +241,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
 
   const launchMutation = useMutation({
     mutationFn: async () => {
-      if (!parsedPlan) throw new Error('Plan data is missing')
+      if (!resolvedPlan) throw new Error('Plan data is missing')
       const cleanedTasks = tasks.map((task) => ({
         ...task,
         name: task.name.trim(),
@@ -170,13 +256,51 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
         throw new Error('Task names must stay unique after edits')
       }
 
+      if (resolvedPlan.missionId) {
+        const idByName = new Map(cleanedTasks.map((task) => [task.name, task.id] as const))
+
+        await Promise.all(
+          cleanedTasks.map(async (task, index) => {
+            const dependencyIds = task.depends_on
+              .map((dependency) => idByName.get(dependency))
+              .filter((dependencyId): dependencyId is string => typeof dependencyId === 'string')
+
+            if (dependencyIds.length !== task.depends_on.length) {
+              throw new Error(`Task "${task.name}" has an invalid dependency`)
+            }
+
+            await apiRequest(`/api/workspace-tasks/${encodeURIComponent(task.id)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: task.name,
+                description: task.description,
+                sort_order: index,
+                depends_on: dependencyIds,
+              }),
+            })
+          }),
+        )
+
+        await apiRequest(
+          `/api/workspace/missions/${encodeURIComponent(resolvedPlan.missionId)}/start`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          },
+        )
+
+        return { missionId: resolvedPlan.missionId, projectId: resolvedPlan.projectId ?? null }
+      }
+
       const missionPayload = normalizeMission(
         await apiRequest('/api/workspace/missions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            phase_id: parsedPlan.phaseId,
-            name: missionName || `${parsedPlan.phaseName} Mission`,
+            phase_id: resolvedPlan.phaseId,
+            name: missionName || `${resolvedPlan.phaseName} Mission`,
           }),
         }),
       )
@@ -222,9 +346,24 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
+
+      return {
+        missionId: missionPayload.id,
+        projectId: resolvedPlan.projectId ?? null,
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast('Mission launched', { type: 'success' })
+      if (result?.missionId) {
+        void navigate({
+          to: '/mission-console',
+          search: {
+            missionId: result.missionId,
+            projectId: result.projectId ?? '',
+          },
+        })
+        return
+      }
       void navigate({ to: '/runs' })
     },
     onError: (error) => {
@@ -234,10 +373,36 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
     },
   })
 
-  if (!parsedPlan) {
+  const isMissionLoading = Boolean(missionId) && !parsedPlan && (
+    projectQuery.isLoading ||
+    missionTasksQuery.isLoading
+  )
+
+  const breadcrumbProjectId = (resolvedPlan?.projectId ?? projectId) || undefined
+  const breadcrumbProjectName = resolvedPlan?.projectName ?? projectQuery.data?.name ?? 'Project'
+
+  if (isMissionLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface p-6">
         <div className="w-full max-w-lg rounded-xl border border-primary-200 bg-white p-6 text-center shadow-sm">
+          <h1 className="text-xl font-semibold text-primary-900">Plan Review</h1>
+          <p className="mt-2 text-sm text-primary-500">Loading plan review...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!resolvedPlan) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface p-6">
+        <div className="w-full max-w-lg rounded-xl border border-primary-200 bg-white p-6 text-center shadow-sm">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-primary-500">
+            <Link to="/projects" className="transition-colors hover:text-primary-900">
+              Projects
+            </Link>
+            <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={1.8} />
+            <span>Plan Review</span>
+          </div>
           <h1 className="text-xl font-semibold text-primary-900">Plan Review</h1>
           <p className="mt-2 text-sm text-primary-500">
             This plan link is missing data. Go back to Projects and regenerate the mission
@@ -270,9 +435,25 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 lg:flex-row">
         <section className="min-w-0 flex-1 rounded-xl border border-primary-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="border-b border-primary-200 pb-5">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
-              {parsedPlan.projectName ?? 'Project'} / New Mission
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-primary-500">
+              <Link to="/projects" className="transition-colors hover:text-primary-900">
+                Projects
+              </Link>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={1.8} />
+              {breadcrumbProjectId ? (
+                <Link
+                  to="/projects"
+                  search={{ projectId: breadcrumbProjectId }}
+                  className="transition-colors hover:text-primary-900"
+                >
+                  {breadcrumbProjectName}
+                </Link>
+              ) : (
+                <span>{breadcrumbProjectName}</span>
+              )}
+              <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={1.8} />
+              <span>Plan Review</span>
+            </div>
             <h1 className="mt-2 text-2xl font-semibold text-primary-900 sm:text-[2rem]">
               {missionName}
             </h1>
@@ -528,11 +709,11 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
                   void navigate({
                     to: '/projects',
                     search: {
-                      project: parsedPlan.projectId ?? undefined,
-                      projectId: parsedPlan.projectId ?? undefined,
-                      phaseId: parsedPlan.phaseId,
-                      phaseName: parsedPlan.phaseName,
-                      goal: parsedPlan.goal,
+                      project: resolvedPlan.projectId ?? undefined,
+                      projectId: resolvedPlan.projectId ?? undefined,
+                      phaseId: resolvedPlan.phaseId,
+                      phaseName: resolvedPlan.phaseName,
+                      goal: resolvedPlan.goal,
                     },
                   })
                 }

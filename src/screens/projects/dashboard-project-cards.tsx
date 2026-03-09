@@ -18,16 +18,20 @@ import {
 type DashboardProjectCardsProps = {
   projectOverviews: ProjectOverview[]
   selectedProjectId: string | null
+  planReviewMissionIdsByProjectId: Record<string, string>
   onSelect: (projectId: string) => void
   onResume: (missionId: string) => void
+  onReviewPlan: (missionId: string, projectId: string) => void
   submittingKey: string | null
 }
 
 export function DashboardProjectCards({
   projectOverviews,
   selectedProjectId,
+  planReviewMissionIdsByProjectId,
   onSelect,
   onResume,
+  onReviewPlan,
   submittingKey,
 }: DashboardProjectCardsProps) {
   return (
@@ -35,6 +39,8 @@ export function DashboardProjectCards({
       {projectOverviews.map((overview) => {
         const active = overview.project.id === selectedProjectId
         const tone = getProjectTone(overview.project)
+        const planReviewMissionId =
+          planReviewMissionIdsByProjectId[overview.project.id] ?? null
 
         return (
           <article
@@ -150,6 +156,16 @@ export function DashboardProjectCards({
             </button>
 
             <div className="mt-5 flex flex-wrap gap-2">
+              {planReviewMissionId ? (
+                <Button
+                  variant="outline"
+                  onClick={() => onReviewPlan(planReviewMissionId, overview.project.id)}
+                  className="border-accent-500/30 bg-accent-500/10 text-accent-400 hover:bg-accent-500/15"
+                >
+                  <HugeiconsIcon icon={Task01Icon} size={16} strokeWidth={1.6} />
+                  Review Plan
+                </Button>
+              ) : null}
               {overview.canResume && overview.resumeMissionId ? (
                 <Button
                   onClick={() => onResume(overview.resumeMissionId!)}

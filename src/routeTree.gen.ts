@@ -23,7 +23,9 @@ import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as PlanReviewRouteImport } from './routes/plan-review'
 import { Route as NodesRouteImport } from './routes/nodes'
+import { Route as NewProjectRouteImport } from './routes/new-project'
 import { Route as NewRouteImport } from './routes/new'
+import { Route as MissionConsoleRouteImport } from './routes/mission-console'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as InstancesRouteImport } from './routes/instances'
@@ -142,7 +144,11 @@ import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents
 import { Route as ApiWorkspaceTaskRunsIdStopRouteImport } from './routes/api/workspace/task-runs.$id.stop'
 import { Route as ApiWorkspaceTaskRunsIdPauseRouteImport } from './routes/api/workspace/task-runs.$id.pause'
 import { Route as ApiWorkspaceTaskRunsIdEventsRouteImport } from './routes/api/workspace/task-runs.$id.events'
+import { Route as ApiWorkspaceMissionsIdStopRouteImport } from './routes/api/workspace/missions.$id.stop'
+import { Route as ApiWorkspaceMissionsIdStatusRouteImport } from './routes/api/workspace/missions.$id.status'
 import { Route as ApiWorkspaceMissionsIdStartRouteImport } from './routes/api/workspace/missions.$id.start'
+import { Route as ApiWorkspaceMissionsIdResumeRouteImport } from './routes/api/workspace/missions.$id.resume'
+import { Route as ApiWorkspaceMissionsIdPauseRouteImport } from './routes/api/workspace/missions.$id.pause'
 import { Route as ApiWorkspaceCheckpointsIdVerifyTscRouteImport } from './routes/api/workspace/checkpoints.$id.verify-tsc'
 import { Route as ApiWorkspaceCheckpointsIdReviseRouteImport } from './routes/api/workspace/checkpoints.$id.revise'
 import { Route as ApiWorkspaceCheckpointsIdRejectRouteImport } from './routes/api/workspace/checkpoints.$id.reject'
@@ -223,9 +229,19 @@ const NodesRoute = NodesRouteImport.update({
   path: '/nodes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NewProjectRoute = NewProjectRouteImport.update({
+  id: '/new-project',
+  path: '/new-project',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewRoute = NewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MissionConsoleRoute = MissionConsoleRouteImport.update({
+  id: '/mission-console',
+  path: '/mission-console',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MemoryRoute = MemoryRouteImport.update({
@@ -824,10 +840,34 @@ const ApiWorkspaceTaskRunsIdEventsRoute =
     path: '/$id/events',
     getParentRoute: () => ApiWorkspaceTaskRunsRoute,
   } as any)
+const ApiWorkspaceMissionsIdStopRoute =
+  ApiWorkspaceMissionsIdStopRouteImport.update({
+    id: '/$id/stop',
+    path: '/$id/stop',
+    getParentRoute: () => ApiWorkspaceMissionsRoute,
+  } as any)
+const ApiWorkspaceMissionsIdStatusRoute =
+  ApiWorkspaceMissionsIdStatusRouteImport.update({
+    id: '/$id/status',
+    path: '/$id/status',
+    getParentRoute: () => ApiWorkspaceMissionsRoute,
+  } as any)
 const ApiWorkspaceMissionsIdStartRoute =
   ApiWorkspaceMissionsIdStartRouteImport.update({
     id: '/$id/start',
     path: '/$id/start',
+    getParentRoute: () => ApiWorkspaceMissionsRoute,
+  } as any)
+const ApiWorkspaceMissionsIdResumeRoute =
+  ApiWorkspaceMissionsIdResumeRouteImport.update({
+    id: '/$id/resume',
+    path: '/$id/resume',
+    getParentRoute: () => ApiWorkspaceMissionsRoute,
+  } as any)
+const ApiWorkspaceMissionsIdPauseRoute =
+  ApiWorkspaceMissionsIdPauseRouteImport.update({
+    id: '/$id/pause',
+    path: '/$id/pause',
     getParentRoute: () => ApiWorkspaceMissionsRoute,
   } as any)
 const ApiWorkspaceCheckpointsIdVerifyTscRoute =
@@ -902,7 +942,9 @@ export interface FileRoutesByFullPath {
   '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
+  '/mission-console': typeof MissionConsoleRoute
   '/new': typeof NewRoute
+  '/new-project': typeof NewProjectRoute
   '/nodes': typeof NodesRoute
   '/plan-review': typeof PlanReviewRoute
   '/projects': typeof ProjectsRoute
@@ -1025,7 +1067,11 @@ export interface FileRoutesByFullPath {
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
+  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
+  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
+  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
+  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
   '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
   '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
@@ -1047,7 +1093,9 @@ export interface FileRoutesByTo {
   '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
+  '/mission-console': typeof MissionConsoleRoute
   '/new': typeof NewRoute
+  '/new-project': typeof NewProjectRoute
   '/nodes': typeof NodesRoute
   '/plan-review': typeof PlanReviewRoute
   '/projects': typeof ProjectsRoute
@@ -1169,7 +1217,11 @@ export interface FileRoutesByTo {
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
+  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
+  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
+  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
+  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
   '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
   '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
@@ -1192,7 +1244,9 @@ export interface FileRoutesById {
   '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
+  '/mission-console': typeof MissionConsoleRoute
   '/new': typeof NewRoute
+  '/new-project': typeof NewProjectRoute
   '/nodes': typeof NodesRoute
   '/plan-review': typeof PlanReviewRoute
   '/projects': typeof ProjectsRoute
@@ -1315,7 +1369,11 @@ export interface FileRoutesById {
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
+  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
+  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
+  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
+  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
   '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
   '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
@@ -1339,7 +1397,9 @@ export interface FileRouteTypes {
     | '/instances'
     | '/logs'
     | '/memory'
+    | '/mission-console'
     | '/new'
+    | '/new-project'
     | '/nodes'
     | '/plan-review'
     | '/projects'
@@ -1462,7 +1522,11 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
+    | '/api/workspace/missions/$id/pause'
+    | '/api/workspace/missions/$id/resume'
     | '/api/workspace/missions/$id/start'
+    | '/api/workspace/missions/$id/status'
+    | '/api/workspace/missions/$id/stop'
     | '/api/workspace/task-runs/$id/events'
     | '/api/workspace/task-runs/$id/pause'
     | '/api/workspace/task-runs/$id/stop'
@@ -1484,7 +1548,9 @@ export interface FileRouteTypes {
     | '/instances'
     | '/logs'
     | '/memory'
+    | '/mission-console'
     | '/new'
+    | '/new-project'
     | '/nodes'
     | '/plan-review'
     | '/projects'
@@ -1606,7 +1672,11 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
+    | '/api/workspace/missions/$id/pause'
+    | '/api/workspace/missions/$id/resume'
     | '/api/workspace/missions/$id/start'
+    | '/api/workspace/missions/$id/status'
+    | '/api/workspace/missions/$id/stop'
     | '/api/workspace/task-runs/$id/events'
     | '/api/workspace/task-runs/$id/pause'
     | '/api/workspace/task-runs/$id/stop'
@@ -1628,7 +1698,9 @@ export interface FileRouteTypes {
     | '/instances'
     | '/logs'
     | '/memory'
+    | '/mission-console'
     | '/new'
+    | '/new-project'
     | '/nodes'
     | '/plan-review'
     | '/projects'
@@ -1751,7 +1823,11 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
+    | '/api/workspace/missions/$id/pause'
+    | '/api/workspace/missions/$id/resume'
     | '/api/workspace/missions/$id/start'
+    | '/api/workspace/missions/$id/status'
+    | '/api/workspace/missions/$id/stop'
     | '/api/workspace/task-runs/$id/events'
     | '/api/workspace/task-runs/$id/pause'
     | '/api/workspace/task-runs/$id/stop'
@@ -1774,7 +1850,9 @@ export interface RootRouteChildren {
   InstancesRoute: typeof InstancesRoute
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
+  MissionConsoleRoute: typeof MissionConsoleRoute
   NewRoute: typeof NewRoute
+  NewProjectRoute: typeof NewProjectRoute
   NodesRoute: typeof NodesRoute
   PlanReviewRoute: typeof PlanReviewRoute
   ProjectsRoute: typeof ProjectsRoute
@@ -1962,11 +2040,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NodesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/new-project': {
+      id: '/new-project'
+      path: '/new-project'
+      fullPath: '/new-project'
+      preLoaderRoute: typeof NewProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/new': {
       id: '/new'
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof NewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mission-console': {
+      id: '/mission-console'
+      path: '/mission-console'
+      fullPath: '/mission-console'
+      preLoaderRoute: typeof MissionConsoleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/memory': {
@@ -2795,11 +2887,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceTaskRunsIdEventsRouteImport
       parentRoute: typeof ApiWorkspaceTaskRunsRoute
     }
+    '/api/workspace/missions/$id/stop': {
+      id: '/api/workspace/missions/$id/stop'
+      path: '/$id/stop'
+      fullPath: '/api/workspace/missions/$id/stop'
+      preLoaderRoute: typeof ApiWorkspaceMissionsIdStopRouteImport
+      parentRoute: typeof ApiWorkspaceMissionsRoute
+    }
+    '/api/workspace/missions/$id/status': {
+      id: '/api/workspace/missions/$id/status'
+      path: '/$id/status'
+      fullPath: '/api/workspace/missions/$id/status'
+      preLoaderRoute: typeof ApiWorkspaceMissionsIdStatusRouteImport
+      parentRoute: typeof ApiWorkspaceMissionsRoute
+    }
     '/api/workspace/missions/$id/start': {
       id: '/api/workspace/missions/$id/start'
       path: '/$id/start'
       fullPath: '/api/workspace/missions/$id/start'
       preLoaderRoute: typeof ApiWorkspaceMissionsIdStartRouteImport
+      parentRoute: typeof ApiWorkspaceMissionsRoute
+    }
+    '/api/workspace/missions/$id/resume': {
+      id: '/api/workspace/missions/$id/resume'
+      path: '/$id/resume'
+      fullPath: '/api/workspace/missions/$id/resume'
+      preLoaderRoute: typeof ApiWorkspaceMissionsIdResumeRouteImport
+      parentRoute: typeof ApiWorkspaceMissionsRoute
+    }
+    '/api/workspace/missions/$id/pause': {
+      id: '/api/workspace/missions/$id/pause'
+      path: '/$id/pause'
+      fullPath: '/api/workspace/missions/$id/pause'
+      preLoaderRoute: typeof ApiWorkspaceMissionsIdPauseRouteImport
       parentRoute: typeof ApiWorkspaceMissionsRoute
     }
     '/api/workspace/checkpoints/$id/verify-tsc': {
@@ -3007,11 +3127,19 @@ const ApiWorkspaceCheckpointsRouteWithChildren =
   )
 
 interface ApiWorkspaceMissionsRouteChildren {
+  ApiWorkspaceMissionsIdPauseRoute: typeof ApiWorkspaceMissionsIdPauseRoute
+  ApiWorkspaceMissionsIdResumeRoute: typeof ApiWorkspaceMissionsIdResumeRoute
   ApiWorkspaceMissionsIdStartRoute: typeof ApiWorkspaceMissionsIdStartRoute
+  ApiWorkspaceMissionsIdStatusRoute: typeof ApiWorkspaceMissionsIdStatusRoute
+  ApiWorkspaceMissionsIdStopRoute: typeof ApiWorkspaceMissionsIdStopRoute
 }
 
 const ApiWorkspaceMissionsRouteChildren: ApiWorkspaceMissionsRouteChildren = {
+  ApiWorkspaceMissionsIdPauseRoute: ApiWorkspaceMissionsIdPauseRoute,
+  ApiWorkspaceMissionsIdResumeRoute: ApiWorkspaceMissionsIdResumeRoute,
   ApiWorkspaceMissionsIdStartRoute: ApiWorkspaceMissionsIdStartRoute,
+  ApiWorkspaceMissionsIdStatusRoute: ApiWorkspaceMissionsIdStatusRoute,
+  ApiWorkspaceMissionsIdStopRoute: ApiWorkspaceMissionsIdStopRoute,
 }
 
 const ApiWorkspaceMissionsRouteWithChildren =
@@ -3101,7 +3229,9 @@ const rootRouteChildren: RootRouteChildren = {
   InstancesRoute: InstancesRoute,
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
+  MissionConsoleRoute: MissionConsoleRoute,
   NewRoute: NewRoute,
+  NewProjectRoute: NewProjectRoute,
   NodesRoute: NodesRoute,
   PlanReviewRoute: PlanReviewRoute,
   ProjectsRoute: ProjectsRoute,
