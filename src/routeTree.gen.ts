@@ -19,6 +19,7 @@ import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as RunsRouteImport } from './routes/runs'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as PlanReviewRouteImport } from './routes/plan-review'
 import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -97,6 +98,7 @@ import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/st
 import { Route as ApiWorkspaceProjectsRouteImport } from './routes/api/workspace/projects'
 import { Route as ApiWorkspacePhasesRouteImport } from './routes/api/workspace/phases'
 import { Route as ApiWorkspaceMissionsRouteImport } from './routes/api/workspace/missions'
+import { Route as ApiWorkspaceMemoryFilesRouteImport } from './routes/api/workspace/memory-files'
 import { Route as ApiWorkspaceEventsRouteImport } from './routes/api/workspace/events'
 import { Route as ApiWorkspaceDecomposeRouteImport } from './routes/api/workspace/decompose'
 import { Route as ApiWorkspaceCheckpointsRouteImport } from './routes/api/workspace/checkpoints'
@@ -196,6 +198,11 @@ const ReviewRoute = ReviewRouteImport.update({
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanReviewRoute = PlanReviewRouteImport.update({
+  id: '/plan-review',
+  path: '/plan-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NodesRoute = NodesRouteImport.update({
@@ -588,6 +595,11 @@ const ApiWorkspaceMissionsRoute = ApiWorkspaceMissionsRouteImport.update({
   path: '/missions',
   getParentRoute: () => ApiWorkspaceRoute,
 } as any)
+const ApiWorkspaceMemoryFilesRoute = ApiWorkspaceMemoryFilesRouteImport.update({
+  id: '/memory-files',
+  path: '/memory-files',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
 const ApiWorkspaceEventsRoute = ApiWorkspaceEventsRouteImport.update({
   id: '/events',
   path: '/events',
@@ -873,6 +885,7 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
+  '/plan-review': typeof PlanReviewRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
   '/runs': typeof RunsRoute
@@ -969,6 +982,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
+  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
@@ -1013,6 +1027,7 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
+  '/plan-review': typeof PlanReviewRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
   '/runs': typeof RunsRoute
@@ -1108,6 +1123,7 @@ export interface FileRoutesByTo {
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
+  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
@@ -1153,6 +1169,7 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
+  '/plan-review': typeof PlanReviewRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
   '/runs': typeof RunsRoute
@@ -1249,6 +1266,7 @@ export interface FileRoutesById {
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
+  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
@@ -1295,6 +1313,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
+    | '/plan-review'
     | '/projects'
     | '/review'
     | '/runs'
@@ -1391,6 +1410,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints'
     | '/api/workspace/decompose'
     | '/api/workspace/events'
+    | '/api/workspace/memory-files'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
@@ -1435,6 +1455,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
+    | '/plan-review'
     | '/projects'
     | '/review'
     | '/runs'
@@ -1530,6 +1551,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints'
     | '/api/workspace/decompose'
     | '/api/workspace/events'
+    | '/api/workspace/memory-files'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
@@ -1574,6 +1596,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
+    | '/plan-review'
     | '/projects'
     | '/review'
     | '/runs'
@@ -1670,6 +1693,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints'
     | '/api/workspace/decompose'
     | '/api/workspace/events'
+    | '/api/workspace/memory-files'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
@@ -1715,6 +1739,7 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
   NodesRoute: typeof NodesRoute
+  PlanReviewRoute: typeof PlanReviewRoute
   ProjectsRoute: typeof ProjectsRoute
   ReviewRoute: typeof ReviewRoute
   RunsRoute: typeof RunsRoute
@@ -1868,6 +1893,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plan-review': {
+      id: '/plan-review'
+      path: '/plan-review'
+      fullPath: '/plan-review'
+      preLoaderRoute: typeof PlanReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nodes': {
@@ -2416,6 +2448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceMissionsRouteImport
       parentRoute: typeof ApiWorkspaceRoute
     }
+    '/api/workspace/memory-files': {
+      id: '/api/workspace/memory-files'
+      path: '/memory-files'
+      fullPath: '/api/workspace/memory-files'
+      preLoaderRoute: typeof ApiWorkspaceMemoryFilesRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
     '/api/workspace/events': {
       id: '/api/workspace/events'
       path: '/events'
@@ -2947,6 +2986,7 @@ interface ApiWorkspaceRouteChildren {
   ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
   ApiWorkspaceDecomposeRoute: typeof ApiWorkspaceDecomposeRoute
   ApiWorkspaceEventsRoute: typeof ApiWorkspaceEventsRoute
+  ApiWorkspaceMemoryFilesRoute: typeof ApiWorkspaceMemoryFilesRoute
   ApiWorkspaceMissionsRoute: typeof ApiWorkspaceMissionsRouteWithChildren
   ApiWorkspacePhasesRoute: typeof ApiWorkspacePhasesRoute
   ApiWorkspaceProjectsRoute: typeof ApiWorkspaceProjectsRouteWithChildren
@@ -2959,6 +2999,7 @@ const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspaceCheckpointsRoute: ApiWorkspaceCheckpointsRouteWithChildren,
   ApiWorkspaceDecomposeRoute: ApiWorkspaceDecomposeRoute,
   ApiWorkspaceEventsRoute: ApiWorkspaceEventsRoute,
+  ApiWorkspaceMemoryFilesRoute: ApiWorkspaceMemoryFilesRoute,
   ApiWorkspaceMissionsRoute: ApiWorkspaceMissionsRouteWithChildren,
   ApiWorkspacePhasesRoute: ApiWorkspacePhasesRoute,
   ApiWorkspaceProjectsRoute: ApiWorkspaceProjectsRouteWithChildren,
@@ -3000,6 +3041,7 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
   NodesRoute: NodesRoute,
+  PlanReviewRoute: PlanReviewRoute,
   ProjectsRoute: ProjectsRoute,
   ReviewRoute: ReviewRoute,
   RunsRoute: RunsRoute,

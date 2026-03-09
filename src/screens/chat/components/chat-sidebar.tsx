@@ -796,6 +796,14 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/skills',
+      icon: PuzzleIcon,
+      label: 'Skills & Memory',
+      active: isSkillsActive,
+      dataTour: 'skills',
+    },
+    {
+      kind: 'link',
       to: '/projects',
       icon: Folder01Icon,
       label: 'Projects',
@@ -829,14 +837,6 @@ function ChatSidebarComponent({
       icon: Task01Icon,
       label: 'Tasks',
       active: isTasksActive,
-    },
-    {
-      kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: 'Skills',
-      active: isSkillsActive,
-      dataTour: 'skills',
     },
     {
       kind: 'link',
