@@ -903,10 +903,10 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/skills',
+      to: '/workspace-skills',
       icon: PuzzleIcon,
       label: 'Skills & Memory',
-      active: isSkillsActive,
+      active: pathname === '/workspace-skills',
     },
   ]
 

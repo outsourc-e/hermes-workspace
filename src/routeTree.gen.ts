@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkspaceSkillsRouteImport } from './routes/workspace-skills'
 import { Route as WizardRouteImport } from './routes/wizard'
 import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
@@ -150,6 +151,11 @@ import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from '.
 import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
+const WorkspaceSkillsRoute = WorkspaceSkillsRouteImport.update({
+  id: '/workspace-skills',
+  path: '/workspace-skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WizardRoute = WizardRouteImport.update({
   id: '/wizard',
   path: '/wizard',
@@ -896,6 +902,7 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
+  '/workspace-skills': typeof WorkspaceSkillsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1037,6 +1044,7 @@ export interface FileRoutesByTo {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
+  '/workspace-skills': typeof WorkspaceSkillsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1180,6 +1188,7 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
+  '/workspace-skills': typeof WorkspaceSkillsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1324,6 +1333,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
+    | '/workspace-skills'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1465,6 +1475,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
+    | '/workspace-skills'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1607,6 +1618,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
+    | '/workspace-skills'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1750,6 +1762,7 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   UsageRoute: typeof UsageRoute
   WizardRoute: typeof WizardRoute
+  WorkspaceSkillsRoute: typeof WorkspaceSkillsRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
@@ -1825,6 +1838,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workspace-skills': {
+      id: '/workspace-skills'
+      path: '/workspace-skills'
+      fullPath: '/workspace-skills'
+      preLoaderRoute: typeof WorkspaceSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/wizard': {
       id: '/wizard'
       path: '/wizard'
@@ -3052,6 +3072,7 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   UsageRoute: UsageRoute,
   WizardRoute: WizardRoute,
+  WorkspaceSkillsRoute: WorkspaceSkillsRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,
