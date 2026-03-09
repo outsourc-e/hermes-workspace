@@ -59,6 +59,7 @@ type ProjectsScreenProps = {
     goal?: string
     phaseId?: string
     phaseName?: string
+    project?: string
     projectId?: string
   }
 }
@@ -568,10 +569,11 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   }
 
   useEffect(() => {
-    if (replanSearch?.projectId && replanSearch.projectId !== selectedProjectId) {
-      setSelectedProjectId(replanSearch.projectId)
+    const requestedProjectId = replanSearch?.project ?? replanSearch?.projectId
+    if (requestedProjectId && requestedProjectId !== selectedProjectId) {
+      setSelectedProjectId(requestedProjectId)
     }
-  }, [replanSearch?.projectId, selectedProjectId])
+  }, [replanSearch?.project, replanSearch?.projectId, selectedProjectId])
 
   useEffect(() => {
     if (!replanSearch?.phaseId || !replanSearch.goal || !projectDetail) return
@@ -597,6 +599,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       to: '/projects',
       replace: true,
       search: {
+        project: undefined,
         goal: undefined,
         phaseId: undefined,
         phaseName: undefined,

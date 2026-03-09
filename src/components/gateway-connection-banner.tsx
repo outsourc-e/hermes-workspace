@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Link } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   Alert02Icon,
   Cancel01Icon,
-  LinkSquare02Icon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -19,8 +17,11 @@ import {
 import { getConnectionErrorInfo } from '@/lib/connection-errors'
 import { cn } from '@/lib/utils'
 
-const HEALTH_CHECK_INTERVAL_MS = 5_000
+const HEALTH_CHECK_INTERVAL_MS = 15_000
 const HEALTH_CHECK_DELAY_MS = 1_000
+const REQUIRED_FAILURES = 4
+const DISMISS_STORAGE_KEY = 'clawsuite-gateway-banner-dismissed-until'
+const DISMISS_TTL_MS = 60 * 60 * 1000
 
 type GatewayConnectionSetupFormProps = {
   variant?: 'banner' | 'card'
@@ -161,6 +162,7 @@ export function GatewayConnectionBanner() {
 
   const [healthState, setHealthState] = useState<'unknown' | 'healthy' | 'unhealthy'>('unknown')
   const [dismissed, setDismissed] = useState(false)
+  const consecutiveFailuresRef = useRef(0)
   const wasUnhealthyRef = useRef(false)
   const errorInfo = getConnectionErrorInfo(testError)
   const isReconnecting = setupConfigured && (saving || testStatus === 'testing')
@@ -170,6 +172,23 @@ export function GatewayConnectionBanner() {
   }, [initialize])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const dismissedUntil = Number(localStorage.getItem(DISMISS_STORAGE_KEY) ?? '0')
+      if (dismissedUntil > Date.now()) {
+        setDismissed(true)
+        return
+      }
+      localStorage.removeItem(DISMISS_STORAGE_KEY)
+    } catch {
+      localStorage.removeItem(DISMISS_STORAGE_KEY)
+    }
+
+    setDismissed(false)
+  }, [])
+
+  useEffect(() => {
     let mounted = true
 
     async function checkHealth() {
@@ -177,17 +196,24 @@ export function GatewayConnectionBanner() {
       if (!mounted) return
 
       if (ok) {
+        consecutiveFailuresRef.current = 0
         setHealthState('healthy')
         if (wasUnhealthyRef.current && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('gateway:health-restored'))
         }
         wasUnhealthyRef.current = false
         setDismissed(false)
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(DISMISS_STORAGE_KEY)
+        }
         return
       }
 
-      wasUnhealthyRef.current = true
-      setHealthState('unhealthy')
+      consecutiveFailuresRef.current += 1
+      if (consecutiveFailuresRef.current >= REQUIRED_FAILURES) {
+        wasUnhealthyRef.current = true
+        setHealthState('unhealthy')
+      }
     }
 
     const initialTimer = window.setTimeout(() => {
@@ -209,107 +235,74 @@ export function GatewayConnectionBanner() {
     await saveAndTest()
   }
 
-  const showBanner = healthState === 'unhealthy' && !dismissed
+  function handleDismiss() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        DISMISS_STORAGE_KEY,
+        String(Date.now() + DISMISS_TTL_MS),
+      )
+    }
+    setDismissed(true)
+  }
+
+  const showBanner = setupConfigured && healthState === 'unhealthy' && !dismissed
 
   return (
     <AnimatePresence initial={false}>
       {showBanner ? (
         <motion.div
           key="gateway-connection-banner"
-          initial={{ opacity: 0, y: -18 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -18 }}
+          exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="mx-auto mb-3 w-full max-w-[1600px] px-3 pt-3 sm:px-4 md:mb-4 md:px-6 md:pt-4"
+          className="fixed bottom-4 right-4 z-40 w-[calc(100vw-2rem)] max-w-72"
         >
-          {setupConfigured ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-100/85 px-3 py-3 text-primary-900 shadow-sm">
-              <div className="flex items-start gap-3">
-                <img
-                  src="/logo-icon.png"
-                  alt="ClawSuite logo"
-                  width={24}
-                  height={24}
-                  className="mt-0.5 size-6 shrink-0 rounded-lg"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-primary-950">
-                      {isReconnecting ? 'Reconnecting...' : 'Gateway disconnected'}
-                    </p>
-                    {isReconnecting ? (
-                      <HugeiconsIcon
-                        icon={RefreshIcon}
-                        size={16}
-                        strokeWidth={1.6}
-                        className="animate-spin text-amber-700"
-                      />
-                    ) : (
-                      <HugeiconsIcon
-                        icon={Alert02Icon}
-                        size={16}
-                        strokeWidth={1.8}
-                        className="text-amber-700"
-                      />
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-primary-700">
-                    {isReconnecting
-                      ? 'Trying the saved gateway connection again.'
-                      : 'Only chat and agent features need the gateway. The rest of ClawSuite stays available offline.'}
-                  </p>
-                  {!isReconnecting && testStatus === 'error' && testError ? (
-                    <p className="mt-1 text-xs text-red-700">
-                      {errorInfo.title}. {errorInfo.description}
-                    </p>
-                  ) : null}
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void handleReconnect()}
-                      disabled={isReconnecting}
-                      className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-200"
-                    >
-                      <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.6} />
-                      Reconnect
-                    </Button>
-                    <Link
-                      to="/settings"
-                      className="inline-flex items-center gap-1 text-xs font-medium text-amber-900 underline decoration-amber-400 underline-offset-4 transition-colors hover:text-primary-950"
-                    >
-                      <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={1.8} />
-                      Configure
-                    </Link>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDismissed(true)}
-                  className="rounded-lg p-1 text-amber-800 transition-colors hover:bg-amber-200"
-                  aria-label="Dismiss gateway connection banner"
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.8} />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="relative">
-              <GatewayConnectionSetupForm
-                variant="banner"
-                className="pr-11"
-                onSuccess={() => setDismissed(false)}
+          <div className="rounded-xl border border-amber-300 bg-amber-100/95 px-3 py-2.5 text-primary-900 shadow-lg">
+            <div className="flex items-start gap-2">
+              <HugeiconsIcon
+                icon={isReconnecting ? RefreshIcon : Alert02Icon}
+                size={18}
+                strokeWidth={1.7}
+                className={cn(
+                  'mt-0.5 shrink-0 text-amber-700',
+                  isReconnecting ? 'animate-spin' : '',
+                )}
               />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-amber-950">
+                  {isReconnecting
+                    ? 'Gateway reconnecting...'
+                    : '⚠ Gateway offline · Chat unavailable'}
+                </p>
+                {!isReconnecting && testStatus === 'error' && testError ? (
+                  <p className="mt-1 text-[11px] text-amber-800">
+                    {errorInfo.title}. {errorInfo.description}
+                  </p>
+                ) : null}
+                <div className="mt-2 flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleReconnect()}
+                    disabled={isReconnecting}
+                    className="h-7 border-amber-300 bg-amber-50 px-2 text-xs text-amber-900 hover:bg-amber-200"
+                  >
+                    <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
+                    Reconnect
+                  </Button>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setDismissed(true)}
-                className="absolute right-3 top-3 rounded-lg p-1 text-amber-800 transition-colors hover:bg-amber-200"
+                onClick={handleDismiss}
+                className="rounded-md p-1 text-amber-800 transition-colors hover:bg-amber-200"
                 aria-label="Dismiss gateway connection banner"
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.8} />
+                <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.8} />
               </button>
             </div>
-          )}
+          </div>
         </motion.div>
       ) : null}
     </AnimatePresence>

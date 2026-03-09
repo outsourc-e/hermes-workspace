@@ -249,6 +249,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
               void navigate({
                 to: '/projects',
                 search: {
+                  project: undefined,
                   goal: undefined,
                   phaseId: undefined,
                   phaseName: undefined,
@@ -527,6 +528,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
                   void navigate({
                     to: '/projects',
                     search: {
+                      project: parsedPlan.projectId ?? undefined,
                       projectId: parsedPlan.projectId ?? undefined,
                       phaseId: parsedPlan.phaseId,
                       phaseName: parsedPlan.phaseName,
