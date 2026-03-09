@@ -10,6 +10,7 @@ import {
   mergeWorktreeToMain,
 } from "../git-ops";
 import { Tracker } from "../tracker";
+import { runVerification, type VerificationResult } from "../verification";
 
 const execFileAsync = promisify(execFile);
 
@@ -20,6 +21,8 @@ type ParsedDiffStat = {
 };
 
 type VerificationStatus = "passed" | "failed" | "missing" | "not_configured";
+
+type StoredCheckpointVerification = VerificationResult;
 
 async function runCommand(
   command: string,
@@ -74,6 +77,30 @@ function parseRunEventData(value: string | null): Record<string, unknown> | null
     return JSON.parse(value) as Record<string, unknown>;
   } catch {
     return { message: value };
+  }
+}
+
+function parseStoredVerification(value: string | null): StoredCheckpointVerification | null {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<StoredCheckpointVerification>;
+    if (
+      typeof parsed.passed !== "boolean" ||
+      typeof parsed.output !== "string" ||
+      typeof parsed.durationMs !== "number" ||
+      !Number.isFinite(parsed.durationMs)
+    ) {
+      return null;
+    }
+
+    return {
+      passed: parsed.passed,
+      output: parsed.output,
+      durationMs: parsed.durationMs,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -168,16 +195,18 @@ async function buildCheckpointDetail(tracker: Tracker, checkpointId: string) {
     data: parseRunEventData(event.data),
   }));
 
+  const storedVerification = parseStoredVerification(checkpoint.verification);
+
   return {
     checkpoint,
     parsed_diff_stat: parsedDiffStat,
     file_diffs: fileDiffs,
     verification: {
       tsc: {
-        status: "missing" satisfies VerificationStatus,
-        label: "Not run yet",
-        output: null,
-        checked_at: null,
+        status: (storedVerification ? (storedVerification.passed ? "passed" : "failed") : "missing") satisfies VerificationStatus,
+        label: storedVerification ? (storedVerification.passed ? "Passed" : "Failed") : "Not run yet",
+        output: storedVerification?.output ?? null,
+        checked_at: storedVerification ? checkpoint.created_at : null,
       },
       tests: {
         status: "not_configured" satisfies VerificationStatus,
@@ -227,34 +256,14 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
       return;
     }
 
-    try {
-      const { stdout, stderr } = await runCommand("npx", ["tsc", "--noEmit"], cwd, 120_000);
-      res.json({
-        check: "tsc",
-        status: "passed",
-        label: "Passed",
-        output: [stdout, stderr].filter(Boolean).join("\n").trim() || "TypeScript passed with 0 errors.",
-        checked_at: new Date().toISOString(),
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error && "stderr" in error && typeof error.stderr === "string"
-          ? error.stderr
-          : error instanceof Error
-            ? error.message
-            : "TypeScript check failed";
-      const stdout =
-        error && typeof error === "object" && "stdout" in error && typeof error.stdout === "string"
-          ? error.stdout
-          : "";
-      res.json({
-        check: "tsc",
-        status: "failed",
-        label: "Failed",
-        output: [stdout, message].filter(Boolean).join("\n").trim(),
-        checked_at: new Date().toISOString(),
-      });
-    }
+    const result = await runVerification(cwd);
+    res.json({
+      check: "tsc",
+      status: result.passed ? "passed" : "failed",
+      label: result.passed ? "Passed" : "Failed",
+      output: result.output,
+      checked_at: new Date().toISOString(),
+    });
   });
 
   router.post("/:id/approve", (req, res) => {

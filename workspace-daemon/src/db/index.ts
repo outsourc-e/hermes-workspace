@@ -22,6 +22,11 @@ function ensureCheckpointCommitHashColumn(db: Database.Database): void {
   if (!hasCommitHash) {
     db.exec("ALTER TABLE checkpoints ADD COLUMN commit_hash TEXT");
   }
+
+  const hasVerification = columns.some((column) => column.name === "verification");
+  if (!hasVerification) {
+    db.exec("ALTER TABLE checkpoints ADD COLUMN verification TEXT");
+  }
 }
 
 export function getDatabase(dbPath = process.env.WORKSPACE_DAEMON_DB_PATH ?? DEFAULT_DB_PATH): Database.Database {

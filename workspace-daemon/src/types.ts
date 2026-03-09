@@ -148,6 +148,7 @@ export interface Checkpoint {
   task_run_id: string;
   summary: string | null;
   diff_stat: string | null;
+  verification: string | null;
   status: CheckpointStatus;
   reviewer_notes: string | null;
   commit_hash: string | null;

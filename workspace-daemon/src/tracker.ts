@@ -789,18 +789,20 @@ export class Tracker extends EventEmitter {
     summary: string | null,
     diffStat: string | null,
     commitHash?: string | null,
+    verification?: string | null,
   ): Checkpoint {
     const checkpoint = this.db
       .prepare(
-        "INSERT INTO checkpoints (task_run_id, summary, diff_stat, commit_hash) VALUES (?, ?, ?, ?) RETURNING *",
+        "INSERT INTO checkpoints (task_run_id, summary, diff_stat, commit_hash, verification) VALUES (?, ?, ?, ?, ?) RETURNING *",
       )
-      .get(taskRunId, summary, diffStat, commitHash ?? null) as Checkpoint;
+      .get(taskRunId, summary, diffStat, commitHash ?? null, verification ?? null) as Checkpoint;
     this.logActivity("checkpoint.created", "checkpoint", checkpoint.id, null, {
       checkpoint_id: checkpoint.id,
       task_run_id: taskRunId,
       summary,
       diff_stat: diffStat,
       commit_hash: commitHash ?? null,
+      verification: verification ?? null,
       ...this.getCheckpointProjectContext(checkpoint.id),
     });
     this.emitSse("checkpoint.created", checkpoint);
@@ -809,6 +811,16 @@ export class Tracker extends EventEmitter {
 
   getCheckpoint(id: string): Checkpoint | null {
     return (this.db.prepare("SELECT * FROM checkpoints WHERE id = ?").get(id) as Checkpoint | undefined) ?? null;
+  }
+
+  updateCheckpointVerification(id: string, verification: string | null): Checkpoint | null {
+    this.db.prepare("UPDATE checkpoints SET verification = ? WHERE id = ?").run(verification, id);
+    const checkpoint =
+      (this.db.prepare("SELECT * FROM checkpoints WHERE id = ?").get(id) as Checkpoint | undefined) ?? null;
+    if (checkpoint) {
+      this.emitSse("checkpoint.updated", checkpoint);
+    }
+    return checkpoint;
   }
 
   getCheckpointDetail(id: string): (Checkpoint & {
