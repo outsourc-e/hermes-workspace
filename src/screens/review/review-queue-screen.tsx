@@ -86,11 +86,11 @@ function ReviewQueueSkeleton() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="rounded-2xl border border-primary-800 bg-primary-900/70 p-4"
+          className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm"
         >
-          <div className="animate-shimmer rounded-lg bg-primary-800/80 h-4 w-40" />
-          <div className="mt-3 animate-shimmer rounded-lg bg-primary-800/70 h-5 w-2/3" />
-          <div className="mt-2 animate-shimmer rounded-lg bg-primary-800/60 h-4 w-full" />
+          <div className="animate-shimmer rounded-lg bg-primary-200/80 h-4 w-40" />
+          <div className="mt-3 animate-shimmer rounded-lg bg-primary-200/70 h-5 w-2/3" />
+          <div className="mt-2 animate-shimmer rounded-lg bg-primary-200/60 h-4 w-full" />
           <div className="mt-4 grid gap-2 md:grid-cols-3">
             <div className="animate-shimmer rounded-lg bg-primary-800/60 h-10" />
             <div className="animate-shimmer rounded-lg bg-primary-800/60 h-10" />
@@ -138,11 +138,11 @@ function ReviewRow({
   const parsedDiff = getCheckpointDiffStatParsed(checkpoint)
 
   return (
-    <article className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4 md:p-5">
+    <article className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-primary-700 bg-primary-800/70 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-300">
+            <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-600">
               Run {checkpoint.task_run_id}
             </span>
             <span
@@ -156,13 +156,13 @@ function ReviewRow({
           </div>
 
           <div>
-            <p className="mt-1 text-sm font-medium text-primary-200">
+            <p className="mt-1 text-sm font-medium text-primary-800">
               {checkpoint.project_name || 'Unassigned project'}
               {checkpoint.task_name ? ` · ${checkpoint.task_name}` : ''}
               {checkpoint.agent_name ? ` · ${checkpoint.agent_name}` : ''}
             </p>
             <div className="mt-2">
-              <p className="whitespace-pre-wrap text-sm text-primary-300 leading-relaxed">
+              <p className="whitespace-pre-wrap text-sm text-primary-600 leading-relaxed">
                 {expanded ? fullSummary : truncatedSummary}
               </p>
               {isTruncated && (
@@ -177,18 +177,18 @@ function ReviewRow({
             </div>
           </div>
 
-          <div className="grid gap-3 text-sm text-primary-300 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-xl border border-primary-800 bg-primary-800/40 px-3 py-2.5">
+          <div className="grid gap-3 text-sm text-primary-600 md:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                 Diff Stat
               </p>
-              <p className="mt-1 text-sm font-medium text-primary-200">
+              <p className="mt-1 text-sm font-medium text-primary-800">
                 {getCheckpointDiffStat(checkpoint)}
               </p>
               {parsedDiff && parsedDiff.changedFiles.length > 0 && (
                 <div className="mt-2 space-y-0.5">
                   {parsedDiff.changedFiles.slice(0, 5).map((file) => (
-                    <p key={file} className="truncate text-xs text-primary-400 font-mono">
+                    <p key={file} className="truncate font-mono text-xs text-primary-500">
                       {file}
                     </p>
                   ))}
@@ -200,21 +200,21 @@ function ReviewRow({
                 </div>
               )}
             </div>
-            <div className="rounded-xl border border-primary-800 bg-primary-800/40 px-3 py-2.5">
+            <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                 Commit
               </p>
               <div className="mt-1">
                 {commitHashLabel ? (
-                  <code className="inline-flex items-center rounded-md border border-primary-700 bg-primary-900/80 px-2 py-1 font-mono text-xs text-primary-200 tabular-nums">
+                  <code className="inline-flex items-center rounded-md border border-primary-200 bg-white px-2 py-1 font-mono text-xs text-primary-700 tabular-nums">
                     {commitHashLabel}
                   </code>
                 ) : (
-                  <p className="text-sm text-primary-400">pending</p>
+                  <p className="text-sm text-primary-500">pending</p>
                 )}
               </div>
             </div>
-            <div className="rounded-xl border border-primary-800 bg-primary-800/40 px-3 py-2.5">
+            <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                 Created
               </p>
@@ -447,11 +447,11 @@ export function ReviewQueueScreen() {
   }
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-100 md:px-6 md:pt-8">
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto w-full max-w-[1400px]">
-        <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-primary-800 bg-primary-900/85 px-4 py-4 shadow-sm md:flex-row md:items-center md:justify-between md:px-5">
+        <header className="mb-6 flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-4 shadow-sm md:flex-row md:items-center md:justify-between md:px-5">
           <div className="flex items-start gap-3">
-            <div className="flex size-11 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
+            <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
               <HugeiconsIcon
                 icon={CheckmarkCircle02Icon}
                 size={22}
@@ -459,17 +459,17 @@ export function ReviewQueueScreen() {
               />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-primary-100 md:text-xl">
+              <h1 className="text-base font-semibold text-primary-900 md:text-lg">
                 Review Queue
               </h1>
-              <p className="text-sm text-primary-400">
+              <p className="text-sm text-primary-500">
                 Triage workspace checkpoints and move execution forward.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-primary-700 bg-primary-800/70 px-3 py-2 text-xs font-medium text-primary-300">
+            <span className="rounded-full border border-primary-200 bg-white px-3 py-2 text-xs font-medium text-primary-600">
               {pendingCount} pending
             </span>
             <Button
@@ -493,8 +493,8 @@ export function ReviewQueueScreen() {
                 className={cn(
                   'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
                   active
-                    ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
-                    : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
+                    ? 'border-accent-500/40 bg-accent-500/10 text-accent-400'
+                    : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50',
                 )}
               >
                 {filter.label}
@@ -510,8 +510,8 @@ export function ReviewQueueScreen() {
             className={cn(
               'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
               projectFilter === 'all'
-                ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
-                : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
+                ? 'border-accent-500/40 bg-accent-500/10 text-accent-400'
+                : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50',
             )}
           >
             All projects
@@ -524,8 +524,8 @@ export function ReviewQueueScreen() {
               className={cn(
                 'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
                 projectFilter === projectName
-                  ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
-                  : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
+                  ? 'border-accent-500/40 bg-accent-500/10 text-accent-400'
+                  : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50',
               )}
             >
               {projectName}
@@ -536,18 +536,18 @@ export function ReviewQueueScreen() {
         {checkpointsQuery.isLoading ? (
           <ReviewQueueSkeleton />
         ) : visibleCheckpoints.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-3xl border border-primary-700 bg-primary-800/80 text-primary-300">
+          <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
               <HugeiconsIcon
                 icon={CheckmarkCircle02Icon}
                 size={26}
                 strokeWidth={1.5}
               />
             </div>
-            <h2 className="text-lg font-semibold text-primary-100">
+            <h2 className="text-lg font-semibold text-primary-900">
               No checkpoints found
             </h2>
-            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
+            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
               There are no checkpoints for the current status and project filters.
             </p>
           </div>

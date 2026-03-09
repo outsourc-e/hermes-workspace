@@ -62,13 +62,13 @@ export function DashboardReviewInbox({
   onReview,
 }: DashboardReviewInboxProps) {
   return (
-    <section className="rounded-3xl border border-primary-800 bg-primary-900/78 p-5 shadow-sm">
+    <section className="rounded-xl border border-primary-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-primary-100">
+          <h2 className="text-base font-semibold text-primary-900">
             Review Inbox ({checkpoints.length})
           </h2>
-          <p className="text-sm text-primary-400">
+          <p className="text-sm text-primary-500">
             Pending checkpoint handoffs with fast verification and approval actions.
           </p>
         </div>
@@ -106,7 +106,7 @@ export function DashboardReviewInbox({
             {projectName}
           </button>
         ))}
-        <div className="mx-1 hidden h-7 w-px bg-primary-800 md:block" />
+        <div className="mx-1 hidden h-7 w-px bg-primary-200 md:block" />
         {([
           ['all', 'All checks'],
           ['verified', 'Verified'],
@@ -141,10 +141,10 @@ export function DashboardReviewInbox({
           Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
-              className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4"
+              className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
             >
-              <div className="h-4 w-40 animate-shimmer rounded bg-primary-800/80" />
-              <div className="mt-3 h-5 w-3/4 animate-shimmer rounded bg-primary-800/70" />
+              <div className="h-4 w-40 animate-shimmer rounded bg-primary-200/80" />
+              <div className="mt-3 h-5 w-3/4 animate-shimmer rounded bg-primary-200/70" />
             </div>
           ))
         ) : checkpoints.length > 0 ? (
@@ -162,7 +162,7 @@ export function DashboardReviewInbox({
             return (
               <article
                 key={checkpoint.id}
-                className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4"
+                className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
                   <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -175,10 +175,10 @@ export function DashboardReviewInbox({
                       {projectName}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-primary-100">
+                      <p className="truncate text-sm font-semibold text-primary-900">
                         {checkpoint.task_name ?? getCheckpointSummary(checkpoint, 88)}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-sm text-primary-400">
+                      <p className="mt-1 line-clamp-2 text-sm text-primary-500">
                         {getCheckpointFullSummary(checkpoint)}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -229,8 +229,8 @@ export function DashboardReviewInbox({
             )
           })
         ) : (
-          <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-800/25 px-6 py-12 text-center">
-            <p className="text-sm text-primary-300">
+          <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/60 px-6 py-12 text-center">
+            <p className="text-sm text-primary-500">
               No pending checkpoints match the current inbox filters.
             </p>
           </div>

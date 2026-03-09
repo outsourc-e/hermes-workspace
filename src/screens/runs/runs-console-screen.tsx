@@ -102,7 +102,7 @@ function RunLog({
     <div
       ref={containerRef}
       className={[
-        'overflow-y-auto rounded-2xl border border-primary-800 bg-primary-950/90 font-mono text-xs',
+        'overflow-y-auto rounded-xl border border-primary-200 bg-white font-mono text-xs',
         compact ? 'max-h-56 p-3' : 'max-h-80 p-4',
       ].join(' ')}
     >
@@ -110,7 +110,7 @@ function RunLog({
         <div className="space-y-2">
           {events.map((event) => (
             <div key={event.id} className="grid grid-cols-[72px_1fr] gap-3">
-              <span className="text-primary-400">
+              <span className="text-primary-500">
                 {new Date(event.created_at).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -122,7 +122,7 @@ function RunLog({
           ))}
         </div>
       ) : (
-        <p className="text-primary-400">No run output yet.</p>
+        <p className="text-primary-500">No run output yet.</p>
       )}
     </div>
   )
@@ -140,14 +140,14 @@ function FilterSelect({
   options: Array<{ label: string; value: string }>
 }) {
   return (
-    <label className="flex min-w-[160px] flex-1 flex-col gap-2 text-xs text-primary-300">
-      <span className="font-medium uppercase tracking-[0.18em] text-primary-400">
+    <label className="flex min-w-[160px] flex-1 flex-col gap-2 text-xs text-primary-500">
+      <span className="font-medium uppercase tracking-[0.18em] text-primary-500">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-xl border border-primary-700 bg-primary-900 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+        className="rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -175,8 +175,8 @@ function ActiveRunCard({
   const progress = getRunProgress(run, events)
 
   return (
-    <article className="rounded-3xl border border-primary-800 bg-primary-900/75 p-4 shadow-sm md:p-5">
-      <div className="flex flex-col gap-4 border-b border-primary-800 pb-4 md:flex-row md:items-start md:justify-between">
+    <article className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
+      <div className="flex flex-col gap-4 border-b border-primary-200 pb-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-xs font-medium text-accent-300">
@@ -192,8 +192,8 @@ function ActiveRunCard({
             </span>
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-primary-100">{run.task_name}</h2>
-            <p className="mt-1 text-sm text-primary-300">
+            <h2 className="text-lg font-semibold text-primary-900">{run.task_name}</h2>
+            <p className="mt-1 text-sm text-primary-600">
               {run.project_name} · {run.mission_name} · {run.agent_name ?? 'Unassigned agent'}
             </p>
           </div>
@@ -204,7 +204,7 @@ function ActiveRunCard({
             type="button"
             disabled={actionPending}
             onClick={() => onPause(run.id)}
-            className="inline-flex items-center gap-2 rounded-xl border border-primary-700 bg-primary-950 px-3 py-2 text-sm font-medium text-primary-100 transition-colors hover:border-amber-500/50 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm font-medium text-primary-800 transition-colors hover:border-amber-500/50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <HugeiconsIcon icon={PauseIcon} className="size-4" />
             Pause
@@ -224,38 +224,38 @@ function ActiveRunCard({
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <RunLog events={events} compact />
 
-        <div className="space-y-4 rounded-2xl border border-primary-800 bg-primary-950/50 p-4">
+        <div className="space-y-4 rounded-xl border border-primary-200 bg-primary-50/70 p-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Elapsed</p>
-              <p className="mt-1 text-sm font-medium text-primary-100">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Elapsed</p>
+              <p className="mt-1 text-sm font-medium text-primary-900">
                 {formatRunDuration(run)}
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Attempt</p>
-              <p className="mt-1 text-sm font-medium text-primary-100">{run.attempt}</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Attempt</p>
+              <p className="mt-1 text-sm font-medium text-primary-900">{run.attempt}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Tokens</p>
-              <p className="mt-1 text-sm font-medium text-primary-100">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Tokens</p>
+              <p className="mt-1 text-sm font-medium text-primary-900">
                 {formatRunTokens(run)}
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Cost</p>
-              <p className="mt-1 text-sm font-medium text-primary-100">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Cost</p>
+              <p className="mt-1 text-sm font-medium text-primary-900">
                 {formatRunCost(run.cost_cents)}
               </p>
             </div>
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between text-xs text-primary-300">
+            <div className="mb-2 flex items-center justify-between text-xs text-primary-500">
               <span>Progress</span>
               <span>{progress}%</span>
             </div>
-            <div className="h-2 rounded-full bg-primary-800">
+            <div className="h-2 rounded-full bg-primary-100">
               <div
                 className="h-2 rounded-full bg-accent-500 transition-all"
                 style={{ width: `${progress}%` }}
@@ -280,18 +280,18 @@ function RecentRunRow({
   onToggle: () => void
 }) {
   return (
-    <article className="rounded-2xl border border-primary-800 bg-primary-900/65">
+    <article className="rounded-xl border border-primary-200 bg-white shadow-sm">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-900/90 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr_auto] md:items-center"
+        className="flex w-full flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-50 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr_auto] md:items-center"
       >
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-primary-100">{run.task_name}</p>
-          <p className="mt-1 text-xs text-primary-400">{run.mission_name}</p>
+          <p className="truncate text-sm font-semibold text-primary-900">{run.task_name}</p>
+          <p className="mt-1 text-xs text-primary-500">{run.mission_name}</p>
         </div>
-        <p className="text-sm text-primary-300">{run.project_name}</p>
-        <p className="text-sm text-primary-300">{run.agent_name ?? 'Unknown agent'}</p>
+        <p className="text-sm text-primary-600">{run.project_name}</p>
+        <p className="text-sm text-primary-600">{run.agent_name ?? 'Unknown agent'}</p>
         <div>
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getRunStatusClass(
@@ -301,44 +301,44 @@ function RecentRunRow({
             {formatRunStatus(run.status)}
           </span>
         </div>
-        <p className="text-sm text-primary-300">{formatRunDuration(run)}</p>
-        <p className="text-sm text-primary-300">{formatRunTokens(run)}</p>
-        <p className="text-sm text-primary-300">{formatRunCost(run.cost_cents)}</p>
-        <p className="text-sm text-primary-300">
+        <p className="text-sm text-primary-600">{formatRunDuration(run)}</p>
+        <p className="text-sm text-primary-600">{formatRunTokens(run)}</p>
+        <p className="text-sm text-primary-600">{formatRunCost(run.cost_cents)}</p>
+        <p className="text-sm text-primary-600">
           {formatRunTimestamp(run.completed_at ?? run.started_at)}
         </p>
         <HugeiconsIcon
           icon={ArrowDown01Icon}
-          className={`size-4 text-primary-400 transition-transform ${
+          className={`size-4 text-primary-500 transition-transform ${
             expanded ? 'rotate-180' : ''
           }`}
         />
       </button>
 
       {expanded ? (
-        <div className="border-t border-primary-800 px-4 py-4">
+        <div className="border-t border-primary-200 px-4 py-4">
           <div className="mb-4 grid gap-3 md:grid-cols-4">
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Started</p>
-              <p className="mt-1 text-sm text-primary-100">
+            <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Started</p>
+              <p className="mt-1 text-sm text-primary-900">
                 {formatRunTimestamp(run.started_at)}
               </p>
             </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Cost</p>
-              <p className="mt-1 text-sm text-primary-100">
+            <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Cost</p>
+              <p className="mt-1 text-sm text-primary-900">
                 {formatRunCost(run.cost_cents)}
               </p>
             </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Workspace</p>
-              <p className="mt-1 truncate text-sm text-primary-100">
+            <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Workspace</p>
+              <p className="mt-1 truncate text-sm text-primary-900">
                 {run.workspace_path ?? 'No workspace recorded'}
               </p>
             </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Error</p>
-              <p className="mt-1 text-sm text-primary-100">
+            <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Error</p>
+              <p className="mt-1 text-sm text-primary-900">
                 {run.error ?? 'No error recorded'}
               </p>
             </div>
@@ -500,19 +500,19 @@ export function RunsConsoleScreen() {
   ]
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-100 md:px-6 md:pt-8">
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <header className="rounded-3xl border border-primary-800 bg-primary-900/85 px-5 py-5 shadow-sm">
+        <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
-              <div className="flex size-12 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
+              <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
                 <HugeiconsIcon icon={PlayCircleIcon} className="size-6" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-primary-100">
+                <h1 className="text-base font-semibold text-primary-900">
                   Runs / Console
                 </h1>
-                <p className="mt-1 max-w-2xl text-sm text-primary-300">
+                <p className="mt-1 max-w-2xl text-sm text-primary-500">
                   Cross-project visibility into live agent execution, recent completions,
                   and run output.
                 </p>
@@ -520,7 +520,7 @@ export function RunsConsoleScreen() {
             </div>
 
             <div className="flex w-full max-w-4xl flex-col gap-3 xl:items-end">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-primary-400">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-primary-500">
                 <HugeiconsIcon icon={FilterHorizontalIcon} className="size-4 text-accent-300" />
                 Filters
               </div>
@@ -550,7 +550,7 @@ export function RunsConsoleScreen() {
                   options={timeOptions}
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-primary-400">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-primary-500">
                 <span>
                   Showing {filteredRuns.length} run{filteredRuns.length === 1 ? '' : 's'}
                 </span>
@@ -563,7 +563,7 @@ export function RunsConsoleScreen() {
                       setStatusFilter('all')
                       setTimeRange('today')
                     }}
-                    className="rounded-full border border-primary-700 px-3 py-1 text-primary-200 transition-colors hover:border-accent-500/50 hover:text-accent-300"
+                    className="rounded-full border border-primary-200 bg-white px-3 py-1 text-primary-600 transition-colors hover:border-accent-500/50 hover:text-accent-400"
                   >
                     Reset filters
                   </button>
@@ -574,43 +574,43 @@ export function RunsConsoleScreen() {
         </header>
 
         <section className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4">
+          <div className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <HugeiconsIcon icon={Task01Icon} className="size-5 text-accent-300" />
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-primary-400">
+                <p className="text-xs uppercase tracking-[0.18em] text-primary-500">
                   Active Runs
                 </p>
-                <p className="text-2xl font-semibold text-primary-100">
+                <p className="text-2xl font-semibold text-primary-900">
                   {visibleActiveRuns.length}
                 </p>
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4">
+          <div className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <HugeiconsIcon
                 icon={TimeQuarterPassIcon}
                 className="size-5 text-accent-300"
               />
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-primary-400">
+                <p className="text-xs uppercase tracking-[0.18em] text-primary-500">
                   Recent Runs
                 </p>
-                <p className="text-2xl font-semibold text-primary-100">
+                <p className="text-2xl font-semibold text-primary-900">
                   {recentRuns.length}
                 </p>
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4">
+          <div className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <HugeiconsIcon icon={PlayCircleIcon} className="size-5 text-accent-300" />
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-primary-400">
+                <p className="text-xs uppercase tracking-[0.18em] text-primary-500">
                   Refresh
                 </p>
-                <p className="text-sm font-medium text-primary-100">
+                <p className="text-sm font-medium text-primary-900">
                   Auto-refreshing every 5 seconds
                 </p>
               </div>
@@ -620,14 +620,14 @@ export function RunsConsoleScreen() {
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-primary-100">Active Runs</h2>
+            <h2 className="text-base font-semibold text-primary-900">Active Runs</h2>
             {runsQuery.isFetching ? (
-              <span className="text-xs text-primary-400">Syncing latest activity...</span>
+              <span className="text-xs text-primary-500">Syncing latest activity...</span>
             ) : null}
           </div>
 
           {runsQuery.isLoading ? (
-            <div className="rounded-3xl border border-primary-800 bg-primary-900/75 px-6 py-14 text-center text-primary-300">
+            <div className="rounded-xl border border-primary-200 bg-white px-6 py-14 text-center text-primary-600 shadow-sm">
               Loading active runs...
             </div>
           ) : visibleActiveRuns.length > 0 ? (
@@ -644,9 +644,9 @@ export function RunsConsoleScreen() {
               ))}
             </div>
           ) : (
-            <div className="rounded-3xl border border-primary-800 bg-primary-900/75 px-6 py-14 text-center">
-              <p className="text-lg font-semibold text-primary-100">No active runs</p>
-              <p className="mt-2 text-sm text-primary-300">
+            <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-14 text-center">
+              <p className="text-lg font-semibold text-primary-900">No active runs</p>
+              <p className="mt-2 text-sm text-primary-500">
                 Adjust the filters or wait for the next task dispatch.
               </p>
             </div>
@@ -655,13 +655,13 @@ export function RunsConsoleScreen() {
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-primary-100">Recent Runs</h2>
-            <span className="text-xs text-primary-400">
+            <h2 className="text-base font-semibold text-primary-900">Recent Runs</h2>
+            <span className="text-xs text-primary-500">
               Click any row to inspect the run log
             </span>
           </div>
 
-          <div className="hidden rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-3 text-xs uppercase tracking-[0.18em] text-primary-400 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr_auto] md:items-center">
+          <div className="hidden rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3 text-xs uppercase tracking-[0.18em] text-primary-500 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr_auto] md:items-center">
             <span>Task</span>
             <span>Project</span>
             <span>Agent</span>
@@ -691,9 +691,9 @@ export function RunsConsoleScreen() {
               ))}
             </div>
           ) : (
-            <div className="rounded-3xl border border-primary-800 bg-primary-900/75 px-6 py-14 text-center">
-              <p className="text-lg font-semibold text-primary-100">No recent runs</p>
-              <p className="mt-2 text-sm text-primary-300">
+            <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-14 text-center">
+              <p className="text-lg font-semibold text-primary-900">No recent runs</p>
+              <p className="mt-2 text-sm text-primary-500">
                 There are no completed, paused, or failed runs for the current filters.
               </p>
             </div>

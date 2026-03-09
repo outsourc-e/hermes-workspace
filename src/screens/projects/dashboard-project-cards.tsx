@@ -40,10 +40,10 @@ export function DashboardProjectCards({
           <article
             key={overview.project.id}
             className={cn(
-              'rounded-3xl border bg-primary-900/78 p-5 shadow-sm transition-colors',
+              'rounded-xl border bg-white p-5 shadow-sm transition-colors',
               active
-                ? 'border-accent-500/60 shadow-[0_0_0_1px_rgba(251,146,60,0.14)]'
-                : 'border-primary-800 hover:border-primary-700',
+                ? 'border-accent-500/50 shadow-[0_0_0_1px_rgba(251,146,60,0.12)]'
+                : 'border-primary-200 hover:border-primary-300',
             )}
           >
             <button
@@ -63,10 +63,10 @@ export function DashboardProjectCards({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-semibold text-primary-100">
+                      <p className="truncate text-base font-semibold text-primary-900">
                         {overview.project.name}
                       </p>
-                      <p className="truncate text-xs text-primary-400">
+                      <p className="truncate text-xs text-primary-500">
                         {overview.project.path || 'No path configured'}
                       </p>
                     </div>
@@ -84,16 +84,16 @@ export function DashboardProjectCards({
                     <p className="text-xs uppercase tracking-[0.16em] text-primary-500">
                       Current phase
                     </p>
-                    <p className="text-sm font-medium text-primary-100">
+                    <p className="text-sm font-medium text-primary-900">
                       {overview.phaseLabel}
                     </p>
-                    <p className="text-sm text-primary-300">
+                    <p className="text-sm text-primary-600">
                       {overview.missionLabel}
                     </p>
                   </div>
 
                   <div className="mt-4">
-                    <div className="h-2.5 overflow-hidden rounded-full bg-primary-800">
+                    <div className="h-2.5 overflow-hidden rounded-full bg-primary-100">
                       <div
                         className={cn(
                           'h-full rounded-full bg-gradient-to-r',
@@ -104,14 +104,14 @@ export function DashboardProjectCards({
                         style={{ width: `${overview.progress}%` }}
                       />
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-primary-400">
+                    <div className="mt-2 flex items-center justify-between text-xs text-primary-500">
                       <span>{overview.progress}%</span>
                       <span
                         className={cn(
                           'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
                           overview.pendingCheckpointCount > 0
                             ? 'border-red-500/30 bg-red-500/10 text-red-300'
-                            : 'border-primary-700 bg-primary-800/80 text-primary-300',
+                            : 'border-primary-200 bg-primary-50 text-primary-600',
                         )}
                       >
                         {overview.pendingCheckpointCount} checkpoint
@@ -138,7 +138,7 @@ export function DashboardProjectCards({
                     {overview.squad.map((agent) => (
                       <span
                         key={`${overview.project.id}-${agent.label}`}
-                        className="inline-flex items-center gap-2 rounded-full border border-primary-700 bg-primary-800/80 px-3 py-1 text-xs text-primary-200"
+                        className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-700"
                       >
                         <span className={cn('size-2 rounded-full', agent.tone)} />
                         {agent.label}

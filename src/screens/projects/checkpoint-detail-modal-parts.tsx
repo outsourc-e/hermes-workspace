@@ -45,9 +45,9 @@ export function getDiffLineClass(line: string) {
 
 export function DetailStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-primary-800 bg-primary-950/60 px-3 py-3">
+    <div className="rounded-xl border border-primary-200 bg-white px-3 py-3">
       <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">{label}</p>
-      <p className="mt-1 text-sm text-primary-100">{value}</p>
+      <p className="mt-1 text-sm text-primary-900">{value}</p>
     </div>
   )
 }
@@ -64,8 +64,8 @@ export function SectionHeader({
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div>
-        <h3 className="text-sm font-semibold text-primary-100">{title}</h3>
-        <p className="text-xs text-primary-400">{description}</p>
+        <h3 className="text-sm font-semibold text-primary-900">{title}</h3>
+        <p className="text-xs text-primary-500">{description}</p>
       </div>
       {action}
     </div>
@@ -88,14 +88,14 @@ export function FileDiffCard({
   onToggle: () => void
 }) {
   return (
-    <div className="rounded-2xl border border-primary-800 bg-primary-900/60">
+    <div className="rounded-xl border border-primary-200 bg-primary-50/70">
       <button
         type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
         <div className="min-w-0">
-          <p className="truncate font-mono text-sm text-primary-100">{path}</p>
+          <p className="truncate font-mono text-sm text-primary-900">{path}</p>
           <div className="mt-1 flex flex-wrap gap-3 text-xs text-primary-500">
             {additions !== null || deletions !== null ? (
               <>
@@ -110,7 +110,7 @@ export function FileDiffCard({
           icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
           size={16}
           strokeWidth={1.8}
-          className="shrink-0 text-primary-400"
+          className="shrink-0 text-primary-500"
         />
       </button>
 
@@ -122,9 +122,9 @@ export function FileDiffCard({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-primary-800 px-4 py-4">
+            <div className="border-t border-primary-200 px-4 py-4">
               {patch ? (
-                <pre className="overflow-x-auto rounded-2xl border border-primary-800 bg-primary-950/90 p-3 font-mono text-xs leading-5">
+                <pre className="overflow-x-auto rounded-xl border border-primary-200 bg-white p-3 font-mono text-xs leading-5">
                   {patch.split('\n').map((line, index) => (
                     <div key={`${path}:${index}`} className={getDiffLineClass(line)}>
                       {line || ' '}
@@ -132,7 +132,7 @@ export function FileDiffCard({
                   ))}
                 </pre>
               ) : (
-                <p className="text-sm text-primary-400">
+                <p className="text-sm text-primary-500">
                   No diff content was available for this file.
                 </p>
               )}

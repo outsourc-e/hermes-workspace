@@ -199,13 +199,13 @@ export function CheckpointDetailModal({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(92dvh,920px)] w-[min(1120px,96vw)] max-w-none overflow-hidden rounded-3xl border-primary-700 bg-primary-900 p-0 text-primary-100 shadow-2xl max-md:bottom-0 max-md:left-0 max-md:h-[92dvh] max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-3xl max-md:top-auto">
+      <DialogContent className="h-[min(92dvh,920px)] w-[min(1120px,96vw)] max-w-none overflow-hidden rounded-2xl border-primary-200 bg-primary-50 p-0 text-primary-900 shadow-2xl max-md:bottom-0 max-md:left-0 max-md:h-[92dvh] max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-2xl max-md:top-auto">
         <div className="flex h-full flex-col">
-          <div className="border-b border-primary-800 px-5 py-4 md:px-6">
-            <DialogTitle className="text-base font-semibold text-primary-100">
+          <div className="border-b border-primary-200 px-5 py-4 md:px-6">
+            <DialogTitle className="text-base font-semibold text-primary-900">
               {checkpoint?.task_name ?? 'Checkpoint detail'}
             </DialogTitle>
-            <DialogDescription className="text-sm text-primary-400">
+            <DialogDescription className="text-sm text-primary-500">
               Full review detail before approval, revision, or rejection.
             </DialogDescription>
           </div>
@@ -214,7 +214,7 @@ export function CheckpointDetailModal({
             <div className="flex flex-1 items-center justify-center px-6">
               <div className="text-center">
                 <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-                <p className="text-sm text-primary-400">Loading checkpoint detail...</p>
+                <p className="text-sm text-primary-500">Loading checkpoint detail...</p>
               </div>
             </div>
           ) : detailQuery.isError || !detail ? (

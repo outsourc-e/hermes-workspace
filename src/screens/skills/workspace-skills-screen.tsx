@@ -231,24 +231,24 @@ export function WorkspaceSkillsScreen() {
   }
 
   return (
-    <div className="min-h-full bg-primary-950 text-primary-100">
+    <div className="min-h-full bg-surface text-primary-900">
       <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col px-4 py-4 sm:px-5 lg:px-6">
         <div className="flex flex-col gap-2 pb-4">
-          <h1 className="text-lg font-semibold text-primary-100">
+          <h1 className="text-base font-semibold text-primary-900">
             Skills &amp; Memory
           </h1>
-          <p className="text-sm text-primary-400">
+          <p className="text-sm text-primary-500">
             Browse installed skills and inspect workspace memory sources in one
             place.
           </p>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-2xl border border-primary-800 bg-primary-900/70 lg:grid-cols-2">
-          <section className="min-h-0 border-b border-primary-800 lg:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm lg:grid-cols-2">
+          <section className="min-h-0 border-b border-primary-200 lg:border-b-0">
             <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
-              <div className="flex flex-col gap-3 border-b border-primary-800 pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-b border-primary-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-[15px] font-semibold text-primary-100">
+                  <h2 className="text-[15px] font-semibold text-primary-900">
                     Skills
                   </h2>
                 </div>
@@ -281,8 +281,8 @@ export function WorkspaceSkillsScreen() {
                       className={cn(
                         'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
                         active
-                          ? 'border-accent-500/40 bg-accent-500/10 text-accent-300'
-                          : 'border-primary-700 bg-primary-900 text-primary-300 hover:border-primary-600 hover:text-primary-100',
+                          ? 'border-accent-500/40 bg-accent-500/10 text-accent-400'
+                          : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:text-primary-900',
                       )}
                     >
                       {category}
@@ -298,11 +298,11 @@ export function WorkspaceSkillsScreen() {
                     <div
                       key={skill.id}
                       className={cn(
-                        'overflow-hidden rounded-2xl border bg-primary-950/60 transition-all',
+                        'overflow-hidden rounded-xl border bg-primary-50/60 transition-all',
                         skill.status === 'disabled' && 'opacity-50',
                         expanded
                           ? 'border-accent-500/40 bg-accent-500/5'
-                          : 'border-primary-800 hover:border-primary-700',
+                          : 'border-primary-200 hover:border-primary-300',
                       )}
                     >
                       <button
@@ -324,7 +324,7 @@ export function WorkspaceSkillsScreen() {
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-primary-100">
+                            <span className="text-sm font-semibold text-primary-900">
                               {skill.name}
                             </span>
                             <span
@@ -344,7 +344,7 @@ export function WorkspaceSkillsScreen() {
                               {skill.status}
                             </span>
                           </span>
-                          <span className="mt-1 block text-sm text-primary-300">
+                          <span className="mt-1 block text-sm text-primary-600">
                             {skill.description}
                           </span>
                         </span>
@@ -352,7 +352,7 @@ export function WorkspaceSkillsScreen() {
                           icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
                           size={18}
                           strokeWidth={1.7}
-                          className="mt-0.5 shrink-0 text-primary-400"
+                          className="mt-0.5 shrink-0 text-primary-500"
                         />
                       </button>
 
@@ -363,10 +363,10 @@ export function WorkspaceSkillsScreen() {
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.16 }}
-                            className="overflow-hidden border-t border-primary-800"
+                            className="overflow-hidden border-t border-primary-200"
                           >
                             <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex items-start gap-3 text-sm text-primary-300">
+                              <div className="flex items-start gap-3 text-sm text-primary-600">
                                 <HugeiconsIcon
                                   icon={SparklesIcon}
                                   size={18}
@@ -412,9 +412,9 @@ export function WorkspaceSkillsScreen() {
               </div>
 
               {selectedSkill ? (
-                <div className="mt-4 rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-3 text-sm text-primary-300">
+                <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3 text-sm text-primary-600">
                   Selected skill:{" "}
-                  <span className="font-medium text-primary-100">
+                  <span className="font-medium text-primary-900">
                     {selectedSkill.name}
                   </span>
                 </div>
@@ -422,10 +422,10 @@ export function WorkspaceSkillsScreen() {
             </div>
           </section>
 
-          <section className="min-h-0 border-l-0 border-primary-800 lg:border-l">
+          <section className="min-h-0 border-l-0 border-primary-200 lg:border-l">
             <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
-              <div className="flex flex-col gap-3 border-b border-primary-800 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-[15px] font-semibold text-primary-100">
+              <div className="flex flex-col gap-3 border-b border-primary-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-[15px] font-semibold text-primary-900">
                   Memory
                 </h2>
                 <div className="flex flex-wrap gap-2">
@@ -452,13 +452,13 @@ export function WorkspaceSkillsScreen() {
                     icon={Search01Icon}
                     size={16}
                     strokeWidth={1.8}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary-400"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary-500"
                   />
                   <input
                     value={memorySearch}
                     onChange={(event) => setMemorySearch(event.target.value)}
                     placeholder="Search memory..."
-                    className="w-full rounded-xl border border-primary-700 bg-primary-950 px-10 py-2.5 text-sm text-primary-100 outline-none transition-colors placeholder:text-primary-400 focus:border-accent-500/50"
+                    className="w-full rounded-xl border border-primary-200 bg-white px-10 py-2.5 text-sm text-primary-900 outline-none transition-colors placeholder:text-primary-500 focus:border-accent-500/50"
                   />
                 </div>
 
@@ -473,8 +473,8 @@ export function WorkspaceSkillsScreen() {
                         className={cn(
                           'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
                           active
-                            ? 'border-accent-500/40 bg-accent-500/10 text-accent-300'
-                            : 'border-primary-700 bg-primary-900 text-primary-300 hover:border-primary-600 hover:text-primary-100',
+                            ? 'border-accent-500/40 bg-accent-500/10 text-accent-400'
+                            : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:text-primary-900',
                         )}
                       >
                         {filter}
@@ -486,7 +486,7 @@ export function WorkspaceSkillsScreen() {
 
               <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
                 {memoryQuery.isPending ? (
-                  <div className="rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-5 text-sm text-primary-300">
+                  <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-600">
                     Loading memory files...
                   </div>
                 ) : memoryQuery.isError ? (
@@ -521,12 +521,12 @@ export function WorkspaceSkillsScreen() {
                 {!memoryQuery.isPending &&
                 !memoryQuery.isError &&
                 filteredMemoryFiles.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/40 px-4 py-5 text-sm text-primary-400">
+                  <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-500">
                     No memory files match the current filter.
                   </div>
                 ) : null}
 
-                <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-4">
+                <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-4">
                   <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-400">
                     Retention
                   </div>

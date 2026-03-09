@@ -13,7 +13,7 @@ function MetricCard({
   label,
   value,
   sublabel,
-  tone = 'text-primary-100',
+  tone = 'text-primary-900',
 }: {
   label: string
   value: string
@@ -21,11 +21,11 @@ function MetricCard({
   tone?: string
 }) {
   return (
-    <div className="rounded-2xl border border-primary-800 bg-primary-900/75 px-4 py-4 shadow-sm">
+    <div className="rounded-xl border border-primary-200 bg-white px-4 py-4 shadow-sm">
       <div className={cn('text-2xl font-semibold tracking-tight', tone)}>
         {value}
       </div>
-      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary-400">
+      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary-500">
         {label}
       </div>
       {sublabel ? (

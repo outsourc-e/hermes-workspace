@@ -804,16 +804,16 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   }
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-100 md:px-6 md:pt-8">
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto w-full max-w-[1480px] space-y-5">
-        <header className="flex flex-col gap-4 rounded-3xl border border-primary-800 bg-primary-900/85 px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex size-12 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
+            <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
               <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.6} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-primary-100">Projects</h1>
-              <p className="text-sm text-primary-400">
+              <h1 className="text-base font-semibold text-primary-900">Projects</h1>
+              <p className="text-sm text-primary-500">
                 Mission control for workspace execution, review handoffs, and agent load.
               </p>
             </div>
@@ -834,17 +834,17 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
         </header>
 
         {listLoading && projects.length === 0 ? (
-          <div className="rounded-3xl border border-primary-800 bg-primary-900/70 px-6 py-16 text-center">
+          <div className="rounded-xl border border-primary-200 bg-white px-6 py-16 text-center shadow-sm">
             <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-            <p className="text-sm text-primary-400">Loading workspace projects...</p>
+            <p className="text-sm text-primary-500">Loading workspace projects...</p>
           </div>
         ) : projects.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-3xl border border-primary-700 bg-primary-800/80 text-primary-300">
+          <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
               <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
             </div>
-            <h2 className="text-lg font-semibold text-primary-100">No projects yet</h2>
-            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
+            <h2 className="text-lg font-semibold text-primary-900">No projects yet</h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
               Create your first project to organize phases, missions, and task execution for an
               agent workflow.
             </p>
@@ -908,7 +908,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
 
             <section
               ref={detailSectionRef}
-              className="rounded-3xl border border-primary-800 bg-primary-900/75 p-4 md:p-5"
+              className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5"
             >
               <ProjectDetailView
                 selectedSummary={selectedSummary}

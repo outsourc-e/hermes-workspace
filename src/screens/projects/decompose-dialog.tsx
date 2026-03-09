@@ -59,26 +59,26 @@ export function DecomposeDialog({
 }: DecomposeDialogProps) {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(860px,96vw)] border-primary-700 bg-primary-900 p-0 text-primary-100 shadow-2xl">
+      <DialogContent className="w-[min(860px,96vw)] border-primary-200 bg-primary-50 p-0 text-primary-900 shadow-2xl">
         {missionLauncher ? (
           missionLauncher.step === 'input' ? (
             <form onSubmit={onDecomposeSubmit} className="space-y-6 p-5">
               <div className="space-y-1">
-                <DialogTitle className="text-base font-semibold text-primary-100">
+                <DialogTitle className="text-base font-semibold text-primary-900">
                   Mission Launcher
                 </DialogTitle>
-                <DialogDescription className="text-sm text-primary-400">
+                <DialogDescription className="text-sm text-primary-500">
                   Describe the goal and let the daemon build the task plan for{' '}
                   {missionLauncher.phase.name}.
                 </DialogDescription>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-primary-800 bg-primary-800/35 p-4 md:grid-cols-2">
+              <div className="grid gap-3 rounded-xl border border-primary-200 bg-white p-4 md:grid-cols-2">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
                     Project
                   </p>
-                  <p className="mt-1 text-sm font-medium text-primary-100">
+                  <p className="mt-1 text-sm font-medium text-primary-900">
                     {project?.name ?? 'Unknown project'}
                   </p>
                 </div>
@@ -86,32 +86,32 @@ export function DecomposeDialog({
                   <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
                     Path
                   </p>
-                  <p className="mt-1 break-all font-mono text-xs text-primary-300">
+                  <p className="mt-1 break-all font-mono text-xs text-primary-600">
                     {path ?? 'No project path available'}
                   </p>
                 </div>
               </div>
 
               <label className="block space-y-1.5">
-                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-400">
+                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-500">
                   Goal
                 </span>
                 <textarea
                   value={missionLauncher.goal}
                   onChange={(event) => onGoalChange(event.target.value)}
                   rows={12}
-                  className="w-full rounded-2xl border border-primary-700 bg-primary-800 px-3 py-3 font-mono text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                  className="w-full rounded-xl border border-primary-200 bg-white px-3 py-3 font-mono text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                   placeholder="Describe what you want to build, paste a PRD, or outline the implementation goal..."
                   autoFocus
                 />
               </label>
 
               {decomposePending ? (
-                <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
-                  <p className="text-sm font-medium text-primary-100">
+                <div className="rounded-xl border border-primary-200 bg-white p-4">
+                  <p className="text-sm font-medium text-primary-900">
                     AI is analyzing your goal...
                   </p>
-                  <p className="mt-1 text-sm text-primary-400">
+                  <p className="mt-1 text-sm text-primary-500">
                     This can take 15-30 seconds while the daemon gathers project
                     context and plans the work.
                   </p>

@@ -168,12 +168,12 @@ function StatCard({
   value: string
 }) {
   return (
-    <div className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
-      <div className="mb-3 flex items-center gap-2 text-primary-400">
+    <div className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-primary-500">
         <HugeiconsIcon icon={icon} size={16} strokeWidth={1.7} />
         <span className="text-xs uppercase tracking-[0.16em]">{label}</span>
       </div>
-      <div className="text-2xl font-semibold text-primary-100">{value}</div>
+      <div className="text-2xl font-semibold text-primary-900">{value}</div>
     </div>
   )
 }
@@ -188,9 +188,9 @@ function SectionCard({
   action?: React.ReactNode
 }) {
   return (
-    <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4 md:p-5">
+    <section className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary-300">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary-600">
           {title}
         </h3>
         {action}
@@ -308,15 +308,15 @@ export function AgentsScreen() {
   const stats = statsQuery.data
 
   return (
-    <div className="h-full overflow-hidden bg-primary-950 text-primary-100">
+    <div className="h-full overflow-hidden bg-surface text-primary-900">
       <div className="flex h-full flex-col md:flex-row">
-        <aside className="flex shrink-0 flex-col border-b border-primary-800 bg-primary-900/80 md:w-[220px] md:border-b-0 md:border-r">
-          <div className="flex items-center justify-between gap-3 border-b border-primary-800 px-4 py-4">
+        <aside className="flex shrink-0 flex-col border-b border-primary-200 bg-primary-50/70 md:w-[220px] md:border-b-0 md:border-r">
+          <div className="flex items-center justify-between gap-3 border-b border-primary-200 px-4 py-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-400">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
                 Agents
               </p>
-              <p className="mt-1 text-xs text-primary-300">
+              <p className="mt-1 text-xs text-primary-500">
                 {agents.length} registered
               </p>
             </div>
@@ -345,7 +345,7 @@ export function AgentsScreen() {
                     'mb-1 flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors',
                     isActive
                       ? 'border-accent-500/30 bg-accent-500/10'
-                      : 'border-transparent bg-transparent hover:border-primary-800 hover:bg-primary-800/35',
+                      : 'border-transparent bg-transparent hover:border-primary-200 hover:bg-white',
                   )}
                 >
                   <div
@@ -357,10 +357,10 @@ export function AgentsScreen() {
                     <span aria-hidden="true">{agent.avatar}</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-primary-100">
+                    <p className="truncate text-sm font-semibold text-primary-900">
                       {agent.name}
                     </p>
-                    <p className="truncate text-xs text-primary-400">
+                    <p className="truncate text-xs text-primary-500">
                       {agent.role} · {agent.model ?? agent.adapter_type}
                     </p>
                   </div>
@@ -378,7 +378,7 @@ export function AgentsScreen() {
 
         <section className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:p-6">
-            <div className="rounded-3xl border border-primary-800 bg-primary-900/70 p-5">
+            <div className="rounded-xl border border-primary-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
@@ -391,10 +391,10 @@ export function AgentsScreen() {
                       <span aria-hidden="true">{selectedAgent.avatar}</span>
                     </div>
                     <div>
-                      <h1 className="text-2xl font-semibold text-primary-100">
+                      <h1 className="text-2xl font-semibold text-primary-900">
                         {selectedAgent.name}
                       </h1>
-                      <p className="mt-1 text-sm text-primary-300">
+                      <p className="mt-1 text-sm text-primary-500">
                         {selectedAgent.description}
                       </p>
                     </div>
@@ -408,10 +408,10 @@ export function AgentsScreen() {
                     >
                       {selectedAgent.status}
                     </span>
-                    <span className="rounded-full border border-primary-700 bg-primary-950/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-primary-200">
+                    <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-primary-700">
                       {selectedAgent.role}
                     </span>
-                    <span className="rounded-full border border-primary-700 bg-primary-950/80 px-3 py-1 text-xs text-primary-300">
+                    <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-600">
                       {selectedAgent.provider}
                     </span>
                   </div>
@@ -450,34 +450,34 @@ export function AgentsScreen() {
               onValueChange={(value) => setActiveTab(value as AgentDetailTab)}
               className="gap-4"
             >
-              <TabsList className="w-full flex-wrap rounded-3xl border border-primary-800 bg-primary-900/80 p-1 text-primary-400">
+              <TabsList className="w-full flex-wrap rounded-xl border border-primary-200 bg-primary-50/80 p-1 text-primary-500">
                 <TabsTrigger
                   value="profile"
-                  className="rounded-2xl px-4 text-primary-400 data-active:bg-primary-800 data-active:text-primary-100"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
                 >
                   Profile
                 </TabsTrigger>
                 <TabsTrigger
                   value="model-limits"
-                  className="rounded-2xl px-4 text-primary-400 data-active:bg-primary-800 data-active:text-primary-100"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
                 >
                   Model &amp; Limits
                 </TabsTrigger>
                 <TabsTrigger
                   value="system-prompt"
-                  className="rounded-2xl px-4 text-primary-400 data-active:bg-primary-800 data-active:text-primary-100"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
                 >
                   System Prompt
                 </TabsTrigger>
                 <TabsTrigger
                   value="skills"
-                  className="rounded-2xl px-4 text-primary-400 data-active:bg-primary-800 data-active:text-primary-100"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
                 >
                   Skills
                 </TabsTrigger>
                 <TabsTrigger
                   value="runs"
-                  className="rounded-2xl px-4 text-primary-400 data-active:bg-primary-800 data-active:text-primary-100"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
                 >
                   Runs
                 </TabsTrigger>

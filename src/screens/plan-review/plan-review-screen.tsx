@@ -236,10 +236,10 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
 
   if (!parsedPlan) {
     return (
-      <div className="flex h-full items-center justify-center bg-primary-950 p-6">
-        <div className="w-full max-w-lg rounded-3xl border border-primary-800 bg-primary-900 p-6 text-center">
-          <h1 className="text-xl font-semibold text-primary-100">Plan Review</h1>
-          <p className="mt-2 text-sm text-primary-400">
+      <div className="flex h-full items-center justify-center bg-surface p-6">
+        <div className="w-full max-w-lg rounded-xl border border-primary-200 bg-white p-6 text-center shadow-sm">
+          <h1 className="text-xl font-semibold text-primary-900">Plan Review</h1>
+          <p className="mt-2 text-sm text-primary-500">
             This plan link is missing data. Go back to Projects and regenerate the mission
             plan.
           </p>
@@ -266,17 +266,17 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
   }
 
   return (
-    <div className="min-h-full bg-primary-950 px-4 py-5 text-primary-100 sm:px-6 lg:px-8">
+    <div className="min-h-full bg-surface px-4 py-5 text-primary-900 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 lg:flex-row">
-        <section className="min-w-0 flex-1 rounded-[28px] border border-primary-800 bg-primary-900/95 p-5 sm:p-6">
-          <div className="border-b border-primary-800 pb-5">
+        <section className="min-w-0 flex-1 rounded-xl border border-primary-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="border-b border-primary-200 pb-5">
             <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
               {parsedPlan.projectName ?? 'Project'} / New Mission
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-primary-100 sm:text-[2rem]">
+            <h1 className="mt-2 text-2xl font-semibold text-primary-900 sm:text-[2rem]">
               {missionName}
             </h1>
-            <p className="mt-2 max-w-3xl text-sm text-primary-400">
+            <p className="mt-2 max-w-3xl text-sm text-primary-500">
               AI generated {tasks.length} task{tasks.length === 1 ? '' : 's'} with
               dependencies. Review and edit before launching.
             </p>
@@ -426,7 +426,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
         </section>
 
         <aside className="w-full shrink-0 lg:w-[260px]">
-          <div className="rounded-[28px] border border-primary-800 bg-primary-900/95 p-5">
+          <div className="rounded-xl border border-primary-200 bg-white p-5 shadow-sm">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-3">
                 <p className="text-xs text-primary-500">Tasks</p>
