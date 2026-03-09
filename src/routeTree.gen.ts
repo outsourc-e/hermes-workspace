@@ -91,6 +91,7 @@ import { Route as ApiAgentKillRouteImport } from './routes/api/agent-kill'
 import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activity'
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
+import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/stats'
 import { Route as ApiWorkspaceProjectsRouteImport } from './routes/api/workspace/projects'
 import { Route as ApiWorkspacePhasesRouteImport } from './routes/api/workspace/phases'
 import { Route as ApiWorkspaceMissionsRouteImport } from './routes/api/workspace/missions'
@@ -545,6 +546,11 @@ const ApiTasksIndexRoute = ApiTasksIndexRouteImport.update({
   path: '/api/tasks/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceStatsRoute = ApiWorkspaceStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
 const ApiWorkspaceProjectsRoute = ApiWorkspaceProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -883,6 +889,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
+  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -1009,6 +1016,7 @@ export interface FileRoutesByTo {
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
+  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/tasks': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -1137,6 +1145,7 @@ export interface FileRoutesById {
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
+  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -1266,6 +1275,7 @@ export interface FileRouteTypes {
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
+    | '/api/workspace/stats'
     | '/api/tasks/'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
@@ -1392,6 +1402,7 @@ export interface FileRouteTypes {
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
+    | '/api/workspace/stats'
     | '/api/tasks'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
@@ -1519,6 +1530,7 @@ export interface FileRouteTypes {
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
+    | '/api/workspace/stats'
     | '/api/tasks/'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
@@ -2210,6 +2222,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTasksIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/stats': {
+      id: '/api/workspace/stats'
+      path: '/stats'
+      fullPath: '/api/workspace/stats'
+      preLoaderRoute: typeof ApiWorkspaceStatsRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
     '/api/workspace/projects': {
       id: '/api/workspace/projects'
       path: '/projects'
@@ -2655,6 +2674,7 @@ interface ApiWorkspaceRouteChildren {
   ApiWorkspaceMissionsRoute: typeof ApiWorkspaceMissionsRouteWithChildren
   ApiWorkspacePhasesRoute: typeof ApiWorkspacePhasesRoute
   ApiWorkspaceProjectsRoute: typeof ApiWorkspaceProjectsRouteWithChildren
+  ApiWorkspaceStatsRoute: typeof ApiWorkspaceStatsRoute
 }
 
 const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
@@ -2663,6 +2683,7 @@ const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspaceMissionsRoute: ApiWorkspaceMissionsRouteWithChildren,
   ApiWorkspacePhasesRoute: ApiWorkspacePhasesRoute,
   ApiWorkspaceProjectsRoute: ApiWorkspaceProjectsRouteWithChildren,
+  ApiWorkspaceStatsRoute: ApiWorkspaceStatsRoute,
 }
 
 const ApiWorkspaceRouteWithChildren = ApiWorkspaceRoute._addFileChildren(
