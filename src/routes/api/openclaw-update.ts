@@ -100,10 +100,19 @@ async function checkOpenClawVersion(): Promise<VersionCheckResult> {
     // Can't check registry — assume up to date
   }
 
+  // Normalize version strings for comparison — currentVersion may include prefix/hash
+  // e.g. "OpenClaw 2026.3.8 (3caab92)" vs "2026.3.8"
+  const normalizeVersion = (v: string) => {
+    const match = v.match(/(\d{4}\.\d+\.\d+)/)
+    return match ? match[1] : v
+  }
+  const normalizedCurrent = normalizeVersion(currentVersion)
+  const normalizedLatest = normalizeVersion(latestVersion)
+
   const updateAvailable =
-    currentVersion !== 'unknown' &&
-    latestVersion !== currentVersion &&
-    latestVersion !== 'unknown'
+    normalizedCurrent !== 'unknown' &&
+    normalizedLatest !== normalizedCurrent &&
+    normalizedLatest !== 'unknown'
 
   const result: VersionCheckResult = {
     currentVersion,

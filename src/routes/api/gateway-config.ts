@@ -313,7 +313,11 @@ export const Route = createFileRoute('/api/gateway-config')({
             body.url = sanitizeGatewayUrl(rawBody.url)
           }
           if (Object.prototype.hasOwnProperty.call(rawBody, 'token')) {
-            body.token = sanitizeEnvValue(rawBody.token, 'token')
+            const sanitized = sanitizeEnvValue(rawBody.token, 'token')
+            // Don't overwrite a valid token with an empty one — prevents wizard from wiping credentials
+            if (sanitized) {
+              body.token = sanitized
+            }
           }
 
           const envPath = join(process.cwd(), '.env')
@@ -357,9 +361,13 @@ export const Route = createFileRoute('/api/gateway-config')({
             process.env.CLAWDBOT_GATEWAY_TOKEN = body.token
           }
 
-          // Try to persist to .env (may fail in Docker/read-only containers — that's OK)
+          // Try to persist to .env — but only if content changed (avoids Vite restart loops)
           try {
-            await writeFile(envPath, envContent, 'utf-8')
+            let existingContent = ''
+            try { existingContent = await readFile(envPath, 'utf-8') } catch { /* */ }
+            if (envContent !== existingContent) {
+              await writeFile(envPath, envContent, 'utf-8')
+            }
           } catch {
             // In-memory env vars are already set above, so connection will still work
           }

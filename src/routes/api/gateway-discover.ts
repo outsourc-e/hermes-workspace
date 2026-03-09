@@ -101,7 +101,12 @@ export const Route = createFileRoute('/api/gateway-discover')({
             }
           }
 
-          await writeFile(envPath, envContent, 'utf-8')
+          // Only write .env if content actually changed — avoids Vite restart loops
+          let existingContent = ''
+          try { existingContent = await readFile(envPath, 'utf-8') } catch { /* */ }
+          if (envContent !== existingContent) {
+            await writeFile(envPath, envContent, 'utf-8')
+          }
 
           // Now test the actual connection
           const { gatewayConnectCheck } = await import('../../server/gateway')

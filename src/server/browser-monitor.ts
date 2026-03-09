@@ -31,12 +31,14 @@ export type BrowserScreenshotResponse = {
 }
 
 const BROWSER_TABS_METHODS = [
+  'browser',            // Current OpenClaw API — single method with action param
   'browser.tabs',
   'browser.list_tabs',
   'browser.get_tabs',
 ]
 
 const BROWSER_SCREENSHOT_METHODS = [
+  'browser',            // Current OpenClaw API — single method with action param
   'browser.screenshot',
   'browser.capture',
   'browser.take_screenshot',
@@ -183,11 +185,16 @@ function normalizeTab(tab: unknown, index: number): BrowserTab {
 async function callGatewayRpcWithFallbackMethods(
   methods: Array<string>,
   params?: unknown,
+  action?: string,
 ): Promise<unknown> {
   let lastError: unknown = null
   for (const method of methods) {
     try {
-      return await gatewayRpc(method, params)
+      // Current OpenClaw uses single 'browser' method with action param
+      const rpcParams = method === 'browser' && action
+        ? { action, ...(params && typeof params === 'object' ? params : {}) }
+        : params
+      return await gatewayRpc(method, rpcParams)
     } catch (error) {
       lastError = error
     }
@@ -274,7 +281,7 @@ export function buildDemoScreenshotResponse(params?: {
 export async function getGatewayTabsResponse(): Promise<BrowserTabsResponse> {
   try {
     const payload =
-      await callGatewayRpcWithFallbackMethods(BROWSER_TABS_METHODS)
+      await callGatewayRpcWithFallbackMethods(BROWSER_TABS_METHODS, undefined, 'tabs')
 
     const payloadRecord = isRecord(payload) ? payload : null
     const rawTabs = Array.isArray(payload)
@@ -323,7 +330,8 @@ export async function getGatewayScreenshotResponse(
   try {
     const payload = await callGatewayRpcWithFallbackMethods(
       BROWSER_SCREENSHOT_METHODS,
-      activeTabId ? { tabId: activeTabId } : undefined,
+      activeTabId ? { tabId: activeTabId, targetId: activeTabId } : undefined,
+      'screenshot',
     )
 
     if (!isRecord(payload)) {
