@@ -896,10 +896,10 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/agents',
+      to: '/workspace-agents',
       icon: UserGroupIcon,
       label: 'Agents',
-      active: isAgentsActive,
+      active: pathname === '/workspace-agents',
     },
     {
       kind: 'link',

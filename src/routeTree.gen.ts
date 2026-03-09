@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkspaceSkillsRouteImport } from './routes/workspace-skills'
+import { Route as WorkspaceAgentsRouteImport } from './routes/workspace-agents'
 import { Route as WizardRouteImport } from './routes/wizard'
 import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
@@ -154,6 +155,11 @@ import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './route
 const WorkspaceSkillsRoute = WorkspaceSkillsRouteImport.update({
   id: '/workspace-skills',
   path: '/workspace-skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkspaceAgentsRoute = WorkspaceAgentsRouteImport.update({
+  id: '/workspace-agents',
+  path: '/workspace-agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WizardRoute = WizardRouteImport.update({
@@ -902,6 +908,7 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
+  '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
@@ -1044,6 +1051,7 @@ export interface FileRoutesByTo {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
+  '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
@@ -1188,6 +1196,7 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
+  '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
@@ -1333,6 +1342,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
+    | '/workspace-agents'
     | '/workspace-skills'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
@@ -1475,6 +1485,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
+    | '/workspace-agents'
     | '/workspace-skills'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
@@ -1618,6 +1629,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
+    | '/workspace-agents'
     | '/workspace-skills'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
@@ -1762,6 +1774,7 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   UsageRoute: typeof UsageRoute
   WizardRoute: typeof WizardRoute
+  WorkspaceAgentsRoute: typeof WorkspaceAgentsRoute
   WorkspaceSkillsRoute: typeof WorkspaceSkillsRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
@@ -1843,6 +1856,13 @@ declare module '@tanstack/react-router' {
       path: '/workspace-skills'
       fullPath: '/workspace-skills'
       preLoaderRoute: typeof WorkspaceSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workspace-agents': {
+      id: '/workspace-agents'
+      path: '/workspace-agents'
+      fullPath: '/workspace-agents'
+      preLoaderRoute: typeof WorkspaceAgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wizard': {
@@ -3072,6 +3092,7 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   UsageRoute: UsageRoute,
   WizardRoute: WizardRoute,
+  WorkspaceAgentsRoute: WorkspaceAgentsRoute,
   WorkspaceSkillsRoute: WorkspaceSkillsRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
