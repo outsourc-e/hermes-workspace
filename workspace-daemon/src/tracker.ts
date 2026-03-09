@@ -1137,18 +1137,34 @@ export class Tracker extends EventEmitter {
 
   listCheckpoints(
     status?: string,
+    projectId?: string,
   ): Array<
     Checkpoint & {
       task_name?: string
       mission_name?: string
       project_name?: string
+      project_id?: string
       agent_name?: string
     }
   > {
+    const whereClauses: string[] = []
+    const params: string[] = []
+
+    if (status) {
+      whereClauses.push('c.status = ?')
+      params.push(status)
+    }
+
+    if (projectId) {
+      whereClauses.push('p.id = ?')
+      params.push(projectId)
+    }
+
     const query = `
       SELECT c.*,
         t.name AS task_name,
         m.name AS mission_name,
+        p.id AS project_id,
         p.name AS project_name,
         a.name AS agent_name
       FROM checkpoints c
@@ -1158,16 +1174,15 @@ export class Tracker extends EventEmitter {
       LEFT JOIN phases ph ON m.phase_id = ph.id
       LEFT JOIN projects p ON ph.project_id = p.id
       LEFT JOIN agents a ON tr.agent_id = a.id
-      ${status ? 'WHERE c.status = ?' : ''}
+      ${whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''}
       ORDER BY c.created_at DESC
     `
-    return (
-      status ? this.db.prepare(query).all(status) : this.db.prepare(query).all()
-    ) as Array<
+    return this.db.prepare(query).all(...params) as Array<
       Checkpoint & {
         task_name?: string
         mission_name?: string
         project_name?: string
+        project_id?: string
         agent_name?: string
       }
     >

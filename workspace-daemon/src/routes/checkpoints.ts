@@ -247,7 +247,8 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
 
   router.get("/", (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    res.json(tracker.listCheckpoints(status));
+    const projectId = typeof req.query.project_id === "string" ? req.query.project_id : undefined;
+    res.json(tracker.listCheckpoints(status, projectId));
   });
 
   router.get("/:id", async (req, res) => {

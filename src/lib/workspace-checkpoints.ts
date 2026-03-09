@@ -20,6 +20,7 @@ export type WorkspaceCheckpoint = {
   task_run_id: string
   summary: string | null
   diff_stat: string | null
+  verification_raw: string | null
   status: CheckpointStatus
   reviewer_notes: string | null
   commit_hash: string | null
@@ -134,6 +135,8 @@ function normalizeCheckpoint(value: unknown): WorkspaceCheckpoint {
     task_run_id: asString(record?.task_run_id) ?? 'unknown-run',
     summary: typeof record?.summary === 'string' ? record.summary : null,
     diff_stat: typeof record?.diff_stat === 'string' ? record.diff_stat : null,
+    verification_raw:
+      typeof record?.verification === 'string' ? record.verification : null,
     status: asString(record?.status) ?? 'pending',
     reviewer_notes:
       typeof record?.reviewer_notes === 'string' ? record.reviewer_notes : null,

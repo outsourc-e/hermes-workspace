@@ -47,11 +47,19 @@ export type WorkspaceProject = {
   max_concurrent?: number
   required_checks?: string
   allowed_tools?: string
+  git_status?: WorkspaceProjectGitStatus
   status: WorkspaceStatus
   phases: Array<WorkspacePhase>
   phase_count: number
   mission_count: number
   task_count: number
+}
+
+export type WorkspaceProjectGitStatus = {
+  branch?: string
+  commit_hash?: string
+  commit_message?: string
+  commit_date?: string
 }
 
 export type WorkspaceAgent = {
@@ -60,6 +68,7 @@ export type WorkspaceAgent = {
   role?: string
   adapter_type?: string
   status: string
+  assigned_projects?: string[]
 }
 
 export type WorkspaceTaskRun = {
@@ -321,6 +330,7 @@ export function normalizePhase(value: unknown): WorkspacePhase {
 export function normalizeProject(value: unknown): WorkspaceProject {
   const record = asRecord(value)
   const phases = asArray(record?.phases).map(normalizePhase)
+  const gitStatus = asRecord(record?.git_status)
   return {
     id:
       asString(record?.id) ??
@@ -333,6 +343,14 @@ export function normalizeProject(value: unknown): WorkspaceProject {
     max_concurrent: asNumber(record?.max_concurrent),
     required_checks: asString(record?.required_checks),
     allowed_tools: asString(record?.allowed_tools),
+    git_status: gitStatus
+      ? {
+          branch: asString(gitStatus.branch),
+          commit_hash: asString(gitStatus.commit_hash),
+          commit_message: asString(gitStatus.commit_message),
+          commit_date: asString(gitStatus.commit_date),
+        }
+      : undefined,
     status: normalizeStatus(record?.status),
     phases,
     phase_count: asNumber(record?.phase_count) ?? phases.length,
@@ -353,6 +371,9 @@ export function normalizeAgent(value: unknown): WorkspaceAgent {
     role: asString(record?.role),
     adapter_type: asString(record?.adapter_type),
     status: asString(record?.status) ?? 'offline',
+    assigned_projects: asArray(record?.assigned_projects).flatMap((item) =>
+      typeof item === 'string' && item.trim().length > 0 ? [item] : [],
+    ),
   }
 }
 

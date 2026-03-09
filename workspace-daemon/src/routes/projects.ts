@@ -1,5 +1,51 @@
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { Router } from 'express'
 import { Tracker } from '../tracker'
+
+const execFileAsync = promisify(execFile)
+
+async function runGitCommand(projectPath: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, {
+    cwd: projectPath,
+    timeout: 10_000,
+  })
+
+  return stdout.trim()
+}
+
+async function getProjectGitStatus(projectPath: string | null | undefined) {
+  if (!projectPath) {
+    return {
+      branch: null,
+      commit_hash: null,
+      commit_message: null,
+      commit_date: null,
+    }
+  }
+
+  try {
+    const [branch, commitLine] = await Promise.all([
+      runGitCommand(projectPath, ['branch', '--show-current']),
+      runGitCommand(projectPath, ['log', '-1', '--format=%h|%s|%ai']),
+    ])
+    const [commit_hash, commit_message, commit_date] = commitLine.split('|')
+
+    return {
+      branch: branch || null,
+      commit_hash: commit_hash?.trim() || null,
+      commit_message: commit_message?.trim() || null,
+      commit_date: commit_date?.trim() || null,
+    }
+  } catch {
+    return {
+      branch: null,
+      commit_hash: null,
+      commit_message: null,
+      commit_date: null,
+    }
+  }
+}
 
 export function createProjectsRouter(tracker: Tracker): Router {
   const router = Router()
@@ -67,13 +113,26 @@ export function createProjectsRouter(tracker: Tracker): Router {
     res.status(201).json(project)
   })
 
-  router.get('/:id', (req, res) => {
+  router.get('/:id', async (req, res) => {
     const project = tracker.getProjectDetail(req.params.id)
     if (!project) {
       res.status(404).json({ error: 'Project not found' })
       return
     }
-    res.json(project)
+    res.json({
+      ...project,
+      git_status: await getProjectGitStatus(project.path),
+    })
+  })
+
+  router.get('/:id/git-status', async (req, res) => {
+    const project = tracker.getProject(req.params.id)
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' })
+      return
+    }
+
+    res.json(await getProjectGitStatus(project.path))
   })
 
   router.put('/:id', (req, res) => {

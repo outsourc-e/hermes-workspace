@@ -21,6 +21,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import {
+  extractCheckpoints,
   formatCheckpointStatus,
   formatCheckpointTimestamp,
   getCheckpointActionButtonClass,
@@ -39,10 +40,12 @@ import {
 } from './lib/spec-file'
 import type {
   WorkspaceActivityEvent,
+  WorkspaceAgent,
   WorkspaceMission,
   WorkspacePhase,
   WorkspaceProject,
 } from './lib/workspace-types'
+import { extractAgents } from './lib/workspace-types'
 import {
   formatRelativeTime,
   formatStatus,
@@ -69,6 +72,137 @@ import {
   type WorkspaceTaskRun,
 } from '../runs/lib/runs-types'
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+type ProjectHealthSnapshot = {
+  tsc: {
+    status: 'passed' | 'failed' | 'missing'
+    checkedAt: string | null
+  }
+  tests: {
+    status: 'passed' | 'failed' | 'not_configured'
+    label: string
+  }
+  e2e: {
+    status: 'passed' | 'failed' | 'not_configured'
+    label: string
+  }
+}
+
+function DetailPanel({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-primary-200 bg-primary-50/70 p-4">
+      <h3 className="text-sm font-semibold text-primary-900">{title}</h3>
+      <div className="mt-3 space-y-2">{children}</div>
+    </section>
+  )
+}
+
+function parseListSetting(value?: string): string[] {
+  return value
+    ?.split(',')
+    .map((item) => item.trim())
+    .filter(Boolean) ?? []
+}
+
+function truncateMiddle(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
+}
+
+function isQaAgent(agent: Pick<WorkspaceAgent, 'name' | 'role' | 'adapter_type'>): boolean {
+  const haystack = `${agent.name} ${agent.role ?? ''} ${agent.adapter_type ?? ''}`.toLowerCase()
+  return haystack.includes('qa') || haystack.includes('quality')
+}
+
+function getAgentDotClass(agent: Pick<WorkspaceAgent, 'name' | 'role' | 'adapter_type'>): string {
+  if (isQaAgent(agent)) return 'bg-teal-400'
+  if (agent.adapter_type === 'codex') return 'bg-emerald-400'
+  if (agent.adapter_type === 'claude') return 'bg-fuchsia-400'
+  if (agent.adapter_type === 'ollama') return 'bg-sky-400'
+  return 'bg-primary-400'
+}
+
+function parseHealthSnapshot(checkpoint: WorkspaceCheckpoint | null): ProjectHealthSnapshot {
+  const defaultSnapshot: ProjectHealthSnapshot = {
+    tsc: {
+      status: 'missing',
+      checkedAt: null,
+    },
+    tests: {
+      status: 'not_configured',
+      label: 'Tests: not configured',
+    },
+    e2e: {
+      status: 'not_configured',
+      label: 'e2e: not configured',
+    },
+  }
+
+  if (!checkpoint?.verification_raw) return defaultSnapshot
+
+  try {
+    const parsed = JSON.parse(checkpoint.verification_raw) as Record<string, unknown>
+    const testsRecord =
+      parsed.tests && typeof parsed.tests === 'object' && !Array.isArray(parsed.tests)
+        ? (parsed.tests as Record<string, unknown>)
+        : null
+    const e2eRecord =
+      parsed.e2e && typeof parsed.e2e === 'object' && !Array.isArray(parsed.e2e)
+        ? (parsed.e2e as Record<string, unknown>)
+        : null
+
+    const testsPassed =
+      typeof testsRecord?.passed === 'number' ? testsRecord.passed : null
+    const testsTotal =
+      typeof testsRecord?.total === 'number' ? testsRecord.total : null
+    const testsStatus =
+      testsPassed !== null && testsTotal !== null
+        ? testsPassed === testsTotal
+          ? 'passed'
+          : 'failed'
+        : 'not_configured'
+
+    const e2eStatus =
+      e2eRecord && typeof e2eRecord.status === 'string'
+        ? e2eRecord.status === 'passed'
+          ? 'passed'
+          : e2eRecord.status === 'failed'
+            ? 'failed'
+            : 'not_configured'
+        : 'not_configured'
+
+    return {
+      tsc: {
+        status: typeof parsed.passed === 'boolean' ? (parsed.passed ? 'passed' : 'failed') : 'missing',
+        checkedAt: checkpoint.created_at,
+      },
+      tests: {
+        status: testsStatus,
+        label:
+          testsPassed !== null && testsTotal !== null
+            ? `Tests: ${testsPassed}/${testsTotal} passing`
+            : 'Tests: not configured',
+      },
+      e2e: {
+        status: e2eStatus,
+        label:
+          e2eStatus === 'passed'
+            ? 'e2e: passing'
+            : e2eStatus === 'failed'
+              ? 'e2e: failing'
+              : 'e2e: not configured',
+      },
+    }
+  } catch {
+    return defaultSnapshot
+  }
+}
 
 type ProjectDetailViewProps = {
   selectedSummary: WorkspaceProject | null
@@ -184,23 +318,29 @@ export function ProjectDetailView({
   const navigate = useNavigate()
   const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
   const specFileInputRef = useRef<HTMLInputElement | null>(null)
+  const sourceProject = projectDetail ?? selectedSummary
   const taskNameById = useMemo(() => {
-    const source = projectDetail ?? selectedSummary
-    if (!source) return new Map<string, string>()
+    if (!sourceProject) return new Map<string, string>()
 
     return new Map(
-      source.phases.flatMap((phase) =>
+      sourceProject.phases.flatMap((phase) =>
         phase.missions.flatMap((mission) =>
           mission.tasks.map((task) => [task.id, task.name] as const),
         ),
       ),
     )
-  }, [projectDetail, selectedSummary])
+  }, [sourceProject])
   const activeProjectId = projectDetail?.id ?? selectedSummary?.id ?? null
   const checkpointByRunId = useMemo(
     () => new Map(checkpoints.map((checkpoint) => [checkpoint.task_run_id, checkpoint])),
     [checkpoints],
   )
+  const agentsQuery = useQuery({
+    queryKey: ['workspace', 'agents', 'project-detail', activeProjectId],
+    enabled: Boolean(activeProjectId),
+    queryFn: async () => extractAgents(await workspaceRequestJson('/api/workspace/agents')),
+    staleTime: 30_000,
+  })
   const runsQuery = useQuery({
     queryKey: ['workspace', 'task-runs', 'project', activeProjectId],
     enabled: Boolean(activeProjectId),
@@ -216,6 +356,18 @@ export function ProjectDetailView({
       const runs = query.state.data as Array<WorkspaceTaskRun> | undefined
       return runs?.some((run) => run.status === 'running') ? 5_000 : false
     },
+  })
+  const healthQuery = useQuery({
+    queryKey: ['workspace', 'project-health', activeProjectId],
+    enabled: Boolean(activeProjectId),
+    queryFn: async () => {
+      if (!activeProjectId) return []
+      const payload = await workspaceRequestJson(
+        `/api/workspace/checkpoints?project_id=${encodeURIComponent(activeProjectId)}`,
+      )
+      return extractCheckpoints(payload)
+    },
+    staleTime: 5_000,
   })
   const projectRuns = useMemo(
     () => [...(runsQuery.data ?? [])].sort(sortRunsNewestFirst),
@@ -300,6 +452,99 @@ export function ProjectDetailView({
 
     return 'pending'
   }
+
+  const projectTasks = useMemo(
+    () =>
+      sourceProject?.phases.flatMap((phase) =>
+        phase.missions.flatMap((mission) => mission.tasks),
+      ) ?? [],
+    [sourceProject],
+  )
+  const openCheckpointList = useMemo(
+    () => checkpoints.filter((checkpoint) => checkpoint.status === 'pending').slice(0, 3),
+    [checkpoints],
+  )
+  const nextUpTasks = useMemo(
+    () =>
+      projectTasks
+        .filter(
+          (task) =>
+            !isCompletedTaskStatus(task.status) && !isRunningTaskStatus(task.status),
+        )
+        .slice(0, 4),
+    [projectTasks],
+  )
+  const squadEntries = useMemo(() => {
+    if (!sourceProject) return []
+
+    const agents = agentsQuery.data ?? []
+    const agentById = new Map(agents.map((agent) => [agent.id, agent] as const))
+    const collectedIds = new Set<string>()
+
+    for (const task of projectTasks) {
+      if (task.agent_id) collectedIds.add(task.agent_id)
+    }
+
+    for (const run of projectRuns) {
+      if (run.agent_id) collectedIds.add(run.agent_id)
+    }
+
+    for (const agent of agents) {
+      if (
+        agent.assigned_projects?.some(
+          (projectName) =>
+            projectName.toLowerCase() === sourceProject.name.toLowerCase() ||
+            projectName === sourceProject.id,
+        )
+      ) {
+        collectedIds.add(agent.id)
+      }
+    }
+
+    return Array.from(collectedIds)
+      .map((agentId) => {
+        const agent = agentById.get(agentId)
+        const activeRun = projectRuns.find(
+          (run) => run.agent_id === agentId && run.status === 'running',
+        )
+
+        return {
+          id: agentId,
+          name:
+            agent?.name ??
+            activeRun?.agent_name ??
+            agentId,
+          role: agent?.role,
+          adapter_type: agent?.adapter_type,
+          currentTask: activeRun?.task_name ?? 'idle',
+          isRunning: Boolean(activeRun),
+        }
+      })
+      .sort((left, right) => {
+        if (left.isRunning !== right.isRunning) return left.isRunning ? -1 : 1
+        return left.name.localeCompare(right.name)
+      })
+  }, [agentsQuery.data, projectRuns, projectTasks, sourceProject])
+  const latestVerifiedCheckpoint = useMemo(
+    () =>
+      (healthQuery.data ?? []).find(
+        (checkpoint) => typeof checkpoint.verification_raw === 'string',
+      ) ?? null,
+    [healthQuery.data],
+  )
+  const healthSnapshot = useMemo(
+    () => parseHealthSnapshot(latestVerifiedCheckpoint),
+    [latestVerifiedCheckpoint],
+  )
+  const requiredChecks = useMemo(
+    () => parseListSetting(sourceProject?.required_checks),
+    [sourceProject?.required_checks],
+  )
+  const allowedTools = useMemo(
+    () => parseListSetting(sourceProject?.allowed_tools),
+    [sourceProject?.allowed_tools],
+  )
+  const gitStatus = sourceProject?.git_status
 
   async function handleSpecFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -438,6 +683,73 @@ export function ProjectDetailView({
           </CollapsiblePanel>
         </section>
       </Collapsible>
+
+      <div className="mt-5 grid gap-3 xl:grid-cols-3">
+        <DetailPanel title="Open Checkpoints">
+          {openCheckpointList.length > 0 ? (
+            openCheckpointList.map((checkpoint) => (
+              <div
+                key={checkpoint.id}
+                className="flex items-center gap-2 border-b border-primary-200/80 pb-2 text-sm last:border-b-0 last:pb-0"
+              >
+                <span className="rounded-full border border-primary-200 bg-white px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-600">
+                  {checkpoint.task_name ?? checkpoint.task_run_id}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-primary-700">
+                  {truncateMiddle(getCheckpointSummary(checkpoint), 44)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onCheckpointReview(checkpoint)}
+                  className="text-xs font-medium text-accent-500 hover:text-accent-400"
+                >
+                  Review
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-primary-500">No open checkpoints.</p>
+          )}
+        </DetailPanel>
+
+        <DetailPanel title="Next Up">
+          {nextUpTasks.length > 0 ? (
+            nextUpTasks.map((task) => (
+              <div key={task.id} className="flex items-center gap-2 text-sm text-primary-600">
+                <span className="text-primary-400">⏸</span>
+                <span className="truncate">{task.name}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-primary-500">No queued tasks.</p>
+          )}
+        </DetailPanel>
+
+        <DetailPanel title="Agent Squad">
+          {squadEntries.length > 0 ? (
+            squadEntries.map((agent) => (
+              <div key={agent.id} className="flex items-center gap-2 text-sm">
+                <span
+                  className={cn(
+                    'inline-flex size-2 shrink-0 rounded-full',
+                    getAgentDotClass(agent),
+                  )}
+                />
+                <span className="min-w-0 flex-1 truncate font-medium text-primary-800">
+                  {agent.name}
+                </span>
+                <span className="truncate text-primary-500">
+                  {agent.currentTask}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-primary-500">
+              No agents assigned — configure in wizard
+            </p>
+          )}
+        </DetailPanel>
+      </div>
 
       {detailLoading ? (
         <div className="py-14 text-center">
@@ -759,6 +1071,122 @@ export function ProjectDetailView({
           </p>
         </div>
       )}
+
+      <div className="mt-6 grid gap-3 xl:grid-cols-3">
+        <DetailPanel title="Project Policies">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-primary-500">Approval</span>
+            <span className="text-primary-800">
+              {sourceProject?.auto_approve ? 'Auto' : 'Manual (PR mode)'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-primary-500">Required</span>
+            <span className="text-right text-primary-800">
+              {requiredChecks.length > 0 ? requiredChecks.join(', ') : 'None'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-primary-500">Max agents</span>
+            <span className="text-primary-800">
+              {sourceProject?.max_concurrent ?? 1}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-primary-500">Shell</span>
+            <span className="text-primary-800">
+              {allowedTools.includes('shell') ? '✅' : '❌'}
+            </span>
+          </div>
+        </DetailPanel>
+
+        <DetailPanel title="Health">
+          {healthQuery.isLoading ? (
+            <>
+              <div className="h-4 w-40 animate-shimmer rounded bg-primary-200/60" />
+              <div className="h-4 w-32 animate-shimmer rounded bg-primary-200/60" />
+              <div className="h-4 w-28 animate-shimmer rounded bg-primary-200/60" />
+            </>
+          ) : (
+            <>
+              <p
+                className={cn(
+                  'text-sm',
+                  healthSnapshot.tsc.status === 'passed'
+                    ? 'text-emerald-500'
+                    : healthSnapshot.tsc.status === 'failed'
+                      ? 'text-rose-500'
+                      : 'text-primary-500',
+                )}
+              >
+                {healthSnapshot.tsc.status === 'passed'
+                  ? `✅ Last tsc: passed (${formatRelativeTime(healthSnapshot.tsc.checkedAt ?? '')})`
+                  : healthSnapshot.tsc.status === 'failed'
+                    ? '❌ Last tsc: failed'
+                    : '⚪ Last tsc: not run yet'}
+              </p>
+              <p
+                className={cn(
+                  'text-sm',
+                  healthSnapshot.tests.status === 'passed'
+                    ? 'text-emerald-500'
+                    : healthSnapshot.tests.status === 'failed'
+                      ? 'text-rose-500'
+                      : 'text-primary-500',
+                )}
+              >
+                {healthSnapshot.tests.status === 'passed'
+                  ? `✅ ${healthSnapshot.tests.label}`
+                  : healthSnapshot.tests.status === 'failed'
+                    ? `❌ ${healthSnapshot.tests.label}`
+                    : `⚪ ${healthSnapshot.tests.label}`}
+              </p>
+              <p
+                className={cn(
+                  'text-sm',
+                  healthSnapshot.e2e.status === 'passed'
+                    ? 'text-emerald-500'
+                    : healthSnapshot.e2e.status === 'failed'
+                      ? 'text-rose-500'
+                      : 'text-primary-500',
+                )}
+              >
+                {healthSnapshot.e2e.status === 'passed'
+                  ? `✅ ${healthSnapshot.e2e.label}`
+                  : healthSnapshot.e2e.status === 'failed'
+                    ? `❌ ${healthSnapshot.e2e.label}`
+                    : `⚪ ${healthSnapshot.e2e.label}`}
+              </p>
+            </>
+          )}
+        </DetailPanel>
+
+        <DetailPanel title="Git">
+          <div className="space-y-1 text-sm leading-6 text-primary-600">
+            <p>
+              Branch:{' '}
+              <code className="font-mono text-accent-500">
+                {gitStatus?.branch ?? 'Unavailable'}
+              </code>
+            </p>
+            <p>
+              Commit:{' '}
+              <code className="font-mono text-primary-800">
+                {gitStatus?.commit_hash ?? 'N/A'}
+              </code>
+              {gitStatus?.commit_message ? ` ${truncateMiddle(gitStatus.commit_message, 40)}` : ''}
+            </p>
+            <p>
+              Date:{' '}
+              <span className="text-primary-800">
+                {gitStatus?.commit_date
+                  ? new Date(gitStatus.commit_date).toLocaleString()
+                  : 'Unavailable'}
+              </span>
+            </p>
+          </div>
+        </DetailPanel>
+      </div>
 
       <section className="mt-6 border-t border-primary-200 pt-5">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
