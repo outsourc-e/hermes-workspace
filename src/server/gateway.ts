@@ -110,8 +110,28 @@ export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
   const browserUrl = typeof window !== 'undefined' ? (window as any).__GATEWAY_URL__ : undefined
   const url = browserUrl || process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
-  const token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim() || ''
+  let token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim() || ''
   const password = process.env.CLAWDBOT_GATEWAY_PASSWORD?.trim() || ''
+
+  // Fallback: if env token is empty, try reading from ~/.openclaw/openclaw.json directly.
+  // This handles the case where .env gets reset (e.g. by gateway wizard POST)
+  // but the config file still has the correct token.
+  if (!token) {
+    try {
+      const os = require('node:os')
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
+      const raw = fs.readFileSync(configPath, 'utf-8')
+      const config = JSON.parse(raw)
+      const fileToken = config?.gateway?.auth?.token
+      if (fileToken) {
+        token = fileToken
+        // Also fix process.env so subsequent calls don't re-read the file
+        process.env.CLAWDBOT_GATEWAY_TOKEN = fileToken
+      }
+    } catch { /* config file not available — continue without token */ }
+  }
 
   // Allow connecting without shared auth — device identity signature handles authentication.
   // Some gateways (e.g. nanobot) run without a token by default.
