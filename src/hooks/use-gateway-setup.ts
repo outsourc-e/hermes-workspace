@@ -87,6 +87,14 @@ export async function fetchCurrentConfig(): Promise<{
 async function saveConfig(url: string, token: string): Promise<{ ok: boolean; error?: string }> {
   const normalizedUrl = normalizeGatewayUrl(url)
 
+  // Persist to localStorage so token survives page refresh
+  try {
+    localStorage.setItem('clawsuite-gateway-url', normalizedUrl)
+    localStorage.setItem('clawsuite-gateway-token', token)
+  } catch {
+    // Ignore localStorage write failures (private browsing, etc.)
+  }
+
   try {
     const response = await fetch('/api/gateway-config', {
       method: 'POST',
