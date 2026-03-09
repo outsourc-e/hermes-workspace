@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { getDatabase } from "./db";
 import type {
   ActivityLogEntry,
+  ActivityEvent,
   AgentRecord,
   Checkpoint,
   CreateMissionInput,
@@ -284,10 +285,69 @@ export class Tracker extends EventEmitter {
     this.db.prepare("UPDATE tasks SET status = ? WHERE id = ?").run(status, id);
     const task = this.getTask(id);
     if (task && task.status !== current.status) {
+      if (status === "running" || status === "completed" || status === "failed") {
+        this.logActivity(status === "running" ? "task.started" : `task.${status}`, "task", task.id, task.agent_id, {
+          task_id: task.id,
+          task_name: task.name,
+          mission_id: task.mission_id,
+          previous_status: current.status,
+          status,
+          ...this.getTaskProjectContext(task.id),
+        });
+      }
       this.emitSse("task.updated", task);
       this.emitMissionProgress(task.mission_id);
+
+      // Auto-complete mission when all its tasks are completed
+      if (status === "completed") {
+        this.checkMissionCompletion(task.mission_id);
+      }
     }
     return task;
+  }
+
+  private checkMissionCompletion(missionId: string): void {
+    const tasks = this.db
+      .prepare("SELECT status FROM tasks WHERE mission_id = ?")
+      .all(missionId) as Array<{ status: string }>;
+
+    if (tasks.length === 0) return;
+
+    const allCompleted = tasks.every((t) => t.status === "completed");
+    if (!allCompleted) return;
+
+    const mission = this.db.prepare("SELECT * FROM missions WHERE id = ?").get(missionId) as { id: string; status: string } | undefined;
+    if (!mission || mission.status === "completed") return;
+
+    this.db.prepare("UPDATE missions SET status = 'completed' WHERE id = ?").run(missionId);
+    this.logActivity("mission.completed", "mission", missionId, null, {
+      mission_id: missionId,
+      status: "completed",
+      ...this.getMissionProjectContext(missionId),
+    });
+    this.emitSse("mission.updated", { id: missionId, status: "completed" });
+
+    // Also check if the parent phase is complete
+    const phase = this.db.prepare(
+      "SELECT phases.id FROM phases JOIN missions ON missions.phase_id = phases.id WHERE missions.id = ?"
+    ).get(missionId) as { id: string } | undefined;
+    if (phase) {
+      this.checkPhaseCompletion(phase.id);
+    }
+  }
+
+  private checkPhaseCompletion(phaseId: string): void {
+    const missions = this.db
+      .prepare("SELECT status FROM missions WHERE phase_id = ?")
+      .all(phaseId) as Array<{ status: string }>;
+
+    if (missions.length === 0) return;
+
+    const allCompleted = missions.every((m) => m.status === "completed");
+    if (!allCompleted) return;
+
+    this.db.prepare("UPDATE phases SET status = 'completed' WHERE id = ?").run(phaseId);
+    this.emitSse("phase.updated", { id: phaseId, status: "completed" });
   }
 
   refreshMissionTaskStatuses(missionId: string): TaskWithRelations[] {
@@ -462,6 +522,49 @@ export class Tracker extends EventEmitter {
     return this.db.prepare("SELECT * FROM run_events ORDER BY id DESC LIMIT 200").all() as RunEvent[];
   }
 
+  listActivityEvents(filters: { project_id?: string; limit?: number } = {}): ActivityEvent[] {
+    const params: unknown[] = [];
+    const clauses = [
+      "activity_log.action IN ('task.started', 'task.completed', 'task.failed', 'checkpoint.created', 'mission.started', 'mission.completed')",
+    ];
+
+    if (filters.project_id) {
+      clauses.push("json_extract(activity_log.details, '$.project_id') = ?");
+      params.push(filters.project_id);
+    }
+
+    const limit = Number.isFinite(filters.limit)
+      ? Math.max(1, Math.min(200, Math.trunc(filters.limit ?? 50)))
+      : 50;
+    params.push(limit);
+
+    const rows = this.db
+      .prepare(
+        `SELECT activity_log.id, activity_log.action, activity_log.entity_type, activity_log.entity_id, activity_log.details, activity_log.created_at
+         FROM activity_log
+         WHERE ${clauses.join(" AND ")}
+         ORDER BY activity_log.created_at DESC, activity_log.id DESC
+         LIMIT ?`,
+      )
+      .all(...params) as Array<{
+      id: number;
+      action: string;
+      entity_type: string;
+      entity_id: string;
+      details: string | null;
+      created_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      type: row.action,
+      entity_type: row.entity_type,
+      entity_id: row.entity_id,
+      data: parseJsonOrDefault<Record<string, unknown> | null>(row.details, null),
+      timestamp: row.created_at,
+    }));
+  }
+
   createCheckpoint(
     taskRunId: string,
     summary: string | null,
@@ -473,6 +576,14 @@ export class Tracker extends EventEmitter {
         "INSERT INTO checkpoints (task_run_id, summary, diff_stat, commit_hash) VALUES (?, ?, ?, ?) RETURNING *",
       )
       .get(taskRunId, summary, diffStat, commitHash ?? null) as Checkpoint;
+    this.logActivity("checkpoint.created", "checkpoint", checkpoint.id, null, {
+      checkpoint_id: checkpoint.id,
+      task_run_id: taskRunId,
+      summary,
+      diff_stat: diffStat,
+      commit_hash: commitHash ?? null,
+      ...this.getCheckpointProjectContext(checkpoint.id),
+    });
     this.emitSse("checkpoint.created", checkpoint);
     return checkpoint;
   }
@@ -680,6 +791,12 @@ export class Tracker extends EventEmitter {
     const result = this.db.prepare("UPDATE missions SET status = 'running' WHERE id = ?").run(id);
     this.db.prepare("UPDATE tasks SET status = 'pending' WHERE mission_id = ? AND status = 'paused'").run(id);
     if (result.changes > 0) {
+      this.logActivity("mission.started", "mission", id, null, {
+        mission_id: id,
+        status: "running",
+        source: "start",
+        ...this.getMissionProjectContext(id),
+      });
       this.refreshMissionTaskStatuses(id);
       this.emitMissionProgress(id);
     }
@@ -699,6 +816,12 @@ export class Tracker extends EventEmitter {
     const result = this.db.prepare("UPDATE missions SET status = 'running' WHERE id = ?").run(id);
     this.db.prepare("UPDATE tasks SET status = 'pending' WHERE mission_id = ? AND status = 'paused'").run(id);
     if (result.changes > 0) {
+      this.logActivity("mission.started", "mission", id, null, {
+        mission_id: id,
+        status: "running",
+        source: "resume",
+        ...this.getMissionProjectContext(id),
+      });
       this.refreshMissionTaskStatuses(id);
       this.emitMissionProgress(id);
     }
@@ -720,6 +843,78 @@ export class Tracker extends EventEmitter {
       .get(action, entityType, entityId, agentId, JSON.stringify(details)) as ActivityLogEntry;
     this.emitSse("activity_log", entry);
     return entry;
+  }
+
+  private getTaskProjectContext(taskId: string): Record<string, unknown> {
+    const row = this.db
+      .prepare(
+        `SELECT tasks.name AS task_name, missions.id AS mission_id, missions.name AS mission_name, phases.id AS phase_id, projects.id AS project_id, projects.name AS project_name
+         FROM tasks
+         JOIN missions ON missions.id = tasks.mission_id
+         JOIN phases ON phases.id = missions.phase_id
+         JOIN projects ON projects.id = phases.project_id
+         WHERE tasks.id = ?`,
+      )
+      .get(taskId) as
+      | {
+          task_name: string;
+          mission_id: string;
+          mission_name: string;
+          phase_id: string;
+          project_id: string;
+          project_name: string;
+        }
+      | undefined;
+
+    return row ?? {};
+  }
+
+  private getMissionProjectContext(missionId: string): Record<string, unknown> {
+    const row = this.db
+      .prepare(
+        `SELECT missions.name AS mission_name, phases.id AS phase_id, projects.id AS project_id, projects.name AS project_name
+         FROM missions
+         JOIN phases ON phases.id = missions.phase_id
+         JOIN projects ON projects.id = phases.project_id
+         WHERE missions.id = ?`,
+      )
+      .get(missionId) as
+      | {
+          mission_name: string;
+          phase_id: string;
+          project_id: string;
+          project_name: string;
+        }
+      | undefined;
+
+    return row ?? {};
+  }
+
+  private getCheckpointProjectContext(checkpointId: string): Record<string, unknown> {
+    const row = this.db
+      .prepare(
+        `SELECT checkpoints.task_run_id, tasks.id AS task_id, tasks.name AS task_name, missions.id AS mission_id, missions.name AS mission_name, projects.id AS project_id, projects.name AS project_name
+         FROM checkpoints
+         JOIN task_runs ON task_runs.id = checkpoints.task_run_id
+         JOIN tasks ON tasks.id = task_runs.task_id
+         JOIN missions ON missions.id = tasks.mission_id
+         JOIN phases ON phases.id = missions.phase_id
+         JOIN projects ON projects.id = phases.project_id
+         WHERE checkpoints.id = ?`,
+      )
+      .get(checkpointId) as
+      | {
+          task_run_id: string;
+          task_id: string;
+          task_name: string;
+          mission_id: string;
+          mission_name: string;
+          project_id: string;
+          project_name: string;
+        }
+      | undefined;
+
+    return row ?? {};
   }
 
   private emitSse(event: string, payload: unknown): void {

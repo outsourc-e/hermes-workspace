@@ -8,6 +8,7 @@ import {
   EyeIcon,
   Folder01Icon,
   PlayCircleIcon,
+  RefreshIcon,
   Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -117,6 +118,15 @@ type WorkspaceStats = {
   checkpointsPending: number
   policyAlerts: number
   costToday: number
+}
+
+type WorkspaceActivityEvent = {
+  id: string
+  type: string
+  entity_type: string
+  entity_id: string
+  data: Record<string, unknown> | null
+  timestamp: string
 }
 
 type ProjectFormState = {
@@ -309,6 +319,18 @@ function normalizeStats(value: unknown): WorkspaceStats {
   }
 }
 
+function normalizeActivityEvent(value: unknown): WorkspaceActivityEvent {
+  const record = asRecord(value)
+  return {
+    id: String(record?.id ?? crypto.randomUUID()),
+    type: asString(record?.type) ?? 'activity.unknown',
+    entity_type: asString(record?.entity_type) ?? 'activity',
+    entity_id: asString(record?.entity_id) ?? '',
+    data: asRecord(record?.data),
+    timestamp: asString(record?.timestamp) ?? new Date().toISOString(),
+  }
+}
+
 function extractProjects(payload: unknown): Array<WorkspaceProject> {
   if (Array.isArray(payload)) return payload.map(normalizeProject)
 
@@ -359,6 +381,21 @@ function extractAgents(payload: unknown): Array<WorkspaceAgent> {
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
       return candidate.map(normalizeAgent)
+    }
+  }
+
+  return []
+}
+
+function extractActivityEvents(payload: unknown): Array<WorkspaceActivityEvent> {
+  if (Array.isArray(payload)) return payload.map(normalizeActivityEvent)
+
+  const record = asRecord(payload)
+  const candidates = [record?.events, record?.data, record?.items]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.map(normalizeActivityEvent)
     }
   }
 
@@ -418,6 +455,96 @@ function formatStatus(status: WorkspaceStatus): string {
   return status
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function formatRelativeTime(value: string): string {
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return 'just now'
+
+  const diffMs = timestamp - Date.now()
+  const diffSeconds = Math.round(diffMs / 1000)
+  const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ['day', 86_400],
+    ['hour', 3_600],
+    ['minute', 60],
+    ['second', 1],
+  ]
+
+  for (const [unit, seconds] of units) {
+    if (Math.abs(diffSeconds) >= seconds || unit === 'second') {
+      return formatter.format(Math.round(diffSeconds / seconds), unit)
+    }
+  }
+
+  return 'just now'
+}
+
+function getActivityEventDescription(event: WorkspaceActivityEvent): string {
+  const data = event.data
+  const taskName = asString(data?.task_name)
+  const missionName = asString(data?.mission_name)
+  const checkpointSummary = asString(data?.summary)
+
+  switch (event.type) {
+    case 'task.started':
+      return `Started task${taskName ? `: ${taskName}` : ''}`
+    case 'task.completed':
+      return `Completed task${taskName ? `: ${taskName}` : ''}`
+    case 'task.failed':
+      return `Failed task${taskName ? `: ${taskName}` : ''}`
+    case 'mission.started':
+      return `Started mission${missionName ? `: ${missionName}` : ''}`
+    case 'mission.completed':
+      return `Completed mission${missionName ? `: ${missionName}` : ''}`
+    case 'checkpoint.created':
+      return checkpointSummary
+        ? `Created checkpoint: ${checkpointSummary}`
+        : 'Created checkpoint'
+    default:
+      return event.type.replace(/\./g, ' ')
+  }
+}
+
+function getActivityEventTone(eventType: string): {
+  dotClass: string
+  icon: React.ComponentProps<typeof HugeiconsIcon>['icon']
+  iconClass: string
+} {
+  if (eventType === 'task.started' || eventType === 'mission.started') {
+    return {
+      dotClass: 'bg-sky-400 ring-4 ring-sky-400/10',
+      icon: PlayCircleIcon,
+      iconClass: 'text-sky-300',
+    }
+  }
+  if (eventType === 'task.completed' || eventType === 'mission.completed') {
+    return {
+      dotClass: 'bg-green-400 ring-4 ring-green-400/10',
+      icon: CheckmarkCircle02Icon,
+      iconClass: 'text-green-300',
+    }
+  }
+  if (eventType === 'task.failed') {
+    return {
+      dotClass: 'bg-red-400 ring-4 ring-red-400/10',
+      icon: Cancel01Icon,
+      iconClass: 'text-red-300',
+    }
+  }
+  if (eventType === 'checkpoint.created') {
+    return {
+      dotClass: 'bg-amber-400 ring-4 ring-amber-400/10',
+      icon: Task01Icon,
+      iconClass: 'text-amber-300',
+    }
+  }
+  return {
+    dotClass: 'bg-primary-500 ring-4 ring-primary-500/10',
+    icon: Clock01Icon,
+    iconClass: 'text-primary-300',
+  }
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -1078,6 +1205,24 @@ export function ProjectsScreen() {
     queryFn: () => listWorkspaceCheckpoints(),
   })
 
+  const activityEventsQuery = useQuery({
+    queryKey: ['workspace', 'events', selectedProjectId],
+    enabled: Boolean(selectedProjectId),
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: '30',
+      })
+
+      if (selectedProjectId) {
+        params.set('project_id', selectedProjectId)
+      }
+
+      return extractActivityEvents(
+        await apiRequest(`/api/workspace/events?${params.toString()}`),
+      )
+    },
+  })
+
   const projectCheckpointMutation = useMutation({
     mutationFn: ({
       checkpointId,
@@ -1108,6 +1253,7 @@ export function ProjectsScreen() {
 
   const agents = agentsQuery.data ?? []
   const allCheckpoints = checkpointsQuery.data ?? []
+  const activityEvents = activityEventsQuery.data ?? []
   const pendingCheckpoints = useMemo(
     () =>
       sortCheckpointsNewestFirst(
@@ -2464,6 +2610,98 @@ export function ProjectsScreen() {
                         {pendingProjectCheckpoints.length === 1 ? '' : 's'}
                       </p>
                     ) : null}
+                  </section>
+
+                  <section className="mt-6 border-t border-primary-800 pt-5">
+                    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-primary-100">
+                          Activity
+                        </h3>
+                        <p className="text-sm text-primary-400">
+                          Recent project events across missions, tasks, and checkpoints.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => activityEventsQuery.refetch()}
+                        disabled={activityEventsQuery.isFetching}
+                      >
+                        <HugeiconsIcon
+                          icon={RefreshIcon}
+                          size={14}
+                          strokeWidth={1.7}
+                        />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    {activityEventsQuery.isLoading ? (
+                      <div className="space-y-3">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                          <div
+                            key={index}
+                            className="rounded-2xl border border-primary-800 bg-primary-800/30 p-4"
+                          >
+                            <div className="h-4 w-40 animate-shimmer rounded bg-primary-800/80" />
+                            <div className="mt-2 h-4 w-24 animate-shimmer rounded bg-primary-800/60" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : activityEvents.length > 0 ? (
+                      <div className="relative pl-8">
+                        <div className="absolute bottom-2 left-[11px] top-2 w-px bg-primary-800" />
+                        <div className="space-y-3">
+                          {activityEvents.map((event) => {
+                            const tone = getActivityEventTone(event.type)
+
+                            return (
+                              <article
+                                key={event.id}
+                                className="relative rounded-2xl border border-primary-800 bg-primary-800/35 px-4 py-3"
+                              >
+                                <span
+                                  className={cn(
+                                    'absolute -left-[26px] top-4 block size-3 rounded-full border border-primary-950',
+                                    tone.dotClass,
+                                  )}
+                                />
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <HugeiconsIcon
+                                        icon={tone.icon}
+                                        size={15}
+                                        strokeWidth={1.7}
+                                        className={tone.iconClass}
+                                      />
+                                      <p className="truncate text-sm font-medium text-primary-100">
+                                        {getActivityEventDescription(event)}
+                                      </p>
+                                    </div>
+                                    <p className="mt-1 text-xs uppercase tracking-[0.14em] text-primary-500">
+                                      {event.entity_type.replace(/_/g, ' ')}
+                                    </p>
+                                  </div>
+                                  <span className="shrink-0 text-xs text-primary-400">
+                                    {formatRelativeTime(event.timestamp)}
+                                  </span>
+                                </div>
+                              </article>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-800/25 px-6 py-10 text-center">
+                        <p className="text-sm text-primary-300">
+                          No activity for this project yet.
+                        </p>
+                        <p className="mt-1 text-sm text-primary-500">
+                          Timeline entries will appear as missions run, tasks finish, and checkpoints are created.
+                        </p>
+                      </div>
+                    )}
                   </section>
                 </>
               ) : (

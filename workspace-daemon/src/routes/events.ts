@@ -14,7 +14,23 @@ function setupSseHeaders(res: Response): void {
 }
 
 export function registerEventsRoutes(router: Router, tracker: Tracker): void {
-  router.get("/", (_req: Request, res: Response) => {
+  router.get("/", (req: Request, res: Response) => {
+    const wantsStream =
+      req.accepts("text/event-stream") &&
+      !("limit" in req.query) &&
+      !("project_id" in req.query);
+
+    if (!wantsStream) {
+      const projectId =
+        typeof req.query.project_id === "string" ? req.query.project_id : undefined;
+      const limit =
+        typeof req.query.limit === "string"
+          ? Number.parseInt(req.query.limit, 10)
+          : undefined;
+      res.json(tracker.listActivityEvents({ project_id: projectId, limit }));
+      return;
+    }
+
     setupSseHeaders(res);
 
     const listener = (payload: { event: string; data: unknown }) => {

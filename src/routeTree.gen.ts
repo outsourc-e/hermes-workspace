@@ -95,6 +95,7 @@ import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/st
 import { Route as ApiWorkspaceProjectsRouteImport } from './routes/api/workspace/projects'
 import { Route as ApiWorkspacePhasesRouteImport } from './routes/api/workspace/phases'
 import { Route as ApiWorkspaceMissionsRouteImport } from './routes/api/workspace/missions'
+import { Route as ApiWorkspaceEventsRouteImport } from './routes/api/workspace/events'
 import { Route as ApiWorkspaceCheckpointsRouteImport } from './routes/api/workspace/checkpoints'
 import { Route as ApiWorkspaceAgentsRouteImport } from './routes/api/workspace/agents'
 import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
@@ -566,6 +567,11 @@ const ApiWorkspaceMissionsRoute = ApiWorkspaceMissionsRouteImport.update({
   path: '/missions',
   getParentRoute: () => ApiWorkspaceRoute,
 } as any)
+const ApiWorkspaceEventsRoute = ApiWorkspaceEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
 const ApiWorkspaceCheckpointsRoute = ApiWorkspaceCheckpointsRouteImport.update({
   id: '/checkpoints',
   path: '/checkpoints',
@@ -886,6 +892,7 @@ export interface FileRoutesByFullPath {
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
@@ -1013,6 +1020,7 @@ export interface FileRoutesByTo {
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
@@ -1142,6 +1150,7 @@ export interface FileRoutesById {
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
@@ -1272,6 +1281,7 @@ export interface FileRouteTypes {
     | '/api/tasks/$taskId'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/events'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
@@ -1399,6 +1409,7 @@ export interface FileRouteTypes {
     | '/api/tasks/$taskId'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/events'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
@@ -1527,6 +1538,7 @@ export interface FileRouteTypes {
     | '/api/tasks/$taskId'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/events'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
     | '/api/workspace/projects'
@@ -2250,6 +2262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceMissionsRouteImport
       parentRoute: typeof ApiWorkspaceRoute
     }
+    '/api/workspace/events': {
+      id: '/api/workspace/events'
+      path: '/events'
+      fullPath: '/api/workspace/events'
+      preLoaderRoute: typeof ApiWorkspaceEventsRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
     '/api/workspace/checkpoints': {
       id: '/api/workspace/checkpoints'
       path: '/checkpoints'
@@ -2671,6 +2690,7 @@ const ApiWorkspaceProjectsRouteWithChildren =
 interface ApiWorkspaceRouteChildren {
   ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRoute
   ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
+  ApiWorkspaceEventsRoute: typeof ApiWorkspaceEventsRoute
   ApiWorkspaceMissionsRoute: typeof ApiWorkspaceMissionsRouteWithChildren
   ApiWorkspacePhasesRoute: typeof ApiWorkspacePhasesRoute
   ApiWorkspaceProjectsRoute: typeof ApiWorkspaceProjectsRouteWithChildren
@@ -2680,6 +2700,7 @@ interface ApiWorkspaceRouteChildren {
 const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspaceAgentsRoute: ApiWorkspaceAgentsRoute,
   ApiWorkspaceCheckpointsRoute: ApiWorkspaceCheckpointsRouteWithChildren,
+  ApiWorkspaceEventsRoute: ApiWorkspaceEventsRoute,
   ApiWorkspaceMissionsRoute: ApiWorkspaceMissionsRouteWithChildren,
   ApiWorkspacePhasesRoute: ApiWorkspacePhasesRoute,
   ApiWorkspaceProjectsRoute: ApiWorkspaceProjectsRouteWithChildren,

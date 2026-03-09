@@ -179,6 +179,15 @@ export interface ActivityLogEntry {
   created_at: string;
 }
 
+export interface ActivityEvent {
+  id: number;
+  type: string;
+  entity_type: string;
+  entity_id: string;
+  data: Record<string, unknown> | null;
+  timestamp: string;
+}
+
 export interface ProjectDetail extends Project {
   phases: Array<
     Phase & {
