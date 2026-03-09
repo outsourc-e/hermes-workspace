@@ -45,6 +45,20 @@ export type WorkspaceCheckpointDiffFile = {
   patch: string
 }
 
+export type WorkspaceCheckpointVerificationItem = {
+  status: 'passed' | 'failed' | 'missing' | 'not_configured'
+  label: string
+  output: string | null
+  checked_at: string | null
+}
+
+export type WorkspaceCheckpointVerificationKey = 'tsc' | 'tests' | 'lint' | 'e2e'
+
+export type WorkspaceCheckpointVerificationMap = Record<
+  WorkspaceCheckpointVerificationKey,
+  WorkspaceCheckpointVerificationItem
+>
+
 export type WorkspaceCheckpointDetail = WorkspaceCheckpoint & {
   task_id: string | null
   project_id: string | null
@@ -62,13 +76,7 @@ export type WorkspaceCheckpointDetail = WorkspaceCheckpoint & {
   task_run_cost_cents: number | null
   run_events: WorkspaceCheckpointRunEvent[]
   diff_files: WorkspaceCheckpointDiffFile[]
-}
-
-export type WorkspaceCheckpointVerificationItem = {
-  status: 'passed' | 'failed' | 'missing' | 'not_configured'
-  label: string
-  output: string | null
-  checked_at: string | null
+  verification: WorkspaceCheckpointVerificationMap
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -149,6 +157,52 @@ function normalizeRunEvent(value: unknown): WorkspaceCheckpointRunEvent {
   }
 }
 
+function normalizeVerificationItem(value: unknown): WorkspaceCheckpointVerificationItem {
+  const record = asRecord(value)
+  const status = asString(record?.status)
+  return {
+    status:
+      status === 'passed' ||
+      status === 'failed' ||
+      status === 'missing' ||
+      status === 'not_configured'
+        ? status
+        : 'missing',
+    label: asString(record?.label) ?? 'Unknown',
+    output: typeof record?.output === 'string' ? record.output : null,
+    checked_at: asString(record?.checked_at) ?? null,
+  }
+}
+
+function getDefaultVerificationMap(): WorkspaceCheckpointVerificationMap {
+  return {
+    tsc: {
+      status: 'missing',
+      label: 'Not run yet',
+      output: null,
+      checked_at: null,
+    },
+    tests: {
+      status: 'not_configured',
+      label: 'Not configured',
+      output: null,
+      checked_at: null,
+    },
+    lint: {
+      status: 'not_configured',
+      label: 'Not configured',
+      output: null,
+      checked_at: null,
+    },
+    e2e: {
+      status: 'not_configured',
+      label: 'Not configured',
+      output: null,
+      checked_at: null,
+    },
+  }
+}
+
 export function extractCheckpoints(
   payload: unknown,
 ): Array<WorkspaceCheckpoint> {
@@ -219,6 +273,7 @@ export async function getWorkspaceCheckpointDetail(
 
   const detailRecord = asRecord(record.checkpoint) ?? record
   const parsedDiffStat = asRecord(record.parsed_diff_stat)
+  const verificationRecord = asRecord(record.verification) ?? asRecord(detailRecord.verification)
   const fileDiffs = Array.isArray(record.file_diffs)
     ? record.file_diffs.map((entry) => {
         const item = asRecord(entry)
@@ -275,6 +330,13 @@ export async function getWorkspaceCheckpointDetail(
       : Array.isArray(detailRecord.run_events)
         ? detailRecord.run_events.map(normalizeRunEvent)
         : [],
+    verification: {
+      ...getDefaultVerificationMap(),
+      tsc: normalizeVerificationItem(verificationRecord?.tsc),
+      tests: normalizeVerificationItem(verificationRecord?.tests),
+      lint: normalizeVerificationItem(verificationRecord?.lint),
+      e2e: normalizeVerificationItem(verificationRecord?.e2e),
+    },
     diff_files: fileDiffs.map((file) => {
       const totals = parseDiffLineTotals(rawDiffStat, file.path)
       return {

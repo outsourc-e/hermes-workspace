@@ -1,5 +1,6 @@
 import {
   ArrowDown01Icon,
+  FilterHorizontalIcon,
   PauseIcon,
   PlayCircleIcon,
   SquareArrowDown02Icon,
@@ -46,11 +47,11 @@ import {
 type StatusFilter =
   | 'all'
   | 'running'
-  | 'awaiting_review'
   | 'completed'
   | 'failed'
   | 'paused'
   | 'stopped'
+  | 'awaiting_review'
 
 async function readPayload(response: Response): Promise<unknown> {
   const text = await response.text()
@@ -283,7 +284,7 @@ function RecentRunRow({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-900/90 md:grid md:grid-cols-[minmax(0,2fr)_1.1fr_1fr_0.9fr_0.8fr_0.9fr_1fr_auto] md:items-center"
+        className="flex w-full flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-900/90 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr_auto] md:items-center"
       >
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-primary-100">{run.task_name}</p>
@@ -302,6 +303,7 @@ function RecentRunRow({
         </div>
         <p className="text-sm text-primary-300">{formatRunDuration(run)}</p>
         <p className="text-sm text-primary-300">{formatRunTokens(run)}</p>
+        <p className="text-sm text-primary-300">{formatRunCost(run.cost_cents)}</p>
         <p className="text-sm text-primary-300">
           {formatRunTimestamp(run.completed_at ?? run.started_at)}
         </p>
@@ -422,6 +424,11 @@ export function RunsConsoleScreen() {
     () => filteredRuns.filter((run) => !isRunningRun(run)),
     [filteredRuns],
   )
+  const hasFiltersApplied =
+    projectFilter !== 'all' ||
+    agentFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    timeRange !== 'today'
 
   const controlMutation = useMutation({
     mutationFn: async ({
@@ -479,11 +486,11 @@ export function RunsConsoleScreen() {
   const statusOptions: Array<{ label: string; value: StatusFilter }> = [
     { label: 'All statuses', value: 'all' },
     { label: 'Running', value: 'running' },
-    { label: 'Awaiting review', value: 'awaiting_review' },
     { label: 'Completed', value: 'completed' },
     { label: 'Failed', value: 'failed' },
     { label: 'Paused', value: 'paused' },
     { label: 'Stopped', value: 'stopped' },
+    { label: 'Awaiting review', value: 'awaiting_review' },
   ]
 
   const timeOptions: Array<{ label: string; value: RunTimeRange }> = [
@@ -512,31 +519,56 @@ export function RunsConsoleScreen() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <FilterSelect
-                label="Project"
-                value={projectFilter}
-                onChange={setProjectFilter}
-                options={projectOptions}
-              />
-              <FilterSelect
-                label="Agent"
-                value={agentFilter}
-                onChange={setAgentFilter}
-                options={agentOptions}
-              />
-              <FilterSelect
-                label="Status"
-                value={statusFilter}
-                onChange={(value) => setStatusFilter(value as StatusFilter)}
-                options={statusOptions}
-              />
-              <FilterSelect
-                label="Time Range"
-                value={timeRange}
-                onChange={(value) => setTimeRange(value as RunTimeRange)}
-                options={timeOptions}
-              />
+            <div className="flex w-full max-w-4xl flex-col gap-3 xl:items-end">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-primary-400">
+                <HugeiconsIcon icon={FilterHorizontalIcon} className="size-4 text-accent-300" />
+                Filters
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <FilterSelect
+                  label="Project"
+                  value={projectFilter}
+                  onChange={setProjectFilter}
+                  options={projectOptions}
+                />
+                <FilterSelect
+                  label="Agent"
+                  value={agentFilter}
+                  onChange={setAgentFilter}
+                  options={agentOptions}
+                />
+                <FilterSelect
+                  label="Status"
+                  value={statusFilter}
+                  onChange={(value) => setStatusFilter(value as StatusFilter)}
+                  options={statusOptions}
+                />
+                <FilterSelect
+                  label="Time Range"
+                  value={timeRange}
+                  onChange={(value) => setTimeRange(value as RunTimeRange)}
+                  options={timeOptions}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-primary-400">
+                <span>
+                  Showing {filteredRuns.length} run{filteredRuns.length === 1 ? '' : 's'}
+                </span>
+                {hasFiltersApplied ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectFilter('all')
+                      setAgentFilter('all')
+                      setStatusFilter('all')
+                      setTimeRange('today')
+                    }}
+                    className="rounded-full border border-primary-700 px-3 py-1 text-primary-200 transition-colors hover:border-accent-500/50 hover:text-accent-300"
+                  >
+                    Reset filters
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </header>
@@ -629,13 +661,14 @@ export function RunsConsoleScreen() {
             </span>
           </div>
 
-          <div className="hidden rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-3 text-xs uppercase tracking-[0.18em] text-primary-400 md:grid md:grid-cols-[minmax(0,2fr)_1.1fr_1fr_0.9fr_0.8fr_0.9fr_1fr_auto] md:items-center">
+          <div className="hidden rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-3 text-xs uppercase tracking-[0.18em] text-primary-400 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr_auto] md:items-center">
             <span>Task</span>
             <span>Project</span>
             <span>Agent</span>
             <span>Status</span>
             <span>Duration</span>
             <span>Tokens</span>
+            <span>Cost</span>
             <span>Timestamp</span>
             <span />
           </div>

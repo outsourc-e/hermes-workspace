@@ -92,14 +92,14 @@ export function getRunEventMessage(event: WorkspaceRunEvent): string {
 
   if (event.type === 'started') return 'Run started'
   if (event.type === 'completed') return 'Run completed'
-  if (event.type === 'error') return 'Run failed'
+  if (event.type === 'failed' || event.type === 'error') return 'Run failed'
   if (event.type === 'tool_use') return 'Tool invoked'
   if (event.type === 'checkpoint') return 'Checkpoint created'
   return formatRunStatus(event.type)
 }
 
 export function getRunEventLineClass(event: WorkspaceRunEvent): string {
-  if (event.type === 'error') return 'text-red-300'
+  if (event.type === 'failed' || event.type === 'error') return 'text-red-300'
   if (event.type === 'tool_use' || event.type === 'checkpoint') {
     return 'text-amber-300'
   }

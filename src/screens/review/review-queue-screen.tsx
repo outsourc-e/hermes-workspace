@@ -14,6 +14,8 @@ import {
   getCheckpointActionButtonClass,
   getCheckpointCommitHashLabel,
   getCheckpointDiffStat,
+  getCheckpointDiffStatParsed,
+  getCheckpointFullSummary,
   getCheckpointReviewSubmitLabel,
   getCheckpointReviewSuccessMessage,
   getCheckpointStatusBadgeClass,
@@ -89,9 +91,14 @@ function ReviewRow({
   onSubmitComposer: () => void
   mutationPending: boolean
 }) {
+  const [expanded, setExpanded] = useState(false)
   const isComposerOpen = composer?.checkpointId === checkpoint.id
   const canReview = isCheckpointReviewable(checkpoint)
   const commitHashLabel = getCheckpointCommitHashLabel(checkpoint)
+  const truncatedSummary = getCheckpointSummary(checkpoint, 200)
+  const fullSummary = getCheckpointFullSummary(checkpoint)
+  const isTruncated = truncatedSummary !== fullSummary
+  const parsedDiff = getCheckpointDiffStatParsed(checkpoint)
 
   return (
     <article className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4 md:p-5">
@@ -112,14 +119,25 @@ function ReviewRow({
           </div>
 
           <div>
-            <h2 className="text-base font-semibold text-primary-100">
-              {getCheckpointSummary(checkpoint)}
-            </h2>
-            <p className="mt-1 text-sm text-primary-400">
+            <p className="mt-1 text-sm font-medium text-primary-200">
               {checkpoint.project_name || 'Unassigned project'}
               {checkpoint.task_name ? ` · ${checkpoint.task_name}` : ''}
               {checkpoint.agent_name ? ` · ${checkpoint.agent_name}` : ''}
             </p>
+            <div className="mt-2">
+              <p className="whitespace-pre-wrap text-sm text-primary-300 leading-relaxed">
+                {expanded ? fullSummary : truncatedSummary}
+              </p>
+              {isTruncated && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded(!expanded)}
+                  className="mt-1 text-xs font-medium text-accent-400 hover:text-accent-300 transition-colors"
+                >
+                  {expanded ? 'Show less' : 'Show full log'}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-3 text-sm text-primary-300 md:grid-cols-2 xl:grid-cols-3">
@@ -127,9 +145,23 @@ function ReviewRow({
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                 Diff Stat
               </p>
-              <p className="mt-1 text-sm text-primary-200">
+              <p className="mt-1 text-sm font-medium text-primary-200">
                 {getCheckpointDiffStat(checkpoint)}
               </p>
+              {parsedDiff && parsedDiff.changedFiles.length > 0 && (
+                <div className="mt-2 space-y-0.5">
+                  {parsedDiff.changedFiles.slice(0, 5).map((file) => (
+                    <p key={file} className="truncate text-xs text-primary-400 font-mono">
+                      {file}
+                    </p>
+                  ))}
+                  {parsedDiff.changedFiles.length > 5 && (
+                    <p className="text-xs text-primary-500">
+                      +{parsedDiff.changedFiles.length - 5} more
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="rounded-xl border border-primary-800 bg-primary-800/40 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
