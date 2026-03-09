@@ -19,6 +19,8 @@ function computeRetryDelay(attempt: number): number {
 export class Orchestrator extends EventEmitter {
   private readonly tracker: Tracker;
   private readonly agentRunner: AgentRunner;
+  private readonly abortControllers: Map<string, AbortController>;
+  private readonly controlRequests: Map<string, { status: Extract<TaskRunStatus, "paused" | "stopped">; reason: string }>;
   private timer: NodeJS.Timeout | null = null;
   readonly state: OrchestratorState;
 
@@ -26,6 +28,8 @@ export class Orchestrator extends EventEmitter {
     super();
     this.tracker = tracker;
     this.agentRunner = agentRunner;
+    this.abortControllers = new Map();
+    this.controlRequests = new Map();
     const workflowConfig = getWorkflowConfig();
     this.state = {
       pollIntervalMs: workflowConfig.pollIntervalMs,
@@ -64,6 +68,31 @@ export class Orchestrator extends EventEmitter {
 
     this.tracker.setTaskStatus(taskId, "ready");
     await this.tick();
+    return true;
+  }
+
+  controlTaskRun(runId: string, action: "pause" | "stop"): boolean {
+    const runningEntry = [...this.state.running.values()].find((entry) => entry.runId === runId);
+    if (!runningEntry) {
+      return false;
+    }
+
+    const nextStatus: Extract<TaskRunStatus, "paused" | "stopped"> = action === "pause" ? "paused" : "stopped";
+    const reason = action === "pause" ? "Paused by user" : "Stopped by user";
+    const controller = this.abortControllers.get(runId);
+    if (!controller) {
+      return false;
+    }
+
+    this.controlRequests.set(runId, {
+      status: nextStatus,
+      reason,
+    });
+    this.tracker.appendRunEvent(runId, "status", {
+      status: nextStatus,
+      message: reason,
+    });
+    controller.abort(reason);
     return true;
   }
 
@@ -116,6 +145,7 @@ export class Orchestrator extends EventEmitter {
     this.tracker.setAgentStatus(agent.id, "running");
 
     const taskRun = this.tracker.createTaskRun(task.id, agent.id, null, attempt);
+    const abortController = new AbortController();
     const runningEntry: RunningEntry = {
       taskId: task.id,
       runId: taskRun.id,
@@ -126,6 +156,7 @@ export class Orchestrator extends EventEmitter {
       session: null,
     };
     this.state.running.set(task.id, runningEntry);
+    this.abortControllers.set(taskRun.id, abortController);
     this.emit("dispatch", { taskId: task.id, runId: taskRun.id });
 
     try {
@@ -135,9 +166,26 @@ export class Orchestrator extends EventEmitter {
         taskRun,
         agent,
         attempt,
+        signal: abortController.signal,
       });
 
       runningEntry.workspacePath = workspacePath;
+      const controlRequest = this.controlRequests.get(taskRun.id);
+
+      if (controlRequest || result.status === "stopped") {
+        const finalStatus = controlRequest?.status ?? "stopped";
+        const finalError = controlRequest?.reason ?? result.error ?? result.summary;
+        this.tracker.updateTaskRun(taskRun.id, {
+          status: finalStatus,
+          completed_at: nowIso(),
+          error: finalError,
+          input_tokens: result.inputTokens,
+          output_tokens: result.outputTokens,
+          cost_cents: result.costCents,
+        });
+        this.tracker.setTaskStatus(task.id, finalStatus);
+        return;
+      }
 
       const taskRunStatus: TaskRunStatus = result.status === "completed" ? "awaiting_review" : "failed";
       this.tracker.updateTaskRun(taskRun.id, {
@@ -163,6 +211,17 @@ export class Orchestrator extends EventEmitter {
         this.queueRetry(task.id, attempt, result.error ?? result.summary);
       }
     } catch (error) {
+      const controlRequest = this.controlRequests.get(taskRun.id);
+      if (controlRequest) {
+        this.tracker.updateTaskRun(taskRun.id, {
+          status: controlRequest.status,
+          completed_at: nowIso(),
+          error: controlRequest.reason,
+        });
+        this.tracker.setTaskStatus(task.id, controlRequest.status);
+        return;
+      }
+
       const message = error instanceof Error ? error.message : String(error);
       this.tracker.updateTaskRun(taskRun.id, {
         status: "failed",
@@ -172,6 +231,8 @@ export class Orchestrator extends EventEmitter {
       this.tracker.setTaskStatus(task.id, "failed");
       this.queueRetry(task.id, attempt, message);
     } finally {
+      this.abortControllers.delete(taskRun.id);
+      this.controlRequests.delete(taskRun.id);
       this.state.running.delete(task.id);
       this.state.claimed.delete(task.id);
       this.tracker.setAgentStatus(agent.id, "idle");

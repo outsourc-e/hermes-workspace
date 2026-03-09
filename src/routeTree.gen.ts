@@ -135,6 +135,8 @@ import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/work
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
 import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents.$pid.kill'
+import { Route as ApiWorkspaceTaskRunsIdStopRouteImport } from './routes/api/workspace/task-runs.$id.stop'
+import { Route as ApiWorkspaceTaskRunsIdPauseRouteImport } from './routes/api/workspace/task-runs.$id.pause'
 import { Route as ApiWorkspaceTaskRunsIdEventsRouteImport } from './routes/api/workspace/task-runs.$id.events'
 import { Route as ApiWorkspaceMissionsIdStartRouteImport } from './routes/api/workspace/missions.$id.start'
 import { Route as ApiWorkspaceCheckpointsIdVerifyTscRouteImport } from './routes/api/workspace/checkpoints.$id.verify-tsc'
@@ -779,6 +781,18 @@ const ApiCliAgentsPidKillRoute = ApiCliAgentsPidKillRouteImport.update({
   path: '/$pid/kill',
   getParentRoute: () => ApiCliAgentsRoute,
 } as any)
+const ApiWorkspaceTaskRunsIdStopRoute =
+  ApiWorkspaceTaskRunsIdStopRouteImport.update({
+    id: '/$id/stop',
+    path: '/$id/stop',
+    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
+  } as any)
+const ApiWorkspaceTaskRunsIdPauseRoute =
+  ApiWorkspaceTaskRunsIdPauseRouteImport.update({
+    id: '/$id/pause',
+    path: '/$id/pause',
+    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
+  } as any)
 const ApiWorkspaceTaskRunsIdEventsRoute =
   ApiWorkspaceTaskRunsIdEventsRouteImport.update({
     id: '/$id/events',
@@ -977,6 +991,8 @@ export interface FileRoutesByFullPath {
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
+  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
+  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1114,6 +1130,8 @@ export interface FileRoutesByTo {
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
+  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
+  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1253,6 +1271,8 @@ export interface FileRoutesById {
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
+  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
+  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1393,6 +1413,8 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/verify-tsc'
     | '/api/workspace/missions/$id/start'
     | '/api/workspace/task-runs/$id/events'
+    | '/api/workspace/task-runs/$id/pause'
+    | '/api/workspace/task-runs/$id/stop'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1530,6 +1552,8 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/verify-tsc'
     | '/api/workspace/missions/$id/start'
     | '/api/workspace/task-runs/$id/events'
+    | '/api/workspace/task-runs/$id/pause'
+    | '/api/workspace/task-runs/$id/stop'
   id:
     | '__root__'
     | '/'
@@ -1668,6 +1692,8 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/verify-tsc'
     | '/api/workspace/missions/$id/start'
     | '/api/workspace/task-runs/$id/events'
+    | '/api/workspace/task-runs/$id/pause'
+    | '/api/workspace/task-runs/$id/stop'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2656,6 +2682,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCliAgentsPidKillRouteImport
       parentRoute: typeof ApiCliAgentsRoute
     }
+    '/api/workspace/task-runs/$id/stop': {
+      id: '/api/workspace/task-runs/$id/stop'
+      path: '/$id/stop'
+      fullPath: '/api/workspace/task-runs/$id/stop'
+      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdStopRouteImport
+      parentRoute: typeof ApiWorkspaceTaskRunsRoute
+    }
+    '/api/workspace/task-runs/$id/pause': {
+      id: '/api/workspace/task-runs/$id/pause'
+      path: '/$id/pause'
+      fullPath: '/api/workspace/task-runs/$id/pause'
+      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdPauseRouteImport
+      parentRoute: typeof ApiWorkspaceTaskRunsRoute
+    }
     '/api/workspace/task-runs/$id/events': {
       id: '/api/workspace/task-runs/$id/events'
       path: '/$id/events'
@@ -2889,10 +2929,14 @@ const ApiWorkspaceProjectsRouteWithChildren =
 
 interface ApiWorkspaceTaskRunsRouteChildren {
   ApiWorkspaceTaskRunsIdEventsRoute: typeof ApiWorkspaceTaskRunsIdEventsRoute
+  ApiWorkspaceTaskRunsIdPauseRoute: typeof ApiWorkspaceTaskRunsIdPauseRoute
+  ApiWorkspaceTaskRunsIdStopRoute: typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 
 const ApiWorkspaceTaskRunsRouteChildren: ApiWorkspaceTaskRunsRouteChildren = {
   ApiWorkspaceTaskRunsIdEventsRoute: ApiWorkspaceTaskRunsIdEventsRoute,
+  ApiWorkspaceTaskRunsIdPauseRoute: ApiWorkspaceTaskRunsIdPauseRoute,
+  ApiWorkspaceTaskRunsIdStopRoute: ApiWorkspaceTaskRunsIdStopRoute,
 }
 
 const ApiWorkspaceTaskRunsRouteWithChildren =

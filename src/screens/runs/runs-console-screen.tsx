@@ -1,38 +1,56 @@
 import {
-  Cancel01Icon,
-  CheckmarkCircle02Icon,
-  Clock01Icon,
-  ComputerTerminal01Icon,
-  Folder01Icon,
+  ArrowDown01Icon,
+  PauseIcon,
   PlayCircleIcon,
+  SquareArrowDown02Icon,
   Task01Icon,
+  TimeQuarterPassIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
-import { AnimatePresence, motion } from 'motion/react'
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 import {
   extractAgents,
   extractProjects,
-  extractRunEvents,
-  extractTaskRuns,
   type WorkspaceAgent,
   type WorkspaceProject,
-  type WorkspaceRunEvent,
-  type WorkspaceTaskRun,
 } from '@/screens/projects/lib/workspace-types'
 import {
-  formatRelativeTime,
-  formatStatus,
-  getStatusBadgeClass,
-} from '@/screens/projects/lib/workspace-utils'
+  extractRunEvents,
+  extractTaskRuns,
+  type WorkspaceRunEvent,
+  type WorkspaceTaskRun,
+} from './lib/runs-types'
+import {
+  formatRunCost,
+  formatRunDuration,
+  formatRunStatus,
+  formatRunTimestamp,
+  formatRunTokens,
+  getConsoleLineClass,
+  getRunEventMessage,
+  getRunProgress,
+  getRunStatusClass,
+  isRunningRun,
+  matchesTimeRange,
+  sortRunsNewestFirst,
+  type RunTimeRange,
+} from './lib/runs-utils'
 
-const RUN_POLL_MS = 5_000
-
-type StatusFilter = 'all' | 'running' | 'completed' | 'failed'
-type TimeRangeFilter = 'hour' | 'today' | 'all'
+type StatusFilter =
+  | 'all'
+  | 'running'
+  | 'awaiting_review'
+  | 'completed'
+  | 'failed'
+  | 'paused'
+  | 'stopped'
 
 async function readPayload(response: Response): Promise<unknown> {
   const text = await response.text()
@@ -64,95 +82,49 @@ async function apiRequest(input: string, init?: RequestInit): Promise<unknown> {
   return payload
 }
 
-function parseTime(value?: string): number | null {
-  if (!value) return null
-  const timestamp = new Date(value).getTime()
-  return Number.isFinite(timestamp) ? timestamp : null
-}
+function RunLog({
+  events,
+  compact = false,
+}: {
+  events: Array<WorkspaceRunEvent>
+  compact?: boolean
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
-function matchesTimeRange(run: WorkspaceTaskRun, range: TimeRangeFilter): boolean {
-  if (range === 'all') return true
+  useEffect(() => {
+    const node = containerRef.current
+    if (!node) return
+    node.scrollTop = node.scrollHeight
+  }, [events])
 
-  const timestamp =
-    parseTime(run.started_at) ??
-    parseTime(run.completed_at) ??
-    Number.NaN
-
-  if (!Number.isFinite(timestamp)) return false
-
-  const now = Date.now()
-  if (range === 'hour') {
-    return now - timestamp <= 60 * 60 * 1000
-  }
-
-  const startOfDay = new Date()
-  startOfDay.setHours(0, 0, 0, 0)
-  return timestamp >= startOfDay.getTime()
-}
-
-function formatTimestamp(value?: string): string {
-  if (!value) return 'Unknown'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Unknown'
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
-
-function formatDuration(startedAt?: string, completedAt?: string): string {
-  const start = parseTime(startedAt)
-  const end = parseTime(completedAt) ?? Date.now()
-  if (!start || end < start) return 'n/a'
-
-  const totalSeconds = Math.max(0, Math.round((end - start) / 1000))
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-
-  if (hours > 0) return `${hours}h ${minutes}m`
-  if (minutes > 0) return `${minutes}m ${seconds}s`
-  return `${seconds}s`
-}
-
-function formatTokens(run: WorkspaceTaskRun): string {
-  const total = run.input_tokens + run.output_tokens
-  return total > 0 ? total.toLocaleString() : '0'
-}
-
-function formatCost(costCents: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(costCents / 100)
-}
-
-function getRunPreview(events: WorkspaceRunEvent[]): string[] {
-  const lines = events
-    .map((event) => {
-      const message = event.data?.message
-      if (typeof message === 'string' && message.trim().length > 0) {
-        return message.trimEnd()
-      }
-
-      if (event.type === 'started') {
-        return 'Run started'
-      }
-      if (event.type === 'completed') {
-        return 'Run completed'
-      }
-      if (event.type === 'error') {
-        return 'Run failed'
-      }
-
-      const fallback = event.data
-        ? JSON.stringify(event.data)
-        : event.type.replace(/_/g, ' ')
-      return fallback
-    })
-    .filter((line) => line.length > 0)
-
-  return lines.length > 0 ? lines : ['Waiting for run output…']
+  return (
+    <div
+      ref={containerRef}
+      className={[
+        'overflow-y-auto rounded-2xl border border-primary-800 bg-primary-950/90 font-mono text-xs',
+        compact ? 'max-h-56 p-3' : 'max-h-80 p-4',
+      ].join(' ')}
+    >
+      {events.length > 0 ? (
+        <div className="space-y-2">
+          {events.map((event) => (
+            <div key={event.id} className="grid grid-cols-[72px_1fr] gap-3">
+              <span className="text-primary-400">
+                {new Date(event.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })}
+              </span>
+              <p className={getConsoleLineClass(event)}>{getRunEventMessage(event)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-primary-400">No run output yet.</p>
+      )}
+    </div>
+  )
 }
 
 function FilterSelect({
@@ -167,14 +139,14 @@ function FilterSelect({
   options: Array<{ label: string; value: string }>
 }) {
   return (
-    <label className="flex min-w-0 flex-col gap-2">
-      <span className="text-[11px] uppercase tracking-[0.16em] text-primary-400">
+    <label className="flex min-w-[160px] flex-1 flex-col gap-2 text-xs text-primary-300">
+      <span className="font-medium uppercase tracking-[0.18em] text-primary-400">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-xl border border-primary-800 bg-primary-900 px-3 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+        className="rounded-xl border border-primary-700 bg-primary-900 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -186,172 +158,109 @@ function FilterSelect({
   )
 }
 
-function RunsLog({
-  runId,
-  active,
-  compact = false,
+function ActiveRunCard({
+  run,
+  events,
+  actionPending,
+  onPause,
+  onStop,
 }: {
-  runId: string
-  active: boolean
-  compact?: boolean
+  run: WorkspaceTaskRun
+  events: Array<WorkspaceRunEvent>
+  actionPending: boolean
+  onPause: (runId: string) => void
+  onStop: (runId: string) => void
 }) {
-  const viewportRef = useRef<HTMLDivElement | null>(null)
-  const eventsQuery = useQuery({
-    queryKey: ['workspace', 'task-run-events', runId],
-    queryFn: async () =>
-      extractRunEvents(
-        await apiRequest(`/api/workspace/task-runs/${encodeURIComponent(runId)}/events`),
-      ),
-    refetchInterval: active ? RUN_POLL_MS : false,
-  })
-
-  const lines = useMemo(
-    () => getRunPreview(eventsQuery.data ?? []),
-    [eventsQuery.data],
-  )
-
-  useEffect(() => {
-    const node = viewportRef.current
-    if (!node) return
-    node.scrollTop = node.scrollHeight
-  }, [lines.length])
-
-  if (eventsQuery.isLoading) {
-    return (
-      <div className="rounded-2xl border border-primary-800 bg-primary-950/90 p-4">
-        <div className="h-24 animate-pulse rounded-xl bg-primary-900/70" />
-      </div>
-    )
-  }
-
-  if (eventsQuery.isError) {
-    return (
-      <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-        {eventsQuery.error instanceof Error
-          ? eventsQuery.error.message
-          : 'Failed to load run output'}
-      </div>
-    )
-  }
+  const progress = getRunProgress(run, events)
 
   return (
-    <div
-      ref={viewportRef}
-      className={cn(
-        'overflow-y-auto rounded-2xl border border-primary-800 bg-primary-950/95 font-mono text-[12px] leading-6 text-primary-200',
-        compact ? 'max-h-52 p-3' : 'max-h-72 p-4',
-      )}
-    >
-      {lines.map((line, index) => (
-        <div
-          key={`${runId}-${index}-${line.slice(0, 24)}`}
-          className="whitespace-pre-wrap break-words"
-        >
-          <span className="mr-2 text-primary-500">$</span>
-          {line}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ActiveRunCard({ run }: { run: WorkspaceTaskRun }) {
-  return (
-    <article className="rounded-3xl border border-primary-800 bg-primary-900/80 p-5 shadow-[0_20px_60px_rgba(3,7,18,0.35)]">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
-                  getStatusBadgeClass(run.status),
-                )}
-              >
-                <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-                {formatStatus(run.status)}
-              </span>
-              <span className="rounded-full border border-primary-700 bg-primary-800/80 px-3 py-1 text-xs text-primary-300">
-                Attempt {run.attempt}
-              </span>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold text-primary-100">
-                {run.task_name}
-              </h3>
-              <p className="mt-1 text-sm text-primary-300">
-                {run.agent_name || 'Unassigned agent'}
-                {run.project_name ? ` · ${run.project_name}` : ''}
-                {run.mission_name ? ` · ${run.mission_name}` : ''}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/40 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
-                Elapsed
-              </p>
-              <p className="mt-1 text-sm font-medium text-primary-100">
-                {formatDuration(run.started_at)}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/40 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
-                Started
-              </p>
-              <p className="mt-1 text-sm font-medium text-primary-100">
-                {run.started_at ? formatRelativeTime(run.started_at) : 'Unknown'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/40 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
-                Tokens
-              </p>
-              <p className="mt-1 text-sm font-medium text-primary-100">
-                {formatTokens(run)}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/40 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
-                Workspace
-              </p>
-              <p className="mt-1 truncate text-sm font-medium text-primary-100">
-                {run.workspace_path || 'Allocating…'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <RunsLog runId={run.id} active />
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <article className="rounded-3xl border border-primary-800 bg-primary-900/75 p-4 shadow-sm md:p-5">
+      <div className="flex flex-col gap-4 border-b border-primary-800 pb-4 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="Pause is not exposed by the daemon for active task runs yet."
-              className="border-primary-700 bg-primary-900/60 text-primary-300"
+            <span className="inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-xs font-medium text-accent-300">
+              <span className="size-2 rounded-full bg-accent-400" />
+              Live run
+            </span>
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getRunStatusClass(
+                run.status,
+              )}`}
             >
-              <HugeiconsIcon icon={Clock01Icon} size={16} strokeWidth={1.8} />
-              Pause
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="Stop is not exposed by the daemon for active task runs yet."
-              className="border-primary-700 bg-primary-900/60 text-primary-300"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.8} />
-              Stop
-            </Button>
+              {formatRunStatus(run.status)}
+            </span>
           </div>
-          <p className="text-xs text-primary-500">
-            Run controls are pending daemon support.
-          </p>
+          <div>
+            <h2 className="text-lg font-semibold text-primary-100">{run.task_name}</h2>
+            <p className="mt-1 text-sm text-primary-300">
+              {run.project_name} · {run.mission_name} · {run.agent_name ?? 'Unassigned agent'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={actionPending}
+            onClick={() => onPause(run.id)}
+            className="inline-flex items-center gap-2 rounded-xl border border-primary-700 bg-primary-950 px-3 py-2 text-sm font-medium text-primary-100 transition-colors hover:border-amber-500/50 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <HugeiconsIcon icon={PauseIcon} className="size-4" />
+            Pause
+          </button>
+          <button
+            type="button"
+            disabled={actionPending}
+            onClick={() => onStop(run.id)}
+            className="inline-flex items-center gap-2 rounded-xl bg-accent-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <HugeiconsIcon icon={SquareArrowDown02Icon} className="size-4" />
+            Stop
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <RunLog events={events} compact />
+
+        <div className="space-y-4 rounded-2xl border border-primary-800 bg-primary-950/50 p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Elapsed</p>
+              <p className="mt-1 text-sm font-medium text-primary-100">
+                {formatRunDuration(run)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Attempt</p>
+              <p className="mt-1 text-sm font-medium text-primary-100">{run.attempt}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Tokens</p>
+              <p className="mt-1 text-sm font-medium text-primary-100">
+                {formatRunTokens(run)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Cost</p>
+              <p className="mt-1 text-sm font-medium text-primary-100">
+                {formatRunCost(run.cost_cents)}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between text-xs text-primary-300">
+              <span>Progress</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-primary-800">
+              <div
+                className="h-2 rounded-full bg-accent-500 transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </article>
@@ -360,222 +269,245 @@ function ActiveRunCard({ run }: { run: WorkspaceTaskRun }) {
 
 function RecentRunRow({
   run,
+  events,
   expanded,
   onToggle,
 }: {
   run: WorkspaceTaskRun
+  events: Array<WorkspaceRunEvent>
   expanded: boolean
   onToggle: () => void
 }) {
   return (
-    <div className="rounded-2xl border border-primary-800 bg-primary-900/65">
+    <article className="rounded-2xl border border-primary-800 bg-primary-900/65">
       <button
         type="button"
         onClick={onToggle}
-        className="grid w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-primary-800/40 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_auto_auto_auto_auto]"
+        className="flex w-full flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-900/90 md:grid md:grid-cols-[minmax(0,2fr)_1.1fr_1fr_0.9fr_0.8fr_0.9fr_1fr_auto] md:items-center"
       >
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-primary-100">
-            {run.task_name}
-          </p>
-          <p className="mt-1 truncate text-xs text-primary-400">
-            {run.mission_name || 'No mission'}
-          </p>
+          <p className="truncate text-sm font-semibold text-primary-100">{run.task_name}</p>
+          <p className="mt-1 text-xs text-primary-400">{run.mission_name}</p>
         </div>
-        <p className="truncate text-sm text-primary-300">
-          {run.project_name || 'Unknown project'}
-        </p>
-        <p className="truncate text-sm text-primary-300">
-          {run.agent_name || 'Unassigned'}
-        </p>
-        <div className="sm:text-right">
+        <p className="text-sm text-primary-300">{run.project_name}</p>
+        <p className="text-sm text-primary-300">{run.agent_name ?? 'Unknown agent'}</p>
+        <div>
           <span
-            className={cn(
-              'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium',
-              getStatusBadgeClass(run.status),
-            )}
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getRunStatusClass(
+              run.status,
+            )}`}
           >
-            {formatStatus(run.status)}
+            {formatRunStatus(run.status)}
           </span>
         </div>
-        <p className="text-sm text-primary-300 sm:text-right">
-          {formatDuration(run.started_at, run.completed_at)}
+        <p className="text-sm text-primary-300">{formatRunDuration(run)}</p>
+        <p className="text-sm text-primary-300">{formatRunTokens(run)}</p>
+        <p className="text-sm text-primary-300">
+          {formatRunTimestamp(run.completed_at ?? run.started_at)}
         </p>
-        <p className="text-sm text-primary-300 sm:text-right">
-          {formatTokens(run)}
-          <span className="ml-2 text-primary-500">{formatCost(run.cost_cents)}</span>
-        </p>
-        <p className="text-sm text-primary-300 sm:text-right">
-          {formatTimestamp(run.completed_at || run.started_at)}
-        </p>
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          className={`size-4 text-primary-400 transition-transform ${
+            expanded ? 'rotate-180' : ''
+          }`}
+        />
       </button>
 
-      <AnimatePresence initial={false}>
-        {expanded ? (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="overflow-hidden border-t border-primary-800"
-          >
-            <div className="space-y-3 p-4">
-              {run.error ? (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                  {run.error}
-                </div>
-              ) : null}
-              <RunsLog runId={run.id} active={false} compact />
+      {expanded ? (
+        <div className="border-t border-primary-800 px-4 py-4">
+          <div className="mb-4 grid gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Started</p>
+              <p className="mt-1 text-sm text-primary-100">
+                {formatRunTimestamp(run.started_at)}
+              </p>
             </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
+            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Cost</p>
+              <p className="mt-1 text-sm text-primary-100">
+                {formatRunCost(run.cost_cents)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Workspace</p>
+              <p className="mt-1 truncate text-sm text-primary-100">
+                {run.workspace_path ?? 'No workspace recorded'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary-400">Error</p>
+              <p className="mt-1 text-sm text-primary-100">
+                {run.error ?? 'No error recorded'}
+              </p>
+            </div>
+          </div>
+          <RunLog events={events} />
+        </div>
+      ) : null}
+    </article>
   )
 }
 
 export function RunsConsoleScreen() {
+  const queryClient = useQueryClient()
   const [projectFilter, setProjectFilter] = useState('all')
   const [agentFilter, setAgentFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [timeRange, setTimeRange] = useState<TimeRangeFilter>('today')
+  const [timeRange, setTimeRange] = useState<RunTimeRange>('today')
   const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
-
-  const projectsQuery = useQuery({
-    queryKey: ['workspace', 'projects'],
-    queryFn: async () => extractProjects(await apiRequest('/api/workspace/projects')),
-  })
-
-  const agentsQuery = useQuery({
-    queryKey: ['workspace', 'agents'],
-    queryFn: async () => extractAgents(await apiRequest('/api/workspace/agents')),
-  })
 
   const runsQuery = useQuery({
     queryKey: ['workspace', 'task-runs'],
     queryFn: async () => extractTaskRuns(await apiRequest('/api/workspace/task-runs')),
-    refetchInterval: RUN_POLL_MS,
+    refetchInterval: 5_000,
   })
 
-  const projects = projectsQuery.data ?? []
-  const agents = agentsQuery.data ?? []
+  const projectsQuery = useQuery({
+    queryKey: ['workspace', 'projects', 'for-runs'],
+    queryFn: async () => extractProjects(await apiRequest('/api/workspace/projects')),
+    staleTime: 60_000,
+  })
+
+  const agentsQuery = useQuery({
+    queryKey: ['workspace', 'agents', 'for-runs'],
+    queryFn: async () => extractAgents(await apiRequest('/api/workspace/agents')),
+    staleTime: 60_000,
+  })
+
   const runs = runsQuery.data ?? []
+  const activeRuns = useMemo(() => runs.filter(isRunningRun), [runs])
+  const expandedRecentRunIds = useMemo(
+    () => Object.entries(expandedRunIds).flatMap(([id, expanded]) => (expanded ? [id] : [])),
+    [expandedRunIds],
+  )
+  const eventRunIds = useMemo(
+    () => Array.from(new Set([...activeRuns.map((run) => run.id), ...expandedRecentRunIds])),
+    [activeRuns, expandedRecentRunIds],
+  )
 
-  const filteredRuns = useMemo(() => {
-    return runs.filter((run) => {
-      if (projectFilter !== 'all' && run.project_id !== projectFilter) return false
-      if (agentFilter !== 'all' && run.agent_id !== agentFilter) return false
-      if (statusFilter !== 'all' && run.status !== statusFilter) return false
-      return matchesTimeRange(run, timeRange)
+  const eventQueries = useQueries({
+    queries: eventRunIds.map((runId) => ({
+      queryKey: ['workspace', 'task-runs', runId, 'events'],
+      queryFn: async () =>
+        extractRunEvents(await apiRequest(`/api/workspace/task-runs/${runId}/events`)),
+      refetchInterval: activeRuns.some((run) => run.id === runId) ? 5_000 : false,
+      staleTime: 1_000,
+    })),
+  })
+
+  const eventsByRunId = useMemo(() => {
+    const map = new Map<string, Array<WorkspaceRunEvent>>()
+    eventRunIds.forEach((runId, index) => {
+      map.set(runId, eventQueries[index]?.data ?? [])
     })
-  }, [agentFilter, projectFilter, runs, statusFilter, timeRange])
+    return map
+  }, [eventQueries, eventRunIds])
 
-  const activeRuns = useMemo(
-    () => filteredRuns.filter((run) => run.status === 'running'),
-    [filteredRuns],
-  )
-
-  const recentRuns = useMemo(
+  const filteredRuns = useMemo(
     () =>
-      filteredRuns
-        .filter((run) => run.status !== 'running')
-        .sort((a, b) => {
-          const aTime = parseTime(a.completed_at) ?? parseTime(a.started_at) ?? 0
-          const bTime = parseTime(b.completed_at) ?? parseTime(b.started_at) ?? 0
-          return bTime - aTime
-        }),
+      runs
+        .filter((run) => (projectFilter === 'all' ? true : run.project_id === projectFilter))
+        .filter((run) => (agentFilter === 'all' ? true : run.agent_id === agentFilter))
+        .filter((run) => (statusFilter === 'all' ? true : run.status === statusFilter))
+        .filter((run) => matchesTimeRange(run, timeRange))
+        .sort(sortRunsNewestFirst),
+    [agentFilter, projectFilter, runs, statusFilter, timeRange],
+  )
+
+  const visibleActiveRuns = useMemo(
+    () => filteredRuns.filter(isRunningRun),
+    [filteredRuns],
+  )
+  const recentRuns = useMemo(
+    () => filteredRuns.filter((run) => !isRunningRun(run)),
     [filteredRuns],
   )
 
-  const isLoading =
-    projectsQuery.isLoading || agentsQuery.isLoading || runsQuery.isLoading
-  const loadError =
-    projectsQuery.error || agentsQuery.error || runsQuery.error || null
+  const controlMutation = useMutation({
+    mutationFn: async ({
+      runId,
+      action,
+    }: {
+      runId: string
+      action: 'pause' | 'stop'
+    }) =>
+      apiRequest(`/api/workspace/task-runs/${runId}/${action}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }),
+    onSuccess: (_, variables) => {
+      toast(variables.action === 'pause' ? 'Run paused' : 'Run stopped', {
+        type: 'success',
+      })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'task-runs'] })
+      void queryClient.invalidateQueries({
+        queryKey: ['workspace', 'task-runs', variables.runId, 'events'],
+      })
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to control run', {
+        type: 'error',
+      })
+    },
+  })
 
   const projectOptions = useMemo(
     () => [
       { label: 'All projects', value: 'all' },
-      ...projects.map((project: WorkspaceProject) => ({
+      ...(projectsQuery.data ?? []).map((project: WorkspaceProject) => ({
         label: project.name,
         value: project.id,
       })),
     ],
-    [projects],
+    [projectsQuery.data],
   )
 
   const agentOptions = useMemo(
     () => [
       { label: 'All agents', value: 'all' },
-      ...agents.map((agent: WorkspaceAgent) => ({
+      ...(agentsQuery.data ?? []).map((agent: WorkspaceAgent) => ({
         label: agent.name,
         value: agent.id,
       })),
     ],
-    [agents],
+    [agentsQuery.data],
   )
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 p-4 sm:p-6">
-        <div className="animate-pulse rounded-3xl border border-primary-800 bg-primary-900/70 p-6">
-          <div className="h-7 w-48 rounded-lg bg-primary-800/80" />
-          <div className="mt-5 grid gap-3 md:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-16 rounded-2xl bg-primary-800/70"
-              />
-            ))}
-          </div>
-        </div>
-        {Array.from({ length: 2 }).map((_, index) => (
-          <div
-            key={index}
-            className="h-72 animate-pulse rounded-3xl border border-primary-800 bg-primary-900/70"
-          />
-        ))}
-      </div>
-    )
-  }
+  const statusOptions: Array<{ label: string; value: StatusFilter }> = [
+    { label: 'All statuses', value: 'all' },
+    { label: 'Running', value: 'running' },
+    { label: 'Awaiting review', value: 'awaiting_review' },
+    { label: 'Completed', value: 'completed' },
+    { label: 'Failed', value: 'failed' },
+    { label: 'Paused', value: 'paused' },
+    { label: 'Stopped', value: 'stopped' },
+  ]
 
-  if (loadError) {
-    return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="max-w-lg rounded-3xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-          <p className="text-lg font-semibold text-red-100">
-            Failed to load runs console
-          </p>
-          <p className="mt-2 text-sm text-red-200">
-            {loadError instanceof Error
-              ? loadError.message
-              : 'An unexpected error occurred'}
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const timeOptions: Array<{ label: string; value: RunTimeRange }> = [
+    { label: 'Last hour', value: 'last_hour' },
+    { label: 'Today', value: 'today' },
+    { label: 'All time', value: 'all' },
+  ]
 
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,1))] p-4 sm:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-primary-800 bg-primary-900/75 p-5 sm:p-6">
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-100 md:px-6 md:pt-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <header className="rounded-3xl border border-primary-800 bg-primary-900/85 px-5 py-5 shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-accent-300">
-                <HugeiconsIcon
-                  icon={ComputerTerminal01Icon}
-                  size={15}
-                  strokeWidth={1.9}
-                />
-                Workspace Ops
+              <div className="flex size-12 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
+                <HugeiconsIcon icon={PlayCircleIcon} className="size-6" />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold text-primary-100 sm:text-3xl">
+                <h1 className="text-xl font-semibold text-primary-100">
                   Runs / Console
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm text-primary-300">
-                  Monitor active agent runs and inspect recent execution logs
-                  across every project.
+                <p className="mt-1 max-w-2xl text-sm text-primary-300">
+                  Cross-project visibility into live agent execution, recent completions,
+                  and run output.
                 </p>
               </div>
             </div>
@@ -597,117 +529,124 @@ export function RunsConsoleScreen() {
                 label="Status"
                 value={statusFilter}
                 onChange={(value) => setStatusFilter(value as StatusFilter)}
-                options={[
-                  { label: 'All statuses', value: 'all' },
-                  { label: 'Running', value: 'running' },
-                  { label: 'Completed', value: 'completed' },
-                  { label: 'Failed', value: 'failed' },
-                ]}
+                options={statusOptions}
               />
               <FilterSelect
-                label="Range"
+                label="Time Range"
                 value={timeRange}
-                onChange={(value) => setTimeRange(value as TimeRangeFilter)}
-                options={[
-                  { label: 'Last hour', value: 'hour' },
-                  { label: 'Today', value: 'today' },
-                  { label: 'All time', value: 'all' },
-                ]}
+                onChange={(value) => setTimeRange(value as RunTimeRange)}
+                options={timeOptions}
               />
             </div>
           </div>
+        </header>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/35 p-4">
-              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-primary-500">
-                <HugeiconsIcon icon={PlayCircleIcon} size={15} strokeWidth={1.9} />
-                Active Runs
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-primary-100">
-                {activeRuns.length}
-              </p>
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4">
+            <div className="flex items-center gap-3">
+              <HugeiconsIcon icon={Task01Icon} className="size-5 text-accent-300" />
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-primary-400">
+                  Active Runs
+                </p>
+                <p className="text-2xl font-semibold text-primary-100">
+                  {visibleActiveRuns.length}
+                </p>
+              </div>
             </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/35 p-4">
-              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-primary-500">
-                <HugeiconsIcon icon={Task01Icon} size={15} strokeWidth={1.9} />
-                Recent Runs
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-primary-100">
-                {recentRuns.length}
-              </p>
+          </div>
+          <div className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4">
+            <div className="flex items-center gap-3">
+              <HugeiconsIcon
+                icon={TimeQuarterPassIcon}
+                className="size-5 text-accent-300"
+              />
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-primary-400">
+                  Recent Runs
+                </p>
+                <p className="text-2xl font-semibold text-primary-100">
+                  {recentRuns.length}
+                </p>
+              </div>
             </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/35 p-4">
-              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-primary-500">
-                <HugeiconsIcon icon={CheckmarkCircle02Icon} size={15} strokeWidth={1.9} />
-                Completed
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-primary-100">
-                {filteredRuns.filter((run) => run.status === 'completed').length}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-primary-800 bg-primary-950/35 p-4">
-              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-primary-500">
-                <HugeiconsIcon icon={Folder01Icon} size={15} strokeWidth={1.9} />
-                Projects
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-primary-100">
-                {new Set(filteredRuns.map((run) => run.project_id).filter(Boolean)).size}
-              </p>
+          </div>
+          <div className="rounded-2xl border border-primary-800 bg-primary-900/75 p-4">
+            <div className="flex items-center gap-3">
+              <HugeiconsIcon icon={PlayCircleIcon} className="size-5 text-accent-300" />
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-primary-400">
+                  Refresh
+                </p>
+                <p className="text-sm font-medium text-primary-100">
+                  Auto-refreshing every 5 seconds
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-primary-100">
-                Active Runs
-              </h2>
-              <p className="mt-1 text-sm text-primary-400">
-                Live output refreshes every 5 seconds.
-              </p>
-            </div>
+            <h2 className="text-lg font-semibold text-primary-100">Active Runs</h2>
+            {runsQuery.isFetching ? (
+              <span className="text-xs text-primary-400">Syncing latest activity...</span>
+            ) : null}
           </div>
 
-          {activeRuns.length > 0 ? (
+          {runsQuery.isLoading ? (
+            <div className="rounded-3xl border border-primary-800 bg-primary-900/75 px-6 py-14 text-center text-primary-300">
+              Loading active runs...
+            </div>
+          ) : visibleActiveRuns.length > 0 ? (
             <div className="space-y-4">
-              {activeRuns.map((run) => (
-                <ActiveRunCard key={run.id} run={run} />
+              {visibleActiveRuns.map((run) => (
+                <ActiveRunCard
+                  key={run.id}
+                  run={run}
+                  events={eventsByRunId.get(run.id) ?? []}
+                  actionPending={controlMutation.isPending}
+                  onPause={(runId) => controlMutation.mutate({ runId, action: 'pause' })}
+                  onStop={(runId) => controlMutation.mutate({ runId, action: 'stop' })}
+                />
               ))}
             </div>
           ) : (
-            <div className="rounded-3xl border border-dashed border-primary-800 bg-primary-900/45 px-6 py-12 text-center">
-              <p className="text-lg font-medium text-primary-200">
-                No active runs match the current filters.
-              </p>
-              <p className="mt-2 text-sm text-primary-500">
+            <div className="rounded-3xl border border-primary-800 bg-primary-900/75 px-6 py-14 text-center">
+              <p className="text-lg font-semibold text-primary-100">No active runs</p>
+              <p className="mt-2 text-sm text-primary-300">
                 Adjust the filters or wait for the next task dispatch.
               </p>
             </div>
           )}
         </section>
 
-        <section className="rounded-3xl border border-primary-800 bg-primary-900/70 p-5 sm:p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-primary-100">
-                Recent Runs
-              </h2>
-              <p className="mt-1 text-sm text-primary-400">
-                Expand any run to inspect its execution log.
-              </p>
-            </div>
-            <p className="text-xs uppercase tracking-[0.16em] text-primary-500">
-              Task · Project · Agent · Status · Duration · Tokens · Timestamp
-            </p>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-primary-100">Recent Runs</h2>
+            <span className="text-xs text-primary-400">
+              Click any row to inspect the run log
+            </span>
           </div>
 
-          <div className="mt-4 space-y-3">
-            {recentRuns.length > 0 ? (
-              recentRuns.map((run) => (
+          <div className="hidden rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-3 text-xs uppercase tracking-[0.18em] text-primary-400 md:grid md:grid-cols-[minmax(0,2fr)_1.1fr_1fr_0.9fr_0.8fr_0.9fr_1fr_auto] md:items-center">
+            <span>Task</span>
+            <span>Project</span>
+            <span>Agent</span>
+            <span>Status</span>
+            <span>Duration</span>
+            <span>Tokens</span>
+            <span>Timestamp</span>
+            <span />
+          </div>
+
+          {recentRuns.length > 0 ? (
+            <div className="space-y-3">
+              {recentRuns.map((run) => (
                 <RecentRunRow
                   key={run.id}
                   run={run}
+                  events={eventsByRunId.get(run.id) ?? []}
                   expanded={Boolean(expandedRunIds[run.id])}
                   onToggle={() =>
                     setExpandedRunIds((current) => ({
@@ -716,17 +655,18 @@ export function RunsConsoleScreen() {
                     }))
                   }
                 />
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-primary-800 bg-primary-950/30 px-6 py-12 text-center">
-                <p className="text-lg font-medium text-primary-200">
-                  No recent runs match the current filters.
-                </p>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-primary-800 bg-primary-900/75 px-6 py-14 text-center">
+              <p className="text-lg font-semibold text-primary-100">No recent runs</p>
+              <p className="mt-2 text-sm text-primary-300">
+                There are no completed, paused, or failed runs for the current filters.
+              </p>
+            </div>
+          )}
         </section>
       </div>
-    </div>
+    </main>
   )
 }

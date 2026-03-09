@@ -1,7 +1,8 @@
 import { Router } from "express";
+import { Orchestrator } from "../orchestrator";
 import { Tracker } from "../tracker";
 
-export function createTaskRunsRouter(tracker: Tracker): Router {
+export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrator): Router {
   const router = Router();
 
   router.get("/", (_req, res) => {
@@ -15,6 +16,24 @@ export function createTaskRunsRouter(tracker: Tracker): Router {
     }
 
     res.json(tracker.listRunEvents(req.params.id));
+  });
+
+  router.post("/:id/pause", (req, res) => {
+    if (!orchestrator.controlTaskRun(req.params.id, "pause")) {
+      res.status(404).json({ error: "Active task run not found" });
+      return;
+    }
+
+    res.json({ ok: true });
+  });
+
+  router.post("/:id/stop", (req, res) => {
+    if (!orchestrator.controlTaskRun(req.params.id, "stop")) {
+      res.status(404).json({ error: "Active task run not found" });
+      return;
+    }
+
+    res.json({ ok: true });
   });
 
   return router;

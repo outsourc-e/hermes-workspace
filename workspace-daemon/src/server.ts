@@ -30,7 +30,7 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
   app.use("/api/projects", createProjectsRouter(tracker));
   app.use("/api/phases", createPhasesRouter(tracker));
   app.use("/api/tasks", createTasksRouter(tracker, orchestrator));
-  app.use("/api/task-runs", createTaskRunsRouter(tracker));
+  app.use("/api/task-runs", createTaskRunsRouter(tracker, orchestrator));
   app.use("/api/agents", createAgentsRouter(tracker));
   app.use("/api/missions", createMissionsRouter(tracker));
   app.use("/api/checkpoints", createCheckpointsRouter(tracker));
