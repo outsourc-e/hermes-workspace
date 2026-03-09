@@ -28,10 +28,20 @@ export function createTasksRouter(tracker: Tracker, orchestrator: Orchestrator):
       return;
     }
 
+    if (!tracker.getMission(mission_id)) {
+      res.status(404).json({ error: "Mission not found" });
+      return;
+    }
+
+    if (depends_on && (!Array.isArray(depends_on) || depends_on.some((value) => typeof value !== "string"))) {
+      res.status(400).json({ error: "depends_on must be an array of task ids" });
+      return;
+    }
+
     const task = tracker.createTask({
       mission_id,
-      name,
-      description,
+      name: name.trim(),
+      description: typeof description === "string" ? description.trim() : description,
       agent_id,
       status,
       sort_order,

@@ -28,6 +28,41 @@ import {
   type WorkspaceCheckpoint,
 } from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
+import { CheckpointDetailModal } from '@/screens/projects/checkpoint-detail-modal'
+import {
+  extractProject,
+  extractProjects,
+} from '@/screens/projects/lib/workspace-types'
+
+async function readPayload(response: Response): Promise<unknown> {
+  const text = await response.text()
+  if (!text) return null
+
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return text
+  }
+}
+
+async function apiRequest(input: string, init?: RequestInit): Promise<unknown> {
+  const response = await fetch(input, init)
+  const payload = await readPayload(response)
+
+  if (!response.ok) {
+    const record =
+      payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null
+    throw new Error(
+      (typeof record?.error === 'string' && record.error) ||
+        (typeof record?.message === 'string' && record.message) ||
+        `Request failed with status ${response.status}`,
+    )
+  }
+
+  return payload
+}
 
 const FILTERS: Array<{
   label: string
@@ -72,6 +107,7 @@ function ReviewRow({
   composer,
   notes,
   onApprove,
+  onReview,
   onOpenComposer,
   onCancelComposer,
   onNotesChange,
@@ -82,6 +118,7 @@ function ReviewRow({
   composer: ReviewComposerState | null
   notes: string
   onApprove: (checkpointId: string) => void
+  onReview: (checkpoint: WorkspaceCheckpoint) => void
   onOpenComposer: (
     checkpointId: string,
     action: Extract<CheckpointReviewAction, 'revise' | 'reject'>,
@@ -200,6 +237,13 @@ function ReviewRow({
 
         {canReview ? (
           <div className="flex flex-wrap items-center gap-2 md:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => onReview(checkpoint)}
+              disabled={mutationPending}
+            >
+              Review
+            </Button>
             <button
               type="button"
               onClick={() => onApprove(checkpoint.id)}
@@ -285,8 +329,10 @@ export function ReviewQueueScreen() {
   const [statusFilter, setStatusFilter] = useState<'all' | CheckpointStatus>(
     'all',
   )
+  const [projectFilter, setProjectFilter] = useState('all')
   const [composer, setComposer] = useState<ReviewComposerState | null>(null)
   const [reviewerNotes, setReviewerNotes] = useState('')
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<WorkspaceCheckpoint | null>(null)
   const queryClient = useQueryClient()
 
   const checkpointsQuery = useQuery({
@@ -294,6 +340,30 @@ export function ReviewQueueScreen() {
     queryFn: () =>
       listWorkspaceCheckpoints(
         statusFilter === 'all' ? undefined : statusFilter,
+      ),
+  })
+  const projectsQuery = useQuery({
+    queryKey: ['workspace', 'projects', 'review-queue'],
+    queryFn: async () => extractProjects(await apiRequest('/api/workspace/projects')),
+    staleTime: 60_000,
+  })
+  const selectedProject = useMemo(
+    () =>
+      selectedCheckpoint
+        ? (projectsQuery.data ?? []).find(
+            (project) => project.name === selectedCheckpoint.project_name,
+          ) ?? null
+        : null,
+    [projectsQuery.data, selectedCheckpoint],
+  )
+  const selectedProjectDetailQuery = useQuery({
+    queryKey: ['workspace', 'project-detail', selectedProject?.id, 'review-queue'],
+    enabled: Boolean(selectedProject?.id && selectedCheckpoint),
+    queryFn: async () =>
+      extractProject(
+        await apiRequest(
+          `/api/workspace/projects/${encodeURIComponent(selectedProject!.id)}`,
+        ),
       ),
   })
 
@@ -326,6 +396,24 @@ export function ReviewQueueScreen() {
   })
 
   const checkpoints = checkpointsQuery.data ?? []
+  const projectOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          checkpoints
+            .map((checkpoint) => checkpoint.project_name)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ),
+    [checkpoints],
+  )
+  const visibleCheckpoints = useMemo(
+    () =>
+      checkpoints.filter((checkpoint) =>
+        projectFilter === 'all' ? true : checkpoint.project_name === projectFilter,
+      ),
+    [checkpoints, projectFilter],
+  )
   const pendingCount = useMemo(
     () =>
       checkpoints.filter((checkpoint) => checkpoint.status === 'pending')
@@ -336,7 +424,7 @@ export function ReviewQueueScreen() {
   function handleApprove(checkpointId: string) {
     reviewMutation.mutate({
       checkpointId,
-      action: 'approve',
+      action: 'approve-and-commit',
     })
   }
 
@@ -415,9 +503,39 @@ export function ReviewQueueScreen() {
           })}
         </div>
 
+        <div className="mb-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setProjectFilter('all')}
+            className={cn(
+              'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+              projectFilter === 'all'
+                ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
+                : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
+            )}
+          >
+            All projects
+          </button>
+          {projectOptions.map((projectName) => (
+            <button
+              key={projectName}
+              type="button"
+              onClick={() => setProjectFilter(projectName)}
+              className={cn(
+                'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+                projectFilter === projectName
+                  ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
+                  : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
+              )}
+            >
+              {projectName}
+            </button>
+          ))}
+        </div>
+
         {checkpointsQuery.isLoading ? (
           <ReviewQueueSkeleton />
-        ) : checkpoints.length === 0 ? (
+        ) : visibleCheckpoints.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-3xl border border-primary-700 bg-primary-800/80 text-primary-300">
               <HugeiconsIcon
@@ -430,18 +548,19 @@ export function ReviewQueueScreen() {
               No checkpoints found
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
-              There are no checkpoints for the current filter.
+              There are no checkpoints for the current status and project filters.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {checkpoints.map((checkpoint) => (
+            {visibleCheckpoints.map((checkpoint) => (
               <ReviewRow
                 key={checkpoint.id}
                 checkpoint={checkpoint}
                 composer={composer}
                 notes={reviewerNotes}
                 onApprove={handleApprove}
+                onReview={setSelectedCheckpoint}
                 onOpenComposer={handleOpenComposer}
                 onCancelComposer={() => {
                   setComposer(null)
@@ -455,6 +574,41 @@ export function ReviewQueueScreen() {
           </div>
         )}
       </section>
+
+      <CheckpointDetailModal
+        checkpoint={selectedCheckpoint}
+        project={selectedProject}
+        projectDetail={selectedProjectDetailQuery.data ?? null}
+        open={selectedCheckpoint !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCheckpoint(null)
+        }}
+        onApprove={(checkpointId, notes, mode) =>
+          submitCheckpointReview(
+            checkpointId,
+            mode ?? 'approve-and-commit',
+            notes,
+          ).then(async () => {
+            await queryClient.invalidateQueries({
+              queryKey: ['workspace', 'checkpoints'],
+            })
+          })
+        }
+        onRevise={(checkpointId, notes) =>
+          submitCheckpointReview(checkpointId, 'revise', notes).then(async () => {
+            await queryClient.invalidateQueries({
+              queryKey: ['workspace', 'checkpoints'],
+            })
+          })
+        }
+        onReject={(checkpointId, notes) =>
+          submitCheckpointReview(checkpointId, 'reject', notes).then(async () => {
+            await queryClient.invalidateQueries({
+              queryKey: ['workspace', 'checkpoints'],
+            })
+          })
+        }
+      />
     </main>
   )
 }

@@ -42,6 +42,7 @@ import {
   getStatusBadgeClass,
   getTaskDotClass,
 } from './lib/workspace-utils'
+import { useMemo } from 'react'
 
 type ProjectDetailViewProps = {
   selectedSummary: WorkspaceProject | null
@@ -106,6 +107,19 @@ export function ProjectDetailView({
   onCheckpointReject,
   onRefreshActivity,
 }: ProjectDetailViewProps) {
+  const taskNameById = useMemo(() => {
+    const source = projectDetail ?? selectedSummary
+    if (!source) return new Map<string, string>()
+
+    return new Map(
+      source.phases.flatMap((phase) =>
+        phase.missions.flatMap((mission) =>
+          mission.tasks.map((task) => [task.id, task.name] as const),
+        ),
+      ),
+    )
+  }, [projectDetail, selectedSummary])
+
   if (!selectedSummary) {
     return (
       <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-primary-700 bg-primary-800/20 px-6 text-center">
@@ -360,7 +374,10 @@ export function ProjectDetailView({
                                     ) : null}
                                     {task.depends_on.length > 0 ? (
                                       <p className="mt-2 text-[11px] text-primary-500">
-                                        Depends on: {task.depends_on.join(', ')}
+                                        Depends on:{' '}
+                                        {task.depends_on
+                                          .map((dependencyId) => taskNameById.get(dependencyId) ?? dependencyId)
+                                          .join(', ')}
                                       </p>
                                     ) : null}
                                   </div>

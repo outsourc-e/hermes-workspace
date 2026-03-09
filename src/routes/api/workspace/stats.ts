@@ -34,6 +34,12 @@ type AgentRecord = {
   status?: string | null
 }
 
+type TaskRunRecord = {
+  started_at?: string | null
+  completed_at?: string | null
+  cost_cents?: number | null
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
@@ -108,6 +114,15 @@ function normalizeTaskBucket(status: string | null | undefined): 'running' | 'qu
   return null
 }
 
+function isToday(value: string | null | undefined): boolean {
+  if (!value) return false
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return false
+
+  const now = new Date()
+  return date.toDateString() === now.toDateString()
+}
+
 export const Route = createFileRoute('/api/workspace/stats')({
   server: {
     handlers: {
@@ -122,11 +137,12 @@ export const Route = createFileRoute('/api/workspace/stats')({
         }
 
         try {
-          const [projectsPayload, agentsPayload, checkpointsPayload] =
+          const [projectsPayload, agentsPayload, checkpointsPayload, taskRunsPayload] =
             await Promise.all([
               daemonJson('/projects'),
               daemonJson('/agents'),
               daemonJson('/checkpoints?status=pending'),
+              daemonJson('/task-runs'),
             ])
 
           const projectIds = extractProjectIds(projectsPayload)
@@ -135,6 +151,7 @@ export const Route = createFileRoute('/api/workspace/stats')({
             checkpointsPayload,
             'checkpoints',
           )
+          const taskRuns = extractItems<TaskRunRecord>(taskRunsPayload, 'task_runs')
 
           const projectDetails = await Promise.all(
             projectIds.map((projectId) =>
@@ -158,6 +175,10 @@ export const Route = createFileRoute('/api/workspace/stats')({
           const agentsOnline = agents.filter(
             (agent) => (agent?.status ?? 'offline') !== 'offline',
           ).length
+          const costToday = taskRuns.reduce((total, run) => {
+            if (!isToday(run?.started_at ?? run?.completed_at)) return total
+            return total + (typeof run?.cost_cents === 'number' ? run.cost_cents / 100 : 0)
+          }, 0)
 
           return json({
             projects: projectIds.length,
@@ -168,7 +189,7 @@ export const Route = createFileRoute('/api/workspace/stats')({
             paused,
             checkpointsPending: checkpoints.length,
             policyAlerts: 0,
-            costToday: 0,
+            costToday,
           })
         } catch (error) {
           return json(

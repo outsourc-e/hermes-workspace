@@ -379,10 +379,10 @@ export function ProjectsScreen() {
   )
   const projectCheckpoints = useMemo(() => {
     const projectName = projectDetail?.name ?? selectedSummary?.name
-    const filtered = allCheckpoints.filter((checkpoint) =>
+    if (!projectName) return allCheckpoints
+    return allCheckpoints.filter((checkpoint) =>
       matchesCheckpointProject(checkpoint, projectName),
     )
-    return filtered.length > 0 ? filtered : allCheckpoints
   }, [allCheckpoints, projectDetail?.name, selectedSummary?.name])
   const pendingProjectCheckpoints = useMemo(
     () => projectCheckpoints.filter((checkpoint) => checkpoint.status === 'pending'),
@@ -520,10 +520,10 @@ export function ProjectsScreen() {
   }
 
   function focusCheckpointReview(checkpoint: WorkspaceCheckpoint) {
-    setSelectedCheckpoint(checkpoint)
     const project = projects.find((item) => item.name === checkpoint.project_name)
     if (project && project.id !== selectedProjectId) {
       setPendingReviewCheckpoint(checkpoint)
+      setSelectedCheckpoint(null)
       setSelectedProjectId(project.id)
       window.requestAnimationFrame(() => {
         detailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -531,6 +531,7 @@ export function ProjectsScreen() {
       return
     }
     setPendingReviewCheckpoint(null)
+    setSelectedCheckpoint(checkpoint)
   }
 
   useEffect(() => {
