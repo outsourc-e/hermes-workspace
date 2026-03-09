@@ -1,6 +1,8 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
+import { usePageTitle } from '@/hooks/use-page-title'
+import { ProjectsScreen } from '@/screens/projects/projects-screen'
 
-export const Route = createFileRoute('/projects')({
+export const Route = createFileRoute('/workspace/projects')({
   validateSearch: (
     search: Record<string, unknown>,
   ): {
@@ -16,14 +18,8 @@ export const Route = createFileRoute('/projects')({
     phaseName: typeof search.phaseName === 'string' ? search.phaseName : undefined,
     goal: typeof search.goal === 'string' ? search.goal : undefined,
   }),
-  beforeLoad: ({ search }) => {
-    throw redirect({
-      to: '/workspace/projects',
-      search,
-      replace: true,
-    })
-  },
-  component: function ProjectsRedirectRoute() {
-    return null
+  component: function WorkspaceProjectsRoute() {
+    usePageTitle('Workspace Projects')
+    return <ProjectsScreen replanSearch={Route.useSearch()} />
   },
 })

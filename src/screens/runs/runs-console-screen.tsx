@@ -500,8 +500,7 @@ export function RunsConsoleScreen() {
   ]
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-100 md:px-6 md:pt-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+    <div className="flex flex-col gap-6 text-primary-100">
         <header className="rounded-3xl border border-primary-800 bg-primary-900/85 px-5 py-5 shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
@@ -699,7 +698,6 @@ export function RunsConsoleScreen() {
             </div>
           )}
         </section>
-      </div>
-    </main>
+    </div>
   )
 }

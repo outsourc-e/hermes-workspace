@@ -16,15 +16,12 @@ import {
   ListViewIcon,
   Notification03Icon,
   PencilEdit02Icon,
-  PuzzleIcon,
   Search01Icon,
   ApiIcon,
-  CheckmarkCircle02Icon,
   Folder01Icon,
   Settings01Icon,
   ServerStack01Icon,
   SmartPhone01Icon,
-  PlayCircle02Icon as PlayCircleIcon,
   Task01Icon,
   UserGroupIcon,
   UserMultipleIcon,
@@ -551,8 +548,7 @@ function ChatSidebarComponent({
   const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
   const isTasksActive = pathname === '/tasks'
-  const isProjectsActive = pathname.startsWith('/projects')
-  const isReviewActive = pathname.startsWith('/review')
+  const isWorkspaceActive = pathname.startsWith('/workspace')
   // Gateway
   const isCronActive = pathname === '/cron'
   const isChannelsActive = pathname === '/channels'
@@ -561,10 +557,8 @@ function ChatSidebarComponent({
   const isCostsActive = pathname === '/costs'
   const isInstancesActive = pathname === '/instances'
   // Agent
-  const isRunsActive = pathname.startsWith('/runs')
   const isAgentsActive = pathname === '/agents'
   const isNodesActive = pathname === '/nodes'
-  const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isMemoryActive = pathname === '/memory'
   const isDebugActive = pathname === '/debug'
@@ -574,13 +568,16 @@ function ChatSidebarComponent({
   const suiteRoutes = [
     '/dashboard',
     '/agent-swarm',
-    '/projects',
-    '/review',
+    '/workspace/projects',
+    '/workspace/review',
+    '/workspace/runs',
+    '/workspace/skills',
+    '/workspace/plan-review',
+    '/workspace/agents',
     '/new',
     '/browser',
     '/terminal',
     '/tasks',
-    '/skills',
     '/cron',
     '/activity',
     '/logs',
@@ -599,7 +596,8 @@ function ChatSidebarComponent({
   ]
 
   useEffect(() => {
-    if (suiteRoutes.includes(pathname)) setLastRoute('suite', pathname)
+    if (pathname.startsWith('/workspace')) setLastRoute('suite', pathname)
+    else if (suiteRoutes.includes(pathname)) setLastRoute('suite', pathname)
     else if (gatewayRoutes.includes(pathname)) setLastRoute('gateway', pathname)
   }, [pathname])
 
@@ -805,43 +803,12 @@ function ChatSidebarComponent({
       active: isAgentSwarmActive,
       dataTour: 'agent-hub',
     },
-    // ── Workspace section ──
-    { kind: 'section', label: 'Workspace' },
     {
       kind: 'link',
-      to: '/projects',
+      to: '/workspace',
       icon: Folder01Icon,
-      label: 'Projects',
-      active: isProjectsActive,
-    },
-    {
-      kind: 'link',
-      to: '/review',
-      icon: CheckmarkCircle02Icon,
-      label: 'Review Queue',
-      active: isReviewActive,
-    },
-    {
-      kind: 'link',
-      to: '/runs',
-      icon: PlayCircleIcon,
-      label: 'Runs / Console',
-      active: isRunsActive,
-    },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: isAgentsActive,
-    },
-    {
-      kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: 'Skills & Memory',
-      active: isSkillsActive,
-      dataTour: 'skills',
+      label: 'Workspace',
+      active: isWorkspaceActive,
     },
     // ── Tools section ──
     { kind: 'section', label: 'Tools' },
