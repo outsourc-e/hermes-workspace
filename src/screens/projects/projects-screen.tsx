@@ -57,6 +57,7 @@ import { ProjectDetailView } from './project-detail-view'
 type ProjectsScreenProps = {
   replanSearch?: {
     goal?: string
+    checkpointId?: string
     phaseId?: string
     phaseName?: string
     project?: string
@@ -574,6 +575,34 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
       setSelectedProjectId(requestedProjectId)
     }
   }, [replanSearch?.project, replanSearch?.projectId, selectedProjectId])
+
+  useEffect(() => {
+    if (!replanSearch?.checkpointId) return
+    const checkpoint = allCheckpoints.find((entry) => entry.id === replanSearch.checkpointId)
+    if (!checkpoint) return
+    focusCheckpointReview(checkpoint)
+    void navigate({
+      to: '/projects',
+      replace: true,
+      search: {
+        project: replanSearch.project,
+        projectId: replanSearch.projectId,
+        goal: replanSearch.goal,
+        phaseId: replanSearch.phaseId,
+        phaseName: replanSearch.phaseName,
+        checkpointId: undefined,
+      },
+    })
+  }, [
+    allCheckpoints,
+    navigate,
+    replanSearch?.checkpointId,
+    replanSearch?.goal,
+    replanSearch?.phaseId,
+    replanSearch?.phaseName,
+    replanSearch?.project,
+    replanSearch?.projectId,
+  ])
 
   useEffect(() => {
     if (!replanSearch?.phaseId || !replanSearch.goal || !projectDetail) return

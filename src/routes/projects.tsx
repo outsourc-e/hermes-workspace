@@ -8,12 +8,15 @@ export const Route = createFileRoute('/projects')({
   ): {
     project?: string
     projectId?: string
+    checkpointId?: string
     phaseId?: string
     phaseName?: string
     goal?: string
   } => ({
     project: typeof search.project === 'string' ? search.project : undefined,
     projectId: typeof search.projectId === 'string' ? search.projectId : undefined,
+    checkpointId:
+      typeof search.checkpointId === 'string' ? search.checkpointId : undefined,
     phaseId: typeof search.phaseId === 'string' ? search.phaseId : undefined,
     phaseName: typeof search.phaseName === 'string' ? search.phaseName : undefined,
     goal: typeof search.goal === 'string' ? search.goal : undefined,
