@@ -182,11 +182,7 @@ function NavItem({
 }) {
   if (item.kind === 'section') {
     if (isCollapsed) return <div className="my-1 border-t border-primary-200 dark:border-primary-800" />
-    return (
-      <div className="px-3 pt-4 pb-1 text-[9px] font-bold uppercase tracking-[1.2px] text-primary-400 dark:text-primary-600">
-        {item.label}
-      </div>
-    )
+    return null // sections are rendered by CollapsibleNavSection
   }
 
   const cls = cn(
@@ -604,7 +600,6 @@ function ChatSidebarComponent({
   }, [pathname])
 
   // Resolve navigation targets (last visited or default)
-  const suiteNav = getLastRoute('suite') || '/dashboard'
   const gatewayNav = getLastRoute('gateway') || '/channels'
 
   const transition = {
@@ -621,9 +616,17 @@ function ChatSidebarComponent({
   const showDebugErrorDot = Boolean(recentIssuesQuery.data)
 
   // Collapsible section states
-  const [suiteExpanded, toggleSuite] = usePersistedBool(
-    'openclaw-sidebar-suite-expanded',
+  const [workspaceExpanded, toggleWorkspace] = usePersistedBool(
+    'openclaw-sidebar-workspace-expanded',
     true,
+  )
+  const [toolsExpanded, toggleTools] = usePersistedBool(
+    'openclaw-sidebar-tools-expanded',
+    false,
+  )
+  const [dataExpanded, toggleData] = usePersistedBool(
+    'openclaw-sidebar-data-expanded',
+    false,
   )
   const [systemExpanded, toggleSystem] = usePersistedBool(
     'openclaw-sidebar-system-expanded',
@@ -788,7 +791,7 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
-  const suiteItems: NavItemDef[] = [
+  const suiteTopItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/dashboard',
@@ -805,8 +808,9 @@ function ChatSidebarComponent({
       active: isAgentSwarmActive,
       dataTour: 'agent-hub',
     },
-    // ── Workspace section ──
-    { kind: 'section', label: 'Workspace' },
+  ]
+
+  const workspaceItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/projects',
@@ -843,8 +847,9 @@ function ChatSidebarComponent({
       active: isSkillsActive,
       dataTour: 'skills',
     },
-    // ── Tools section ──
-    { kind: 'section', label: 'Tools' },
+  ]
+
+  const toolsItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/browser',
@@ -889,8 +894,9 @@ function ChatSidebarComponent({
       active: isDebugActive,
       badge: showDebugErrorDot ? 'error-dot' : undefined,
     },
-    // ── Data section ──
-    { kind: 'section', label: 'Data' },
+  ]
+
+  const dataItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/files',
@@ -913,6 +919,9 @@ function ChatSidebarComponent({
       active: isCostsActive,
     },
   ]
+
+  // Combined for backwards compat (mobile secondary, search, etc.)
+  const suiteItems: NavItemDef[] = [...suiteTopItems, ...workspaceItems, ...toolsItems, ...dataItems]
 
   const gatewayItems: NavItemDef[] = [
     {
@@ -1121,19 +1130,61 @@ function ChatSidebarComponent({
         <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
           {!isMobile && (
             <>
-              {/* SUITE */}
+              {/* TOP (Dashboard, Agent Hub) */}
+              <CollapsibleSection
+                expanded={true}
+                items={suiteTopItems}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+
+              {/* WORKSPACE */}
               <SectionLabel
-                label="Suite"
+                label="Workspace"
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 collapsible
-                expanded={suiteExpanded}
-                onToggle={toggleSuite}
-                navigateTo={suiteNav}
+                expanded={workspaceExpanded}
+                onToggle={toggleWorkspace}
               />
               <CollapsibleSection
-                expanded={suiteExpanded || isCollapsed}
-                items={suiteItems}
+                expanded={workspaceExpanded || isCollapsed}
+                items={workspaceItems}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+
+              {/* TOOLS */}
+              <SectionLabel
+                label="Tools"
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                collapsible
+                expanded={toolsExpanded}
+                onToggle={toggleTools}
+              />
+              <CollapsibleSection
+                expanded={toolsExpanded || isCollapsed}
+                items={toolsItems}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+
+              {/* DATA */}
+              <SectionLabel
+                label="Data"
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                collapsible
+                expanded={dataExpanded}
+                onToggle={toggleData}
+              />
+              <CollapsibleSection
+                expanded={dataExpanded || isCollapsed}
+                items={dataItems}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
