@@ -1,623 +1,1011 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  File01Icon,
-  Search01Icon,
-  SparklesIcon,
-} from '@hugeicons/core-free-icons'
+import { useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
-import { toast } from '@/components/ui/toast'
+import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import {
+  DialogContent,
+  DialogDescription,
+  DialogRoot,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  ScrollAreaRoot,
+  ScrollAreaScrollbar,
+  ScrollAreaThumb,
+  ScrollAreaViewport,
+} from '@/components/ui/scroll-area'
+import { Markdown } from '@/components/prompt-kit/markdown'
 import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 
-type SkillCategory = 'QA' | 'Auth' | 'UI' | 'DB' | 'DevOps'
-type MemoryFilter = 'All' | 'Workspace' | 'Project' | 'Agent'
-type MemorySection = 'workspace' | 'project' | 'agent'
+type SkillsTab = 'installed' | 'marketplace' | 'featured'
+type SkillsSort = 'name' | 'category'
 
-type SkillItem = {
+type SecurityRisk = {
+  level: 'safe' | 'low' | 'medium' | 'high'
+  flags: Array<string>
+  score: number
+}
+
+type SkillSummary = {
   id: string
+  slug: string
   name: string
   description: string
-  category: SkillCategory
-  status: 'active' | 'disabled'
-  emoji: string
-  tone: string
+  author: string
+  triggers: Array<string>
+  tags: Array<string>
+  homepage: string | null
+  category: string
+  icon: string
+  content: string
+  fileCount: number
+  sourcePath: string
+  installed: boolean
+  enabled: boolean
+  featuredGroup?: string
+  security?: SecurityRisk
 }
 
-type MemoryFileItem = {
-  name: string
-  path: string
-  size: string
-  section: MemorySection
+type SkillsApiResponse = {
+  skills: Array<SkillSummary>
+  total: number
+  page: number
+  categories: Array<string>
 }
 
-type MemoryFilesResponse = {
-  files: Array<MemoryFileItem>
-}
+type SkillSearchTier = 0 | 1 | 2 | 3
 
-const SKILL_CATEGORIES: Array<'All' | SkillCategory> = [
+const PAGE_LIMIT = 30
+
+const DEFAULT_CATEGORIES = [
   'All',
-  'QA',
-  'Auth',
-  'UI',
-  'DB',
-  'DevOps',
+  'Web & Frontend',
+  'Coding Agents',
+  'Git & GitHub',
+  'DevOps & Cloud',
+  'Browser & Automation',
+  'Image & Video',
+  'Search & Research',
+  'AI & LLMs',
+  'Productivity',
+  'Marketing & Sales',
+  'Communication',
+  'Data & Analytics',
+  'Finance & Crypto',
 ]
 
-const MEMORY_FILTERS: Array<MemoryFilter> = [
-  'All',
-  'Workspace',
-  'Project',
-  'Agent',
-]
+function resolveSkillSearchTier(
+  skill: SkillSummary,
+  query: string,
+): SkillSearchTier {
+  const normalizedQuery = query.trim().toLowerCase()
+  if (!normalizedQuery) return 0
 
-const SKILLS: Array<SkillItem> = [
-  {
-    id: 'code-reviewer',
-    name: 'Code Reviewer',
-    description: 'Automated code review with style + security checks',
-    category: 'QA',
-    status: 'active',
-    emoji: '🔍',
-    tone: 'bg-green-500/10 text-green-300',
-  },
-  {
-    id: 'auth-patterns',
-    name: 'Auth Patterns',
-    description: 'JWT, OAuth, session management templates',
-    category: 'Auth',
-    status: 'active',
-    emoji: '🔒',
-    tone: 'bg-red-500/10 text-red-300',
-  },
-  {
-    id: 'db-migration',
-    name: 'DB Migration',
-    description: 'Schema migrations, seed data, rollback',
-    category: 'DB',
-    status: 'active',
-    emoji: '🗄️',
-    tone: 'bg-blue-500/10 text-blue-300',
-  },
-  {
-    id: 'ui-component-gen',
-    name: 'UI Component Gen',
-    description: 'Generate React components from descriptions',
-    category: 'UI',
-    status: 'active',
-    emoji: '🎨',
-    tone: 'bg-accent-500/10 text-accent-300',
-  },
-  {
-    id: 'test-writer',
-    name: 'Test Writer',
-    description: 'Generate unit + integration tests from code',
-    category: 'QA',
-    status: 'active',
-    emoji: '🧪',
-    tone: 'bg-fuchsia-500/10 text-fuchsia-300',
-  },
-  {
-    id: 'docker-compose',
-    name: 'Docker Compose',
-    description: 'Container orchestration + CI/CD',
-    category: 'DevOps',
-    status: 'disabled',
-    emoji: '🐳',
-    tone: 'bg-primary-800 text-primary-300',
-  },
-]
+  if (skill.name.toLowerCase().includes(normalizedQuery)) return 0
 
-const CATEGORY_BADGE_CLASS: Record<SkillCategory, string> = {
-  QA: 'border-teal-500/30 bg-teal-500/10 text-teal-300',
-  Auth: 'border-red-500/30 bg-red-500/10 text-red-300',
-  UI: 'border-accent-500/30 bg-accent-500/10 text-accent-300',
-  DB: 'border-blue-500/30 bg-blue-500/10 text-blue-300',
-  DevOps: 'border-primary-700 bg-primary-800 text-primary-300',
-}
+  const tagText = skill.tags.join(' ').toLowerCase()
+  const triggerText = skill.triggers.join(' ').toLowerCase()
+  if (
+    tagText.includes(normalizedQuery) ||
+    triggerText.includes(normalizedQuery)
+  ) {
+    return 1
+  }
 
-const STATUS_BADGE_CLASS: Record<SkillItem['status'], string> = {
-  active: 'border-green-500/30 bg-green-500/10 text-green-300',
-  disabled: 'border-primary-700 bg-primary-800 text-primary-300',
-}
-
-function sectionLabel(section: MemorySection): string {
-  if (section === 'workspace') return 'Workspace Memory'
-  if (section === 'project') return 'Daily Logs'
-  return 'Agent Memory'
-}
-
-function matchesFilter(section: MemorySection, filter: MemoryFilter): boolean {
-  if (filter === 'All') return true
-  if (filter === 'Workspace') return section === 'workspace'
-  if (filter === 'Project') return section === 'project'
-  return section === 'agent'
-}
-
-function EmptyMemorySection({ label }: { label: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-primary-700 bg-primary-900/40 px-3 py-4 text-xs text-primary-400">
-      No files found in {label.toLowerCase()}.
-    </div>
-  )
+  if (skill.description.toLowerCase().includes(normalizedQuery)) return 2
+  return 3
 }
 
 export function SkillsScreen() {
-  const [skillFilter, setSkillFilter] = useState<'All' | SkillCategory>('All')
-  const [selectedSkillId, setSelectedSkillId] = useState<string>('code-reviewer')
-  const [memoryFilter, setMemoryFilter] = useState<MemoryFilter>('All')
-  const [memorySearch, setMemorySearch] = useState('')
-  const deferredSearch = useDeferredValue(memorySearch)
-  const [selectedMemoryPath, setSelectedMemoryPath] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const [tab, setTab] = useState<SkillsTab>('installed')
+  const [searchInput, setSearchInput] = useState('')
+  const [category, setCategory] = useState('All')
+  const [sort, setSort] = useState<SkillsSort>('name')
+  const [page, setPage] = useState(1)
+  const [actionSkillId, setActionSkillId] = useState<string | null>(null)
+  const [selectedSkill, setSelectedSkill] = useState<SkillSummary | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const memoryQuery = useQuery({
-    queryKey: ['workspace', 'memory-files'],
-    queryFn: async function fetchMemoryFiles(): Promise<MemoryFilesResponse> {
-      const response = await fetch('/api/workspace/memory-files')
-      const payload = (await response.json().catch(() => ({}))) as
-        | MemoryFilesResponse
-        | { error?: string }
+  const skillsQuery = useQuery({
+    queryKey: ['skills-browser', tab, searchInput, category, page, sort],
+    queryFn: async function fetchSkills(): Promise<SkillsApiResponse> {
+      const params = new URLSearchParams()
+      params.set('tab', tab)
+      params.set('search', searchInput)
+      params.set('category', category)
+      params.set('page', String(page))
+      params.set('limit', String(PAGE_LIMIT))
+      params.set('sort', sort)
 
+      const response = await fetch(`/api/skills?${params.toString()}`)
+      const payload = (await response.json()) as SkillsApiResponse & {
+        error?: string
+      }
       if (!response.ok) {
-        throw new Error(
-          'error' in payload && typeof payload.error === 'string'
-            ? payload.error
-            : 'Failed to load memory files',
-        )
+        throw new Error(payload.error || 'Failed to fetch skills')
       }
-
-      return {
-        files: Array.isArray((payload as MemoryFilesResponse).files)
-          ? (payload as MemoryFilesResponse).files
-          : [],
-      }
+      return payload
     },
   })
 
-  const visibleSkills = useMemo(
-    () =>
-      SKILLS.filter((skill) =>
-        skillFilter === 'All' ? true : skill.category === skillFilter,
-      ),
-    [skillFilter],
+  const categories = useMemo(
+    function resolveCategories() {
+      const fromApi = skillsQuery.data?.categories
+      if (Array.isArray(fromApi) && fromApi.length > 0) {
+        return fromApi
+      }
+      return DEFAULT_CATEGORIES
+    },
+    [skillsQuery.data?.categories],
   )
 
-  const normalizedSearch = deferredSearch.trim().toLowerCase()
-  const filteredMemoryFiles = useMemo(() => {
-    const files = memoryQuery.data?.files ?? []
-    return files.filter((file) => {
-      if (!matchesFilter(file.section, memoryFilter)) return false
-      if (!normalizedSearch) return true
-      const haystack = `${file.name} ${file.path}`.toLowerCase()
-      return haystack.includes(normalizedSearch)
-    })
-  }, [memoryFilter, memoryQuery.data?.files, normalizedSearch])
-
-  const workspaceFiles = filteredMemoryFiles.filter(
-    (file) => file.section === 'workspace',
+  const totalPages = Math.max(
+    1,
+    Math.ceil((skillsQuery.data?.total || 0) / PAGE_LIMIT),
   )
-  const projectFiles = filteredMemoryFiles.filter(
-    (file) => file.section === 'project',
+
+  const skills = useMemo(
+    function resolveVisibleSkills() {
+      const sourceSkills = skillsQuery.data?.skills || []
+      const normalizedQuery = searchInput.trim().toLowerCase()
+      if (!normalizedQuery) {
+        return sourceSkills
+      }
+
+      return sourceSkills
+        .map(function mapSkillToTier(skill, index) {
+          return {
+            skill,
+            index,
+            tier: resolveSkillSearchTier(skill, normalizedQuery),
+          }
+        })
+        .sort(function sortByTierThenOriginalOrder(a, b) {
+          if (a.tier !== b.tier) return a.tier - b.tier
+          return a.index - b.index
+        })
+        .map(function unwrapSkill(entry) {
+          return entry.skill
+        })
+    },
+    [searchInput, skillsQuery.data?.skills],
   )
-  const agentFiles = filteredMemoryFiles.filter((file) => file.section === 'agent')
 
-  const selectedSkill =
-    SKILLS.find((skill) => skill.id === selectedSkillId) ?? SKILLS[0] ?? null
+  async function runSkillAction(
+    action: 'install' | 'uninstall' | 'toggle',
+    payload: {
+      skillId: string
+      enabled?: boolean
+    },
+  ) {
+    setActionError(null)
+    setActionSkillId(payload.skillId)
 
-  useEffect(() => {
-    if (selectedMemoryPath) return
-    const firstFile = memoryQuery.data?.files?.[0]
-    if (firstFile) {
-      setSelectedMemoryPath(firstFile.path)
+    try {
+      const response = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          skillId: payload.skillId,
+          enabled: payload.enabled,
+        }),
+      })
+
+      const data = (await response.json()) as { error?: string }
+      if (!response.ok) {
+        throw new Error(data.error || 'Action failed')
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['skills-browser'] })
+      setSelectedSkill(function updateSelectedSkill(current) {
+        if (!current || current.id !== payload.skillId) return current
+        if (action === 'install') {
+          return {
+            ...current,
+            installed: true,
+            enabled: true,
+          }
+        }
+        if (action === 'uninstall') {
+          return {
+            ...current,
+            installed: false,
+            enabled: false,
+          }
+        }
+        return {
+          ...current,
+          enabled: payload.enabled ?? current.enabled,
+        }
+      })
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      setActionError(errorMessage)
+      toast(errorMessage, { type: 'error', icon: '❌' })
+    } finally {
+      setActionSkillId(null)
     }
-  }, [memoryQuery.data?.files, selectedMemoryPath])
-
-  function handleComingSoon() {
-    toast('Coming soon', { type: 'info' })
   }
 
-  function handleClearAll() {
-    toast('Are you sure?', { type: 'warning' })
-    const confirmed =
-      typeof window === 'undefined'
-        ? true
-        : window.confirm('Are you sure you want to clear all memory?')
+  function handleTabChange(nextTab: string) {
+    const parsedTab: SkillsTab =
+      nextTab === 'installed' ||
+      nextTab === 'marketplace' ||
+      nextTab === 'featured'
+        ? nextTab
+        : 'installed'
 
-    if (!confirmed) return
-    toast('Cleared', { type: 'success' })
+    setTab(parsedTab)
+    setPage(1)
+    if (parsedTab !== 'marketplace') {
+      setCategory('All')
+      setSort('name')
+    }
+  }
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value)
+    setPage(1)
+  }
+
+  function handleCategoryChange(value: string) {
+    setCategory(value)
+    setPage(1)
+  }
+
+  function handleSortChange(value: SkillsSort) {
+    setSort(value)
+    setPage(1)
   }
 
   return (
-    <div className="min-h-full bg-primary-950 text-primary-100">
-      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col px-4 py-4 sm:px-5 lg:px-6">
-        <div className="flex flex-col gap-2 pb-4">
-          <h1 className="text-lg font-semibold text-primary-100">
-            Skills &amp; Memory
-          </h1>
-          <p className="text-sm text-primary-400">
-            Browse installed skills and inspect workspace memory sources in one
-            place.
-          </p>
-        </div>
-
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-2xl border border-primary-800 bg-primary-900/70 lg:grid-cols-2">
-          <section className="min-h-0 border-b border-primary-800 lg:border-b-0">
-            <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
-              <div className="flex flex-col gap-3 border-b border-primary-800 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-[15px] font-semibold text-primary-100">
-                    Skills
-                  </h2>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleComingSoon}
-                  >
-                    + Install Skill
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleComingSoon}
-                  >
-                    Browse ClawHub
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 py-4">
-                {SKILL_CATEGORIES.map((category) => {
-                  const active = category === skillFilter
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setSkillFilter(category)}
-                      className={cn(
-                        'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                        active
-                          ? 'border-accent-500/40 bg-accent-500/10 text-accent-300'
-                          : 'border-primary-700 bg-primary-900 text-primary-300 hover:border-primary-600 hover:text-primary-100',
-                      )}
-                    >
-                      {category}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
-                {visibleSkills.map((skill) => {
-                  const expanded = selectedSkillId === skill.id
-                  return (
-                    <div
-                      key={skill.id}
-                      className={cn(
-                        'overflow-hidden rounded-2xl border bg-primary-950/60 transition-all',
-                        skill.status === 'disabled' && 'opacity-50',
-                        expanded
-                          ? 'border-accent-500/40 bg-accent-500/5'
-                          : 'border-primary-800 hover:border-primary-700',
-                      )}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedSkillId((current) =>
-                            current === skill.id ? '' : skill.id,
-                          )
-                        }
-                        className="flex w-full items-start gap-3 px-4 py-4 text-left"
-                      >
-                        <span
-                          className={cn(
-                            'flex size-11 shrink-0 items-center justify-center rounded-2xl text-xl',
-                            skill.tone,
-                          )}
-                        >
-                          {skill.emoji}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-primary-100">
-                              {skill.name}
-                            </span>
-                            <span
-                              className={cn(
-                                'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                                CATEGORY_BADGE_CLASS[skill.category],
-                              )}
-                            >
-                              {skill.category}
-                            </span>
-                            <span
-                              className={cn(
-                                'rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize',
-                                STATUS_BADGE_CLASS[skill.status],
-                              )}
-                            >
-                              {skill.status}
-                            </span>
-                          </span>
-                          <span className="mt-1 block text-sm text-primary-300">
-                            {skill.description}
-                          </span>
-                        </span>
-                        <HugeiconsIcon
-                          icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
-                          size={18}
-                          strokeWidth={1.7}
-                          className="mt-0.5 shrink-0 text-primary-400"
-                        />
-                      </button>
-
-                      <AnimatePresence initial={false}>
-                        {expanded ? (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.16 }}
-                            className="overflow-hidden border-t border-primary-800"
-                          >
-                            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex items-start gap-3 text-sm text-primary-300">
-                                <HugeiconsIcon
-                                  icon={SparklesIcon}
-                                  size={18}
-                                  strokeWidth={1.7}
-                                  className="mt-0.5 shrink-0 text-accent-300"
-                                />
-                                <p>
-                                  {skill.status === 'active'
-                                    ? 'Installed and ready to use in the workspace.'
-                                    : 'Installed package exists, but this skill is currently disabled.'}
-                                </p>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant={
-                                  skill.status === 'active'
-                                    ? 'secondary'
-                                    : 'outline'
-                                }
-                                onClick={() =>
-                                  toast(
-                                    skill.status === 'active'
-                                      ? `${skill.name} is already enabled`
-                                      : `${skill.name} cannot be enabled yet`,
-                                    {
-                                      type:
-                                        skill.status === 'active'
-                                          ? 'info'
-                                          : 'warning',
-                                    },
-                                  )
-                                }
-                              >
-                                {skill.status === 'active' ? 'Enabled' : 'Disabled'}
-                              </Button>
-                            </div>
-                          </motion.div>
-                        ) : null}
-                      </AnimatePresence>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {selectedSkill ? (
-                <div className="mt-4 rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-3 text-sm text-primary-300">
-                  Selected skill:{" "}
-                  <span className="font-medium text-primary-100">
-                    {selectedSkill.name}
-                  </span>
-                </div>
-              ) : null}
+    <div className="h-full overflow-y-auto bg-surface text-ink">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+        <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
+                ClawSuite Marketplace
+              </p>
+              <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
+                Skills Browser
+              </h1>
+              <p className="text-sm text-primary-500 text-pretty sm:text-base">
+                Discover, install, and manage skills across your local workspace
+                and ClawdHub registry.
+              </p>
             </div>
-          </section>
+          </div>
+        </header>
 
-          <section className="min-h-0 border-l-0 border-primary-800 lg:border-l">
-            <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
-              <div className="flex flex-col gap-3 border-b border-primary-800 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-[15px] font-semibold text-primary-100">
-                  Memory
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleComingSoon}
+        <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-3 backdrop-blur-xl sm:p-4">
+          <Tabs value={tab} onValueChange={handleTabChange}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <TabsList
+                className="rounded-xl border border-primary-200 bg-primary-100/60 p-1"
+                variant="default"
+              >
+                <TabsTab value="installed" className="min-w-[132px]">
+                  Installed Skills
+                </TabsTab>
+                <TabsTab value="marketplace" className="min-w-[168px]">
+                  ClawdHub Marketplace
+                </TabsTab>
+                <TabsTab value="featured" className="min-w-[120px]">
+                  Featured
+                </TabsTab>
+              </TabsList>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={searchInput}
+                  onChange={(event) => handleSearchChange(event.target.value)}
+                  placeholder="Search by name, tags, or description"
+                  className="h-9 min-w-[220px] rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
+                />
+
+                {tab === 'marketplace' ? (
+                  <select
+                    value={category}
+                    onChange={(event) =>
+                      handleCategoryChange(event.target.value)
+                    }
+                    className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
                   >
-                    Export
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleClearAll}
-                  >
-                    Clear All
-                  </Button>
-                </div>
-              </div>
-
-              <div className="py-4">
-                <div className="relative">
-                  <HugeiconsIcon
-                    icon={Search01Icon}
-                    size={16}
-                    strokeWidth={1.8}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary-400"
-                  />
-                  <input
-                    value={memorySearch}
-                    onChange={(event) => setMemorySearch(event.target.value)}
-                    placeholder="Search memory..."
-                    className="w-full rounded-xl border border-primary-700 bg-primary-950 px-10 py-2.5 text-sm text-primary-100 outline-none transition-colors placeholder:text-primary-400 focus:border-accent-500/50"
-                  />
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {MEMORY_FILTERS.map((filter) => {
-                    const active = filter === memoryFilter
-                    return (
-                      <button
-                        key={filter}
-                        type="button"
-                        onClick={() => setMemoryFilter(filter)}
-                        className={cn(
-                          'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                          active
-                            ? 'border-accent-500/40 bg-accent-500/10 text-accent-300'
-                            : 'border-primary-700 bg-primary-900 text-primary-300 hover:border-primary-600 hover:text-primary-100',
-                        )}
-                      >
-                        {filter}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
-                {memoryQuery.isPending ? (
-                  <div className="rounded-2xl border border-primary-800 bg-primary-950/50 px-4 py-5 text-sm text-primary-300">
-                    Loading memory files...
-                  </div>
-                ) : memoryQuery.isError ? (
-                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-5 text-sm text-red-200">
-                    {memoryQuery.error instanceof Error
-                      ? memoryQuery.error.message
-                      : 'Failed to load memory files'}
-                  </div>
-                ) : (
-                  <>
-                    <MemorySectionBlock
-                      title={sectionLabel('workspace')}
-                      files={workspaceFiles}
-                      selectedPath={selectedMemoryPath}
-                      onSelect={setSelectedMemoryPath}
-                    />
-                    <MemorySectionBlock
-                      title={sectionLabel('project')}
-                      files={projectFiles}
-                      selectedPath={selectedMemoryPath}
-                      onSelect={setSelectedMemoryPath}
-                    />
-                    <MemorySectionBlock
-                      title={sectionLabel('agent')}
-                      files={agentFiles}
-                      selectedPath={selectedMemoryPath}
-                      onSelect={setSelectedMemoryPath}
-                    />
-                  </>
-                )}
-
-                {!memoryQuery.isPending &&
-                !memoryQuery.isError &&
-                filteredMemoryFiles.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/40 px-4 py-5 text-sm text-primary-400">
-                    No memory files match the current filter.
-                  </div>
+                    {categories.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
                 ) : null}
 
-                <div className="rounded-2xl border border-primary-800 bg-primary-950/50 p-4">
-                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-400">
-                    Retention
+                {tab === 'marketplace' ? (
+                  <select
+                    value={sort}
+                    onChange={(event) =>
+                      handleSortChange(
+                        event.target.value === 'category' ? 'category' : 'name',
+                      )
+                    }
+                    className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
+                  >
+                    <option value="name">Name A-Z</option>
+                    <option value="category">Category</option>
+                  </select>
+                ) : null}
+              </div>
+            </div>
+
+            {actionError ? (
+              <p className="rounded-lg border border-primary-200 bg-primary-100/60 px-3 py-2 text-sm text-ink">
+                {actionError}
+              </p>
+            ) : null}
+
+            <TabsPanel value="installed" className="pt-2">
+              <SkillsGrid
+                skills={skills}
+                loading={skillsQuery.isPending}
+                actionSkillId={actionSkillId}
+                tab="installed"
+                onOpenDetails={setSelectedSkill}
+                onInstall={(skillId) => runSkillAction('install', { skillId })}
+                onUninstall={(skillId) =>
+                  runSkillAction('uninstall', { skillId })
+                }
+                onToggle={(skillId, enabled) =>
+                  runSkillAction('toggle', { skillId, enabled })
+                }
+              />
+            </TabsPanel>
+
+            <TabsPanel value="marketplace" className="pt-2">
+              <SkillsGrid
+                skills={skills}
+                loading={skillsQuery.isPending}
+                actionSkillId={actionSkillId}
+                tab="marketplace"
+                onOpenDetails={setSelectedSkill}
+                onInstall={(skillId) => runSkillAction('install', { skillId })}
+                onUninstall={(skillId) =>
+                  runSkillAction('uninstall', { skillId })
+                }
+                onToggle={(skillId, enabled) =>
+                  runSkillAction('toggle', { skillId, enabled })
+                }
+              />
+            </TabsPanel>
+
+            <TabsPanel value="featured" className="pt-2">
+              <FeaturedGrid
+                skills={skills}
+                loading={skillsQuery.isPending}
+                actionSkillId={actionSkillId}
+                onOpenDetails={setSelectedSkill}
+                onInstall={(skillId) => runSkillAction('install', { skillId })}
+                onUninstall={(skillId) =>
+                  runSkillAction('uninstall', { skillId })
+                }
+              />
+            </TabsPanel>
+          </Tabs>
+        </section>
+
+        {tab !== 'featured' ? (
+          <footer className="flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-sm text-primary-500 tabular-nums">
+            <span>
+              {(skillsQuery.data?.total || 0).toLocaleString()} total skills
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || skillsQuery.isPending}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                Previous
+              </Button>
+              <span className="min-w-[82px] text-center">
+                {page} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages || skillsQuery.isPending}
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
+              >
+                Next
+              </Button>
+            </div>
+          </footer>
+        ) : null}
+      </div>
+
+      <DialogRoot
+        open={Boolean(selectedSkill)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedSkill(null)
+          }
+        }}
+      >
+        <DialogContent className="w-[min(960px,95vw)] border-primary-200 bg-primary-50/95 backdrop-blur-sm">
+          {selectedSkill ? (
+            <div className="flex max-h-[85vh] flex-col">
+              <div className="border-b border-primary-200 px-5 py-4">
+                <DialogTitle className="text-balance">
+                  {selectedSkill.icon} {selectedSkill.name}
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-pretty">
+                  by {selectedSkill.author} • {selectedSkill.category} •{' '}
+                  {selectedSkill.fileCount.toLocaleString()} files
+                </DialogDescription>
+                {selectedSkill.security && (
+                  <div className="mt-3 rounded-xl border border-primary-200 bg-primary-50/80 overflow-hidden">
+                    <SecurityBadge
+                      security={selectedSkill.security}
+                      compact={false}
+                    />
                   </div>
-                  <div className="space-y-2 text-sm text-primary-300">
-                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-800 bg-primary-900/60 px-3 py-2">
-                      <span>Workspace memory</span>
-                      <span className="font-medium text-primary-100">
-                        Permanent
-                      </span>
+                )}
+              </div>
+
+              <ScrollAreaRoot className="h-[56vh]">
+                <ScrollAreaViewport className="px-5 py-4">
+                  <div className="space-y-3">
+                    {selectedSkill.homepage ? (
+                      <p className="text-sm text-primary-500 text-pretty">
+                        Homepage:{' '}
+                        <a
+                          href={selectedSkill.homepage}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline decoration-border underline-offset-4 hover:decoration-primary"
+                        >
+                          {selectedSkill.homepage}
+                        </a>
+                      </p>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedSkill.triggers.length > 0 ? (
+                        selectedSkill.triggers.slice(0, 8).map((trigger) => (
+                          <span
+                            key={trigger}
+                            className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500"
+                          >
+                            {trigger}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
+                          No triggers listed
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-800 bg-primary-900/60 px-3 py-2">
-                      <span>Project memory</span>
-                      <span className="font-medium text-primary-100">
-                        Per-project
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-800 bg-primary-900/60 px-3 py-2">
-                      <span>Agent memory</span>
-                      <span className="font-medium text-primary-100">
-                        30 day rolling
-                      </span>
-                    </div>
+
+                    <article className="rounded-xl border border-primary-200 bg-primary-100/30 p-4 backdrop-blur-sm">
+                      <Markdown>
+                        {selectedSkill.content ||
+                          `# ${selectedSkill.name}\n\n${selectedSkill.description}`}
+                      </Markdown>
+                    </article>
                   </div>
+                </ScrollAreaViewport>
+                <ScrollAreaScrollbar>
+                  <ScrollAreaThumb />
+                </ScrollAreaScrollbar>
+              </ScrollAreaRoot>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-200 px-5 py-3">
+                <p className="text-sm text-primary-500 text-pretty">
+                  Source:{' '}
+                  <code className="inline-code">
+                    {selectedSkill.sourcePath}
+                  </code>
+                </p>
+                <div className="flex items-center gap-2">
+                  {selectedSkill.installed ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={actionSkillId === selectedSkill.id}
+                      onClick={() => {
+                        runSkillAction('uninstall', {
+                          skillId: selectedSkill.id,
+                        })
+                      }}
+                    >
+                      Uninstall
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled={actionSkillId === selectedSkill.id}
+                      onClick={() =>
+                        runSkillAction('install', { skillId: selectedSkill.id })
+                      }
+                    >
+                      Install
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedSkill(null)}
+                  >
+                    Close
+                  </Button>
                 </div>
               </div>
             </div>
-          </section>
+          ) : null}
+        </DialogContent>
+      </DialogRoot>
+    </div>
+  )
+}
+
+type SkillsGridProps = {
+  skills: Array<SkillSummary>
+  loading: boolean
+  actionSkillId: string | null
+  tab: 'installed' | 'marketplace'
+  onOpenDetails: (skill: SkillSummary) => void
+  onInstall: (skillId: string) => void
+  onUninstall: (skillId: string) => void
+  onToggle: (skillId: string, enabled: boolean) => void
+}
+
+const SECURITY_BADGE: Record<
+  string,
+  { label: string; badgeClass: string; confidence: string }
+> = {
+  safe: {
+    label: 'Benign',
+    badgeClass: 'bg-green-100 text-green-700 border-green-200',
+    confidence: 'HIGH CONFIDENCE',
+  },
+  low: {
+    label: 'Benign',
+    badgeClass: 'bg-green-100 text-green-700 border-green-200',
+    confidence: 'MODERATE',
+  },
+  medium: {
+    label: 'Caution',
+    badgeClass: 'bg-amber-100 text-amber-700 border-amber-200',
+    confidence: 'REVIEW RECOMMENDED',
+  },
+  high: {
+    label: 'Warning',
+    badgeClass: 'bg-red-100 text-red-700 border-red-200',
+    confidence: 'MANUAL REVIEW',
+  },
+}
+
+function SecurityBadge({
+  security,
+  compact = true,
+}: {
+  security?: SecurityRisk
+  compact?: boolean
+}) {
+  if (!security) return null
+  const config = SECURITY_BADGE[security.level]
+  if (!config) return null
+
+  const [expanded, setExpanded] = useState(false)
+
+  // Compact badge for card grid
+  if (compact) {
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          className={cn(
+            'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
+            config.badgeClass,
+          )}
+          onMouseEnter={() => setExpanded(true)}
+          onMouseLeave={() => setExpanded(false)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpanded((v) => !v)
+          }}
+        >
+          {config.label}
+        </button>
+        {expanded && (
+          <div className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 rounded-xl border border-primary-200 bg-surface p-0 shadow-xl overflow-hidden">
+            <SecurityScanCard security={security} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Full card for detail dialog
+  return <SecurityScanCard security={security} />
+}
+
+function SecurityScanCard({ security }: { security: SecurityRisk }) {
+  const [showDetails, setShowDetails] = useState(false)
+  const config = SECURITY_BADGE[security.level]
+  if (!config) return null
+
+  const summaryText =
+    security.flags.length === 0
+      ? 'No risky patterns detected. This skill appears safe to install.'
+      : security.level === 'high'
+        ? `Found ${security.flags.length} potential security concern${security.flags.length !== 1 ? 's' : ''}. Review before installing.`
+        : `The skill's code was scanned for common risk patterns. ${security.flags.length} item${security.flags.length !== 1 ? 's' : ''} noted.`
+
+  return (
+    <div className="text-xs">
+      <div className="px-3 pt-3 pb-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-400 mb-2">
+          Security Scan
+        </p>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-primary-500 font-medium w-16 shrink-0">
+              ClawSuite
+            </span>
+            <span
+              className={cn(
+                'rounded-md border px-1.5 py-0.5 text-[10px] font-semibold',
+                config.badgeClass,
+              )}
+            >
+              {config.label}
+            </span>
+            <span className="text-[10px] text-primary-400 uppercase tracking-wide font-medium">
+              {config.confidence}
+            </span>
+          </div>
         </div>
+      </div>
+      <div className="px-3 pb-2">
+        <p className="text-primary-500 text-pretty leading-relaxed">
+          {summaryText}
+        </p>
+      </div>
+      {security.flags.length > 0 && (
+        <div className="border-t border-primary-100">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowDetails((v) => !v)
+            }}
+            className="flex w-full items-center justify-between px-3 py-2 text-accent-500 hover:text-accent-600 transition-colors"
+          >
+            <span className="text-[11px] font-medium">Details</span>
+            <span className="text-[10px]">{showDetails ? '▲' : '▼'}</span>
+          </button>
+          {showDetails && (
+            <div className="px-3 pb-3 space-y-1">
+              {security.flags.map((flag) => (
+                <div
+                  key={flag}
+                  className="flex items-start gap-2 text-primary-600"
+                >
+                  <span className="mt-0.5 text-[9px] text-primary-400">●</span>
+                  <span>{flag}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div className="border-t border-primary-100 px-3 py-2">
+        <p className="text-[10px] text-primary-400 italic">
+          Like a lobster shell, security has layers — review code before you run
+          it.
+        </p>
       </div>
     </div>
   )
 }
 
-function MemorySectionBlock({
-  title,
-  files,
-  selectedPath,
-  onSelect,
-}: {
-  title: string
-  files: Array<MemoryFileItem>
-  selectedPath: string | null
-  onSelect: (path: string) => void
-}) {
-  return (
-    <div>
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-400">
-        {title}
-      </div>
+function SkillsGrid({
+  skills,
+  loading,
+  actionSkillId,
+  tab,
+  onOpenDetails,
+  onInstall,
+  onUninstall,
+  onToggle,
+}: SkillsGridProps) {
+  if (loading) {
+    return <SkillsSkeleton count={tab === 'installed' ? 6 : 9} />
+  }
 
-      {files.length === 0 ? (
-        <EmptyMemorySection label={title} />
-      ) : (
-        <div className="space-y-2">
-          {files.map((file) => {
-            const active = selectedPath === file.path
-            return (
-              <button
-                key={file.path}
-                type="button"
-                onClick={() => onSelect(file.path)}
+  if (skills.length === 0) {
+    const isMarketplace = tab === 'marketplace' || tab === ('featured' as string)
+    return (
+      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
+        <p className="text-sm font-medium text-primary-700">
+          {isMarketplace ? 'Marketplace Not Configured' : 'No skills found'}
+        </p>
+        <p className="mt-1 text-xs text-primary-500 text-pretty max-w-sm mx-auto">
+          {isMarketplace ? (
+            <>
+              Run{' '}
+              <code className="rounded bg-primary-200 px-1.5 py-0.5 font-mono text-[11px]">
+                clawdhub sync
+              </code>{' '}
+              in your terminal to download the skills registry, or browse skills
+              at{' '}
+              <a
+                href="https://clawdhub.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-500 hover:underline"
+              >
+                clawdhub.com
+              </a>
+            </>
+          ) : (
+            'Try adjusting your filters or search term'
+          )}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <AnimatePresence initial={false}>
+        {skills.map((skill) => {
+          const isActing = actionSkillId === skill.id
+
+          return (
+            <motion.article
+              key={`${tab}-${skill.id}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18 }}
+              className="flex min-h-[220px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
+            >
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <p className="text-xl leading-none">{skill.icon}</p>
+                  <h3 className="line-clamp-1 text-base font-medium text-ink text-balance">
+                    {skill.name}
+                  </h3>
+                  <p className="line-clamp-1 text-xs text-primary-500">
+                    by {skill.author}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    'rounded-md border px-2 py-0.5 text-xs tabular-nums',
+                    skill.installed
+                      ? 'border-primary/40 bg-primary/15 text-primary'
+                      : 'border-primary-200 bg-primary-100/60 text-primary-500',
+                  )}
+                >
+                  {skill.installed ? 'Installed' : 'Available'}
+                </span>
+              </div>
+
+              <p className="line-clamp-3 min-h-[58px] text-sm text-primary-500 text-pretty">
+                {skill.description}
+              </p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <SecurityBadge security={skill.security} />
+                <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
+                  {skill.category}
+                </span>
+                {skill.triggers.slice(0, 2).map((trigger) => (
+                  <span
+                    key={`${skill.id}-${trigger}`}
+                    className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500"
+                  >
+                    {trigger}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onOpenDetails(skill)}
+                >
+                  Details
+                </Button>
+
+                {tab === 'installed' ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-primary-500">
+                      <Switch
+                        checked={skill.enabled}
+                        disabled={isActing}
+                        onCheckedChange={(checked) =>
+                          onToggle(skill.id, checked)
+                        }
+                        aria-label={`Toggle ${skill.name}`}
+                      />
+                      {skill.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isActing}
+                      onClick={() => onUninstall(skill.id)}
+                    >
+                      Uninstall
+                    </Button>
+                  </div>
+                ) : skill.installed ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isActing}
+                    onClick={() => onUninstall(skill.id)}
+                  >
+                    Uninstall
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={isActing}
+                    onClick={() => onInstall(skill.id)}
+                  >
+                    Install
+                  </Button>
+                )}
+              </div>
+            </motion.article>
+          )
+        })}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+type FeaturedGridProps = {
+  skills: Array<SkillSummary>
+  loading: boolean
+  actionSkillId: string | null
+  onOpenDetails: (skill: SkillSummary) => void
+  onInstall: (skillId: string) => void
+  onUninstall: (skillId: string) => void
+}
+
+function FeaturedGrid({
+  skills,
+  loading,
+  actionSkillId,
+  onOpenDetails,
+  onInstall,
+  onUninstall,
+}: FeaturedGridProps) {
+  if (loading) {
+    return <SkillsSkeleton count={6} large />
+  }
+
+  if (skills.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-10 text-center text-sm text-primary-500 text-pretty">
+        Featured picks are currently unavailable.
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {skills.map((skill) => {
+        const isActing = actionSkillId === skill.id
+        return (
+          <article
+            key={skill.id}
+            className="flex min-h-[258px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
+          >
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
+                  {skill.featuredGroup || 'Staff Pick'}
+                </p>
+                <h3 className="text-lg font-medium text-ink text-balance">
+                  {skill.icon} {skill.name}
+                </h3>
+                <p className="text-sm text-primary-500">by {skill.author}</p>
+              </div>
+
+              <span
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors',
-                  active
-                    ? 'border-accent-500/40 bg-accent-500/5'
-                    : 'border-primary-800 bg-primary-950/50 hover:border-primary-700',
+                  'rounded-md border px-2 py-0.5 text-xs tabular-nums',
+                  skill.installed
+                    ? 'border-primary/40 bg-primary/15 text-primary'
+                    : 'border-primary-200 bg-primary-100/60 text-primary-500',
                 )}
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary-800 bg-primary-900 text-primary-300">
-                  <HugeiconsIcon
-                    icon={File01Icon}
-                    size={16}
-                    strokeWidth={1.7}
-                  />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-primary-100">
-                    {file.name}
-                  </span>
-                  <span className="block truncate text-xs text-primary-400">
-                    {file.path}
-                  </span>
-                </span>
-                <span className="shrink-0 text-xs text-primary-400">
-                  {file.size}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                {skill.installed ? 'Installed' : 'Staff Pick'}
+              </span>
+            </div>
+
+            <p className="line-clamp-3 mb-3 text-sm text-primary-500 text-pretty">
+              {skill.description}
+            </p>
+
+            <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenDetails(skill)}
+              >
+                Details
+              </Button>
+              {skill.installed ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isActing}
+                  onClick={() => onUninstall(skill.id)}
+                >
+                  Uninstall
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={isActing}
+                  onClick={() => onInstall(skill.id)}
+                >
+                  Install
+                </Button>
+              )}
+            </div>
+          </article>
+        )
+      })}
+    </div>
+  )
+}
+
+function SkillsSkeleton({
+  count,
+  large = false,
+}: {
+  count: number
+  large?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'grid gap-3',
+        large
+          ? 'grid-cols-1 lg:grid-cols-2'
+          : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
       )}
+    >
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={index}
+          className={cn(
+            'animate-pulse rounded-2xl border border-primary-200 bg-primary-50/70 p-4',
+            large ? 'min-h-[258px]' : 'min-h-[220px]',
+          )}
+        >
+          <div className="mb-3 h-5 w-2/5 rounded-md bg-primary-100" />
+          <div className="mb-2 h-4 w-3/4 rounded-md bg-primary-100" />
+          <div className="h-4 w-1/2 rounded-md bg-primary-100" />
+          <div className="mt-4 h-20 rounded-xl bg-primary-100/80" />
+          <div className="mt-4 h-8 w-1/3 rounded-md bg-primary-100" />
+        </div>
+      ))}
     </div>
   )
 }

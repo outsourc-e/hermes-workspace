@@ -843,7 +843,7 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/skills',
       icon: PuzzleIcon,
-      label: 'Skills & Memory',
+      label: 'Skills',
       active: isSkillsActive,
       dataTour: 'skills',
     },
