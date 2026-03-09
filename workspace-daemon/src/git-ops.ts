@@ -33,11 +33,33 @@ export async function cleanupWorktree(projectPath: string, workspacePath: string
   }
 }
 
+export async function hasGitRemote(projectPath: string): Promise<boolean> {
+  try {
+    const remotes = await runGit(projectPath, ["remote"]);
+    return remotes.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function createPullRequest(
-  _projectPath: string,
-  _branch: string,
-  _title: string,
-  _body: string,
+  projectPath: string,
+  branch: string,
+  title: string,
+  body: string,
 ): Promise<string | null> {
-  return null;
+  try {
+    const { stdout } = await execFileAsync(
+      "gh",
+      ["pr", "create", "--title", title, "--body", body, "--base", "main", "--head", branch],
+      { cwd: projectPath, timeout: 30_000 },
+    );
+    const url = stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => /^https?:\/\//.test(line));
+    return url ?? null;
+  } catch {
+    return null;
+  }
 }

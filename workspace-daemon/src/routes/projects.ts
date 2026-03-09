@@ -41,6 +41,15 @@ export function createProjectsRouter(tracker: Tracker): Router {
     res.json(project);
   });
 
+  router.patch("/:id", (req, res) => {
+    const project = tracker.updateProject(req.params.id, req.body);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    res.json(project);
+  });
+
   router.delete("/:id", (req, res) => {
     const deleted = tracker.deleteProject(req.params.id);
     if (!deleted) {

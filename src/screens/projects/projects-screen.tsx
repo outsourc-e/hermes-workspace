@@ -16,6 +16,11 @@ import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
   DialogClose,
   DialogContent,
   DialogDescription,
@@ -841,6 +846,8 @@ export function ProjectsScreen() {
   const [projectDetail, setProjectDetail] = useState<WorkspaceProject | null>(
     null,
   )
+  const [projectSpecDraft, setProjectSpecDraft] = useState('')
+  const [projectSpecOpen, setProjectSpecOpen] = useState(false)
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>(
     {},
   )
@@ -1024,6 +1031,12 @@ export function ProjectsScreen() {
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
   )
+
+  useEffect(() => {
+    const spec = projectDetail?.spec ?? selectedSummary?.spec ?? ''
+    setProjectSpecDraft(spec)
+    setProjectSpecOpen(spec.trim().length > 0)
+  }, [projectDetail?.id, projectDetail?.spec, selectedSummary?.id, selectedSummary?.spec])
 
   const statsQuery = useQuery({
     queryKey: ['workspace', 'stats'],
@@ -1376,6 +1389,52 @@ export function ProjectsScreen() {
         {
           type: 'error',
         },
+      )
+    } finally {
+      setSubmittingKey(null)
+    }
+  }
+
+  async function handleSaveProjectSpec() {
+    const activeProject = projectDetail ?? selectedSummary
+    if (!activeProject) {
+      return
+    }
+
+    setSubmittingKey('project-spec')
+
+    try {
+      const payload = await apiRequest(
+        `/api/workspace/projects/${encodeURIComponent(activeProject.id)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            spec: projectSpecDraft.trim() ? projectSpecDraft : null,
+          }),
+        },
+      )
+
+      const updatedProject = extractProject(payload)
+      if (updatedProject) {
+        setProjectDetail((current) =>
+          current?.id === updatedProject.id ? { ...current, ...updatedProject } : current,
+        )
+        setProjects((current) =>
+          current.map((project) =>
+            project.id === updatedProject.id ? { ...project, ...updatedProject } : project,
+          ),
+        )
+        setProjectSpecDraft(updatedProject.spec ?? '')
+        setProjectSpecOpen(Boolean(updatedProject.spec?.trim()))
+      }
+
+      toast('Project spec saved', { type: 'success' })
+      triggerRefresh()
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'Failed to save project spec',
+        { type: 'error' },
       )
     } finally {
       setSubmittingKey(null)
@@ -1961,11 +2020,6 @@ export function ProjectsScreen() {
                             selectedSummary.path ||
                             'No path configured'}
                         </p>
-                        {(projectDetail?.spec || selectedSummary.spec) && (
-                          <p className="max-w-3xl whitespace-pre-wrap text-primary-300">
-                            {projectDetail?.spec || selectedSummary.spec}
-                          </p>
-                        )}
                       </div>
                     </div>
 
@@ -1983,6 +2037,67 @@ export function ProjectsScreen() {
                       Add Phase
                     </Button>
                   </div>
+
+                  <Collapsible
+                    open={projectSpecOpen}
+                    onOpenChange={setProjectSpecOpen}
+                  >
+                    <section className="mt-5 rounded-2xl border border-primary-800 bg-primary-800/35">
+                      <CollapsibleTrigger
+                        render={
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                          />
+                        }
+                        className="w-full bg-transparent p-0 hover:bg-transparent"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-primary-100">
+                            Project Spec / PRD
+                          </p>
+                          <p className="text-xs text-primary-400">
+                            {projectSpecDraft.trim()
+                              ? 'Execution context and product requirements'
+                              : 'No spec yet. Add a brief or PRD for this project.'}
+                          </p>
+                        </div>
+                        <HugeiconsIcon
+                          icon={projectSpecOpen ? ArrowDown01Icon : ArrowRight01Icon}
+                          size={16}
+                          strokeWidth={1.7}
+                          className="text-primary-400"
+                        />
+                      </CollapsibleTrigger>
+                      <CollapsiblePanel
+                        className="pt-0"
+                        contentClassName="border-t border-primary-800 px-4 py-4"
+                      >
+                        <div className="space-y-3">
+                          <textarea
+                            value={projectSpecDraft}
+                            onChange={(event) =>
+                              setProjectSpecDraft(event.target.value)
+                            }
+                            rows={10}
+                            className="min-h-[220px] w-full rounded-2xl border border-primary-700 bg-primary-900/90 px-4 py-3 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                            placeholder="Add the project spec, PRD, or execution brief..."
+                          />
+                          <div className="flex justify-end">
+                            <Button
+                              onClick={() => void handleSaveProjectSpec()}
+                              disabled={submittingKey === 'project-spec'}
+                              className="bg-accent-500 text-white hover:bg-accent-400"
+                            >
+                              {submittingKey === 'project-spec'
+                                ? 'Saving...'
+                                : 'Save Spec'}
+                            </Button>
+                          </div>
+                        </div>
+                      </CollapsiblePanel>
+                    </section>
+                  </Collapsible>
 
                   {detailLoading ? (
                     <div className="py-14 text-center">

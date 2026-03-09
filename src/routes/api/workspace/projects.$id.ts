@@ -62,6 +62,32 @@ export const Route = createFileRoute('/api/workspace/projects/$id')({
         }
       },
 
+      PATCH: async ({ request, params }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+
+        const ip = getClientIp(request)
+        if (!rateLimit(`workspace-project-patch:${ip}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
+
+        try {
+          return await forwardWorkspaceRequest({
+            request,
+            path: `/projects/${params.id}`,
+          })
+        } catch (error) {
+          return json(
+            { ok: false, error: safeErrorMessage(error) },
+            { status: 502 },
+          )
+        }
+      },
+
       DELETE: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })

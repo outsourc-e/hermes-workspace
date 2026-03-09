@@ -1,7 +1,13 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Router } from "express";
-import { cleanupWorktree, getWorktreeBranch, mergeWorktreeToMain } from "../git-ops";
+import {
+  cleanupWorktree,
+  createPullRequest,
+  getWorktreeBranch,
+  hasGitRemote,
+  mergeWorktreeToMain,
+} from "../git-ops";
 import { Tracker } from "../tracker";
 
 const execFileAsync = promisify(execFile);
@@ -69,6 +75,14 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
       }
 
       const commitHash = await mergeWorktreeToMain(taskRun.project_path, branch, taskRun.task_name);
+      if (await hasGitRemote(taskRun.project_path)) {
+        await createPullRequest(
+          taskRun.project_path,
+          branch,
+          taskRun.task_name,
+          `Automated PR for approved checkpoint ${checkpoint.id}`,
+        );
+      }
       const updatedCheckpoint = tracker.approveCheckpoint(
         checkpoint.id,
         req.body?.reviewer_notes,
