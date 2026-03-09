@@ -6,6 +6,7 @@ import type {
 } from './runs-types'
 
 export type RunTimeRange = 'last_hour' | 'today' | 'all'
+export type RunAgentTone = 'codex' | 'claude' | 'ollama' | 'default'
 
 export function formatRunStatus(status: WorkspaceRunStatus): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
@@ -41,8 +42,18 @@ export function formatRunTokens(run: WorkspaceTaskRun): string {
   return (run.input_tokens + run.output_tokens).toLocaleString()
 }
 
+export function formatTokenCount(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '0'
+  if (n < 1000) return String(Math.round(n))
+  return `${(n / 1000).toFixed(1)}k`
+}
+
 export function formatRunCost(costCents: number): string {
   return `$${(costCents / 100).toFixed(2)}`
+}
+
+export function formatRunInputTokens(run: WorkspaceTaskRun): string {
+  return `${formatTokenCount(run.input_tokens)} tok`
 }
 
 export function formatRunTimestamp(value: string | null): string {
@@ -131,6 +142,71 @@ export function getRunProgress(
   return Math.max(14, Math.min(92, weightedEvents))
 }
 
+export function getRunProgressLabel(
+  run: WorkspaceTaskRun,
+  events: Array<WorkspaceRunEvent>,
+): string {
+  if (run.status === 'running' && events.length === 0) return 'running'
+  return `${getRunProgress(run, events)}%`
+}
+
+function extractFilePaths(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return /\.[A-Za-z0-9]+$/.test(value) || value.includes('/')
+      ? [value]
+      : []
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => extractFilePaths(entry))
+  }
+  if (!value || typeof value !== 'object') return []
+
+  const record = value as Record<string, unknown>
+  return Object.entries(record).flatMap(([key, entry]) => {
+    if (
+      key === 'path' ||
+      key === 'file' ||
+      key === 'filePath' ||
+      key === 'file_path' ||
+      key === 'target_file'
+    ) {
+      return extractFilePaths(entry)
+    }
+    if (key === 'changed_files') {
+      return extractFilePaths(entry)
+    }
+    return []
+  })
+}
+
+export function getRunFilesWritten(events: Array<WorkspaceRunEvent>): number | null {
+  const files = new Set<string>()
+  let fileChangeRequests = 0
+
+  for (const event of events) {
+    const method = typeof event.data?.method === 'string' ? event.data.method : null
+    if (method === 'item/fileChange/requestApproval') {
+      fileChangeRequests += 1
+    }
+
+    for (const path of extractFilePaths(event.data)) {
+      files.add(path)
+    }
+
+    const message = typeof event.data?.message === 'string' ? event.data.message : ''
+    const messagePaths = Array.from(
+      message.matchAll(/([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)/g),
+      (match) => match[1],
+    )
+    for (const path of messagePaths) {
+      files.add(path)
+    }
+  }
+
+  const count = Math.max(files.size, fileChangeRequests)
+  return count > 0 ? count : null
+}
+
 export function isRunningRun(run: WorkspaceTaskRun): boolean {
   return run.status === 'running'
 }
@@ -143,4 +219,25 @@ export function sortRunsNewestFirst(a: WorkspaceTaskRun, b: WorkspaceTaskRun): n
 
 export function getConsoleLineClass(event: WorkspaceRunEvent): string {
   return cn('whitespace-pre-wrap break-words', getRunEventLineClass(event))
+}
+
+export function getRunAgentTone(agentName: string | null): RunAgentTone {
+  const normalized = agentName?.toLowerCase() ?? ''
+  if (normalized.includes('codex')) return 'codex'
+  if (normalized.includes('claude')) return 'claude'
+  if (
+    normalized.includes('ollama') ||
+    normalized.includes('openclaw') ||
+    normalized.includes('pc1')
+  ) {
+    return 'ollama'
+  }
+  return 'default'
+}
+
+export function getRunRetryNarrative(run: WorkspaceTaskRun): string | null {
+  if (run.status === 'completed' && run.attempt > 1 && run.error?.trim()) {
+    return `❌ ${run.error.trim()} — auto-retried → passed on retry`
+  }
+  return null
 }

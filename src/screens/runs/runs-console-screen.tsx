@@ -48,12 +48,17 @@ import {
 import {
   formatRunCost,
   formatRunDuration,
+  formatRunInputTokens,
   formatRunStatus,
   formatRunTimestamp,
   formatRunTokens,
   getConsoleLineClass,
+  getRunAgentTone,
   getRunEventMessage,
+  getRunFilesWritten,
   getRunProgress,
+  getRunProgressLabel,
+  getRunRetryNarrative,
   getRunStatusClass,
   isRunningRun,
   matchesTimeRange,
@@ -461,14 +466,61 @@ function ActiveRunCard({
   onStop: (runId: string) => void
 }) {
   const progress = getRunProgress(run, events)
+  const progressLabel = getRunProgressLabel(run, events)
+  const filesWritten = getRunFilesWritten(events)
+  const agentTone = getRunAgentTone(run.agent_name)
+  const accentClasses =
+    agentTone === 'codex'
+      ? {
+          liveBadge: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+          dot: 'bg-emerald-400',
+          cardGlow:
+            'border-emerald-500/25 shadow-[0_0_0_1px_rgba(52,211,153,0.08),0_18px_40px_rgba(16,185,129,0.18)]',
+          progress: 'bg-emerald-400',
+        }
+      : agentTone === 'claude'
+        ? {
+            liveBadge: 'border-violet-500/30 bg-violet-500/10 text-violet-300',
+            dot: 'bg-violet-400',
+            cardGlow:
+              'border-violet-500/25 shadow-[0_0_0_1px_rgba(196,181,253,0.08),0_18px_40px_rgba(139,92,246,0.16)]',
+            progress: 'bg-violet-400',
+          }
+        : agentTone === 'ollama'
+          ? {
+              liveBadge: 'border-sky-500/30 bg-sky-500/10 text-sky-300',
+              dot: 'bg-sky-400',
+              cardGlow:
+                'border-sky-500/25 shadow-[0_0_0_1px_rgba(125,211,252,0.08),0_18px_40px_rgba(14,165,233,0.16)]',
+              progress: 'bg-sky-400',
+            }
+          : {
+              liveBadge: 'border-accent-500/30 bg-accent-500/10 text-accent-300',
+              dot: 'bg-accent-400',
+              cardGlow:
+                'border-accent-500/25 shadow-[0_0_0_1px_rgba(251,146,60,0.08),0_18px_40px_rgba(249,115,22,0.14)]',
+              progress: 'bg-accent-500',
+            }
 
   return (
-    <article className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
+    <article
+      className={cn(
+        'rounded-xl border bg-white p-4 shadow-sm transition-shadow md:p-5',
+        accentClasses.cardGlow,
+      )}
+    >
       <div className="flex flex-col gap-4 border-b border-primary-200 pb-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-xs font-medium text-accent-300">
-              <span className="size-2 rounded-full bg-accent-400" />
+            <span
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
+                accentClasses.liveBadge,
+              )}
+            >
+              <span
+                className={cn('size-2 rounded-full shadow-[0_0_10px_currentColor]', accentClasses.dot)}
+              />
               Live run
             </span>
             <span
@@ -478,6 +530,14 @@ function ActiveRunCard({
             >
               {formatRunStatus(run.status)}
             </span>
+            <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
+              {progressLabel}
+            </span>
+            {filesWritten ? (
+              <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
+                {filesWritten} file{filesWritten === 1 ? '' : 's'} written
+              </span>
+            ) : null}
           </div>
           <div>
             <h2 className="text-lg font-semibold text-primary-900">{run.task_name}</h2>
@@ -545,7 +605,7 @@ function ActiveRunCard({
             </div>
             <div className="h-2 rounded-full bg-primary-100">
               <div
-                className="h-2 rounded-full bg-accent-500 transition-all"
+                className={cn('h-2 rounded-full transition-all', accentClasses.progress)}
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -563,6 +623,8 @@ function RecentRunRow({
   run: WorkspaceTaskRun
   onOpen: () => void
 }) {
+  const retryNarrative = getRunRetryNarrative(run)
+
   return (
     <article className="rounded-xl border border-primary-200 bg-white shadow-sm">
       <button
@@ -572,7 +634,17 @@ function RecentRunRow({
       >
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-primary-900">{run.task_name}</p>
-          <p className="mt-1 text-xs text-primary-500">{run.mission_name}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-xs text-primary-500">{run.mission_name}</p>
+            {run.attempt > 1 ? (
+              <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-600">
+                retry #{run.attempt}
+              </span>
+            ) : null}
+          </div>
+          {retryNarrative ? (
+            <p className="mt-1 truncate text-xs text-primary-500">{retryNarrative}</p>
+          ) : null}
         </div>
         <p className="text-sm text-primary-600">{run.project_name}</p>
         <p className="text-sm text-primary-600">{run.agent_name ?? 'Unknown agent'}</p>
@@ -586,7 +658,7 @@ function RecentRunRow({
           </span>
         </div>
         <p className="text-sm text-primary-600">{formatRunDuration(run)}</p>
-        <p className="text-sm text-primary-600">{formatRunTokens(run)}</p>
+        <p className="text-sm text-primary-600">{formatRunInputTokens(run)}</p>
         <p className="text-sm text-primary-600">{formatRunCost(run.cost_cents)}</p>
         <p className="text-sm text-primary-600">
           {formatRunTimestamp(run.completed_at ?? run.started_at)}
@@ -941,7 +1013,7 @@ export function RunsConsoleScreen() {
             <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-14 text-center">
               <p className="text-lg font-semibold text-primary-900">No active runs</p>
               <p className="mt-2 text-sm text-primary-500">
-                Adjust the filters or wait for the next task dispatch.
+                Start a mission from a project to see live agent activity here.
               </p>
             </div>
           )}
