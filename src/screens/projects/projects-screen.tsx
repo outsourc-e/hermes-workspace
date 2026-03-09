@@ -149,6 +149,28 @@ type TaskFormState = {
   dependsOn: string
 }
 
+type DecomposedTaskDraft = {
+  id: string
+  name: string
+  description: string
+  estimated_minutes: number
+  depends_on: string[]
+  suggested_agent_type: string | null
+}
+
+type DecomposeResponse = {
+  tasks: DecomposedTaskDraft[]
+  raw_response?: string
+}
+
+type MissionLaunchState = {
+  phase: WorkspacePhase
+  goal: string
+  step: 'input' | 'review'
+  tasks: DecomposedTaskDraft[]
+  rawResponse?: string
+}
+
 type ReviewVerificationFilter = 'all' | 'verified' | 'missing'
 type ReviewRiskFilter = 'all' | 'high'
 
@@ -240,6 +262,35 @@ function normalizeTask(value: unknown): WorkspaceTask {
     sort_order: asNumber(record?.sort_order),
     depends_on: parseDependsOn(record?.depends_on),
     agent_id: asString(record?.agent_id),
+  }
+}
+
+function normalizeDecomposedTask(
+  value: unknown,
+  index: number,
+): DecomposedTaskDraft {
+  const record = asRecord(value)
+  return {
+    id: crypto.randomUUID(),
+    name: asString(record?.name) ?? `Task ${index + 1}`,
+    description:
+      asString(record?.description) ??
+      asString(record?.name) ??
+      `Task ${index + 1}`,
+    estimated_minutes: Math.max(1, asNumber(record?.estimated_minutes) ?? 30),
+    depends_on: parseDependsOn(record?.depends_on),
+    suggested_agent_type:
+      typeof record?.suggested_agent_type === 'string'
+        ? record.suggested_agent_type
+        : null,
+  }
+}
+
+function extractDecomposeResponse(value: unknown): DecomposeResponse {
+  const record = asRecord(value)
+  return {
+    tasks: asArray(record?.tasks).map(normalizeDecomposedTask),
+    raw_response: asString(record?.raw_response),
   }
 }
 
@@ -843,6 +894,72 @@ function formatTimeAgo(value: string): string {
   return `${Math.round(diff / day)}d`
 }
 
+function formatMinutes(minutes: number): string {
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return `${minutes / 60}h`
+  }
+  if (minutes >= 60) {
+    return `${(minutes / 60).toFixed(1)}h`
+  }
+  return `${minutes}m`
+}
+
+function getExecutionWaveCount(tasks: DecomposedTaskDraft[]): number {
+  if (tasks.length === 0) return 0
+
+  const taskNames = new Set(tasks.map((task) => task.name))
+  const levelByName = new Map<string, number>()
+
+  const visit = (taskName: string, stack = new Set<string>()): number => {
+    const cached = levelByName.get(taskName)
+    if (cached) return cached
+    if (stack.has(taskName)) return 1
+
+    const task = tasks.find((entry) => entry.name === taskName)
+    if (!task) return 1
+
+    stack.add(taskName)
+    const level =
+      1 +
+      task.depends_on
+        .filter((dependency) => taskNames.has(dependency))
+        .reduce(
+          (maxLevel, dependency) =>
+            Math.max(maxLevel, visit(dependency, new Set(stack))),
+          0,
+        )
+    levelByName.set(taskName, level)
+    return level
+  }
+
+  return Math.max(...tasks.map((task) => visit(task.name)))
+}
+
+function getAgentBadgeLabel(agentType: string | null): string {
+  if (!agentType) return 'Unassigned'
+  if (agentType === 'codex') return 'Codex'
+  if (agentType === 'claude') return 'Claude'
+  if (agentType === 'ollama') return 'Ollama'
+  if (agentType === 'openclaw') return 'OpenClaw'
+  return agentType
+}
+
+function getAgentBadgeClass(agentType: string | null): string {
+  if (agentType === 'codex') {
+    return 'border-sky-500/30 bg-sky-500/10 text-sky-300'
+  }
+  if (agentType === 'claude') {
+    return 'border-accent-500/30 bg-accent-500/10 text-accent-300'
+  }
+  if (agentType === 'ollama') {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+  }
+  if (agentType === 'openclaw') {
+    return 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300'
+  }
+  return 'border-primary-700 bg-primary-800/80 text-primary-300'
+}
+
 function getAgentUtilization(agent: WorkspaceAgent): {
   percent: number
   label: string
@@ -986,6 +1103,8 @@ export function ProjectsScreen() {
     null,
   )
   const [missionPhase, setMissionPhase] = useState<WorkspacePhase | null>(null)
+  const [missionLauncher, setMissionLauncher] =
+    useState<MissionLaunchState | null>(null)
   const [taskMission, setTaskMission] = useState<WorkspaceMission | null>(null)
   const [submittingKey, setSubmittingKey] = useState<string | null>(null)
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
@@ -1006,6 +1125,8 @@ export function ProjectsScreen() {
   const [reviewRiskFilter, setReviewRiskFilter] =
     useState<ReviewRiskFilter>('all')
   const [batchApproving, setBatchApproving] = useState(false)
+  const [expandedDecomposeDescriptions, setExpandedDecomposeDescriptions] =
+    useState<Record<string, boolean>>({})
   const queryClient = useQueryClient()
   const detailSectionRef = useRef<HTMLElement | null>(null)
 
@@ -1335,6 +1456,161 @@ export function ProjectsScreen() {
       ),
     [projectCheckpoints],
   )
+  const missionLaunchMinutes = useMemo(
+    () =>
+      missionLauncher?.tasks.reduce(
+        (total, task) => total + task.estimated_minutes,
+        0,
+      ) ?? 0,
+    [missionLauncher],
+  )
+  const missionLaunchWaves = useMemo(
+    () => getExecutionWaveCount(missionLauncher?.tasks ?? []),
+    [missionLauncher],
+  )
+
+  const decomposeMutation = useMutation({
+    mutationFn: async ({
+      goal,
+      projectId,
+    }: {
+      goal: string
+      projectId?: string
+    }) =>
+      extractDecomposeResponse(
+        await apiRequest('/api/workspace/decompose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            goal,
+            project_id: projectId,
+          }),
+        }),
+      ),
+    onSuccess: (result) => {
+      setMissionLauncher((current) =>
+        current
+          ? {
+              ...current,
+              step: 'review',
+              tasks: result.tasks,
+              rawResponse: result.raw_response,
+            }
+          : current,
+      )
+      setExpandedDecomposeDescriptions({})
+    },
+    onError: (error) => {
+      toast(
+        error instanceof Error ? error.message : 'Failed to decompose goal',
+        {
+          type: 'error',
+        },
+      )
+    },
+  })
+
+  const launchMissionMutation = useMutation({
+    mutationFn: async ({
+      phase,
+      tasks,
+      startMission,
+    }: {
+      phase: WorkspacePhase
+      tasks: DecomposedTaskDraft[]
+      startMission: boolean
+    }) => {
+      const missionName = tasks[0]?.name
+        ? `${phase.name}: ${tasks[0].name}`
+        : `${phase.name} Mission`
+
+      const missionPayload = normalizeMission(
+        await apiRequest('/api/workspace/missions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phase_id: phase.id,
+            name: missionName,
+          }),
+        }),
+      )
+
+      const createdTasks = await Promise.all(
+        tasks.map(async (task, index) =>
+          normalizeTask(
+            await apiRequest('/api/workspace-tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                mission_id: missionPayload.id,
+                name: task.name.trim(),
+                description: task.description.trim(),
+                sort_order: index,
+                depends_on: [],
+              }),
+            }),
+          ),
+        ),
+      )
+
+      const idByName = new Map(
+        createdTasks.map((task, index) => [tasks[index]?.name, task.id] as const),
+      )
+
+      await Promise.all(
+        createdTasks.map(async (createdTask, index) => {
+          const dependencyIds = (tasks[index]?.depends_on ?? [])
+            .map((dependency) => idByName.get(dependency))
+            .filter((dependencyId): dependencyId is string =>
+              typeof dependencyId === 'string',
+            )
+
+          if (dependencyIds.length === 0) return
+
+          await apiRequest(
+            `/api/workspace-tasks/${encodeURIComponent(createdTask.id)}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                depends_on: dependencyIds,
+              }),
+            },
+          )
+        }),
+      )
+
+      if (startMission) {
+        await apiRequest(
+          `/api/workspace/missions/${encodeURIComponent(missionPayload.id)}/start`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          },
+        )
+      }
+
+      return { mission: missionPayload }
+    },
+    onSuccess: (_result, variables) => {
+      toast(
+        variables.startMission ? 'Mission launched' : 'Mission saved as draft',
+        { type: 'success' },
+      )
+      setMissionLauncher(null)
+      setExpandedDecomposeDescriptions({})
+      triggerRefresh()
+    },
+    onError: (error) => {
+      toast(
+        error instanceof Error ? error.message : 'Failed to launch mission',
+        {
+          type: 'error',
+        },
+      )
+    },
+  })
 
   function triggerRefresh() {
     setRefreshToken((value) => value + 1)
@@ -1348,6 +1624,118 @@ export function ProjectsScreen() {
         behavior: 'smooth',
         block: 'start',
       })
+    })
+  }
+
+  function openMissionLauncher(phase: WorkspacePhase) {
+    setMissionLauncher({
+      phase,
+      goal: '',
+      step: 'input',
+      tasks: [],
+    })
+    setExpandedDecomposeDescriptions({})
+  }
+
+  function resetMissionLauncher() {
+    setMissionLauncher(null)
+    setExpandedDecomposeDescriptions({})
+    decomposeMutation.reset()
+    launchMissionMutation.reset()
+  }
+
+  function handleMissionLauncherOpenChange(open: boolean) {
+    if (!open) {
+      resetMissionLauncher()
+    }
+  }
+
+  function handleTaskDraftChange(
+    taskId: string,
+    updates: Partial<DecomposedTaskDraft>,
+  ) {
+    setMissionLauncher((current) => {
+      if (!current) return current
+      const previousTask = current.tasks.find((task) => task.id === taskId)
+      const previousName = previousTask?.name
+      const nextName = updates.name
+
+      return {
+        ...current,
+        tasks: current.tasks.map((task) => {
+          if (task.id === taskId) {
+            return { ...task, ...updates }
+          }
+
+          if (
+            previousName &&
+            nextName &&
+            previousName !== nextName &&
+            task.depends_on.includes(previousName)
+          ) {
+            return {
+              ...task,
+              depends_on: task.depends_on.map((dependency) =>
+                dependency === previousName ? nextName : dependency,
+              ),
+            }
+          }
+
+          return task
+        }),
+      }
+    })
+  }
+
+  function handleDecomposeSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!missionLauncher?.goal.trim()) {
+      toast('Goal is required', { type: 'warning' })
+      return
+    }
+
+    decomposeMutation.mutate({
+      goal: missionLauncher.goal.trim(),
+      projectId: projectDetail?.id ?? selectedSummary?.id,
+    })
+  }
+
+  function handleLaunchMission(startMission: boolean) {
+    if (!missionLauncher) return
+
+    const cleanedTasks = missionLauncher.tasks.map((task) => ({
+      ...task,
+      name: task.name.trim(),
+      description: task.description.trim(),
+      depends_on: task.depends_on.filter(Boolean),
+    }))
+
+    if (cleanedTasks.length === 0) {
+      toast('Add at least one task before launching', { type: 'warning' })
+      return
+    }
+
+    if (cleanedTasks.some((task) => task.name.length === 0)) {
+      toast('Each task needs a name', { type: 'warning' })
+      return
+    }
+
+    if (new Set(cleanedTasks.map((task) => task.name)).size !== cleanedTasks.length) {
+      toast('Task names must be unique so dependencies can be mapped', {
+        type: 'warning',
+      })
+      return
+    }
+
+    setMissionLauncher((current) =>
+      current ? { ...current, tasks: cleanedTasks } : current,
+    )
+
+    launchMissionMutation.mutate({
+      phase: missionLauncher.phase,
+      tasks: cleanedTasks,
+      startMission,
     })
   }
 
@@ -2296,6 +2684,21 @@ export function ProjectsScreen() {
                                   />
                                   Add Mission
                                 </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    openMissionLauncher(phase)
+                                  }}
+                                >
+                                  <HugeiconsIcon
+                                    icon={Task01Icon}
+                                    size={14}
+                                    strokeWidth={1.6}
+                                  />
+                                  Decompose Goal
+                                </Button>
                                 <HugeiconsIcon
                                   icon={
                                     expanded
@@ -2880,6 +3283,298 @@ export function ProjectsScreen() {
           />
         </FieldLabel>
       </CreateDialog>
+
+      <DialogRoot
+        open={missionLauncher !== null}
+        onOpenChange={handleMissionLauncherOpenChange}
+      >
+        <DialogContent className="w-[min(860px,96vw)] border-primary-700 bg-primary-900 p-0 text-primary-100 shadow-2xl">
+          {missionLauncher ? (
+            missionLauncher.step === 'input' ? (
+              <form onSubmit={handleDecomposeSubmit} className="space-y-6 p-5">
+                <div className="space-y-1">
+                  <DialogTitle className="text-base font-semibold text-primary-100">
+                    Mission Launcher
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-primary-400">
+                    Describe the goal and let the daemon build the task plan for{' '}
+                    {missionLauncher.phase.name}.
+                  </DialogDescription>
+                </div>
+
+                <div className="grid gap-3 rounded-2xl border border-primary-800 bg-primary-800/35 p-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                      Project
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-primary-100">
+                      {projectDetail?.name ?? selectedSummary?.name ?? 'Unknown project'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                      Path
+                    </p>
+                    <p className="mt-1 break-all font-mono text-xs text-primary-300">
+                      {projectDetail?.path ??
+                        selectedSummary?.path ??
+                        'No project path available'}
+                    </p>
+                  </div>
+                </div>
+
+                <FieldLabel label="Goal">
+                  <textarea
+                    value={missionLauncher.goal}
+                    onChange={(event) =>
+                      setMissionLauncher((current) =>
+                        current
+                          ? {
+                              ...current,
+                              goal: event.target.value,
+                            }
+                          : current,
+                      )
+                    }
+                    rows={12}
+                    className="w-full rounded-2xl border border-primary-700 bg-primary-800 px-3 py-3 font-mono text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                    placeholder="Describe what you want to build, paste a PRD, or outline the implementation goal..."
+                    autoFocus
+                  />
+                </FieldLabel>
+
+                {decomposeMutation.isPending ? (
+                  <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+                    <p className="text-sm font-medium text-primary-100">
+                      AI is analyzing your goal...
+                    </p>
+                    <p className="mt-1 text-sm text-primary-400">
+                      This can take 15-30 seconds while the daemon gathers project
+                      context and plans the work.
+                    </p>
+                    <div className="mt-4 space-y-2">
+                      {Array.from({ length: 3 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="h-12 animate-shimmer rounded-xl bg-primary-800/80"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="flex items-center justify-end gap-2">
+                  <DialogClose render={<Button variant="outline">Cancel</Button>} />
+                  <Button
+                    type="submit"
+                    className="bg-accent-500 text-white hover:bg-accent-400"
+                    disabled={decomposeMutation.isPending}
+                  >
+                    {decomposeMutation.isPending ? 'Decomposing...' : 'Decompose'}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-6 p-5">
+                <div className="space-y-1">
+                  <DialogTitle className="text-base font-semibold text-primary-100">
+                    Review Task Plan
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-primary-400">
+                    Review and edit the generated plan before creating the mission.
+                  </DialogDescription>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                      Tasks
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-primary-100">
+                      {missionLauncher.tasks.length}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                      Estimate
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-primary-100">
+                      {formatMinutes(missionLaunchMinutes)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                      Waves
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-primary-100">
+                      {missionLaunchWaves}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-primary-800 bg-primary-800/35 px-4 py-3">
+                  <p className="text-sm text-primary-300">
+                    {missionLauncher.tasks.length} tasks, ~
+                    {formatMinutes(missionLaunchMinutes)} estimated,{' '}
+                    {missionLaunchWaves} execution wave
+                    {missionLaunchWaves === 1 ? '' : 's'}.
+                  </p>
+                </div>
+
+                <div className="max-h-[48vh] space-y-3 overflow-y-auto pr-1">
+                  {missionLauncher.tasks.map((task, index) => {
+                    const descriptionOpen =
+                      expandedDecomposeDescriptions[task.id] ?? index === 0
+
+                    return (
+                      <article
+                        key={task.id}
+                        className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4"
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex size-7 items-center justify-center rounded-xl border border-primary-700 bg-primary-900 text-xs font-semibold text-primary-300">
+                                {index + 1}
+                              </span>
+                              <input
+                                value={task.name}
+                                onChange={(event) =>
+                                  handleTaskDraftChange(task.id, {
+                                    name: event.target.value,
+                                  })
+                                }
+                                className="min-w-0 flex-1 rounded-xl border border-primary-700 bg-primary-900/80 px-3 py-2 text-sm font-medium text-primary-100 outline-none transition-colors focus:border-accent-500"
+                              />
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="inline-flex rounded-full border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-[11px] font-medium text-primary-300">
+                                {formatMinutes(task.estimated_minutes)}
+                              </span>
+                              <span
+                                className={cn(
+                                  'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                                  getAgentBadgeClass(task.suggested_agent_type),
+                                )}
+                              >
+                                {getAgentBadgeLabel(task.suggested_agent_type)}
+                              </span>
+                              {task.depends_on.length > 0 ? (
+                                <span className="inline-flex rounded-full border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-[11px] font-medium text-primary-300">
+                                  Depends on: {task.depends_on.join(', ')}
+                                </span>
+                              ) : (
+                                <span className="inline-flex rounded-full border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-[11px] font-medium text-primary-500">
+                                  Ready in wave 1
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setExpandedDecomposeDescriptions((current) => ({
+                                ...current,
+                                [task.id]: !descriptionOpen,
+                              }))
+                            }
+                          >
+                            <HugeiconsIcon
+                              icon={
+                                descriptionOpen
+                                  ? ArrowDown01Icon
+                                  : ArrowRight01Icon
+                              }
+                              size={14}
+                              strokeWidth={1.6}
+                            />
+                            {descriptionOpen ? 'Hide Details' : 'Edit Details'}
+                          </Button>
+                        </div>
+
+                        {descriptionOpen ? (
+                          <div className="mt-4 space-y-3">
+                            <textarea
+                              value={task.description}
+                              onChange={(event) =>
+                                handleTaskDraftChange(task.id, {
+                                  description: event.target.value,
+                                })
+                              }
+                              rows={4}
+                              className="w-full rounded-xl border border-primary-700 bg-primary-900/80 px-3 py-2.5 text-sm text-primary-200 outline-none transition-colors focus:border-accent-500"
+                            />
+                          </div>
+                        ) : null}
+                      </article>
+                    )
+                  })}
+                </div>
+
+                {missionLauncher.rawResponse ? (
+                  <div className="rounded-2xl border border-primary-800 bg-primary-800/25 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                      Fallback output
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-primary-300">
+                      {missionLauncher.rawResponse}
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setMissionLauncher((current) =>
+                        current
+                          ? {
+                              ...current,
+                              step: 'input',
+                            }
+                          : current,
+                      )
+                    }
+                    disabled={launchMissionMutation.isPending}
+                  >
+                    Re-decompose
+                  </Button>
+                  <DialogClose
+                    render={
+                      <Button
+                        variant="outline"
+                        disabled={launchMissionMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => handleLaunchMission(false)}
+                    disabled={launchMissionMutation.isPending}
+                  >
+                    {launchMissionMutation.isPending
+                      ? 'Saving...'
+                      : 'Save as Draft'}
+                  </Button>
+                  <Button
+                    onClick={() => handleLaunchMission(true)}
+                    disabled={launchMissionMutation.isPending}
+                    className="bg-accent-500 text-white hover:bg-accent-400"
+                  >
+                    {launchMissionMutation.isPending
+                      ? 'Launching...'
+                      : 'Launch Mission'}
+                  </Button>
+                </div>
+              </div>
+            )
+          ) : null}
+        </DialogContent>
+      </DialogRoot>
     </main>
   )
 }

@@ -96,8 +96,10 @@ import { Route as ApiWorkspaceProjectsRouteImport } from './routes/api/workspace
 import { Route as ApiWorkspacePhasesRouteImport } from './routes/api/workspace/phases'
 import { Route as ApiWorkspaceMissionsRouteImport } from './routes/api/workspace/missions'
 import { Route as ApiWorkspaceEventsRouteImport } from './routes/api/workspace/events'
+import { Route as ApiWorkspaceDecomposeRouteImport } from './routes/api/workspace/decompose'
 import { Route as ApiWorkspaceCheckpointsRouteImport } from './routes/api/workspace/checkpoints'
 import { Route as ApiWorkspaceAgentsRouteImport } from './routes/api/workspace/agents'
+import { Route as ApiWorkspaceTasksIdRouteImport } from './routes/api/workspace-tasks.$id'
 import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
@@ -572,6 +574,11 @@ const ApiWorkspaceEventsRoute = ApiWorkspaceEventsRouteImport.update({
   path: '/events',
   getParentRoute: () => ApiWorkspaceRoute,
 } as any)
+const ApiWorkspaceDecomposeRoute = ApiWorkspaceDecomposeRouteImport.update({
+  id: '/decompose',
+  path: '/decompose',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
 const ApiWorkspaceCheckpointsRoute = ApiWorkspaceCheckpointsRouteImport.update({
   id: '/checkpoints',
   path: '/checkpoints',
@@ -581,6 +588,11 @@ const ApiWorkspaceAgentsRoute = ApiWorkspaceAgentsRouteImport.update({
   id: '/agents',
   path: '/agents',
   getParentRoute: () => ApiWorkspaceRoute,
+} as any)
+const ApiWorkspaceTasksIdRoute = ApiWorkspaceTasksIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiWorkspaceTasksRoute,
 } as any)
 const ApiTasksTaskIdRoute = ApiTasksTaskIdRouteImport.update({
   id: '/api/tasks/$taskId',
@@ -858,7 +870,7 @@ export interface FileRoutesByFullPath {
   '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
-  '/api/workspace-tasks': typeof ApiWorkspaceTasksRoute
+  '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -890,8 +902,10 @@ export interface FileRoutesByFullPath {
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
+  '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
@@ -986,7 +1000,7 @@ export interface FileRoutesByTo {
   '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
-  '/api/workspace-tasks': typeof ApiWorkspaceTasksRoute
+  '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
@@ -1018,8 +1032,10 @@ export interface FileRoutesByTo {
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
+  '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
@@ -1116,7 +1132,7 @@ export interface FileRoutesById {
   '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
-  '/api/workspace-tasks': typeof ApiWorkspaceTasksRoute
+  '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -1148,8 +1164,10 @@ export interface FileRoutesById {
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
+  '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
@@ -1279,8 +1297,10 @@ export interface FileRouteTypes {
     | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
+    | '/api/workspace-tasks/$id'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/decompose'
     | '/api/workspace/events'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
@@ -1407,8 +1427,10 @@ export interface FileRouteTypes {
     | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
+    | '/api/workspace-tasks/$id'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/decompose'
     | '/api/workspace/events'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
@@ -1536,8 +1558,10 @@ export interface FileRouteTypes {
     | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
+    | '/api/workspace-tasks/$id'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/decompose'
     | '/api/workspace/events'
     | '/api/workspace/missions'
     | '/api/workspace/phases'
@@ -1634,7 +1658,7 @@ export interface RootRouteChildren {
   ApiUsageAnalyticsRoute: typeof ApiUsageAnalyticsRoute
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
-  ApiWorkspaceTasksRoute: typeof ApiWorkspaceTasksRoute
+  ApiWorkspaceTasksRoute: typeof ApiWorkspaceTasksRouteWithChildren
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiCloudProvisionRoute: typeof ApiCloudProvisionRoute
@@ -2269,6 +2293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceEventsRouteImport
       parentRoute: typeof ApiWorkspaceRoute
     }
+    '/api/workspace/decompose': {
+      id: '/api/workspace/decompose'
+      path: '/decompose'
+      fullPath: '/api/workspace/decompose'
+      preLoaderRoute: typeof ApiWorkspaceDecomposeRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
     '/api/workspace/checkpoints': {
       id: '/api/workspace/checkpoints'
       path: '/checkpoints'
@@ -2282,6 +2313,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/workspace/agents'
       preLoaderRoute: typeof ApiWorkspaceAgentsRouteImport
       parentRoute: typeof ApiWorkspaceRoute
+    }
+    '/api/workspace-tasks/$id': {
+      id: '/api/workspace-tasks/$id'
+      path: '/$id'
+      fullPath: '/api/workspace-tasks/$id'
+      preLoaderRoute: typeof ApiWorkspaceTasksIdRouteImport
+      parentRoute: typeof ApiWorkspaceTasksRoute
     }
     '/api/tasks/$taskId': {
       id: '/api/tasks/$taskId'
@@ -2690,6 +2728,7 @@ const ApiWorkspaceProjectsRouteWithChildren =
 interface ApiWorkspaceRouteChildren {
   ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRoute
   ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
+  ApiWorkspaceDecomposeRoute: typeof ApiWorkspaceDecomposeRoute
   ApiWorkspaceEventsRoute: typeof ApiWorkspaceEventsRoute
   ApiWorkspaceMissionsRoute: typeof ApiWorkspaceMissionsRouteWithChildren
   ApiWorkspacePhasesRoute: typeof ApiWorkspacePhasesRoute
@@ -2700,6 +2739,7 @@ interface ApiWorkspaceRouteChildren {
 const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspaceAgentsRoute: ApiWorkspaceAgentsRoute,
   ApiWorkspaceCheckpointsRoute: ApiWorkspaceCheckpointsRouteWithChildren,
+  ApiWorkspaceDecomposeRoute: ApiWorkspaceDecomposeRoute,
   ApiWorkspaceEventsRoute: ApiWorkspaceEventsRoute,
   ApiWorkspaceMissionsRoute: ApiWorkspaceMissionsRouteWithChildren,
   ApiWorkspacePhasesRoute: ApiWorkspacePhasesRoute,
@@ -2710,6 +2750,17 @@ const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
 const ApiWorkspaceRouteWithChildren = ApiWorkspaceRoute._addFileChildren(
   ApiWorkspaceRouteChildren,
 )
+
+interface ApiWorkspaceTasksRouteChildren {
+  ApiWorkspaceTasksIdRoute: typeof ApiWorkspaceTasksIdRoute
+}
+
+const ApiWorkspaceTasksRouteChildren: ApiWorkspaceTasksRouteChildren = {
+  ApiWorkspaceTasksIdRoute: ApiWorkspaceTasksIdRoute,
+}
+
+const ApiWorkspaceTasksRouteWithChildren =
+  ApiWorkspaceTasksRoute._addFileChildren(ApiWorkspaceTasksRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -2788,7 +2839,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUsageAnalyticsRoute: ApiUsageAnalyticsRoute,
   ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
-  ApiWorkspaceTasksRoute: ApiWorkspaceTasksRoute,
+  ApiWorkspaceTasksRoute: ApiWorkspaceTasksRouteWithChildren,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiCloudProvisionRoute: ApiCloudProvisionRoute,
