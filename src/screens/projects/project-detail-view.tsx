@@ -11,6 +11,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQueries, useQuery } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import type React from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
@@ -177,6 +178,7 @@ export function ProjectDetailView({
   onCheckpointReject,
   onRefreshActivity,
 }: ProjectDetailViewProps) {
+  const navigate = useNavigate()
   const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
   const specFileInputRef = useRef<HTMLInputElement | null>(null)
   const taskNameById = useMemo(() => {
@@ -551,6 +553,29 @@ export function ProjectDetailView({
                                     strokeWidth={1.6}
                                   />
                                   Start Mission
+                                </Button>
+                              ) : null}
+                              {mission.status === 'running' || mission.status === 'active' ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    navigate({
+                                      to: '/mission-console',
+                                      search: {
+                                        missionId: mission.id,
+                                        projectId:
+                                          projectDetail?.id ?? selectedSummary?.id ?? '',
+                                      },
+                                    })
+                                  }
+                                >
+                                  <HugeiconsIcon
+                                    icon={PlayCircleIcon}
+                                    size={16}
+                                    strokeWidth={1.6}
+                                  />
+                                  Open Console
                                 </Button>
                               ) : null}
                               {mission.status === 'running' || mission.status === 'active' ? (

@@ -550,6 +550,7 @@ function ChatSidebarComponent({
   const isInstancesActive = pathname === '/instances'
   // Agent
   const isProjectsActive = pathname.startsWith('/projects')
+  const isMissionConsoleActive = pathname.startsWith('/mission-console')
   const isReviewActive = pathname.startsWith('/review')
   const isRunsActive = pathname.startsWith('/runs')
   const isAgentsActive = pathname === '/agents'
@@ -879,6 +880,13 @@ function ChatSidebarComponent({
       icon: Folder01Icon,
       label: 'Projects',
       active: isProjectsActive,
+    },
+    {
+      kind: 'link',
+      to: '/mission-console',
+      icon: ComputerTerminal01Icon,
+      label: 'Mission Console',
+      active: isMissionConsoleActive,
     },
     {
       kind: 'link',
