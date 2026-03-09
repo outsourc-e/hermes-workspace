@@ -7,10 +7,12 @@ import {
   BrainIcon,
   ChartLineData01Icon,
   ChartLineData02Icon,
+  CheckmarkCircle02Icon,
   Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
+  Folder01Icon,
   GlobeIcon,
   Home01Icon,
   ListViewIcon,
@@ -19,8 +21,6 @@ import {
   PuzzleIcon,
   Search01Icon,
   ApiIcon,
-  CheckmarkCircle02Icon,
-  Folder01Icon,
   Settings01Icon,
   ServerStack01Icon,
   SmartPhone01Icon,
@@ -88,11 +88,7 @@ function ThemeToggleMini() {
       className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      <HugeiconsIcon
-        icon={isDark ? Sun02Icon : Moon02Icon}
-        size={16}
-        strokeWidth={1.5}
-      />
+      <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
     </button>
   )
 }
@@ -158,11 +154,11 @@ async function fetchHasRecentIssues(): Promise<boolean> {
 // ── Reusable nav item ───────────────────────────────────────────────────
 
 type NavItemDef = {
-  kind: 'link' | 'button' | 'section'
+  kind: 'link' | 'button'
   to?: string
-  icon?: unknown
+  icon: unknown
   label: string
-  active?: boolean
+  active: boolean
   onClick?: () => void
   disabled?: boolean
   badge?: 'error-dot'
@@ -180,15 +176,6 @@ function NavItem({
   transition: Record<string, unknown>
   onSelectSession?: () => void
 }) {
-  if (item.kind === 'section') {
-    if (isCollapsed) return <div className="my-1 border-t border-primary-200 dark:border-primary-800" />
-    return (
-      <div className="px-3 pt-4 pb-1 text-[9px] font-bold uppercase tracking-[1.2px] text-primary-400 dark:text-primary-600">
-        {item.label}
-      </div>
-    )
-  }
-
   const cls = cn(
     buttonVariants({ variant: 'ghost', size: 'sm' }),
     'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0',
@@ -517,8 +504,11 @@ function ChatSidebarComponent({
   sessionsError,
   onRetrySessions,
 }: ChatSidebarProps) {
-  const { settingsOpen, setSettingsOpen, handleOpenSettings } =
-    useSidebarSettings()
+  const {
+    settingsOpen,
+    setSettingsOpen,
+    handleOpenSettings,
+  } = useSidebarSettings()
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
@@ -551,8 +541,6 @@ function ChatSidebarComponent({
   const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
   const isTasksActive = pathname === '/tasks'
-  const isProjectsActive = pathname.startsWith('/projects')
-  const isReviewActive = pathname.startsWith('/review')
   // Gateway
   const isCronActive = pathname === '/cron'
   const isChannelsActive = pathname === '/channels'
@@ -561,6 +549,8 @@ function ChatSidebarComponent({
   const isCostsActive = pathname === '/costs'
   const isInstancesActive = pathname === '/instances'
   // Agent
+  const isProjectsActive = pathname.startsWith('/projects')
+  const isReviewActive = pathname.startsWith('/review')
   const isRunsActive = pathname.startsWith('/runs')
   const isAgentsActive = pathname === '/agents'
   const isNodesActive = pathname === '/nodes'
@@ -574,8 +564,6 @@ function ChatSidebarComponent({
   const suiteRoutes = [
     '/dashboard',
     '/agent-swarm',
-    '/projects',
-    '/review',
     '/new',
     '/browser',
     '/terminal',
@@ -805,8 +793,6 @@ function ChatSidebarComponent({
       active: isAgentSwarmActive,
       dataTour: 'agent-hub',
     },
-    // ── Workspace section ──
-    { kind: 'section', label: 'Workspace' },
     {
       kind: 'link',
       to: '/projects',
@@ -825,26 +811,9 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/runs',
       icon: PlayCircleIcon,
-      label: 'Runs / Console',
+      label: 'Runs',
       active: isRunsActive,
     },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: isAgentsActive,
-    },
-    {
-      kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: 'Skills & Memory',
-      active: isSkillsActive,
-      dataTour: 'skills',
-    },
-    // ── Tools section ──
-    { kind: 'section', label: 'Tools' },
     {
       kind: 'link',
       to: '/browser',
@@ -869,6 +838,14 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/skills',
+      icon: PuzzleIcon,
+      label: 'Skills',
+      active: isSkillsActive,
+      dataTour: 'skills',
+    },
+    {
+      kind: 'link',
       to: '/cron',
       icon: Clock01Icon,
       label: 'Cron Jobs',
@@ -889,8 +866,6 @@ function ChatSidebarComponent({
       active: isDebugActive,
       badge: showDebugErrorDot ? 'error-dot' : undefined,
     },
-    // ── Data section ──
-    { kind: 'section', label: 'Data' },
     {
       kind: 'link',
       to: '/files',
@@ -982,19 +957,10 @@ function ChatSidebarComponent({
       }}
       initial={false}
       animate={{
-        width: isVisuallyCollapsed
-          ? isMobile
-            ? 0
-            : 48
-          : isMobile
-            ? '85vw'
-            : 300,
+        width: isVisuallyCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={cn(
-        asideProps.className,
-        isMobile && isCollapsed && 'pointer-events-none overflow-hidden',
-      )}
+      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
       onMouseEnter={() => {
@@ -1006,7 +972,6 @@ function ChatSidebarComponent({
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
-      {/* Electron title bar is rendered at shell level (workspace-shell.tsx) */}
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
         layout
@@ -1042,9 +1007,7 @@ function ChatSidebarComponent({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={
-                    isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'
-                  }
+                  aria-label={isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
                   className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
                   data-tour="sidebar-collapse-toggle"
                 >
@@ -1220,12 +1183,10 @@ function ChatSidebarComponent({
       {/* ── Footer with User Menu ─────────────────────────────────── */}
       <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
         {/* User card + actions */}
-        <div
-          className={cn(
-            'flex items-center rounded-lg transition-colors',
-            isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
-          )}
-        >
+        <div className={cn(
+          'flex items-center rounded-lg transition-colors',
+          isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
+        )}>
           {/* User menu trigger */}
           <MenuRoot>
             <MenuTrigger
@@ -1302,11 +1263,7 @@ function ChatSidebarComponent({
                 className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >
-                <HugeiconsIcon
-                  icon={Settings01Icon}
-                  size={16}
-                  strokeWidth={1.5}
-                />
+                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
               </button>
               <ThemeToggleMini />
             </div>
