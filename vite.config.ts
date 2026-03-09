@@ -20,7 +20,7 @@ const config = defineConfig(({ mode }) => {
     ? env.CLAWSUITE_ALLOWED_HOSTS.split(',')
         .map((h) => h.trim())
         .filter(Boolean)
-    : []
+    : ['.ts.net']  // allow all Tailscale hostnames by default
   let proxyTarget = 'http://127.0.0.1:18789'
 
   try {
