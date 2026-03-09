@@ -59,6 +59,10 @@ export type WorkspaceCheckpointVerificationMap = Record<
   WorkspaceCheckpointVerificationItem
 >
 
+export type WorkspaceCheckpointRawDiff = {
+  diff: string
+}
+
 export type WorkspaceCheckpointDetail = WorkspaceCheckpoint & {
   task_id: string | null
   project_id: string | null
@@ -346,6 +350,22 @@ export async function getWorkspaceCheckpointDetail(
         patch: file.patch,
       }
     }),
+  }
+}
+
+export async function getWorkspaceCheckpointDiff(
+  id: string,
+): Promise<WorkspaceCheckpointRawDiff> {
+  const payload = await workspaceRequestJson(
+    `/api/workspace/checkpoints/${encodeURIComponent(id)}/diff`,
+  )
+  const record = asRecord(payload)
+  if (!record) {
+    throw new Error('Checkpoint diff response was empty')
+  }
+
+  return {
+    diff: typeof record.diff === 'string' ? record.diff : '',
   }
 }
 

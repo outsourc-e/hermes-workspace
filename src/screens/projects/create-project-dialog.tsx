@@ -1,5 +1,7 @@
 import type React from 'react'
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/toast'
 import {
   DialogClose,
   DialogContent,
@@ -8,6 +10,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { ProjectFormState } from './lib/workspace-types'
+import {
+  ACCEPTED_SPEC_FILE_TYPES,
+  readSpecFile,
+} from './lib/spec-file'
 
 type WorkspaceEntityDialogProps = {
   open: boolean
@@ -95,6 +101,23 @@ export function CreateProjectDialog({
   onFormChange,
   onSubmit,
 }: CreateProjectDialogProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  async function handleSpecFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      const spec = await readSpecFile(file)
+      onFormChange({ ...form, spec })
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to read spec file', {
+        type: 'error',
+      })
+    }
+  }
+
   return (
     <WorkspaceEntityDialog
       open={open}
@@ -123,13 +146,32 @@ export function CreateProjectDialog({
         />
       </WorkspaceFieldLabel>
       <WorkspaceFieldLabel label="Spec">
-        <textarea
-          value={form.spec}
-          onChange={(event) => onFormChange({ ...form, spec: event.target.value })}
-          rows={5}
-          className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
-          placeholder="Optional project brief or execution spec..."
-        />
+        <div className="space-y-2">
+          <textarea
+            value={form.spec}
+            onChange={(event) => onFormChange({ ...form, spec: event.target.value })}
+            rows={5}
+            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            placeholder="Optional project brief or execution spec..."
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_SPEC_FILE_TYPES}
+            className="hidden"
+            onChange={(event) => void handleSpecFileSelect(event)}
+          />
+          <div className="space-y-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload SPEC.md
+            </Button>
+            <p className="text-xs text-primary-400">Or upload a SPEC.md / PRD file</p>
+          </div>
+        </div>
       </WorkspaceFieldLabel>
     </WorkspaceEntityDialog>
   )

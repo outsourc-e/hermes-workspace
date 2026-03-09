@@ -37,9 +37,9 @@ export function getStatusTone(status: string) {
 }
 
 export function getDiffLineClass(line: string) {
-  if (line.startsWith('+')) return 'text-emerald-300'
-  if (line.startsWith('-')) return 'text-red-300'
-  if (line.startsWith('@@')) return 'text-accent-300'
+  if (line.startsWith('+')) return 'bg-emerald-500/12 text-emerald-200'
+  if (line.startsWith('-')) return 'bg-red-500/12 text-red-200'
+  if (line.startsWith('@@')) return 'bg-sky-500/12 text-sky-200'
   return 'text-primary-300'
 }
 
@@ -140,6 +140,25 @@ export function FileDiffCard({
           </motion.div>
         ) : null}
       </AnimatePresence>
+    </div>
+  )
+}
+
+export function RawDiffViewer({ diff }: { diff: string }) {
+  if (!diff.trim()) {
+    return <p className="text-sm text-primary-400">No raw diff was available for this checkpoint.</p>
+  }
+
+  return (
+    <div className="max-h-[420px] overflow-auto rounded-2xl border border-primary-800 bg-primary-950/85 font-mono text-xs leading-5">
+      {diff.split('\n').map((line, index) => (
+        <div
+          key={`raw-diff:${index}`}
+          className={getDiffLineClass(line)}
+        >
+          <div className="min-w-full px-3 py-0.5 whitespace-pre">{line || ' '}</div>
+        </div>
+      ))}
     </div>
   )
 }

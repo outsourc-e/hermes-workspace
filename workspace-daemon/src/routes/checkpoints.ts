@@ -152,6 +152,23 @@ async function getCheckpointFileDiff(input: {
   return "";
 }
 
+async function getCheckpointRawDiff(checkpointId: string, tracker: Tracker): Promise<string> {
+  const checkpoint = tracker.getCheckpointDetail(checkpointId);
+  if (!checkpoint) {
+    throw new Error("Checkpoint not found");
+  }
+
+  if (!checkpoint.project_path) {
+    throw new Error("Project path is unavailable");
+  }
+
+  if (!checkpoint.commit_hash) {
+    throw new Error("Checkpoint commit hash is unavailable");
+  }
+
+  return runGit(checkpoint.project_path, ["show", checkpoint.commit_hash]);
+}
+
 async function stageAndCommitWorkspace(workspacePath: string, checkpointId: string): Promise<string> {
   await runGit(workspacePath, ["add", "-A"]);
 
@@ -241,6 +258,17 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
     }
 
     res.json(detail);
+  });
+
+  router.get("/:id/diff", async (req, res) => {
+    try {
+      const diff = await getCheckpointRawDiff(req.params.id, tracker);
+      res.json({ diff });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load checkpoint diff";
+      const status = message === "Checkpoint not found" ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
   });
 
   router.post("/:id/verify-tsc", async (req, res) => {

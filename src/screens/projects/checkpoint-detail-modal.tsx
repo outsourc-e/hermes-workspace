@@ -20,8 +20,10 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/toast'
 import {
+  getCheckpointDiffStatParsed,
   formatCheckpointStatus,
   formatCheckpointTimestamp,
+  getWorkspaceCheckpointDiff,
   getWorkspaceCheckpointDetail,
   runWorkspaceCheckpointTsc,
   type CheckpointReviewAction,
@@ -35,6 +37,7 @@ import type { WorkspaceProject, WorkspaceTask } from './lib/workspace-types'
 import {
   DetailStat,
   FileDiffCard,
+  RawDiffViewer,
   SectionHeader,
   formatCost,
   formatDuration,
@@ -101,6 +104,7 @@ export function CheckpointDetailModal({
   const [reviseConstraints, setReviseConstraints] = useState('')
   const [reviseAcceptance, setReviseAcceptance] = useState('')
   const [logOpen, setLogOpen] = useState(false)
+  const [rawDiffOpen, setRawDiffOpen] = useState(false)
   const [expandedDiffs, setExpandedDiffs] = useState<Record<string, boolean>>({})
   const [localTscResult, setLocalTscResult] = useState<WorkspaceCheckpointVerificationItem | null>(
     null,
@@ -115,6 +119,7 @@ export function CheckpointDetailModal({
     setReviseConstraints('')
     setReviseAcceptance('')
     setLogOpen(false)
+    setRawDiffOpen(false)
     setExpandedDiffs({})
     setLocalTscResult(null)
   }, [checkpoint, open])
@@ -123,6 +128,12 @@ export function CheckpointDetailModal({
     queryKey: ['workspace', 'checkpoint-detail', checkpoint?.id],
     enabled: open && Boolean(checkpoint?.id),
     queryFn: () => getWorkspaceCheckpointDetail(checkpoint!.id),
+  })
+  const rawDiffQuery = useQuery({
+    queryKey: ['workspace', 'checkpoint-diff', checkpoint?.id],
+    enabled: open && rawDiffOpen && Boolean(checkpoint?.id),
+    queryFn: () => getWorkspaceCheckpointDiff(checkpoint!.id),
+    staleTime: 30_000,
   })
 
   const verifyMutation = useMutation({
@@ -377,7 +388,46 @@ export function CheckpointDetailModal({
                     <SectionHeader
                       title="Files Changed"
                       description={`${detail.diff_files.length} file${detail.diff_files.length === 1 ? '' : 's'} in this checkpoint. Expand a file to inspect its inline diff.`}
+                      action={
+                        <button
+                          type="button"
+                          onClick={() => setRawDiffOpen((value) => !value)}
+                          className="inline-flex items-center gap-2 text-xs font-medium text-accent-300 hover:text-accent-400"
+                        >
+                          {rawDiffOpen ? 'Hide diff' : 'Show diff'}
+                        </button>
+                      }
                     />
+                    <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-primary-800 bg-primary-950/60 px-3 py-3 font-mono text-xs leading-5 text-primary-300">
+                      {getCheckpointDiffStatParsed(checkpoint)?.raw ||
+                        'No diff stat summary was recorded for this checkpoint.'}
+                    </p>
+                    <AnimatePresence initial={false}>
+                      {rawDiffOpen ? (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-4">
+                            {rawDiffQuery.isLoading ? (
+                              <div className="rounded-2xl border border-primary-800 bg-primary-950/60 px-4 py-8 text-center text-sm text-primary-400">
+                                Loading raw diff...
+                              </div>
+                            ) : rawDiffQuery.isError ? (
+                              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-200">
+                                {rawDiffQuery.error instanceof Error
+                                  ? rawDiffQuery.error.message
+                                  : 'Checkpoint diff could not be loaded'}
+                              </div>
+                            ) : (
+                              <RawDiffViewer diff={rawDiffQuery.data?.diff ?? ''} />
+                            )}
+                          </div>
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>
                     <div className="mt-4 space-y-3">
                       {detail.diff_files.length > 0 ? (
                         detail.diff_files.map((file) => (
