@@ -554,7 +554,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     }
     setMissionLauncher((current) => (current ? { ...current, tasks: cleanedTasks } : current))
     void navigate({
-      to: '/workspace/plan-review',
+      to: '/plan-review',
       search: {
         plan: JSON.stringify({
           goal: missionLauncher.goal,
@@ -596,7 +596,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     })
     setExpandedDecomposeDescriptions({})
     void navigate({
-      to: '/workspace/projects',
+      to: '/projects',
       replace: true,
       search: {
         project: undefined,
@@ -804,154 +804,156 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   }
 
   return (
-    <div className="space-y-5 text-primary-100">
-      <header className="flex flex-col gap-4 rounded-3xl border border-primary-800 bg-primary-900/85 px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex size-12 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
-            <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.6} />
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-100 md:px-6 md:pt-8">
+      <section className="mx-auto w-full max-w-[1480px] space-y-5">
+        <header className="flex flex-col gap-4 rounded-3xl border border-primary-800 bg-primary-900/85 px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-12 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
+              <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.6} />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-primary-100">Projects</h1>
+              <p className="text-sm text-primary-400">
+                Mission control for workspace execution, review handoffs, and agent load.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold text-primary-100">Projects</h1>
-            <p className="text-sm text-primary-400">
-              Mission control for workspace execution, review handoffs, and agent load.
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={triggerRefresh} disabled={listLoading || detailLoading}>
+              Refresh
+            </Button>
+            <Button
+              onClick={() => setProjectDialogOpen(true)}
+              className="bg-accent-500 text-white hover:bg-accent-400"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
+              New Project
+            </Button>
+          </div>
+        </header>
+
+        {listLoading && projects.length === 0 ? (
+          <div className="rounded-3xl border border-primary-800 bg-primary-900/70 px-6 py-16 text-center">
+            <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
+            <p className="text-sm text-primary-400">Loading workspace projects...</p>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-3xl border border-primary-700 bg-primary-800/80 text-primary-300">
+              <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
+            </div>
+            <h2 className="text-lg font-semibold text-primary-100">No projects yet</h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
+              Create your first project to organize phases, missions, and task execution for an
+              agent workflow.
             </p>
+            <Button
+              onClick={() => setProjectDialogOpen(true)}
+              className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
+              Create First Project
+            </Button>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={triggerRefresh} disabled={listLoading || detailLoading}>
-            Refresh
-          </Button>
-          <Button
-            onClick={() => setProjectDialogOpen(true)}
-            className="bg-accent-500 text-white hover:bg-accent-400"
-          >
-            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
-            New Project
-          </Button>
-        </div>
-      </header>
-
-      {listLoading && projects.length === 0 ? (
-        <div className="rounded-3xl border border-primary-800 bg-primary-900/70 px-6 py-16 text-center">
-          <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-          <p className="text-sm text-primary-400">Loading workspace projects...</p>
-        </div>
-      ) : projects.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
-          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-3xl border border-primary-700 bg-primary-800/80 text-primary-300">
-            <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
-          </div>
-          <h2 className="text-lg font-semibold text-primary-100">No projects yet</h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
-            Create your first project to organize phases, missions, and task execution for an
-            agent workflow.
-          </p>
-          <Button
-            onClick={() => setProjectDialogOpen(true)}
-            className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
-          >
-            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
-            Create First Project
-          </Button>
-        </div>
-      ) : (
-        <>
-          <DashboardKpiBar
-            stats={statsQuery.data}
-            projects={projects}
-            agents={agents}
-            pendingCheckpointCount={pendingCheckpoints.length}
-          />
-
-          <DashboardProjectCards
-            projectOverviews={projectOverviews}
-            selectedProjectId={selectedProjectId}
-            onSelect={focusProject}
-            onResume={(missionId) => void handleStartMission(missionId)}
-            submittingKey={submittingKey}
-          />
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
-            <DashboardReviewInbox
-              checkpoints={reviewInboxItems}
-              projects={projects}
-              selectedProjectName={selectedSummary?.name}
-              projectOptions={reviewProjectOptions}
-              projectFilter={reviewProjectFilter}
-              verificationFilter={reviewVerificationFilter}
-              riskFilter={reviewRiskFilter}
-              loading={checkpointsQuery.isLoading}
-              batchApproving={batchApproving}
-              verifiedCount={verifiedReviewItems.length}
-              actionPending={projectCheckpointMutation.isPending}
-              onProjectFilterChange={setReviewProjectFilter}
-              onVerificationFilterChange={setReviewVerificationFilter}
-              onRiskFilterChange={setReviewRiskFilter}
-              onApproveVerified={() => void handleApproveVerified()}
-              onApprove={(checkpointId) =>
-                projectCheckpointMutation.mutate({
-                  checkpointId,
-                  action: 'approve-and-commit',
-                })
-              }
-              onReview={focusCheckpointReview}
-            />
-
-            <DashboardAgentCapacity
-              agents={agents}
+        ) : (
+          <>
+            <DashboardKpiBar
               stats={statsQuery.data}
-              loading={agentsQuery.isLoading}
+              projects={projects}
+              agents={agents}
+              pendingCheckpointCount={pendingCheckpoints.length}
             />
-          </div>
 
-          <section
-            ref={detailSectionRef}
-            className="rounded-3xl border border-primary-800 bg-primary-900/75 p-4 md:p-5"
-          >
-            <ProjectDetailView
-              selectedSummary={selectedSummary}
-              projectDetail={projectDetail}
-              detailLoading={detailLoading}
-              projectSpecDraft={projectSpecDraft}
-              projectSpecOpen={projectSpecOpen}
-              expandedPhases={expandedPhases}
-              checkpoints={projectCheckpoints}
-              pendingCheckpointCount={pendingProjectCheckpoints.length}
-              checkpointsLoading={checkpointsQuery.isLoading}
-              checkpointsFetching={checkpointsQuery.isFetching}
-              checkpointActionPending={projectCheckpointMutation.isPending}
-              activityEvents={activityEvents}
-              activityLoading={activityEventsQuery.isLoading}
-              activityFetching={activityEventsQuery.isFetching}
+            <DashboardProjectCards
+              projectOverviews={projectOverviews}
+              selectedProjectId={selectedProjectId}
+              onSelect={focusProject}
+              onResume={(missionId) => void handleStartMission(missionId)}
               submittingKey={submittingKey}
-              onSpecDraftChange={setProjectSpecDraft}
-              onSpecOpenChange={setProjectSpecOpen}
-              onSaveSpec={() => void handleSaveProjectSpec()}
-              onAddPhase={setPhaseProject}
-              onTogglePhase={(phaseId) =>
-                setExpandedPhases((current) => ({ ...current, [phaseId]: !current[phaseId] }))
-              }
-              onAddMission={setMissionPhase}
-              onOpenMissionLauncher={openMissionLauncher}
-              onStartMission={(missionId) => void handleStartMission(missionId)}
-              onAddTask={setTaskMission}
-              onRefreshCheckpoints={() => void checkpointsQuery.refetch()}
-              onCheckpointReview={focusCheckpointReview}
-              onCheckpointApprove={(checkpointId) =>
-                projectCheckpointMutation.mutate({
-                  checkpointId,
-                  action: 'approve-and-commit',
-                })
-              }
-              onCheckpointReject={(checkpointId) =>
-                projectCheckpointMutation.mutate({ checkpointId, action: 'reject' })
-              }
-              onRefreshActivity={() => void activityEventsQuery.refetch()}
             />
-          </section>
-        </>
-      )}
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
+              <DashboardReviewInbox
+                checkpoints={reviewInboxItems}
+                projects={projects}
+                selectedProjectName={selectedSummary?.name}
+                projectOptions={reviewProjectOptions}
+                projectFilter={reviewProjectFilter}
+                verificationFilter={reviewVerificationFilter}
+                riskFilter={reviewRiskFilter}
+                loading={checkpointsQuery.isLoading}
+                batchApproving={batchApproving}
+                verifiedCount={verifiedReviewItems.length}
+                actionPending={projectCheckpointMutation.isPending}
+                onProjectFilterChange={setReviewProjectFilter}
+                onVerificationFilterChange={setReviewVerificationFilter}
+                onRiskFilterChange={setReviewRiskFilter}
+                onApproveVerified={() => void handleApproveVerified()}
+                onApprove={(checkpointId) =>
+                  projectCheckpointMutation.mutate({
+                    checkpointId,
+                    action: 'approve-and-commit',
+                  })
+                }
+                onReview={focusCheckpointReview}
+              />
+
+              <DashboardAgentCapacity
+                agents={agents}
+                stats={statsQuery.data}
+                loading={agentsQuery.isLoading}
+              />
+            </div>
+
+            <section
+              ref={detailSectionRef}
+              className="rounded-3xl border border-primary-800 bg-primary-900/75 p-4 md:p-5"
+            >
+              <ProjectDetailView
+                selectedSummary={selectedSummary}
+                projectDetail={projectDetail}
+                detailLoading={detailLoading}
+                projectSpecDraft={projectSpecDraft}
+                projectSpecOpen={projectSpecOpen}
+                expandedPhases={expandedPhases}
+                checkpoints={projectCheckpoints}
+                pendingCheckpointCount={pendingProjectCheckpoints.length}
+                checkpointsLoading={checkpointsQuery.isLoading}
+                checkpointsFetching={checkpointsQuery.isFetching}
+                checkpointActionPending={projectCheckpointMutation.isPending}
+                activityEvents={activityEvents}
+                activityLoading={activityEventsQuery.isLoading}
+                activityFetching={activityEventsQuery.isFetching}
+                submittingKey={submittingKey}
+                onSpecDraftChange={setProjectSpecDraft}
+                onSpecOpenChange={setProjectSpecOpen}
+                onSaveSpec={() => void handleSaveProjectSpec()}
+                onAddPhase={setPhaseProject}
+                onTogglePhase={(phaseId) =>
+                  setExpandedPhases((current) => ({ ...current, [phaseId]: !current[phaseId] }))
+                }
+                onAddMission={setMissionPhase}
+                onOpenMissionLauncher={openMissionLauncher}
+                onStartMission={(missionId) => void handleStartMission(missionId)}
+                onAddTask={setTaskMission}
+                onRefreshCheckpoints={() => void checkpointsQuery.refetch()}
+                onCheckpointReview={focusCheckpointReview}
+                onCheckpointApprove={(checkpointId) =>
+                  projectCheckpointMutation.mutate({
+                    checkpointId,
+                    action: 'approve-and-commit',
+                  })
+                }
+                onCheckpointReject={(checkpointId) =>
+                  projectCheckpointMutation.mutate({ checkpointId, action: 'reject' })
+                }
+                onRefreshActivity={() => void activityEventsQuery.refetch()}
+              />
+            </section>
+          </>
+        )}
+      </section>
 
       {selectedCheckpoint ? (
         <CheckpointDetailModal
@@ -1117,6 +1119,6 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
         onDecomposeSubmit={handleDecomposeSubmit}
         onReview={handleReviewMission}
       />
-    </div>
+    </main>
   )
 }

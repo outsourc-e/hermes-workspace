@@ -308,7 +308,8 @@ export function AgentsScreen() {
   const stats = statsQuery.data
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden text-primary-100 md:flex-row">
+    <div className="h-full overflow-hidden bg-primary-950 text-primary-100">
+      <div className="flex h-full flex-col md:flex-row">
         <aside className="flex shrink-0 flex-col border-b border-primary-800 bg-primary-900/80 md:w-[220px] md:border-b-0 md:border-r">
           <div className="flex items-center justify-between gap-3 border-b border-primary-800 px-4 py-4">
             <div>
@@ -376,7 +377,7 @@ export function AgentsScreen() {
         </aside>
 
         <section className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-4 p-4 md:p-6">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:p-6">
             <div className="rounded-3xl border border-primary-800 bg-primary-900/70 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
@@ -885,6 +886,7 @@ export function AgentsScreen() {
             </Tabs>
           </div>
         </section>
+      </div>
     </div>
   )
 }

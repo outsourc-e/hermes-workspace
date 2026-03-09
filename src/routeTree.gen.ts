@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as WizardRouteImport } from './routes/wizard'
 import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
@@ -39,15 +38,8 @@ import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as WorkspaceIndexRouteImport } from './routes/workspace/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
-import { Route as WorkspaceSkillsRouteImport } from './routes/workspace/skills'
-import { Route as WorkspaceRunsRouteImport } from './routes/workspace/runs'
-import { Route as WorkspaceReviewRouteImport } from './routes/workspace/review'
-import { Route as WorkspaceProjectsRouteImport } from './routes/workspace/projects'
-import { Route as WorkspacePlanReviewRouteImport } from './routes/workspace/plan-review'
-import { Route as WorkspaceAgentsRouteImport } from './routes/workspace/agents'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceTasksRouteImport } from './routes/api/workspace-tasks'
@@ -158,11 +150,6 @@ import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from '.
 import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
-const WorkspaceRoute = WorkspaceRouteImport.update({
-  id: '/workspace',
-  path: '/workspace',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const WizardRoute = WizardRouteImport.update({
   id: '/wizard',
   path: '/wizard',
@@ -308,11 +295,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkspaceIndexRoute = WorkspaceIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => WorkspaceRoute,
-} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -322,36 +304,6 @@ const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/chat/',
   path: '/chat/',
   getParentRoute: () => rootRouteImport,
-} as any)
-const WorkspaceSkillsRoute = WorkspaceSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => WorkspaceRoute,
-} as any)
-const WorkspaceRunsRoute = WorkspaceRunsRouteImport.update({
-  id: '/runs',
-  path: '/runs',
-  getParentRoute: () => WorkspaceRoute,
-} as any)
-const WorkspaceReviewRoute = WorkspaceReviewRouteImport.update({
-  id: '/review',
-  path: '/review',
-  getParentRoute: () => WorkspaceRoute,
-} as any)
-const WorkspaceProjectsRoute = WorkspaceProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => WorkspaceRoute,
-} as any)
-const WorkspacePlanReviewRoute = WorkspacePlanReviewRouteImport.update({
-  id: '/plan-review',
-  path: '/plan-review',
-  getParentRoute: () => WorkspaceRoute,
-} as any)
-const WorkspaceAgentsRoute = WorkspaceAgentsRouteImport.update({
-  id: '/agents',
-  path: '/agents',
-  getParentRoute: () => WorkspaceRoute,
 } as any)
 const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
   id: '/providers',
@@ -944,7 +896,6 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRouteWithChildren
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -997,15 +948,8 @@ export interface FileRoutesByFullPath {
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
-  '/workspace/agents': typeof WorkspaceAgentsRoute
-  '/workspace/plan-review': typeof WorkspacePlanReviewRoute
-  '/workspace/projects': typeof WorkspaceProjectsRoute
-  '/workspace/review': typeof WorkspaceReviewRoute
-  '/workspace/runs': typeof WorkspaceRunsRoute
-  '/workspace/skills': typeof WorkspaceSkillsRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/workspace/': typeof WorkspaceIndexRoute
   '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
@@ -1145,15 +1089,8 @@ export interface FileRoutesByTo {
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
-  '/workspace/agents': typeof WorkspaceAgentsRoute
-  '/workspace/plan-review': typeof WorkspacePlanReviewRoute
-  '/workspace/projects': typeof WorkspaceProjectsRoute
-  '/workspace/review': typeof WorkspaceReviewRoute
-  '/workspace/runs': typeof WorkspaceRunsRoute
-  '/workspace/skills': typeof WorkspaceSkillsRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
-  '/workspace': typeof WorkspaceIndexRoute
   '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
@@ -1243,7 +1180,6 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRouteWithChildren
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1296,15 +1232,8 @@ export interface FileRoutesById {
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
-  '/workspace/agents': typeof WorkspaceAgentsRoute
-  '/workspace/plan-review': typeof WorkspacePlanReviewRoute
-  '/workspace/projects': typeof WorkspaceProjectsRoute
-  '/workspace/review': typeof WorkspaceReviewRoute
-  '/workspace/runs': typeof WorkspaceRunsRoute
-  '/workspace/skills': typeof WorkspaceSkillsRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/workspace/': typeof WorkspaceIndexRoute
   '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
@@ -1395,7 +1324,6 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
-    | '/workspace'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1448,15 +1376,8 @@ export interface FileRouteTypes {
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
     | '/settings/providers'
-    | '/workspace/agents'
-    | '/workspace/plan-review'
-    | '/workspace/projects'
-    | '/workspace/review'
-    | '/workspace/runs'
-    | '/workspace/skills'
     | '/chat/'
     | '/settings/'
-    | '/workspace/'
     | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
@@ -1596,15 +1517,8 @@ export interface FileRouteTypes {
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
     | '/settings/providers'
-    | '/workspace/agents'
-    | '/workspace/plan-review'
-    | '/workspace/projects'
-    | '/workspace/review'
-    | '/workspace/runs'
-    | '/workspace/skills'
     | '/chat'
     | '/settings'
-    | '/workspace'
     | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
@@ -1693,7 +1607,6 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
-    | '/workspace'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1746,15 +1659,8 @@ export interface FileRouteTypes {
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
     | '/settings/providers'
-    | '/workspace/agents'
-    | '/workspace/plan-review'
-    | '/workspace/projects'
-    | '/workspace/review'
-    | '/workspace/runs'
-    | '/workspace/skills'
     | '/chat/'
     | '/settings/'
-    | '/workspace/'
     | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
@@ -1844,7 +1750,6 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   UsageRoute: typeof UsageRoute
   WizardRoute: typeof WizardRoute
-  WorkspaceRoute: typeof WorkspaceRouteWithChildren
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
@@ -1920,13 +1825,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/workspace': {
-      id: '/workspace'
-      path: '/workspace'
-      fullPath: '/workspace'
-      preLoaderRoute: typeof WorkspaceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/wizard': {
       id: '/wizard'
       path: '/wizard'
@@ -2130,13 +2028,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/workspace/': {
-      id: '/workspace/'
-      path: '/'
-      fullPath: '/workspace/'
-      preLoaderRoute: typeof WorkspaceIndexRouteImport
-      parentRoute: typeof WorkspaceRoute
-    }
     '/settings/': {
       id: '/settings/'
       path: '/'
@@ -2150,48 +2041,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/chat/'
       preLoaderRoute: typeof ChatIndexRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/workspace/skills': {
-      id: '/workspace/skills'
-      path: '/skills'
-      fullPath: '/workspace/skills'
-      preLoaderRoute: typeof WorkspaceSkillsRouteImport
-      parentRoute: typeof WorkspaceRoute
-    }
-    '/workspace/runs': {
-      id: '/workspace/runs'
-      path: '/runs'
-      fullPath: '/workspace/runs'
-      preLoaderRoute: typeof WorkspaceRunsRouteImport
-      parentRoute: typeof WorkspaceRoute
-    }
-    '/workspace/review': {
-      id: '/workspace/review'
-      path: '/review'
-      fullPath: '/workspace/review'
-      preLoaderRoute: typeof WorkspaceReviewRouteImport
-      parentRoute: typeof WorkspaceRoute
-    }
-    '/workspace/projects': {
-      id: '/workspace/projects'
-      path: '/projects'
-      fullPath: '/workspace/projects'
-      preLoaderRoute: typeof WorkspaceProjectsRouteImport
-      parentRoute: typeof WorkspaceRoute
-    }
-    '/workspace/plan-review': {
-      id: '/workspace/plan-review'
-      path: '/plan-review'
-      fullPath: '/workspace/plan-review'
-      preLoaderRoute: typeof WorkspacePlanReviewRouteImport
-      parentRoute: typeof WorkspaceRoute
-    }
-    '/workspace/agents': {
-      id: '/workspace/agents'
-      path: '/agents'
-      fullPath: '/workspace/agents'
-      preLoaderRoute: typeof WorkspaceAgentsRouteImport
-      parentRoute: typeof WorkspaceRoute
     }
     '/settings/providers': {
       id: '/settings/providers'
@@ -2973,30 +2822,6 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
 
-interface WorkspaceRouteChildren {
-  WorkspaceAgentsRoute: typeof WorkspaceAgentsRoute
-  WorkspacePlanReviewRoute: typeof WorkspacePlanReviewRoute
-  WorkspaceProjectsRoute: typeof WorkspaceProjectsRoute
-  WorkspaceReviewRoute: typeof WorkspaceReviewRoute
-  WorkspaceRunsRoute: typeof WorkspaceRunsRoute
-  WorkspaceSkillsRoute: typeof WorkspaceSkillsRoute
-  WorkspaceIndexRoute: typeof WorkspaceIndexRoute
-}
-
-const WorkspaceRouteChildren: WorkspaceRouteChildren = {
-  WorkspaceAgentsRoute: WorkspaceAgentsRoute,
-  WorkspacePlanReviewRoute: WorkspacePlanReviewRoute,
-  WorkspaceProjectsRoute: WorkspaceProjectsRoute,
-  WorkspaceReviewRoute: WorkspaceReviewRoute,
-  WorkspaceRunsRoute: WorkspaceRunsRoute,
-  WorkspaceSkillsRoute: WorkspaceSkillsRoute,
-  WorkspaceIndexRoute: WorkspaceIndexRoute,
-}
-
-const WorkspaceRouteWithChildren = WorkspaceRoute._addFileChildren(
-  WorkspaceRouteChildren,
-)
-
 interface ApiBrowserRouteChildren {
   ApiBrowserNavigateRoute: typeof ApiBrowserNavigateRoute
   ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
@@ -3227,7 +3052,6 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   UsageRoute: UsageRoute,
   WizardRoute: WizardRoute,
-  WorkspaceRoute: WorkspaceRouteWithChildren,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,

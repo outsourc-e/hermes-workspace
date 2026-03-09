@@ -225,7 +225,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
     },
     onSuccess: () => {
       toast('Mission launched', { type: 'success' })
-      void navigate({ to: '/workspace/runs' })
+      void navigate({ to: '/runs' })
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to launch mission', {
@@ -247,7 +247,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
             className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
             onClick={() =>
               void navigate({
-                to: '/workspace/projects',
+                to: '/projects',
                 search: {
                   project: undefined,
                   goal: undefined,
@@ -266,7 +266,8 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
   }
 
   return (
-    <div className="flex w-full flex-col gap-5 text-primary-100 lg:flex-row">
+    <div className="min-h-full bg-primary-950 px-4 py-5 text-primary-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 lg:flex-row">
         <section className="min-w-0 flex-1 rounded-[28px] border border-primary-800 bg-primary-900/95 p-5 sm:p-6">
           <div className="border-b border-primary-800 pb-5">
             <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
@@ -525,7 +526,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
                 className="border-primary-700 bg-primary-800/60 text-primary-100 hover:bg-primary-800"
                 onClick={() =>
                   void navigate({
-                    to: '/workspace/projects',
+                    to: '/projects',
                     search: {
                       project: parsedPlan.projectId ?? undefined,
                       projectId: parsedPlan.projectId ?? undefined,
@@ -550,6 +551,7 @@ export function PlanReviewScreen({ plan }: PlanReviewScreenProps) {
             </div>
           </div>
         </aside>
+      </div>
     </div>
   )
 }

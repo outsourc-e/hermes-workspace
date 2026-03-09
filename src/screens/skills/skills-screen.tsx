@@ -231,7 +231,8 @@ export function SkillsScreen() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col text-primary-100">
+    <div className="min-h-full bg-primary-950 text-primary-100">
+      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col px-4 py-4 sm:px-5 lg:px-6">
         <div className="flex flex-col gap-2 pb-4">
           <h1 className="text-lg font-semibold text-primary-100">
             Skills &amp; Memory
@@ -554,6 +555,7 @@ export function SkillsScreen() {
             </div>
           </section>
         </div>
+      </div>
     </div>
   )
 }

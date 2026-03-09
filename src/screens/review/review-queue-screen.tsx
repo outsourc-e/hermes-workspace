@@ -447,131 +447,133 @@ export function ReviewQueueScreen() {
   }
 
   return (
-    <div className="space-y-5 text-primary-100">
-      <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-primary-800 bg-primary-900/85 px-4 py-4 shadow-sm md:flex-row md:items-center md:justify-between md:px-5">
-        <div className="flex items-start gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
-            <HugeiconsIcon
-              icon={CheckmarkCircle02Icon}
-              size={22}
-              strokeWidth={1.6}
-            />
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-100 md:px-6 md:pt-8">
+      <section className="mx-auto w-full max-w-[1400px]">
+        <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-primary-800 bg-primary-900/85 px-4 py-4 shadow-sm md:flex-row md:items-center md:justify-between md:px-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-300">
+              <HugeiconsIcon
+                icon={CheckmarkCircle02Icon}
+                size={22}
+                strokeWidth={1.6}
+              />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-primary-100 md:text-xl">
+                Review Queue
+              </h1>
+              <p className="text-sm text-primary-400">
+                Triage workspace checkpoints and move execution forward.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-primary-100 md:text-xl">
-              Review Queue
-            </h1>
-            <p className="text-sm text-primary-400">
-              Triage workspace checkpoints and move execution forward.
-            </p>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-primary-700 bg-primary-800/70 px-3 py-2 text-xs font-medium text-primary-300">
-            {pendingCount} pending
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => checkpointsQuery.refetch()}
-            disabled={checkpointsQuery.isFetching}
-          >
-            Refresh
-          </Button>
-        </div>
-      </header>
-
-      <div className="mb-5 flex flex-wrap gap-2">
-        {FILTERS.map((filter) => {
-          const active = filter.value === statusFilter
-          return (
-            <button
-              key={filter.value}
-              type="button"
-              onClick={() => setStatusFilter(filter.value)}
-              className={cn(
-                'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
-                active
-                  ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
-                  : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
-              )}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-primary-700 bg-primary-800/70 px-3 py-2 text-xs font-medium text-primary-300">
+              {pendingCount} pending
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => checkpointsQuery.refetch()}
+              disabled={checkpointsQuery.isFetching}
             >
-              {filter.label}
-            </button>
-          )
-        })}
-      </div>
+              Refresh
+            </Button>
+          </div>
+        </header>
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setProjectFilter('all')}
-          className={cn(
-            'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
-            projectFilter === 'all'
-              ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
-              : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
-          )}
-        >
-          All projects
-        </button>
-        {projectOptions.map((projectName) => (
+        <div className="mb-5 flex flex-wrap gap-2">
+          {FILTERS.map((filter) => {
+            const active = filter.value === statusFilter
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setStatusFilter(filter.value)}
+                className={cn(
+                  'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
+                    : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
+                )}
+              >
+                {filter.label}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mb-5 flex flex-wrap gap-2">
           <button
-            key={projectName}
             type="button"
-            onClick={() => setProjectFilter(projectName)}
+            onClick={() => setProjectFilter('all')}
             className={cn(
               'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
-              projectFilter === projectName
+              projectFilter === 'all'
                 ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
                 : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
             )}
           >
-            {projectName}
+            All projects
           </button>
-        ))}
-      </div>
-
-      {checkpointsQuery.isLoading ? (
-        <ReviewQueueSkeleton />
-      ) : visibleCheckpoints.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
-          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-3xl border border-primary-700 bg-primary-800/80 text-primary-300">
-            <HugeiconsIcon
-              icon={CheckmarkCircle02Icon}
-              size={26}
-              strokeWidth={1.5}
-            />
-          </div>
-          <h2 className="text-lg font-semibold text-primary-100">
-            No checkpoints found
-          </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
-            There are no checkpoints for the current status and project filters.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {visibleCheckpoints.map((checkpoint) => (
-            <ReviewRow
-              key={checkpoint.id}
-              checkpoint={checkpoint}
-              composer={composer}
-              notes={reviewerNotes}
-              onApprove={handleApprove}
-              onReview={setSelectedCheckpoint}
-              onOpenComposer={handleOpenComposer}
-              onCancelComposer={() => {
-                setComposer(null)
-                setReviewerNotes('')
-              }}
-              onNotesChange={setReviewerNotes}
-              onSubmitComposer={handleSubmitComposer}
-              mutationPending={reviewMutation.isPending}
-            />
+          {projectOptions.map((projectName) => (
+            <button
+              key={projectName}
+              type="button"
+              onClick={() => setProjectFilter(projectName)}
+              className={cn(
+                'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+                projectFilter === projectName
+                  ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
+                  : 'border-primary-800 bg-primary-900/70 text-primary-300 hover:border-primary-700 hover:bg-primary-900',
+              )}
+            >
+              {projectName}
+            </button>
           ))}
         </div>
-      )}
+
+        {checkpointsQuery.isLoading ? (
+          <ReviewQueueSkeleton />
+        ) : visibleCheckpoints.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/60 px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-3xl border border-primary-700 bg-primary-800/80 text-primary-300">
+              <HugeiconsIcon
+                icon={CheckmarkCircle02Icon}
+                size={26}
+                strokeWidth={1.5}
+              />
+            </div>
+            <h2 className="text-lg font-semibold text-primary-100">
+              No checkpoints found
+            </h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-400">
+              There are no checkpoints for the current status and project filters.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {visibleCheckpoints.map((checkpoint) => (
+              <ReviewRow
+                key={checkpoint.id}
+                checkpoint={checkpoint}
+                composer={composer}
+                notes={reviewerNotes}
+                onApprove={handleApprove}
+                onReview={setSelectedCheckpoint}
+                onOpenComposer={handleOpenComposer}
+                onCancelComposer={() => {
+                  setComposer(null)
+                  setReviewerNotes('')
+                }}
+                onNotesChange={setReviewerNotes}
+                onSubmitComposer={handleSubmitComposer}
+                mutationPending={reviewMutation.isPending}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       <CheckpointDetailModal
         checkpoint={selectedCheckpoint}
@@ -607,6 +609,6 @@ export function ReviewQueueScreen() {
           })
         }
       />
-    </div>
+    </main>
   )
 }
