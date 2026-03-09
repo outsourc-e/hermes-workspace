@@ -2,32 +2,22 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
-  ArrowDown01Icon,
   BotIcon,
-  BrainIcon,
-  ChartLineData01Icon,
-  ChartLineData02Icon,
-  Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
-  File01Icon,
   GlobeIcon,
   Home01Icon,
   ListViewIcon,
-  Notification03Icon,
   PencilEdit02Icon,
+  PlayCircleIcon,
   PuzzleIcon,
   Search01Icon,
   ApiIcon,
   CheckmarkCircle02Icon,
   Folder01Icon,
   Settings01Icon,
-  ServerStack01Icon,
-  SmartPhone01Icon,
-  PlayCircle02Icon as PlayCircleIcon,
   Task01Icon,
   UserGroupIcon,
-  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
@@ -67,6 +57,12 @@ import {
 } from '@/components/ui/menu'
 import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import {
+  extractProjects,
+  normalizeStats,
+  type WorkspaceProject,
+} from '@/screens/projects/lib/workspace-types'
+import { getProjectProgress } from '@/screens/projects/lib/workspace-utils'
 
 function ThemeToggleMini() {
   const theme = useSettingsStore((state) => state.settings.theme)
@@ -112,62 +108,97 @@ type ChatSidebarProps = {
   onRetrySessions: () => void
 }
 
-type RecentEventsResponse = {
-  events?: Array<unknown>
-}
+type WorkspaceStats = ReturnType<typeof normalizeStats>
 
-const DEBUG_ERROR_WINDOW_MS = 5 * 60 * 1000
+async function readPayload(response: Response): Promise<unknown> {
+  const text = await response.text()
+  if (!text) return null
 
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object') return null
-  if (Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-function hasRecentIssueEvent(item: unknown, cutoffMs: number): boolean {
-  const record = toRecord(item)
-  if (!record) return false
-
-  const level = record.level
-  const timestamp = record.timestamp
-  if (level !== 'warn' && level !== 'error') return false
-  if (typeof timestamp !== 'number') return false
-  if (!Number.isFinite(timestamp)) return false
-  return timestamp >= cutoffMs
-}
-
-async function fetchHasRecentIssues(): Promise<boolean> {
   try {
-    const response = await fetch('/api/events/recent?count=40')
-    if (!response.ok) return false
-
-    const payload = (await response.json()) as RecentEventsResponse
-    const events = Array.isArray(payload.events) ? payload.events : []
-    const cutoffMs = Date.now() - DEBUG_ERROR_WINDOW_MS
-
-    for (const item of events) {
-      if (hasRecentIssueEvent(item, cutoffMs)) return true
-    }
-
-    return false
+    return JSON.parse(text) as unknown
   } catch {
-    return false
+    return text
   }
+}
+
+async function fetchWorkspaceStats(): Promise<WorkspaceStats> {
+  const response = await fetch('/api/workspace/stats')
+  const payload = await readPayload(response)
+  if (!response.ok) {
+    const record =
+      payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null
+    throw new Error(
+      (typeof record?.error === 'string' && record.error) ||
+        `Request failed with status ${response.status}`,
+    )
+  }
+  return normalizeStats(payload)
+}
+
+async function fetchWorkspaceProjects(): Promise<Array<WorkspaceProject>> {
+  const response = await fetch('/api/workspace/projects')
+  const payload = await readPayload(response)
+  if (!response.ok) {
+    const record =
+      payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null
+    throw new Error(
+      (typeof record?.error === 'string' && record.error) ||
+        `Request failed with status ${response.status}`,
+    )
+  }
+  return extractProjects(payload)
+}
+
+function getProjectShortcutEmoji(name: string): string {
+  if (name === 'ClawSuite') return '🔧'
+  if (name === 'LuxeLab') return '💎'
+  return '📁'
 }
 
 // ── Reusable nav item ───────────────────────────────────────────────────
 
-type NavItemDef = {
-  kind: 'link' | 'button' | 'section'
-  to?: string
-  icon?: unknown
+type NavSectionItemDef = {
+  kind: 'section'
   label: string
-  active?: boolean
+}
+
+type NavLinkItemDef = {
+  kind: 'link'
+  to: string
+  icon: unknown
+  label: string
+  active: boolean
   onClick?: () => void
   disabled?: boolean
   badge?: 'error-dot'
+  countBadge?: {
+    value: number
+    tone?: 'default' | 'danger'
+  }
+  dataTour?: string
+  search?: Record<string, string | undefined>
+}
+
+type NavButtonItemDef = {
+  kind: 'button'
+  icon: unknown
+  label: string
+  active: boolean
+  onClick?: () => void
+  disabled?: boolean
+  badge?: 'error-dot'
+  countBadge?: {
+    value: number
+    tone?: 'default' | 'danger'
+  }
   dataTour?: string
 }
+
+type NavItemDef = NavSectionItemDef | NavLinkItemDef | NavButtonItemDef
 
 function NavItem({
   item,
@@ -181,8 +212,12 @@ function NavItem({
   onSelectSession?: () => void
 }) {
   if (item.kind === 'section') {
-    if (isCollapsed) return <div className="my-1 border-t border-primary-200 dark:border-primary-800" />
-    return null // sections are rendered by CollapsibleNavSection
+    if (isCollapsed) return null
+    return (
+      <div className="px-3 pt-4 pb-1 text-[9px] font-bold uppercase tracking-[1.2px] text-primary-600">
+        {item.label}
+      </div>
+    )
   }
 
   const cls = cn(
@@ -222,7 +257,7 @@ function NavItem({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={transition}
-          className="overflow-hidden whitespace-nowrap"
+          className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left"
         >
           {item.label}
         </motion.span>
@@ -230,7 +265,24 @@ function NavItem({
     </AnimatePresence>
   )
 
+  const countBadge =
+    !isCollapsed &&
+    item.countBadge &&
+    item.countBadge.value > 0 ? (
+      <span
+        className={cn(
+          'ml-auto inline-flex min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+          item.countBadge.tone === 'danger'
+            ? 'bg-red-500/15 text-red-400'
+            : 'bg-primary-200 text-primary-700 dark:bg-primary-800 dark:text-primary-300',
+        )}
+      >
+        {item.countBadge.value}
+      </span>
+    ) : null
+
   const handleSelect = () => {
+    item.onClick?.()
     onSelectSession?.()
   }
 
@@ -242,7 +294,8 @@ function NavItem({
             <TooltipTrigger
               render={
                 <Link
-                  to={item.to!}
+                  to={item.to}
+                  search={item.search}
                   onClick={handleSelect}
                   className={cls}
                   data-tour={item.dataTour}
@@ -258,13 +311,15 @@ function NavItem({
     }
     return (
       <Link
-        to={item.to!}
+        to={item.to}
+        search={item.search}
         onClick={handleSelect}
         className={cls}
         data-tour={item.dataTour}
       >
         {iconEl}
         {labelEl}
+        {countBadge}
       </Link>
     )
   }
@@ -279,10 +334,7 @@ function NavItem({
                 disabled={item.disabled}
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  item.onClick?.()
-                  handleSelect()
-                }}
+                onClick={handleSelect}
                 className={cls}
                 data-tour={item.dataTour}
               >
@@ -301,202 +353,15 @@ function NavItem({
       disabled={item.disabled}
       variant="ghost"
       size="sm"
-      onClick={() => {
-        item.onClick?.()
-        handleSelect()
-      }}
+      onClick={handleSelect}
       className={cls}
       data-tour={item.dataTour}
     >
       {iconEl}
       {labelEl}
+      {countBadge}
     </Button>
   )
-}
-
-// ── Last-visited route tracking ─────────────────────────────────────────
-
-const LAST_ROUTE_KEY = 'openclaw-sidebar-last-route'
-
-function getLastRoute(section: string): string | null {
-  try {
-    const stored = localStorage.getItem(LAST_ROUTE_KEY)
-    if (!stored) return null
-    const map = JSON.parse(stored) as Record<string, string>
-    return map[section] || null
-  } catch {
-    return null
-  }
-}
-
-function setLastRoute(section: string, route: string) {
-  try {
-    const stored = localStorage.getItem(LAST_ROUTE_KEY)
-    const map = stored ? (JSON.parse(stored) as Record<string, string>) : {}
-    map[section] = route
-    localStorage.setItem(LAST_ROUTE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-// ── Section header ──────────────────────────────────────────────────────
-
-function SectionLabel({
-  label,
-  isCollapsed,
-  transition,
-  collapsible,
-  expanded,
-  onToggle,
-  navigateTo,
-}: {
-  label: string
-  isCollapsed: boolean
-  transition: Record<string, unknown>
-  collapsible?: boolean
-  expanded?: boolean
-  onToggle?: () => void
-  navigateTo?: string
-}) {
-  if (isCollapsed) return null
-
-  const labelContent = (
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 select-none">
-      {label}
-    </span>
-  )
-
-  if (collapsible) {
-    return (
-      <motion.div
-        layout
-        transition={{ layout: transition }}
-        className="flex items-center gap-1.5 px-3 pt-3 pb-1 w-full"
-      >
-        {navigateTo ? (
-          <Link
-            to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
-          >
-            {label}
-          </Link>
-        ) : (
-          labelContent
-        )}
-        <button
-          type="button"
-          onClick={onToggle}
-          className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors"
-          aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
-        >
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={12}
-            strokeWidth={2}
-            className={cn(
-              'text-primary-500 transition-transform duration-150',
-              expanded ? 'rotate-0' : '-rotate-90',
-            )}
-          />
-        </button>
-      </motion.div>
-    )
-  }
-
-  return (
-    <motion.div
-      layout
-      transition={{ layout: transition }}
-      className="px-3 pt-3 pb-1"
-    >
-      {navigateTo ? (
-        <Link
-          to={navigateTo}
-          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
-        >
-          {label}
-        </Link>
-      ) : (
-        labelContent
-      )}
-    </motion.div>
-  )
-}
-
-// ── Collapsible section wrapper ─────────────────────────────────────────
-
-function CollapsibleSection({
-  expanded,
-  items,
-  isCollapsed,
-  transition,
-  onSelectSession,
-}: {
-  expanded: boolean
-  items: NavItemDef[]
-  isCollapsed: boolean
-  transition: Record<string, unknown>
-  onSelectSession?: () => void
-}) {
-  return (
-    <AnimatePresence initial={false}>
-      {expanded && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="overflow-hidden space-y-0.5"
-        >
-          {items.map((item) => (
-            <motion.div
-              key={item.label}
-              layout
-              transition={{ layout: transition }}
-              className="w-full"
-            >
-              <NavItem
-                item={item}
-                isCollapsed={isCollapsed}
-                transition={transition}
-                onSelectSession={onSelectSession}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
-
-// ── Persist helper ──────────────────────────────────────────────────────
-
-function usePersistedBool(key: string, defaultValue: boolean) {
-  const [value, setValue] = useState(() => {
-    try {
-      const stored = localStorage.getItem(key)
-      if (stored === 'true') return true
-      if (stored === 'false') return false
-      return defaultValue
-    } catch {
-      return defaultValue
-    }
-  })
-
-  function toggle() {
-    setValue((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem(key, String(next))
-      } catch {
-        // ignore
-      }
-      return next
-    })
-  }
-
-  return [value, toggle] as const
 }
 
 // ── Main component ──────────────────────────────────────────────────────
@@ -528,6 +393,17 @@ function ChatSidebarComponent({
       return state.location.pathname
     },
   })
+  const projectsSearchId = useRouterState({
+    select: function selectProjectSearch(state) {
+      const project = state.location.search.project
+      const projectId = state.location.search.projectId
+      return typeof project === 'string'
+        ? project
+        : typeof projectId === 'string'
+          ? projectId
+          : null
+    },
+  })
 
   // Platform-aware modifier key
   const mod = useMemo(
@@ -549,93 +425,33 @@ function ChatSidebarComponent({
   const isTasksActive = pathname === '/tasks'
   const isProjectsActive = pathname.startsWith('/projects')
   const isReviewActive = pathname.startsWith('/review')
-  // Gateway
-  const isCronActive = pathname === '/cron'
-  const isChannelsActive = pathname === '/channels'
-  const isSessionsActive = pathname === '/sessions'
-  const isUsageActive = pathname === '/usage'
-  const isCostsActive = pathname === '/costs'
-  const isInstancesActive = pathname === '/instances'
-  // Agent
   const isRunsActive = pathname.startsWith('/runs')
+  const isCronActive = pathname === '/cron'
   const isAgentsActive = pathname === '/agents'
-  const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
-  const isFilesActive = pathname === '/files'
-  const isMemoryActive = pathname === '/memory'
-  const isDebugActive = pathname === '/debug'
   const isLogsActive = pathname === '/activity' || pathname === '/logs'
-
-  // Track last-visited route per section
-  const suiteRoutes = [
-    '/dashboard',
-    '/agent-swarm',
-    '/projects',
-    '/review',
-    '/new',
-    '/browser',
-    '/terminal',
-    '/tasks',
-    '/skills',
-    '/cron',
-    '/activity',
-    '/logs',
-    '/debug',
-    '/files',
-    '/memory',
-    '/costs',
-  ]
-  const gatewayRoutes = [
-    '/channels',
-    '/instances',
-    '/sessions',
-    '/usage',
-    '/agents',
-    '/nodes',
-  ]
-
-  useEffect(() => {
-    if (suiteRoutes.includes(pathname)) setLastRoute('suite', pathname)
-    else if (gatewayRoutes.includes(pathname)) setLastRoute('gateway', pathname)
-  }, [pathname])
-
-  // Resolve navigation targets (last visited or default)
-  const gatewayNav = getLastRoute('gateway') || '/channels'
 
   const transition = {
     duration: 0.15,
     ease: isCollapsed ? 'easeIn' : 'easeOut',
   } as const
 
-  const recentIssuesQuery = useQuery({
-    queryKey: ['activity', 'recent-issues-indicator'],
-    queryFn: fetchHasRecentIssues,
+  const workspaceStatsQuery = useQuery({
+    queryKey: ['workspace', 'sidebar-stats'],
+    queryFn: fetchWorkspaceStats,
     refetchInterval: 20_000,
     retry: false,
   })
-  const showDebugErrorDot = Boolean(recentIssuesQuery.data)
-
-  // Collapsible section states
-  const [workspaceExpanded, toggleWorkspace] = usePersistedBool(
-    'openclaw-sidebar-workspace-expanded',
-    true,
-  )
-  const [toolsExpanded, toggleTools] = usePersistedBool(
-    'openclaw-sidebar-tools-expanded',
-    false,
-  )
-  const [dataExpanded, toggleData] = usePersistedBool(
-    'openclaw-sidebar-data-expanded',
-    false,
-  )
-  const [systemExpanded, toggleSystem] = usePersistedBool(
-    'openclaw-sidebar-system-expanded',
-    false,
-  )
-  const [gatewayExpanded, toggleGateway] = usePersistedBool(
-    'openclaw-sidebar-gateway-expanded',
-    false,
-  )
+  const workspaceProjectsQuery = useQuery({
+    queryKey: ['workspace', 'sidebar-projects'],
+    queryFn: fetchWorkspaceProjects,
+    refetchInterval: 20_000,
+    retry: false,
+  })
+  const workspaceStats = workspaceStatsQuery.data
+  const reviewCount = workspaceStats?.checkpointsPending ?? 0
+  const activeRunCount = workspaceStats?.running ?? 0
+  const projectShortcuts = (workspaceProjectsQuery.data ?? []).slice(0, 5)
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
   const [renameSessionKey, setRenameSessionKey] = useState<string | null>(null)
@@ -791,7 +607,7 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
-  const suiteTopItems: NavItemDef[] = [
+  const topNavItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/dashboard',
@@ -810,7 +626,11 @@ function ChatSidebarComponent({
     },
   ]
 
-  const workspaceItems: NavItemDef[] = [
+  const workspaceNavItems: NavItemDef[] = [
+    {
+      kind: 'section',
+      label: 'WORKSPACE',
+    },
     {
       kind: 'link',
       to: '/projects',
@@ -824,6 +644,13 @@ function ChatSidebarComponent({
       icon: CheckmarkCircle02Icon,
       label: 'Review Queue',
       active: isReviewActive,
+      countBadge:
+        reviewCount > 0
+          ? {
+              value: reviewCount,
+              tone: 'danger',
+            }
+          : undefined,
     },
     {
       kind: 'link',
@@ -831,6 +658,12 @@ function ChatSidebarComponent({
       icon: PlayCircleIcon,
       label: 'Runs / Console',
       active: isRunsActive,
+      countBadge:
+        activeRunCount > 0
+          ? {
+              value: activeRunCount,
+            }
+          : undefined,
     },
     {
       kind: 'link',
@@ -843,13 +676,17 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/skills',
       icon: PuzzleIcon,
-      label: 'Skills',
+      label: 'Skills & Memory',
       active: isSkillsActive,
       dataTour: 'skills',
     },
   ]
 
-  const toolsItems: NavItemDef[] = [
+  const toolsNavItems: NavItemDef[] = [
+    {
+      kind: 'section',
+      label: 'TOOLS',
+    },
     {
       kind: 'link',
       to: '/browser',
@@ -886,103 +723,21 @@ function ChatSidebarComponent({
       label: 'Logs',
       active: isLogsActive,
     },
-    {
-      kind: 'link',
-      to: '/debug',
-      icon: Notification03Icon,
-      label: 'Debug',
-      active: isDebugActive,
-      badge: showDebugErrorDot ? 'error-dot' : undefined,
-    },
   ]
 
-  const dataItems: NavItemDef[] = [
+  const systemNavItems: NavItemDef[] = [
     {
-      kind: 'link',
-      to: '/files',
-      icon: File01Icon,
-      label: 'Files',
-      active: isFilesActive,
+      kind: 'section',
+      label: 'SYSTEM',
     },
     {
-      kind: 'link',
-      to: '/memory',
-      icon: BrainIcon,
-      label: 'Memory',
-      active: isMemoryActive,
-    },
-    {
-      kind: 'link',
-      to: '/costs',
-      icon: ChartLineData02Icon,
-      label: 'Cost & Usage',
-      active: isCostsActive,
+      kind: 'button',
+      icon: Settings01Icon,
+      label: 'Settings',
+      active: settingsOpen,
+      onClick: handleOpenSettings,
     },
   ]
-
-  // Combined for backwards compat (mobile secondary, search, etc.)
-  const suiteItems: NavItemDef[] = [...suiteTopItems, ...workspaceItems, ...toolsItems, ...dataItems]
-
-  const gatewayItems: NavItemDef[] = [
-    {
-      kind: 'link',
-      to: '/channels',
-      icon: Chat01Icon,
-      label: 'Channels',
-      active: isChannelsActive,
-    },
-    {
-      kind: 'link',
-      to: '/instances',
-      icon: ServerStack01Icon,
-      label: 'Instances',
-      active: isInstancesActive,
-    },
-    {
-      kind: 'link',
-      to: '/sessions',
-      icon: UserMultipleIcon,
-      label: 'Sessions',
-      active: isSessionsActive,
-    },
-    {
-      kind: 'link',
-      to: '/usage',
-      icon: ChartLineData01Icon,
-      label: 'Usage',
-      active: isUsageActive,
-    },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: isAgentsActive,
-    },
-    {
-      kind: 'link',
-      to: '/nodes',
-      icon: SmartPhone01Icon,
-      label: 'Nodes',
-      active: isNodesActive,
-    },
-  ]
-
-  // Auto-expand mobile System section if any child route is active.
-  const mobileSystemLabels = [
-    'Files',
-    'Memory',
-    'Tasks',
-    'Terminal',
-    'Browser',
-    'Cron Jobs',
-    'Logs',
-    'Debug',
-  ]
-  const mobileSecondarySuite = mobileSystemLabels
-    .map((label) => suiteItems.find((item) => item.label === label))
-    .filter((item): item is NavItemDef => Boolean(item))
-  const isAnySystemActive = mobileSecondarySuite.some((item) => item.active)
 
   return (
     <motion.aside
@@ -1128,107 +883,131 @@ function ChatSidebarComponent({
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
         <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
-          {!isMobile && (
-            <>
-              {/* TOP (Dashboard, Agent Hub) */}
-              <CollapsibleSection
-                expanded={true}
-                items={suiteTopItems}
+          {topNavItems.map((item) => (
+            <motion.div
+              key={`${item.kind}:${item.label}`}
+              layout
+              transition={{ layout: transition }}
+              className="w-full"
+            >
+              <NavItem
+                item={item}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
+            </motion.div>
+          ))}
 
-              {/* WORKSPACE */}
-              <SectionLabel
-                label="Workspace"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={workspaceExpanded}
-                onToggle={toggleWorkspace}
-              />
-              <CollapsibleSection
-                expanded={workspaceExpanded || isCollapsed}
-                items={workspaceItems}
+          {workspaceNavItems.map((item) => (
+            <motion.div
+              key={`${item.kind}:${item.label}`}
+              layout
+              transition={{ layout: transition }}
+              className="w-full"
+            >
+              <NavItem
+                item={item}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
+            </motion.div>
+          ))}
 
-              {/* TOOLS */}
-              <SectionLabel
-                label="Tools"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={toolsExpanded}
-                onToggle={toggleTools}
-              />
-              <CollapsibleSection
-                expanded={toolsExpanded || isCollapsed}
-                items={toolsItems}
+          {!isVisuallyCollapsed && projectShortcuts.length > 0 && (
+            <div className="pt-0.5">
+              <NavItem
+                item={{ kind: 'section', label: 'PROJECTS' }}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
+              <div className="space-y-0.5">
+                {projectShortcuts.map((project) => {
+                  const progress = getProjectProgress(project)
+                  const isDone =
+                    progress >= 100 ||
+                    ['completed', 'done'].includes(
+                      project.status.trim().toLowerCase(),
+                    )
 
-              {/* DATA */}
-              <SectionLabel
-                label="Data"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={dataExpanded}
-                onToggle={toggleData}
-              />
-              <CollapsibleSection
-                expanded={dataExpanded || isCollapsed}
-                items={dataItems}
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                onSelectSession={onSelectSession}
-              />
-            </>
+                  return (
+                    <Link
+                      key={project.id}
+                      to="/projects"
+                      search={{
+                        project: project.id,
+                        projectId: undefined,
+                        phaseId: undefined,
+                        phaseName: undefined,
+                        goal: undefined,
+                      }}
+                      onClick={() => {
+                        onSelectSession?.()
+                      }}
+                      className={cn(
+                        buttonVariants({ variant: 'ghost', size: 'sm' }),
+                        'h-auto min-h-11 w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800 md:min-h-0',
+                        pathname === '/projects' &&
+                          projectsSearchId === project.id &&
+                          'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
+                      )}
+                    >
+                      <span className="text-sm leading-none" aria-hidden="true">
+                        {getProjectShortcutEmoji(project.name)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        {project.name}
+                      </span>
+                      <span
+                        className={cn(
+                          'ml-auto inline-flex shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                          isDone
+                            ? 'bg-emerald-500/15 text-emerald-400'
+                            : 'bg-accent-500/15 text-accent-400',
+                        )}
+                      >
+                        {progress}%
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
           )}
 
-          {isMobile && mobileSecondarySuite.length > 0 && (
-            <>
-              <SectionLabel
-                label="System"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={systemExpanded || isAnySystemActive}
-                onToggle={toggleSystem}
-              />
-              <CollapsibleSection
-                expanded={systemExpanded || isAnySystemActive || isCollapsed}
-                items={mobileSecondarySuite}
+          {toolsNavItems.map((item) => (
+            <motion.div
+              key={`${item.kind}:${item.label}`}
+              layout
+              transition={{ layout: transition }}
+              className="w-full"
+            >
+              <NavItem
+                item={item}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
-            </>
-          )}
+            </motion.div>
+          ))}
 
-          {/* GATEWAY */}
-          <SectionLabel
-            label="Gateway"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={gatewayExpanded}
-            onToggle={toggleGateway}
-            navigateTo={gatewayNav}
-          />
-          <CollapsibleSection
-            expanded={gatewayExpanded || isCollapsed}
-            items={gatewayItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
+          {systemNavItems.map((item) => (
+            <motion.div
+              key={`${item.kind}:${item.label}`}
+              layout
+              transition={{ layout: transition }}
+              className="w-full"
+            >
+              <NavItem
+                item={item}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </motion.div>
+          ))}
         </div>
 
         {/* Sessions list */}
