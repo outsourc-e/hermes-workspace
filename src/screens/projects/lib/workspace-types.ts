@@ -58,6 +58,35 @@ export type WorkspaceAgent = {
   status: string
 }
 
+export type WorkspaceTaskRun = {
+  id: string
+  task_id?: string
+  task_name: string
+  mission_id?: string
+  mission_name?: string
+  project_id?: string
+  project_name?: string
+  agent_id?: string
+  agent_name?: string
+  status: WorkspaceStatus
+  attempt: number
+  workspace_path?: string
+  started_at?: string
+  completed_at?: string
+  error?: string
+  input_tokens: number
+  output_tokens: number
+  cost_cents: number
+}
+
+export type WorkspaceRunEvent = {
+  id: string
+  task_run_id: string
+  type: string
+  data: Record<string, unknown> | null
+  created_at: string
+}
+
 export type WorkspaceStats = {
   projects: number
   agentsOnline: number
@@ -159,6 +188,19 @@ function asNumber(value: unknown): number | undefined {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : []
+}
+
+function parseJsonRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      return asRecord(parsed)
+    } catch {
+      return { message: value }
+    }
+  }
+
+  return asRecord(value)
 }
 
 function getMissionCount(project: WorkspaceProject): number {
@@ -305,6 +347,41 @@ export function normalizeAgent(value: unknown): WorkspaceAgent {
   }
 }
 
+export function normalizeTaskRun(value: unknown): WorkspaceTaskRun {
+  const record = asRecord(value)
+  return {
+    id: asString(record?.id) ?? crypto.randomUUID(),
+    task_id: asString(record?.task_id),
+    task_name: asString(record?.task_name) ?? 'Untitled task',
+    mission_id: asString(record?.mission_id),
+    mission_name: asString(record?.mission_name),
+    project_id: asString(record?.project_id),
+    project_name: asString(record?.project_name),
+    agent_id: asString(record?.agent_id),
+    agent_name: asString(record?.agent_name),
+    status: normalizeStatus(record?.status),
+    attempt: Math.max(1, asNumber(record?.attempt) ?? 1),
+    workspace_path: asString(record?.workspace_path),
+    started_at: asString(record?.started_at),
+    completed_at: asString(record?.completed_at),
+    error: asString(record?.error),
+    input_tokens: asNumber(record?.input_tokens) ?? 0,
+    output_tokens: asNumber(record?.output_tokens) ?? 0,
+    cost_cents: asNumber(record?.cost_cents) ?? 0,
+  }
+}
+
+export function normalizeRunEvent(value: unknown): WorkspaceRunEvent {
+  const record = asRecord(value)
+  return {
+    id: String(record?.id ?? crypto.randomUUID()),
+    task_run_id: asString(record?.task_run_id) ?? '',
+    type: asString(record?.type) ?? 'output',
+    data: parseJsonRecord(record?.data),
+    created_at: asString(record?.created_at) ?? new Date().toISOString(),
+  }
+}
+
 export function normalizeStats(value: unknown): WorkspaceStats {
   const record = asRecord(value)
   return {
@@ -382,6 +459,36 @@ export function extractAgents(payload: unknown): Array<WorkspaceAgent> {
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
       return candidate.map(normalizeAgent)
+    }
+  }
+
+  return []
+}
+
+export function extractTaskRuns(payload: unknown): Array<WorkspaceTaskRun> {
+  if (Array.isArray(payload)) return payload.map(normalizeTaskRun)
+
+  const record = asRecord(payload)
+  const candidates = [record?.task_runs, record?.runs, record?.data, record?.items]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.map(normalizeTaskRun)
+    }
+  }
+
+  return []
+}
+
+export function extractRunEvents(payload: unknown): Array<WorkspaceRunEvent> {
+  if (Array.isArray(payload)) return payload.map(normalizeRunEvent)
+
+  const record = asRecord(payload)
+  const candidates = [record?.run_events, record?.events, record?.data, record?.items]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.map(normalizeRunEvent)
     }
   }
 

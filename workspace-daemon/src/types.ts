@@ -209,8 +209,10 @@ export interface TaskWithRelations extends Task {
 
 export interface TaskRunWithRelations extends TaskRun {
   task_name: string;
+  mission_name: string;
   mission_id: string;
   project_id: string;
+  project_name: string;
   agent_name: string | null;
 }
 

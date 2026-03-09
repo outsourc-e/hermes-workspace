@@ -493,11 +493,18 @@ export class Tracker extends EventEmitter {
     const clause = taskId ? "WHERE task_runs.task_id = ?" : "";
     return this.db
       .prepare(
-        `SELECT task_runs.*, tasks.name AS task_name, tasks.mission_id, phases.project_id, agents.name AS agent_name
+        `SELECT task_runs.*,
+            tasks.name AS task_name,
+            missions.name AS mission_name,
+            tasks.mission_id,
+            phases.project_id,
+            projects.name AS project_name,
+            agents.name AS agent_name
          FROM task_runs
          JOIN tasks ON tasks.id = task_runs.task_id
          JOIN missions ON missions.id = tasks.mission_id
          JOIN phases ON phases.id = missions.phase_id
+         JOIN projects ON projects.id = phases.project_id
          LEFT JOIN agents ON agents.id = task_runs.agent_id
          ${clause}
          ORDER BY task_runs.started_at DESC`,

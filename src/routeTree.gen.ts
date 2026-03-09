@@ -16,6 +16,7 @@ import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionsRouteImport } from './routes/sessions'
+import { Route as RunsRouteImport } from './routes/runs'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as NodesRouteImport } from './routes/nodes'
@@ -91,6 +92,7 @@ import { Route as ApiAgentKillRouteImport } from './routes/api/agent-kill'
 import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activity'
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
+import { Route as ApiWorkspaceTaskRunsRouteImport } from './routes/api/workspace/task-runs'
 import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/stats'
 import { Route as ApiWorkspaceProjectsRouteImport } from './routes/api/workspace/projects'
 import { Route as ApiWorkspacePhasesRouteImport } from './routes/api/workspace/phases'
@@ -133,6 +135,7 @@ import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/work
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
 import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents.$pid.kill'
+import { Route as ApiWorkspaceTaskRunsIdEventsRouteImport } from './routes/api/workspace/task-runs.$id.events'
 import { Route as ApiWorkspaceMissionsIdStartRouteImport } from './routes/api/workspace/missions.$id.start'
 import { Route as ApiWorkspaceCheckpointsIdVerifyTscRouteImport } from './routes/api/workspace/checkpoints.$id.verify-tsc'
 import { Route as ApiWorkspaceCheckpointsIdReviseRouteImport } from './routes/api/workspace/checkpoints.$id.revise'
@@ -176,6 +179,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SessionsRoute = SessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RunsRoute = RunsRouteImport.update({
+  id: '/runs',
+  path: '/runs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -553,6 +561,11 @@ const ApiTasksIndexRoute = ApiTasksIndexRouteImport.update({
   path: '/api/tasks/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceTaskRunsRoute = ApiWorkspaceTaskRunsRouteImport.update({
+  id: '/task-runs',
+  path: '/task-runs',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
 const ApiWorkspaceStatsRoute = ApiWorkspaceStatsRouteImport.update({
   id: '/stats',
   path: '/stats',
@@ -766,6 +779,12 @@ const ApiCliAgentsPidKillRoute = ApiCliAgentsPidKillRouteImport.update({
   path: '/$pid/kill',
   getParentRoute: () => ApiCliAgentsRoute,
 } as any)
+const ApiWorkspaceTaskRunsIdEventsRoute =
+  ApiWorkspaceTaskRunsIdEventsRouteImport.update({
+    id: '/$id/events',
+    path: '/$id/events',
+    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
+  } as any)
 const ApiWorkspaceMissionsIdStartRoute =
   ApiWorkspaceMissionsIdStartRouteImport.update({
     id: '/$id/start',
@@ -842,6 +861,7 @@ export interface FileRoutesByFullPath {
   '/nodes': typeof NodesRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
+  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -939,6 +959,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
   '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
+  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -955,6 +976,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
+  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -977,6 +999,7 @@ export interface FileRoutesByTo {
   '/nodes': typeof NodesRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
+  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
@@ -1073,6 +1096,7 @@ export interface FileRoutesByTo {
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
   '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
+  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
   '/api/tasks': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -1089,6 +1113,7 @@ export interface FileRoutesByTo {
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
+  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1112,6 +1137,7 @@ export interface FileRoutesById {
   '/nodes': typeof NodesRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
+  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1209,6 +1235,7 @@ export interface FileRoutesById {
   '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
   '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
   '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
+  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -1225,6 +1252,7 @@ export interface FileRoutesById {
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
   '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
+  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1249,6 +1277,7 @@ export interface FileRouteTypes {
     | '/nodes'
     | '/projects'
     | '/review'
+    | '/runs'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1346,6 +1375,7 @@ export interface FileRouteTypes {
     | '/api/workspace/phases'
     | '/api/workspace/projects'
     | '/api/workspace/stats'
+    | '/api/workspace/task-runs'
     | '/api/tasks/'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
@@ -1362,6 +1392,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
     | '/api/workspace/missions/$id/start'
+    | '/api/workspace/task-runs/$id/events'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1384,6 +1415,7 @@ export interface FileRouteTypes {
     | '/nodes'
     | '/projects'
     | '/review'
+    | '/runs'
     | '/sessions'
     | '/skills'
     | '/tasks'
@@ -1480,6 +1512,7 @@ export interface FileRouteTypes {
     | '/api/workspace/phases'
     | '/api/workspace/projects'
     | '/api/workspace/stats'
+    | '/api/workspace/task-runs'
     | '/api/tasks'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
@@ -1496,6 +1529,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
     | '/api/workspace/missions/$id/start'
+    | '/api/workspace/task-runs/$id/events'
   id:
     | '__root__'
     | '/'
@@ -1518,6 +1552,7 @@ export interface FileRouteTypes {
     | '/nodes'
     | '/projects'
     | '/review'
+    | '/runs'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1615,6 +1650,7 @@ export interface FileRouteTypes {
     | '/api/workspace/phases'
     | '/api/workspace/projects'
     | '/api/workspace/stats'
+    | '/api/workspace/task-runs'
     | '/api/tasks/'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
@@ -1631,6 +1667,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
     | '/api/workspace/missions/$id/start'
+    | '/api/workspace/task-runs/$id/events'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1654,6 +1691,7 @@ export interface RootRouteChildren {
   NodesRoute: typeof NodesRoute
   ProjectsRoute: typeof ProjectsRoute
   ReviewRoute: typeof ReviewRoute
+  RunsRoute: typeof RunsRoute
   SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -1783,6 +1821,13 @@ declare module '@tanstack/react-router' {
       path: '/sessions'
       fullPath: '/sessions'
       preLoaderRoute: typeof SessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runs': {
+      id: '/runs'
+      path: '/runs'
+      fullPath: '/runs'
+      preLoaderRoute: typeof RunsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -2310,6 +2355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTasksIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/task-runs': {
+      id: '/api/workspace/task-runs'
+      path: '/task-runs'
+      fullPath: '/api/workspace/task-runs'
+      preLoaderRoute: typeof ApiWorkspaceTaskRunsRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
     '/api/workspace/stats': {
       id: '/api/workspace/stats'
       path: '/stats'
@@ -2604,6 +2656,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCliAgentsPidKillRouteImport
       parentRoute: typeof ApiCliAgentsRoute
     }
+    '/api/workspace/task-runs/$id/events': {
+      id: '/api/workspace/task-runs/$id/events'
+      path: '/$id/events'
+      fullPath: '/api/workspace/task-runs/$id/events'
+      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdEventsRouteImport
+      parentRoute: typeof ApiWorkspaceTaskRunsRoute
+    }
     '/api/workspace/missions/$id/start': {
       id: '/api/workspace/missions/$id/start'
       path: '/$id/start'
@@ -2828,6 +2887,17 @@ const ApiWorkspaceProjectsRouteChildren: ApiWorkspaceProjectsRouteChildren = {
 const ApiWorkspaceProjectsRouteWithChildren =
   ApiWorkspaceProjectsRoute._addFileChildren(ApiWorkspaceProjectsRouteChildren)
 
+interface ApiWorkspaceTaskRunsRouteChildren {
+  ApiWorkspaceTaskRunsIdEventsRoute: typeof ApiWorkspaceTaskRunsIdEventsRoute
+}
+
+const ApiWorkspaceTaskRunsRouteChildren: ApiWorkspaceTaskRunsRouteChildren = {
+  ApiWorkspaceTaskRunsIdEventsRoute: ApiWorkspaceTaskRunsIdEventsRoute,
+}
+
+const ApiWorkspaceTaskRunsRouteWithChildren =
+  ApiWorkspaceTaskRunsRoute._addFileChildren(ApiWorkspaceTaskRunsRouteChildren)
+
 interface ApiWorkspaceRouteChildren {
   ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRoute
   ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
@@ -2837,6 +2907,7 @@ interface ApiWorkspaceRouteChildren {
   ApiWorkspacePhasesRoute: typeof ApiWorkspacePhasesRoute
   ApiWorkspaceProjectsRoute: typeof ApiWorkspaceProjectsRouteWithChildren
   ApiWorkspaceStatsRoute: typeof ApiWorkspaceStatsRoute
+  ApiWorkspaceTaskRunsRoute: typeof ApiWorkspaceTaskRunsRouteWithChildren
 }
 
 const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
@@ -2848,6 +2919,7 @@ const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspacePhasesRoute: ApiWorkspacePhasesRoute,
   ApiWorkspaceProjectsRoute: ApiWorkspaceProjectsRouteWithChildren,
   ApiWorkspaceStatsRoute: ApiWorkspaceStatsRoute,
+  ApiWorkspaceTaskRunsRoute: ApiWorkspaceTaskRunsRouteWithChildren,
 }
 
 const ApiWorkspaceRouteWithChildren = ApiWorkspaceRoute._addFileChildren(
@@ -2886,6 +2958,7 @@ const rootRouteChildren: RootRouteChildren = {
   NodesRoute: NodesRoute,
   ProjectsRoute: ProjectsRoute,
   ReviewRoute: ReviewRoute,
+  RunsRoute: RunsRoute,
   SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
