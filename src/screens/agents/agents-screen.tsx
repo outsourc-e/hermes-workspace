@@ -14,7 +14,11 @@ import {
   Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import type React from 'react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -29,10 +33,15 @@ import {
 } from '@/lib/workspace-agents'
 import {
   listWorkspaceCheckpoints,
+  readWorkspacePayload,
   type WorkspaceCheckpoint,
+  workspaceRequestJson,
 } from '@/lib/workspace-checkpoints'
-import { workspaceRequestJson } from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
+import {
+  WorkspaceEntityDialog,
+  WorkspaceFieldLabel,
+} from '@/screens/projects/create-project-dialog'
 import {
   extractTaskRuns,
   type WorkspaceTaskRun,
@@ -46,6 +55,27 @@ type AgentDetailTab =
   | 'runs'
 
 type AgentPromptDrafts = Record<string, string>
+
+type AgentRole = 'coder' | 'reviewer' | 'qa' | 'planner'
+type AgentAdapterType = 'codex' | 'claude' | 'openclaw' | 'ollama'
+
+type RegisterAgentFormState = {
+  name: string
+  role: AgentRole
+  adapter_type: AgentAdapterType
+  model: string
+  system_prompt: string
+}
+
+type RegisterAgentFormErrors = Partial<Record<'name' | 'adapter_type', string>>
+
+const REGISTER_AGENT_DEFAULTS: RegisterAgentFormState = {
+  name: '',
+  role: 'coder',
+  adapter_type: 'codex',
+  model: '',
+  system_prompt: '',
+}
 
 function normalizeKey(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
@@ -158,6 +188,46 @@ async function loadTaskRuns(): Promise<WorkspaceTaskRun[]> {
   return extractTaskRuns(await workspaceRequestJson('/api/workspace/task-runs'))
 }
 
+function readRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+async function registerWorkspaceAgent(form: RegisterAgentFormState): Promise<string | null> {
+  const response = await fetch('/api/workspace/agents', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: form.name.trim(),
+      role: form.role,
+      adapter_type: form.adapter_type,
+      model: form.model.trim() || null,
+      adapter_config: form.system_prompt.trim()
+        ? { system_prompt: form.system_prompt.trim() }
+        : undefined,
+    }),
+  })
+
+  const payload = await readWorkspacePayload(response)
+  if (!response.ok) {
+    const record = readRecord(payload)
+    throw new Error(
+      asString(record?.error) ??
+        asString(record?.message) ??
+        `Request failed with status ${response.status}`,
+    )
+  }
+
+  const record = readRecord(payload)
+  return asString(record?.id)
+}
+
 function StatCard({
   icon,
   label,
@@ -201,9 +271,15 @@ function SectionCard({
 }
 
 export function AgentsScreen() {
+  const queryClient = useQueryClient()
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<AgentDetailTab>('profile')
   const [promptDrafts, setPromptDrafts] = useState<AgentPromptDrafts>({})
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
+  const [registerForm, setRegisterForm] =
+    useState<RegisterAgentFormState>(REGISTER_AGENT_DEFAULTS)
+  const [registerErrors, setRegisterErrors] = useState<RegisterAgentFormErrors>({})
+  const [pendingSelectedAgentId, setPendingSelectedAgentId] = useState<string | null>(null)
 
   const agentsQuery = useQuery({
     queryKey: ['workspace', 'agents-directory'],
@@ -225,9 +301,21 @@ export function AgentsScreen() {
   useEffect(() => {
     if (agents.length === 0) return
     setSelectedAgentId((current) =>
-      current && agents.some((agent) => agent.id === current) ? current : agents[0]!.id,
+      current && agents.some((agent) => agent.id === current)
+        ? current
+        : pendingSelectedAgentId && agents.some((agent) => agent.id === pendingSelectedAgentId)
+          ? pendingSelectedAgentId
+          : agents[0]!.id,
     )
-  }, [agents])
+  }, [agents, pendingSelectedAgentId])
+
+  useEffect(() => {
+    if (!pendingSelectedAgentId) return
+    if (!agents.some((agent) => agent.id === pendingSelectedAgentId)) return
+    setSelectedAgentId(pendingSelectedAgentId)
+    setActiveTab('profile')
+    setPendingSelectedAgentId(null)
+  }, [agents, pendingSelectedAgentId])
 
   useEffect(() => {
     if (agents.length === 0) return
@@ -242,6 +330,56 @@ export function AgentsScreen() {
 
   const selectedAgent =
     agents.find((agent) => agent.id === selectedAgentId) ?? agents[0] ?? null
+
+  const registerAgentMutation = useMutation({
+    mutationFn: registerWorkspaceAgent,
+    onSuccess: async (createdAgentId) => {
+      if (createdAgentId) setPendingSelectedAgentId(createdAgentId)
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'agents-directory'],
+      })
+      toast('Agent registered', { type: 'success' })
+      setRegisterDialogOpen(false)
+      setRegisterForm(REGISTER_AGENT_DEFAULTS)
+      setRegisterErrors({})
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to register agent', {
+        type: 'error',
+      })
+    },
+  })
+
+  const isDefaultOnlyView =
+    agents.length > 0 &&
+    agents.length <= 2 &&
+    agents.every((agent) => agent.adapter_type === 'codex' || agent.adapter_type === 'claude')
+
+  function resetRegisterDialog(open: boolean) {
+    setRegisterDialogOpen(open)
+    if (!open) {
+      setRegisterForm(REGISTER_AGENT_DEFAULTS)
+      setRegisterErrors({})
+      registerAgentMutation.reset()
+    }
+  }
+
+  function validateRegisterForm(): RegisterAgentFormErrors {
+    const nextErrors: RegisterAgentFormErrors = {}
+    if (!registerForm.name.trim()) nextErrors.name = 'Name is required.'
+    if (!registerForm.adapter_type.trim()) {
+      nextErrors.adapter_type = 'Adapter type is required.'
+    }
+    return nextErrors
+  }
+
+  function handleRegisterSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const nextErrors = validateRegisterForm()
+    setRegisterErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
+    registerAgentMutation.mutate(registerForm)
+  }
 
   const statsQuery = useQuery({
     queryKey: ['workspace', 'agent-stats', selectedAgent?.id],
@@ -281,7 +419,7 @@ export function AgentsScreen() {
     )
   }
 
-  if (agentsQuery.isError || !selectedAgent) {
+  if (agentsQuery.isError) {
     return (
       <div className="flex h-full items-center justify-center bg-primary-950 px-6">
         <div className="max-w-md rounded-3xl border border-red-500/20 bg-red-500/10 p-5 text-center">
@@ -298,6 +436,152 @@ export function AgentsScreen() {
             <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.7} />
             Retry
           </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!selectedAgent) {
+    return (
+      <div className="h-full overflow-hidden bg-surface text-primary-900">
+        <div className="mx-auto flex h-full max-w-5xl flex-col p-4 md:p-6">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-white px-5 py-4 shadow-sm">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
+                Agents
+              </p>
+              <p className="mt-1 text-sm text-primary-500">0 registered</p>
+            </div>
+            <Button
+              className="bg-accent-500 text-primary-950 hover:bg-accent-400"
+              onClick={() => resetRegisterDialog(true)}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
+              Register Agent
+            </Button>
+          </div>
+
+          <div className="flex flex-1 items-center justify-center">
+            <div className="w-full max-w-2xl rounded-3xl border border-primary-200 bg-white px-6 py-10 text-center shadow-sm">
+              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-accent-500/25 bg-accent-500/10 text-accent-400">
+                <HugeiconsIcon icon={Add01Icon} size={28} strokeWidth={1.6} />
+              </div>
+              <h1 className="mt-5 text-2xl font-semibold text-primary-900">
+                Register your first agent
+              </h1>
+              <p className="mx-auto mt-3 max-w-xl text-sm text-primary-500">
+                Agents are pre-configured. Codex and Claude are available by default.
+              </p>
+              <p className="mx-auto mt-2 max-w-xl text-sm text-primary-500">
+                Custom agents let you set specific models, prompts, and tool permissions.
+              </p>
+              <Button
+                className="mt-6 bg-accent-500 text-primary-950 hover:bg-accent-400"
+                onClick={() => resetRegisterDialog(true)}
+              >
+                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
+                Register Agent
+              </Button>
+            </div>
+          </div>
+          <WorkspaceEntityDialog
+            open={registerDialogOpen}
+            onOpenChange={resetRegisterDialog}
+            title="Register Agent"
+            description="Create a reusable agent profile with a role, adapter, model, and optional prompt."
+            submitting={registerAgentMutation.isPending}
+            onSubmit={handleRegisterSubmit}
+            submitLabel="Register Agent"
+          >
+            <WorkspaceFieldLabel label="Name">
+              <div className="space-y-1.5">
+                <input
+                  value={registerForm.name}
+                  onChange={(event) => {
+                    setRegisterForm((current) => ({ ...current, name: event.target.value }))
+                    if (registerErrors.name) {
+                      setRegisterErrors((current) => ({ ...current, name: undefined }))
+                    }
+                  }}
+                  className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                  placeholder="Codex Builder"
+                  autoFocus
+                />
+                {registerErrors.name ? (
+                  <p className="text-xs text-red-300">{registerErrors.name}</p>
+                ) : null}
+              </div>
+            </WorkspaceFieldLabel>
+            <WorkspaceFieldLabel label="Role">
+              <select
+                value={registerForm.role}
+                onChange={(event) =>
+                  setRegisterForm((current) => ({
+                    ...current,
+                    role: event.target.value as AgentRole,
+                  }))
+                }
+                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              >
+                <option value="coder">coder</option>
+                <option value="reviewer">reviewer</option>
+                <option value="qa">qa</option>
+                <option value="planner">planner</option>
+              </select>
+            </WorkspaceFieldLabel>
+            <WorkspaceFieldLabel label="Adapter Type">
+              <div className="space-y-1.5">
+                <select
+                  value={registerForm.adapter_type}
+                  onChange={(event) => {
+                    setRegisterForm((current) => ({
+                      ...current,
+                      adapter_type: event.target.value as AgentAdapterType,
+                    }))
+                    if (registerErrors.adapter_type) {
+                      setRegisterErrors((current) => ({
+                        ...current,
+                        adapter_type: undefined,
+                      }))
+                    }
+                  }}
+                  className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                >
+                  <option value="codex">codex</option>
+                  <option value="claude">claude</option>
+                  <option value="openclaw">openclaw</option>
+                  <option value="ollama">ollama</option>
+                </select>
+                {registerErrors.adapter_type ? (
+                  <p className="text-xs text-red-300">{registerErrors.adapter_type}</p>
+                ) : null}
+              </div>
+            </WorkspaceFieldLabel>
+            <WorkspaceFieldLabel label="Model">
+              <input
+                value={registerForm.model}
+                onChange={(event) =>
+                  setRegisterForm((current) => ({ ...current, model: event.target.value }))
+                }
+                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                placeholder='gpt-5.4 or claude-sonnet-4-6'
+              />
+            </WorkspaceFieldLabel>
+            <WorkspaceFieldLabel label="System Prompt">
+              <textarea
+                value={registerForm.system_prompt}
+                onChange={(event) =>
+                  setRegisterForm((current) => ({
+                    ...current,
+                    system_prompt: event.target.value,
+                  }))
+                }
+                rows={4}
+                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                placeholder="Optional system prompt for this agent profile..."
+              />
+            </WorkspaceFieldLabel>
+          </WorkspaceEntityDialog>
         </div>
       </div>
     )
@@ -323,10 +607,10 @@ export function AgentsScreen() {
             <Button
               size="sm"
               className="bg-accent-500 text-primary-950 hover:bg-accent-400"
-              onClick={() => toast('Agent creation is not wired yet.', { type: 'info' })}
+              onClick={() => resetRegisterDialog(true)}
             >
               <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
-              New Agent
+              Register Agent
             </Button>
           </div>
 
@@ -378,6 +662,14 @@ export function AgentsScreen() {
 
         <section className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:p-6">
+            {isDefaultOnlyView ? (
+              <div className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm text-primary-500 shadow-sm">
+                <p>Agents are pre-configured. Codex and Claude are available by default.</p>
+                <p className="mt-1">
+                  Custom agents let you set specific models, prompts, and tool permissions.
+                </p>
+              </div>
+            ) : null}
             <div className="rounded-xl border border-primary-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
@@ -887,6 +1179,104 @@ export function AgentsScreen() {
           </div>
         </section>
       </div>
+      <WorkspaceEntityDialog
+        open={registerDialogOpen}
+        onOpenChange={resetRegisterDialog}
+        title="Register Agent"
+        description="Create a reusable agent profile with a role, adapter, model, and optional prompt."
+        submitting={registerAgentMutation.isPending}
+        onSubmit={handleRegisterSubmit}
+        submitLabel="Register Agent"
+      >
+        <WorkspaceFieldLabel label="Name">
+          <div className="space-y-1.5">
+            <input
+              value={registerForm.name}
+              onChange={(event) => {
+                setRegisterForm((current) => ({ ...current, name: event.target.value }))
+                if (registerErrors.name) {
+                  setRegisterErrors((current) => ({ ...current, name: undefined }))
+                }
+              }}
+              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              placeholder="Codex Builder"
+              autoFocus
+            />
+            {registerErrors.name ? (
+              <p className="text-xs text-red-300">{registerErrors.name}</p>
+            ) : null}
+          </div>
+        </WorkspaceFieldLabel>
+        <WorkspaceFieldLabel label="Role">
+          <select
+            value={registerForm.role}
+            onChange={(event) =>
+              setRegisterForm((current) => ({
+                ...current,
+                role: event.target.value as AgentRole,
+              }))
+            }
+            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+          >
+            <option value="coder">coder</option>
+            <option value="reviewer">reviewer</option>
+            <option value="qa">qa</option>
+            <option value="planner">planner</option>
+          </select>
+        </WorkspaceFieldLabel>
+        <WorkspaceFieldLabel label="Adapter Type">
+          <div className="space-y-1.5">
+            <select
+              value={registerForm.adapter_type}
+              onChange={(event) => {
+                setRegisterForm((current) => ({
+                  ...current,
+                  adapter_type: event.target.value as AgentAdapterType,
+                }))
+                if (registerErrors.adapter_type) {
+                  setRegisterErrors((current) => ({
+                    ...current,
+                    adapter_type: undefined,
+                  }))
+                }
+              }}
+              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            >
+              <option value="codex">codex</option>
+              <option value="claude">claude</option>
+              <option value="openclaw">openclaw</option>
+              <option value="ollama">ollama</option>
+            </select>
+            {registerErrors.adapter_type ? (
+              <p className="text-xs text-red-300">{registerErrors.adapter_type}</p>
+            ) : null}
+          </div>
+        </WorkspaceFieldLabel>
+        <WorkspaceFieldLabel label="Model">
+          <input
+            value={registerForm.model}
+            onChange={(event) =>
+              setRegisterForm((current) => ({ ...current, model: event.target.value }))
+            }
+            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            placeholder='gpt-5.4 or claude-sonnet-4-6'
+          />
+        </WorkspaceFieldLabel>
+        <WorkspaceFieldLabel label="System Prompt">
+          <textarea
+            value={registerForm.system_prompt}
+            onChange={(event) =>
+              setRegisterForm((current) => ({
+                ...current,
+                system_prompt: event.target.value,
+              }))
+            }
+            rows={4}
+            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            placeholder="Optional system prompt for this agent profile..."
+          />
+        </WorkspaceFieldLabel>
+      </WorkspaceEntityDialog>
     </div>
   )
 }

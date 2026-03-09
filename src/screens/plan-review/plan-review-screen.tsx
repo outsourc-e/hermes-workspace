@@ -173,6 +173,18 @@ function reorderTasks(
   return next
 }
 
+function removeTask(tasks: DecomposedTaskDraft[], taskId: string): DecomposedTaskDraft[] {
+  const removedTask = tasks.find((task) => task.id === taskId)
+  if (!removedTask) return tasks
+
+  return tasks
+    .filter((task) => task.id !== taskId)
+    .map((task) => ({
+      ...task,
+      depends_on: task.depends_on.filter((dependency) => dependency !== removedTask.name),
+    }))
+}
+
 export function PlanReviewScreen({
   plan,
   missionId = '',
@@ -464,6 +476,10 @@ export function PlanReviewScreen({
           </div>
 
           <div className="mt-5 space-y-3">
+            <div className="rounded-2xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm text-primary-500">
+              Review the task plan before launching. You can edit task names,
+              reorder, or remove tasks.
+            </div>
             {riskTasks.length > 0 ? (
               <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
                 {riskTasks.length} task{riskTasks.length === 1 ? '' : 's'} touch auth,
@@ -534,42 +550,57 @@ export function PlanReviewScreen({
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      {isEditing ? (
-                        <input
-                          ref={(element) => {
-                            inputRefs.current[task.id] = element
-                          }}
-                          value={task.name}
-                          onChange={(event) =>
-                            setTasks((current) =>
-                              current.map((entry) => {
-                                if (entry.id === task.id) {
-                                  return { ...entry, name: event.target.value }
-                                }
-                                if (entry.depends_on.includes(task.name)) {
-                                  return {
-                                    ...entry,
-                                    depends_on: entry.depends_on.map((dependency) =>
-                                      dependency === task.name ? event.target.value : dependency,
-                                    ),
-                                  }
-                                }
-                                return entry
-                              }),
-                            )
-                          }
-                          onBlur={() => setEditingTaskId((current) => (current === task.id ? null : current))}
-                          className="w-full rounded-xl border border-primary-700 bg-primary-900 px-3 py-2 text-base font-medium text-primary-100 outline-none transition-colors focus:border-accent-500"
-                        />
-                      ) : (
-                        <button
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          {isEditing ? (
+                            <input
+                              ref={(element) => {
+                                inputRefs.current[task.id] = element
+                              }}
+                              value={task.name}
+                              onChange={(event) =>
+                                setTasks((current) =>
+                                  current.map((entry) => {
+                                    if (entry.id === task.id) {
+                                      return { ...entry, name: event.target.value }
+                                    }
+                                    if (entry.depends_on.includes(task.name)) {
+                                      return {
+                                        ...entry,
+                                        depends_on: entry.depends_on.map((dependency) =>
+                                          dependency === task.name ? event.target.value : dependency,
+                                        ),
+                                      }
+                                    }
+                                    return entry
+                                  }),
+                                )
+                              }
+                              onBlur={() => setEditingTaskId((current) => (current === task.id ? null : current))}
+                              className="w-full rounded-xl border border-primary-700 bg-primary-900 px-3 py-2 text-base font-medium text-primary-100 outline-none transition-colors focus:border-accent-500"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setEditingTaskId(task.id)}
+                              className="text-left text-base font-medium text-primary-100 transition-colors hover:text-accent-300"
+                            >
+                              {task.name}
+                            </button>
+                          )}
+                        </div>
+                        <Button
                           type="button"
-                          onClick={() => setEditingTaskId(task.id)}
-                          className="text-left text-base font-medium text-primary-100 transition-colors hover:text-accent-300"
+                          variant="ghost"
+                          className="shrink-0 text-primary-400 hover:bg-primary-800 hover:text-red-300"
+                          onClick={() => {
+                            setTasks((current) => removeTask(current, task.id))
+                            setEditingTaskId((current) => (current === task.id ? null : current))
+                          }}
                         >
-                          {task.name}
-                        </button>
-                      )}
+                          Remove
+                        </Button>
+                      </div>
 
                       <p className="mt-1 text-sm text-primary-400">
                         {task.depends_on.length > 0

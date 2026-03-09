@@ -528,6 +528,14 @@ export function MissionConsoleScreen({
     refetchInterval: 3_000,
   })
 
+  const activeMissionRunsQuery = useQuery({
+    queryKey: ['workspace', 'task-runs', 'mission-console', 'all'],
+    enabled: missionId.length === 0,
+    queryFn: async () =>
+      extractTaskRuns(await workspaceRequestJson('/api/workspace/task-runs')),
+    refetchInterval: 5_000,
+  })
+
   const projectQuery = useQuery({
     queryKey: ['workspace', 'projects', projectId],
     enabled: projectId.length > 0,
@@ -583,6 +591,54 @@ export function MissionConsoleScreen({
 
   const missionStatus = missionStatusQuery.data
   const project = projectQuery.data as WorkspaceProject | null | undefined
+  const runningMissionOptions = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        missionId: string
+        missionName: string
+        projectId: string
+        projectName: string
+        activeRuns: number
+        updatedAt: string | null
+      }
+    >()
+
+    for (const run of activeMissionRunsQuery.data ?? []) {
+      if (!run.mission_id || !run.project_id) continue
+      if (run.status !== 'running' && run.status !== 'active') continue
+
+      const current = grouped.get(run.mission_id)
+      const updatedAt = run.started_at ?? run.completed_at ?? null
+      if (!current) {
+        grouped.set(run.mission_id, {
+          missionId: run.mission_id,
+          missionName: run.mission_name ?? 'Active mission',
+          projectId: run.project_id,
+          projectName: run.project_name ?? 'Project',
+          activeRuns: 1,
+          updatedAt,
+        })
+        continue
+      }
+
+      grouped.set(run.mission_id, {
+        ...current,
+        activeRuns: current.activeRuns + 1,
+        updatedAt:
+          updatedAt &&
+          (!current.updatedAt ||
+            new Date(updatedAt).getTime() > new Date(current.updatedAt).getTime())
+            ? updatedAt
+            : current.updatedAt,
+      })
+    }
+
+    return Array.from(grouped.values()).sort((left, right) => {
+      return new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime()
+    })
+  }, [activeMissionRunsQuery.data])
+
   const allMissionRuns = useMemo(() => {
     return (runsQuery.data ?? []).filter((run) => run.mission_id === missionId)
   }, [missionId, runsQuery.data])
@@ -864,7 +920,7 @@ export function MissionConsoleScreen({
   if (!missionId) {
     return (
       <div className="flex h-full items-center justify-center bg-primary-950 px-6">
-        <div className="max-w-md rounded-3xl border border-primary-800 bg-primary-900 p-8 text-center">
+        <div className="w-full max-w-2xl rounded-3xl border border-primary-800 bg-primary-900 p-8 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-primary-400">
             Mission Console
           </p>
@@ -872,8 +928,50 @@ export function MissionConsoleScreen({
             No mission selected
           </h1>
           <p className="mt-3 text-sm text-primary-300">
-            Open a project, start a mission, then click Open Console
+            Select an active mission to monitor live agent progress.
           </p>
+          <div className="mt-6 rounded-2xl border border-primary-800 bg-primary-950/60 p-4 text-left">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
+              Running Missions
+            </p>
+            {activeMissionRunsQuery.isLoading ? (
+              <p className="mt-3 text-sm text-primary-400">Loading active missions...</p>
+            ) : runningMissionOptions.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {runningMissionOptions.map((mission) => (
+                  <Link
+                    key={mission.missionId}
+                    to="/mission-console"
+                    search={{
+                      missionId: mission.missionId,
+                      projectId: mission.projectId,
+                    }}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-primary-800 bg-primary-900 px-4 py-3 transition-colors hover:border-primary-700 hover:bg-primary-800"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-primary-100">
+                        {mission.missionName}
+                      </p>
+                      <p className="truncate text-xs text-primary-400">
+                        {mission.projectName} · {mission.activeRuns} active run
+                        {mission.activeRuns === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={16}
+                      strokeWidth={1.8}
+                      className="shrink-0 text-primary-400"
+                    />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-primary-400">
+                No missions are running right now.
+              </p>
+            )}
+          </div>
           <Link
             to="/projects"
             className={cn(

@@ -1,5 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Add01Icon, Folder01Icon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  ArrowRight01Icon,
+  CheckmarkCircle02Icon,
+  Folder01Icon,
+  Rocket01Icon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type React from 'react'
@@ -1063,19 +1069,51 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
               <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
             </div>
             <h2 className="text-lg font-semibold text-primary-900">
-              No projects yet
+              Start your first project
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
-              Create your first project to organize phases, missions, and task
-              execution for an agent workflow.
+              Create a project, add a spec or PRD, pick your agents, and let them
+              build.
             </p>
             <Button
               onClick={() => void navigate({ to: '/new-project' })}
               className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
             >
-              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
-              Create First Project
+              Create Project
+              <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.6} />
             </Button>
+            <div className="mx-auto mt-8 grid max-w-3xl gap-3 text-left md:grid-cols-3">
+              {[
+                {
+                  icon: Add01Icon,
+                  title: '1. Create project',
+                  text: 'Add your repo path and spec.',
+                },
+                {
+                  icon: Rocket01Icon,
+                  title: '2. Launch agents',
+                  text: 'Start a mission and let the squad run.',
+                },
+                {
+                  icon: CheckmarkCircle02Icon,
+                  title: '3. Review & merge',
+                  text: 'Approve checkpoints and ship the work.',
+                },
+              ].map((step) => (
+                <div
+                  key={step.title}
+                  className="rounded-xl border border-primary-200 bg-white px-4 py-4 shadow-sm"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-xl border border-accent-500/20 bg-accent-500/10 text-accent-400">
+                    <HugeiconsIcon icon={step.icon} size={18} strokeWidth={1.6} />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-primary-900">
+                    {step.title}
+                  </p>
+                  <p className="mt-1 text-sm text-primary-500">{step.text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <>

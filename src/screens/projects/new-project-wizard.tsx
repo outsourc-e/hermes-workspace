@@ -655,21 +655,27 @@ export function NewProjectWizard() {
                       label="Local Path"
                       hint="Paste an absolute path from Finder or Terminal"
                     >
-                      <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-1">
-                        <div className="flex items-center gap-3 rounded-[18px] border border-primary-800 bg-primary-900 px-3 py-3">
-                          <HugeiconsIcon
-                            icon={Folder01Icon}
-                            size={18}
-                            strokeWidth={1.7}
-                            className="text-primary-500"
-                          />
-                          <input
-                            value={path}
-                            onChange={(event) => setPath(event.target.value)}
-                            placeholder="/Users/aurora/.openclaw/workspace/clawsuite"
-                            className="w-full bg-transparent text-sm text-primary-100 outline-none placeholder:text-primary-500"
-                          />
+                      <div className="space-y-2">
+                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-1">
+                          <div className="flex items-center gap-3 rounded-[18px] border border-primary-800 bg-primary-900 px-3 py-3">
+                            <HugeiconsIcon
+                              icon={Folder01Icon}
+                              size={18}
+                              strokeWidth={1.7}
+                              className="text-primary-500"
+                            />
+                            <input
+                              value={path}
+                              onChange={(event) => setPath(event.target.value)}
+                              placeholder="/Users/aurora/.openclaw/workspace/clawsuite"
+                              className="w-full bg-transparent text-sm text-primary-100 outline-none placeholder:text-primary-500"
+                            />
+                          </div>
                         </div>
+                        <p className="text-xs text-primary-500">
+                          This is the local path to your codebase. Leave blank to
+                          create a new workspace.
+                        </p>
                       </div>
                     </WizardField>
                   </div>
@@ -731,6 +737,10 @@ export function NewProjectWizard() {
                           Skip for now
                         </button>
                       </div>
+                      <p className="text-xs text-primary-500">
+                        Paste your PRD, feature spec, or just describe what you
+                        want built. More detail = better task breakdown.
+                      </p>
                     </div>
                   </WizardField>
                 </div>
@@ -747,6 +757,10 @@ export function NewProjectWizard() {
                     </h2>
                     <p className="mt-1 text-sm text-primary-400">
                       Choose a squad template or customize the roster.
+                    </p>
+                    <p className="mt-2 text-xs text-primary-500">
+                      Full Stack is recommended for most projects. You can
+                      customize agents after creation.
                     </p>
                   </div>
 

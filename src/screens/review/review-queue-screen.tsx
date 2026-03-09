@@ -503,6 +503,11 @@ export function ReviewQueueScreen() {
           })}
         </div>
 
+        <div className="mb-5 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm text-primary-500 shadow-sm">
+          Approving merges agent work into your project. Review the diff before
+          approving.
+        </div>
+
         <div className="mb-5 flex flex-wrap gap-2">
           <button
             type="button"
@@ -535,6 +540,22 @@ export function ReviewQueueScreen() {
 
         {checkpointsQuery.isLoading ? (
           <ReviewQueueSkeleton />
+        ) : visibleCheckpoints.length === 0 && checkpoints.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
+              <HugeiconsIcon
+                icon={CheckmarkCircle02Icon}
+                size={26}
+                strokeWidth={1.5}
+              />
+            </div>
+            <h2 className="text-lg font-semibold text-primary-900">
+              No checkpoints waiting
+            </h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
+              When agents finish a task, their work appears here for your review.
+            </p>
+          </div>
         ) : visibleCheckpoints.length === 0 ? (
           <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
