@@ -86,6 +86,7 @@ export class AgentRunner {
       ? await buildCheckpoint(
           workspace.path,
           input.project.path,
+          input.project.name,
           input.task.id,
           input.task.name,
           input.taskRun.id,

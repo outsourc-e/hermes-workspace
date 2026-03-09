@@ -11,7 +11,9 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQueries, useQuery } from '@tanstack/react-query'
+import type React from 'react'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/toast'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -30,6 +32,10 @@ import {
   type WorkspaceCheckpoint,
 } from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
+import {
+  ACCEPTED_SPEC_FILE_TYPES,
+  readSpecFile,
+} from './lib/spec-file'
 import type {
   WorkspaceActivityEvent,
   WorkspaceMission,
@@ -39,6 +45,7 @@ import type {
 import {
   formatRelativeTime,
   formatStatus,
+  calculateExecutionWaves,
   getActivityEventDescription,
   getActivityEventTone,
   getStatusBadgeClass,
@@ -79,12 +86,15 @@ type ProjectDetailViewProps = {
   submittingKey: string | null
   onSpecDraftChange: (value: string) => void
   onSpecOpenChange: (open: boolean) => void
-  onSaveSpec: () => void
+  onSaveSpec: (value?: string) => void
   onAddPhase: (project: WorkspaceProject) => void
   onTogglePhase: (phaseId: string) => void
   onAddMission: (phase: WorkspacePhase) => void
   onOpenMissionLauncher: (phase: WorkspacePhase) => void
   onStartMission: (missionId: string) => void
+  onPauseMission: (missionId: string) => void
+  onResumeMission: (missionId: string) => void
+  onStopMission: (missionId: string) => void
   onAddTask: (mission: WorkspaceMission) => void
   onRefreshCheckpoints: () => void
   onCheckpointReview: (checkpoint: WorkspaceCheckpoint) => void
@@ -157,6 +167,9 @@ export function ProjectDetailView({
   onAddMission,
   onOpenMissionLauncher,
   onStartMission,
+  onPauseMission,
+  onResumeMission,
+  onStopMission,
   onAddTask,
   onRefreshCheckpoints,
   onCheckpointReview,
@@ -165,6 +178,7 @@ export function ProjectDetailView({
   onRefreshActivity,
 }: ProjectDetailViewProps) {
   const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
+  const specFileInputRef = useRef<HTMLInputElement | null>(null)
   const taskNameById = useMemo(() => {
     const source = projectDetail ?? selectedSummary
     if (!source) return new Map<string, string>()
@@ -228,6 +242,76 @@ export function ProjectDetailView({
   useEffect(() => {
     setExpandedRunIds({})
   }, [activeProjectId])
+
+  function isCompletedTaskStatus(status: string) {
+    return status === 'completed' || status === 'done'
+  }
+
+  function isRunningTaskStatus(status: string) {
+    return status === 'running' || status === 'active'
+  }
+
+  function getMissionExecutionWaves(tasks: WorkspaceMission['tasks']) {
+    const taskById = new Map(tasks.map((task) => [task.id, task]))
+    const taskNameById = new Map(tasks.map((task) => [task.id, task.name]))
+    const drafts = tasks.map((task) => ({
+      id: task.id,
+      name: task.name,
+      description: task.description ?? '',
+      estimated_minutes: 0,
+      depends_on: task.depends_on.map((dependencyId) => taskNameById.get(dependencyId) ?? dependencyId),
+      suggested_agent_type: null,
+    }))
+
+    return calculateExecutionWaves(drafts).map((wave) =>
+      wave.flatMap((draft) => {
+        const task = taskById.get(draft.id)
+        return task ? [task] : []
+      }),
+    )
+  }
+
+  function getWaveStatus(
+    missionStatus: WorkspaceMission['status'],
+    waves: Array<WorkspaceMission['tasks']>,
+    waveIndex: number,
+  ): 'complete' | 'running' | 'pending' {
+    const wave = waves[waveIndex] ?? []
+    if (wave.length > 0 && wave.every((task) => isCompletedTaskStatus(task.status))) {
+      return 'complete'
+    }
+
+    if (wave.some((task) => isRunningTaskStatus(task.status))) {
+      return 'running'
+    }
+
+    const firstIncompleteWaveIndex = waves.findIndex(
+      (candidate) => !candidate.every((task) => isCompletedTaskStatus(task.status)),
+    )
+    const isCurrentWave = firstIncompleteWaveIndex === waveIndex
+    if (isCurrentWave && (missionStatus === 'running' || missionStatus === 'active')) {
+      return 'running'
+    }
+
+    return 'pending'
+  }
+
+  async function handleSpecFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      const spec = await readSpecFile(file)
+      onSpecDraftChange(spec)
+      onSpecOpenChange(true)
+      onSaveSpec(spec)
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to read spec file', {
+        type: 'error',
+      })
+    }
+  }
 
   if (!selectedSummary) {
     return (
@@ -305,6 +389,11 @@ export function ProjectDetailView({
             contentClassName="border-t border-primary-200 px-4 py-4"
           >
             <div className="space-y-3">
+              {!projectSpecDraft.trim() ? (
+                <div className="rounded-xl border border-dashed border-primary-200 bg-white px-4 py-4 text-sm text-primary-500">
+                  No spec yet — add one to improve decomposition quality
+                </div>
+              ) : null}
               <textarea
                 value={projectSpecDraft}
                 onChange={(event) => onSpecDraftChange(event.target.value)}
@@ -312,14 +401,33 @@ export function ProjectDetailView({
                 className="min-h-[220px] w-full rounded-xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                 placeholder="Add the project spec, PRD, or execution brief..."
               />
-              <div className="flex justify-end">
+              <input
+                ref={specFileInputRef}
+                type="file"
+                accept={ACCEPTED_SPEC_FILE_TYPES}
+                className="hidden"
+                onChange={(event) => void handleSpecFileSelect(event)}
+              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-primary-500">Markdown supported. Upload `.md` or `.txt`.</p>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => specFileInputRef.current?.click()}
+                    disabled={submittingKey === 'project-spec'}
+                  >
+                    Upload spec file
+                  </Button>
                 <Button
-                  onClick={onSaveSpec}
+                  type="button"
+                  onClick={() => onSaveSpec()}
                   disabled={submittingKey === 'project-spec'}
                   className="bg-accent-500 text-white hover:bg-accent-400"
                 >
                   {submittingKey === 'project-spec' ? 'Saving...' : 'Save Spec'}
                 </Button>
+                </div>
               </div>
             </div>
           </CollapsiblePanel>
@@ -399,12 +507,15 @@ export function ProjectDetailView({
                         No missions in this phase yet.
                       </div>
                     ) : (
-                      phase.missions.map((mission) => (
-                        <article
-                          key={mission.id}
-                          className="rounded-xl border border-primary-200 bg-white p-4"
-                        >
-                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      phase.missions.map((mission) => {
+                        const missionWaves = getMissionExecutionWaves(mission.tasks)
+
+                        return (
+                          <article
+                            key={mission.id}
+                            className="rounded-xl border border-primary-200 bg-white p-4"
+                          >
+                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                             <div className="space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-sm font-semibold text-primary-900">
@@ -425,9 +536,9 @@ export function ProjectDetailView({
                               </p>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                              {mission.status !== 'running' &&
-                              mission.status !== 'completed' ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                              {mission.status === 'pending' ||
+                              mission.status === 'ready' ? (
                                 <Button
                                   size="sm"
                                   onClick={() => onStartMission(mission.id)}
@@ -440,6 +551,38 @@ export function ProjectDetailView({
                                     strokeWidth={1.6}
                                   />
                                   Start Mission
+                                </Button>
+                              ) : null}
+                              {mission.status === 'running' || mission.status === 'active' ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onPauseMission(mission.id)}
+                                  disabled={submittingKey === `pause:${mission.id}`}
+                                >
+                                  Pause
+                                </Button>
+                              ) : null}
+                              {mission.status === 'paused' ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => onResumeMission(mission.id)}
+                                  disabled={submittingKey === `resume:${mission.id}`}
+                                  className="bg-accent-500 text-white hover:bg-accent-400"
+                                >
+                                  Resume
+                                </Button>
+                              ) : null}
+                              {mission.status === 'running' ||
+                              mission.status === 'active' ||
+                              mission.status === 'paused' ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onStopMission(mission.id)}
+                                  disabled={submittingKey === `stop:${mission.id}`}
+                                >
+                                  Stop
                                 </Button>
                               ) : null}
                               <Button
@@ -459,46 +602,103 @@ export function ProjectDetailView({
                                 No tasks for this mission yet.
                               </div>
                             ) : (
-                              mission.tasks.map((task) => (
-                                <div
-                                  key={task.id}
-                                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 md:flex-row md:items-start md:justify-between"
-                                >
-                                  <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
+                              missionWaves.map((wave, waveIndex) => {
+                                const waveStatus = getWaveStatus(
+                                  mission.status,
+                                  missionWaves,
+                                  waveIndex,
+                                )
+
+                                return (
+                                  <section
+                                    key={`${mission.id}-wave-${waveIndex + 1}`}
+                                    className={cn(
+                                      'rounded-xl border border-primary-200 bg-primary-50/70 p-3',
+                                      waveStatus === 'running' && 'animate-shimmer',
+                                    )}
+                                  >
+                                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600">
+                                        Wave {waveIndex + 1}
+                                      </p>
                                       <span
                                         className={cn(
-                                          'mt-0.5 size-2.5 shrink-0 rounded-full',
-                                          getTaskDotClass(task.status),
+                                          'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                                          waveStatus === 'complete' &&
+                                            'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+                                          waveStatus === 'running' &&
+                                            'border-sky-500/30 bg-sky-500/10 text-sky-300',
+                                          waveStatus === 'pending' &&
+                                            'border-primary-700 bg-primary-800/70 text-primary-300',
                                         )}
-                                      />
-                                      <p className="truncate text-sm font-medium text-primary-900">
-                                        {task.name}
-                                      </p>
+                                      >
+                                        {waveStatus === 'complete'
+                                          ? '✅ complete'
+                                          : waveStatus === 'running'
+                                            ? '▶ running'
+                                            : '⏳ pending'}
+                                      </span>
                                     </div>
-                                    {task.description ? (
-                                      <p className="mt-1 whitespace-pre-wrap text-xs text-primary-500">
-                                        {task.description}
-                                      </p>
-                                    ) : null}
-                                    {task.depends_on.length > 0 ? (
-                                      <p className="mt-2 text-[11px] text-primary-500">
-                                        Depends on:{' '}
-                                        {task.depends_on
-                                          .map((dependencyId) => taskNameById.get(dependencyId) ?? dependencyId)
-                                          .join(', ')}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                  <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
-                                    {formatStatus(task.status)}
-                                  </span>
-                                </div>
-                              ))
+
+                                    <div className="space-y-2">
+                                      {wave.map((task) => (
+                                        <div
+                                          key={task.id}
+                                          className={cn(
+                                            'flex flex-col gap-2 rounded-xl border border-primary-200 bg-white px-3 py-3 md:flex-row md:items-start md:justify-between',
+                                            waveStatus === 'running' && 'bg-white/90',
+                                          )}
+                                        >
+                                          <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              {isCompletedTaskStatus(task.status) ? (
+                                                <HugeiconsIcon
+                                                  icon={CheckmarkCircle02Icon}
+                                                  size={16}
+                                                  strokeWidth={1.7}
+                                                  className="shrink-0 text-emerald-400"
+                                                />
+                                              ) : (
+                                                <span
+                                                  className={cn(
+                                                    'mt-0.5 size-2.5 shrink-0 rounded-full',
+                                                    getTaskDotClass(task.status),
+                                                    waveStatus === 'running' && 'animate-pulse',
+                                                  )}
+                                                />
+                                              )}
+                                              <p className="truncate text-sm font-medium text-primary-900">
+                                                {task.name}
+                                              </p>
+                                            </div>
+                                            {task.description ? (
+                                              <p className="mt-1 whitespace-pre-wrap text-xs text-primary-500">
+                                                {task.description}
+                                              </p>
+                                            ) : null}
+                                            {task.depends_on.length > 0 ? (
+                                              <p className="mt-2 text-[11px] text-primary-500">
+                                                Depends on:{' '}
+                                                {task.depends_on
+                                                  .map((dependencyId) => taskNameById.get(dependencyId) ?? dependencyId)
+                                                  .join(', ')}
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
+                                            {formatStatus(task.status)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </section>
+                                )
+                              })
                             )}
                           </div>
-                        </article>
-                      ))
+                          </article>
+                        )
+                      })
                     )}
                   </div>
                 ) : null}

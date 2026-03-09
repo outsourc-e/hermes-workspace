@@ -797,16 +797,74 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     }
   }
 
-  async function handleSaveProjectSpec() {
+  async function handlePauseMission(missionId: string) {
+    setSubmittingKey(`pause:${missionId}`)
+    try {
+      await apiRequest(`/api/workspace/missions/${missionId}/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      toast('Mission paused', { type: 'success' })
+      triggerRefresh()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to pause mission', {
+        type: 'error',
+      })
+    } finally {
+      setSubmittingKey(null)
+    }
+  }
+
+  async function handleResumeMission(missionId: string) {
+    setSubmittingKey(`resume:${missionId}`)
+    try {
+      await apiRequest(`/api/workspace/missions/${missionId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      toast('Mission resumed', { type: 'success' })
+      triggerRefresh()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to resume mission', {
+        type: 'error',
+      })
+    } finally {
+      setSubmittingKey(null)
+    }
+  }
+
+  async function handleStopMission(missionId: string) {
+    setSubmittingKey(`stop:${missionId}`)
+    try {
+      await apiRequest(`/api/workspace/missions/${missionId}/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      toast('Mission stopped', { type: 'success' })
+      triggerRefresh()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to stop mission', {
+        type: 'error',
+      })
+    } finally {
+      setSubmittingKey(null)
+    }
+  }
+
+  async function handleSaveProjectSpec(nextSpec?: string) {
     const activeProject = projectDetail ?? selectedSummary
     if (!activeProject) return
+    const specValue = typeof nextSpec === 'string' ? nextSpec : projectSpecDraft
     setSubmittingKey('project-spec')
     try {
       const updatedProject = extractProject(
         await apiRequest(`/api/workspace/projects/${encodeURIComponent(activeProject.id)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ spec: projectSpecDraft.trim() ? projectSpecDraft : null }),
+          body: JSON.stringify({ spec: specValue.trim() ? specValue : null }),
         }),
       )
       if (updatedProject) {
@@ -957,7 +1015,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
                 submittingKey={submittingKey}
                 onSpecDraftChange={setProjectSpecDraft}
                 onSpecOpenChange={setProjectSpecOpen}
-                onSaveSpec={() => void handleSaveProjectSpec()}
+                onSaveSpec={(value) => void handleSaveProjectSpec(value)}
                 onAddPhase={setPhaseProject}
                 onTogglePhase={(phaseId) =>
                   setExpandedPhases((current) => ({ ...current, [phaseId]: !current[phaseId] }))
@@ -965,6 +1023,9 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
                 onAddMission={setMissionPhase}
                 onOpenMissionLauncher={openMissionLauncher}
                 onStartMission={(missionId) => void handleStartMission(missionId)}
+                onPauseMission={(missionId) => void handlePauseMission(missionId)}
+                onResumeMission={(missionId) => void handleResumeMission(missionId)}
+                onStopMission={(missionId) => void handleStopMission(missionId)}
                 onAddTask={setTaskMission}
                 onRefreshCheckpoints={() => void checkpointsQuery.refetch()}
                 onCheckpointReview={focusCheckpointReview}

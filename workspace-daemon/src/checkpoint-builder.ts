@@ -26,6 +26,28 @@ async function tryGitExec(args: string[], cwd: string): Promise<string> {
   }
 }
 
+function notifyCheckpointReady(taskName: string, projectName: string, taskRunId: string): void {
+  try {
+    const child = execFile(
+      "openclaw",
+      [
+        "system",
+        "event",
+        "--text",
+        `Checkpoint ready for review: ${taskName} (${projectName}). Run ID: ${taskRunId}. Open ClawSuite → Review Queue.`,
+        "--mode",
+        "now",
+      ],
+      () => {
+        // Best-effort notification only.
+      },
+    );
+    child.unref();
+  } catch {
+    // Notification failures must not break checkpoint creation.
+  }
+}
+
 async function attachVerification(
   tracker: Tracker,
   checkpoint: Checkpoint,
@@ -42,6 +64,7 @@ async function attachVerification(
 export async function buildCheckpoint(
   workspacePath: string,
   projectPath: string | null,
+  projectName: string,
   taskId: string,
   taskName: string,
   taskRunId: string,
@@ -53,6 +76,8 @@ export async function buildCheckpoint(
     const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);
     if (autoApprove) {
       tracker.approveCheckpoint(verifiedCheckpoint.id);
+    } else {
+      notifyCheckpointReady(taskName, projectName, taskRunId);
     }
     return tracker.getCheckpoint(verifiedCheckpoint.id) ?? verifiedCheckpoint;
   }
@@ -72,6 +97,8 @@ export async function buildCheckpoint(
     const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);
     if (autoApprove) {
       tracker.approveCheckpoint(verifiedCheckpoint.id);
+    } else {
+      notifyCheckpointReady(taskName, projectName, taskRunId);
     }
     return tracker.getCheckpoint(verifiedCheckpoint.id) ?? verifiedCheckpoint;
   }
@@ -97,6 +124,7 @@ export async function buildCheckpoint(
   } else {
     const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, null, null);
     const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);
+    notifyCheckpointReady(taskName, projectName, taskRunId);
     // Unstage so reviewer can inspect before approval
     await gitExec(["reset", "HEAD"], workspacePath);
     return tracker.getCheckpoint(verifiedCheckpoint.id) ?? verifiedCheckpoint;
