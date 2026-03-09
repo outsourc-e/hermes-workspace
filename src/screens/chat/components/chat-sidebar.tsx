@@ -613,6 +613,10 @@ function ChatSidebarComponent({
     'openclaw-sidebar-suite-expanded',
     true,
   )
+  const [workspaceExpanded, toggleWorkspace] = usePersistedBool(
+    'openclaw-sidebar-workspace-expanded',
+    true,
+  )
   const [systemExpanded, toggleSystem] = usePersistedBool(
     'openclaw-sidebar-system-expanded',
     false,
@@ -795,27 +799,6 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/projects',
-      icon: Folder01Icon,
-      label: 'Projects',
-      active: isProjectsActive,
-    },
-    {
-      kind: 'link',
-      to: '/review',
-      icon: CheckmarkCircle02Icon,
-      label: 'Review Queue',
-      active: isReviewActive,
-    },
-    {
-      kind: 'link',
-      to: '/runs',
-      icon: PlayCircleIcon,
-      label: 'Runs',
-      active: isRunsActive,
-    },
-    {
-      kind: 'link',
       to: '/browser',
       icon: GlobeIcon,
       label: 'Browser',
@@ -886,6 +869,44 @@ function ChatSidebarComponent({
       icon: ChartLineData02Icon,
       label: 'Cost & Usage',
       active: isCostsActive,
+    },
+  ]
+
+  const workspaceItems: NavItemDef[] = [
+    {
+      kind: 'link',
+      to: '/projects',
+      icon: Folder01Icon,
+      label: 'Projects',
+      active: isProjectsActive,
+    },
+    {
+      kind: 'link',
+      to: '/review',
+      icon: CheckmarkCircle02Icon,
+      label: 'Review Queue',
+      active: isReviewActive,
+    },
+    {
+      kind: 'link',
+      to: '/runs',
+      icon: PlayCircleIcon,
+      label: 'Runs / Console',
+      active: isRunsActive,
+    },
+    {
+      kind: 'link',
+      to: '/agents',
+      icon: UserGroupIcon,
+      label: 'Agents',
+      active: isAgentsActive,
+    },
+    {
+      kind: 'link',
+      to: '/skills',
+      icon: PuzzleIcon,
+      label: 'Skills & Memory',
+      active: isSkillsActive,
     },
   ]
 
@@ -1123,6 +1144,23 @@ function ChatSidebarComponent({
               />
             </>
           )}
+
+          {/* WORKSPACE */}
+          <SectionLabel
+            label="Workspace"
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            collapsible
+            expanded={workspaceExpanded}
+            onToggle={toggleWorkspace}
+          />
+          <CollapsibleSection
+            expanded={workspaceExpanded || isCollapsed}
+            items={workspaceItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
 
           {/* GATEWAY */}
           <SectionLabel
