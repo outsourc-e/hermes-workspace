@@ -592,6 +592,82 @@ export class Tracker extends EventEmitter {
     return (this.db.prepare("SELECT * FROM checkpoints WHERE id = ?").get(id) as Checkpoint | undefined) ?? null;
   }
 
+  getCheckpointDetail(id: string): (Checkpoint & {
+    task_id: string | null;
+    task_name: string | null;
+    mission_name: string | null;
+    project_name: string | null;
+    project_id: string | null;
+    project_path: string | null;
+    agent_name: string | null;
+    agent_model: string | null;
+    agent_adapter_type: string | null;
+    task_run_status: string | null;
+    task_run_attempt: number | null;
+    task_run_workspace_path: string | null;
+    task_run_started_at: string | null;
+    task_run_completed_at: string | null;
+    task_run_error: string | null;
+    task_run_input_tokens: number | null;
+    task_run_output_tokens: number | null;
+    task_run_cost_cents: number | null;
+  }) | null {
+    return (
+      (this.db
+        .prepare(
+          `SELECT c.*,
+            t.id AS task_id,
+            t.name AS task_name,
+            m.name AS mission_name,
+            p.id AS project_id,
+            p.name AS project_name,
+            p.path AS project_path,
+            a.name AS agent_name,
+            a.model AS agent_model,
+            a.adapter_type AS agent_adapter_type,
+            tr.status AS task_run_status,
+            tr.attempt AS task_run_attempt,
+            tr.workspace_path AS task_run_workspace_path,
+            tr.started_at AS task_run_started_at,
+            tr.completed_at AS task_run_completed_at,
+            tr.error AS task_run_error,
+            tr.input_tokens AS task_run_input_tokens,
+            tr.output_tokens AS task_run_output_tokens,
+            tr.cost_cents AS task_run_cost_cents
+           FROM checkpoints c
+           LEFT JOIN task_runs tr ON c.task_run_id = tr.id
+           LEFT JOIN tasks t ON tr.task_id = t.id
+           LEFT JOIN missions m ON t.mission_id = m.id
+           LEFT JOIN phases ph ON m.phase_id = ph.id
+           LEFT JOIN projects p ON ph.project_id = p.id
+           LEFT JOIN agents a ON tr.agent_id = a.id
+           WHERE c.id = ?`,
+        )
+        .get(id) as
+        | (Checkpoint & {
+            task_id: string | null;
+            task_name: string | null;
+            mission_name: string | null;
+            project_name: string | null;
+            project_id: string | null;
+            project_path: string | null;
+            agent_name: string | null;
+            agent_model: string | null;
+            agent_adapter_type: string | null;
+            task_run_status: string | null;
+            task_run_attempt: number | null;
+            task_run_workspace_path: string | null;
+            task_run_started_at: string | null;
+            task_run_completed_at: string | null;
+            task_run_error: string | null;
+            task_run_input_tokens: number | null;
+            task_run_output_tokens: number | null;
+            task_run_cost_cents: number | null;
+          })
+        | undefined) ?? null
+    );
+  }
+
   listCheckpoints(status?: string): Array<Checkpoint & { task_name?: string; mission_name?: string; project_name?: string; agent_name?: string }> {
     const query = `
       SELECT c.*,

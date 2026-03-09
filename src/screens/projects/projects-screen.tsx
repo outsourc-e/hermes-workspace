@@ -6,15 +6,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import {
+  type CheckpointReviewAction,
+  getCheckpointReviewSuccessMessage,
   listWorkspaceCheckpoints,
   matchesCheckpointProject,
   sortCheckpointsNewestFirst,
   submitCheckpointReview,
+  type WorkspaceCheckpoint,
 } from '@/lib/workspace-checkpoints'
 import { DashboardAgentCapacity } from './dashboard-agent-capacity'
 import { DashboardKpiBar } from './dashboard-kpi-bar'
 import { DashboardProjectCards } from './dashboard-project-cards'
 import { DashboardReviewInbox } from './dashboard-review-inbox'
+import { CheckpointDetailModal } from './checkpoint-detail-modal'
 import {
   CreateProjectDialog,
   WorkspaceEntityDialog,
@@ -123,6 +127,10 @@ export function ProjectsScreen() {
   const [batchApproving, setBatchApproving] = useState(false)
   const [expandedDecomposeDescriptions, setExpandedDecomposeDescriptions] =
     useState<Record<string, boolean>>({})
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<WorkspaceCheckpoint | null>(null)
+  const [pendingReviewCheckpoint, setPendingReviewCheckpoint] = useState<WorkspaceCheckpoint | null>(
+    null,
+  )
   const queryClient = useQueryClient()
   const detailSectionRef = useRef<HTMLElement | null>(null)
 
@@ -301,14 +309,15 @@ export function ProjectsScreen() {
     mutationFn: ({
       checkpointId,
       action,
+      reviewerNotes,
     }: {
       checkpointId: string
-      action: 'approve' | 'reject'
-    }) => submitCheckpointReview(checkpointId, action),
+      action: CheckpointReviewAction
+      reviewerNotes?: string
+    }) => submitCheckpointReview(checkpointId, action, reviewerNotes),
     onSuccess: (_checkpoint, variables) => {
-      toast(variables.action === 'approve' ? 'Checkpoint approved' : 'Checkpoint rejected', {
-        type: 'success',
-      })
+      toast(getCheckpointReviewSuccessMessage(variables.action), { type: 'success' })
+      setSelectedCheckpoint(null)
       void queryClient.invalidateQueries({ queryKey: ['workspace'] })
       triggerRefresh()
     },
@@ -379,6 +388,12 @@ export function ProjectsScreen() {
     () => projectCheckpoints.filter((checkpoint) => checkpoint.status === 'pending'),
     [projectCheckpoints],
   )
+  const selectedCheckpointProject = useMemo(() => {
+    if (!selectedCheckpoint) return null
+    return (
+      projects.find((project) => project.name === selectedCheckpoint.project_name) ?? null
+    )
+  }, [projects, selectedCheckpoint])
   const missionLaunchMinutes = useMemo(
     () => missionLauncher?.tasks.reduce((total, task) => total + task.estimated_minutes, 0) ?? 0,
     [missionLauncher],
@@ -504,10 +519,26 @@ export function ProjectsScreen() {
     })
   }
 
-  function focusProjectByName(projectName?: string) {
-    const project = projects.find((item) => item.name === projectName)
-    if (project) focusProject(project.id)
+  function focusCheckpointReview(checkpoint: WorkspaceCheckpoint) {
+    setSelectedCheckpoint(checkpoint)
+    const project = projects.find((item) => item.name === checkpoint.project_name)
+    if (project && project.id !== selectedProjectId) {
+      setPendingReviewCheckpoint(checkpoint)
+      setSelectedProjectId(project.id)
+      window.requestAnimationFrame(() => {
+        detailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+      return
+    }
+    setPendingReviewCheckpoint(null)
   }
+
+  useEffect(() => {
+    if (!pendingReviewCheckpoint || !projectDetail) return
+    if (projectDetail.name !== pendingReviewCheckpoint.project_name) return
+    setSelectedCheckpoint(pendingReviewCheckpoint)
+    setPendingReviewCheckpoint(null)
+  }, [pendingReviewCheckpoint, projectDetail])
 
   function openMissionLauncher(phase: WorkspacePhase) {
     setMissionLauncher({ phase, goal: '', step: 'input', tasks: [] })
@@ -598,7 +629,7 @@ export function ProjectsScreen() {
     setBatchApproving(true)
     try {
       for (const checkpoint of verifiedReviewItems) {
-        await submitCheckpointReview(checkpoint.id, 'approve')
+        await submitCheckpointReview(checkpoint.id, 'approve-and-commit')
       }
       toast(
         `Approved ${verifiedReviewItems.length} verified checkpoint${verifiedReviewItems.length === 1 ? '' : 's'}`,
@@ -873,9 +904,12 @@ export function ProjectsScreen() {
                 onRiskFilterChange={setReviewRiskFilter}
                 onApproveVerified={() => void handleApproveVerified()}
                 onApprove={(checkpointId) =>
-                  projectCheckpointMutation.mutate({ checkpointId, action: 'approve' })
+                  projectCheckpointMutation.mutate({
+                    checkpointId,
+                    action: 'approve-and-commit',
+                  })
                 }
-                onReview={focusProjectByName}
+                onReview={focusCheckpointReview}
               />
 
               <DashboardAgentCapacity
@@ -917,8 +951,12 @@ export function ProjectsScreen() {
                 onStartMission={(missionId) => void handleStartMission(missionId)}
                 onAddTask={setTaskMission}
                 onRefreshCheckpoints={() => void checkpointsQuery.refetch()}
+                onCheckpointReview={focusCheckpointReview}
                 onCheckpointApprove={(checkpointId) =>
-                  projectCheckpointMutation.mutate({ checkpointId, action: 'approve' })
+                  projectCheckpointMutation.mutate({
+                    checkpointId,
+                    action: 'approve-and-commit',
+                  })
                 }
                 onCheckpointReject={(checkpointId) =>
                   projectCheckpointMutation.mutate({ checkpointId, action: 'reject' })
@@ -929,6 +967,39 @@ export function ProjectsScreen() {
           </>
         )}
       </section>
+
+      {selectedCheckpoint ? (
+        <CheckpointDetailModal
+          checkpoint={selectedCheckpoint}
+          project={selectedCheckpointProject}
+          projectDetail={projectDetail}
+          open={selectedCheckpoint !== null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedCheckpoint(null)
+          }}
+          onApprove={(checkpointId, notes, mode) =>
+            projectCheckpointMutation.mutateAsync({
+              checkpointId,
+              action: mode ?? 'approve-and-commit',
+              reviewerNotes: notes,
+            }).then(() => undefined)
+          }
+          onRevise={(checkpointId, notes) =>
+            projectCheckpointMutation.mutateAsync({
+              checkpointId,
+              action: 'revise',
+              reviewerNotes: notes,
+            }).then(() => undefined)
+          }
+          onReject={(checkpointId, notes) =>
+            projectCheckpointMutation.mutateAsync({
+              checkpointId,
+              action: 'reject',
+              reviewerNotes: notes,
+            }).then(() => undefined)
+          }
+        />
+      ) : null}
 
       <CreateProjectDialog
         open={projectDialogOpen}

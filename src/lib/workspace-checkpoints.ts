@@ -7,7 +7,13 @@ export type CheckpointStatus =
   | 'revised'
   | string
 
-export type CheckpointReviewAction = 'approve' | 'reject' | 'revise'
+export type CheckpointReviewAction =
+  | 'approve'
+  | 'approve-and-commit'
+  | 'approve-and-pr'
+  | 'approve-and-merge'
+  | 'reject'
+  | 'revise'
 
 export type WorkspaceCheckpoint = {
   id: string
@@ -22,6 +28,47 @@ export type WorkspaceCheckpoint = {
   mission_name: string | null
   project_name: string | null
   agent_name: string | null
+}
+
+export type WorkspaceCheckpointRunEvent = {
+  id: number
+  type: string
+  created_at: string
+  text: string
+  data: Record<string, unknown> | null
+}
+
+export type WorkspaceCheckpointDiffFile = {
+  path: string
+  additions: number | null
+  deletions: number | null
+  patch: string
+}
+
+export type WorkspaceCheckpointDetail = WorkspaceCheckpoint & {
+  task_id: string | null
+  project_id: string | null
+  project_path: string | null
+  agent_model: string | null
+  agent_adapter_type: string | null
+  task_run_status: string | null
+  task_run_attempt: number | null
+  task_run_workspace_path: string | null
+  task_run_started_at: string | null
+  task_run_completed_at: string | null
+  task_run_error: string | null
+  task_run_input_tokens: number | null
+  task_run_output_tokens: number | null
+  task_run_cost_cents: number | null
+  run_events: WorkspaceCheckpointRunEvent[]
+  diff_files: WorkspaceCheckpointDiffFile[]
+}
+
+export type WorkspaceCheckpointVerificationItem = {
+  status: 'passed' | 'failed' | 'missing' | 'not_configured'
+  label: string
+  output: string | null
+  checked_at: string | null
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -88,6 +135,20 @@ function normalizeCheckpoint(value: unknown): WorkspaceCheckpoint {
   }
 }
 
+function normalizeRunEvent(value: unknown): WorkspaceCheckpointRunEvent {
+  const record = asRecord(value)
+  return {
+    id:
+      typeof record?.id === 'number'
+        ? record.id
+        : Number.parseInt(asString(record?.id) ?? '0', 10) || 0,
+    type: asString(record?.type) ?? 'status',
+    created_at: asString(record?.created_at) ?? new Date().toISOString(),
+    text: asString(record?.text) ?? '',
+    data: asRecord(record?.data),
+  }
+}
+
 export function extractCheckpoints(
   payload: unknown,
 ): Array<WorkspaceCheckpoint> {
@@ -123,10 +184,8 @@ export async function submitCheckpointReview(
   action: CheckpointReviewAction,
   reviewerNotes?: string,
 ): Promise<WorkspaceCheckpoint> {
-  const actionPath =
-    action === 'approve' ? 'approve-and-merge' : action
   const payload = await workspaceRequestJson(
-    `/api/workspace/checkpoints/${encodeURIComponent(id)}/${actionPath}`,
+    `/api/workspace/checkpoints/${encodeURIComponent(id)}/${action}`,
     {
       method: 'POST',
       headers: {
@@ -145,6 +204,173 @@ export async function submitCheckpointReview(
     throw new Error('Checkpoint response was empty')
   }
   return checkpoint
+}
+
+export async function getWorkspaceCheckpointDetail(
+  id: string,
+): Promise<WorkspaceCheckpointDetail> {
+  const payload = await workspaceRequestJson(
+    `/api/workspace/checkpoints/${encodeURIComponent(id)}`,
+  )
+  const record = asRecord(payload)
+  if (!record) {
+    throw new Error('Checkpoint detail response was empty')
+  }
+
+  const detailRecord = asRecord(record.checkpoint) ?? record
+  const parsedDiffStat = asRecord(record.parsed_diff_stat)
+  const fileDiffs = Array.isArray(record.file_diffs)
+    ? record.file_diffs.map((entry) => {
+        const item = asRecord(entry)
+        return {
+          path: asString(item?.path) ?? 'unknown',
+          patch:
+            typeof item?.diff === 'string'
+              ? item.diff
+              : asString(item?.patch) ?? '',
+        }
+      })
+    : Array.isArray(detailRecord.diff_files)
+      ? detailRecord.diff_files.map((entry) => {
+          const item = asRecord(entry)
+          return {
+            path: asString(item?.path) ?? 'unknown',
+            patch: asString(item?.patch) ?? '',
+          }
+        })
+      : []
+
+  const rawDiffStat = typeof parsedDiffStat?.raw === 'string' ? parsedDiffStat.raw : ''
+  const checkpoint = normalizeCheckpoint(detailRecord)
+  return {
+    ...checkpoint,
+    task_id: asString(detailRecord.task_id) ?? null,
+    project_id: asString(detailRecord.project_id) ?? null,
+    project_path: asString(detailRecord.project_path) ?? null,
+    agent_model: asString(detailRecord.agent_model) ?? null,
+    agent_adapter_type: asString(detailRecord.agent_adapter_type) ?? null,
+    task_run_status: asString(detailRecord.task_run_status) ?? null,
+    task_run_attempt:
+      typeof detailRecord.task_run_attempt === 'number'
+        ? detailRecord.task_run_attempt
+        : null,
+    task_run_workspace_path: asString(detailRecord.task_run_workspace_path) ?? null,
+    task_run_started_at: asString(detailRecord.task_run_started_at) ?? null,
+    task_run_completed_at: asString(detailRecord.task_run_completed_at) ?? null,
+    task_run_error: asString(detailRecord.task_run_error) ?? null,
+    task_run_input_tokens:
+      typeof detailRecord.task_run_input_tokens === 'number'
+        ? detailRecord.task_run_input_tokens
+        : null,
+    task_run_output_tokens:
+      typeof detailRecord.task_run_output_tokens === 'number'
+        ? detailRecord.task_run_output_tokens
+        : null,
+    task_run_cost_cents:
+      typeof detailRecord.task_run_cost_cents === 'number'
+        ? detailRecord.task_run_cost_cents
+        : null,
+    run_events: Array.isArray(record.run_events)
+      ? record.run_events.map(normalizeRunEvent)
+      : Array.isArray(detailRecord.run_events)
+        ? detailRecord.run_events.map(normalizeRunEvent)
+        : [],
+    diff_files: fileDiffs.map((file) => {
+      const totals = parseDiffLineTotals(rawDiffStat, file.path)
+      return {
+        path: file.path,
+        additions: totals?.additions ?? null,
+        deletions: totals?.deletions ?? null,
+        patch: file.patch,
+      }
+    }),
+  }
+}
+
+function parseDiffLineTotals(
+  raw: string,
+  filePath: string,
+): { additions: number; deletions: number } | null {
+  const line = raw
+    .split('\n')
+    .map((entry) => entry.trimEnd())
+    .find((entry) => entry.trimStart().startsWith(filePath) || entry.includes(` ${filePath} `))
+
+  if (!line) return null
+  const match = line.match(/^(.*?)\s+\|\s+(\d+)\s+([+\-]+)$/)
+  if (!match) return null
+  const markers = match[3] ?? ''
+  return {
+    additions: markers.split('').filter((value) => value === '+').length,
+    deletions: markers.split('').filter((value) => value === '-').length,
+  }
+}
+
+export async function runCheckpointTypecheck(id: string): Promise<{
+  ok: boolean
+  command: string
+  cwd: string
+  stdout: string
+  stderr: string
+  exitCode: number | null
+}> {
+  const payload = await workspaceRequestJson(
+    `/api/workspace/checkpoints/${encodeURIComponent(id)}/verify-tsc`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    },
+  )
+
+  const record = asRecord(payload)
+  if (!record) {
+    throw new Error('Verification response was empty')
+  }
+
+  return {
+    ok: Boolean(record.ok),
+    command: asString(record.command) ?? 'npx tsc --noEmit',
+    cwd: asString(record.cwd) ?? '',
+    stdout: asString(record.stdout) ?? '',
+    stderr: asString(record.stderr) ?? '',
+    exitCode: typeof record.exitCode === 'number' ? record.exitCode : null,
+  }
+}
+
+export async function runWorkspaceCheckpointTsc(
+  id: string,
+): Promise<WorkspaceCheckpointVerificationItem> {
+  const payload = await workspaceRequestJson(
+    `/api/workspace/checkpoints/${encodeURIComponent(id)}/verify-tsc`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    },
+  )
+  const record = asRecord(payload)
+  if (!record) {
+    throw new Error('Verification response was empty')
+  }
+
+  const status = asString(record.status)
+  return {
+    status:
+      status === 'passed' ||
+      status === 'failed' ||
+      status === 'missing' ||
+      status === 'not_configured'
+        ? status
+        : 'missing',
+    label: asString(record.label) ?? 'Unknown',
+    output: typeof record.output === 'string' ? record.output : null,
+    checked_at: asString(record.checked_at) ?? null,
+  }
 }
 
 export function formatCheckpointStatus(status: CheckpointStatus): string {
@@ -200,11 +426,41 @@ export function matchesCheckpointProject(
   return checkpoint.project_name === projectName
 }
 
-export function getCheckpointSummary(checkpoint: WorkspaceCheckpoint): string {
+export function getCheckpointSummary(checkpoint: WorkspaceCheckpoint, maxLength = 200): string {
+  const raw = checkpoint.summary?.trim() || 'No checkpoint summary provided.'
+  if (raw.length <= maxLength) return raw
+  return raw.slice(0, maxLength).trimEnd() + '…'
+}
+
+export function getCheckpointFullSummary(checkpoint: WorkspaceCheckpoint): string {
   return checkpoint.summary?.trim() || 'No checkpoint summary provided.'
 }
 
+export interface ParsedDiffStat {
+  raw: string
+  changedFiles: string[]
+  filesChanged: number
+}
+
+export function getCheckpointDiffStatParsed(checkpoint: WorkspaceCheckpoint): ParsedDiffStat | null {
+  if (!checkpoint.diff_stat) return null
+  try {
+    const parsed = JSON.parse(checkpoint.diff_stat) as Record<string, unknown>
+    return {
+      raw: typeof parsed.raw === 'string' ? parsed.raw : '',
+      changedFiles: Array.isArray(parsed.changed_files) ? (parsed.changed_files as string[]) : [],
+      filesChanged: typeof parsed.files_changed === 'number' ? parsed.files_changed : 0,
+    }
+  } catch {
+    return null
+  }
+}
+
 export function getCheckpointDiffStat(checkpoint: WorkspaceCheckpoint): string {
+  const parsed = getCheckpointDiffStatParsed(checkpoint)
+  if (parsed && parsed.filesChanged > 0) {
+    return `${parsed.filesChanged} file${parsed.filesChanged === 1 ? '' : 's'} changed`
+  }
   return checkpoint.diff_stat?.trim() || 'No diff stat reported'
 }
 
@@ -219,6 +475,9 @@ export function getCheckpointReviewSuccessMessage(
   action: CheckpointReviewAction,
 ): string {
   if (action === 'approve') return 'Checkpoint approved'
+  if (action === 'approve-and-commit') return 'Checkpoint approved and committed'
+  if (action === 'approve-and-pr') return 'Checkpoint approved and PR opened'
+  if (action === 'approve-and-merge') return 'Checkpoint approved and merged'
   if (action === 'revise') return 'Checkpoint sent back for revision'
   return 'Checkpoint rejected'
 }

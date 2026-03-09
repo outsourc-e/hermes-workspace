@@ -69,6 +69,7 @@ type ProjectDetailViewProps = {
   onStartMission: (missionId: string) => void
   onAddTask: (mission: WorkspaceMission) => void
   onRefreshCheckpoints: () => void
+  onCheckpointReview: (checkpoint: WorkspaceCheckpoint) => void
   onCheckpointApprove: (checkpointId: string) => void
   onCheckpointReject: (checkpointId: string) => void
   onRefreshActivity: () => void
@@ -100,6 +101,7 @@ export function ProjectDetailView({
   onStartMission,
   onAddTask,
   onRefreshCheckpoints,
+  onCheckpointReview,
   onCheckpointApprove,
   onCheckpointReject,
   onRefreshActivity,
@@ -466,6 +468,14 @@ export function ProjectDetailView({
 
                     {isCheckpointReviewable(checkpoint) ? (
                       <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onCheckpointReview(checkpoint)}
+                          disabled={checkpointActionPending}
+                        >
+                          Review
+                        </Button>
                         <button
                           type="button"
                           onClick={() => onCheckpointApprove(checkpoint.id)}

@@ -39,7 +39,7 @@ type DashboardReviewInboxProps = {
   onRiskFilterChange: (value: ReviewRiskFilter) => void
   onApproveVerified: () => void
   onApprove: (checkpointId: string) => void
-  onReview: (projectName?: string) => void
+  onReview: (checkpoint: WorkspaceCheckpoint) => void
 }
 
 export function DashboardReviewInbox({
@@ -217,7 +217,7 @@ export function DashboardReviewInbox({
                     >
                       Approve
                     </Button>
-                    <Button variant="outline" onClick={() => onReview(checkpoint.project_name ?? undefined)}>
+                    <Button variant="outline" onClick={() => onReview(checkpoint)}>
                       Review
                     </Button>
                     <span className="min-w-10 text-right text-xs text-primary-500">
