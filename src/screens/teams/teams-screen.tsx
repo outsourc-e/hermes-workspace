@@ -54,17 +54,17 @@ const APPROVAL_TIERS: ApprovalTier[] = [
   {
     label: 'Low risk',
     summary: 'Auto-approve',
-    toneClassName: 'border-green-400/25 bg-green-400/10 text-green-300',
+    toneClassName: 'border-green-200 bg-green-50 text-green-700',
   },
   {
     label: 'Medium',
     summary: '1 reviewer',
-    toneClassName: 'border-amber-400/25 bg-amber-400/10 text-amber-300',
+    toneClassName: 'border-amber-200 bg-amber-50 text-amber-700',
   },
   {
     label: 'High',
     summary: 'Admin required',
-    toneClassName: 'border-red-400/25 bg-red-400/10 text-red-300',
+    toneClassName: 'border-red-200 bg-red-50 text-red-700',
   },
 ]
 
@@ -334,7 +334,7 @@ export function TeamsScreen() {
 
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
-      <section className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      <section className="mx-auto flex w-full max-w-[1480px] flex-col gap-5">
         <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-4 shadow-sm md:px-5">
           <h1 className="text-xl font-bold text-primary-900 md:text-2xl">
             Teams &amp; Roles
