@@ -206,7 +206,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   return (
     <div className="flex flex-col bg-primary-950 text-primary-100">
       <div className="sticky top-0 z-20 border-b border-primary-800 bg-primary-950/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
             {TAB_ORDER.map((tab) => {
               const active = tab === activeTab
