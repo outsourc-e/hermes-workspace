@@ -110,9 +110,11 @@ function ReviewRow({
   checkpoint,
   composer,
   notes,
+  isHighlighted,
   onApprove,
   onOpenDetail,
   onQuickPreview,
+  onHighlight,
   onOpenComposer,
   onCancelComposer,
   onNotesChange,
@@ -122,9 +124,11 @@ function ReviewRow({
   checkpoint: WorkspaceCheckpoint
   composer: ReviewComposerState | null
   notes: string
+  isHighlighted: boolean
   onApprove: (checkpointId: string) => void
   onOpenDetail: (checkpoint: WorkspaceCheckpoint) => void
   onQuickPreview: (checkpoint: WorkspaceCheckpoint) => void
+  onHighlight: (checkpoint: WorkspaceCheckpoint) => void
   onOpenComposer: (
     checkpointId: string,
     action: Extract<CheckpointReviewAction, 'revise' | 'reject'>,
@@ -155,8 +159,14 @@ function ReviewRow({
 
   return (
     <article
-      className="cursor-pointer rounded-xl border border-primary-200 bg-white p-3 shadow-sm transition-colors hover:border-primary-300"
+      className={cn(
+        'cursor-pointer rounded-xl border bg-white p-3 shadow-sm transition-colors hover:border-primary-300',
+        isHighlighted
+          ? 'border-accent-500/60 ring-1 ring-accent-500/30'
+          : 'border-primary-200',
+      )}
       onClick={handleOpen}
+      onMouseEnter={() => onHighlight(checkpoint)}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 space-y-3">
@@ -364,6 +374,7 @@ export function ReviewQueueScreen() {
   const [page, setPage] = useState(1)
   const [composer, setComposer] = useState<ReviewComposerState | null>(null)
   const [reviewerNotes, setReviewerNotes] = useState('')
+  const [highlightedCheckpointId, setHighlightedCheckpointId] = useState<string | null>(null)
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<WorkspaceCheckpoint | null>(null)
   const queryClient = useQueryClient()
 
@@ -467,6 +478,35 @@ export function ReviewQueueScreen() {
     setPage(1)
   }, [statusFilter, projectFilter])
 
+  useEffect(() => {
+    if (visibleCheckpoints.length === 0) {
+      setHighlightedCheckpointId(null)
+      return
+    }
+
+    const hasHighlightedCheckpoint = visibleCheckpoints.some(
+      (checkpoint) => checkpoint.id === highlightedCheckpointId,
+    )
+
+    if (!hasHighlightedCheckpoint) {
+      setHighlightedCheckpointId(visibleCheckpoints[0]?.id ?? null)
+    }
+  }, [highlightedCheckpointId, visibleCheckpoints])
+
+  useEffect(() => {
+    if (!highlightedCheckpointId) return
+
+    const highlightedIndex = visibleCheckpoints.findIndex(
+      (checkpoint) => checkpoint.id === highlightedCheckpointId,
+    )
+    if (highlightedIndex === -1) return
+
+    const nextPage = Math.floor(highlightedIndex / PAGE_SIZE) + 1
+    if (nextPage !== page) {
+      setPage(nextPage)
+    }
+  }, [highlightedCheckpointId, page, visibleCheckpoints])
+
   function handleApprove(checkpointId: string) {
     reviewMutation.mutate({
       checkpointId,
@@ -501,6 +541,70 @@ export function ReviewQueueScreen() {
       },
     })
   }
+
+  useEffect(() => {
+    function isTypingTarget(target: EventTarget | null) {
+      if (!(target instanceof HTMLElement)) return false
+      const tagName = target.tagName.toLowerCase()
+      return (
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select' ||
+        target.isContentEditable
+      )
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (isTypingTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (visibleCheckpoints.length === 0) return
+
+      const highlightedIndex = visibleCheckpoints.findIndex(
+        (checkpoint) => checkpoint.id === highlightedCheckpointId,
+      )
+      const currentIndex = highlightedIndex === -1 ? 0 : highlightedIndex
+      const currentCheckpoint = visibleCheckpoints[currentIndex]
+
+      if (!currentCheckpoint) return
+
+      if (event.key === 'a') {
+        event.preventDefault()
+        if (isCheckpointReviewable(currentCheckpoint) && !reviewMutation.isPending) {
+          handleApprove(currentCheckpoint.id)
+        }
+        return
+      }
+
+      if (event.key === 'r') {
+        event.preventDefault()
+        if (isCheckpointReviewable(currentCheckpoint) && !reviewMutation.isPending) {
+          handleOpenComposer(currentCheckpoint.id, 'reject')
+        }
+        return
+      }
+
+      if (event.key === 'j' || event.key === 'ArrowDown') {
+        event.preventDefault()
+        const nextCheckpoint =
+          visibleCheckpoints[Math.min(currentIndex + 1, visibleCheckpoints.length - 1)]
+        if (nextCheckpoint) {
+          setHighlightedCheckpointId(nextCheckpoint.id)
+        }
+        return
+      }
+
+      if (event.key === 'k' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        const previousCheckpoint = visibleCheckpoints[Math.max(currentIndex - 1, 0)]
+        if (previousCheckpoint) {
+          setHighlightedCheckpointId(previousCheckpoint.id)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [highlightedCheckpointId, reviewMutation.isPending, visibleCheckpoints])
 
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
@@ -630,15 +734,21 @@ export function ReviewQueueScreen() {
           </div>
         ) : (
           <div className="space-y-3">
+            <div className="flex items-center justify-between px-1 text-xs text-primary-500">
+              <p>Use the keyboard to move through the queue.</p>
+              <p>a approve · r reject · j/k navigate</p>
+            </div>
             {pageItems.map((checkpoint) => (
               <ReviewRow
                 key={checkpoint.id}
                 checkpoint={checkpoint}
                 composer={composer}
                 notes={reviewerNotes}
+                isHighlighted={checkpoint.id === highlightedCheckpointId}
                 onApprove={handleApprove}
                 onOpenDetail={openCheckpointDetail}
                 onQuickPreview={setSelectedCheckpoint}
+                onHighlight={(nextCheckpoint) => setHighlightedCheckpointId(nextCheckpoint.id)}
                 onOpenComposer={handleOpenComposer}
                 onCancelComposer={() => {
                   setComposer(null)
