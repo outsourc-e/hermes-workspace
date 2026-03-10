@@ -139,7 +139,7 @@ function matchesFilter(section: MemorySection, filter: MemoryFilter): boolean {
 
 function EmptyMemorySection({ label }: { label: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-primary-700 bg-primary-900/40 px-3 py-4 text-xs text-primary-400">
+    <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-3 py-4 text-xs text-primary-500">
       No files found in {label.toLowerCase()}.
     </div>
   )
@@ -231,8 +231,8 @@ export function WorkspaceSkillsScreen() {
   }
 
   return (
-    <div className="min-h-full bg-surface text-primary-900">
-      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col px-4 py-4 sm:px-5 lg:px-6">
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+      <div className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col py-4">
         <div className="flex flex-col gap-2 pb-4">
           <h1 className="text-base font-semibold text-primary-900">
             Skills &amp; Memory
@@ -490,7 +490,7 @@ export function WorkspaceSkillsScreen() {
                     Loading memory files...
                   </div>
                 ) : memoryQuery.isError ? (
-                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-5 text-sm text-red-200">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">
                     {memoryQuery.error instanceof Error
                       ? memoryQuery.error.message
                       : 'Failed to load memory files'}
@@ -530,22 +530,22 @@ export function WorkspaceSkillsScreen() {
                   <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-400">
                     Retention
                   </div>
-                  <div className="space-y-2 text-sm text-primary-300">
-                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-800 bg-primary-900/60 px-3 py-2">
-                      <span>Workspace memory</span>
-                      <span className="font-medium text-primary-100">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2">
+                      <span className="text-primary-600">Workspace memory</span>
+                      <span className="font-medium text-primary-900">
                         Permanent
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-800 bg-primary-900/60 px-3 py-2">
-                      <span>Project memory</span>
-                      <span className="font-medium text-primary-100">
+                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2">
+                      <span className="text-primary-600">Project memory</span>
+                      <span className="font-medium text-primary-900">
                         Per-project
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-800 bg-primary-900/60 px-3 py-2">
-                      <span>Agent memory</span>
-                      <span className="font-medium text-primary-100">
+                    <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2">
+                      <span className="text-primary-600">Agent memory</span>
+                      <span className="font-medium text-primary-900">
                         30 day rolling
                       </span>
                     </div>
@@ -556,7 +556,7 @@ export function WorkspaceSkillsScreen() {
           </section>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
 
@@ -592,10 +592,10 @@ function MemorySectionBlock({
                   'flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors',
                   active
                     ? 'border-accent-500/40 bg-accent-500/5'
-                    : 'border-primary-800 bg-primary-950/50 hover:border-primary-700',
+                    : 'border-primary-200 bg-white hover:border-primary-300',
                 )}
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary-800 bg-primary-900 text-primary-300">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-primary-50 text-primary-500">
                   <HugeiconsIcon
                     icon={File01Icon}
                     size={16}
@@ -603,7 +603,7 @@ function MemorySectionBlock({
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-primary-100">
+                  <span className="block truncate text-sm font-medium text-primary-900">
                     {file.name}
                   </span>
                   <span className="block truncate text-xs text-primary-400">
