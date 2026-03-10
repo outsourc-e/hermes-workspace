@@ -887,32 +887,26 @@ export function ProjectDetailView({
                                   Start Mission
                                 </Button>
                               ) : null}
-                              {mission.status === 'running' || mission.status === 'active' ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    navigate({
-                                      to: '/workspace',
-                                      hash: 'projects',
-                                      search: {
-                                        missionId: mission.id,
-                                        projectId:
-                                          projectDetail?.id ?? selectedSummary?.id ?? '',
-                                        project:
-                                          projectDetail?.id ?? selectedSummary?.id ?? '',
-                                      },
-                                    })
-                                  }
-                                >
-                                  <HugeiconsIcon
-                                    icon={PlayCircleIcon}
-                                    size={16}
-                                    strokeWidth={1.6}
-                                  />
-                                  Open Console
-                                </Button>
-                              ) : null}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  navigate({
+                                    to: '/workspace',
+                                    search: {
+                                      missionId: mission.id,
+                                      projectId: projectDetail?.id ?? selectedSummary?.id ?? '',
+                                    },
+                                  })
+                                }
+                              >
+                                <HugeiconsIcon
+                                  icon={PlayCircleIcon}
+                                  size={16}
+                                  strokeWidth={1.6}
+                                />
+                                Open Console
+                              </Button>
                               {mission.status === 'running' || mission.status === 'active' ? (
                                 <Button
                                   variant="outline"
