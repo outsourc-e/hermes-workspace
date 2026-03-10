@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { parseUtcTimestamp } from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
 import {
   extractActivityEvents,
@@ -214,13 +215,13 @@ function formatMemberLabel(member: WorkspaceTeamMember): string {
 }
 
 function formatAuditTimestamp(timestamp: string): string {
-  const parsed = Date.parse(timestamp)
-  if (Number.isNaN(parsed)) return timestamp
+  const parsed = parseUtcTimestamp(timestamp)
+  if (Number.isNaN(parsed.getTime())) return timestamp
 
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(parsed))
+  }).format(parsed)
 }
 
 async function fetchWorkspaceTeams(): Promise<WorkspaceTeam[]> {

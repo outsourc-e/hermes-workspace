@@ -20,6 +20,7 @@ import {
   formatCheckpointTimestamp,
   getWorkspaceCheckpointDetail,
   listWorkspaceCheckpoints,
+  parseUtcTimestamp,
   type WorkspaceCheckpoint,
   type WorkspaceCheckpointDetail,
   type WorkspaceCheckpointVerificationItem,
@@ -137,7 +138,7 @@ function RunLog({
           {events.map((event) => (
             <div key={event.id} className="grid grid-cols-[72px_1fr] gap-3">
               <span className="text-primary-500">
-                {new Date(event.created_at).toLocaleTimeString([], {
+                {parseUtcTimestamp(event.created_at).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
                   second: '2-digit',

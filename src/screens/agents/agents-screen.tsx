@@ -33,6 +33,7 @@ import {
 } from '@/lib/workspace-agents'
 import {
   listWorkspaceCheckpoints,
+  parseUtcTimestamp,
   readWorkspacePayload,
   type WorkspaceCheckpoint,
   workspaceRequestJson,
@@ -118,7 +119,7 @@ function formatDuration(ms: number | null): string {
 }
 
 function formatTimestamp(value: string): string {
-  const date = new Date(value)
+  const date = parseUtcTimestamp(value)
   if (Number.isNaN(date.getTime())) return 'Unknown'
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -397,8 +398,10 @@ export function AgentsScreen() {
     return (taskRunsQuery.data ?? [])
       .filter((run) => matchesAgentRun(selectedAgent, run))
       .sort((left, right) => {
-        const leftTime = Date.parse(left.started_at ?? left.completed_at ?? '') || 0
-        const rightTime = Date.parse(right.started_at ?? right.completed_at ?? '') || 0
+        const leftTime =
+          parseUtcTimestamp(left.started_at ?? left.completed_at ?? '').getTime() || 0
+        const rightTime =
+          parseUtcTimestamp(right.started_at ?? right.completed_at ?? '').getTime() || 0
         return rightTime - leftTime
       })
       .slice(0, 8)
@@ -1130,7 +1133,8 @@ export function AgentsScreen() {
                               const tokenTotal = run.input_tokens + run.output_tokens
                               const durationMs =
                                 run.started_at && run.completed_at
-                                  ? Date.parse(run.completed_at) - Date.parse(run.started_at)
+                                  ? parseUtcTimestamp(run.completed_at).getTime() -
+                                    parseUtcTimestamp(run.started_at).getTime()
                                   : null
 
                               return (
