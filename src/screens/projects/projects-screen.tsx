@@ -1297,8 +1297,14 @@ export function ProjectsScreen({
               submittingKey={submittingKey}
             />
 
+            <DashboardAgentCapacity
+              agents={agents}
+              stats={statsQuery.data}
+              loading={agentsQuery.isLoading}
+            />
+
             {reviewInboxItems.length > 0 && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
+              <div className="grid grid-cols-1 gap-4">
                 <DashboardReviewInbox
                   checkpoints={reviewInboxItems}
                   projects={projects}
@@ -1322,12 +1328,6 @@ export function ProjectsScreen({
                     })
                   }
                   onReview={focusCheckpointReview}
-                />
-
-                <DashboardAgentCapacity
-                  agents={agents}
-                  stats={statsQuery.data}
-                  loading={agentsQuery.isLoading}
                 />
               </div>
             )}

@@ -107,6 +107,12 @@ function formatPercent(value: number): string {
   return `${Math.round(value)}%`
 }
 
+function formatAgentDetailValue(value: string | number | null | undefined): string {
+  if (typeof value === 'number') return formatInteger(value)
+  if (typeof value === 'string' && value.trim().length > 0) return value
+  return 'Not set'
+}
+
 function formatDuration(ms: number | null): string {
   if (!ms || !Number.isFinite(ms) || ms <= 0) return 'N/A'
   if (ms < 1_000) return `${Math.round(ms)}ms`
@@ -816,35 +822,39 @@ export function AgentsScreen() {
                         <div>
                           <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Model</p>
                           <p className="mt-1 font-medium text-primary-100">
-                            {selectedAgent.model ?? selectedAgent.adapter_type}
+                            {formatAgentDetailValue(
+                              selectedAgent.model ?? selectedAgent.adapter_type,
+                            )}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Provider</p>
-                          <p className="mt-1 font-medium text-primary-100">{selectedAgent.provider}</p>
+                          <p className="mt-1 font-medium text-primary-100">
+                            {formatAgentDetailValue(selectedAgent.provider)}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Max Tokens</p>
                           <p className="mt-1 font-medium text-primary-100">
-                            {formatInteger(selectedAgent.limits.max_tokens)}
+                            {formatAgentDetailValue(selectedAgent.limits.max_tokens)}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Cost</p>
                           <p className="mt-1 font-medium text-primary-100">
-                            {selectedAgent.limits.cost_label}
+                            {formatAgentDetailValue(selectedAgent.limits.cost_label)}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Concurrency</p>
                           <p className="mt-1 font-medium text-primary-100">
-                            {selectedAgent.limits.concurrency_limit}
+                            {formatAgentDetailValue(selectedAgent.limits.concurrency_limit)}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Memory Scope</p>
                           <p className="mt-1 font-medium text-primary-100">
-                            {selectedAgent.limits.memory_scope}
+                            {formatAgentDetailValue(selectedAgent.limits.memory_scope)}
                           </p>
                         </div>
                       </div>
