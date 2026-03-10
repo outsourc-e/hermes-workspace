@@ -27,6 +27,10 @@ export const Route = createFileRoute('/workspace')({
       search.showWizard === true || search.showWizard === 'true' ? true : undefined,
   }),
   component: function WorkspaceRoute() {
-    return <WorkspaceLayout search={Route.useSearch()} />
+    return (
+      <div className="h-full min-h-full">
+        <WorkspaceLayout search={Route.useSearch()} />
+      </div>
+    )
   },
 })
