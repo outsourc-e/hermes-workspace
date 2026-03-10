@@ -1297,38 +1297,40 @@ export function ProjectsScreen({
               submittingKey={submittingKey}
             />
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
-              <DashboardReviewInbox
-                checkpoints={reviewInboxItems}
-                projects={projects}
-                selectedProjectName={selectedSummary?.name}
-                projectOptions={reviewProjectOptions}
-                projectFilter={reviewProjectFilter}
-                verificationFilter={reviewVerificationFilter}
-                riskFilter={reviewRiskFilter}
-                loading={checkpointsQuery.isLoading}
-                batchApproving={batchApproving}
-                verifiedCount={verifiedReviewItems.length}
-                actionPending={projectCheckpointMutation.isPending}
-                onProjectFilterChange={setReviewProjectFilter}
-                onVerificationFilterChange={setReviewVerificationFilter}
-                onRiskFilterChange={setReviewRiskFilter}
-                onApproveVerified={() => void handleApproveVerified()}
-                onApprove={(checkpointId) =>
-                  projectCheckpointMutation.mutate({
-                    checkpointId,
-                    action: 'approve-and-commit',
-                  })
-                }
-                onReview={focusCheckpointReview}
-              />
+            {reviewInboxItems.length > 0 && (
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
+                <DashboardReviewInbox
+                  checkpoints={reviewInboxItems}
+                  projects={projects}
+                  selectedProjectName={selectedSummary?.name}
+                  projectOptions={reviewProjectOptions}
+                  projectFilter={reviewProjectFilter}
+                  verificationFilter={reviewVerificationFilter}
+                  riskFilter={reviewRiskFilter}
+                  loading={checkpointsQuery.isLoading}
+                  batchApproving={batchApproving}
+                  verifiedCount={verifiedReviewItems.length}
+                  actionPending={projectCheckpointMutation.isPending}
+                  onProjectFilterChange={setReviewProjectFilter}
+                  onVerificationFilterChange={setReviewVerificationFilter}
+                  onRiskFilterChange={setReviewRiskFilter}
+                  onApproveVerified={() => void handleApproveVerified()}
+                  onApprove={(checkpointId) =>
+                    projectCheckpointMutation.mutate({
+                      checkpointId,
+                      action: 'approve-and-commit',
+                    })
+                  }
+                  onReview={focusCheckpointReview}
+                />
 
-              <DashboardAgentCapacity
-                agents={agents}
-                stats={statsQuery.data}
-                loading={agentsQuery.isLoading}
-              />
-            </div>
+                <DashboardAgentCapacity
+                  agents={agents}
+                  stats={statsQuery.data}
+                  loading={agentsQuery.isLoading}
+                />
+              </div>
+            )}
           </>
         )}
       </section>

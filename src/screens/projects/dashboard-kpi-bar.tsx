@@ -9,30 +9,11 @@ type DashboardKpiBarProps = {
   pendingCheckpointCount: number
 }
 
-function MetricCard({
-  label,
-  value,
-  sublabel,
-  tone = 'text-primary-900',
-}: {
+type StatPill = {
   label: string
   value: string
+  tone: string
   sublabel?: string
-  tone?: string
-}) {
-  return (
-    <div className="rounded-xl border border-primary-200 bg-white px-4 py-4 shadow-sm">
-      <div className={cn('text-2xl font-semibold tracking-tight', tone)}>
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary-500">
-        {label}
-      </div>
-      {sublabel ? (
-        <div className="mt-2 text-xs text-primary-500">{sublabel}</div>
-      ) : null}
-    </div>
-  )
 }
 
 export function DashboardKpiBar({
@@ -41,39 +22,62 @@ export function DashboardKpiBar({
   agents,
   pendingCheckpointCount,
 }: DashboardKpiBarProps) {
+  const pills: StatPill[] = [
+    {
+      label: 'Projects',
+      value: String(stats?.projects ?? projects.length),
+      tone: 'text-accent-400',
+    },
+    {
+      label: 'Agents',
+      value: `${stats?.agentsOnline ?? agents.filter((a) => a.status !== 'offline').length}/${stats?.agentsTotal ?? agents.length} online`,
+      tone: 'text-emerald-400',
+    },
+    {
+      label: 'Running',
+      value: `${stats?.running ?? 0} / ${stats?.queued ?? 0} / ${stats?.paused ?? 0}`,
+      tone: 'text-sky-400',
+      sublabel: 'run / queue / pause',
+    },
+    {
+      label: 'Checkpoints',
+      value: String(stats?.checkpointsPending ?? pendingCheckpointCount),
+      tone: (stats?.checkpointsPending ?? pendingCheckpointCount) > 0 ? 'text-red-400' : 'text-primary-400',
+      sublabel: 'pending review',
+    },
+    {
+      label: 'Alerts',
+      value: String(stats?.policyAlerts ?? 0),
+      tone: (stats?.policyAlerts ?? 0) > 0 ? 'text-amber-400' : 'text-primary-400',
+      sublabel: (stats?.policyAlerts ?? 0) > 0 ? 'action required' : 'no blockers',
+    },
+    {
+      label: 'Cost today',
+      value: formatCurrency(stats?.costToday ?? 0),
+      tone: 'text-emerald-400',
+    },
+  ]
+
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-      <MetricCard
-        label="Projects"
-        value={String(stats?.projects ?? projects.length)}
-        tone="text-accent-300"
-      />
-      <MetricCard
-        label="Agents Online"
-        value={`${stats?.agentsOnline ?? agents.filter((agent) => agent.status !== 'offline').length}/${stats?.agentsTotal ?? agents.length}`}
-        tone="text-emerald-300"
-      />
-      <MetricCard
-        label="Running / Queued / Paused"
-        value={`${stats?.running ?? 0} / ${stats?.queued ?? 0} / ${stats?.paused ?? 0}`}
-        tone="text-sky-300"
-      />
-      <MetricCard
-        label="Checkpoints Pending"
-        value={String(stats?.checkpointsPending ?? pendingCheckpointCount)}
-        tone="text-red-300"
-      />
-      <MetricCard
-        label="Policy Alerts"
-        value={String(stats?.policyAlerts ?? 0)}
-        sublabel={(stats?.policyAlerts ?? 0) > 0 ? 'Action required' : 'No blockers'}
-        tone="text-amber-300"
-      />
-      <MetricCard
-        label="Cost Today"
-        value={formatCurrency(stats?.costToday ?? 0)}
-        tone="text-emerald-300"
-      />
+    <div className="flex flex-wrap gap-2">
+      {pills.map((pill) => (
+        <div
+          key={pill.label}
+          className="flex min-w-[120px] flex-1 items-center gap-3 rounded-lg border border-primary-200 bg-white px-3 py-2 shadow-sm"
+        >
+          <div className={cn('text-xl font-semibold tabular-nums', pill.tone)}>
+            {pill.value}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-primary-500">
+              {pill.label}
+            </div>
+            {pill.sublabel && (
+              <div className="truncate text-[10px] text-primary-400">{pill.sublabel}</div>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

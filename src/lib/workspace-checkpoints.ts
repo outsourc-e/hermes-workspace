@@ -493,8 +493,16 @@ export function getCheckpointActionButtonClass(
   )
 }
 
+/** SQLite timestamps come as "2026-03-10 21:40:00" (no tz) — treat as UTC */
+export function parseUtcTimestamp(value: string): Date {
+  const normalized = value.includes('T') || value.endsWith('Z')
+    ? value
+    : value.replace(' ', 'T') + 'Z'
+  return new Date(normalized)
+}
+
 export function formatCheckpointTimestamp(value: string): string {
-  const date = new Date(value)
+  const date = parseUtcTimestamp(value)
   if (Number.isNaN(date.getTime())) return value
 
   return new Intl.DateTimeFormat(undefined, {

@@ -30,6 +30,7 @@ import {
   getCheckpointStatusBadgeClass,
   getCheckpointSummary,
   isCheckpointReviewable,
+  parseUtcTimestamp,
   workspaceRequestJson,
   type WorkspaceCheckpoint,
 } from '@/lib/workspace-checkpoints'
@@ -263,7 +264,7 @@ function RunLog({
           {events.map((event) => (
             <div key={event.id} className="grid grid-cols-[72px_1fr] gap-3">
               <span className="text-primary-500">
-                {new Date(event.created_at).toLocaleTimeString([], {
+                {parseUtcTimestamp(event.created_at).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
                   second: '2-digit',
@@ -1177,7 +1178,7 @@ export function ProjectDetailView({
               Date:{' '}
               <span className="text-primary-800">
                 {gitStatus?.commit_date
-                  ? new Date(gitStatus.commit_date).toLocaleString()
+                  ? parseUtcTimestamp(gitStatus.commit_date).toLocaleString()
                   : 'Unavailable'}
               </span>
             </p>
