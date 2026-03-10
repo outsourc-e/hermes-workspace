@@ -9,6 +9,15 @@ type StreamingState = {
   error: string | null
 }
 
+type StreamLifecyclePhase =
+  | 'idle'
+  | 'requesting'
+  | 'accepted'
+  | 'active'
+  | 'handoff'
+  | 'complete'
+  | 'error'
+
 type StreamChunk = {
   text?: string
   delta?: string
@@ -45,10 +54,18 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const thinkingRef = useRef<string>('')
   const activeRunIdRef = useRef<string | null>(null)
   const activeSessionKeyRef = useRef<string>('main')
+  const lifecyclePhaseRef = useRef<StreamLifecyclePhase>('idle')
+  const acceptedAtRef = useRef<number | null>(null)
+  const lastActivityAtRef = useRef<number | null>(null)
+  const handoffTimerRef = useRef<number | null>(null)
 
   const registerSendStreamRun = useGatewayChatStore((s) => s.registerSendStreamRun)
   const unregisterSendStreamRun = useGatewayChatStore((s) => s.unregisterSendStreamRun)
   const processStoreEvent = useGatewayChatStore((s) => s.processEvent)
+  const clearStreamingSession = useGatewayChatStore((s) => s.clearStreamingSession)
+
+  const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 30_000
+  const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = 45_000
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {
@@ -56,6 +73,113 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       frameRef.current = null
     }
   }, [])
+
+  const clearHandoffTimer = useCallback(() => {
+    if (handoffTimerRef.current !== null) {
+      window.clearTimeout(handoffTimerRef.current)
+      handoffTimerRef.current = null
+    }
+  }, [])
+
+  const clearSendStreamRun = useCallback(() => {
+    if (activeRunIdRef.current) {
+      unregisterSendStreamRun(activeRunIdRef.current)
+      activeRunIdRef.current = null
+    }
+  }, [unregisterSendStreamRun])
+
+  const markActivity = useCallback(() => {
+    lastActivityAtRef.current = Date.now()
+    if (
+      lifecyclePhaseRef.current === 'accepted' ||
+      lifecyclePhaseRef.current === 'requesting' ||
+      lifecyclePhaseRef.current === 'handoff'
+    ) {
+      lifecyclePhaseRef.current = 'active'
+    }
+  }, [])
+
+  const markAccepted = useCallback(() => {
+    const now = Date.now()
+    acceptedAtRef.current = now
+    lastActivityAtRef.current = now
+    lifecyclePhaseRef.current = 'accepted'
+  }, [])
+
+  const markFailed = useCallback(
+    (message: string) => {
+      finishedRef.current = true
+      eventSourceRef.current = null
+      stopFrame()
+      lifecyclePhaseRef.current = 'error'
+      clearHandoffTimer()
+      clearSendStreamRun()
+      clearStreamingSession(activeSessionKeyRef.current)
+      setState((prev) => ({
+        ...prev,
+        isStreaming: false,
+        error: message,
+      }))
+      onError?.(message)
+    },
+    [clearHandoffTimer, clearSendStreamRun, clearStreamingSession, onError, stopFrame],
+  )
+
+  const schedulePostAcceptanceTimeout = useCallback(
+    (reason: 'accepted' | 'handoff') => {
+      clearHandoffTimer()
+      const timeoutMs =
+        reason === 'handoff'
+          ? HANDOFF_NO_ACTIVITY_TIMEOUT_MS
+          : ACCEPTED_NO_ACTIVITY_TIMEOUT_MS
+      handoffTimerRef.current = window.setTimeout(() => {
+        if (finishedRef.current) return
+        if (
+          lifecyclePhaseRef.current !== 'accepted' &&
+          lifecyclePhaseRef.current !== 'handoff'
+        ) {
+          return
+        }
+        if (reason === 'handoff') {
+          const store = useGatewayChatStore.getState()
+          const gatewayStreamingState =
+            store.streamingState.get(activeSessionKeyRef.current) ?? null
+          const gatewayLastEventAt = store.lastEventAt
+          if (
+            gatewayStreamingState !== null ||
+            (gatewayLastEventAt > 0 && Date.now() - gatewayLastEventAt < timeoutMs)
+          ) {
+            schedulePostAcceptanceTimeout(reason)
+            return
+          }
+        }
+        const lastActivityAt = lastActivityAtRef.current ?? acceptedAtRef.current
+        if (lastActivityAt && Date.now() - lastActivityAt < timeoutMs - 250) {
+          schedulePostAcceptanceTimeout(reason)
+          return
+        }
+        markFailed(
+          reason === 'handoff'
+            ? 'Run stalled after handoff'
+            : 'No activity received after message was accepted',
+        )
+      }, timeoutMs)
+    },
+    [clearHandoffTimer, markFailed],
+  )
+
+  const transitionToHandoff = useCallback(() => {
+    if (finishedRef.current) return
+    lifecyclePhaseRef.current = 'handoff'
+    clearSendStreamRun()
+    clearHandoffTimer()
+    stopFrame()
+    setState((prev) => ({
+      ...prev,
+      isStreaming: false,
+    }))
+    schedulePostAcceptanceTimeout('handoff')
+  }, [clearHandoffTimer, clearSendStreamRun, schedulePostAcceptanceTimeout, stopFrame])
 
   useEffect(
     function cleanupStreamingOnUnmount() {
@@ -66,28 +190,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         finishedRef.current = true
         stopFrame()
+        clearHandoffTimer()
+        clearSendStreamRun()
       }
     },
-    [stopFrame],
-  )
-
-  const markFailed = useCallback(
-    (message: string) => {
-      finishedRef.current = true
-      eventSourceRef.current = null
-      stopFrame()
-      if (activeRunIdRef.current) {
-        unregisterSendStreamRun(activeRunIdRef.current)
-        activeRunIdRef.current = null
-      }
-      setState((prev) => ({
-        ...prev,
-        isStreaming: false,
-        error: message,
-      }))
-      onError?.(message)
-    },
-    [onError, stopFrame, unregisterSendStreamRun],
+    [clearHandoffTimer, clearSendStreamRun, stopFrame],
   )
 
   const pushTargetText = useCallback(
@@ -143,11 +250,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       finishedRef.current = true
       eventSourceRef.current = null
       stopFrame()
-      // Unregister runId — chat-events can now process events freely again
-      if (activeRunIdRef.current) {
-        unregisterSendStreamRun(activeRunIdRef.current)
-        activeRunIdRef.current = null
-      }
+      lifecyclePhaseRef.current = 'complete'
+      clearHandoffTimer()
+      clearSendStreamRun()
 
       const finalText = fullTextRef.current
       const thinking = thinkingRef.current
@@ -173,7 +278,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       onComplete?.(message)
     },
-    [onComplete, stopFrame, unregisterSendStreamRun],
+    [clearHandoffTimer, clearSendStreamRun, onComplete, stopFrame],
   )
 
   const processEvent = useCallback(
@@ -188,6 +293,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             activeRunIdRef.current = runId
             registerSendStreamRun(runId)
           }
+          markActivity()
           processStoreEvent({
             type: 'chunk',
             text: '',
@@ -201,6 +307,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         case 'assistant': {
           const text = (payload as { text?: string }).text ?? ''
           if (text) {
+            markActivity()
             processStoreEvent({
               type: 'chunk',
               text,
@@ -217,6 +324,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const newText =
             chunk.delta ?? chunk.text ?? chunk.content ?? chunk.chunk ?? ''
           if (newText) {
+            markActivity()
             pushTargetText(fullTextRef.current + newText)
           }
           break
@@ -227,6 +335,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             (payload as { thinking?: string }).thinking ??
             ''
           if (thinking) {
+            markActivity()
             thinkingRef.current = thinking
             processStoreEvent({
               type: 'thinking',
@@ -240,6 +349,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           break
         }
         case 'tool': {
+          markActivity()
           processStoreEvent({
             type: 'tool',
             phase:
@@ -287,12 +397,26 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           break
         }
         case 'timeout': {
-          markFailed('Request timed out')
+          if (
+            lifecyclePhaseRef.current === 'accepted' ||
+            lifecyclePhaseRef.current === 'active' ||
+            lifecyclePhaseRef.current === 'handoff'
+          ) {
+            transitionToHandoff()
+          } else {
+            markFailed('Request timed out')
+          }
           break
         }
         case 'close': {
           if (fullTextRef.current) {
             finishStream()
+          } else if (
+            lifecyclePhaseRef.current === 'accepted' ||
+            lifecyclePhaseRef.current === 'active' ||
+            lifecyclePhaseRef.current === 'handoff'
+          ) {
+            transitionToHandoff()
           } else {
             markFailed('Gateway connection closed')
           }
@@ -306,9 +430,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       onStarted,
       onThinking,
       onTool,
+      markActivity,
       processStoreEvent,
       pushTargetText,
       registerSendStreamRun,
+      transitionToHandoff,
     ],
   )
 
@@ -329,12 +455,16 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       eventSourceRef.current = abortController
       finishedRef.current = false
       stopFrame()
+      clearHandoffTimer()
       fullTextRef.current = ''
       renderedTextRef.current = ''
       targetTextRef.current = ''
       thinkingRef.current = ''
-      activeRunIdRef.current = null
+      clearSendStreamRun()
       activeSessionKeyRef.current = params.sessionKey
+      lifecyclePhaseRef.current = 'requesting'
+      acceptedAtRef.current = null
+      lastActivityAtRef.current = null
 
       const messageId = `streaming-${Date.now()}`
 
@@ -364,6 +494,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const errorText = await response.text()
           throw new Error(errorText || 'Stream request failed')
         }
+
+        markAccepted()
+        schedulePostAcceptanceTimeout('accepted')
 
         // HTTP 200 — message accepted by gateway. Clear optimistic "sending"
         // status so the Retry timer never fires. The gateway does NOT echo
@@ -415,7 +548,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           }
         }
 
-        if (!finishedRef.current) {
+        const lifecyclePhase = lifecyclePhaseRef.current as StreamLifecyclePhase
+        if (!finishedRef.current && lifecyclePhase !== 'handoff') {
           finishStream()
         }
       } catch (err) {
@@ -424,7 +558,17 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         markFailed(errorMessage)
       }
     },
-    [finishStream, markFailed, onMessageAccepted, processEvent, stopFrame],
+    [
+      clearHandoffTimer,
+      clearSendStreamRun,
+      finishStream,
+      markAccepted,
+      markFailed,
+      onMessageAccepted,
+      processEvent,
+      schedulePostAcceptanceTimeout,
+      stopFrame,
+    ],
   )
 
   const cancelStreaming = useCallback(() => {
@@ -434,15 +578,20 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     }
     finishedRef.current = true
     stopFrame()
+    clearHandoffTimer()
+    clearSendStreamRun()
     fullTextRef.current = ''
     renderedTextRef.current = ''
     targetTextRef.current = ''
     thinkingRef.current = ''
+    lifecyclePhaseRef.current = 'idle'
+    acceptedAtRef.current = null
+    lastActivityAtRef.current = null
     setState((prev) => ({
       ...prev,
       isStreaming: false,
     }))
-  }, [stopFrame])
+  }, [clearHandoffTimer, clearSendStreamRun, stopFrame])
 
   const resetStreaming = useCallback(() => {
     cancelStreaming()
