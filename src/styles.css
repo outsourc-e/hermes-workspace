@@ -1,6 +1,35 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:opsz,wght@8..120,400..800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 
+/* Hide scrollbars until scroll (cross-browser) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: rgba(0,0,0,0.2) transparent;
+}
+.dark *:hover {
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.2);
+}
+.dark *:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255,255,255,0.2);
+}
+
 .root {
   isolation: isolate;
 }
