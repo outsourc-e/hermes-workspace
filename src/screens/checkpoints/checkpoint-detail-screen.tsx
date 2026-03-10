@@ -6,7 +6,6 @@ import {
   Clock01Icon,
   RefreshIcon,
   Rocket01Icon,
-  Task01Icon,
   Tick02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -30,7 +29,6 @@ import { cn } from '@/lib/utils'
 import { extractProject, type WorkspaceProject, type WorkspaceTask } from '@/screens/projects/lib/workspace-types'
 import {
   DetailStat,
-  FileDiffCard,
   RawDiffViewer,
   SectionHeader,
   formatCost,
@@ -89,11 +87,25 @@ function getVerificationTone(status: WorkspaceCheckpointVerificationItem['status
   return 'border-primary-700 bg-primary-800/70 text-primary-400'
 }
 
-function getVerificationGlyph(status: WorkspaceCheckpointVerificationItem['status']) {
-  if (status === 'passed') return 'PASS'
-  if (status === 'failed') return 'FAIL'
-  if (status === 'missing') return 'MISS'
-  return 'N/A'
+function getVerificationBadge(status: WorkspaceCheckpointVerificationItem['status']) {
+  if (status === 'passed') return '✅ Passed'
+  if (status === 'failed') return '❌ Failed'
+  if (status === 'missing') return '⚠️ Warning'
+  return '⚪ Unknown'
+}
+
+function getVerificationCardTone(status: WorkspaceCheckpointVerificationItem['status']) {
+  if (status === 'passed') return 'border-emerald-500/30 bg-emerald-500/10'
+  if (status === 'failed') return 'border-red-500/30 bg-red-500/10'
+  if (status === 'missing') return 'border-amber-500/30 bg-amber-500/10'
+  return 'border-primary-700 bg-primary-950/70'
+}
+
+function getInlineDiffLineTone(line: string) {
+  if (line.startsWith('+') && !line.startsWith('+++')) return 'bg-emerald-500/12 text-emerald-200'
+  if (line.startsWith('-') && !line.startsWith('---')) return 'bg-red-500/12 text-red-200'
+  if (line.startsWith('@@')) return 'bg-primary-800/90 text-accent-300'
+  return 'text-primary-300'
 }
 
 function getRunEventText(event: WorkspaceCheckpointDetail['run_events'][number]) {
@@ -205,11 +217,13 @@ export function CheckpointDetailScreen({
 
   const detail = detailQuery.data
   const verificationRows = [
-    ['tsc', 'TypeScript', localTscResult ?? detail?.verification.tsc ?? null],
+    ['tsc', 'TSC', localTscResult ?? detail?.verification.tsc ?? null],
     ['tests', 'Tests', detail?.verification.tests ?? null],
-    ['lint', 'Lint', detail?.verification.lint ?? null],
     ['e2e', 'E2E', detail?.verification.e2e ?? null],
   ] as const
+  const diffStat = detail ? getCheckpointDiffStatParsed(detail) : null
+  const changedFiles = diffStat?.changedFiles ?? []
+  const hasInlineDiffs = detail ? detail.diff_files.some((file) => file.patch.trim().length > 0) : false
   const unblocks = useMemo(() => {
     if (!projectDetailQuery.data || !detail?.task_id) return [] as WorkspaceTask[]
     return flattenTasks(projectDetailQuery.data).filter((task) => task.depends_on.includes(detail.task_id!))
@@ -282,6 +296,61 @@ export function CheckpointDetailScreen({
             <>
               <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6">
                 <div className="space-y-5 pb-28">
+                  <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
+                    <SectionHeader
+                      title="Verification"
+                      description="Checkpoint verification state across the configured checks."
+                      action={
+                        <Button
+                          variant="outline"
+                          onClick={() => verifyMutation.mutate(checkpointId)}
+                          disabled={verifyMutation.isPending}
+                        >
+                          <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.7} />
+                          {verifyMutation.isPending ? 'Running...' : 'Run TSC'}
+                        </Button>
+                      }
+                    />
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {verificationRows.map(([key, label, value]) => {
+                        if (!value) return null
+
+                        return (
+                          <div
+                            key={key}
+                            className={cn(
+                              'rounded-2xl border px-4 py-3',
+                              getVerificationCardTone(value.status),
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium text-primary-100">{label}</p>
+                              <span
+                                className={cn(
+                                  'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                                  getVerificationTone(value.status),
+                                )}
+                              >
+                                {getVerificationBadge(value.status)}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm text-primary-200">{value.label}</p>
+                            {value.checked_at ? (
+                              <p className="mt-1 text-xs text-primary-400">
+                                {formatCheckpointTimestamp(value.checked_at)}
+                              </p>
+                            ) : null}
+                            {value.output ? (
+                              <pre className="mt-3 max-h-36 overflow-auto rounded-xl border border-primary-800 bg-primary-950/80 px-3 py-2 font-mono text-[11px] leading-5 text-primary-300">
+                                {value.output}
+                              </pre>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
+
                   <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="space-y-3">
@@ -381,55 +450,8 @@ export function CheckpointDetailScreen({
 
                   <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
                     <SectionHeader
-                      title="Verification Matrix"
-                      description="TypeScript can run now. Tests, lint, and e2e remain placeholders until configured."
-                      action={
-                        <Button
-                          variant="outline"
-                          onClick={() => verifyMutation.mutate(checkpointId)}
-                          disabled={verifyMutation.isPending}
-                        >
-                          <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.7} />
-                          {verifyMutation.isPending ? 'Running...' : 'Run missing checks'}
-                        </Button>
-                      }
-                    />
-                    <div className="mt-4 grid gap-3">
-                      {verificationRows.map(([key, label, value]) => (
-                        <div
-                          key={key}
-                          className="grid gap-3 rounded-2xl border border-primary-800 bg-primary-950/60 px-3 py-3 md:grid-cols-[minmax(0,1fr)_120px_minmax(0,2fr)] md:items-start"
-                        >
-                          <div className="flex items-center gap-2 text-sm text-primary-100">
-                            <HugeiconsIcon icon={Task01Icon} size={14} strokeWidth={1.7} />
-                            {label}
-                          </div>
-                          <span
-                            className={cn(
-                              'inline-flex w-fit rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em]',
-                              getVerificationTone(value?.status ?? 'missing'),
-                            )}
-                          >
-                            {getVerificationGlyph(value?.status ?? 'missing')}
-                          </span>
-                          <div className="text-xs text-primary-400">
-                            <p>{value?.label ?? 'Missing'}</p>
-                            {value?.checked_at ? <p className="mt-1">{formatCheckpointTimestamp(value.checked_at)}</p> : null}
-                            {value?.output ? (
-                              <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl border border-primary-800 bg-primary-900 px-3 py-2 font-mono text-[11px] leading-5 text-primary-300">
-                                {value.output}
-                              </pre>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
-                    <SectionHeader
                       title="Files Changed"
-                      description={`${detail.diff_files.length} file${detail.diff_files.length === 1 ? '' : 's'} in this checkpoint. Expand a file to inspect its inline diff.`}
+                      description={`${detail.diff_files.length} file${detail.diff_files.length === 1 ? '' : 's'} in this checkpoint.`}
                       action={
                         <button
                           type="button"
@@ -441,7 +463,7 @@ export function CheckpointDetailScreen({
                       }
                     />
                     <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-primary-800 bg-primary-950/60 px-3 py-3 font-mono text-xs leading-5 text-primary-300">
-                      {getCheckpointDiffStatParsed(detail)?.raw ||
+                      {diffStat?.raw ||
                         'No diff stat summary was recorded for this checkpoint.'}
                     </p>
                     <AnimatePresence initial={false}>
@@ -471,20 +493,86 @@ export function CheckpointDetailScreen({
                       ) : null}
                     </AnimatePresence>
                     <div className="mt-4 space-y-3">
-                      {detail.diff_files.length > 0 ? (
+                      {detail.diff_files.length > 0 && hasInlineDiffs ? (
                         detail.diff_files.map((file) => (
-                          <FileDiffCard
-                            key={file.path}
-                            path={file.path}
-                            additions={file.additions}
-                            deletions={file.deletions}
-                            patch={file.patch}
-                            expanded={expandedDiffs[file.path] ?? false}
-                            onToggle={() =>
-                              setExpandedDiffs((current) => ({ ...current, [file.path]: !current[file.path] }))
-                            }
-                          />
+                          <div key={file.path} className="overflow-hidden rounded-2xl border border-primary-800 bg-primary-950/60">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedDiffs((current) => ({ ...current, [file.path]: !current[file.path] }))
+                              }
+                              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary-900/80"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate font-mono text-sm text-primary-100">{file.path}</p>
+                                <div className="mt-1 flex flex-wrap gap-3 text-xs">
+                                  <span className="text-emerald-300">+{file.additions ?? 0}</span>
+                                  <span className="text-red-300">-{file.deletions ?? 0}</span>
+                                  <span className="text-primary-400">
+                                    {file.patch.trim() ? 'Inline diff available' : 'Diff not available'}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="shrink-0 text-xs font-medium text-primary-400">
+                                {expandedDiffs[file.path] ? 'Hide' : 'Show'}
+                              </span>
+                            </button>
+
+                            <AnimatePresence initial={false}>
+                              {expandedDiffs[file.path] ? (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className="overflow-hidden border-t border-primary-800"
+                                >
+                                  {file.patch.trim() ? (
+                                    <div className="overflow-x-auto p-3">
+                                      <div className="min-w-full overflow-hidden rounded-xl border border-primary-800 bg-primary-950">
+                                        {file.patch.split('\n').map((line, index) => (
+                                          <div
+                                            key={`${file.path}:${index}`}
+                                            className={cn(
+                                              'font-mono text-xs leading-5',
+                                              getInlineDiffLineTone(line),
+                                            )}
+                                          >
+                                            <div className="min-w-full whitespace-pre px-3 py-0.5">
+                                              {line || ' '}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="px-4 py-4 text-sm text-primary-400">
+                                      Diff not available for this file.
+                                    </div>
+                                  )}
+                                </motion.div>
+                              ) : null}
+                            </AnimatePresence>
+                          </div>
                         ))
+                      ) : detail.diff_files.length > 0 ? (
+                        <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/40 px-4 py-5">
+                          <p className="text-sm font-medium text-primary-100">Diff not available</p>
+                          <p className="mt-1 text-sm text-primary-400">
+                            This checkpoint includes a diff summary, but no inline patch content was returned by the API.
+                          </p>
+                          {changedFiles.length > 0 ? (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {changedFiles.map((path) => (
+                                <span
+                                  key={path}
+                                  className="rounded-full border border-primary-700 bg-primary-950/70 px-3 py-1 font-mono text-xs text-primary-300"
+                                >
+                                  {path}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
                       ) : (
                         <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/40 px-4 py-8 text-center text-sm text-primary-400">
                           No changed files were recorded for this checkpoint.
