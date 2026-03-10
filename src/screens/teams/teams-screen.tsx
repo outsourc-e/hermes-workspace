@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { UserGroupIcon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { parseUtcTimestamp } from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
 import {
@@ -335,14 +337,21 @@ export function TeamsScreen() {
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto flex w-full max-w-[1480px] flex-col gap-5">
-        <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-4 shadow-sm md:px-5">
-          <h1 className="text-xl font-bold text-primary-900 md:text-2xl">
-            Teams &amp; Roles
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm text-primary-500">
-            Workspace permissions, approval thresholds, and review activity for
-            the current operator roster.
-          </p>
+        <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
+              <HugeiconsIcon icon={UserGroupIcon} size={24} strokeWidth={1.6} />
+            </div>
+            <div>
+              <h1 className="text-base font-semibold text-primary-900">
+                Teams &amp; Roles
+              </h1>
+              <p className="mt-1 text-sm text-primary-500">
+                Workspace permissions, approval thresholds, and review activity
+                for the current operator roster.
+              </p>
+            </div>
+          </div>
         </header>
 
         <SectionCard title="Teams">
