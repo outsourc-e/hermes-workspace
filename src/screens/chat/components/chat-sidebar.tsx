@@ -12,9 +12,9 @@ import {
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
-  Folder01Icon,
   GlobeIcon,
   Home01Icon,
+  LayoutDashboard as LayoutDashboardIcon,
   ListViewIcon,
   Notification03Icon,
   PencilEdit02Icon,
@@ -70,7 +70,6 @@ import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import {
   extractProject,
   extractProjects,
-  type WorkspaceProject,
   type WorkspaceStats,
 } from '@/screens/projects/lib/workspace-types'
 
@@ -180,8 +179,6 @@ type SidebarProjectShortcut = {
   pendingCount: number
 }
 
-const PROJECT_SHORTCUT_ORDER = ['ClawSuite', 'LuxeLab OS', 'Client Portal']
-
 export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   try {
     const response = await fetch('/api/workspace/stats')
@@ -222,12 +219,17 @@ export async function fetchWorkspaceProjectShortcuts(): Promise<SidebarProjectSh
     {},
   )
 
-  const preferredProjects = PROJECT_SHORTCUT_ORDER.map((name) =>
-    projects.find((project) => project.name === name),
-  ).filter((project): project is WorkspaceProject => Boolean(project))
+  const activeProjects = projects.filter((project) => {
+    const normalizedStatus = project.status.toLowerCase()
+    return !['completed', 'done', 'failed'].includes(normalizedStatus)
+  })
+  const shortcutProjects = (activeProjects.length > 0 ? activeProjects : projects).slice(
+    0,
+    5,
+  )
 
   const details = await Promise.all(
-    preferredProjects.map(async (project) => {
+    shortcutProjects.map(async (project) => {
       const response = await fetch(
         `/api/workspace/projects/${encodeURIComponent(project.id)}`,
       )
@@ -236,7 +238,7 @@ export async function fetchWorkspaceProjectShortcuts(): Promise<SidebarProjectSh
     }),
   )
 
-  return preferredProjects.map((project, index) => {
+  return shortcutProjects.map((project, index) => {
     const detail = details[index]
     const tasks =
       detail?.phases.flatMap((phase) =>
@@ -311,9 +313,14 @@ function NavItem({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={transition}
-          className="overflow-hidden whitespace-nowrap"
+          className="flex min-w-0 items-center gap-2"
         >
-          {item.label}
+          <span className="overflow-hidden whitespace-nowrap">{item.label}</span>
+          {item.badge && item.badge !== 'error-dot' ? (
+            <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full border border-primary-700 bg-primary-900 px-2 py-0.5 text-[10px] font-semibold leading-none text-primary-300">
+              {item.badge}
+            </span>
+          ) : null}
         </motion.span>
       ) : null}
     </AnimatePresence>
@@ -332,6 +339,8 @@ function NavItem({
               render={
                 <Link
                   to={item.to!}
+                  search={item.search}
+                  hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
                   data-tour={item.dataTour}
@@ -348,6 +357,8 @@ function NavItem({
     return (
       <Link
         to={item.to!}
+        search={item.search}
+        hash={item.hash}
         onClick={handleSelect}
         className={cls}
         data-tour={item.dataTour}
@@ -620,6 +631,11 @@ function ChatSidebarComponent({
       return state.location.pathname
     },
   })
+  const hash = useRouterState({
+    select: function selectHash(state) {
+      return state.location.hash
+    },
+  })
 
   // Platform-aware modifier key
   const mod = useMemo(
@@ -646,11 +662,6 @@ function ChatSidebarComponent({
   const isUsageActive = pathname === '/usage'
   const isCostsActive = pathname === '/costs'
   const isInstancesActive = pathname === '/instances'
-  // Agent
-  const isProjectsActive = pathname.startsWith('/projects')
-  const isMissionConsoleActive = pathname.startsWith('/mission-console')
-  const isReviewActive = pathname.startsWith('/review')
-  const isRunsActive = pathname.startsWith('/runs')
   const isAgentsActive = pathname === '/agents'
   const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
@@ -799,6 +810,22 @@ function ChatSidebarComponent({
 
   const isVisuallyCollapsed = isCollapsed && !isHoverExpanded
   const isHoverPreviewExpanded = !isMobile && isCollapsed && isHoverExpanded
+  const workspaceStatsQuery = useQuery({
+    queryKey: ['workspace', 'sidebar', 'stats'],
+    queryFn: fetchWorkspaceStats,
+    enabled: workspaceExpanded && !isVisuallyCollapsed,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: false,
+  })
+  const workspaceProjectShortcutsQuery = useQuery({
+    queryKey: ['workspace', 'sidebar', 'project-shortcuts'],
+    queryFn: fetchWorkspaceProjectShortcuts,
+    enabled: workspaceExpanded && !isVisuallyCollapsed,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: false,
+  })
 
   function handleSidebarToggle() {
     if (isHoverPreviewExpanded) {
@@ -974,54 +1001,53 @@ function ChatSidebarComponent({
   const workspaceItems: NavItemDef[] = [
     {
       kind: 'link',
-      to: '/projects',
-      icon: Folder01Icon,
-      label: 'Projects',
-      active: isProjectsActive,
-    },
-    {
-      kind: 'link',
-      to: '/mission-console',
-      icon: ComputerTerminal01Icon,
-      label: 'Mission Console',
-      active: isMissionConsoleActive,
-    },
-    {
-      kind: 'link',
-      to: '/review',
-      icon: CheckmarkCircle02Icon,
-      label: 'Review Queue',
-      active: isReviewActive,
-    },
-    {
-      kind: 'link',
-      to: '/runs',
-      icon: PlayCircleIcon,
-      label: 'Runs / Console',
-      active: isRunsActive,
-    },
-    {
-      kind: 'link',
-      to: '/workspace-agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: pathname === '/workspace-agents',
-    },
-    {
-      kind: 'link',
-      to: '/workspace-skills',
-      icon: PuzzleIcon,
-      label: 'Skills & Memory',
-      active: pathname === '/workspace-skills',
-    },
-    {
-      kind: 'link',
-      to: '/workspace-teams',
-      icon: UserMultipleIcon,
-      label: 'Teams & Roles',
-      active: pathname === '/workspace-teams',
+      to: '/workspace',
+      icon: LayoutDashboardIcon,
+      label: 'Workspace',
+      active: pathname.startsWith('/workspace'),
     },
   ]
+
+  const normalizedWorkspaceHash = hash.replace(/^#/, '').trim().toLowerCase()
+  const workspaceStats = workspaceStatsQuery.data
+  const selectedWorkspaceProjectId =
+    typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('projectId') ??
+        new URLSearchParams(window.location.search).get('project')
+  const workspaceSubItems: NavItemDef[] = [
+    {
+      kind: 'link',
+      to: '/workspace',
+      hash: 'review',
+      icon: CheckmarkCircle02Icon,
+      label: 'Review Queue',
+      active: pathname === '/workspace' && normalizedWorkspaceHash === 'review',
+      badge: workspaceStats?.checkpointsPending,
+    },
+    {
+      kind: 'link',
+      to: '/workspace',
+      hash: 'runs',
+      icon: PlayCircleIcon,
+      label: 'Runs',
+      active: pathname === '/workspace' && normalizedWorkspaceHash === 'runs',
+      badge: workspaceStats?.running,
+    },
+    {
+      kind: 'link',
+      to: '/workspace',
+      hash: 'agents',
+      icon: UserGroupIcon,
+      label: 'Agents',
+      active: pathname === '/workspace' && normalizedWorkspaceHash === 'agents',
+      badge:
+        workspaceStats && workspaceStats.agentsTotal > 0
+          ? `${workspaceStats.agentsOnline}/${workspaceStats.agentsTotal}`
+          : undefined,
+    },
+  ]
+  const workspaceProjectShortcuts = workspaceProjectShortcutsQuery.data ?? []
 
   const gatewayItems: NavItemDef[] = [
     {
@@ -1274,6 +1300,63 @@ function ChatSidebarComponent({
             transition={transition}
             onSelectSession={onSelectSession}
           />
+          {!isVisuallyCollapsed && workspaceExpanded && workspaceSubItems.length > 0 ? (
+            <div className="space-y-0.5 pt-1">
+              <CollapsibleSection
+                expanded
+                items={workspaceSubItems}
+                isCollapsed={false}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </div>
+          ) : null}
+          {!isVisuallyCollapsed &&
+          workspaceExpanded &&
+          workspaceProjectShortcutsQuery.isSuccess &&
+          workspaceProjectShortcuts.length > 0 ? (
+            <motion.div
+              layout
+              transition={{ layout: transition }}
+              className="space-y-1 px-3 pb-1 pt-2"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+                Projects
+              </div>
+              <div className="space-y-1">
+                {workspaceProjectShortcuts.map((project) => {
+                  const isActiveProjectShortcut =
+                    pathname === '/workspace' &&
+                    (normalizedWorkspaceHash === '' ||
+                      normalizedWorkspaceHash === 'projects') &&
+                    project.id === selectedWorkspaceProjectId
+
+                  return (
+                    <Link
+                      key={project.id}
+                      to="/workspace"
+                      search={{ projectId: project.id, project: project.id }}
+                      hash="projects"
+                      onClick={() => {
+                        onSelectSession?.()
+                      }}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors',
+                        isActiveProjectShortcut
+                          ? 'bg-accent-500/10 text-accent-400'
+                          : 'text-primary-300 hover:bg-primary-800 hover:text-primary-100',
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                      <span className="inline-flex shrink-0 items-center rounded-full border border-primary-700 bg-primary-900 px-2 py-0.5 text-[10px] font-semibold leading-none text-primary-300">
+                        {project.progress}%
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </motion.div>
+          ) : null}
 
           {/* GATEWAY */}
           <SectionLabel
