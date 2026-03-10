@@ -670,7 +670,7 @@ export function AgentsScreen() {
         </aside>
 
         <section className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:p-6">
+          <div className="flex flex-col gap-4 p-4 md:p-6">
             {isDefaultOnlyView ? (
               <div className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm text-primary-500 shadow-sm">
                 <p>Agents are pre-configured. Codex and Claude are available by default.</p>
