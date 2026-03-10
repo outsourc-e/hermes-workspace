@@ -621,11 +621,18 @@ export function ProjectsScreen({
 
   function openPlanReview(missionId: string, projectId: string) {
     void navigate({
-      to: '/plan-review',
+      to: '/workspace',
       search: {
-        plan: undefined,
-        missionId,
+        goal: undefined,
+        checkpointId: undefined,
+        planId: missionId,
+        returnTo: undefined,
+        phaseId: undefined,
+        phaseName: undefined,
         projectId,
+        project: undefined,
+        missionId: undefined,
+        showWizard: undefined,
       },
     })
   }

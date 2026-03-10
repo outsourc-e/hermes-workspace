@@ -12,6 +12,7 @@ export const Route = createFileRoute('/workspace')({
     projectId: typeof search.projectId === 'string' ? search.projectId : undefined,
     checkpointId:
       typeof search.checkpointId === 'string' ? search.checkpointId : undefined,
+    planId: typeof search.planId === 'string' ? search.planId : undefined,
     returnTo:
       search.returnTo === 'review' ||
       search.returnTo === 'projects' ||

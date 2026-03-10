@@ -14,6 +14,7 @@ import { ProjectsScreen } from '@/screens/projects/projects-screen'
 import {
   extractProject,
 } from '@/screens/projects/lib/workspace-types'
+import { PlanReviewScreen } from '@/screens/plan-review/plan-review-screen'
 import { ReviewQueueScreen } from '@/screens/review/review-queue-screen'
 import { RunsConsoleScreen } from '@/screens/runs/runs-console-screen'
 import { WorkspaceSkillsScreen } from '@/screens/skills/workspace-skills-screen'
@@ -30,6 +31,7 @@ export type WorkspaceTab =
 export type WorkspaceSearch = {
   goal?: string
   checkpointId?: string
+  planId?: string
   returnTo?: 'review' | 'projects' | 'mission'
   phaseId?: string
   phaseName?: string
@@ -164,6 +166,8 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   const pageTitle =
     search.checkpointId
       ? 'Checkpoint Detail'
+      : search.planId
+        ? 'Plan Review'
       : search.showWizard
         ? 'New Project'
         : activeTab === 'projects' && search.missionId
@@ -278,13 +282,15 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
       {search.checkpointId ? (
         <CheckpointDetailScreen
           checkpointId={search.checkpointId}
-          projectId={search.projectId}
-          returnTo={search.returnTo ?? (search.missionId ? 'mission' : 'projects')}
-          onBack={() => {
-            restoreTab(search.returnTo ?? (search.missionId ? 'mission' : 'projects'))
-            clearWorkspaceOverlay()
-          }}
-        />
+        projectId={search.projectId}
+        returnTo={search.returnTo ?? (search.missionId ? 'mission' : 'projects')}
+        onBack={() => {
+          restoreTab(search.returnTo ?? (search.missionId ? 'mission' : 'projects'))
+          clearWorkspaceOverlay()
+        }}
+      />
+      ) : search.planId ? (
+        <PlanReviewScreen missionId={search.planId} projectId={search.projectId} plan="" />
       ) : search.showWizard ? (
         <NewProjectWizardContent
           routePath="/workspace"
