@@ -33,7 +33,8 @@ const TEAM_CARDS: TeamCard[] = [
   {
     name: 'Reviewer',
     members: ['🔍 QA Agent', '⚡ Aurora'],
-    summary: 'Review / verify',
+    summary:
+      'Review checkpoints · Run verification · Cannot write code · Can request revisions',
   },
 ]
 
@@ -120,7 +121,7 @@ export function TeamsScreen() {
         </header>
 
         <SectionCard title="Teams">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {TEAM_CARDS.map((team) => (
               <article
                 key={team.name}
