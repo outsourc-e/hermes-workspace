@@ -1,5 +1,6 @@
 import {
   Add01Icon,
+  BotIcon,
   ChartLineData02Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
@@ -419,47 +420,56 @@ export function AgentsScreen() {
 
   if (agentsQuery.isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-gray-50 px-6">
-        <div className="text-center">
-          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-          <p className="text-sm text-primary-500">Loading agents directory...</p>
-        </div>
-      </div>
+      <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+        <section className="mx-auto w-full max-w-[1480px] space-y-5">
+          <div className="rounded-xl border border-primary-200 bg-white px-6 py-16 text-center shadow-sm">
+            <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
+            <p className="text-sm text-primary-500">Loading agents directory...</p>
+          </div>
+        </section>
+      </main>
     )
   }
 
   if (agentsQuery.isError) {
     return (
-      <div className="flex h-full items-center justify-center bg-gray-50 px-6">
-        <div className="max-w-md rounded-3xl border border-red-200 bg-red-50 p-5 text-center">
-          <h2 className="text-lg font-semibold text-red-900">Agents directory unavailable</h2>
-          <p className="mt-2 text-sm text-red-600">
-            {agentsQuery.error instanceof Error
-              ? agentsQuery.error.message
-              : 'The agents directory could not be loaded.'}
-          </p>
-          <Button
-            className="mt-4 bg-accent-500 text-primary-950 hover:bg-accent-400"
-            onClick={() => void agentsQuery.refetch()}
-          >
-            <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.7} />
-            Retry
-          </Button>
-        </div>
-      </div>
+      <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+        <section className="mx-auto w-full max-w-[1480px] space-y-5">
+          <div className="mx-auto max-w-md rounded-3xl border border-red-200 bg-red-50 p-5 text-center">
+            <h2 className="text-lg font-semibold text-red-900">Agents directory unavailable</h2>
+            <p className="mt-2 text-sm text-red-600">
+              {agentsQuery.error instanceof Error
+                ? agentsQuery.error.message
+                : 'The agents directory could not be loaded.'}
+            </p>
+            <Button
+              className="mt-4 bg-accent-500 text-primary-950 hover:bg-accent-400"
+              onClick={() => void agentsQuery.refetch()}
+            >
+              <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.7} />
+              Retry
+            </Button>
+          </div>
+        </section>
+      </main>
     )
   }
 
   if (!selectedAgent) {
     return (
-      <div className="h-full overflow-y-auto bg-gray-50 text-primary-900">
-        <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-6">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-white px-5 py-4 shadow-sm">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
-                Agents
-              </p>
-              <p className="mt-1 text-sm text-primary-500">0 registered</p>
+      <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+        <section className="mx-auto w-full max-w-[1480px] space-y-5">
+          <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
+                <HugeiconsIcon icon={BotIcon} size={24} strokeWidth={1.6} />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold text-primary-900">Agents</h1>
+                <p className="mt-1 text-sm text-primary-500">
+                  0 registered · manage agent profiles, models, and capabilities
+                </p>
+              </div>
             </div>
             <Button
               className="bg-accent-500 text-primary-950 hover:bg-accent-400"
@@ -468,31 +478,30 @@ export function AgentsScreen() {
               <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
               Register Agent
             </Button>
+          </header>
+
+          <div className="rounded-3xl border border-primary-200 bg-white px-6 py-10 text-center shadow-sm">
+            <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-accent-500/25 bg-accent-500/10 text-accent-500">
+              <HugeiconsIcon icon={Add01Icon} size={28} strokeWidth={1.6} />
+            </div>
+            <h1 className="mt-5 text-2xl font-semibold text-primary-900">
+              Register your first agent
+            </h1>
+            <p className="mx-auto mt-3 max-w-xl text-sm text-primary-500">
+              Agents are pre-configured. Codex and Claude are available by default.
+            </p>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-primary-500">
+              Custom agents let you set specific models, prompts, and tool permissions.
+            </p>
+            <Button
+              className="mt-6 bg-accent-500 text-primary-950 hover:bg-accent-400"
+              onClick={() => resetRegisterDialog(true)}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
+              Register Agent
+            </Button>
           </div>
 
-          <div className="flex flex-1 items-center justify-center">
-            <div className="w-full rounded-3xl border border-primary-200 bg-white px-6 py-10 text-center shadow-sm">
-              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-accent-500/25 bg-accent-500/10 text-accent-500">
-                <HugeiconsIcon icon={Add01Icon} size={28} strokeWidth={1.6} />
-              </div>
-              <h1 className="mt-5 text-2xl font-semibold text-primary-900">
-                Register your first agent
-              </h1>
-              <p className="mx-auto mt-3 max-w-xl text-sm text-primary-500">
-                Agents are pre-configured. Codex and Claude are available by default.
-              </p>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-primary-500">
-                Custom agents let you set specific models, prompts, and tool permissions.
-              </p>
-              <Button
-                className="mt-6 bg-accent-500 text-primary-950 hover:bg-accent-400"
-                onClick={() => resetRegisterDialog(true)}
-              >
-                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
-                Register Agent
-              </Button>
-            </div>
-          </div>
           <WorkspaceEntityDialog
             open={registerDialogOpen}
             onOpenChange={resetRegisterDialog}
@@ -591,8 +600,8 @@ export function AgentsScreen() {
               />
             </WorkspaceFieldLabel>
           </WorkspaceEntityDialog>
-        </div>
-      </div>
+        </section>
+      </main>
     )
   }
 
@@ -601,57 +610,57 @@ export function AgentsScreen() {
   const stats = statsQuery.data
 
   return (
-    <div className="h-full overflow-hidden bg-gray-50 text-primary-900">
-      <div className="flex h-full flex-col md:flex-row">
-        {/* Sidebar — agent list */}
-        <aside className="flex shrink-0 flex-col border-b border-primary-200 bg-white md:w-[280px] md:border-b-0 md:border-r">
-          <div className="flex items-center justify-between gap-2 border-b border-primary-200 px-4 py-3">
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+      <section className="mx-auto w-full max-w-[1480px] space-y-5">
+        <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
+              <HugeiconsIcon icon={BotIcon} size={24} strokeWidth={1.6} />
+            </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
-                Agents
-              </p>
-              <p className="mt-0.5 text-xs text-primary-400">
-                {agents.length} registered
+              <h1 className="text-base font-semibold text-primary-900">Agents</h1>
+              <p className="mt-1 text-sm text-primary-500">
+                {agents.length} registered · manage agent profiles, models, and capabilities
               </p>
             </div>
-            <Button
-              size="sm"
-              className="bg-accent-500 text-primary-950 hover:bg-accent-400"
-              onClick={() => resetRegisterDialog(true)}
-            >
-              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
-              <span className="hidden sm:inline">Register</span>
-            </Button>
           </div>
+          <Button
+            className="bg-accent-500 text-primary-950 hover:bg-accent-400"
+            onClick={() => resetRegisterDialog(true)}
+          >
+            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
+            Register Agent
+          </Button>
+        </header>
 
-          <div className="overflow-y-auto p-2">
-            {agents.map((agent) => {
-              const isActive = agent.id === selectedAgent.id
-              return (
-                <button
-                  key={agent.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedAgentId(agent.id)
-                    setActiveTab('profile')
-                  }}
-                  className={cn(
-                    'mb-1 flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
-                    isActive
-                      ? 'border-accent-500/30 bg-accent-500/8 text-primary-900'
-                      : 'border-transparent bg-transparent hover:border-primary-200 hover:bg-primary-50',
-                  )}
-                >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {agents.map((agent) => {
+            const isActive = agent.id === selectedAgent.id
+
+            return (
+              <button
+                key={agent.id}
+                type="button"
+                onClick={() => {
+                  setSelectedAgentId(agent.id)
+                  setActiveTab('profile')
+                }}
+                className={cn(
+                  'rounded-xl border bg-white p-4 text-left shadow-sm transition-colors hover:border-primary-300',
+                  isActive ? 'border-accent-500/40 bg-accent-500/5' : 'border-primary-200',
+                )}
+              >
+                <div className="flex items-center gap-3">
                   <div
                     className={cn(
-                      'flex size-9 shrink-0 items-center justify-center rounded-xl text-base',
+                      'flex size-10 items-center justify-center rounded-xl text-lg',
                       getAvatarToneClass(agent.avatar_tone),
                     )}
                   >
                     <span aria-hidden="true">{agent.avatar}</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-primary-900">
+                    <p className="truncate text-sm font-semibold text-primary-900">
                       {agent.name}
                     </p>
                     <p className="truncate text-xs text-primary-500">
@@ -664,15 +673,14 @@ export function AgentsScreen() {
                       getStatusDotClass(agent.status),
                     )}
                   />
-                </button>
-              )
-            })}
-          </div>
-        </aside>
+                </div>
+              </button>
+            )
+          })}
+        </div>
 
-        {/* Detail pane */}
-        <section className="min-h-0 flex-1 overflow-y-auto bg-gray-50">
-          <div className="mx-auto w-full max-w-4xl flex flex-col gap-4 p-4 md:p-6">
+        {selectedAgent ? (
+          <div className="space-y-4">
             {isDefaultOnlyView ? (
               <div className="rounded-xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-500 shadow-sm">
                 <p>Agents are pre-configured. Codex and Claude are available by default.</p>
@@ -682,7 +690,6 @@ export function AgentsScreen() {
               </div>
             ) : null}
 
-            {/* Agent header */}
             <div className="rounded-xl border border-primary-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3">
@@ -1155,107 +1162,107 @@ export function AgentsScreen() {
               </AnimatePresence>
             </Tabs>
           </div>
-        </section>
-      </div>
+        ) : null}
 
-      <WorkspaceEntityDialog
-        open={registerDialogOpen}
-        onOpenChange={resetRegisterDialog}
-        title="Register Agent"
-        description="Create a reusable agent profile with a role, adapter, model, and optional prompt."
-        submitting={registerAgentMutation.isPending}
-        onSubmit={handleRegisterSubmit}
-        submitLabel="Register Agent"
-      >
-        <WorkspaceFieldLabel label="Name">
-          <div className="space-y-1.5">
-            <input
-              value={registerForm.name}
-              onChange={(event) => {
-                setRegisterForm((current) => ({ ...current, name: event.target.value }))
-                if (registerErrors.name) {
-                  setRegisterErrors((current) => ({ ...current, name: undefined }))
-                }
-              }}
-              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
-              placeholder="Codex Builder"
-              autoFocus
-            />
-            {registerErrors.name ? (
-              <p className="text-xs text-red-500">{registerErrors.name}</p>
-            ) : null}
-          </div>
-        </WorkspaceFieldLabel>
-        <WorkspaceFieldLabel label="Role">
-          <select
-            value={registerForm.role}
-            onChange={(event) =>
-              setRegisterForm((current) => ({
-                ...current,
-                role: event.target.value as AgentRole,
-              }))
-            }
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
-          >
-            <option value="coder">coder</option>
-            <option value="reviewer">reviewer</option>
-            <option value="qa">qa</option>
-            <option value="planner">planner</option>
-          </select>
-        </WorkspaceFieldLabel>
-        <WorkspaceFieldLabel label="Adapter Type">
-          <div className="space-y-1.5">
+        <WorkspaceEntityDialog
+          open={registerDialogOpen}
+          onOpenChange={resetRegisterDialog}
+          title="Register Agent"
+          description="Create a reusable agent profile with a role, adapter, model, and optional prompt."
+          submitting={registerAgentMutation.isPending}
+          onSubmit={handleRegisterSubmit}
+          submitLabel="Register Agent"
+        >
+          <WorkspaceFieldLabel label="Name">
+            <div className="space-y-1.5">
+              <input
+                value={registerForm.name}
+                onChange={(event) => {
+                  setRegisterForm((current) => ({ ...current, name: event.target.value }))
+                  if (registerErrors.name) {
+                    setRegisterErrors((current) => ({ ...current, name: undefined }))
+                  }
+                }}
+                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                placeholder="Codex Builder"
+                autoFocus
+              />
+              {registerErrors.name ? (
+                <p className="text-xs text-red-500">{registerErrors.name}</p>
+              ) : null}
+            </div>
+          </WorkspaceFieldLabel>
+          <WorkspaceFieldLabel label="Role">
             <select
-              value={registerForm.adapter_type}
-              onChange={(event) => {
+              value={registerForm.role}
+              onChange={(event) =>
                 setRegisterForm((current) => ({
                   ...current,
-                  adapter_type: event.target.value as AgentAdapterType,
+                  role: event.target.value as AgentRole,
                 }))
-                if (registerErrors.adapter_type) {
-                  setRegisterErrors((current) => ({
-                    ...current,
-                    adapter_type: undefined,
-                  }))
-                }
-              }}
+              }
               className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
             >
-              <option value="codex">codex</option>
-              <option value="claude">claude</option>
-              <option value="openclaw">openclaw</option>
-              <option value="ollama">ollama</option>
+              <option value="coder">coder</option>
+              <option value="reviewer">reviewer</option>
+              <option value="qa">qa</option>
+              <option value="planner">planner</option>
             </select>
-            {registerErrors.adapter_type ? (
-              <p className="text-xs text-red-500">{registerErrors.adapter_type}</p>
-            ) : null}
-          </div>
-        </WorkspaceFieldLabel>
-        <WorkspaceFieldLabel label="Model">
-          <input
-            value={registerForm.model}
-            onChange={(event) =>
-              setRegisterForm((current) => ({ ...current, model: event.target.value }))
-            }
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
-            placeholder="gpt-5.4 or claude-sonnet-4-6"
-          />
-        </WorkspaceFieldLabel>
-        <WorkspaceFieldLabel label="System Prompt">
-          <textarea
-            value={registerForm.system_prompt}
-            onChange={(event) =>
-              setRegisterForm((current) => ({
-                ...current,
-                system_prompt: event.target.value,
-              }))
-            }
-            rows={4}
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
-            placeholder="Optional system prompt for this agent profile..."
-          />
-        </WorkspaceFieldLabel>
-      </WorkspaceEntityDialog>
-    </div>
+          </WorkspaceFieldLabel>
+          <WorkspaceFieldLabel label="Adapter Type">
+            <div className="space-y-1.5">
+              <select
+                value={registerForm.adapter_type}
+                onChange={(event) => {
+                  setRegisterForm((current) => ({
+                    ...current,
+                    adapter_type: event.target.value as AgentAdapterType,
+                  }))
+                  if (registerErrors.adapter_type) {
+                    setRegisterErrors((current) => ({
+                      ...current,
+                      adapter_type: undefined,
+                    }))
+                  }
+                }}
+                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              >
+                <option value="codex">codex</option>
+                <option value="claude">claude</option>
+                <option value="openclaw">openclaw</option>
+                <option value="ollama">ollama</option>
+              </select>
+              {registerErrors.adapter_type ? (
+                <p className="text-xs text-red-500">{registerErrors.adapter_type}</p>
+              ) : null}
+            </div>
+          </WorkspaceFieldLabel>
+          <WorkspaceFieldLabel label="Model">
+            <input
+              value={registerForm.model}
+              onChange={(event) =>
+                setRegisterForm((current) => ({ ...current, model: event.target.value }))
+              }
+              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              placeholder="gpt-5.4 or claude-sonnet-4-6"
+            />
+          </WorkspaceFieldLabel>
+          <WorkspaceFieldLabel label="System Prompt">
+            <textarea
+              value={registerForm.system_prompt}
+              onChange={(event) =>
+                setRegisterForm((current) => ({
+                  ...current,
+                  system_prompt: event.target.value,
+                }))
+              }
+              rows={4}
+              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              placeholder="Optional system prompt for this agent profile..."
+            />
+          </WorkspaceFieldLabel>
+        </WorkspaceEntityDialog>
+      </section>
+    </main>
   )
 }
