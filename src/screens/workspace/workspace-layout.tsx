@@ -204,7 +204,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   }
 
   return (
-    <div className="min-h-full bg-primary-950 text-primary-100">
+    <div className="flex min-h-screen flex-col bg-primary-950 text-primary-100">
       <div className="sticky top-0 z-20 border-b border-primary-800 bg-primary-950/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
@@ -287,45 +287,47 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
         </div>
       </div>
 
-      {search.checkpointId ? (
-        <CheckpointDetailScreen
-          checkpointId={search.checkpointId}
-        projectId={search.projectId}
-        returnTo={search.returnTo ?? (search.missionId ? 'mission' : 'projects')}
-        onBack={() => {
-          restoreTab(search.returnTo ?? (search.missionId ? 'mission' : 'projects'))
-          clearWorkspaceOverlay()
-        }}
-      />
-      ) : search.planId ? (
-        <PlanReviewScreen missionId={search.planId} projectId={search.projectId} plan="" />
-      ) : search.showWizard ? (
-        <NewProjectWizardContent
-          routePath="/workspace"
-          onClose={() => {
-            restoreTab('projects')
-            clearWorkspaceOverlay()
-          }}
-        />
-      ) : activeTab === 'projects' ? (
-        search.missionId ? (
-          <MissionConsoleScreen
-            missionId={search.missionId}
-            projectId={activeProjectId}
+      <main className="flex-1">
+        {search.checkpointId ? (
+          <CheckpointDetailScreen
+            checkpointId={search.checkpointId}
+            projectId={search.projectId}
+            returnTo={search.returnTo ?? (search.missionId ? 'mission' : 'projects')}
+            onBack={() => {
+              restoreTab(search.returnTo ?? (search.missionId ? 'mission' : 'projects'))
+              clearWorkspaceOverlay()
+            }}
           />
-        ) : (
-          <ProjectsScreen
-            replanSearch={search}
+        ) : search.planId ? (
+          <PlanReviewScreen missionId={search.planId} projectId={search.projectId} plan="" />
+        ) : search.showWizard ? (
+          <NewProjectWizardContent
             routePath="/workspace"
-            onProjectContextChange={setProjectContext}
+            onClose={() => {
+              restoreTab('projects')
+              clearWorkspaceOverlay()
+            }}
           />
-        )
-      ) : null}
-      {activeTab === 'review' ? <ReviewQueueScreen /> : null}
-      {activeTab === 'runs' ? <RunsConsoleScreen /> : null}
-      {activeTab === 'agents' ? <AgentsScreen /> : null}
-      {activeTab === 'skills' ? <WorkspaceSkillsScreen /> : null}
-      {activeTab === 'teams' ? <TeamsScreen /> : null}
+        ) : activeTab === 'projects' ? (
+          search.missionId ? (
+            <MissionConsoleScreen
+              missionId={search.missionId}
+              projectId={activeProjectId}
+            />
+          ) : (
+            <ProjectsScreen
+              replanSearch={search}
+              routePath="/workspace"
+              onProjectContextChange={setProjectContext}
+            />
+          )
+        ) : null}
+        {activeTab === 'review' ? <ReviewQueueScreen /> : null}
+        {activeTab === 'runs' ? <RunsConsoleScreen /> : null}
+        {activeTab === 'agents' ? <AgentsScreen /> : null}
+        {activeTab === 'skills' ? <WorkspaceSkillsScreen /> : null}
+        {activeTab === 'teams' ? <TeamsScreen /> : null}
+      </main>
     </div>
   )
 }
