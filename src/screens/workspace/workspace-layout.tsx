@@ -217,7 +217,15 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                   size="sm"
                   onClick={() => {
                     setActiveTab(tab)
-                    writeWorkspaceHash(tab)
+                    void navigate({
+                      to: '/workspace',
+                      search: {
+                        goal: search.goal,
+                        project: search.project,
+                        projectId: search.projectId,
+                      },
+                      hash: tab === 'projects' ? '' : tab,
+                    })
                   }}
                   className={cn(
                     'rounded-full border text-sm',
