@@ -7,7 +7,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import type React from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import {
@@ -76,6 +76,8 @@ const FILTERS: Array<{
   { label: 'Rejected', value: 'rejected' },
   { label: 'Revised', value: 'revised' },
 ]
+
+const PAGE_SIZE = 8
 
 type ReviewComposerState = {
   checkpointId: string
@@ -354,6 +356,7 @@ export function ReviewQueueScreen() {
     'all',
   )
   const [projectFilter, setProjectFilter] = useState('all')
+  const [page, setPage] = useState(1)
   const [composer, setComposer] = useState<ReviewComposerState | null>(null)
   const [reviewerNotes, setReviewerNotes] = useState('')
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<WorkspaceCheckpoint | null>(null)
@@ -444,6 +447,20 @@ export function ReviewQueueScreen() {
         .length,
     [checkpoints],
   )
+  const totalPages = Math.max(1, Math.ceil(visibleCheckpoints.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = visibleCheckpoints.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  )
+  const startIndex = visibleCheckpoints.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const endIndex = visibleCheckpoints.length === 0
+    ? 0
+    : Math.min(currentPage * PAGE_SIZE, visibleCheckpoints.length)
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, projectFilter])
 
   function handleApprove(checkpointId: string) {
     reviewMutation.mutate({
@@ -608,7 +625,7 @@ export function ReviewQueueScreen() {
           </div>
         ) : (
           <div className="space-y-3">
-            {visibleCheckpoints.map((checkpoint) => (
+            {pageItems.map((checkpoint) => (
               <ReviewRow
                 key={checkpoint.id}
                 checkpoint={checkpoint}
@@ -627,6 +644,39 @@ export function ReviewQueueScreen() {
                 mutationPending={reviewMutation.isPending}
               />
             ))}
+            <div className="flex flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm text-primary-500 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                Showing {startIndex}-{endIndex} of {visibleCheckpoints.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={currentPage === 1}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+                    currentPage === 1
+                      ? 'cursor-not-allowed border-primary-200 bg-primary-100 text-primary-400'
+                      : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50',
+                  )}
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={currentPage === totalPages}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+                    currentPage === totalPages
+                      ? 'cursor-not-allowed border-primary-200 bg-primary-100 text-primary-400'
+                      : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50',
+                  )}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>
