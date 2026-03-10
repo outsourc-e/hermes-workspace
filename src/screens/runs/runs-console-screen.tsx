@@ -868,7 +868,7 @@ export function RunsConsoleScreen() {
 
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-6">
         <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
