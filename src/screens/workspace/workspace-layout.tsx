@@ -204,8 +204,8 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-primary-950 text-primary-100">
-      <div className="sticky top-0 z-20 border-b border-primary-800 bg-primary-950/95 backdrop-blur">
+    <div className="flex h-full flex-col overflow-hidden bg-gray-50 text-primary-900">
+      <div className="sticky top-0 z-20 border-b border-primary-200 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
             {TAB_ORDER.map((tab) => {
@@ -230,8 +230,8 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                   className={cn(
                     'rounded-full border text-sm',
                     active
-                      ? 'border-accent-500/40 bg-accent-500/10 text-accent-300 hover:bg-accent-500/15'
-                      : 'border-primary-800 text-primary-300 hover:bg-primary-800 hover:text-primary-100',
+                      ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
+                      : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-900',
                   )}
                 >
                   {TAB_LABELS[tab]}
@@ -240,14 +240,14 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
             })}
           </div>
           {activeTab === 'projects' && (projectName || search.missionId) ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-primary-400">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-primary-500">
               <button
                 type="button"
                 onClick={() => {
                   setActiveTab('projects')
                   writeWorkspaceHash('projects')
                 }}
-                className="transition-colors hover:text-primary-100"
+                className="transition-colors hover:text-primary-900"
               >
                 Projects
               </button>
@@ -264,7 +264,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                       setActiveTab('projects')
                       writeWorkspaceHash('projects')
                     }}
-                    className="transition-colors hover:text-primary-100"
+                    className="transition-colors hover:text-primary-900"
                   >
                     {projectName}
                   </button>
@@ -277,7 +277,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                     size={12}
                     strokeWidth={1.8}
                   />
-                  <span className="font-medium text-primary-100">
+                  <span className="font-medium text-primary-900">
                     {missionName ?? 'Mission Console'}
                   </span>
                 </>
