@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
-type SkillCategory = 'QA' | 'Auth' | 'UI' | 'DB' | 'DevOps'
 type MemoryFilter = 'All' | 'Workspace' | 'Project' | 'Agent'
 type MemorySection = 'workspace' | 'project' | 'agent'
 
@@ -21,10 +20,8 @@ type SkillItem = {
   id: string
   name: string
   description: string
-  category: SkillCategory
-  status: 'active' | 'disabled'
-  emoji: string
-  tone: string
+  path: string
+  status: 'active'
 }
 
 type MemoryFileItem = {
@@ -38,14 +35,9 @@ type MemoryFilesResponse = {
   files: Array<MemoryFileItem>
 }
 
-const SKILL_CATEGORIES: Array<'All' | SkillCategory> = [
-  'All',
-  'QA',
-  'Auth',
-  'UI',
-  'DB',
-  'DevOps',
-]
+type SkillsResponse = {
+  skills: Array<SkillItem>
+}
 
 const MEMORY_FILTERS: Array<MemoryFilter> = [
   'All',
@@ -54,74 +46,39 @@ const MEMORY_FILTERS: Array<MemoryFilter> = [
   'Agent',
 ]
 
-const SKILLS: Array<SkillItem> = [
-  {
-    id: 'code-reviewer',
-    name: 'Code Reviewer',
-    description: 'Automated code review with style + security checks',
-    category: 'QA',
-    status: 'active',
-    emoji: '🔍',
-    tone: 'bg-green-500/10 text-green-300',
-  },
-  {
-    id: 'auth-patterns',
-    name: 'Auth Patterns',
-    description: 'JWT, OAuth, session management templates',
-    category: 'Auth',
-    status: 'active',
-    emoji: '🔒',
-    tone: 'bg-red-500/10 text-red-300',
-  },
-  {
-    id: 'db-migration',
-    name: 'DB Migration',
-    description: 'Schema migrations, seed data, rollback',
-    category: 'DB',
-    status: 'active',
-    emoji: '🗄️',
-    tone: 'bg-blue-500/10 text-blue-300',
-  },
-  {
-    id: 'ui-component-gen',
-    name: 'UI Component Gen',
-    description: 'Generate React components from descriptions',
-    category: 'UI',
-    status: 'active',
-    emoji: '🎨',
-    tone: 'bg-accent-500/10 text-accent-300',
-  },
-  {
-    id: 'test-writer',
-    name: 'Test Writer',
-    description: 'Generate unit + integration tests from code',
-    category: 'QA',
-    status: 'active',
-    emoji: '🧪',
-    tone: 'bg-fuchsia-500/10 text-fuchsia-300',
-  },
-  {
-    id: 'docker-compose',
-    name: 'Docker Compose',
-    description: 'Container orchestration + CI/CD',
-    category: 'DevOps',
-    status: 'disabled',
-    emoji: '🐳',
-    tone: 'bg-primary-800 text-primary-300',
-  },
-]
-
-const CATEGORY_BADGE_CLASS: Record<SkillCategory, string> = {
-  QA: 'border-teal-500/30 bg-teal-500/10 text-teal-300',
-  Auth: 'border-red-500/30 bg-red-500/10 text-red-300',
-  UI: 'border-accent-500/30 bg-accent-500/10 text-accent-300',
-  DB: 'border-blue-500/30 bg-blue-500/10 text-blue-300',
-  DevOps: 'border-primary-700 bg-primary-800 text-primary-300',
-}
-
 const STATUS_BADGE_CLASS: Record<SkillItem['status'], string> = {
   active: 'border-green-500/30 bg-green-500/10 text-green-300',
-  disabled: 'border-primary-700 bg-primary-800 text-primary-300',
+}
+
+async function readPayload(response: Response): Promise<unknown> {
+  const text = await response.text()
+  if (!text) return null
+
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return text
+  }
+}
+
+async function apiRequest(input: string, init?: RequestInit): Promise<unknown> {
+  const response = await fetch(input, init)
+  const payload = await readPayload(response)
+
+  if (!response.ok) {
+    const record =
+      payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null
+
+    throw new Error(
+      (typeof record?.error === 'string' && record.error) ||
+        (typeof record?.message === 'string' && record.message) ||
+        `Request failed with status ${response.status}`,
+    )
+  }
+
+  return payload
 }
 
 function sectionLabel(section: MemorySection): string {
@@ -146,12 +103,24 @@ function EmptyMemorySection({ label }: { label: string }) {
 }
 
 export function WorkspaceSkillsScreen() {
-  const [skillFilter, setSkillFilter] = useState<'All' | SkillCategory>('All')
-  const [selectedSkillId, setSelectedSkillId] = useState<string>('code-reviewer')
+  const [selectedSkillId, setSelectedSkillId] = useState<string>('')
   const [memoryFilter, setMemoryFilter] = useState<MemoryFilter>('All')
   const [memorySearch, setMemorySearch] = useState('')
   const deferredSearch = useDeferredValue(memorySearch)
   const [selectedMemoryPath, setSelectedMemoryPath] = useState<string | null>(null)
+
+  const skillsQuery = useQuery({
+    queryKey: ['workspace', 'skills'],
+    queryFn: async function fetchSkills(): Promise<SkillsResponse> {
+      const payload = await apiRequest('http://localhost:3099/api/workspace/skills')
+
+      return {
+        skills: Array.isArray((payload as SkillsResponse).skills)
+          ? (payload as SkillsResponse).skills
+          : [],
+      }
+    },
+  })
 
   const memoryQuery = useQuery({
     queryKey: ['workspace', 'memory-files'],
@@ -177,13 +146,7 @@ export function WorkspaceSkillsScreen() {
     },
   })
 
-  const visibleSkills = useMemo(
-    () =>
-      SKILLS.filter((skill) =>
-        skillFilter === 'All' ? true : skill.category === skillFilter,
-      ),
-    [skillFilter],
-  )
+  const visibleSkills = skillsQuery.data?.skills ?? []
 
   const normalizedSearch = deferredSearch.trim().toLowerCase()
   const filteredMemoryFiles = useMemo(() => {
@@ -205,7 +168,17 @@ export function WorkspaceSkillsScreen() {
   const agentFiles = filteredMemoryFiles.filter((file) => file.section === 'agent')
 
   const selectedSkill =
-    SKILLS.find((skill) => skill.id === selectedSkillId) ?? SKILLS[0] ?? null
+    visibleSkills.find((skill) => skill.id === selectedSkillId) ??
+    visibleSkills[0] ??
+    null
+
+  useEffect(() => {
+    if (selectedSkillId && visibleSkills.some((skill) => skill.id === selectedSkillId)) {
+      return
+    }
+
+    setSelectedSkillId(visibleSkills[0]?.id ?? '')
+  }, [selectedSkillId, visibleSkills])
 
   useEffect(() => {
     if (selectedMemoryPath) return
@@ -276,145 +249,119 @@ export function WorkspaceSkillsScreen() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 py-4">
-                {SKILL_CATEGORIES.map((category) => {
-                  const active = category === skillFilter
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setSkillFilter(category)}
-                      className={cn(
-                        'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                        active
-                          ? 'border-accent-500/40 bg-accent-500/10 text-accent-400'
-                          : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:text-primary-900',
-                      )}
-                    >
-                      {category}
-                    </button>
-                  )
-                })}
-              </div>
-
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
-                {visibleSkills.map((skill) => {
-                  const expanded = selectedSkillId === skill.id
-                  return (
-                    <div
-                      key={skill.id}
-                      className={cn(
-                        'overflow-hidden rounded-xl border bg-primary-50/60 transition-all',
-                        skill.status === 'disabled' && 'opacity-50',
-                        expanded
-                          ? 'border-accent-500/40 bg-accent-500/5'
-                          : 'border-primary-200 hover:border-primary-300',
-                      )}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedSkillId((current) =>
-                            current === skill.id ? '' : skill.id,
-                          )
-                        }
-                        className="flex w-full items-start gap-3 px-4 py-4 text-left"
+                {skillsQuery.isPending ? (
+                  <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-600">
+                    Loading skills...
+                  </div>
+                ) : skillsQuery.isError ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">
+                    {skillsQuery.error instanceof Error
+                      ? skillsQuery.error.message
+                      : 'Failed to load skills'}
+                  </div>
+                ) : visibleSkills.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-500">
+                    No skills found in `~/.openclaw/workspace/skills`.
+                  </div>
+                ) : (
+                  visibleSkills.map((skill) => {
+                    const expanded = selectedSkillId === skill.id
+                    return (
+                      <div
+                        key={skill.id}
+                        className={cn(
+                          'overflow-hidden rounded-xl border bg-primary-50/60 transition-all',
+                          expanded
+                            ? 'border-accent-500/40 bg-accent-500/5'
+                            : 'border-primary-200 hover:border-primary-300',
+                        )}
                       >
-                        <span
-                          className={cn(
-                            'flex size-11 shrink-0 items-center justify-center rounded-2xl text-xl',
-                            skill.tone,
-                          )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedSkillId((current) =>
+                              current === skill.id ? '' : skill.id,
+                            )
+                          }
+                          className="flex w-full items-start gap-3 px-4 py-4 text-left"
                         >
-                          {skill.emoji}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-primary-900">
-                              {skill.name}
-                            </span>
-                            <span
-                              className={cn(
-                                'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                                CATEGORY_BADGE_CLASS[skill.category],
-                              )}
-                            >
-                              {skill.category}
-                            </span>
-                            <span
-                              className={cn(
-                                'rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize',
-                                STATUS_BADGE_CLASS[skill.status],
-                              )}
-                            >
-                              {skill.status}
-                            </span>
+                          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-accent-500/20 bg-accent-500/10 text-accent-400">
+                            <HugeiconsIcon
+                              icon={SparklesIcon}
+                              size={18}
+                              strokeWidth={1.7}
+                            />
                           </span>
-                          <span className="mt-1 block text-sm text-primary-600">
-                            {skill.description}
-                          </span>
-                        </span>
-                        <HugeiconsIcon
-                          icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
-                          size={18}
-                          strokeWidth={1.7}
-                          className="mt-0.5 shrink-0 text-primary-500"
-                        />
-                      </button>
-
-                      <AnimatePresence initial={false}>
-                        {expanded ? (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.16 }}
-                            className="overflow-hidden border-t border-primary-200"
-                          >
-                            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex items-start gap-3 text-sm text-primary-600">
-                                <HugeiconsIcon
-                                  icon={SparklesIcon}
-                                  size={18}
-                                  strokeWidth={1.7}
-                                  className="mt-0.5 shrink-0 text-accent-300"
-                                />
-                                <p>
-                                  {skill.status === 'active'
-                                    ? 'Installed and ready to use in the workspace.'
-                                    : 'Installed package exists, but this skill is currently disabled.'}
-                                </p>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant={
-                                  skill.status === 'active'
-                                    ? 'secondary'
-                                    : 'outline'
-                                }
-                                onClick={() =>
-                                  toast(
-                                    skill.status === 'active'
-                                      ? `${skill.name} is already enabled`
-                                      : `${skill.name} cannot be enabled yet`,
-                                    {
-                                      type:
-                                        skill.status === 'active'
-                                          ? 'info'
-                                          : 'warning',
-                                    },
-                                  )
-                                }
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-semibold text-primary-900">
+                                {skill.name}
+                              </span>
+                              <span
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize',
+                                  STATUS_BADGE_CLASS[skill.status],
+                                )}
                               >
-                                {skill.status === 'active' ? 'Enabled' : 'Disabled'}
-                              </Button>
-                            </div>
-                          </motion.div>
-                        ) : null}
-                      </AnimatePresence>
-                    </div>
-                  )
-                })}
+                                {skill.status}
+                              </span>
+                            </span>
+                            <span className="mt-1 block text-sm text-primary-600">
+                              {skill.description}
+                            </span>
+                          </span>
+                          <HugeiconsIcon
+                            icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
+                            size={18}
+                            strokeWidth={1.7}
+                            className="mt-0.5 shrink-0 text-primary-500"
+                          />
+                        </button>
+
+                        <AnimatePresence initial={false}>
+                          {expanded ? (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.16 }}
+                              className="overflow-hidden border-t border-primary-200"
+                            >
+                              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-start gap-3 text-sm text-primary-600">
+                                  <HugeiconsIcon
+                                    icon={SparklesIcon}
+                                    size={18}
+                                    strokeWidth={1.7}
+                                    className="mt-0.5 shrink-0 text-accent-300"
+                                  />
+                                  <div className="space-y-1">
+                                    <p>Installed and ready to use in the workspace.</p>
+                                    <p className="break-all text-xs text-primary-500">
+                                      {skill.path}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() =>
+                                    toast(`${skill.name} is installed`, {
+                                      type: 'info',
+                                    })
+                                  }
+                                >
+                                  Enabled
+                                </Button>
+                              </div>
+                            </motion.div>
+                          ) : null}
+                        </AnimatePresence>
+                      </div>
+                    )
+                  })
+                )}
               </div>
 
               {selectedSkill ? (
