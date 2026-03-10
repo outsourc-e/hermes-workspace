@@ -71,6 +71,28 @@ export type WorkspaceAgent = {
   assigned_projects?: string[]
 }
 
+export type WorkspaceTeamMember = {
+  id: string
+  name: string
+  type: 'user' | 'agent'
+  avatar?: string
+}
+
+export type WorkspaceTeam = {
+  id: string
+  name: string
+  description: string
+  members: WorkspaceTeamMember[]
+  permissions: string[]
+}
+
+export type WorkspaceAuditEntry = {
+  id: string
+  timestamp: string
+  actor: string
+  action: string
+}
+
 export type WorkspaceTaskRun = {
   id: string
   task_id?: string
