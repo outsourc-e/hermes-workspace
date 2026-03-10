@@ -154,33 +154,33 @@ function formatRunStatus(
 }
 
 function getStatusDotClass(status: WorkspaceAgentDirectory['status']): string {
-  if (status === 'online') return 'bg-green-400'
-  if (status === 'away') return 'bg-yellow-400'
-  return 'bg-primary-600'
+  if (status === 'online') return 'bg-green-500'
+  if (status === 'away') return 'bg-yellow-500'
+  return 'bg-primary-300'
 }
 
 function getStatusBadgeClass(status: WorkspaceAgentDirectory['status']): string {
   if (status === 'online') {
-    return 'border-green-400/20 bg-green-400/10 text-green-300'
+    return 'border-green-500/30 bg-green-50 text-green-700'
   }
   if (status === 'away') {
-    return 'border-yellow-400/20 bg-yellow-400/10 text-yellow-300'
+    return 'border-yellow-500/30 bg-yellow-50 text-yellow-700'
   }
-  return 'border-primary-700 bg-primary-950/80 text-primary-300'
+  return 'border-primary-200 bg-primary-50 text-primary-600'
 }
 
 function getAvatarToneClass(tone: WorkspaceAgentDirectory['avatar_tone']): string {
-  if (tone === 'accent') return 'bg-accent-500/15 text-accent-300'
-  if (tone === 'green') return 'bg-green-400/10 text-primary-100'
-  if (tone === 'yellow') return 'bg-yellow-400/10 text-primary-100'
-  return 'bg-primary-700 text-primary-100'
+  if (tone === 'accent') return 'bg-accent-500/15 text-accent-600'
+  if (tone === 'green') return 'bg-green-100 text-green-700'
+  if (tone === 'yellow') return 'bg-yellow-100 text-yellow-700'
+  return 'bg-primary-100 text-primary-600'
 }
 
 function getProjectChipClass(index: number): string {
   const variants = [
-    'border-accent-500/25 bg-accent-500/10 text-accent-300',
-    'border-primary-700 bg-primary-950/80 text-primary-200',
-    'border-green-400/20 bg-green-400/10 text-green-300',
+    'border-accent-500/30 bg-accent-500/10 text-accent-700',
+    'border-primary-200 bg-primary-50 text-primary-700',
+    'border-green-500/30 bg-green-50 text-green-700',
   ]
   return variants[index % variants.length] ?? variants[0]
 }
@@ -267,7 +267,7 @@ function SectionCard({
   return (
     <section className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary-600">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary-500">
           {title}
         </h3>
         {action}
@@ -419,10 +419,10 @@ export function AgentsScreen() {
 
   if (agentsQuery.isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-primary-950 px-6">
+      <div className="flex h-full items-center justify-center bg-gray-50 px-6">
         <div className="text-center">
           <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-          <p className="text-sm text-primary-400">Loading agents directory...</p>
+          <p className="text-sm text-primary-500">Loading agents directory...</p>
         </div>
       </div>
     )
@@ -430,10 +430,10 @@ export function AgentsScreen() {
 
   if (agentsQuery.isError) {
     return (
-      <div className="flex h-full items-center justify-center bg-primary-950 px-6">
-        <div className="max-w-md rounded-3xl border border-red-500/20 bg-red-500/10 p-5 text-center">
-          <h2 className="text-lg font-semibold text-primary-100">Agents directory unavailable</h2>
-          <p className="mt-2 text-sm text-primary-300">
+      <div className="flex h-full items-center justify-center bg-gray-50 px-6">
+        <div className="max-w-md rounded-3xl border border-red-200 bg-red-50 p-5 text-center">
+          <h2 className="text-lg font-semibold text-red-900">Agents directory unavailable</h2>
+          <p className="mt-2 text-sm text-red-600">
             {agentsQuery.error instanceof Error
               ? agentsQuery.error.message
               : 'The agents directory could not be loaded.'}
@@ -452,8 +452,8 @@ export function AgentsScreen() {
 
   if (!selectedAgent) {
     return (
-      <div className="h-full overflow-hidden bg-surface text-primary-900">
-        <div className="mx-auto flex h-full max-w-5xl flex-col p-4 md:p-6">
+      <div className="h-full overflow-y-auto bg-gray-50 text-primary-900">
+        <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-6">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-white px-5 py-4 shadow-sm">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
@@ -471,8 +471,8 @@ export function AgentsScreen() {
           </div>
 
           <div className="flex flex-1 items-center justify-center">
-            <div className="w-full max-w-2xl rounded-3xl border border-primary-200 bg-white px-6 py-10 text-center shadow-sm">
-              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-accent-500/25 bg-accent-500/10 text-accent-400">
+            <div className="w-full rounded-3xl border border-primary-200 bg-white px-6 py-10 text-center shadow-sm">
+              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-accent-500/25 bg-accent-500/10 text-accent-500">
                 <HugeiconsIcon icon={Add01Icon} size={28} strokeWidth={1.6} />
               </div>
               <h1 className="mt-5 text-2xl font-semibold text-primary-900">
@@ -517,7 +517,7 @@ export function AgentsScreen() {
                   autoFocus
                 />
                 {registerErrors.name ? (
-                  <p className="text-xs text-red-300">{registerErrors.name}</p>
+                  <p className="text-xs text-red-500">{registerErrors.name}</p>
                 ) : null}
               </div>
             </WorkspaceFieldLabel>
@@ -562,7 +562,7 @@ export function AgentsScreen() {
                   <option value="ollama">ollama</option>
                 </select>
                 {registerErrors.adapter_type ? (
-                  <p className="text-xs text-red-300">{registerErrors.adapter_type}</p>
+                  <p className="text-xs text-red-500">{registerErrors.adapter_type}</p>
                 ) : null}
               </div>
             </WorkspaceFieldLabel>
@@ -573,7 +573,7 @@ export function AgentsScreen() {
                   setRegisterForm((current) => ({ ...current, model: event.target.value }))
                 }
                 className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
-                placeholder='gpt-5.4 or claude-sonnet-4-6'
+                placeholder="gpt-5.4 or claude-sonnet-4-6"
               />
             </WorkspaceFieldLabel>
             <WorkspaceFieldLabel label="System Prompt">
@@ -601,15 +601,16 @@ export function AgentsScreen() {
   const stats = statsQuery.data
 
   return (
-    <div className="h-full overflow-hidden bg-surface text-primary-900">
+    <div className="h-full overflow-hidden bg-gray-50 text-primary-900">
       <div className="flex h-full flex-col md:flex-row">
-        <aside className="flex shrink-0 flex-col border-b border-primary-200 bg-primary-50/70 md:w-[220px] md:border-b-0 md:border-r">
-          <div className="flex items-center justify-between gap-3 border-b border-primary-200 px-4 py-4">
+        {/* Sidebar — agent list */}
+        <aside className="flex shrink-0 flex-col border-b border-primary-200 bg-white md:w-[280px] md:border-b-0 md:border-r">
+          <div className="flex items-center justify-between gap-2 border-b border-primary-200 px-4 py-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
                 Agents
               </p>
-              <p className="mt-1 text-xs text-primary-500">
+              <p className="mt-0.5 text-xs text-primary-400">
                 {agents.length} registered
               </p>
             </div>
@@ -619,7 +620,7 @@ export function AgentsScreen() {
               onClick={() => resetRegisterDialog(true)}
             >
               <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
-              Register Agent
+              <span className="hidden sm:inline">Register</span>
             </Button>
           </div>
 
@@ -635,22 +636,22 @@ export function AgentsScreen() {
                     setActiveTab('profile')
                   }}
                   className={cn(
-                    'mb-1 flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors',
+                    'mb-1 flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
                     isActive
-                      ? 'border-accent-500/30 bg-accent-500/10'
-                      : 'border-transparent bg-transparent hover:border-primary-200 hover:bg-white',
+                      ? 'border-accent-500/30 bg-accent-500/8 text-primary-900'
+                      : 'border-transparent bg-transparent hover:border-primary-200 hover:bg-primary-50',
                   )}
                 >
                   <div
                     className={cn(
-                      'flex size-11 shrink-0 items-center justify-center rounded-2xl text-lg',
+                      'flex size-9 shrink-0 items-center justify-center rounded-xl text-base',
                       getAvatarToneClass(agent.avatar_tone),
                     )}
                   >
                     <span aria-hidden="true">{agent.avatar}</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-primary-900">
+                    <p className="truncate text-sm font-medium text-primary-900">
                       {agent.name}
                     </p>
                     <p className="truncate text-xs text-primary-500">
@@ -659,7 +660,7 @@ export function AgentsScreen() {
                   </div>
                   <span
                     className={cn(
-                      'size-2.5 shrink-0 rounded-full',
+                      'size-2 shrink-0 rounded-full',
                       getStatusDotClass(agent.status),
                     )}
                   />
@@ -669,77 +670,81 @@ export function AgentsScreen() {
           </div>
         </aside>
 
-        <section className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-5xl flex-col gap-4 p-4 md:p-6 flex">
+        {/* Detail pane */}
+        <section className="min-h-0 flex-1 overflow-y-auto bg-gray-50">
+          <div className="mx-auto w-full max-w-4xl flex flex-col gap-4 p-4 md:p-6">
             {isDefaultOnlyView ? (
-              <div className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm text-primary-500 shadow-sm">
+              <div className="rounded-xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-500 shadow-sm">
                 <p>Agents are pre-configured. Codex and Claude are available by default.</p>
                 <p className="mt-1">
                   Custom agents let you set specific models, prompts, and tool permissions.
                 </p>
               </div>
             ) : null}
+
+            {/* Agent header */}
             <div className="rounded-xl border border-primary-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div
-                      className={cn(
-                        'flex size-14 items-center justify-center rounded-3xl text-2xl',
-                        getAvatarToneClass(selectedAgent.avatar_tone),
-                      )}
-                    >
-                      <span aria-hidden="true">{selectedAgent.avatar}</span>
-                    </div>
-                    <div>
-                      <h1 className="text-2xl font-semibold text-primary-900">
-                        {selectedAgent.name}
-                      </h1>
-                      <p className="mt-1 text-sm text-primary-500">
-                        {selectedAgent.description}
-                      </p>
-                    </div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className={cn(
+                      'flex size-12 shrink-0 items-center justify-center rounded-2xl text-xl',
+                      getAvatarToneClass(selectedAgent.avatar_tone),
+                    )}
+                  >
+                    <span aria-hidden="true">{selectedAgent.avatar}</span>
                   </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        'rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em]',
-                        getStatusBadgeClass(selectedAgent.status),
-                      )}
-                    >
-                      {selectedAgent.status}
-                    </span>
-                    <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-primary-700">
-                      {selectedAgent.role}
-                    </span>
-                    <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-600">
-                      {selectedAgent.provider}
-                    </span>
+                  <div className="min-w-0">
+                    <h1 className="text-lg font-semibold text-primary-900">
+                      {selectedAgent.name}
+                    </h1>
+                    <p className="mt-0.5 text-sm text-primary-500">
+                      {selectedAgent.description}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={cn(
+                          'rounded-full border px-2.5 py-0.5 text-xs font-medium uppercase tracking-[0.12em]',
+                          getStatusBadgeClass(selectedAgent.status),
+                        )}
+                      >
+                        {selectedAgent.status}
+                      </span>
+                      <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-0.5 text-xs font-medium uppercase tracking-[0.12em] text-primary-600">
+                        {selectedAgent.role}
+                      </span>
+                      <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-0.5 text-xs text-primary-500">
+                        {selectedAgent.provider}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
                   <Button
                     variant="secondary"
-                    className="border border-primary-700 bg-primary-950/80 text-primary-100 hover:bg-primary-800"
+                    size="sm"
+                    className="border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"
                     onClick={() => toast('Configuration flow is not wired yet.', { type: 'info' })}
                   >
-                    <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.7} />
+                    <HugeiconsIcon icon={Settings01Icon} size={14} strokeWidth={1.7} />
                     Configure
                   </Button>
                   <Button
                     variant="secondary"
-                    className="border border-primary-700 bg-primary-950/80 text-primary-100 hover:bg-primary-800"
+                    size="sm"
+                    className="border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"
                     onClick={() => toast('Project assignment flow is not wired yet.', { type: 'info' })}
                   >
-                    <HugeiconsIcon icon={Folder01Icon} size={16} strokeWidth={1.7} />
-                    Assign to Project
+                    <HugeiconsIcon icon={Folder01Icon} size={14} strokeWidth={1.7} />
+                    Assign
                   </Button>
                   <Button
+                    size="sm"
                     className="bg-accent-500 text-primary-950 hover:bg-accent-400"
                     onClick={() => toast('Test run trigger is not wired yet.', { type: 'info' })}
                   >
-                    <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.7} />
+                    <HugeiconsIcon icon={Rocket01Icon} size={14} strokeWidth={1.7} />
                     Test Run
                   </Button>
                 </div>
@@ -751,34 +756,34 @@ export function AgentsScreen() {
               onValueChange={(value) => setActiveTab(value as AgentDetailTab)}
               className="gap-4"
             >
-              <TabsList className="w-full flex-wrap rounded-xl border border-primary-200 bg-primary-50/80 p-1 text-primary-500">
+              <TabsList className="w-full flex-wrap rounded-xl border border-primary-200 bg-white p-1 text-primary-500 shadow-sm">
                 <TabsTrigger
                   value="profile"
-                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-primary-50 data-active:text-primary-900"
                 >
                   Profile
                 </TabsTrigger>
                 <TabsTrigger
                   value="model-limits"
-                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-primary-50 data-active:text-primary-900"
                 >
                   Model &amp; Limits
                 </TabsTrigger>
                 <TabsTrigger
                   value="system-prompt"
-                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-primary-50 data-active:text-primary-900"
                 >
                   System Prompt
                 </TabsTrigger>
                 <TabsTrigger
                   value="skills"
-                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-primary-50 data-active:text-primary-900"
                 >
                   Skills
                 </TabsTrigger>
                 <TabsTrigger
                   value="runs"
-                  className="rounded-lg px-4 text-primary-500 data-active:bg-white data-active:text-primary-900"
+                  className="rounded-lg px-4 text-primary-500 data-active:bg-primary-50 data-active:text-primary-900"
                 >
                   Runs
                 </TabsTrigger>
@@ -818,50 +823,27 @@ export function AgentsScreen() {
                     </div>
 
                     <SectionCard title="Model & Provider">
-                      <div className="grid gap-3 text-sm text-primary-200 sm:grid-cols-2 xl:grid-cols-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Model</p>
-                          <p className="mt-1 font-medium text-primary-100">
-                            {formatAgentDetailValue(
-                              selectedAgent.model ?? selectedAgent.adapter_type,
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Provider</p>
-                          <p className="mt-1 font-medium text-primary-100">
-                            {formatAgentDetailValue(selectedAgent.provider)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Max Tokens</p>
-                          <p className="mt-1 font-medium text-primary-100">
-                            {formatAgentDetailValue(selectedAgent.limits.max_tokens)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Cost</p>
-                          <p className="mt-1 font-medium text-primary-100">
-                            {formatAgentDetailValue(selectedAgent.limits.cost_label)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Concurrency</p>
-                          <p className="mt-1 font-medium text-primary-100">
-                            {formatAgentDetailValue(selectedAgent.limits.concurrency_limit)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-primary-400">Memory Scope</p>
-                          <p className="mt-1 font-medium text-primary-100">
-                            {formatAgentDetailValue(selectedAgent.limits.memory_scope)}
-                          </p>
-                        </div>
+                      <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                        {[
+                          { label: 'Model', value: selectedAgent.model ?? selectedAgent.adapter_type },
+                          { label: 'Provider', value: selectedAgent.provider },
+                          { label: 'Max Tokens', value: selectedAgent.limits.max_tokens },
+                          { label: 'Cost', value: selectedAgent.limits.cost_label },
+                          { label: 'Concurrency', value: selectedAgent.limits.concurrency_limit },
+                          { label: 'Memory Scope', value: selectedAgent.limits.memory_scope },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-lg border border-primary-100 bg-primary-50/70 px-3 py-2.5">
+                            <p className="text-xs uppercase tracking-[0.14em] text-primary-400">{item.label}</p>
+                            <p className="mt-1 font-medium text-primary-900">
+                              {formatAgentDetailValue(item.value)}
+                            </p>
+                          </div>
+                        ))}
                       </div>
                     </SectionCard>
 
                     <SectionCard title="Capabilities">
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {[
                           {
                             key: 'repo_write',
@@ -901,15 +883,15 @@ export function AgentsScreen() {
                           return (
                             <div
                               key={item.key}
-                              className="flex items-center justify-between gap-4 rounded-2xl border border-primary-800 bg-primary-950/60 px-4 py-3"
+                              className="flex items-center justify-between gap-4 rounded-xl border border-primary-200 bg-primary-50/60 px-4 py-3"
                             >
-                              <div className="flex min-w-0 items-start gap-3">
-                                <div className="mt-0.5 rounded-xl bg-primary-800 p-2 text-primary-300">
-                                  <HugeiconsIcon icon={item.icon} size={16} strokeWidth={1.7} />
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="rounded-lg bg-white border border-primary-200 p-1.5 text-primary-500">
+                                  <HugeiconsIcon icon={item.icon} size={15} strokeWidth={1.7} />
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm font-medium text-primary-100">{item.label}</p>
-                                  <p className="text-sm text-primary-400">{item.description}</p>
+                                  <p className="text-sm font-medium text-primary-900">{item.label}</p>
+                                  <p className="text-xs text-primary-500">{item.description}</p>
                                 </div>
                               </div>
                               <Switch checked={enabled} disabled aria-label={item.label} />
@@ -940,85 +922,67 @@ export function AgentsScreen() {
                     </SectionCard>
                   </TabsContent>
 
-                  <TabsContent
-                    value="model-limits"
-                    className="space-y-4"
-                  >
+                  <TabsContent value="model-limits" className="space-y-4">
                     <SectionCard title="Runtime Envelope">
                       <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-4">
-                          <div className="mb-2 flex items-center gap-2 text-primary-300">
-                            <HugeiconsIcon icon={ChartLineData02Icon} size={16} strokeWidth={1.7} />
-                            <span className="text-sm font-medium">Token Window</span>
+                        {[
+                          {
+                            icon: ChartLineData02Icon,
+                            label: 'Token Window',
+                            value: formatInteger(selectedAgent.limits.max_tokens),
+                            desc: 'Maximum context available to this agent profile.',
+                          },
+                          {
+                            icon: Task01Icon,
+                            label: 'Runs Today',
+                            value: statsQuery.isLoading ? '...' : formatInteger(stats?.runs_today ?? 0),
+                            desc: 'Total runs started today for this agent profile.',
+                          },
+                          {
+                            icon: PlayCircleIcon,
+                            label: 'Concurrency',
+                            value: String(selectedAgent.limits.concurrency_limit),
+                            desc: 'Parallel runs allowed before new work queues.',
+                          },
+                          {
+                            icon: Folder01Icon,
+                            label: 'Memory Scope',
+                            value: String(selectedAgent.limits.memory_scope),
+                            desc: 'Where this agent is allowed to retain task context.',
+                          },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm">
+                            <div className="mb-2 flex items-center gap-2 text-primary-500">
+                              <HugeiconsIcon icon={item.icon} size={15} strokeWidth={1.7} />
+                              <span className="text-sm font-medium">{item.label}</span>
+                            </div>
+                            <p className="text-2xl font-semibold text-primary-900">{item.value}</p>
+                            <p className="mt-1 text-xs text-primary-500">{item.desc}</p>
                           </div>
-                          <p className="text-2xl font-semibold text-primary-100">
-                            {formatInteger(selectedAgent.limits.max_tokens)}
-                          </p>
-                          <p className="mt-1 text-sm text-primary-400">
-                            Maximum context available to this agent profile.
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-4">
-                          <div className="mb-2 flex items-center gap-2 text-primary-300">
-                            <HugeiconsIcon icon={Task01Icon} size={16} strokeWidth={1.7} />
-                            <span className="text-sm font-medium">Runs Today</span>
-                          </div>
-                          <p className="text-2xl font-semibold text-primary-100">
-                            {statsQuery.isLoading ? '...' : formatInteger(stats?.runs_today ?? 0)}
-                          </p>
-                          <p className="mt-1 text-sm text-primary-400">
-                            Total runs started today for this agent profile.
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-4">
-                          <div className="mb-2 flex items-center gap-2 text-primary-300">
-                            <HugeiconsIcon icon={PlayCircleIcon} size={16} strokeWidth={1.7} />
-                            <span className="text-sm font-medium">Concurrency</span>
-                          </div>
-                          <p className="text-2xl font-semibold text-primary-100">
-                            {selectedAgent.limits.concurrency_limit}
-                          </p>
-                          <p className="mt-1 text-sm text-primary-400">
-                            Parallel runs allowed before new work queues.
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-4">
-                          <div className="mb-2 flex items-center gap-2 text-primary-300">
-                            <HugeiconsIcon icon={Folder01Icon} size={16} strokeWidth={1.7} />
-                            <span className="text-sm font-medium">Memory Scope</span>
-                          </div>
-                          <p className="text-2xl font-semibold text-primary-100">
-                            {selectedAgent.limits.memory_scope}
-                          </p>
-                          <p className="mt-1 text-sm text-primary-400">
-                            Where this agent is allowed to retain task context.
-                          </p>
-                        </div>
+                        ))}
                       </div>
                     </SectionCard>
 
                     <SectionCard title="Provider Policy">
-                      <div className="space-y-3 text-sm text-primary-300">
-                        <div className="flex items-center justify-between rounded-2xl border border-primary-800 bg-primary-950/60 px-4 py-3">
-                          <span>Provider</span>
-                          <span className="font-medium text-primary-100">{selectedAgent.provider}</span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-2xl border border-primary-800 bg-primary-950/60 px-4 py-3">
-                          <span>Adapter</span>
-                          <span className="font-medium text-primary-100">{selectedAgent.adapter_type}</span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-2xl border border-primary-800 bg-primary-950/60 px-4 py-3">
-                          <span>Cost Profile</span>
-                          <span className="font-medium text-primary-100">{selectedAgent.limits.cost_label}</span>
-                        </div>
+                      <div className="space-y-2 text-sm">
+                        {[
+                          { label: 'Provider', value: selectedAgent.provider },
+                          { label: 'Adapter', value: selectedAgent.adapter_type },
+                          { label: 'Cost Profile', value: selectedAgent.limits.cost_label },
+                        ].map((item) => (
+                          <div
+                            key={item.label}
+                            className="flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/60 px-4 py-3"
+                          >
+                            <span className="text-primary-500">{item.label}</span>
+                            <span className="font-medium text-primary-900">{item.value}</span>
+                          </div>
+                        ))}
                       </div>
                     </SectionCard>
                   </TabsContent>
 
-                  <TabsContent
-                    value="system-prompt"
-                    className="space-y-4"
-                  >
+                  <TabsContent value="system-prompt" className="space-y-4">
                     <SectionCard
                       title="SOUL / System Prompt"
                       action={
@@ -1035,7 +999,7 @@ export function AgentsScreen() {
                             [selectedAgent.id]: event.target.value,
                           }))
                         }
-                        className="min-h-[320px] w-full rounded-3xl border border-primary-800 bg-primary-950/80 px-4 py-4 font-mono text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                        className="min-h-[320px] w-full rounded-xl border border-primary-200 bg-primary-50 px-4 py-4 font-mono text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 focus:bg-white"
                       />
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Button
@@ -1046,7 +1010,7 @@ export function AgentsScreen() {
                         </Button>
                         <Button
                           variant="secondary"
-                          className="border border-primary-700 bg-primary-950/80 text-primary-100 hover:bg-primary-800"
+                          className="border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"
                           onClick={() =>
                             setPromptDrafts((current) => ({
                               ...current,
@@ -1067,7 +1031,7 @@ export function AgentsScreen() {
                           selectedAgent.skills.map((skill) => (
                             <span
                               key={skill}
-                              className="rounded-full border border-primary-700 bg-primary-950/80 px-3 py-1.5 text-sm text-primary-200"
+                              className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm text-primary-700"
                             >
                               {skill}
                             </span>
@@ -1080,21 +1044,21 @@ export function AgentsScreen() {
 
                     <SectionCard title="Operational Notes">
                       <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-4">
-                          <div className="mb-2 flex items-center gap-2 text-primary-300">
-                            <HugeiconsIcon icon={PuzzleIcon} size={16} strokeWidth={1.7} />
-                            <span className="text-sm font-medium">Focus Area</span>
+                        <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-4">
+                          <div className="mb-2 flex items-center gap-2 text-primary-500">
+                            <HugeiconsIcon icon={PuzzleIcon} size={15} strokeWidth={1.7} />
+                            <span className="text-sm font-medium text-primary-700">Focus Area</span>
                           </div>
-                          <p className="text-sm text-primary-200">
+                          <p className="text-sm text-primary-600">
                             {selectedAgent.role} coverage with {selectedAgent.provider} runtime.
                           </p>
                         </div>
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-4">
-                          <div className="mb-2 flex items-center gap-2 text-primary-300">
-                            <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.7} />
-                            <span className="text-sm font-medium">Recommended Use</span>
+                        <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-4">
+                          <div className="mb-2 flex items-center gap-2 text-primary-500">
+                            <HugeiconsIcon icon={Rocket01Icon} size={15} strokeWidth={1.7} />
+                            <span className="text-sm font-medium text-primary-700">Recommended Use</span>
                           </div>
-                          <p className="text-sm text-primary-200">
+                          <p className="text-sm text-primary-600">
                             Use this agent when the task fits its role and capability envelope.
                           </p>
                         </div>
@@ -1109,7 +1073,7 @@ export function AgentsScreen() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="border border-primary-700 bg-primary-950/80 text-primary-100 hover:bg-primary-800"
+                          className="border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"
                           onClick={() => {
                             void taskRunsQuery.refetch()
                             void checkpointsQuery.refetch()
@@ -1126,19 +1090,19 @@ export function AgentsScreen() {
                           Loading recent runs...
                         </div>
                       ) : recentRuns.length === 0 ? (
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 px-4 py-10 text-center text-sm text-primary-400">
+                        <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/60 px-4 py-10 text-center text-sm text-primary-400">
                           No runs found for this agent yet.
                         </div>
                       ) : (
-                        <div className="overflow-hidden rounded-2xl border border-primary-800">
-                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_120px_120px_120px] gap-3 bg-primary-950/80 px-4 py-3 text-xs uppercase tracking-[0.16em] text-primary-400 max-md:hidden">
+                        <div className="overflow-hidden rounded-xl border border-primary-200">
+                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_110px_100px_100px] gap-3 border-b border-primary-200 bg-primary-50/80 px-4 py-2.5 text-xs uppercase tracking-[0.14em] text-primary-400 max-md:hidden">
                             <span>Task</span>
                             <span>Project</span>
                             <span>Status</span>
                             <span>Duration</span>
                             <span>Tokens</span>
                           </div>
-                          <div className="divide-y divide-primary-800">
+                          <div className="divide-y divide-primary-100">
                             {recentRuns.map(({ run, checkpoint }) => {
                               const tokenTotal = run.input_tokens + run.output_tokens
                               const durationMs =
@@ -1150,33 +1114,33 @@ export function AgentsScreen() {
                               return (
                                 <div
                                   key={run.id}
-                                  className="grid gap-3 bg-primary-900/60 px-4 py-4 text-sm text-primary-200 md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_120px_120px_120px] md:items-center"
+                                  className="grid gap-3 bg-white px-4 py-3.5 text-sm text-primary-700 md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_110px_100px_100px] md:items-center"
                                 >
                                   <div className="min-w-0">
-                                    <p className="truncate font-medium text-primary-100">
+                                    <p className="truncate font-medium text-primary-900">
                                       {run.task_name}
                                     </p>
-                                    <p className="mt-1 truncate text-xs text-primary-400">
+                                    <p className="mt-0.5 truncate text-xs text-primary-400">
                                       {run.mission_name ?? 'Unknown mission'}
                                     </p>
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="truncate text-primary-100">
+                                    <p className="truncate text-primary-900">
                                       {run.project_name ?? 'Unknown project'}
                                     </p>
-                                    <p className="mt-1 text-xs text-primary-400">
+                                    <p className="mt-0.5 text-xs text-primary-400">
                                       {run.started_at ? formatTimestamp(run.started_at) : 'No start time'}
                                     </p>
                                   </div>
                                   <div>
-                                    <span className="rounded-full border border-primary-700 bg-primary-950/80 px-3 py-1 text-xs text-primary-200">
+                                    <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs text-primary-600">
                                       {formatRunStatus(run, checkpoint)}
                                     </span>
                                   </div>
-                                  <div className="text-primary-300">
+                                  <div className="text-primary-500 tabular-nums">
                                     {formatDuration(durationMs)}
                                   </div>
-                                  <div className="text-primary-300">
+                                  <div className="text-primary-500 tabular-nums">
                                     {formatTokens(tokenTotal)}
                                   </div>
                                 </div>
@@ -1193,6 +1157,7 @@ export function AgentsScreen() {
           </div>
         </section>
       </div>
+
       <WorkspaceEntityDialog
         open={registerDialogOpen}
         onOpenChange={resetRegisterDialog}
@@ -1217,7 +1182,7 @@ export function AgentsScreen() {
               autoFocus
             />
             {registerErrors.name ? (
-              <p className="text-xs text-red-300">{registerErrors.name}</p>
+              <p className="text-xs text-red-500">{registerErrors.name}</p>
             ) : null}
           </div>
         </WorkspaceFieldLabel>
@@ -1262,7 +1227,7 @@ export function AgentsScreen() {
               <option value="ollama">ollama</option>
             </select>
             {registerErrors.adapter_type ? (
-              <p className="text-xs text-red-300">{registerErrors.adapter_type}</p>
+              <p className="text-xs text-red-500">{registerErrors.adapter_type}</p>
             ) : null}
           </div>
         </WorkspaceFieldLabel>
@@ -1273,7 +1238,7 @@ export function AgentsScreen() {
               setRegisterForm((current) => ({ ...current, model: event.target.value }))
             }
             className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
-            placeholder='gpt-5.4 or claude-sonnet-4-6'
+            placeholder="gpt-5.4 or claude-sonnet-4-6"
           />
         </WorkspaceFieldLabel>
         <WorkspaceFieldLabel label="System Prompt">
