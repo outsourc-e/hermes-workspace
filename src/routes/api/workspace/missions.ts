@@ -13,6 +13,28 @@ import { forwardWorkspaceRequest } from '../../../server/workspace-proxy'
 export const Route = createFileRoute('/api/workspace/missions')({
   server: {
     handlers: {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const ip = getClientIp(request)
+        if (!rateLimit(`workspace-missions-get:${ip}`, 120, 60_000)) {
+          return rateLimitResponse()
+        }
+
+        try {
+          return await forwardWorkspaceRequest({
+            request,
+            path: '/missions',
+          })
+        } catch (error) {
+          return json(
+            { ok: false, error: safeErrorMessage(error) },
+            { status: 502 },
+          )
+        }
+      },
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })

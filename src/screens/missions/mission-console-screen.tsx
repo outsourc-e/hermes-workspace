@@ -14,7 +14,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import YAML from 'yaml'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -26,6 +26,7 @@ import {
   extractProject,
   extractRunEvents,
   extractTaskRuns,
+  normalizeMission,
   normalizeActivityEvent,
   normalizeRunEvent,
   type WorkspaceActivityEvent,
@@ -33,7 +34,10 @@ import {
   type WorkspaceRunEvent,
   type WorkspaceTaskRun,
 } from '@/screens/projects/lib/workspace-types'
-import { formatStatus } from '@/screens/projects/lib/workspace-utils'
+import {
+  formatStatus,
+  getStatusBadgeClass,
+} from '@/screens/projects/lib/workspace-utils'
 
 type MissionConsoleScreenProps = {
   missionId: string
@@ -68,6 +72,14 @@ type ConsoleFeedItem = {
   timestamp: string
   type: string
   message: string
+}
+
+type MissionListItem = {
+  missionId: string
+  missionName: string
+  status: string
+  projectId: string
+  projectName: string
 }
 
 type WorkflowPolicy = {
@@ -190,6 +202,43 @@ function parseMissionStatus(payload: unknown): MissionStatusPayload | null {
     total_count: Math.max(0, asNumber(record?.total_count) ?? taskBreakdown.length),
     estimated_completion: asString(record?.estimated_completion),
   }
+}
+
+function extractMissionList(payload: unknown): MissionListItem[] {
+  const record = asRecord(payload)
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray(record?.missions)
+      ? record.missions
+      : Array.isArray(record?.items)
+        ? record.items
+        : Array.isArray(record?.data)
+          ? record.data
+          : []
+
+  return source.flatMap((value) => {
+    const missionRecord = asRecord(value)
+    if (!missionRecord) return []
+
+    const mission = normalizeMission(missionRecord)
+    const projectRecord = asRecord(missionRecord.project)
+
+    return [
+      {
+        missionId: mission.id,
+        missionName: mission.name,
+        status: mission.status,
+        projectId:
+          asString(missionRecord.project_id) ??
+          asString(projectRecord?.id) ??
+          '',
+        projectName:
+          asString(missionRecord.project_name) ??
+          asString(projectRecord?.name) ??
+          'Unassigned project',
+      },
+    ]
+  })
 }
 
 function getRunEventText(event: WorkspaceRunEvent): string {
@@ -504,6 +553,7 @@ export function MissionConsoleScreen({
   missionId,
   projectId,
 }: MissionConsoleScreenProps) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [now, setNow] = useState(() => Date.now())
   const [liveEventsByRunId, setLiveEventsByRunId] = useState<
@@ -534,6 +584,14 @@ export function MissionConsoleScreen({
     queryFn: async () =>
       extractTaskRuns(await workspaceRequestJson('/api/workspace/task-runs')),
     refetchInterval: 5_000,
+  })
+
+  const missionsListQuery = useQuery({
+    queryKey: ['workspace', 'missions', 'mission-console'],
+    enabled: missionId.length === 0,
+    queryFn: async () =>
+      extractMissionList(await workspaceRequestJson('/api/workspace/missions')),
+    refetchInterval: 15_000,
   })
 
   const projectQuery = useQuery({
@@ -638,6 +696,37 @@ export function MissionConsoleScreen({
       return new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime()
     })
   }, [activeMissionRunsQuery.data])
+
+  const selectableMissionOptions = useMemo(() => {
+    const byMissionId = new Map<string, MissionListItem>()
+
+    for (const mission of missionsListQuery.data ?? []) {
+      byMissionId.set(mission.missionId, mission)
+    }
+
+    for (const mission of runningMissionOptions) {
+      if (byMissionId.has(mission.missionId)) continue
+      byMissionId.set(mission.missionId, {
+        missionId: mission.missionId,
+        missionName: mission.missionName,
+        status: 'running',
+        projectId: mission.projectId,
+        projectName: mission.projectName,
+      })
+    }
+
+    return Array.from(byMissionId.values())
+      .filter((mission) => mission.projectId.length > 0)
+      .sort((left, right) => {
+        const leftIsRunning =
+          left.status === 'running' || left.status === 'active' ? 1 : 0
+        const rightIsRunning =
+          right.status === 'running' || right.status === 'active' ? 1 : 0
+
+        if (leftIsRunning !== rightIsRunning) return rightIsRunning - leftIsRunning
+        return left.missionName.localeCompare(right.missionName)
+      })
+  }, [missionsListQuery.data, runningMissionOptions])
 
   const allMissionRuns = useMemo(() => {
     return (runsQuery.data ?? []).filter((run) => run.mission_id === missionId)
@@ -920,67 +1009,111 @@ export function MissionConsoleScreen({
   if (!missionId) {
     return (
       <div className="flex h-full items-center justify-center bg-primary-950 px-6">
-        <div className="w-full max-w-2xl rounded-3xl border border-primary-800 bg-primary-900 p-8 text-center">
+        <div className="w-full max-w-3xl rounded-3xl border border-primary-800 bg-primary-900 p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-primary-400">
             Mission Console
           </p>
           <h1 className="mt-3 text-2xl font-semibold text-primary-100">
             No mission selected
           </h1>
-          <p className="mt-3 text-sm text-primary-300">
-            Select an active mission to monitor live agent progress.
+          <p className="mt-3 max-w-2xl text-sm text-primary-300">
+            Select a mission to monitor live agent progress, recent activity,
+            and task execution details.
           </p>
           <div className="mt-6 rounded-2xl border border-primary-800 bg-primary-950/60 p-4 text-left">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
-              Running Missions
+              Select a Mission
             </p>
-            {activeMissionRunsQuery.isLoading ? (
-              <p className="mt-3 text-sm text-primary-400">Loading active missions...</p>
-            ) : runningMissionOptions.length > 0 ? (
+            {missionsListQuery.isLoading ? (
+              <p className="mt-3 text-sm text-primary-400">
+                Loading available missions...
+              </p>
+            ) : missionsListQuery.isError ? (
+              <div className="mt-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                {missionsListQuery.error instanceof Error
+                  ? missionsListQuery.error.message
+                  : 'Unable to load missions right now.'}
+              </div>
+            ) : selectableMissionOptions.length > 0 ? (
               <div className="mt-3 space-y-2">
-                {runningMissionOptions.map((mission) => (
-                  <Link
+                {selectableMissionOptions.map((mission) => (
+                  <button
                     key={mission.missionId}
-                    to="/mission-console"
-                    search={{
-                      missionId: mission.missionId,
-                      projectId: mission.projectId,
-                    }}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-primary-800 bg-primary-900 px-4 py-3 transition-colors hover:border-primary-700 hover:bg-primary-800"
+                    type="button"
+                    onClick={() =>
+                      void navigate({
+                        to: '/mission-console',
+                        search: {
+                          missionId: mission.missionId,
+                          projectId: mission.projectId,
+                        },
+                      })
+                    }
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-primary-800 bg-primary-900 px-4 py-4 text-left transition-colors hover:border-primary-700 hover:bg-primary-800"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-primary-100">
-                        {mission.missionName}
-                      </p>
-                      <p className="truncate text-xs text-primary-400">
-                        {mission.projectName} · {mission.activeRuns} active run
-                        {mission.activeRuns === 1 ? '' : 's'}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-primary-100">
+                          {mission.missionName}
+                        </p>
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                            getStatusBadgeClass(mission.status),
+                          )}
+                        >
+                          {formatStatus(mission.status)}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-xs text-primary-400">
+                        {mission.projectName}
                       </p>
                     </div>
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      size={16}
-                      strokeWidth={1.8}
-                      className="shrink-0 text-primary-400"
-                    />
-                  </Link>
+                    <div className="flex items-center gap-2 text-primary-400">
+                      <span className="hidden text-xs text-primary-500 sm:inline">
+                        Open console
+                      </span>
+                      <HugeiconsIcon
+                        icon={ArrowRight01Icon}
+                        size={16}
+                        strokeWidth={1.8}
+                        className="shrink-0"
+                      />
+                    </div>
+                  </button>
                 ))}
               </div>
             ) : (
-              <p className="mt-3 text-sm text-primary-400">
-                No missions are running right now.
-              </p>
+              <div className="mt-3 rounded-2xl border border-dashed border-primary-800 bg-primary-900/70 px-4 py-6 text-center">
+                <p className="text-sm font-medium text-primary-200">
+                  No missions available yet.
+                </p>
+                <p className="mt-2 text-sm text-primary-400">
+                  Create or start a mission from Projects, then return here.
+                </p>
+                <Link
+                  to="/projects"
+                  className={cn(
+                    buttonVariants({}),
+                    'mt-4 inline-flex bg-accent-500 text-primary-950 hover:bg-accent-400',
+                  )}
+                >
+                  Go to Projects
+                </Link>
+              </div>
             )}
           </div>
-          <Link
-            to="/projects"
-            className={cn(
-              buttonVariants({}),
-              'mt-6 inline-flex bg-accent-500 text-primary-950 hover:bg-accent-400',
-            )}
-          >
-            Go to Projects
-          </Link>
+          {missionsListQuery.isError ? (
+            <Link
+              to="/projects"
+              className={cn(
+                buttonVariants({}),
+                'mt-6 inline-flex bg-accent-500 text-primary-950 hover:bg-accent-400',
+              )}
+            >
+              Go to Projects
+            </Link>
+          ) : null}
         </div>
       </div>
     )
