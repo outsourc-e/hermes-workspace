@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router'
 import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
@@ -6,7 +7,9 @@ import { Button } from '@/components/ui/button'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { cn } from '@/lib/utils'
 import { AgentsScreen } from '@/screens/agents/agents-screen'
+import { CheckpointDetailScreen } from '@/screens/checkpoints/checkpoint-detail-screen'
 import { MissionConsoleScreen } from '@/screens/missions/mission-console-screen'
+import { NewProjectWizardContent } from '@/screens/projects/new-project-wizard'
 import { ProjectsScreen } from '@/screens/projects/projects-screen'
 import {
   extractProject,
@@ -27,11 +30,13 @@ export type WorkspaceTab =
 export type WorkspaceSearch = {
   goal?: string
   checkpointId?: string
+  returnTo?: 'review' | 'projects' | 'mission'
   phaseId?: string
   phaseName?: string
   project?: string
   projectId?: string
   missionId?: string
+  showWizard?: boolean
 }
 
 type WorkspaceLayoutProps = {
@@ -105,6 +110,7 @@ function writeWorkspaceHash(nextTab: WorkspaceTab) {
 }
 
 export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() =>
     typeof window === 'undefined'
       ? 'projects'
@@ -156,11 +162,42 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     null
 
   const pageTitle =
-    activeTab === 'projects' && search.missionId
+    search.checkpointId
+      ? 'Checkpoint Detail'
+      : search.showWizard
+        ? 'New Project'
+        : activeTab === 'projects' && search.missionId
       ? missionName ?? 'Mission Console'
       : TAB_LABELS[activeTab]
 
   usePageTitle(pageTitle)
+
+  function restoreTab(returnTo?: WorkspaceSearch['returnTo']) {
+    const nextTab: WorkspaceTab = returnTo === 'review' ? 'review' : 'projects'
+    setActiveTab(nextTab)
+    writeWorkspaceHash(nextTab)
+  }
+
+  function clearWorkspaceOverlay(options?: {
+    checkpointId?: undefined
+    returnTo?: undefined
+    showWizard?: undefined
+  }) {
+    void navigate({
+      to: '/workspace',
+      search: {
+        goal: search.goal,
+        phaseId: search.phaseId,
+        phaseName: search.phaseName,
+        project: search.project,
+        projectId: search.projectId,
+        missionId: search.missionId,
+        checkpointId: options?.checkpointId,
+        returnTo: options?.returnTo,
+        showWizard: options?.showWizard,
+      },
+    })
+  }
 
   return (
     <div className="min-h-full bg-primary-950 text-primary-100">
@@ -238,7 +275,25 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
         </div>
       </div>
 
-      {activeTab === 'projects' ? (
+      {search.checkpointId ? (
+        <CheckpointDetailScreen
+          checkpointId={search.checkpointId}
+          projectId={search.projectId}
+          returnTo={search.returnTo ?? (search.missionId ? 'mission' : 'projects')}
+          onBack={() => {
+            restoreTab(search.returnTo ?? (search.missionId ? 'mission' : 'projects'))
+            clearWorkspaceOverlay()
+          }}
+        />
+      ) : search.showWizard ? (
+        <NewProjectWizardContent
+          routePath="/workspace"
+          onClose={() => {
+            restoreTab('projects')
+            clearWorkspaceOverlay()
+          }}
+        />
+      ) : activeTab === 'projects' ? (
         search.missionId ? (
           <MissionConsoleScreen
             missionId={search.missionId}

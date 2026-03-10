@@ -330,6 +330,25 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 export function NewProjectWizard() {
   const navigate = useNavigate()
+
+  return (
+    <NewProjectWizardContent
+      routePath="/projects"
+      onClose={() => void navigate({ to: '/projects' })}
+    />
+  )
+}
+
+type NewProjectWizardContentProps = {
+  routePath?: '/projects' | '/workspace'
+  onClose?: () => void
+}
+
+export function NewProjectWizardContent({
+  routePath = '/projects',
+  onClose,
+}: NewProjectWizardContentProps) {
+  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [step, setStep] = useState<WizardStep>(1)
   const [name, setName] = useState('')
@@ -463,7 +482,7 @@ export function NewProjectWizard() {
       if (!spec.trim()) {
         toast('Project created', { type: 'success' })
         await navigate({
-          to: '/projects',
+          to: routePath,
           search: { projectId: project.id },
         })
         return
@@ -540,7 +559,13 @@ export function NewProjectWizard() {
           <Button
             variant="outline"
             className="border-primary-700 bg-primary-900 text-primary-200 hover:bg-primary-800"
-            onClick={() => void navigate({ to: '/projects' })}
+            onClick={() => {
+              if (onClose) {
+                onClose()
+                return
+              }
+              void navigate({ to: routePath })
+            }}
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.8} />
             Back to Projects

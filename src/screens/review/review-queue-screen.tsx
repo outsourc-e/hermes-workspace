@@ -5,6 +5,8 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
+import type React from 'react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
@@ -107,7 +109,8 @@ function ReviewRow({
   composer,
   notes,
   onApprove,
-  onReview,
+  onOpenDetail,
+  onQuickPreview,
   onOpenComposer,
   onCancelComposer,
   onNotesChange,
@@ -118,7 +121,8 @@ function ReviewRow({
   composer: ReviewComposerState | null
   notes: string
   onApprove: (checkpointId: string) => void
-  onReview: (checkpoint: WorkspaceCheckpoint) => void
+  onOpenDetail: (checkpoint: WorkspaceCheckpoint) => void
+  onQuickPreview: (checkpoint: WorkspaceCheckpoint) => void
   onOpenComposer: (
     checkpointId: string,
     action: Extract<CheckpointReviewAction, 'revise' | 'reject'>,
@@ -137,8 +141,21 @@ function ReviewRow({
   const isTruncated = truncatedSummary !== fullSummary
   const parsedDiff = getCheckpointDiffStatParsed(checkpoint)
 
+  function handleOpen(event: React.MouseEvent) {
+    const target = event.target
+    if (target instanceof HTMLElement && target.closest('button, textarea, input, select, a')) return
+    if (event.shiftKey) {
+      onQuickPreview(checkpoint)
+      return
+    }
+    onOpenDetail(checkpoint)
+  }
+
   return (
-    <article className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
+    <article
+      className="cursor-pointer rounded-xl border border-primary-200 bg-white p-4 shadow-sm transition-colors hover:border-primary-300 md:p-5"
+      onClick={handleOpen}
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -239,7 +256,13 @@ function ReviewRow({
           <div className="flex flex-wrap items-center gap-2 md:justify-end">
             <Button
               variant="outline"
-              onClick={() => onReview(checkpoint)}
+              onClick={(event) => {
+                if (event.shiftKey) {
+                  onQuickPreview(checkpoint)
+                  return
+                }
+                onOpenDetail(checkpoint)
+              }}
               disabled={mutationPending}
             >
               Review
@@ -326,6 +349,7 @@ function ReviewRow({
 }
 
 export function ReviewQueueScreen() {
+  const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<'all' | CheckpointStatus>(
     'all',
   )
@@ -443,6 +467,16 @@ export function ReviewQueueScreen() {
       checkpointId: composer.checkpointId,
       action: composer.action,
       reviewerNotes,
+    })
+  }
+
+  function openCheckpointDetail(checkpoint: WorkspaceCheckpoint) {
+    void navigate({
+      to: '/workspace',
+      search: {
+        checkpointId: checkpoint.id,
+        returnTo: 'review',
+      },
     })
   }
 
@@ -581,7 +615,8 @@ export function ReviewQueueScreen() {
                 composer={composer}
                 notes={reviewerNotes}
                 onApprove={handleApprove}
-                onReview={setSelectedCheckpoint}
+                onOpenDetail={openCheckpointDetail}
+                onQuickPreview={setSelectedCheckpoint}
                 onOpenComposer={handleOpenComposer}
                 onCancelComposer={() => {
                   setComposer(null)

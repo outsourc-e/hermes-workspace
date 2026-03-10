@@ -572,6 +572,28 @@ export function ProjectsScreen({
   }
 
   function focusCheckpointReview(checkpoint: WorkspaceCheckpoint) {
+    if (routePath === '/workspace') {
+      const checkpointProjectId =
+        projects.find((item) => item.name === checkpoint.project_name)?.id ??
+        selectedProjectId ??
+        undefined
+      void navigate({
+        to: '/workspace',
+        search: {
+          project: replanSearch?.project,
+          projectId: replanSearch?.projectId ?? checkpointProjectId,
+          goal: replanSearch?.goal,
+          phaseId: replanSearch?.phaseId,
+          phaseName: replanSearch?.phaseName,
+          missionId: replanSearch?.missionId,
+          checkpointId: checkpoint.id,
+          returnTo: 'projects',
+          showWizard: undefined,
+        },
+      })
+      return
+    }
+
     const project = projects.find(
       (item) => item.name === checkpoint.project_name,
     )
@@ -715,6 +737,7 @@ export function ProjectsScreen({
   }, [replanSearch?.project, replanSearch?.projectId, selectedProjectId])
 
   useEffect(() => {
+    if (routePath === '/workspace') return
     if (!replanSearch?.checkpointId) return
     const checkpoint = allCheckpoints.find(
       (entry) => entry.id === replanSearch.checkpointId,
@@ -1111,7 +1134,12 @@ export function ProjectsScreen({
               Refresh
             </Button>
             <Button
-              onClick={() => void navigate({ to: '/new-project' })}
+              onClick={() =>
+                void navigate({
+                  to: '/workspace',
+                  search: { showWizard: true },
+                })
+              }
               className="bg-accent-500 text-white hover:bg-accent-400"
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
@@ -1140,7 +1168,12 @@ export function ProjectsScreen({
               build.
             </p>
             <Button
-              onClick={() => void navigate({ to: '/new-project' })}
+              onClick={() =>
+                void navigate({
+                  to: '/workspace',
+                  search: { showWizard: true },
+                })
+              }
               className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
             >
               Create Project
