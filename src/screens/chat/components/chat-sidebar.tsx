@@ -916,6 +916,13 @@ function ChatSidebarComponent({
       label: 'Skills & Memory',
       active: pathname === '/workspace-skills',
     },
+    {
+      kind: 'link',
+      to: '/workspace-teams',
+      icon: UserMultipleIcon,
+      label: 'Teams & Roles',
+      active: pathname === '/workspace-teams',
+    },
   ]
 
   const gatewayItems: NavItemDef[] = [

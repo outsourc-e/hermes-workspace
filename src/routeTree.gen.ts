@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkspaceTeamsRouteImport } from './routes/workspace-teams'
 import { Route as WorkspaceSkillsRouteImport } from './routes/workspace-skills'
 import { Route as WorkspaceAgentsRouteImport } from './routes/workspace-agents'
 import { Route as WizardRouteImport } from './routes/wizard'
@@ -159,6 +160,11 @@ import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from '.
 import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
+const WorkspaceTeamsRoute = WorkspaceTeamsRouteImport.update({
+  id: '/workspace-teams',
+  path: '/workspace-teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorkspaceSkillsRoute = WorkspaceSkillsRouteImport.update({
   id: '/workspace-skills',
   path: '/workspace-skills',
@@ -959,6 +965,7 @@ export interface FileRoutesByFullPath {
   '/wizard': typeof WizardRoute
   '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
+  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1109,6 +1116,7 @@ export interface FileRoutesByTo {
   '/wizard': typeof WizardRoute
   '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
+  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1261,6 +1269,7 @@ export interface FileRoutesById {
   '/wizard': typeof WizardRoute
   '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
+  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1414,6 +1423,7 @@ export interface FileRouteTypes {
     | '/wizard'
     | '/workspace-agents'
     | '/workspace-skills'
+    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1564,6 +1574,7 @@ export interface FileRouteTypes {
     | '/wizard'
     | '/workspace-agents'
     | '/workspace-skills'
+    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1715,6 +1726,7 @@ export interface FileRouteTypes {
     | '/wizard'
     | '/workspace-agents'
     | '/workspace-skills'
+    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1867,6 +1879,7 @@ export interface RootRouteChildren {
   WizardRoute: typeof WizardRoute
   WorkspaceAgentsRoute: typeof WorkspaceAgentsRoute
   WorkspaceSkillsRoute: typeof WorkspaceSkillsRoute
+  WorkspaceTeamsRoute: typeof WorkspaceTeamsRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
@@ -1942,6 +1955,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workspace-teams': {
+      id: '/workspace-teams'
+      path: '/workspace-teams'
+      fullPath: '/workspace-teams'
+      preLoaderRoute: typeof WorkspaceTeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/workspace-skills': {
       id: '/workspace-skills'
       path: '/workspace-skills'
@@ -3246,6 +3266,7 @@ const rootRouteChildren: RootRouteChildren = {
   WizardRoute: WizardRoute,
   WorkspaceAgentsRoute: WorkspaceAgentsRoute,
   WorkspaceSkillsRoute: WorkspaceSkillsRoute,
+  WorkspaceTeamsRoute: WorkspaceTeamsRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,
