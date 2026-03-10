@@ -233,15 +233,21 @@ export function WorkspaceSkillsScreen() {
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <div className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col py-4">
-        <div className="flex flex-col gap-2 pb-4">
-          <h1 className="text-base font-semibold text-primary-900">
-            Skills &amp; Memory
-          </h1>
-          <p className="text-sm text-primary-500">
-            Browse installed skills and inspect workspace memory sources in one
-            place.
-          </p>
-        </div>
+        <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
+              <HugeiconsIcon icon={SparklesIcon} size={24} strokeWidth={1.6} />
+            </div>
+            <div>
+              <h1 className="text-base font-semibold text-primary-900">
+                Skills &amp; Memory
+              </h1>
+              <p className="mt-1 text-sm text-primary-500">
+                Installed skills and workspace memory sources
+              </p>
+            </div>
+          </div>
+        </header>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm lg:grid-cols-2">
           <section className="min-h-0 border-b border-primary-200 lg:border-b-0">
