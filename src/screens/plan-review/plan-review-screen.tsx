@@ -13,6 +13,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
+import { workspaceRequestJson } from '@/lib/workspace-checkpoints'
 import type { DecomposedTaskDraft } from '@/screens/projects/lib/workspace-types'
 import {
   extractProject,
@@ -28,8 +29,10 @@ import {
   calculateExecutionWaves,
   deriveMissionName,
   formatMinutes,
+  formatStatus,
   getAgentBadgeClass,
   getAgentBadgeLabel,
+  getStatusBadgeClass,
   isHighRiskTask,
 } from '@/screens/projects/lib/workspace-utils'
 
@@ -50,9 +53,22 @@ type PlanReviewState = {
   tasks: DecomposedTaskDraft[]
 }
 
+type RecentPlanMission = {
+  id: string
+  name: string
+  status: string
+  projectId: string
+  projectName: string
+  createdAt: string
+}
+
 function readRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null
 }
 
 function readPayload(response: Response): Promise<unknown> {
@@ -111,6 +127,55 @@ function parsePlanState(plan: string): PlanReviewState | null {
   } catch {
     return null
   }
+}
+
+function extractRecentPlanMissions(payload: unknown): RecentPlanMission[] {
+  const record = readRecord(payload)
+  const candidates = [payload, record?.missions, record?.data, record?.items]
+  const missions = candidates.find((value) => Array.isArray(value))
+  if (!Array.isArray(missions)) return []
+
+  return missions
+    .map((value) => {
+      const missionRecord = readRecord(value)
+      if (!missionRecord) return null
+
+      const mission = normalizeMission(missionRecord)
+      const projectRecord = readRecord(missionRecord.project)
+      const phaseRecord = readRecord(missionRecord.phase)
+      const projectId =
+        readString(missionRecord.project_id) ??
+        readString(projectRecord?.id) ??
+        readString(phaseRecord?.project_id) ??
+        ''
+
+      return {
+        id: mission.id,
+        name: mission.name,
+        status: mission.status,
+        projectId,
+        projectName:
+          readString(missionRecord.project_name) ??
+          readString(projectRecord?.name) ??
+          'Project',
+        createdAt:
+          readString(missionRecord.created_at) ??
+          readString(missionRecord.updated_at) ??
+          '',
+      } satisfies RecentPlanMission
+    })
+    .filter((mission): mission is RecentPlanMission => mission !== null)
+}
+
+function formatRecentPlanDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown date'
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date)
 }
 
 async function loadMissionTasks(missionId: string) {
@@ -192,6 +257,7 @@ export function PlanReviewScreen({
 }: PlanReviewScreenProps) {
   const navigate = useNavigate()
   const parsedPlan = useMemo(() => parsePlanState(plan), [plan])
+  const showRecentPlansFallback = !plan && !missionId && !projectId
   const projectQuery = useQuery({
     queryKey: ['workspace', 'plan-review', 'project', projectId],
     enabled: Boolean(missionId && projectId),
@@ -221,7 +287,22 @@ export function PlanReviewScreen({
       tasks: toTaskDrafts(missionTasksQuery.data ?? missionContext.mission.tasks),
     } satisfies PlanReviewState
   }, [missionId, missionTasksQuery.data, projectQuery.data])
+  const recentMissionsQuery = useQuery({
+    queryKey: ['workspace', 'plan-review', 'recent-missions'],
+    enabled: showRecentPlansFallback,
+    queryFn: async () =>
+      extractRecentPlanMissions(
+        await workspaceRequestJson('/api/workspace/missions'),
+      ),
+  })
   const resolvedPlan = parsedPlan ?? missionPlan
+  const recentPlanMissions = useMemo(
+    () =>
+      (recentMissionsQuery.data ?? [])
+        .filter((mission) => mission.status !== 'draft')
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [recentMissionsQuery.data],
+  )
   const [tasks, setTasks] = useState<DecomposedTaskDraft[]>(() => resolvedPlan?.tasks ?? [])
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -405,6 +486,98 @@ export function PlanReviewScreen({
   }
 
   if (!resolvedPlan) {
+    if (showRecentPlansFallback) {
+      return (
+        <div className="min-h-full bg-surface px-4 py-5 text-primary-900 sm:px-6 lg:px-8">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+            <section className="rounded-xl border border-primary-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                <Link to="/projects" className="transition-colors hover:text-primary-900">
+                  Projects
+                </Link>
+                <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={1.8} />
+                <span>Plan Review</span>
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold text-primary-900 sm:text-[2rem]">
+                Recent Plans
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm text-primary-500">
+                Open a recent mission plan or return to Projects to generate a new one.
+              </p>
+
+              <div className="mt-5 space-y-3">
+                {recentMissionsQuery.isLoading ? (
+                  <div className="rounded-2xl border border-primary-200 bg-primary-50/80 px-4 py-6 text-sm text-primary-500">
+                    Loading recent plans...
+                  </div>
+                ) : null}
+
+                {recentMissionsQuery.isError ? (
+                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-sm text-red-300">
+                    {recentMissionsQuery.error instanceof Error
+                      ? recentMissionsQuery.error.message
+                      : 'Failed to load recent plans'}
+                  </div>
+                ) : null}
+
+                {!recentMissionsQuery.isLoading &&
+                !recentMissionsQuery.isError &&
+                recentPlanMissions.length === 0 ? (
+                  <div className="rounded-2xl border border-primary-200 bg-primary-50/80 px-4 py-6 text-sm text-primary-500">
+                    No recent plans are available yet.
+                  </div>
+                ) : null}
+
+                {recentPlanMissions.map((mission) => (
+                  <Link
+                    key={mission.id}
+                    to="/mission-console"
+                    search={{
+                      missionId: mission.id,
+                      projectId: mission.projectId,
+                    }}
+                    className="block rounded-2xl border border-primary-200 bg-white p-4 transition-colors hover:border-accent-500/40 hover:bg-accent-500/5"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-primary-900">
+                            {mission.name}
+                          </p>
+                          <span
+                            className={[
+                              'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                              getStatusBadgeClass(mission.status),
+                            ].join(' ')}
+                          >
+                            {formatStatus(mission.status)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-primary-500">
+                          {mission.projectName}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-primary-500">
+                        <span>{formatRecentPlanDate(mission.createdAt)}</span>
+                        <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              <Button
+                className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
+                onClick={() => void navigate({ to: '/projects' })}
+              >
+                Go to Projects
+              </Button>
+            </section>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="flex h-full items-center justify-center bg-surface p-6">
         <div className="w-full max-w-lg rounded-xl border border-primary-200 bg-white p-6 text-center shadow-sm">
