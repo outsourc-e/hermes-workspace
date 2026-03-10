@@ -12,6 +12,7 @@ import type {
   CreatePhaseInput,
   CreateProjectInput,
   CreateTaskInput,
+  CreateTeamInput,
   Mission,
   MissionProgressEvent,
   MissionStatus,
@@ -26,6 +27,7 @@ import type {
   TaskRun,
   TaskRunWithRelations,
   TaskStatus,
+  Team,
   TaskWithRelations,
   UpdateTaskInput,
 } from './types'
@@ -267,6 +269,21 @@ function normalizeKey(value: string): string {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
+}
+
+type TeamRow = {
+  id: string
+  name: string
+  description: string | null
+  permissions: string | null
+  created_at: string
+}
+
+function hydrateTeam(row: TeamRow): Team {
+  return {
+    ...row,
+    permissions: parseJsonOrDefault<string[]>(row.permissions, []),
+  }
 }
 
 export class Tracker extends EventEmitter {
@@ -1340,6 +1357,33 @@ export class Tracker extends EventEmitter {
     return this.db
       .prepare('SELECT * FROM agents ORDER BY created_at DESC')
       .all() as AgentRecord[]
+  }
+
+  listTeams(): Team[] {
+    const rows = this.db
+      .prepare('SELECT * FROM teams ORDER BY created_at ASC, name ASC')
+      .all() as TeamRow[]
+
+    return rows.map((row) => hydrateTeam(row))
+  }
+
+  createTeam(input: CreateTeamInput): Team {
+    const team = this.db
+      .prepare(
+        `INSERT INTO teams (id, name, description, permissions)
+         VALUES (@id, @name, @description, @permissions)
+         RETURNING *`,
+      )
+      .get({
+        id: input.id ?? normalizeKey(input.name),
+        name: input.name,
+        description: input.description ?? null,
+        permissions: JSON.stringify(input.permissions ?? []),
+      }) as TeamRow
+
+    const hydratedTeam = hydrateTeam(team)
+    this.logActivity('created', 'team', hydratedTeam.id, null, hydratedTeam)
+    return hydratedTeam
   }
 
   listAgentDirectory(): AgentDirectoryRecord[] {

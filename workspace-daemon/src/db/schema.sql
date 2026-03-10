@@ -43,6 +43,14 @@ CREATE TABLE IF NOT EXISTS agents (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS teams (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  permissions TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
@@ -114,6 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_missions_phase_id ON missions(phase_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_mission_id ON tasks(mission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_agent_id ON tasks(agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_teams_name ON teams(name);
 CREATE INDEX IF NOT EXISTS idx_task_runs_task_id ON task_runs(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_runs_status ON task_runs(status);
 CREATE INDEX IF NOT EXISTS idx_run_events_task_run_id ON run_events(task_run_id);

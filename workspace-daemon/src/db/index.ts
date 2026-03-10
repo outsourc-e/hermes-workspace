@@ -68,6 +68,52 @@ function ensureProjectPolicyColumns(db: Database.Database): void {
   }
 }
 
+function seedDefaultTeams(db: Database.Database): void {
+  const row = db.prepare('SELECT COUNT(*) AS count FROM teams').get() as {
+    count: number
+  }
+  if (row.count > 0) {
+    return
+  }
+
+  const insertTeam = db.prepare(
+    `INSERT INTO teams (id, name, description, permissions)
+     VALUES (@id, @name, @description, @permissions)`,
+  )
+
+  const defaultTeams = [
+    {
+      id: 'admin',
+      name: 'Admin',
+      description: 'Full workspace access',
+      permissions: ['workspace.admin'],
+    },
+    {
+      id: 'dev',
+      name: 'Dev',
+      description: 'Can run tasks and view runs',
+      permissions: ['tasks.run', 'runs.view'],
+    },
+    {
+      id: 'reviewer',
+      name: 'Reviewer',
+      description: 'Can approve and reject checkpoints',
+      permissions: ['checkpoints.review'],
+    },
+  ]
+
+  const insertDefaults = db.transaction(() => {
+    for (const team of defaultTeams) {
+      insertTeam.run({
+        ...team,
+        permissions: JSON.stringify(team.permissions),
+      })
+    }
+  })
+
+  insertDefaults()
+}
+
 export function getDatabase(
   dbPath = process.env.WORKSPACE_DAEMON_DB_PATH ?? DEFAULT_DB_PATH,
 ): Database.Database {
@@ -82,6 +128,7 @@ export function getDatabase(
   db.exec(readSchemaSql())
   ensureCheckpointCommitHashColumn(db)
   ensureProjectPolicyColumns(db)
+  seedDefaultTeams(db)
   dbInstance = db
   return db
 }

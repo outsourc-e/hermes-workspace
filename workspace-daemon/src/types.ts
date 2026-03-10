@@ -179,6 +179,14 @@ export interface AgentRecord {
   created_at: string
 }
 
+export interface Team {
+  id: string
+  name: string
+  description: string | null
+  permissions: string[]
+  created_at: string
+}
+
 export interface AgentDirectoryCapabilities {
   repo_write: boolean
   shell_commands: boolean
@@ -436,6 +444,13 @@ export interface RegisterAgentInput {
   adapter_config?: Record<string, unknown>
   model?: string | null
   capabilities?: Record<string, unknown>
+}
+
+export interface CreateTeamInput {
+  id?: string
+  name: string
+  description?: string | null
+  permissions?: string[] | null
 }
 
 export interface DecomposerContext {
