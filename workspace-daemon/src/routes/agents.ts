@@ -5,7 +5,12 @@ export function createAgentsRouter(tracker: Tracker): Router {
   const router = Router();
 
   router.get("/", (_req, res) => {
-    res.json({ agents: tracker.listAgentDirectory() });
+    const agents = tracker.listAgentDirectory().map((agent) => ({
+      ...agent,
+      model: agent.model ?? (agent.adapter_type === "codex" ? "gpt-5.4-codex" : agent.adapter_type === "claude" ? "claude-sonnet-4-6" : "unknown"),
+      status: agent.status === "away" ? "online" : agent.status,
+    }));
+    res.json({ agents });
   });
 
   router.get("/:id/stats", (req, res) => {

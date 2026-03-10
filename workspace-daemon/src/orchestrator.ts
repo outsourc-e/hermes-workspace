@@ -118,7 +118,7 @@ export class Orchestrator extends EventEmitter {
     this.state.providerConcurrency = this.resolveProviderConcurrency(this.state.maxConcurrentAgents);
     this.tracker.refreshReadyTasks();
     const runnableTasks = this.attachResolvedAdapterTypes(
-      this.tracker.listTasks({}).filter((task) => task.mission_status === "running" || task.status === "completed"),
+      this.tracker.listTasks({}).filter((task) => task.mission_status === "running" && task.status === "ready"),
     );
     const dispatchableTasks = this.getDispatchableTasks(runnableTasks).slice(0, availableSlots);
 
