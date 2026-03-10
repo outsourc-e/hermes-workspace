@@ -20,6 +20,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import type React from 'react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -236,6 +237,39 @@ async function registerWorkspaceAgent(form: RegisterAgentFormState): Promise<str
   return asString(record?.id)
 }
 
+async function dispatchAgentTestRun(agentId: string): Promise<void> {
+  await workspaceRequestJson('http://localhost:3099/api/workspace/task-runs', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      agent_id: agentId,
+      task_name: 'Test run',
+      project_id: null,
+    }),
+  })
+}
+
+async function updateWorkspaceAgentStatus(
+  agentId: string,
+  status: 'online' | 'offline',
+): Promise<void> {
+  await workspaceRequestJson(`http://localhost:3099/api/workspace/agents/${encodeURIComponent(agentId)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status }),
+  })
+}
+
+async function deleteWorkspaceAgent(agentId: string): Promise<void> {
+  await workspaceRequestJson(`http://localhost:3099/api/workspace/agents/${encodeURIComponent(agentId)}`, {
+    method: 'DELETE',
+  })
+}
+
 function StatCard({
   icon,
   label,
@@ -279,6 +313,7 @@ function SectionCard({
 }
 
 export function AgentsScreen() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<AgentDetailTab>('profile')
@@ -353,6 +388,61 @@ export function AgentsScreen() {
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to register agent', {
+        type: 'error',
+      })
+    },
+  })
+
+  const dispatchTestRunMutation = useMutation({
+    mutationFn: dispatchAgentTestRun,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'task-runs'],
+      })
+      setActiveTab('runs')
+      void navigate({
+        to: '/workspace',
+        hash: 'runs',
+      })
+      toast('Test run dispatched', { type: 'success' })
+    },
+    onError: () => {
+      toast('Failed to dispatch test run', { type: 'error' })
+    },
+  })
+
+  const toggleAgentStatusMutation = useMutation({
+    mutationFn: ({
+      agentId,
+      status,
+    }: {
+      agentId: string
+      status: 'online' | 'offline'
+    }) => updateWorkspaceAgentStatus(agentId, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'agents-directory'],
+      })
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to update agent status', {
+        type: 'error',
+      })
+    },
+  })
+
+  const deleteAgentMutation = useMutation({
+    mutationFn: deleteWorkspaceAgent,
+    onSuccess: async (_, agentId) => {
+      setPendingSelectedAgentId(null)
+      setSelectedAgentId((current) => (current === agentId ? null : current))
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'agents-directory'],
+      })
+      toast('Agent deleted', { type: 'success' })
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to delete agent', {
         type: 'error',
       })
     },
@@ -608,6 +698,20 @@ export function AgentsScreen() {
   const selectedPrompt =
     promptDrafts[selectedAgent.id] ?? selectedAgent.system_prompt
   const stats = statsQuery.data
+  const selectedAgentStatus = String(selectedAgent.status)
+  const canDeactivate =
+    selectedAgentStatus === 'online' || selectedAgentStatus === 'active'
+  const canActivate =
+    selectedAgentStatus === 'offline' || selectedAgentStatus === 'inactive'
+  const nextStatus: 'online' | 'offline' =
+    selectedAgentStatus === 'online' ? 'offline' : 'online'
+  const toggleStatusLabel = canDeactivate
+    ? 'Deactivate'
+    : canActivate
+      ? 'Activate'
+      : nextStatus === 'offline'
+        ? 'Deactivate'
+        : 'Activate'
 
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
@@ -732,6 +836,36 @@ export function AgentsScreen() {
                     variant="secondary"
                     size="sm"
                     className="border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"
+                    disabled={toggleAgentStatusMutation.isPending}
+                    onClick={() =>
+                      toggleAgentStatusMutation.mutate({
+                        agentId: selectedAgent.id,
+                        status: nextStatus,
+                      })
+                    }
+                  >
+                    {toggleStatusLabel}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={deleteAgentMutation.isPending}
+                    onClick={() => {
+                      if (
+                        typeof window !== 'undefined' &&
+                        !window.confirm('Delete this agent? This cannot be undone.')
+                      ) {
+                        return
+                      }
+                      deleteAgentMutation.mutate(selectedAgent.id)
+                    }}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"
                     onClick={() => toast('Configuration flow is not wired yet.', { type: 'info' })}
                   >
                     <HugeiconsIcon icon={Settings01Icon} size={14} strokeWidth={1.7} />
@@ -749,7 +883,8 @@ export function AgentsScreen() {
                   <Button
                     size="sm"
                     className="bg-accent-500 text-primary-950 hover:bg-accent-400"
-                    onClick={() => toast('Test run trigger is not wired yet.', { type: 'info' })}
+                    disabled={dispatchTestRunMutation.isPending}
+                    onClick={() => dispatchTestRunMutation.mutate(selectedAgent.id)}
                   >
                     <HugeiconsIcon icon={Rocket01Icon} size={14} strokeWidth={1.7} />
                     Test Run
