@@ -893,10 +893,13 @@ export function ProjectDetailView({
                                   size="sm"
                                   onClick={() =>
                                     navigate({
-                                      to: '/mission-console',
+                                      to: '/workspace',
+                                      hash: 'projects',
                                       search: {
                                         missionId: mission.id,
                                         projectId:
+                                          projectDetail?.id ?? selectedSummary?.id ?? '',
+                                        project:
                                           projectDetail?.id ?? selectedSummary?.id ?? '',
                                       },
                                     })

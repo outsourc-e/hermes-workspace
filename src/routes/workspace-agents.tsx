@@ -1,12 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { AgentsScreen } from '@/screens/agents/agents-screen'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/workspace-agents')({
-  component: WorkspaceAgentsRoute,
+  beforeLoad: function redirectWorkspaceAgentsRoute() {
+    throw redirect({
+      to: '/workspace',
+      hash: 'agents',
+      replace: true,
+    })
+  },
+  component: function WorkspaceAgentsRoute() {
+    return null
+  },
 })
-
-function WorkspaceAgentsRoute() {
-  usePageTitle('Workspace Agents')
-  return <AgentsScreen />
-}

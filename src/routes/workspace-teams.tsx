@@ -1,12 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { TeamsScreen } from '@/screens/teams/teams-screen'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/workspace-teams')({
-  component: WorkspaceTeamsRoute,
+  beforeLoad: function redirectWorkspaceTeamsRoute() {
+    throw redirect({
+      to: '/workspace',
+      hash: 'teams',
+      replace: true,
+    })
+  },
+  component: function WorkspaceTeamsRoute() {
+    return null
+  },
 })
-
-function WorkspaceTeamsRoute() {
-  usePageTitle('Teams & Roles')
-  return <TeamsScreen />
-}

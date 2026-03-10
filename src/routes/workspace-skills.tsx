@@ -1,12 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { WorkspaceSkillsScreen } from '@/screens/skills/workspace-skills-screen'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/workspace-skills')({
-  component: WorkspaceSkillsRoute,
+  beforeLoad: function redirectWorkspaceSkillsRoute() {
+    throw redirect({
+      to: '/workspace',
+      hash: 'skills',
+      replace: true,
+    })
+  },
+  component: function WorkspaceSkillsRoute() {
+    return null
+  },
 })
-
-function WorkspaceSkillsRoute() {
-  usePageTitle('Skills & Memory')
-  return <WorkspaceSkillsScreen />
-}

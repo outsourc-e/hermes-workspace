@@ -67,7 +67,13 @@ type ProjectsScreenProps = {
     phaseName?: string
     project?: string
     projectId?: string
+    missionId?: string
   }
+  routePath?: '/projects' | '/workspace'
+  onProjectContextChange?: (context: {
+    projectId: string | null
+    projectName: string | null
+  }) => void
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -107,7 +113,11 @@ async function loadMissionTasks(missionId: string) {
   return extractTasks(payload)
 }
 
-export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
+export function ProjectsScreen({
+  replanSearch,
+  routePath = '/projects',
+  onProjectContextChange,
+}: ProjectsScreenProps) {
   const [projects, setProjects] = useState<Array<WorkspaceProject>>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,
@@ -287,6 +297,18 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
   )
+
+  useEffect(() => {
+    onProjectContextChange?.({
+      projectId: selectedProjectId,
+      projectName: projectDetail?.name ?? selectedSummary?.name ?? null,
+    })
+  }, [
+    onProjectContextChange,
+    projectDetail?.name,
+    selectedProjectId,
+    selectedSummary?.name,
+  ])
 
   useEffect(() => {
     const spec = projectDetail?.spec ?? selectedSummary?.spec ?? ''
@@ -708,7 +730,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     if (!checkpoint) return
     focusCheckpointReview(checkpoint)
     void navigate({
-      to: '/projects',
+      to: routePath,
       replace: true,
       search: {
         project: replanSearch.project,
@@ -722,6 +744,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
   }, [
     allCheckpoints,
     navigate,
+    routePath,
     replanSearch?.checkpointId,
     replanSearch?.goal,
     replanSearch?.phaseId,
@@ -753,7 +776,7 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
     })
     setExpandedDecomposeDescriptions({})
     void navigate({
-      to: '/projects',
+      to: routePath,
       replace: true,
       search: {
         project: undefined,
@@ -763,7 +786,13 @@ export function ProjectsScreen({ replanSearch }: ProjectsScreenProps) {
         projectId: undefined,
       },
     })
-  }, [navigate, projectDetail, replanSearch?.goal, replanSearch?.phaseId])
+  }, [
+    navigate,
+    projectDetail,
+    replanSearch?.goal,
+    replanSearch?.phaseId,
+    routePath,
+  ])
 
   async function handleApproveVerified() {
     if (verifiedReviewItems.length === 0) {

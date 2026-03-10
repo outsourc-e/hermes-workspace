@@ -67,6 +67,12 @@ import {
 } from '@/components/ui/menu'
 import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import {
+  extractProject,
+  extractProjects,
+  type WorkspaceProject,
+  type WorkspaceStats,
+} from '@/screens/projects/lib/workspace-types'
 
 function ThemeToggleMini() {
   const theme = useSettingsStore((state) => state.settings.theme)
@@ -156,13 +162,105 @@ async function fetchHasRecentIssues(): Promise<boolean> {
 type NavItemDef = {
   kind: 'link' | 'button'
   to?: string
+  search?: Record<string, unknown>
+  hash?: string
   icon: unknown
   label: string
   active: boolean
   onClick?: () => void
   disabled?: boolean
-  badge?: 'error-dot'
+  badge?: 'error-dot' | string | number
   dataTour?: string
+}
+
+type SidebarProjectShortcut = {
+  id: string
+  name: string
+  progress: number
+  pendingCount: number
+}
+
+const PROJECT_SHORTCUT_ORDER = ['ClawSuite', 'LuxeLab OS', 'Client Portal']
+
+export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
+  try {
+    const response = await fetch('/api/workspace/stats')
+    if (!response.ok) return null
+    return (await response.json()) as WorkspaceStats
+  } catch {
+    return null
+  }
+}
+
+export async function fetchWorkspaceProjectShortcuts(): Promise<SidebarProjectShortcut[]> {
+  const [projectsResponse, checkpointsResponse] = await Promise.all([
+    fetch('/api/workspace/projects'),
+    fetch('/api/workspace/checkpoints?status=pending'),
+  ])
+
+  if (!projectsResponse.ok) {
+    throw new Error(`Failed to load workspace projects (${projectsResponse.status})`)
+  }
+
+  const projects = extractProjects(await projectsResponse.json())
+  const pendingPayload = checkpointsResponse.ok ? await checkpointsResponse.json() : null
+  const pendingItems = Array.isArray((pendingPayload as Record<string, unknown> | null)?.checkpoints)
+    ? ((pendingPayload as Record<string, unknown>).checkpoints as Array<unknown>)
+    : Array.isArray((pendingPayload as Record<string, unknown> | null)?.items)
+      ? ((pendingPayload as Record<string, unknown>).items as Array<unknown>)
+      : []
+
+  const pendingByProjectName = pendingItems.reduce<Record<string, number>>(
+    (accumulator, item) => {
+      const record = toRecord(item)
+      const projectName =
+        typeof record?.project_name === 'string' ? record.project_name : null
+      if (!projectName) return accumulator
+      accumulator[projectName] = (accumulator[projectName] ?? 0) + 1
+      return accumulator
+    },
+    {},
+  )
+
+  const preferredProjects = PROJECT_SHORTCUT_ORDER.map((name) =>
+    projects.find((project) => project.name === name),
+  ).filter((project): project is WorkspaceProject => Boolean(project))
+
+  const details = await Promise.all(
+    preferredProjects.map(async (project) => {
+      const response = await fetch(
+        `/api/workspace/projects/${encodeURIComponent(project.id)}`,
+      )
+      if (!response.ok) return null
+      return extractProject(await response.json())
+    }),
+  )
+
+  return preferredProjects.map((project, index) => {
+    const detail = details[index]
+    const tasks =
+      detail?.phases.flatMap((phase) =>
+        phase.missions.flatMap((mission) => mission.tasks),
+      ) ?? []
+    const completedCount = tasks.filter((task) =>
+      ['completed', 'done'].includes(task.status.toLowerCase()),
+    ).length
+    const progress =
+      tasks.length > 0
+        ? Math.round((completedCount / tasks.length) * 100)
+        : project.status === 'completed' || project.status === 'done'
+          ? 100
+          : project.status === 'running' || project.status === 'active'
+            ? 50
+            : 0
+
+    return {
+      id: project.id,
+      name: project.name,
+      progress,
+      pendingCount: pendingByProjectName[project.name] ?? 0,
+    }
+  })
 }
 
 function NavItem({

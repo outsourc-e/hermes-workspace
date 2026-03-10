@@ -1,17 +1,13 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
+import {
+  WorkspaceLayout,
+  type WorkspaceSearch,
+} from '@/screens/workspace/workspace-layout'
 
-export const Route = createFileRoute('/projects')({
+export const Route = createFileRoute('/workspace')({
   validateSearch: (
     search: Record<string, unknown>,
-  ): {
-    project?: string
-    projectId?: string
-    checkpointId?: string
-    phaseId?: string
-    phaseName?: string
-    goal?: string
-    missionId?: string
-  } => ({
+  ): WorkspaceSearch => ({
     project: typeof search.project === 'string' ? search.project : undefined,
     projectId: typeof search.projectId === 'string' ? search.projectId : undefined,
     checkpointId:
@@ -21,15 +17,7 @@ export const Route = createFileRoute('/projects')({
     goal: typeof search.goal === 'string' ? search.goal : undefined,
     missionId: typeof search.missionId === 'string' ? search.missionId : undefined,
   }),
-  beforeLoad: function redirectProjectsRoute({ search }) {
-    throw redirect({
-      to: '/workspace',
-      search,
-      hash: 'projects',
-      replace: true,
-    })
-  },
-  component: function ProjectsRoute() {
-    return null
+  component: function WorkspaceRoute() {
+    return <WorkspaceLayout search={Route.useSearch()} />
   },
 })

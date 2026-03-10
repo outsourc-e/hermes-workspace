@@ -1042,10 +1042,12 @@ export function MissionConsoleScreen({
                     type="button"
                     onClick={() =>
                       void navigate({
-                        to: '/mission-console',
+                        to: '/workspace',
+                        hash: 'projects',
                         search: {
                           missionId: mission.missionId,
                           projectId: mission.projectId,
+                          project: mission.projectId,
                         },
                       })
                     }
@@ -1092,7 +1094,8 @@ export function MissionConsoleScreen({
                   Create or start a mission from Projects, then return here.
                 </p>
                 <Link
-                  to="/projects"
+                  to="/workspace"
+                  hash="projects"
                   className={cn(
                     buttonVariants({}),
                     'mt-4 inline-flex bg-accent-500 text-primary-950 hover:bg-accent-400',
@@ -1105,7 +1108,8 @@ export function MissionConsoleScreen({
           </div>
           {missionsListQuery.isError ? (
             <Link
-              to="/projects"
+              to="/workspace"
+              hash="projects"
               className={cn(
                 buttonVariants({}),
                 'mt-6 inline-flex bg-accent-500 text-primary-950 hover:bg-accent-400',
@@ -1126,7 +1130,11 @@ export function MissionConsoleScreen({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-xs text-primary-400">
-                <Link to="/projects" className="transition-colors hover:text-primary-200">
+                <Link
+                  to="/workspace"
+                  hash="projects"
+                  className="transition-colors hover:text-primary-200"
+                >
                   Projects
                 </Link>
                 <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={1.8} />
