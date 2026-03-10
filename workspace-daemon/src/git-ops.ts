@@ -13,7 +13,20 @@ async function runGit(projectPath: string, args: string[]): Promise<string> {
 }
 
 export function getWorktreeBranch(taskId: string): string {
-  return `task/${sanitizeSegment(taskId)}`;
+  return `task-${sanitizeSegment(taskId)}`;
+}
+
+export async function getBaseBranch(projectPath: string): Promise<string> {
+  try {
+    const branch = await runGit(projectPath, ["branch", "--show-current"]);
+    if (branch) {
+      return branch;
+    }
+  } catch {
+    // Fall through to the default branch fallback.
+  }
+
+  return "main";
 }
 
 export async function mergeWorktreeToMain(projectPath: string, branch: string, taskName: string): Promise<string> {

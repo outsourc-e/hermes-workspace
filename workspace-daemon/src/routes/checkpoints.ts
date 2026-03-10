@@ -365,7 +365,7 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
       return;
     }
 
-    const branch = getWorktreeBranch(taskRun.task_id);
+    const branch = getWorktreeBranch(taskRun.id);
 
     try {
       if (!(await hasGitRemote(taskRun.project_path))) {
@@ -427,7 +427,7 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
       return;
     }
 
-    const branch = getWorktreeBranch(taskRun.task_id);
+    const branch = getWorktreeBranch(taskRun.id);
 
     try {
       await stageAndCommitWorkspace(taskRun.workspace_path, checkpoint.id);

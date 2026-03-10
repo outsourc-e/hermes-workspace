@@ -3,7 +3,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getWorkflowConfig } from "./config";
-import { cleanupWorktree, getWorktreeBranch } from "./git-ops";
+import { cleanupWorktree, getBaseBranch, getWorktreeBranch } from "./git-ops";
 import type { Project, Task, WorkflowHooks, WorkspaceInfo } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -30,32 +30,44 @@ function hasGitDirectory(projectPath: string | null): boolean {
   return fs.existsSync(path.join(projectPath, ".git"));
 }
 
+function hasWorkspaceGitEntry(workspacePath: string): boolean {
+  return fs.existsSync(path.join(workspacePath, ".git"));
+}
+
 export class WorkspaceManager {
-  private async createGitWorktree(projectPath: string, workspacePath: string, taskId: string): Promise<void> {
-    await execFileAsync("git", ["worktree", "add", workspacePath, "-b", getWorktreeBranch(taskId)], {
+  private async createGitWorktree(
+    projectPath: string,
+    workspacePath: string,
+    runId: string,
+    baseBranch: string,
+  ): Promise<void> {
+    await execFileAsync("git", ["worktree", "add", workspacePath, "-b", getWorktreeBranch(runId), baseBranch], {
       cwd: projectPath,
     });
+
+    if (!hasWorkspaceGitEntry(workspacePath)) {
+      throw new Error(`Git worktree creation succeeded but ${workspacePath} does not contain a .git entry`);
+    }
   }
 
-  async prepare(project: Project, task: Task): Promise<WorkspaceInfo> {
+  async prepare(project: Project, task: Task, runId: string): Promise<WorkspaceInfo> {
     const workflowConfig = getWorkflowConfig(project.path);
     const projectKey = sanitizeSegment(project.name || project.id);
     const taskKey = sanitizeSegment(task.name || task.id);
     const workspacePath = path.join(workflowConfig.workspaceRoot, projectKey, `${task.id}-${taskKey}`);
     const createdNow = !fs.existsSync(workspacePath);
-    let gitWorktree = false;
 
     fs.mkdirSync(path.dirname(workspacePath), { recursive: true });
 
-    if (createdNow && project.path && hasGitDirectory(project.path)) {
-      try {
-        await this.createGitWorktree(project.path, workspacePath, task.id);
-        gitWorktree = true;
-      } catch {
-        fs.mkdirSync(workspacePath, { recursive: true });
-      }
-    } else {
-      fs.mkdirSync(workspacePath, { recursive: true });
+    if (!project.path || !hasGitDirectory(project.path)) {
+      throw new Error(`Cannot create workspace for task ${task.id}: project path is not a git repository`);
+    }
+
+    if (createdNow) {
+      const baseBranch = await getBaseBranch(project.path);
+      await this.createGitWorktree(project.path, workspacePath, runId, baseBranch);
+    } else if (!hasWorkspaceGitEntry(workspacePath)) {
+      throw new Error(`Workspace path exists but is not a git worktree: ${workspacePath}`);
     }
 
     if (project.path && fs.existsSync(project.path)) {
@@ -73,15 +85,15 @@ export class WorkspaceManager {
       path: workspacePath,
       createdNow,
       hooks: workflowConfig.hooks,
-      git_worktree: gitWorktree,
+      git_worktree: true,
     };
   }
 
-  async ensureWorkspace(project: Project, task: Task): Promise<WorkspaceInfo> {
-    return this.prepare(project, task);
+  async ensureWorkspace(project: Project, task: Task, runId: string): Promise<WorkspaceInfo> {
+    return this.prepare(project, task, runId);
   }
 
-  async cleanup(project: Project, task: Task): Promise<void> {
+  async cleanup(project: Project, task: Task, runId: string): Promise<void> {
     if (!project.path || !fs.existsSync(project.path)) {
       return;
     }
@@ -91,7 +103,7 @@ export class WorkspaceManager {
     const taskKey = sanitizeSegment(task.name || task.id);
     const workspacePath = path.join(workflowConfig.workspaceRoot, projectKey, `${task.id}-${taskKey}`);
 
-    await cleanupWorktree(project.path, workspacePath, getWorktreeBranch(task.id));
+    await cleanupWorktree(project.path, workspacePath, getWorktreeBranch(runId));
   }
 
   async runBeforeRunHooks(workspacePath: string, hooks: WorkflowHooks): Promise<void> {

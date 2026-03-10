@@ -65,7 +65,6 @@ export async function buildCheckpoint(
   workspacePath: string,
   projectPath: string | null,
   projectName: string,
-  taskId: string,
   taskName: string,
   taskRunId: string,
   tracker: Tracker,
@@ -115,7 +114,7 @@ export async function buildCheckpoint(
   if (autoApprove) {
     await gitExec(["commit", "-m", `chore(workspace): auto-apply task run ${taskRunId}`], workspacePath);
     const commitHash = projectPath
-      ? await mergeWorktreeToMain(projectPath, getWorktreeBranch(taskId), taskName)
+      ? await mergeWorktreeToMain(projectPath, getWorktreeBranch(taskRunId), taskName)
       : null;
     const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, commitHash, null);
     const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);

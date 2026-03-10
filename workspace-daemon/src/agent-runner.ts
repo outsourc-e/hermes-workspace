@@ -41,7 +41,9 @@ export class AgentRunner {
   }): Promise<TaskRunOutcome> {
     const workflow = loadWorkflowDefinition(input.project.path);
     const workflowConfig = getWorkflowConfig(input.project.path);
-    const workspace = await this.workspaceManager.ensureWorkspace(input.project, input.task);
+    const workspace = await this.workspaceManager.ensureWorkspace(input.project, input.task, input.taskRun.id);
+    this.tracker.updateTaskRunWorkspacePath(input.taskRun.id, workspace.path);
+    input.taskRun.workspace_path = workspace.path;
 
     await this.workspaceManager.runBeforeRunHooks(workspace.path, workspace.hooks);
 
@@ -87,7 +89,6 @@ export class AgentRunner {
           workspace.path,
           input.project.path,
           input.project.name,
-          input.task.id,
           input.task.name,
           input.taskRun.id,
           this.tracker,
@@ -96,7 +97,7 @@ export class AgentRunner {
       : null;
 
     if (autoApproved && workspace.git_worktree) {
-      await this.workspaceManager.cleanup(input.project, input.task);
+      await this.workspaceManager.cleanup(input.project, input.task, input.taskRun.id);
     }
 
     return {
