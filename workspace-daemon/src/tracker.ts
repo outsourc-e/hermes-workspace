@@ -786,13 +786,104 @@ export class Tracker extends EventEmitter {
   ): TaskRun {
     const taskRun = this.db
       .prepare(
-        `INSERT INTO task_runs (task_id, agent_id, status, attempt, workspace_path, started_at)
-         VALUES (?, ?, 'running', ?, ?, datetime('now'))
+        `INSERT INTO task_runs (task_id, agent_id, status, attempt, workspace_path)
+         VALUES (?, ?, 'running', ?, ?)
          RETURNING *`,
       )
       .get(taskId, agentId, attempt, workspacePath) as TaskRun
     this.emitSse('task_run.started', taskRun)
     return taskRun
+  }
+
+  markTaskRunStarted(id: string): TaskRun | null {
+    const current = this.getTaskRun(id)
+    if (!current) {
+      return null
+    }
+
+    this.db
+      .prepare(`UPDATE task_runs SET started_at = datetime('now') WHERE id = ?`)
+      .run(id)
+
+    const run = this.getTaskRun(id)
+    if (run) {
+      this.emitSse('task_run.updated', run)
+    }
+    return run
+  }
+
+  completeTaskRun(
+    id: string,
+    updates: Partial<
+      Pick<TaskRun, 'status' | 'error' | 'input_tokens' | 'output_tokens' | 'cost_cents'>
+    >,
+  ): TaskRun | null {
+    const current = this.getTaskRun(id)
+    if (!current) {
+      return null
+    }
+
+    this.db
+      .prepare(
+        `UPDATE task_runs
+         SET completed_at = datetime('now'),
+             status = ?,
+             error = ?,
+             input_tokens = ?,
+             output_tokens = ?,
+             cost_cents = ?
+         WHERE id = ?`,
+      )
+      .run(
+        updates.status ?? current.status,
+        updates.error ?? current.error,
+        updates.input_tokens ?? current.input_tokens,
+        updates.output_tokens ?? current.output_tokens,
+        updates.cost_cents ?? current.cost_cents,
+        id,
+      )
+
+    const run = this.getTaskRun(id)
+    if (run) {
+      this.emitSse('task_run.updated', run)
+    }
+    return run
+  }
+
+  failTaskRun(
+    id: string,
+    error: string | null,
+    updates: Partial<Pick<TaskRun, 'input_tokens' | 'output_tokens' | 'cost_cents'>> = {},
+  ): TaskRun | null {
+    const current = this.getTaskRun(id)
+    if (!current) {
+      return null
+    }
+
+    this.db
+      .prepare(
+        `UPDATE task_runs
+         SET completed_at = datetime('now'),
+             status = 'failed',
+             error = ?,
+             input_tokens = ?,
+             output_tokens = ?,
+             cost_cents = ?
+         WHERE id = ?`,
+      )
+      .run(
+        error,
+        updates.input_tokens ?? current.input_tokens,
+        updates.output_tokens ?? current.output_tokens,
+        updates.cost_cents ?? current.cost_cents,
+        id,
+      )
+
+    const run = this.getTaskRun(id)
+    if (run) {
+      this.emitSse('task_run.updated', run)
+    }
+    return run
   }
 
   updateTaskRun(
@@ -829,6 +920,22 @@ export class Tracker extends EventEmitter {
         updates.cost_cents ?? current.cost_cents,
         id,
       )
+
+    const run = this.getTaskRun(id)
+    if (run) {
+      this.emitSse('task_run.updated', run)
+    }
+    return run
+  }
+
+  updateTaskRunWorkspacePath(id: string, workspacePath: string): TaskRun | null {
+    this.db
+      .prepare(
+        `UPDATE task_runs
+         SET workspace_path = ?
+         WHERE id = ?`,
+      )
+      .run(workspacePath, id)
 
     const run = this.getTaskRun(id)
     if (run) {

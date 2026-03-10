@@ -135,11 +135,7 @@ export class Orchestrator extends EventEmitter {
 
   private reconcileRunningTasks(): void {
     for (const run of this.tracker.getRunningTaskRuns()) {
-      this.tracker.updateTaskRun(run.id, {
-        status: "failed",
-        completed_at: nowIso(),
-        error: "Recovered after daemon restart",
-      });
+      this.tracker.failTaskRun(run.id, "Recovered after daemon restart");
       this.queueRetry(run.task_id, run.attempt, "Recovered after daemon restart");
     }
   }
@@ -177,6 +173,7 @@ export class Orchestrator extends EventEmitter {
     };
     this.state.running.set(task.id, runningEntry);
     this.abortControllers.set(taskRun.id, abortController);
+    this.tracker.markTaskRunStarted(taskRun.id);
     this.emit("dispatch", { taskId: task.id, runId: taskRun.id });
 
     try {
@@ -195,9 +192,8 @@ export class Orchestrator extends EventEmitter {
       if (controlRequest || result.status === "stopped") {
         const finalStatus = controlRequest?.status ?? "stopped";
         const finalError = controlRequest?.reason ?? result.error ?? result.summary;
-        this.tracker.updateTaskRun(taskRun.id, {
+        this.tracker.completeTaskRun(taskRun.id, {
           status: finalStatus,
-          completed_at: nowIso(),
           error: finalError,
           input_tokens: result.inputTokens,
           output_tokens: result.outputTokens,
@@ -208,21 +204,27 @@ export class Orchestrator extends EventEmitter {
       }
 
       const taskRunStatus: TaskRunStatus = result.status === "completed" ? "awaiting_review" : "failed";
-      this.tracker.updateTaskRun(taskRun.id, {
-        status: taskRunStatus,
-        completed_at: nowIso(),
-        error: result.error ?? null,
-        input_tokens: result.inputTokens,
-        output_tokens: result.outputTokens,
-        cost_cents: result.costCents,
-      });
+      if (result.status === "completed") {
+        this.tracker.completeTaskRun(taskRun.id, {
+          status: taskRunStatus,
+          error: result.error ?? null,
+          input_tokens: result.inputTokens,
+          output_tokens: result.outputTokens,
+          cost_cents: result.costCents,
+        });
+      } else {
+        this.tracker.failTaskRun(taskRun.id, result.error ?? result.summary ?? null, {
+          input_tokens: result.inputTokens,
+          output_tokens: result.outputTokens,
+          cost_cents: result.costCents,
+        });
+      }
 
       if (result.status === "completed") {
         if (autoApproved && checkpoint) {
           this.tracker.setTaskStatus(task.id, "completed");
-          this.tracker.updateTaskRun(taskRun.id, {
+          this.tracker.completeTaskRun(taskRun.id, {
             status: "completed",
-            completed_at: nowIso(),
           });
           this.state.completed.add(task.id);
         }
@@ -233,9 +235,8 @@ export class Orchestrator extends EventEmitter {
     } catch (error) {
       const controlRequest = this.controlRequests.get(taskRun.id);
       if (controlRequest) {
-        this.tracker.updateTaskRun(taskRun.id, {
+        this.tracker.completeTaskRun(taskRun.id, {
           status: controlRequest.status,
-          completed_at: nowIso(),
           error: controlRequest.reason,
         });
         this.tracker.setTaskStatus(task.id, controlRequest.status);
@@ -243,11 +244,7 @@ export class Orchestrator extends EventEmitter {
       }
 
       const message = error instanceof Error ? error.message : String(error);
-      this.tracker.updateTaskRun(taskRun.id, {
-        status: "failed",
-        completed_at: nowIso(),
-        error: message,
-      });
+      this.tracker.failTaskRun(taskRun.id, message);
       this.tracker.setTaskStatus(task.id, "failed");
       this.queueRetry(task.id, attempt, message);
     } finally {
