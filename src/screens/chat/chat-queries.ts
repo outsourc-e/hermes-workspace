@@ -167,6 +167,80 @@ function normalizeAttachmentSignature(message: GatewayMessage): string {
     .join('|')
 }
 
+function replaceMatchingOptimisticUserMessage(
+  messages: Array<GatewayMessage>,
+  incomingMessage: GatewayMessage,
+): Array<GatewayMessage> | null {
+  if (incomingMessage.role !== 'user') return null
+
+  const incomingClientId = getMessageClientId(incomingMessage)
+  const incomingOptimisticId = getMessageOptimisticId(incomingMessage)
+  const incomingText = normalizeMessageText(incomingMessage)
+  const incomingAttachSig = normalizeAttachmentSignature(incomingMessage)
+  const nowMs = Date.now()
+  const TEN_SECONDS = 10_000
+
+  const matchIndex = messages.findIndex((message) => {
+    if (message.role !== 'user') return false
+
+    const raw = message as Record<string, unknown>
+    const isOptimistic =
+      typeof raw.__optimisticId === 'string' && raw.__optimisticId.length > 0
+    if (!isOptimistic) return false
+
+    if (
+      incomingClientId &&
+      isMatchingClientMessage(
+        message,
+        incomingClientId,
+        incomingOptimisticId || `opt-${incomingClientId}`,
+      )
+    ) {
+      return true
+    }
+
+    if (!incomingText && !incomingAttachSig) return false
+
+    const textMatch =
+      incomingText.length > 0 && normalizeMessageText(message) === incomingText
+    const attachMatch =
+      incomingAttachSig.length > 0 &&
+      normalizeAttachmentSignature(message) === incomingAttachSig
+    const isContentMatch =
+      (incomingText.length > 0 && textMatch) ||
+      (incomingText.length === 0 && incomingAttachSig.length > 0 && attachMatch)
+
+    if (!isContentMatch) return false
+
+    const timestamp =
+      typeof raw.timestamp === 'number' && Number.isFinite(raw.timestamp)
+        ? raw.timestamp
+        : null
+    if (timestamp !== null) {
+      return nowMs - timestamp < TEN_SECONDS
+    }
+
+    const idx = messages.indexOf(message)
+    return idx >= messages.length - 5
+  })
+
+  if (matchIndex === -1) return null
+
+  const existing = messages[matchIndex]
+  const replacement: GatewayMessage = {
+    ...existing,
+    ...incomingMessage,
+    clientId: incomingClientId || getMessageClientId(existing) || undefined,
+    client_id: incomingClientId || getMessageClientId(existing) || undefined,
+    __optimisticId: undefined,
+    status: undefined,
+  }
+
+  const next = [...messages]
+  next[matchIndex] = replacement
+  return next
+}
+
 export function appendHistoryMessage(
   queryClient: QueryClient,
   friendlyId: string,
@@ -178,6 +252,12 @@ export function appendHistoryMessage(
     friendlyId,
     sessionKey,
     function append(messages) {
+      const replacedOptimistic = replaceMatchingOptimisticUserMessage(
+        messages,
+        message,
+      )
+      if (replacedOptimistic) return replacedOptimistic
+
       // Dedup: if a message with the same clientId (or optimistic id) already
       // exists, skip appending — prevents double-display when an optimistic
       // message is added on send and then echoed back via SSE onUserMessage.
@@ -299,6 +379,38 @@ export function updateHistoryMessageByClientId(
       })
     },
   )
+}
+
+export function updateHistoryMessageByClientIdEverywhere(
+  queryClient: QueryClient,
+  clientId: string,
+  updater: (message: GatewayMessage) => GatewayMessage,
+) {
+  const normalizedClientId = normalizeId(clientId)
+  if (!normalizedClientId) return
+  const optimisticId = `opt-${normalizedClientId}`
+  const historyQueries = queryClient.getQueriesData<HistoryResponse>({
+    queryKey: ['chat', 'history'],
+  })
+
+  for (const [queryKey, data] of historyQueries) {
+    const current = data as HistoryResponse | undefined
+    const messages = Array.isArray(current?.messages) ? current.messages : []
+    let changed = false
+    const nextMessages = messages.map((message) => {
+      if (!isMatchingClientMessage(message, normalizedClientId, optimisticId)) {
+        return message
+      }
+      changed = true
+      return updater(message)
+    })
+    if (!changed) continue
+    queryClient.setQueryData(queryKey, {
+      sessionKey: current?.sessionKey ?? '',
+      sessionId: current?.sessionId,
+      messages: nextMessages,
+    })
+  }
 }
 
 export function removeHistoryMessageByClientId(

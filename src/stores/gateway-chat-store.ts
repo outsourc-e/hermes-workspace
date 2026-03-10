@@ -227,6 +227,29 @@ function getClientNonce(msg: GatewayMessage | null | undefined): string {
   )
 }
 
+function getAttachmentSignature(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const attachments = Array.isArray((msg as any).attachments)
+    ? ((msg as any).attachments as Array<Record<string, unknown>>)
+    : []
+  if (attachments.length === 0) return ''
+  return attachments
+    .map((attachment) => {
+      return `${normalizeString(attachment.name)}:${String(attachment.size ?? '')}`
+    })
+    .sort()
+    .join('|')
+}
+
+function isOptimisticUserCandidate(msg: GatewayMessage | null | undefined): boolean {
+  if (!msg || msg.role !== 'user') return false
+  const raw = msg as Record<string, unknown>
+  return (
+    normalizeString(raw.__optimisticId).length > 0 ||
+    ['sending', 'queued', 'sent', 'done'].includes(normalizeString(raw.status))
+  )
+}
+
 function messageMultipartSignature(msg: GatewayMessage | null | undefined): string {
   if (!msg) return ''
   let content = Array.isArray(msg.content)
@@ -365,8 +388,20 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             : normalizedMessage.role === 'user'
               ? sessionMessages.findIndex((existing) => {
                   if (existing.role !== 'user') return false
-                  if (normalizeString((existing as any).status) !== 'sending') return false
-                  return extractMessageText(existing) === extractMessageText(normalizedMessage)
+                  if (!isOptimisticUserCandidate(existing)) return false
+                  const existingText = extractMessageText(existing)
+                  const incomingText = extractMessageText(normalizedMessage)
+                  if (existingText && incomingText && existingText === incomingText) {
+                    return true
+                  }
+                  const existingAttachments = getAttachmentSignature(existing)
+                  const incomingAttachments = getAttachmentSignature(normalizedMessage)
+                  return (
+                    existingText.length === 0 &&
+                    incomingText.length === 0 &&
+                    existingAttachments.length > 0 &&
+                    existingAttachments === incomingAttachments
+                  )
                 })
               : -1
 

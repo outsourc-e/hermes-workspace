@@ -424,7 +424,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         markFailed(errorMessage)
       }
     },
-    [finishStream, markFailed, processEvent, stopFrame],
+    [finishStream, markFailed, onMessageAccepted, processEvent, stopFrame],
   )
 
   const cancelStreaming = useCallback(() => {

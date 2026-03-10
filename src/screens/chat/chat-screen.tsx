@@ -22,6 +22,7 @@ import {
   clearHistoryMessages,
   fetchGatewayStatus,
   updateHistoryMessageByClientId,
+  updateHistoryMessageByClientIdEverywhere,
   updateSessionLastMessage,
 } from './chat-queries'
 import { ChatHeader } from './components/chat-header'
@@ -1050,17 +1051,11 @@ export function ChatScreen({
       ({ runId }: { runId: string | null }) => {
         const activeSend = activeSendRef.current
         if (!activeSend?.clientId) return
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeSend.friendlyId,
-          activeSend.sessionKey,
-          activeSend.clientId,
-          (message) => ({
-            ...message,
-            status: 'sent',
-            runId: runId ?? message.runId,
-          }),
-        )
+        updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+          ...message,
+          status: 'sent',
+          runId: runId ?? message.runId,
+        }))
         setSending(false)
       },
       [queryClient],
@@ -1068,13 +1063,11 @@ export function ChatScreen({
     onComplete: useCallback(() => {
       const activeSend = activeSendRef.current
       if (activeSend?.clientId) {
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeSend.friendlyId,
-          activeSend.sessionKey,
-          activeSend.clientId,
-          (message) => ({ ...message, status: 'done' }),
-        )
+        updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+          ...message,
+          status: 'done',
+          __optimisticId: undefined,
+        }))
       }
       activeSendRef.current = null
       refreshHistoryRef.current()
@@ -1087,13 +1080,10 @@ export function ChatScreen({
           activeSend?.clientId &&
           !isMissingGatewayAuth(messageText)
         ) {
-          updateHistoryMessageByClientId(
-            queryClient,
-            activeSend.friendlyId,
-            activeSend.sessionKey,
-            activeSend.clientId,
-            (message) => ({ ...message, status: 'error' }),
-          )
+          updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+            ...message,
+            status: 'error',
+          }))
         }
         activeSendRef.current = null
         setSending(false)
@@ -1119,13 +1109,14 @@ export function ChatScreen({
         // status immediately so the Retry timer never fires. This is the
         // primary confirmation path since the gateway does NOT echo user
         // messages back via SSE.
-        updateHistoryMessageByClientId(
-          queryClient,
-          friendlyId,
-          _sessionKey,
-          clientId,
-          (message) => ({ ...message, status: 'queued' }),
-        )
+        updateHistoryMessageByClientId(queryClient, friendlyId, _sessionKey, clientId, (message) => ({
+          ...message,
+          status: 'queued',
+        }))
+        updateHistoryMessageByClientIdEverywhere(queryClient, clientId, (message) => ({
+          ...message,
+          status: 'queued',
+        }))
       },
       [queryClient],
     ),
@@ -1596,15 +1587,12 @@ export function ChatScreen({
       const existingClientId = getMessageClientId(message)
 
       if (existingClientId) {
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeFriendlyId,
-          sessionKeyForMessage,
-          existingClientId,
-          function markSending(currentMessage) {
-            return { ...currentMessage, status: 'sending' }
-          },
-        )
+        updateHistoryMessageByClientId(queryClient, activeFriendlyId, sessionKeyForMessage, existingClientId, function markSending(currentMessage) {
+          return { ...currentMessage, status: 'sending' }
+        })
+        updateHistoryMessageByClientIdEverywhere(queryClient, existingClientId, function markSendingEverywhere(currentMessage) {
+          return { ...currentMessage, status: 'sending' }
+        })
       }
 
       if (mode === 'auto') {

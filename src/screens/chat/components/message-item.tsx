@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
+const STUCK_SENDING_THRESHOLD_MS = 30_000
 
 function isWhitespaceCharacter(value: string): boolean {
   return /\s/.test(value)
@@ -677,7 +678,7 @@ function MessageItemComponent({
     }
     const ts = rawTimestamp(message)
     const elapsed = ts ? Date.now() - ts : 0
-    const remaining = Math.max(0, 10_000 - elapsed)
+    const remaining = Math.max(0, STUCK_SENDING_THRESHOLD_MS - elapsed)
     // Already past 30s threshold
     if (remaining === 0) {
       setIsStuckSending(true)
