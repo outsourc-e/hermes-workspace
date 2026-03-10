@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import {
   Add01Icon,
+  ArrowLeft01Icon,
   ArrowRight01Icon,
   CheckmarkCircle02Icon,
   Folder01Icon,
@@ -9,7 +10,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type React from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import {
@@ -58,6 +59,7 @@ import {
   isCheckpointVerified,
 } from './lib/workspace-utils'
 import { ProjectDetailView } from './project-detail-view'
+import { cn } from '@/lib/utils'
 
 type ProjectsScreenProps = {
   replanSearch?: {
@@ -161,7 +163,6 @@ export function ProjectsScreen({
   const [pendingReviewCheckpoint, setPendingReviewCheckpoint] =
     useState<WorkspaceCheckpoint | null>(null)
   const queryClient = useQueryClient()
-  const detailSectionRef = useRef<HTMLElement | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -176,13 +177,10 @@ export function ProjectsScreen({
         if (cancelled) return
         setProjects(nextProjects)
         setSelectedProjectId((current) => {
-          if (
-            current &&
-            nextProjects.some((project) => project.id === current)
-          ) {
+          if (current && nextProjects.some((project) => project.id === current)) {
             return current
           }
-          return nextProjects[0]?.id ?? null
+          return null
         })
       } catch (error) {
         if (!cancelled) {
@@ -565,12 +563,12 @@ export function ProjectsScreen({
 
   function focusProject(projectId: string) {
     setSelectedProjectId(projectId)
-    window.requestAnimationFrame(() => {
-      detailSectionRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-    })
+  }
+
+  function clearSelectedProject() {
+    setSelectedProjectId(null)
+    setSelectedCheckpoint(null)
+    setPendingReviewCheckpoint(null)
   }
 
   function focusCheckpointReview(checkpoint: WorkspaceCheckpoint) {
@@ -581,12 +579,6 @@ export function ProjectsScreen({
       setPendingReviewCheckpoint(checkpoint)
       setSelectedCheckpoint(null)
       setSelectedProjectId(project.id)
-      window.requestAnimationFrame(() => {
-        detailSectionRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        })
-      })
       return
     }
     setPendingReviewCheckpoint(null)
@@ -1048,6 +1040,9 @@ export function ProjectsScreen({
     }
   }
 
+  const detailMode = selectedProjectId !== null
+  const activeProjectLabel = projectDetail?.name ?? selectedSummary?.name ?? 'Project'
+
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto w-full max-w-[1480px] space-y-5">
@@ -1057,13 +1052,53 @@ export function ProjectsScreen({
               <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.6} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-primary-900">
-                Projects
-              </h1>
-              <p className="text-sm text-primary-500">
-                Mission control for workspace execution, review handoffs, and
-                agent load.
-              </p>
+              {detailMode ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearSelectedProject}
+                      className="-ml-3 h-auto px-3 py-1.5 text-primary-600 hover:bg-primary-100 hover:text-primary-900"
+                    >
+                      <HugeiconsIcon
+                        icon={ArrowLeft01Icon}
+                        size={16}
+                        strokeWidth={1.6}
+                      />
+                      Back to Projects
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-primary-500">
+                    <button
+                      type="button"
+                      onClick={clearSelectedProject}
+                      className="font-medium text-primary-700 transition-colors hover:text-primary-900"
+                    >
+                      Projects
+                    </button>
+                    <span aria-hidden="true">{'>'}</span>
+                    <span
+                      className={cn(
+                        'font-medium text-primary-900',
+                        detailLoading && !projectDetail && 'text-primary-500',
+                      )}
+                    >
+                      {activeProjectLabel}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-base font-semibold text-primary-900">
+                    Projects
+                  </h1>
+                  <p className="text-sm text-primary-500">
+                    Mission control for workspace execution, review handoffs, and
+                    agent load.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -1144,6 +1179,65 @@ export function ProjectsScreen({
               ))}
             </div>
           </div>
+        ) : detailMode ? (
+          <section className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
+            <ProjectDetailView
+              selectedSummary={selectedSummary}
+              projectDetail={projectDetail}
+              detailLoading={detailLoading}
+              projectSpecDraft={projectSpecDraft}
+              projectSpecOpen={projectSpecOpen}
+              expandedPhases={expandedPhases}
+              checkpoints={projectCheckpoints}
+              pendingCheckpointCount={pendingProjectCheckpoints.length}
+              checkpointsLoading={checkpointsQuery.isLoading}
+              checkpointsFetching={checkpointsQuery.isFetching}
+              checkpointActionPending={projectCheckpointMutation.isPending}
+              activityEvents={activityEvents}
+              activityLoading={activityEventsQuery.isLoading}
+              activityFetching={activityEventsQuery.isFetching}
+              submittingKey={submittingKey}
+              onSpecDraftChange={setProjectSpecDraft}
+              onSpecOpenChange={setProjectSpecOpen}
+              onSaveSpec={(value) => void handleSaveProjectSpec(value)}
+              onAddPhase={setPhaseProject}
+              onTogglePhase={(phaseId) =>
+                setExpandedPhases((current) => ({
+                  ...current,
+                  [phaseId]: !current[phaseId],
+                }))
+              }
+              onAddMission={setMissionPhase}
+              onOpenMissionLauncher={openMissionLauncher}
+              onOpenPlanReview={openPlanReview}
+              onStartMission={(missionId) =>
+                void handleStartMission(missionId)
+              }
+              onPauseMission={(missionId) =>
+                void handlePauseMission(missionId)
+              }
+              onResumeMission={(missionId) =>
+                void handleResumeMission(missionId)
+              }
+              onStopMission={(missionId) => void handleStopMission(missionId)}
+              onAddTask={setTaskMission}
+              onRefreshCheckpoints={() => void checkpointsQuery.refetch()}
+              onCheckpointReview={focusCheckpointReview}
+              onCheckpointApprove={(checkpointId) =>
+                projectCheckpointMutation.mutate({
+                  checkpointId,
+                  action: 'approve-and-commit',
+                })
+              }
+              onCheckpointReject={(checkpointId) =>
+                projectCheckpointMutation.mutate({
+                  checkpointId,
+                  action: 'reject',
+                })
+              }
+              onRefreshActivity={() => void activityEventsQuery.refetch()}
+            />
+          </section>
         ) : (
           <>
             <DashboardKpiBar
@@ -1195,68 +1289,6 @@ export function ProjectsScreen({
                 loading={agentsQuery.isLoading}
               />
             </div>
-
-            <section
-              ref={detailSectionRef}
-              className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5"
-            >
-              <ProjectDetailView
-                selectedSummary={selectedSummary}
-                projectDetail={projectDetail}
-                detailLoading={detailLoading}
-                projectSpecDraft={projectSpecDraft}
-                projectSpecOpen={projectSpecOpen}
-                expandedPhases={expandedPhases}
-                checkpoints={projectCheckpoints}
-                pendingCheckpointCount={pendingProjectCheckpoints.length}
-                checkpointsLoading={checkpointsQuery.isLoading}
-                checkpointsFetching={checkpointsQuery.isFetching}
-                checkpointActionPending={projectCheckpointMutation.isPending}
-                activityEvents={activityEvents}
-                activityLoading={activityEventsQuery.isLoading}
-                activityFetching={activityEventsQuery.isFetching}
-                submittingKey={submittingKey}
-                onSpecDraftChange={setProjectSpecDraft}
-                onSpecOpenChange={setProjectSpecOpen}
-                onSaveSpec={(value) => void handleSaveProjectSpec(value)}
-                onAddPhase={setPhaseProject}
-                onTogglePhase={(phaseId) =>
-                  setExpandedPhases((current) => ({
-                    ...current,
-                    [phaseId]: !current[phaseId],
-                  }))
-                }
-                onAddMission={setMissionPhase}
-                onOpenMissionLauncher={openMissionLauncher}
-                onOpenPlanReview={openPlanReview}
-                onStartMission={(missionId) =>
-                  void handleStartMission(missionId)
-                }
-                onPauseMission={(missionId) =>
-                  void handlePauseMission(missionId)
-                }
-                onResumeMission={(missionId) =>
-                  void handleResumeMission(missionId)
-                }
-                onStopMission={(missionId) => void handleStopMission(missionId)}
-                onAddTask={setTaskMission}
-                onRefreshCheckpoints={() => void checkpointsQuery.refetch()}
-                onCheckpointReview={focusCheckpointReview}
-                onCheckpointApprove={(checkpointId) =>
-                  projectCheckpointMutation.mutate({
-                    checkpointId,
-                    action: 'approve-and-commit',
-                  })
-                }
-                onCheckpointReject={(checkpointId) =>
-                  projectCheckpointMutation.mutate({
-                    checkpointId,
-                    action: 'reject',
-                  })
-                }
-                onRefreshActivity={() => void activityEventsQuery.refetch()}
-              />
-            </section>
           </>
         )}
       </section>

@@ -14,7 +14,6 @@ import {
   File01Icon,
   GlobeIcon,
   Home01Icon,
-  LayoutDashboard as LayoutDashboardIcon,
   ListViewIcon,
   Notification03Icon,
   PencilEdit02Icon,
@@ -1002,7 +1001,7 @@ function ChatSidebarComponent({
     {
       kind: 'link',
       to: '/workspace',
-      icon: LayoutDashboardIcon,
+      icon: ListViewIcon,
       label: 'Workspace',
       active: pathname.startsWith('/workspace'),
     },
