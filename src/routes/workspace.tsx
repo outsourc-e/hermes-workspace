@@ -23,9 +23,7 @@ export const Route = createFileRoute('/workspace')({
     goal: typeof search.goal === 'string' ? search.goal : undefined,
     missionId: typeof search.missionId === 'string' ? search.missionId : undefined,
     showWizard:
-      typeof search.showWizard === 'boolean'
-        ? search.showWizard
-        : search.showWizard === 'true',
+      search.showWizard === true || search.showWizard === 'true' ? true : undefined,
   }),
   component: function WorkspaceRoute() {
     return <WorkspaceLayout search={Route.useSearch()} />
