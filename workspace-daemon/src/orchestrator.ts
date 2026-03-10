@@ -174,6 +174,7 @@ export class Orchestrator extends EventEmitter {
     this.state.running.set(task.id, runningEntry);
     this.abortControllers.set(taskRun.id, abortController);
     this.tracker.markTaskRunStarted(taskRun.id);
+    this.tracker.logAuditEvent("task.started", taskRun.id, "task_run");
     this.emit("dispatch", { taskId: task.id, runId: taskRun.id });
 
     try {
@@ -212,12 +213,14 @@ export class Orchestrator extends EventEmitter {
           output_tokens: result.outputTokens,
           cost_cents: result.costCents,
         });
+        this.tracker.logAuditEvent("task.completed", taskRun.id, "task_run");
       } else {
         this.tracker.failTaskRun(taskRun.id, result.error ?? result.summary ?? null, {
           input_tokens: result.inputTokens,
           output_tokens: result.outputTokens,
           cost_cents: result.costCents,
         });
+        this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
       }
 
       if (result.status === "completed") {
@@ -245,6 +248,7 @@ export class Orchestrator extends EventEmitter {
 
       const message = error instanceof Error ? error.message : String(error);
       this.tracker.failTaskRun(taskRun.id, message);
+      this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
       this.tracker.setTaskStatus(task.id, "failed");
       this.queueRetry(task.id, attempt, message);
     } finally {

@@ -23,11 +23,16 @@ export function registerEventsRoutes(router: Router, tracker: Tracker): void {
     if (!wantsStream) {
       const projectId =
         typeof req.query.project_id === "string" ? req.query.project_id : undefined;
+      const type = typeof req.query.type === "string" ? req.query.type : undefined;
       const limit =
         typeof req.query.limit === "string"
           ? Number.parseInt(req.query.limit, 10)
           : undefined;
-      res.json(tracker.listActivityEvents({ project_id: projectId, limit }));
+      if (type === "audit") {
+        res.json(tracker.listAuditEvents({ project_id: projectId, limit }));
+        return;
+      }
+      res.json(tracker.listActivityEvents({ project_id: projectId, limit, type }));
       return;
     }
 

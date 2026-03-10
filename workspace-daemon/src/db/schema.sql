@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS activity_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS events (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  action TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  meta TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_phases_project_id ON phases(project_id);
 CREATE INDEX IF NOT EXISTS idx_missions_phase_id ON missions(phase_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_mission_id ON tasks(mission_id);
@@ -127,6 +137,7 @@ CREATE INDEX IF NOT EXISTS idx_task_runs_task_id ON task_runs(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_runs_status ON task_runs(status);
 CREATE INDEX IF NOT EXISTS idx_run_events_task_run_id ON run_events(task_run_id);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_task_run_id ON checkpoints(task_run_id);
+CREATE INDEX IF NOT EXISTS idx_events_type_created_at ON events(type, created_at DESC);
 
 CREATE TRIGGER IF NOT EXISTS trg_projects_updated_at
 AFTER UPDATE ON projects

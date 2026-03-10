@@ -68,6 +68,21 @@ function ensureProjectPolicyColumns(db: Database.Database): void {
   }
 }
 
+function ensureEventsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      action TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      meta TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_events_type_created_at ON events(type, created_at DESC);
+  `)
+}
+
 function seedDefaultTeams(db: Database.Database): void {
   const row = db.prepare('SELECT COUNT(*) AS count FROM teams').get() as {
     count: number
@@ -128,6 +143,7 @@ export function getDatabase(
   db.exec(readSchemaSql())
   ensureCheckpointCommitHashColumn(db)
   ensureProjectPolicyColumns(db)
+  ensureEventsTable(db)
   seedDefaultTeams(db)
   dbInstance = db
   return db

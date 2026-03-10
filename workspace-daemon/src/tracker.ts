@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import type Database from 'better-sqlite3'
 import { getDatabase } from './db'
@@ -7,6 +8,7 @@ import type {
   AgentDirectoryRecord,
   AgentDirectoryStats,
   AgentRecord,
+  AuditEventEntry,
   Checkpoint,
   CreateMissionInput,
   CreatePhaseInput,
@@ -1078,8 +1080,23 @@ export class Tracker extends EventEmitter {
   }
 
   listActivityEvents(
-    filters: { project_id?: string; limit?: number } = {},
+    filters: { project_id?: string; limit?: number; type?: string } = {},
   ): ActivityEvent[] {
+    if (filters.type === 'audit') {
+      return this.listAuditEvents(filters).map((event) => ({
+        id: event.id,
+        type: event.action,
+        entity_type: event.entity_type,
+        entity_id: event.entity_id,
+        data: {
+          actor: event.actor,
+          action: event.action,
+          ...(event.meta ?? {}),
+        },
+        timestamp: event.created_at,
+      }))
+    }
+
     const params: unknown[] = []
     const clauses = [
       "activity_log.action IN ('task.started', 'task.completed', 'task.failed', 'checkpoint.created', 'mission.started', 'mission.completed')",
@@ -1123,6 +1140,62 @@ export class Tracker extends EventEmitter {
       ),
       timestamp: row.created_at,
     }))
+  }
+
+  listAuditEvents(
+    filters: { project_id?: string; limit?: number } = {},
+  ): AuditEventEntry[] {
+    const params: unknown[] = ['audit']
+    const clauses = ['type = ?']
+
+    if (filters.project_id) {
+      clauses.push("json_extract(meta, '$.project_id') = ?")
+      params.push(filters.project_id)
+    }
+
+    const limit = Number.isFinite(filters.limit)
+      ? Math.max(1, Math.min(200, Math.trunc(filters.limit ?? 50)))
+      : 50
+    params.push(limit)
+
+    const rows = this.db
+      .prepare(
+        `SELECT id, type, action, entity_id, entity_type, meta, created_at
+         FROM events
+         WHERE ${clauses.join(' AND ')}
+         ORDER BY created_at DESC, id DESC
+         LIMIT ?`,
+      )
+      .all(...params) as Array<{
+      id: string
+      type: 'audit'
+      action: string
+      entity_id: string
+      entity_type: string
+      meta: string | null
+      created_at: string
+    }>
+
+    return rows.map((row) => {
+      const meta = parseJsonOrDefault<Record<string, unknown> | null>(
+        row.meta,
+        null,
+      )
+
+      return {
+        id: row.id,
+        type: row.type,
+        actor:
+          (typeof meta?.actor === 'string' && meta.actor.trim().length > 0
+            ? meta.actor
+            : 'System'),
+        action: row.action,
+        entity_id: row.entity_id,
+        entity_type: row.entity_type,
+        meta,
+        created_at: row.created_at,
+      }
+    })
   }
 
   createCheckpoint(
@@ -1327,6 +1400,11 @@ export class Tracker extends EventEmitter {
         | Checkpoint
         | undefined) ?? null
     if (checkpoint) {
+      if (status === 'approved') {
+        this.logAuditEvent('checkpoint.approved', checkpoint.id, 'checkpoint')
+      } else if (status === 'rejected') {
+        this.logAuditEvent('checkpoint.rejected', checkpoint.id, 'checkpoint')
+      }
       this.emitSse('checkpoint.updated', checkpoint)
     }
     return checkpoint
@@ -1345,6 +1423,7 @@ export class Tracker extends EventEmitter {
         .run(reviewerNotes ?? null, commitHash, id)
       const checkpoint = this.getCheckpoint(id)
       if (checkpoint) {
+        this.logAuditEvent('checkpoint.approved', checkpoint.id, 'checkpoint')
         this.emitSse('checkpoint.updated', checkpoint)
       }
       return checkpoint
@@ -1817,6 +1896,61 @@ export class Tracker extends EventEmitter {
     return entry
   }
 
+  logAuditEvent(
+    action: string,
+    entityId: string,
+    entityType: string,
+    meta?: Record<string, unknown>,
+  ): void {
+    const context =
+      entityType === 'checkpoint'
+        ? this.getCheckpointProjectContext(entityId)
+        : entityType === 'task_run'
+          ? this.getTaskRunProjectContext(entityId)
+          : {}
+    const payload = {
+      actor: 'System',
+      ...context,
+      ...(meta ?? {}),
+    }
+    const event = this.db
+      .prepare(
+        `INSERT INTO events (id, type, action, entity_id, entity_type, meta)
+         VALUES (?, 'audit', ?, ?, ?, ?)`,
+      )
+      .run(
+        randomUUID(),
+        action,
+        entityId,
+        entityType,
+        JSON.stringify(payload),
+      )
+
+    const storedEvent = this.db
+      .prepare('SELECT * FROM events WHERE rowid = ?')
+      .get(event.lastInsertRowid) as
+      | {
+          id: string
+          type: string
+          action: string
+          entity_id: string
+          entity_type: string
+          meta: string | null
+          created_at: string
+        }
+      | undefined
+
+    if (storedEvent) {
+      this.emitSse('audit', {
+        ...storedEvent,
+        meta: parseJsonOrDefault<Record<string, unknown> | null>(
+          storedEvent.meta,
+          null,
+        ),
+      })
+    }
+  }
+
   private getTaskProjectContext(taskId: string): Record<string, unknown> {
     const row = this.db
       .prepare(
@@ -1879,6 +2013,31 @@ export class Tracker extends EventEmitter {
       .get(checkpointId) as
       | {
           task_run_id: string
+          task_id: string
+          task_name: string
+          mission_id: string
+          mission_name: string
+          project_id: string
+          project_name: string
+        }
+      | undefined
+
+    return row ?? {}
+  }
+
+  private getTaskRunProjectContext(taskRunId: string): Record<string, unknown> {
+    const row = this.db
+      .prepare(
+        `SELECT task_runs.task_id, tasks.name AS task_name, missions.id AS mission_id, missions.name AS mission_name, projects.id AS project_id, projects.name AS project_name
+         FROM task_runs
+         JOIN tasks ON tasks.id = task_runs.task_id
+         JOIN missions ON missions.id = tasks.mission_id
+         JOIN phases ON phases.id = missions.phase_id
+         JOIN projects ON projects.id = phases.project_id
+         WHERE task_runs.id = ?`,
+      )
+      .get(taskRunId) as
+      | {
           task_id: string
           task_name: string
           mission_id: string

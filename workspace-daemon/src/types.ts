@@ -241,12 +241,23 @@ export interface ActivityLogEntry {
 }
 
 export interface ActivityEvent {
-  id: number
+  id: number | string
   type: string
   entity_type: string
   entity_id: string
   data: Record<string, unknown> | null
   timestamp: string
+}
+
+export interface AuditEventEntry {
+  id: string
+  type: 'audit'
+  actor: string
+  action: string
+  entity_id: string
+  entity_type: string
+  meta: Record<string, unknown> | null
+  created_at: string
 }
 
 export interface ProjectDetail extends Project {
