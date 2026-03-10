@@ -1,5 +1,7 @@
 import { URL, fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import net from 'node:net'
 import { resolve } from 'node:path'
 
 // devtools removed
@@ -10,9 +12,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 
-const config = defineConfig(({ mode }) => {
+const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const gatewayUrl = env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+  let workspaceDaemonStarted = false
 
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. CLAWSUITE_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
@@ -104,6 +107,51 @@ const config = defineConfig(({ mode }) => {
       tailwindcss(),
       tanstackStart(),
       viteReact(),
+      {
+        name: 'workspace-daemon',
+        buildStart() {
+          if (command !== 'serve') return
+        },
+        configureServer() {
+          if (command !== 'serve' || workspaceDaemonStarted) return
+
+          const checkPort = (port: number, cb: (running: boolean) => void) => {
+            const socket = net.createConnection({ port, host: '127.0.0.1' })
+            socket.once('connect', () => {
+              socket.destroy()
+              cb(true)
+            })
+            socket.once('error', () => cb(false))
+          }
+
+          checkPort(3099, (running) => {
+            if (running || workspaceDaemonStarted) return
+
+            const distEntry = resolve('workspace-daemon/dist/server.js')
+            const srcEntry = resolve('workspace-daemon/src/server.ts')
+
+            if (existsSync(distEntry)) {
+              workspaceDaemonStarted = true
+              spawn('node', ['workspace-daemon/dist/server.js'], {
+                cwd: process.cwd(),
+                env: { ...process.env, PORT: '3099' },
+                stdio: 'inherit',
+              })
+              return
+            }
+
+            if (existsSync(srcEntry)) {
+              workspaceDaemonStarted = true
+              spawn('npx', ['--prefix', 'workspace-daemon', 'tsx', 'src/server.ts'], {
+                cwd: process.cwd(),
+                env: { ...process.env, PORT: '3099' },
+                stdio: 'inherit',
+                shell: true,
+              })
+            }
+          })
+        },
+      },
       // Client-only: replace process.env references in client bundles
       // Server bundles must keep real process.env for Docker runtime env vars
       {

@@ -18,10 +18,12 @@ let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 // @ts-expect-error assigned in IPC handler, read on quit
 let _gatewayProcess: ReturnType<typeof spawn> | null = null
+let workspaceDaemonProcess: ReturnType<typeof spawn> | null = null
 
 // Gateway detection
 const DEFAULT_GATEWAY_PORT = 18789
 const DEV_PORT = 3000
+const WORKSPACE_DAEMON_PORT = 3099
 
 function getGatewayUrl(): string | null {
   try {
@@ -41,6 +43,47 @@ function isOpenClawInstalled(): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+async function isWorkspaceDaemonRunning(): Promise<boolean> {
+  try {
+    await fetch(`http://127.0.0.1:${WORKSPACE_DAEMON_PORT}/api/stats`, {
+      signal: AbortSignal.timeout(1000),
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function startWorkspaceDaemonIfNeeded(): Promise<void> {
+  if (await isWorkspaceDaemonRunning()) {
+    return
+  }
+
+  const repoDir = join(__dirname, '..')
+  const distEntry = join(repoDir, 'workspace-daemon', 'dist', 'server.js')
+  const srcEntry = join(repoDir, 'workspace-daemon', 'src', 'server.ts')
+
+  if (existsSync(distEntry)) {
+    workspaceDaemonProcess = spawn('node', ['workspace-daemon/dist/server.js'], {
+      cwd: repoDir,
+      env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT) },
+      stdio: 'ignore',
+      detached: false,
+    })
+    return
+  }
+
+  if (existsSync(srcEntry)) {
+    workspaceDaemonProcess = spawn('npx', ['--prefix', 'workspace-daemon', 'tsx', 'src/server.ts'], {
+      cwd: repoDir,
+      env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT) },
+      stdio: 'ignore',
+      detached: false,
+      shell: true,
+    })
   }
 }
 
@@ -178,6 +221,17 @@ ipcMain.handle('gateway:connect', async (_event, url: string) => {
   }
 })
 
+ipcMain.handle('workspace-daemon:status', async () => {
+  try {
+    await fetch(`http://127.0.0.1:${WORKSPACE_DAEMON_PORT}/api/stats`, {
+      signal: AbortSignal.timeout(1000),
+    })
+    return { running: true }
+  } catch {
+    return { running: false }
+  }
+})
+
 ipcMain.handle('onboarding:complete', async (_event, config: { mode: string; gatewayUrl: string }) => {
   // Store config and load the main app
   if (mainWindow) {
@@ -190,7 +244,8 @@ ipcMain.handle('onboarding:complete', async (_event, config: { mode: string; gat
 })
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await startWorkspaceDaemonIfNeeded()
   createWindow()
   createTray()
 
@@ -210,6 +265,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   // Don't kill gateway — it should persist
   tray?.destroy()
+  workspaceDaemonProcess?.kill()
 })
 
 // Set app name

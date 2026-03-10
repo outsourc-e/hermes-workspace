@@ -11,6 +11,8 @@ const electron_1 = require("electron");
 const path_1 = require("path");
 const fs_1 = require("fs");
 const child_process_1 = require("child_process");
+const WORKSPACE_DAEMON_PORT = 3099;
+let workspaceDaemonProcess = null;
 
 // Prevent multiple instances
 const gotTheLock = electron_1.app.requestSingleInstanceLock();
@@ -49,6 +51,44 @@ function isOpenClawInstalled() {
         return true;
     } catch {
         return false;
+    }
+}
+
+async function isWorkspaceDaemonRunning() {
+    try {
+        await fetch(`http://127.0.0.1:${WORKSPACE_DAEMON_PORT}/api/stats`, {
+            signal: AbortSignal.timeout(1000),
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function startWorkspaceDaemonIfNeeded() {
+    if (await isWorkspaceDaemonRunning()) {
+        return;
+    }
+    const repoDir = (0, path_1.join)(__dirname, "..");
+    const distEntry = (0, path_1.join)(repoDir, "workspace-daemon", "dist", "server.js");
+    const srcEntry = (0, path_1.join)(repoDir, "workspace-daemon", "src", "server.ts");
+    if ((0, fs_1.existsSync)(distEntry)) {
+        workspaceDaemonProcess = (0, child_process_1.spawn)("node", ["workspace-daemon/dist/server.js"], {
+            cwd: repoDir,
+            env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT) },
+            stdio: "ignore",
+            detached: false,
+        });
+        return;
+    }
+    if ((0, fs_1.existsSync)(srcEntry)) {
+        workspaceDaemonProcess = (0, child_process_1.spawn)("npx", ["--prefix", "workspace-daemon", "tsx", "src/server.ts"], {
+            cwd: repoDir,
+            env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT) },
+            stdio: "ignore",
+            detached: false,
+            shell: true,
+        });
     }
 }
 
@@ -403,6 +443,17 @@ electron_1.ipcMain.handle('gateway:connect', async (_event, url) => {
     }
 });
 
+electron_1.ipcMain.handle('workspace-daemon:status', async () => {
+    try {
+        await fetch(`http://127.0.0.1:${WORKSPACE_DAEMON_PORT}/api/stats`, {
+            signal: AbortSignal.timeout(1000),
+        });
+        return { running: true };
+    } catch {
+        return { running: false };
+    }
+});
+
 electron_1.ipcMain.handle('onboarding:complete', async (_event, config) => {
     if (mainWindow) {
         // Start local server with the configured gateway
@@ -421,7 +472,8 @@ electron_1.ipcMain.handle('onboarding:complete', async (_event, config) => {
 });
 
 // App lifecycle
-electron_1.app.whenReady().then(() => {
+electron_1.app.whenReady().then(async () => {
+    await startWorkspaceDaemonIfNeeded();
     createWindow();
     createTray();
     electron_1.app.on('activate', () => {
@@ -446,6 +498,10 @@ electron_1.app.on('before-quit', () => {
     if (gatewayProcess) {
         gatewayProcess.kill();
         gatewayProcess = null;
+    }
+    if (workspaceDaemonProcess) {
+        workspaceDaemonProcess.kill();
+        workspaceDaemonProcess = null;
     }
 });
 
