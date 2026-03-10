@@ -227,6 +227,31 @@ function getClientNonce(msg: GatewayMessage | null | undefined): string {
   )
 }
 
+function getMessageEventTime(msg: GatewayMessage | null | undefined): number | undefined {
+  if (!msg) return undefined
+  const raw = msg as Record<string, unknown>
+  for (const key of ['createdAt', 'timestamp'] as const) {
+    const value = raw[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Date.parse(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
+}
+
+function getMessageReceiveTime(msg: GatewayMessage | null | undefined): number | undefined {
+  if (!msg) return undefined
+  const value = (msg as Record<string, unknown>).__receiveTime
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function isExternalInboundUserSource(source: unknown): boolean {
+  const normalized = normalizeString(source).toLowerCase()
+  return normalized === 'webchat' || normalized === 'signal' || normalized === 'telegram'
+}
+
 function getAttachmentSignature(msg: GatewayMessage | null | undefined): string {
   if (!msg) return ''
   const attachments = Array.isArray((msg as any).attachments)
@@ -352,6 +377,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
         const messages = new Map(state.realtimeMessages)
         const sessionMessages = [...(messages.get(sessionKey) ?? [])]
+        const incomingReceiveTime = now
 
         // Strip <final>…</final> sentinel tags from assistant messages before
         // storing or comparing.  The gateway can emit a bare assistant-message
@@ -408,6 +434,10 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         // Plain-text extraction for content-based dedup (catches identical
         // replies that arrive with different IDs from different channels).
         const newPlainText = extractMessageText(normalizedMessage)
+        const isExternalInboundUser =
+          normalizedMessage.role === 'user' && isExternalInboundUserSource((event as any).source)
+        const incomingEventTime =
+          getMessageEventTime(normalizedMessage) ?? incomingReceiveTime
 
         const duplicateIndex = sessionMessages.findIndex((existing) => {
           if (existing.role !== normalizedMessage.role) return false
@@ -445,6 +475,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           ...normalizedMessage,
           __realtimeSource:
             event.type === 'user_message' ? (event as any).source : undefined,
+          __receiveTime: incomingReceiveTime,
           status: undefined,
         }
 
@@ -457,6 +488,22 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           }
           messages.set(sessionKey, sessionMessages)
           set({ realtimeMessages: messages, lastEventAt: now })
+          break
+        }
+
+        const hasRecentExternalDuplicate =
+          isExternalInboundUser &&
+          newPlainText.length > 0 &&
+          sessionMessages.some((existing) => {
+            if (existing.role !== 'user') return false
+            if (extractMessageText(existing) !== newPlainText) return false
+            const existingEventTime =
+              getMessageEventTime(existing) ?? getMessageReceiveTime(existing)
+            if (existingEventTime === undefined) return false
+            return Math.abs(incomingEventTime - existingEventTime) <= 10_000
+          })
+
+        if (hasRecentExternalDuplicate) {
           break
         }
 
