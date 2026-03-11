@@ -3,6 +3,9 @@ export type EntityStatus =
   | 'pending'
   | 'ready'
   | 'running'
+  | 'online'
+  | 'away'
+  | 'offline'
   | 'paused'
   | 'completed'
   | 'failed'
@@ -116,6 +119,7 @@ export interface Task {
   name: string
   description: string | null
   agent_id: string | null
+  suggested_agent_type?: AgentAdapterType | null
   status: TaskStatus
   sort_order: number
   depends_on: string | null
