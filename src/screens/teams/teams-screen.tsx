@@ -1,8 +1,13 @@
-import type { ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState, type ReactNode } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { UserGroupIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { parseUtcTimestamp } from '@/lib/workspace-checkpoints'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import {
+  parseUtcTimestamp,
+  workspaceRequestJson,
+} from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
 import {
   extractActivityEvents,
@@ -12,63 +17,16 @@ import {
 } from '@/screens/projects/lib/workspace-types'
 
 type ApprovalTier = {
-  label: string
-  summary: string
-  toneClassName: string
+  id: string
+  name: string
+  minConfidence: number
+  autoApprove: boolean
+  requiresHuman: boolean
 }
 
-const FALLBACK_TEAMS: WorkspaceTeam[] = [
-  {
-    id: 'admin',
-    name: 'Admin',
-    description: 'Full access',
-    permissions: ['workspace.admin'],
-    members: [{ id: 'eric', name: 'Eric', type: 'user', avatar: '👤' }],
-  },
-  {
-    id: 'dev',
-    name: 'Dev',
-    description: 'Run tasks / write files',
-    permissions: ['workspace.tasks.run', 'workspace.files.write'],
-    members: [
-      { id: 'codex', name: 'Codex', type: 'agent', avatar: '🤖' },
-      { id: 'claude', name: 'Claude', type: 'agent', avatar: '🧠' },
-      { id: 'ollama', name: 'Ollama', type: 'agent', avatar: '🦙' },
-    ],
-  },
-  {
-    id: 'reviewer',
-    name: 'Reviewer',
-    description:
-      'Review checkpoints · Run verification · Cannot write code · Can request revisions',
-    permissions: [
-      'workspace.checkpoints.review',
-      'workspace.verification.run',
-    ],
-    members: [
-      { id: 'qa-agent', name: 'QA Agent', type: 'agent', avatar: '🔍' },
-      { id: 'aurora', name: 'Aurora', type: 'user', avatar: '⚡' },
-    ],
-  },
-]
-
-const APPROVAL_TIERS: ApprovalTier[] = [
-  {
-    label: 'Low risk',
-    summary: 'Auto-approve',
-    toneClassName: 'border-green-200 bg-green-50 text-green-700',
-  },
-  {
-    label: 'Medium',
-    summary: '1 reviewer',
-    toneClassName: 'border-amber-200 bg-amber-50 text-amber-700',
-  },
-  {
-    label: 'High',
-    summary: 'Admin required',
-    toneClassName: 'border-red-200 bg-red-50 text-red-700',
-  },
-]
+type WorkspaceTeamWithApproval = WorkspaceTeam & {
+  approval_config: ApprovalTier[]
+}
 
 const FALLBACK_AUDIT_LOG: WorkspaceAuditEntry[] = [
   {
@@ -180,6 +138,51 @@ function normalizeTeam(value: unknown, index: number): WorkspaceTeam | null {
   }
 }
 
+function asNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function clampPercentage(value: number): number {
+  return Math.min(100, Math.max(0, Math.round(value)))
+}
+
+function normalizeApprovalTier(
+  value: unknown,
+  index: number,
+): ApprovalTier | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  const name = asString(record.name)
+  if (!name) return null
+
+  return {
+    id: asString(record.id) ?? `tier-${index}-${name}`,
+    name,
+    minConfidence: clampPercentage(asNumber(record.minConfidence) ?? 0),
+    autoApprove: record.autoApprove === true,
+    requiresHuman: record.requiresHuman === true,
+  }
+}
+
+function normalizeTeamWithApproval(
+  value: unknown,
+  index: number,
+): WorkspaceTeamWithApproval | null {
+  const team = normalizeTeam(value, index)
+  if (!team) return null
+
+  const record = asRecord(value)
+  const approvalConfig = asArray(record?.approval_config)
+    .map((entry, tierIndex) => normalizeApprovalTier(entry, tierIndex))
+    .filter((entry): entry is ApprovalTier => Boolean(entry))
+
+  return {
+    ...team,
+    approval_config: approvalConfig,
+  }
+}
+
 function normalizeAuditEntry(
   value: unknown,
   index: number,
@@ -226,34 +229,60 @@ function formatAuditTimestamp(timestamp: string): string {
   }).format(parsed)
 }
 
-async function fetchWorkspaceTeams(): Promise<WorkspaceTeam[]> {
-  try {
-    const response = await fetch('/api/workspace/teams')
-    if (!response.ok) return FALLBACK_TEAMS
+async function fetchWorkspaceTeams(): Promise<WorkspaceTeamWithApproval[]> {
+  const response = await fetch('http://localhost:3099/api/workspace/teams')
+  const payload = await readPayload(response)
 
-    const payload = await readPayload(response)
+  if (!response.ok) {
     const record = asRecord(payload)
-    const candidates = [
-      payload,
-      record?.teams,
-      record?.data,
-      record?.items,
-    ]
-
-    for (const candidate of candidates) {
-      if (!Array.isArray(candidate)) continue
-
-      const teams = candidate
-        .map((entry, index) => normalizeTeam(entry, index))
-        .filter((entry): entry is WorkspaceTeam => Boolean(entry))
-
-      if (teams.length > 0) return teams
-    }
-
-    return FALLBACK_TEAMS
-  } catch {
-    return FALLBACK_TEAMS
+    throw new Error(
+      asString(record?.error) ??
+        asString(record?.message) ??
+        `Request failed with status ${response.status}`,
+    )
   }
+
+  const record = asRecord(payload)
+  const candidates = [payload, record?.teams, record?.data, record?.items]
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue
+
+    const teams = candidate
+      .map((entry, index) => normalizeTeamWithApproval(entry, index))
+      .filter((entry): entry is WorkspaceTeamWithApproval => Boolean(entry))
+
+    if (teams.length > 0) return teams
+  }
+
+  return []
+}
+
+async function updateApprovalConfig(
+  teamId: string,
+  tiers: ApprovalTier[],
+): Promise<WorkspaceTeamWithApproval> {
+  const payload = await workspaceRequestJson(
+    `http://localhost:3099/api/workspace/teams/${encodeURIComponent(teamId)}/approval-config`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tiers }),
+    },
+  )
+
+  return (
+    normalizeTeamWithApproval(payload, 0) ?? {
+      id: teamId,
+      name: teamId,
+      description: 'No description available',
+      permissions: [],
+      members: [],
+      approval_config: tiers,
+    }
+  )
 }
 
 async function fetchAuditLog(): Promise<WorkspaceAuditEntry[]> {
@@ -320,6 +349,7 @@ function SectionCard({
 }
 
 export function TeamsScreen() {
+  const queryClient = useQueryClient()
   const teamsQuery = useQuery({
     queryKey: ['workspace', 'teams'],
     queryFn: fetchWorkspaceTeams,
@@ -331,8 +361,65 @@ export function TeamsScreen() {
     staleTime: 30_000,
   })
 
-  const teams = teamsQuery.data ?? FALLBACK_TEAMS
+  const [approvalDrafts, setApprovalDrafts] = useState<
+    Record<string, ApprovalTier[]>
+  >({})
+
+  useEffect(() => {
+    if (!teamsQuery.data) return
+
+    setApprovalDrafts(
+      Object.fromEntries(
+        teamsQuery.data.map((team) => [team.id, team.approval_config ?? []]),
+      ),
+    )
+  }, [teamsQuery.data])
+
+  const saveApprovalMutation = useMutation({
+    mutationFn: ({
+      teamId,
+      tiers,
+    }: {
+      teamId: string
+      tiers: ApprovalTier[]
+    }) => updateApprovalConfig(teamId, tiers),
+    onSuccess: (updatedTeam) => {
+      queryClient.setQueryData<WorkspaceTeamWithApproval[] | undefined>(
+        ['workspace', 'teams'],
+        (current) =>
+          (current ?? []).map((team) =>
+            team.id === updatedTeam.id ? updatedTeam : team,
+          ),
+      )
+      setApprovalDrafts((current) => ({
+        ...current,
+        [updatedTeam.id]: updatedTeam.approval_config ?? [],
+      }))
+    },
+  })
+
+  const teams = teamsQuery.data ?? []
   const auditLog = auditLogQuery.data ?? FALLBACK_AUDIT_LOG
+
+  function updateTierDraft(
+    teamId: string,
+    tierId: string,
+    updater: (tier: ApprovalTier) => ApprovalTier,
+  ) {
+    setApprovalDrafts((current) => ({
+      ...current,
+      [teamId]: (current[teamId] ?? []).map((tier) =>
+        tier.id === tierId ? updater(tier) : tier,
+      ),
+    }))
+  }
+
+  function isSavingTeam(teamId: string): boolean {
+    return (
+      saveApprovalMutation.isPending &&
+      saveApprovalMutation.variables?.teamId === teamId
+    )
+  }
 
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
@@ -355,65 +442,213 @@ export function TeamsScreen() {
         </header>
 
         <SectionCard title="Teams">
-          {teamsQuery.isLoading ? (
-            <p className="mb-4 text-sm text-primary-500">Loading...</p>
-          ) : null}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {teams.map((team) => (
-              <article
-                key={team.id}
-                className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-primary-900">
-                      {team.name}
-                    </h3>
-                    <p className="mt-1 text-sm text-primary-500">
-                      {team.description}
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-600">
-                    {team.members.length} member{team.members.length === 1 ? '' : 's'}
-                  </span>
+          {teamsQuery.isPending ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={`teams-skeleton-${index}`}
+                  className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
+                >
+                  <div className="h-5 w-28 rounded bg-white" />
+                  <div className="mt-3 h-4 w-full rounded bg-white" />
+                  <div className="mt-2 h-4 w-3/4 rounded bg-white" />
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {team.members.map((member) => (
-                    <span
-                      key={member.id}
-                      className="rounded-full border border-primary-200 bg-white px-3 py-1.5 text-sm text-primary-700"
-                    >
-                      {formatMemberLabel(member)}
+              ))}
+            </div>
+          ) : teamsQuery.isError ? (
+            <p className="text-sm text-primary-600">
+              Failed to load teams. {teamsQuery.error.message}
+            </p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {teams.map((team) => (
+                <article
+                  key={team.id}
+                  className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-semibold text-primary-900">
+                        {team.name}
+                      </h3>
+                      <p className="mt-1 text-sm text-primary-500">
+                        {team.description}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-600">
+                      {team.members.length} member{team.members.length === 1 ? '' : 's'}
                     </span>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {team.members.map((member) => (
+                      <span
+                        key={member.id}
+                        className="rounded-full border border-primary-200 bg-white px-3 py-1.5 text-sm text-primary-700"
+                      >
+                        {formatMemberLabel(member)}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </SectionCard>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <SectionCard title="Approval Policy">
-            <div className="grid gap-3 md:grid-cols-3">
-              {APPROVAL_TIERS.map((tier) => (
-                <div
-                  key={tier.label}
-                  className={cn(
-                    'rounded-xl border px-4 py-4',
-                    tier.toneClassName,
-                  )}
-                >
-                  <p className="text-[11px] font-medium uppercase tracking-[0.14em]">
-                    {tier.label}
-                  </p>
-                  <p className="mt-2 text-base font-semibold">{tier.summary}</p>
-                </div>
-              ))}
-            </div>
+            {teamsQuery.isPending ? (
+              <div className="space-y-4">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div
+                    key={`approval-skeleton-${index}`}
+                    className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
+                  >
+                    <div className="h-5 w-36 rounded bg-white" />
+                    <div className="mt-4 h-12 rounded bg-white" />
+                    <div className="mt-3 h-12 rounded bg-white" />
+                  </div>
+                ))}
+              </div>
+            ) : teamsQuery.isError ? (
+              <p className="text-sm text-primary-600">
+                Failed to load approval tiers. {teamsQuery.error.message}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {teams.map((team) => {
+                  const tiers = approvalDrafts[team.id] ?? []
+
+                  return (
+                    <div
+                      key={team.id}
+                      className="rounded-xl border border-primary-200 bg-primary-50/70 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-semibold text-primary-900">
+                            {team.name}
+                          </h3>
+                          <p className="mt-1 text-sm text-primary-500">
+                            Approval tiers synced from the workspace daemon.
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-600">
+                          {tiers.length} tier{tiers.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+
+                      {tiers.length === 0 ? (
+                        <p className="mt-4 rounded-xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-500">
+                          No approval tiers configured for this team.
+                        </p>
+                      ) : (
+                        <div className="mt-4 space-y-3">
+                          {tiers.map((tier) => (
+                            <div
+                              key={tier.id}
+                              className="rounded-xl border border-primary-200 bg-white px-4 py-4"
+                            >
+                              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_120px_140px_140px_auto] lg:items-center">
+                                <div>
+                                  <p className="text-sm font-semibold text-primary-900">
+                                    {tier.name}
+                                  </p>
+                                  <p className="mt-1 text-xs text-primary-500">
+                                    Confidence threshold and approval behavior.
+                                  </p>
+                                </div>
+
+                                <label className="space-y-1">
+                                  <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
+                                    Min confidence
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={tier.minConfidence}
+                                    onChange={(event) => {
+                                      const nextValue = clampPercentage(
+                                        Number(event.target.value) || 0,
+                                      )
+                                      updateTierDraft(team.id, tier.id, (current) => ({
+                                        ...current,
+                                        minConfidence: nextValue,
+                                      }))
+                                    }}
+                                    className="h-10 w-full rounded-lg border border-primary-200 bg-white px-3 text-sm text-primary-900 outline-none transition focus:border-primary-300"
+                                  />
+                                </label>
+
+                                <label className="flex items-center justify-between rounded-lg border border-primary-200 bg-primary-50 px-3 py-2.5">
+                                  <span className="text-sm text-primary-900">
+                                    Auto-approve
+                                  </span>
+                                  <Switch
+                                    checked={tier.autoApprove}
+                                    onCheckedChange={(checked) => {
+                                      updateTierDraft(team.id, tier.id, (current) => ({
+                                        ...current,
+                                        autoApprove: checked,
+                                      }))
+                                    }}
+                                    className="focus-visible:ring-primary-300 focus-visible:ring-offset-0 data-checked:bg-accent-500 data-unchecked:bg-primary-200"
+                                  />
+                                </label>
+
+                                <label className="flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={tier.requiresHuman}
+                                    onChange={(event) => {
+                                      updateTierDraft(team.id, tier.id, (current) => ({
+                                        ...current,
+                                        requiresHuman: event.target.checked,
+                                      }))
+                                    }}
+                                    className="size-4 rounded border border-primary-300 accent-accent-500"
+                                  />
+                                  <span className="text-sm text-primary-900">
+                                    Requires human
+                                  </span>
+                                </label>
+
+                                <Button
+                                  variant="outline"
+                                  className="border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
+                                  disabled={isSavingTeam(team.id)}
+                                  onClick={() => {
+                                    void saveApprovalMutation.mutateAsync({
+                                      teamId: team.id,
+                                      tiers,
+                                    })
+                                  }}
+                                >
+                                  {isSavingTeam(team.id) ? 'Saving...' : 'Save'}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {saveApprovalMutation.isError &&
+                      saveApprovalMutation.variables?.teamId === team.id ? (
+                        <p className="mt-3 text-sm text-primary-600">
+                          Failed to save approval tiers.{' '}
+                          {saveApprovalMutation.error.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard title="Audit Log">
-            {auditLogQuery.isLoading ? (
+            {auditLogQuery.isPending ? (
               <p className="mb-4 text-sm text-primary-500">Loading...</p>
             ) : null}
             <div className="max-h-[200px] space-y-2 overflow-y-auto pr-1">
