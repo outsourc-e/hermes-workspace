@@ -281,15 +281,6 @@ export class Orchestrator extends EventEmitter {
       }
 
       if (result.status === "completed") {
-        if (checkpoint && !autoApproved) {
-          void this.tracker.triggerQaReview(
-            checkpoint.id,
-            project.id,
-            task.id,
-            workspacePath,
-          );
-        }
-
         if (autoApproved && checkpoint) {
           this.tracker.setTaskStatus(task.id, "completed");
           this.tracker.completeTaskRun(taskRun.id, {

@@ -31,6 +31,7 @@ import type {
   RegisterAgentInput,
   RunEvent,
   RunEventType,
+  QAResult,
   Task,
   TaskRun,
   TaskRunWithRelations,
@@ -50,6 +51,10 @@ type QaReviewPayload = {
   riskLevel: 'low' | 'medium' | 'high'
 }
 
+type CheckpointRow = Omit<Checkpoint, 'qa_result'> & {
+  qa_result?: string | null
+}
+
 function parseJsonOrDefault<T>(
   value: string | null | undefined,
   fallback: T,
@@ -62,6 +67,16 @@ function parseJsonOrDefault<T>(
     return JSON.parse(value) as T
   } catch {
     return fallback
+  }
+}
+
+function hydrateCheckpoint<T extends CheckpointRow>(checkpoint: T): T & Checkpoint {
+  return {
+    ...checkpoint,
+    qa_result:
+      typeof checkpoint.qa_result === 'string'
+        ? parseJsonOrDefault<QAResult | null>(checkpoint.qa_result, null)
+        : checkpoint.qa_result ?? null,
   }
 }
 
@@ -1297,7 +1312,8 @@ export class Tracker extends EventEmitter {
     verification?: string | null,
     rawDiff?: string | null,
   ): Checkpoint {
-    const checkpoint = this.db
+    const checkpoint = hydrateCheckpoint(
+      this.db
       .prepare(
         'INSERT INTO checkpoints (task_run_id, summary, diff_stat, commit_hash, verification, raw_diff) VALUES (?, ?, ?, ?, ?, ?) RETURNING *',
       )
@@ -1308,7 +1324,8 @@ export class Tracker extends EventEmitter {
         commitHash ?? null,
         verification ?? null,
         rawDiff ?? null,
-      ) as Checkpoint
+      ) as CheckpointRow,
+    )
     this.logActivity('checkpoint.created', 'checkpoint', checkpoint.id, null, {
       checkpoint_id: checkpoint.id,
       task_run_id: taskRunId,
@@ -1324,11 +1341,11 @@ export class Tracker extends EventEmitter {
   }
 
   getCheckpoint(id: string): Checkpoint | null {
-    return (
+    const checkpoint =
       (this.db.prepare('SELECT * FROM checkpoints WHERE id = ?').get(id) as
-        | Checkpoint
+        | CheckpointRow
         | undefined) ?? null
-    )
+    return checkpoint ? hydrateCheckpoint(checkpoint) : null
   }
 
   updateCheckpointVerification(
@@ -1338,10 +1355,18 @@ export class Tracker extends EventEmitter {
     this.db
       .prepare('UPDATE checkpoints SET verification = ? WHERE id = ?')
       .run(verification, id)
-    const checkpoint =
-      (this.db.prepare('SELECT * FROM checkpoints WHERE id = ?').get(id) as
-        | Checkpoint
-        | undefined) ?? null
+    const checkpoint = this.getCheckpoint(id)
+    if (checkpoint) {
+      this.emitSse('checkpoint.updated', checkpoint)
+    }
+    return checkpoint
+  }
+
+  setCheckpointQaResult(id: string, result: QAResult): Checkpoint | null {
+    this.db
+      .prepare('UPDATE checkpoints SET qa_result = ? WHERE id = ?')
+      .run(JSON.stringify(result), id)
+    const checkpoint = this.getCheckpoint(id)
     if (checkpoint) {
       this.emitSse('checkpoint.updated', checkpoint)
     }
@@ -1370,8 +1395,8 @@ export class Tracker extends EventEmitter {
         task_run_cost_cents: number | null
       })
     | null {
-    return (
-      (this.db
+    const checkpoint =
+      this.db
         .prepare(
           `SELECT c.*,
             t.id AS task_id,
@@ -1402,7 +1427,7 @@ export class Tracker extends EventEmitter {
            WHERE c.id = ?`,
         )
         .get(id) as
-        | (Checkpoint & {
+        | (CheckpointRow & {
             task_id: string | null
             task_name: string | null
             mission_name: string | null
@@ -1422,8 +1447,8 @@ export class Tracker extends EventEmitter {
             task_run_output_tokens: number | null
             task_run_cost_cents: number | null
           })
-        | undefined) ?? null
-    )
+        | undefined
+    return checkpoint ? hydrateCheckpoint(checkpoint) : null
   }
 
   listCheckpoints(
@@ -1468,15 +1493,17 @@ export class Tracker extends EventEmitter {
       ${whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''}
       ORDER BY c.created_at DESC
     `
-    return this.db.prepare(query).all(...params) as Array<
-      Checkpoint & {
-        task_name?: string
-        mission_name?: string
-        project_name?: string
-        project_id?: string
-        agent_name?: string
-      }
-    >
+    return (
+      this.db.prepare(query).all(...params) as Array<
+        CheckpointRow & {
+          task_name?: string
+          mission_name?: string
+          project_name?: string
+          project_id?: string
+          agent_name?: string
+        }
+      >
+    ).map((checkpoint) => hydrateCheckpoint(checkpoint))
   }
 
   updateCheckpointStatus(
@@ -1489,10 +1516,7 @@ export class Tracker extends EventEmitter {
         'UPDATE checkpoints SET status = ?, reviewer_notes = ? WHERE id = ?',
       )
       .run(status, reviewerNotes ?? null, id)
-    const checkpoint =
-      (this.db.prepare('SELECT * FROM checkpoints WHERE id = ?').get(id) as
-        | Checkpoint
-        | undefined) ?? null
+    const checkpoint = this.getCheckpoint(id)
     if (checkpoint) {
       if (status === 'approved') {
         this.logAuditEvent('checkpoint.approved', checkpoint.id, 'checkpoint')

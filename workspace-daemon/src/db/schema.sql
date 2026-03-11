@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   diff_stat TEXT,
   raw_diff TEXT,
   verification TEXT,
+  qa_result TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   reviewer_notes TEXT,
   commit_hash TEXT,

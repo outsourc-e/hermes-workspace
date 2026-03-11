@@ -109,7 +109,6 @@ export class AgentRunner {
 
     await this.workspaceManager.runAfterRunHooks(workspace.path, workspace.hooks);
 
-    const autoApproved = workflowConfig.autoApprove && result.status === "completed";
     const checkpoint = result.status === "completed"
       ? await buildCheckpoint(
           workspace.path,
@@ -121,6 +120,8 @@ export class AgentRunner {
           workflowConfig.autoApprove,
         )
       : null;
+    const autoApproved =
+      result.status === "completed" && checkpoint?.status === "approved";
 
     if (autoApproved && workspace.git_worktree) {
       await this.workspaceManager.cleanup(input.project, input.task, input.taskRun.id);

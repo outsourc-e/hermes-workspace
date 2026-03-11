@@ -159,10 +159,20 @@ export interface Checkpoint {
   diff_stat: string | null
   raw_diff?: string | null
   verification: string | null
+  qa_result?: QAResult | null
   status: CheckpointStatus
   reviewer_notes: string | null
   commit_hash: string | null
   created_at: string
+}
+
+export interface QAResult {
+  verdict: 'APPROVED' | 'NEEDS_CHANGES' | 'BLOCKED'
+  issues: string[]
+  confidence: number
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH'
+  filesReviewed: string[]
+  suggestion?: string
 }
 
 export interface Artifact {
