@@ -17,6 +17,10 @@ import type {
 const MAX_RETRIES = 3;
 const BASE_RETRY_MS = 10_000;
 const MAX_RETRY_MS = 300_000;
+const FRONTEND_TASK_PATTERN = /ui|react|screen|component|style|layout|design|theme|tailwind|css/i;
+const BACKEND_TASK_PATTERN = /api|route|endpoint|db|database|schema|migration|daemon|server|express/i;
+const QA_TASK_PATTERN = /review|qa|verify|test|check|audit/i;
+const PLANNING_TASK_PATTERN = /plan|decompose|spec|design/i;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -146,7 +150,7 @@ export class Orchestrator extends EventEmitter {
       return;
     }
 
-    const agent = this.resolveAgent(task.agent_id, project.path);
+    const agent = this.selectAgent(task, this.tracker.listAgents());
     if (!agent) {
       this.tracker.setTaskStatus(task.id, "failed");
       this.tracker.logActivity("failed", "task", task.id, null, { reason: "No agent available" });
@@ -261,23 +265,53 @@ export class Orchestrator extends EventEmitter {
     }
   }
 
-  private resolveAgent(agentId: string | null, projectPath: string | null): AgentRecord | null {
-    if (agentId) {
-      return this.tracker.getAgent(agentId);
+  private selectAgent(task: TaskWithRelations, agents: AgentRecord[]): AgentRecord | null {
+    const onlineAgents = agents.filter((agent) => agent.status === "online");
+    const onlineAgentsById = new Map(onlineAgents.map((agent) => [agent.id, agent]));
+
+    if (task.agent_id) {
+      const explicitAgent = onlineAgentsById.get(task.agent_id);
+      if (explicitAgent) {
+        return explicitAgent;
+      }
     }
 
-    const workflowConfig = getWorkflowConfig(projectPath);
-    const existing = this.tracker.listAgents().find((agent) => agent.adapter_type === workflowConfig.defaultAdapter);
-    if (existing) {
-      return existing;
+    const preferredAgentId = this.getPreferredAgentId(task.name);
+    if (preferredAgentId) {
+      const preferredAgent = onlineAgentsById.get(preferredAgentId);
+      if (preferredAgent) {
+        return preferredAgent;
+      }
     }
 
-    const name = `${workflowConfig.defaultAdapter}-default`;
-    return this.tracker.registerAgent({
-      name,
-      adapter_type: workflowConfig.defaultAdapter,
-      role: "coder",
-    });
+    if (task.suggested_agent_type) {
+      const suggestedAgent = onlineAgents.find((agent) => agent.adapter_type === task.suggested_agent_type);
+      if (suggestedAgent) {
+        return suggestedAgent;
+      }
+    }
+
+    return onlineAgents.find((agent) => agent.adapter_type === "codex") ?? null;
+  }
+
+  private getPreferredAgentId(taskName: string): string | null {
+    if (FRONTEND_TASK_PATTERN.test(taskName)) {
+      return "aurora-coder";
+    }
+
+    if (BACKEND_TASK_PATTERN.test(taskName)) {
+      return "aurora-daemon";
+    }
+
+    if (QA_TASK_PATTERN.test(taskName)) {
+      return "aurora-qa";
+    }
+
+    if (PLANNING_TASK_PATTERN.test(taskName)) {
+      return "aurora-planner";
+    }
+
+    return null;
   }
 
   private getDispatchableTasks(tasks: TaskWithRelations[]): TaskWithRelations[] {
