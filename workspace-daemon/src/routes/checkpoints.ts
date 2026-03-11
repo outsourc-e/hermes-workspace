@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { Router } from "express";
 import {
@@ -158,6 +158,10 @@ async function getCheckpointRawDiff(checkpointId: string, tracker: Tracker): Pro
     throw new Error("Checkpoint not found");
   }
 
+  if (checkpoint.raw_diff) {
+    return checkpoint.raw_diff;
+  }
+
   if (!checkpoint.project_path) {
     throw new Error("Project path is unavailable");
   }
@@ -185,6 +189,50 @@ async function stageAndCommitWorkspace(workspacePath: string, checkpointId: stri
   }
 
   return runGit(workspacePath, ["rev-parse", "HEAD"]);
+}
+
+async function pathExists(targetPath: string | null | undefined): Promise<boolean> {
+  if (!targetPath) {
+    return false;
+  }
+
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function applyStoredDiffToProject(
+  projectPath: string,
+  checkpointId: string,
+  rawDiff: string,
+): Promise<string | null> {
+  const patch = rawDiff.trim();
+  if (!patch) {
+    return null;
+  }
+
+  execFileSync("git", ["apply", "--check", "--index", "-"], {
+    cwd: projectPath,
+    input: patch,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  execFileSync("git", ["apply", "--index", "-"], {
+    cwd: projectPath,
+    input: patch,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  try {
+    await runGit(projectPath, ["diff", "--cached", "--quiet"]);
+    return null;
+  } catch {
+    await runGit(projectPath, ["commit", "-m", `merge: checkpoint ${checkpointId}`]);
+    return runGit(projectPath, ["rev-parse", "HEAD"]);
+  }
 }
 
 async function buildCheckpointDetail(tracker: Tracker, checkpointId: string) {
@@ -295,13 +343,45 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
     });
   });
 
-  router.post("/:id/approve", (req, res) => {
-    const checkpoint = tracker.updateCheckpointStatus(req.params.id, "approved", req.body?.reviewer_notes);
+  router.post("/:id/approve", async (req, res) => {
+    const checkpoint = tracker.getCheckpoint(req.params.id);
     if (!checkpoint) {
       res.status(404).json({ error: "Checkpoint not found" });
       return;
     }
-    res.json(checkpoint);
+
+    const taskRun = tracker.getTaskRunApprovalContext(checkpoint.task_run_id);
+    let commitHash: string | null | undefined;
+
+    if (taskRun?.project_path) {
+      const workspaceExists = await pathExists(taskRun.workspace_path);
+      if (!workspaceExists && checkpoint.raw_diff) {
+        try {
+          commitHash = await applyStoredDiffToProject(
+            taskRun.project_path,
+            checkpoint.id,
+            checkpoint.raw_diff,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "unknown error";
+          console.warn(
+            `[checkpoints] Failed to apply stored diff for checkpoint ${checkpoint.id}: ${message}`,
+          );
+        }
+      }
+    }
+
+    const updatedCheckpoint = tracker.approveCheckpoint(
+      checkpoint.id,
+      req.body?.reviewer_notes,
+      commitHash,
+    );
+    if (!updatedCheckpoint) {
+      res.status(500).json({ error: "Failed to update checkpoint" });
+      return;
+    }
+
+    res.json(updatedCheckpoint);
   });
 
   router.post("/:id/approve-and-commit", async (req, res) => {

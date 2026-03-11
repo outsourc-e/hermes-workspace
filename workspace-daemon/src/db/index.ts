@@ -33,6 +33,16 @@ function ensureCheckpointCommitHashColumn(db: Database.Database): void {
   }
 }
 
+function ensureCheckpointRawDiffColumn(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(checkpoints)').all() as Array<{
+    name: string
+  }>
+  const hasRawDiff = columns.some((column) => column.name === 'raw_diff')
+  if (!hasRawDiff) {
+    db.exec('ALTER TABLE checkpoints ADD COLUMN raw_diff TEXT')
+  }
+}
+
 function ensureProjectPolicyColumns(db: Database.Database): void {
   const columns = db.prepare('PRAGMA table_info(projects)').all() as Array<{
     name: string
@@ -316,6 +326,7 @@ export function getDatabase(
   db.pragma('foreign_keys = ON')
   db.exec(readSchemaSql())
   ensureCheckpointCommitHashColumn(db)
+  ensureCheckpointRawDiffColumn(db)
   ensureProjectPolicyColumns(db)
   ensureAgentProfileColumns(db)
   ensureEventsTable(db)

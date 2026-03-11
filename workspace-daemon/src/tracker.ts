@@ -1197,10 +1197,11 @@ export class Tracker extends EventEmitter {
     diffStat: string | null,
     commitHash?: string | null,
     verification?: string | null,
+    rawDiff?: string | null,
   ): Checkpoint {
     const checkpoint = this.db
       .prepare(
-        'INSERT INTO checkpoints (task_run_id, summary, diff_stat, commit_hash, verification) VALUES (?, ?, ?, ?, ?) RETURNING *',
+        'INSERT INTO checkpoints (task_run_id, summary, diff_stat, commit_hash, verification, raw_diff) VALUES (?, ?, ?, ?, ?, ?) RETURNING *',
       )
       .get(
         taskRunId,
@@ -1208,6 +1209,7 @@ export class Tracker extends EventEmitter {
         diffStat,
         commitHash ?? null,
         verification ?? null,
+        rawDiff ?? null,
       ) as Checkpoint
     this.logActivity('checkpoint.created', 'checkpoint', checkpoint.id, null, {
       checkpoint_id: checkpoint.id,
@@ -1216,6 +1218,7 @@ export class Tracker extends EventEmitter {
       diff_stat: diffStat,
       commit_hash: commitHash ?? null,
       verification: verification ?? null,
+      raw_diff: rawDiff ?? null,
       ...this.getCheckpointProjectContext(checkpoint.id),
     })
     this.emitSse('checkpoint.created', checkpoint)

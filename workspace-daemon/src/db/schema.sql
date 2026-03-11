@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   task_run_id TEXT NOT NULL REFERENCES task_runs(id) ON DELETE CASCADE,
   summary TEXT,
   diff_stat TEXT,
+  raw_diff TEXT,
   verification TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   reviewer_notes TEXT,
