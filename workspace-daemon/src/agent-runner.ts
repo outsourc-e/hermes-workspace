@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { CodexAdapter } from "./adapters/codex";
 import { ClaudeAdapter } from "./adapters/claude";
 import { OpenClawAdapter } from "./adapters/openclaw";
@@ -47,12 +48,35 @@ export class AgentRunner {
 
     await this.workspaceManager.runBeforeRunHooks(workspace.path, workspace.hooks);
 
-    const prompt = renderTaskPrompt(workflow.promptTemplate, {
+    const basePrompt = renderTaskPrompt(workflow.promptTemplate, {
       projectName: input.project.name,
       taskName: input.task.name,
       taskDescription: input.task.description,
       workspacePath: workspace.path,
     });
+    const agentSystemPrompt = input.agent.system_prompt?.trim();
+    const prompt = agentSystemPrompt
+      ? `${agentSystemPrompt}\n\n---\n\n${basePrompt}`
+      : basePrompt;
+    let finalPrompt = prompt;
+
+    const projectPath = input.project.path;
+
+    if (projectPath) {
+      try {
+        const recentLog = execSync("git log --oneline -5", {
+          cwd: projectPath,
+          encoding: "utf8",
+        }).trim();
+
+        if (recentLog) {
+          finalPrompt += `\n\n## Recent project commits\n${recentLog}`;
+        }
+      } catch {
+        // Skip git context when the project is not a git repo or has no readable history.
+      }
+    }
+
     const adapter = this.getAdapter(input.agent.adapter_type || workflowConfig.defaultAdapter);
 
     this.tracker.appendRunEvent(input.taskRun.id, "started", {
@@ -68,7 +92,7 @@ export class AgentRunner {
         taskRun: input.taskRun,
         agent: input.agent,
         workspacePath: workspace.path,
-        prompt,
+        prompt: finalPrompt,
       },
       {
         signal: input.signal,
