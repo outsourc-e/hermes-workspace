@@ -12,6 +12,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogRoot,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from '@/components/ui/toast'
 import {
   type CheckpointReviewAction,
@@ -56,6 +63,8 @@ import {
   calculateExecutionWaves,
   deriveCheckpointRisk,
   findPlanReviewMission,
+  formatMinutes,
+  getAgentBadgeLabel,
   isCheckpointVerified,
 } from './lib/workspace-utils'
 import { ProjectDetailView } from './project-detail-view'
@@ -76,6 +85,67 @@ type ProjectsScreenProps = {
     projectId: string | null
     projectName: string | null
   }) => void
+}
+
+type NewProjectFormState = {
+  name: string
+  path: string
+  spec: string
+}
+
+type ProjectMissionComposerState = {
+  project: WorkspaceProject
+  goal: string
+  tasks: DecomposedTaskDraft[]
+  rawResponse?: string
+  error: string | null
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null
+}
+
+function extractEntityRecord(
+  payload: unknown,
+  entityKey: string,
+): Record<string, unknown> | null {
+  const record = asRecord(payload)
+  const candidates = [record?.[entityKey], record?.data, payload]
+
+  for (const candidate of candidates) {
+    const candidateRecord = asRecord(candidate)
+    if (candidateRecord) return candidateRecord
+  }
+
+  return null
+}
+
+function extractEntityId(payload: unknown, entityKey: string): string | null {
+  const record = extractEntityRecord(payload, entityKey)
+  if (!record) return null
+
+  return asString(record.id) ?? asString(record[`${entityKey}_id`])
+}
+
+function getMissionAgentBadgeClass(agentType: string | null): string {
+  if (agentType === 'aurora-coder') {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+  if (agentType === 'aurora-daemon') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (agentType === 'aurora-qa') {
+    return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+  if (agentType === 'aurora-planner') {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  return 'border-primary-200 bg-primary-50 text-primary-600'
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -162,6 +232,16 @@ export function ProjectsScreen({
     useState<WorkspaceCheckpoint | null>(null)
   const [pendingReviewCheckpoint, setPendingReviewCheckpoint] =
     useState<WorkspaceCheckpoint | null>(null)
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [newProjectForm, setNewProjectForm] = useState<NewProjectFormState>({
+    name: '',
+    path: '',
+    spec: '',
+  })
+  const [newProjectError, setNewProjectError] = useState<string | null>(null)
+  const [projectMissionComposer, setProjectMissionComposer] =
+    useState<ProjectMissionComposerState | null>(null)
+  const [missionStartPending, setMissionStartPending] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -556,6 +636,48 @@ export function ProjectsScreen({
     },
   })
 
+  const projectMissionDecomposeMutation = useMutation({
+    mutationFn: async ({
+      goal,
+      projectId,
+    }: {
+      goal: string
+      projectId: string
+    }) =>
+      extractDecomposeResponse(
+        await apiRequest('/api/workspace/decompose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goal, project_id: projectId }),
+        }),
+      ),
+    onSuccess: (result) => {
+      setProjectMissionComposer((current) =>
+        current
+          ? {
+              ...current,
+              tasks: result.tasks,
+              rawResponse: result.raw_response,
+              error: result.tasks.length === 0 ? 'No tasks returned.' : null,
+            }
+          : current,
+      )
+    },
+    onError: (error) => {
+      setProjectMissionComposer((current) =>
+        current
+          ? {
+              ...current,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to decompose goal',
+            }
+          : current,
+      )
+    },
+  })
+
   function triggerRefresh() {
     setRefreshToken((value) => value + 1)
     void queryClient.invalidateQueries({ queryKey: ['workspace'] })
@@ -563,6 +685,12 @@ export function ProjectsScreen({
 
   function focusProject(projectId: string) {
     setSelectedProjectId(projectId)
+  }
+
+  function openNewProjectDialog() {
+    setNewProjectForm({ name: '', path: '', spec: '' })
+    setNewProjectError(null)
+    setNewProjectOpen(true)
   }
 
   function clearSelectedProject() {
@@ -641,6 +769,29 @@ export function ProjectsScreen({
     setMissionLauncher(null)
     setExpandedDecomposeDescriptions({})
     decomposeMutation.reset()
+  }
+
+  function openProjectMissionComposer(projectId: string) {
+    const project =
+      projects.find((entry) => entry.id === projectId) ??
+      (projectDetail?.id === projectId ? projectDetail : null)
+    if (!project) return
+
+    setProjectMissionComposer({
+      project,
+      goal: '',
+      tasks: [],
+      rawResponse: undefined,
+      error: null,
+    })
+    setMissionStartPending(false)
+    projectMissionDecomposeMutation.reset()
+  }
+
+  function closeProjectMissionComposer() {
+    setProjectMissionComposer(null)
+    setMissionStartPending(false)
+    projectMissionDecomposeMutation.reset()
   }
 
   function handleTaskDraftChange(
@@ -734,6 +885,198 @@ export function ProjectsScreen({
         projectId: undefined,
       },
     })
+  }
+
+  function handleProjectMissionTaskChange(
+    taskId: string,
+    updates: Partial<DecomposedTaskDraft>,
+  ) {
+    setProjectMissionComposer((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        tasks: current.tasks.map((task) =>
+          task.id === taskId ? { ...task, ...updates } : task,
+        ),
+      }
+    })
+  }
+
+  async function handleCreateProject(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const name = newProjectForm.name.trim()
+    const path = newProjectForm.path.trim()
+
+    if (!name) {
+      setNewProjectError('Project name is required.')
+      return
+    }
+
+    if (!path) {
+      setNewProjectError('Local path is required.')
+      return
+    }
+
+    setSubmittingKey('project')
+    setNewProjectError(null)
+
+    try {
+      await apiRequest('/api/workspace/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          path,
+          spec: newProjectForm.spec.trim() || undefined,
+        }),
+      })
+      setNewProjectOpen(false)
+      setNewProjectForm({ name: '', path: '', spec: '' })
+      toast('Project created', { type: 'success' })
+      triggerRefresh()
+    } catch (error) {
+      setNewProjectError(
+        error instanceof Error ? error.message : 'Failed to create project',
+      )
+    } finally {
+      setSubmittingKey(null)
+    }
+  }
+
+  function handleProjectMissionDecompose(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault()
+    if (!projectMissionComposer?.goal.trim()) {
+      setProjectMissionComposer((current) =>
+        current ? { ...current, error: 'Goal is required.' } : current,
+      )
+      return
+    }
+
+    setProjectMissionComposer((current) =>
+      current ? { ...current, error: null, tasks: [], rawResponse: undefined } : current,
+    )
+    projectMissionDecomposeMutation.mutate({
+      goal: projectMissionComposer.goal.trim(),
+      projectId: projectMissionComposer.project.id,
+    })
+  }
+
+  async function handleStartProjectMission() {
+    if (!projectMissionComposer) return
+
+    const goal = projectMissionComposer.goal.trim()
+    const cleanedTasks = projectMissionComposer.tasks.map((task) => ({
+      ...task,
+      name: task.name.trim(),
+      description: task.description.trim(),
+      depends_on: task.depends_on.filter(Boolean),
+    }))
+
+    if (!goal) {
+      setProjectMissionComposer((current) =>
+        current ? { ...current, error: 'Goal is required.' } : current,
+      )
+      return
+    }
+
+    if (cleanedTasks.length === 0) {
+      setProjectMissionComposer((current) =>
+        current ? { ...current, error: 'Decompose the goal before starting the mission.' } : current,
+      )
+      return
+    }
+
+    if (cleanedTasks.some((task) => task.name.length === 0)) {
+      setProjectMissionComposer((current) =>
+        current ? { ...current, error: 'Every task needs a name.' } : current,
+      )
+      return
+    }
+
+    setMissionStartPending(true)
+    setProjectMissionComposer((current) =>
+      current ? { ...current, error: null, tasks: cleanedTasks } : current,
+    )
+
+    try {
+      const phasePayload = await apiRequest('/api/workspace/phases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectMissionComposer.project.id,
+          name: 'Phase 1',
+          sort_order: projectMissionComposer.project.phase_count,
+        }),
+      })
+      const phaseId = extractEntityId(phasePayload, 'phase')
+      if (!phaseId) throw new Error('Phase response was empty')
+
+      const missionPayload = await apiRequest('/api/workspace/missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phase_id: phaseId,
+          name: goal.slice(0, 60) || 'Phase 1 mission',
+        }),
+      })
+      const missionId = extractEntityId(missionPayload, 'mission')
+      if (!missionId) throw new Error('Mission response was empty')
+
+      for (const [index, task] of cleanedTasks.entries()) {
+        await apiRequest('/api/workspace-tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mission_id: missionId,
+            name: task.name,
+            description: task.description,
+            suggested_agent_type: task.suggested_agent_type,
+            depends_on: task.depends_on,
+            sort_order: index,
+          }),
+        })
+      }
+
+      await apiRequest(`/api/workspace/missions/${encodeURIComponent(missionId)}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+
+      closeProjectMissionComposer()
+      toast('Mission started', { type: 'success' })
+      triggerRefresh()
+      void navigate({
+        to: '/workspace',
+        hash: 'runs',
+        search: {
+          goal: undefined,
+          checkpointId: undefined,
+          phaseId: undefined,
+          phaseName: undefined,
+          project: undefined,
+          projectId: projectMissionComposer.project.id,
+          missionId,
+          showWizard: undefined,
+        },
+      })
+    } catch (error) {
+      setProjectMissionComposer((current) =>
+        current
+          ? {
+              ...current,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to start mission',
+            }
+          : current,
+      )
+    } finally {
+      setMissionStartPending(false)
+    }
   }
 
   useEffect(() => {
@@ -1141,12 +1484,7 @@ export function ProjectsScreen({
               Refresh
             </Button>
             <Button
-              onClick={() =>
-                void navigate({
-                  to: '/workspace',
-                  search: { showWizard: true },
-                })
-              }
+              onClick={openNewProjectDialog}
               className="bg-accent-500 text-white hover:bg-accent-400"
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.6} />
@@ -1175,12 +1513,7 @@ export function ProjectsScreen({
               build.
             </p>
             <Button
-              onClick={() =>
-                void navigate({
-                  to: '/workspace',
-                  search: { showWizard: true },
-                })
-              }
+              onClick={openNewProjectDialog}
               className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
             >
               Create Project
@@ -1292,6 +1625,7 @@ export function ProjectsScreen({
               selectedProjectId={selectedProjectId}
               planReviewMissionIdsByProjectId={planReviewMissionIdsByProjectId}
               onSelect={focusProject}
+              onCreateMission={openProjectMissionComposer}
               onResume={(missionId) => void handleStartMission(missionId)}
               onReviewPlan={openPlanReview}
               submittingKey={submittingKey}
@@ -1374,6 +1708,293 @@ export function ProjectsScreen({
         />
       ) : null}
 
+      <DialogRoot
+        open={newProjectOpen}
+        onOpenChange={(open) => {
+          setNewProjectOpen(open)
+          if (!open) {
+            setNewProjectError(null)
+          }
+        }}
+      >
+        <DialogContent className="w-[min(620px,94vw)] border-primary-200 bg-primary-50 p-0 text-primary-900 shadow-2xl">
+          <form onSubmit={handleCreateProject} className="space-y-5 p-5">
+            <div className="space-y-1">
+              <DialogTitle className="text-base font-semibold text-primary-900">
+                New Project
+              </DialogTitle>
+              <DialogDescription className="text-sm text-primary-600">
+                Create a project with its local path and an optional working spec.
+              </DialogDescription>
+            </div>
+
+            <div className="space-y-4">
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-600">
+                  Project Name
+                </span>
+                <input
+                  value={newProjectForm.name}
+                  onChange={(event) =>
+                    setNewProjectForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
+                  placeholder="OpenClaw Workspace Refresh"
+                  autoFocus
+                />
+              </label>
+
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-600">
+                  Local Path
+                </span>
+                <input
+                  value={newProjectForm.path}
+                  onChange={(event) =>
+                    setNewProjectForm((current) => ({
+                      ...current,
+                      path: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 font-mono text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
+                  placeholder="/Users/you/myproject"
+                />
+              </label>
+
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-600">
+                  Spec
+                </span>
+                <textarea
+                  value={newProjectForm.spec}
+                  onChange={(event) =>
+                    setNewProjectForm((current) => ({
+                      ...current,
+                      spec: event.target.value,
+                    }))
+                  }
+                  rows={5}
+                  className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
+                  placeholder="Describe what this project does..."
+                />
+              </label>
+
+              {newProjectError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {newProjectError}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <DialogClose render={<Button variant="outline">Cancel</Button>} />
+              <Button
+                type="submit"
+                className="bg-accent-500 text-white hover:bg-accent-400"
+                disabled={submittingKey === 'project'}
+              >
+                {submittingKey === 'project' ? 'Creating...' : 'Create Project'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogRoot>
+
+      <DialogRoot
+        open={projectMissionComposer !== null}
+        onOpenChange={(open) => {
+          if (!open) closeProjectMissionComposer()
+        }}
+      >
+        <DialogContent className="w-[min(860px,96vw)] border-primary-200 bg-primary-50 p-0 text-primary-900 shadow-2xl">
+          {projectMissionComposer ? (
+            <form onSubmit={handleProjectMissionDecompose} className="space-y-5 p-5">
+              <div className="space-y-1">
+                <DialogTitle className="text-base font-semibold text-primary-900">
+                  New Mission
+                </DialogTitle>
+                <DialogDescription className="text-sm text-primary-600">
+                  Decompose a goal for {projectMissionComposer.project.name} and launch it immediately.
+                </DialogDescription>
+              </div>
+
+              <div className="grid gap-3 rounded-xl border border-primary-200 bg-white p-4 md:grid-cols-2">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                    Project
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-primary-900">
+                    {projectMissionComposer.project.name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                    Path
+                  </p>
+                  <p className="mt-1 break-all font-mono text-xs text-primary-600">
+                    {projectMissionComposer.project.path ?? 'No path configured'}
+                  </p>
+                </div>
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-600">
+                  Goal
+                </span>
+                <textarea
+                  value={projectMissionComposer.goal}
+                  onChange={(event) =>
+                    setProjectMissionComposer((current) =>
+                      current
+                        ? {
+                            ...current,
+                            goal: event.target.value,
+                            error: null,
+                          }
+                        : current,
+                    )
+                  }
+                  rows={7}
+                  className="w-full rounded-xl border border-primary-300 bg-white px-3 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
+                  placeholder="What do you want to build or fix?"
+                  autoFocus
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-primary-600">
+                  {projectMissionComposer.tasks.length > 0
+                    ? `${projectMissionComposer.tasks.length} tasks ready`
+                    : 'Generate a task plan before starting the mission.'}
+                </div>
+                <Button
+                  type="submit"
+                  className="bg-accent-500 text-white hover:bg-accent-400"
+                  disabled={projectMissionDecomposeMutation.isPending || missionStartPending}
+                >
+                  {projectMissionDecomposeMutation.isPending ? 'Thinking...' : 'Decompose'}
+                </Button>
+              </div>
+
+              {projectMissionDecomposeMutation.isPending ? (
+                <div className="rounded-xl border border-primary-200 bg-white px-4 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="size-5 animate-spin rounded-full border-2 border-accent-500 border-r-transparent" />
+                    <div>
+                      <p className="text-sm font-medium text-primary-900">Thinking...</p>
+                      <p className="text-sm text-primary-500">
+                        Decomposing the mission goal into executable tasks.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {projectMissionComposer.tasks.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-primary-900">Generated task plan</p>
+                    <p className="text-xs text-primary-500">
+                      {formatMinutes(
+                        projectMissionComposer.tasks.reduce(
+                          (total, task) => total + task.estimated_minutes,
+                          0,
+                        ),
+                      )}{' '}
+                      total estimate
+                    </p>
+                  </div>
+
+                  <div className="max-h-[42vh] space-y-3 overflow-y-auto pr-1">
+                    {projectMissionComposer.tasks.map((task, index) => (
+                      <article
+                        key={task.id}
+                        className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-primary-200 bg-primary-50 text-xs font-semibold text-primary-600">
+                                {index + 1}
+                              </span>
+                              <input
+                                value={task.name}
+                                onChange={(event) =>
+                                  handleProjectMissionTaskChange(task.id, {
+                                    name: event.target.value,
+                                  })
+                                }
+                                className="min-w-0 flex-1 rounded-xl border border-primary-300 bg-white px-3 py-2 text-sm font-medium text-primary-900 outline-none transition-colors focus:border-accent-500"
+                              />
+                            </div>
+                            <p className="mt-3 line-clamp-2 text-sm text-primary-600">
+                              {task.description}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={cn(
+                                'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                                getMissionAgentBadgeClass(task.suggested_agent_type),
+                              )}
+                            >
+                              {getAgentBadgeLabel(task.suggested_agent_type)}
+                            </span>
+                            <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-600">
+                              {formatMinutes(task.estimated_minutes)}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {projectMissionComposer.rawResponse &&
+              projectMissionComposer.tasks.length === 0 ? (
+                <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
+                    Response
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-primary-600">
+                    {projectMissionComposer.rawResponse}
+                  </p>
+                </div>
+              ) : null}
+
+              {projectMissionComposer.error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {projectMissionComposer.error}
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-end gap-2">
+                <DialogClose
+                  render={<Button variant="outline" disabled={missionStartPending}>Cancel</Button>}
+                />
+                <Button
+                  type="button"
+                  onClick={() => void handleStartProjectMission()}
+                  className="bg-accent-500 text-white hover:bg-accent-400"
+                  disabled={
+                    missionStartPending ||
+                    projectMissionDecomposeMutation.isPending ||
+                    projectMissionComposer.tasks.length === 0
+                  }
+                >
+                  {missionStartPending ? 'Starting...' : 'Start Mission'}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </DialogContent>
+      </DialogRoot>
+
       <WorkspaceEntityDialog
         open={phaseProject !== null}
         onOpenChange={(open) => {
@@ -1392,7 +2013,7 @@ export function ProjectsScreen({
           <input
             value={phaseForm.name}
             onChange={(event) => setPhaseForm({ name: event.target.value })}
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
             placeholder="Discovery"
             autoFocus
           />
@@ -1417,7 +2038,7 @@ export function ProjectsScreen({
           <input
             value={missionForm.name}
             onChange={(event) => setMissionForm({ name: event.target.value })}
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
             placeholder="Scaffold project dashboard"
             autoFocus
           />
@@ -1447,7 +2068,7 @@ export function ProjectsScreen({
                 name: event.target.value,
               }))
             }
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
             placeholder="Implement workspace project routes"
             autoFocus
           />
@@ -1462,7 +2083,7 @@ export function ProjectsScreen({
               }))
             }
             rows={4}
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
             placeholder="Optional task detail..."
           />
         </WorkspaceFieldLabel>
@@ -1475,7 +2096,7 @@ export function ProjectsScreen({
                 dependsOn: event.target.value,
               }))
             }
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
             placeholder="task-1, task-2"
           />
         </WorkspaceFieldLabel>

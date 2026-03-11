@@ -20,6 +20,7 @@ type DashboardProjectCardsProps = {
   selectedProjectId: string | null
   planReviewMissionIdsByProjectId: Record<string, string>
   onSelect: (projectId: string) => void
+  onCreateMission: (projectId: string) => void
   onResume: (missionId: string) => void
   onReviewPlan: (missionId: string, projectId: string) => void
   submittingKey: string | null
@@ -30,6 +31,7 @@ export function DashboardProjectCards({
   selectedProjectId,
   planReviewMissionIdsByProjectId,
   onSelect,
+  onCreateMission,
   onResume,
   onReviewPlan,
   submittingKey,
@@ -156,6 +158,14 @@ export function DashboardProjectCards({
             </button>
 
             <div className="mt-5 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => onCreateMission(overview.project.id)}
+                className="border-primary-300 bg-primary-50 text-primary-900 hover:bg-primary-100"
+              >
+                <HugeiconsIcon icon={Task01Icon} size={16} strokeWidth={1.6} />
+                New Mission
+              </Button>
               {planReviewMissionId ? (
                 <Button
                   variant="outline"
