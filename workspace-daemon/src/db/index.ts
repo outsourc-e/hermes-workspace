@@ -109,6 +109,16 @@ function ensureAgentProfileColumns(db: Database.Database): void {
   }
 }
 
+function ensureSessionIdColumn(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(task_runs)').all() as Array<{
+    name: string
+  }>
+  const hasSessionId = columns.some((column) => column.name === 'session_id')
+  if (!hasSessionId) {
+    db.exec('ALTER TABLE task_runs ADD COLUMN session_id TEXT')
+  }
+}
+
 function ensureEventsTable(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS events (
@@ -329,6 +339,7 @@ export function getDatabase(
   ensureCheckpointRawDiffColumn(db)
   ensureProjectPolicyColumns(db)
   ensureAgentProfileColumns(db)
+  ensureSessionIdColumn(db)
   ensureEventsTable(db)
   seedDefaultTeams(db)
   seedDefaultAgents(db)

@@ -1034,6 +1034,23 @@ export class Tracker extends EventEmitter {
     return run
   }
 
+  getTaskRunSessionId(taskRunId: string): string | null {
+    const row = this.db
+      .prepare('SELECT session_id FROM task_runs WHERE id = ?')
+      .get(taskRunId) as { session_id: string | null } | undefined
+    return row?.session_id ?? null
+  }
+
+  setTaskRunSessionId(taskRunId: string, sessionId: string): void {
+    this.db
+      .prepare('UPDATE task_runs SET session_id = ? WHERE id = ?')
+      .run(sessionId, taskRunId)
+    const run = this.getTaskRun(taskRunId)
+    if (run) {
+      this.emitSse('task_run.updated', run)
+    }
+  }
+
   getTaskRun(id: string): TaskRun | null {
     return (
       (this.db.prepare('SELECT * FROM task_runs WHERE id = ?').get(id) as
@@ -1566,9 +1583,11 @@ export class Tracker extends EventEmitter {
           taskRun,
           agent,
           workspacePath,
+          projectName: project.name,
           prompt,
         },
         {
+          tracker: this,
           onEvent: (event) => {
             this.appendRunEvent(
               taskRun.id,

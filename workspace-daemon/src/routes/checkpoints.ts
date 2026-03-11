@@ -9,6 +9,7 @@ import {
   hasGitRemote,
   mergeWorktreeToMain,
 } from "../git-ops";
+import { OpenClawAdapter } from "../adapters/openclaw";
 import { Tracker } from "../tracker";
 import { runVerification, type VerificationResult } from "../verification";
 
@@ -532,12 +533,37 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
     }
   });
 
-  router.post("/:id/reject", (req, res) => {
-    const checkpoint = tracker.updateCheckpointStatus(req.params.id, "rejected", req.body?.reviewer_notes);
+  router.post("/:id/reject", async (req, res) => {
+    const reviewerNotes =
+      typeof req.body?.reviewer_notes === "string" ? req.body.reviewer_notes : undefined;
+    const checkpoint = tracker.updateCheckpointStatus(req.params.id, "rejected", reviewerNotes);
     if (!checkpoint) {
       res.status(404).json({ error: "Checkpoint not found" });
       return;
     }
+
+    const sessionId = tracker.getTaskRunSessionId(checkpoint.task_run_id);
+    if (sessionId) {
+      const reason = reviewerNotes?.trim() || "No reason provided";
+
+      try {
+        await new OpenClawAdapter().steerSession(
+          sessionId,
+          `Checkpoint rejected. Reason: ${reason}. Please revise.`,
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to steer OpenClaw session";
+        res.status(500).json({ error: message });
+        return;
+      }
+    }
+
+    tracker.updateTaskRun(checkpoint.task_run_id, {
+      status: "running",
+      completed_at: null,
+      error: null,
+    });
     res.json(checkpoint);
   });
 

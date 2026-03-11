@@ -135,6 +135,7 @@ export interface TaskRun {
   status: TaskRunStatus
   attempt: number
   workspace_path: string | null
+  session_id: string | null
   started_at: string | null
   completed_at: string | null
   error: string | null
@@ -392,6 +393,7 @@ export interface AgentExecutionRequest {
   taskRun: TaskRun
   agent: AgentRecord
   workspacePath: string
+  projectName?: string
   prompt: string
 }
 

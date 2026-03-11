@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS task_runs (
   status TEXT NOT NULL DEFAULT 'pending',
   attempt INTEGER NOT NULL DEFAULT 1,
   workspace_path TEXT,
+  session_id TEXT,
   started_at TEXT,
   completed_at TEXT,
   error TEXT,

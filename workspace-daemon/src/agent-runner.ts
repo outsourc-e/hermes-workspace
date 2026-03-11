@@ -92,10 +92,12 @@ export class AgentRunner {
         taskRun: input.taskRun,
         agent: input.agent,
         workspacePath: workspace.path,
+        projectName: input.project.name,
         prompt: finalPrompt,
       },
       {
         signal: input.signal,
+        tracker: this.tracker,
         onEvent: (event) => {
           this.tracker.appendRunEvent(input.taskRun.id, event.type === "agent_message" ? "output" : (event.type as any), {
             message: event.message ?? null,

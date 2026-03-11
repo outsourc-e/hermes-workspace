@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,6 +11,10 @@ type WorkspaceSkill = {
   description: string
   path: string
   status: 'active'
+}
+
+function getSkillFilePath(id: string): string {
+  return path.join(getSkillsRoot(), id, 'SKILL.md')
 }
 
 function getSkillsRoot(): string {
@@ -108,6 +113,15 @@ export function createSkillsRouter(): Router {
       res.json({ skills })
     } catch {
       res.status(500).json({ error: 'Failed to read skills directory' })
+    }
+  })
+
+  router.get('/:id/content', (req, res) => {
+    try {
+      const content = readFileSync(getSkillFilePath(req.params.id), 'utf8')
+      res.json({ content })
+    } catch {
+      res.json({ content: '' })
     }
   })
 
