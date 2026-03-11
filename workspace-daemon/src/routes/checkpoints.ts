@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
-import { execFile, execFileSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Router } from "express";
 import {
@@ -215,24 +217,24 @@ async function applyStoredDiffToProject(
     return null;
   }
 
-  execFileSync("git", ["apply", "--check", "--index", "-"], {
-    cwd: projectPath,
-    input: patch,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
-  execFileSync("git", ["apply", "--index", "-"], {
-    cwd: projectPath,
-    input: patch,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const tempFile = path.join(
+    os.tmpdir(),
+    `clawsuite-checkpoint-${checkpointId}-${Date.now()}.patch`,
+  );
 
   try {
-    await runGit(projectPath, ["diff", "--cached", "--quiet"]);
-    return null;
-  } catch {
-    await runGit(projectPath, ["commit", "-m", `merge: checkpoint ${checkpointId}`]);
-    return runGit(projectPath, ["rev-parse", "HEAD"]);
+    await fs.writeFile(tempFile, patch, "utf8");
+    await runGit(projectPath, ["apply", "--index", tempFile]);
+
+    try {
+      await runGit(projectPath, ["diff", "--cached", "--quiet"]);
+      return null;
+    } catch {
+      await runGit(projectPath, ["commit", "-m", `chore: checkpoint ${checkpointId} approved`]);
+      return runGit(projectPath, ["rev-parse", "HEAD"]);
+    }
+  } finally {
+    await fs.rm(tempFile, { force: true });
   }
 }
 
@@ -498,11 +500,6 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
       return;
     }
 
-    if (!taskRun.workspace_path) {
-      res.status(400).json({ error: "Checkpoint workspace is unavailable" });
-      return;
-    }
-
     if (!taskRun.project_path) {
       res.status(400).json({ error: "Project path is unavailable" });
       return;
@@ -511,21 +508,36 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
     const branch = getWorktreeBranch(taskRun.id);
 
     try {
-      await stageAndCommitWorkspace(taskRun.workspace_path, checkpoint.id);
-      const commitHash = await mergeWorktreeToMain(taskRun.project_path, branch, taskRun.task_name);
+      let commitHash: string | null = null;
+      const workspaceExists = await pathExists(taskRun.workspace_path);
+
+      if (taskRun.workspace_path && workspaceExists) {
+        await stageAndCommitWorkspace(taskRun.workspace_path, checkpoint.id);
+        commitHash = await mergeWorktreeToMain(taskRun.project_path, branch, taskRun.task_name);
+        await cleanupWorktree(taskRun.project_path, taskRun.workspace_path, branch);
+      } else if (checkpoint.raw_diff) {
+        commitHash = await applyStoredDiffToProject(
+          taskRun.project_path,
+          checkpoint.id,
+          checkpoint.raw_diff,
+        );
+      } else {
+        res.status(400).json({ error: "Cannot merge: worktree gone and no stored diff" });
+        return;
+      }
+
       const updatedCheckpoint = tracker.approveCheckpoint(
         checkpoint.id,
         req.body?.reviewer_notes,
         commitHash,
       );
 
-      await cleanupWorktree(taskRun.project_path, taskRun.workspace_path, branch);
-
       if (!updatedCheckpoint) {
         res.status(500).json({ error: "Failed to update checkpoint" });
         return;
       }
 
+      tracker.emitCheckpointMerged(checkpoint.id);
       res.json(updatedCheckpoint);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to approve and merge checkpoint";

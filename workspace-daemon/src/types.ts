@@ -195,7 +195,16 @@ export interface Team {
   name: string
   description: string | null
   permissions: string[]
+  approval_config: ApprovalTier[]
   created_at: string
+}
+
+export interface ApprovalTier {
+  id: string
+  name: string
+  minConfidence: number
+  autoApprove: boolean
+  requiresHuman: boolean
 }
 
 export interface AgentDirectoryCapabilities {
@@ -482,6 +491,7 @@ export interface CreateTeamInput {
   name: string
   description?: string | null
   permissions?: string[] | null
+  approval_config?: ApprovalTier[] | null
 }
 
 export interface DecomposerContext {

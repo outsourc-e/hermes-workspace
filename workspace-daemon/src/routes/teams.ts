@@ -57,5 +57,32 @@ export function createTeamsRouter(tracker: Tracker): Router {
     }
   })
 
+  router.patch('/:id/approval-config', (req, res) => {
+    const { tiers } = req.body as { tiers?: unknown }
+
+    if (tiers === undefined) {
+      res.status(400).json({ error: 'tiers is required' })
+      return
+    }
+
+    if (!Array.isArray(tiers)) {
+      res.status(400).json({ error: 'tiers must be an array' })
+      return
+    }
+
+    const team = tracker.listTeams().find((entry) => entry.id === req.params.id)
+    if (!team) {
+      res.status(404).json({ error: 'Resource not found' })
+      return
+    }
+
+    tracker.updateTeamApprovalConfig(req.params.id, tiers)
+
+    res.json({
+      ...team,
+      approval_config: tracker.getTeamApprovalConfig(req.params.id),
+    })
+  })
+
   return router
 }

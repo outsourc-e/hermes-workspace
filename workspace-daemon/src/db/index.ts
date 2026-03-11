@@ -109,6 +109,18 @@ function ensureAgentProfileColumns(db: Database.Database): void {
   }
 }
 
+function ensureTeamsApprovalConfigColumn(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(teams)').all() as Array<{
+    name: string
+  }>
+  const hasApprovalConfig = columns.some(
+    (column) => column.name === 'approval_config',
+  )
+  if (!hasApprovalConfig) {
+    db.exec('ALTER TABLE teams ADD COLUMN approval_config TEXT DEFAULT NULL')
+  }
+}
+
 function ensureSessionIdColumn(db: Database.Database): void {
   const columns = db.prepare('PRAGMA table_info(task_runs)').all() as Array<{
     name: string
@@ -340,6 +352,7 @@ export function getDatabase(
   ensureProjectPolicyColumns(db)
   ensureAgentProfileColumns(db)
   ensureSessionIdColumn(db)
+  ensureTeamsApprovalConfigColumn(db)
   ensureEventsTable(db)
   seedDefaultTeams(db)
   seedDefaultAgents(db)

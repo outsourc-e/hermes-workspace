@@ -9,6 +9,7 @@ import { getDatabase } from './db'
 import type {
   ActivityLogEntry,
   ActivityEvent,
+  ApprovalTier,
   AgentExecutionResult,
   AgentDirectoryRecord,
   AgentDirectoryStats,
@@ -343,6 +344,7 @@ type TeamRow = {
   name: string
   description: string | null
   permissions: string | null
+  approval_config: string | null
   created_at: string
 }
 
@@ -350,6 +352,7 @@ function hydrateTeam(row: TeamRow): Team {
   return {
     ...row,
     permissions: parseJsonOrDefault<string[]>(row.permissions, []),
+    approval_config: parseJsonOrDefault<ApprovalTier[]>(row.approval_config, []),
   }
 }
 
@@ -1686,8 +1689,8 @@ export class Tracker extends EventEmitter {
   createTeam(input: CreateTeamInput): Team {
     const team = this.db
       .prepare(
-        `INSERT INTO teams (id, name, description, permissions)
-         VALUES (@id, @name, @description, @permissions)
+        `INSERT INTO teams (id, name, description, permissions, approval_config)
+         VALUES (@id, @name, @description, @permissions, @approval_config)
          RETURNING *`,
       )
       .get({
@@ -1695,11 +1698,46 @@ export class Tracker extends EventEmitter {
         name: input.name,
         description: input.description ?? null,
         permissions: JSON.stringify(input.permissions ?? []),
+        approval_config: JSON.stringify(input.approval_config ?? []),
       }) as TeamRow
 
     const hydratedTeam = hydrateTeam(team)
     this.logActivity('created', 'team', hydratedTeam.id, null, hydratedTeam)
     return hydratedTeam
+  }
+
+  updateTeamApprovalConfig(teamId: string, tiers: unknown[]): void {
+    this.db
+      .prepare('UPDATE teams SET approval_config = ? WHERE id = ?')
+      .run(JSON.stringify(tiers), teamId)
+
+    const team =
+      (this.db.prepare('SELECT * FROM teams WHERE id = ?').get(teamId) as
+        | TeamRow
+        | undefined) ?? null
+    if (!team) {
+      return
+    }
+
+    const hydratedTeam = hydrateTeam(team)
+    this.logActivity('updated', 'team', hydratedTeam.id, null, hydratedTeam)
+    this.emitSse('team.updated', {
+      type: 'team.updated',
+      teamId,
+      team: hydratedTeam,
+    })
+  }
+
+  getTeamApprovalConfig(teamId: string): unknown[] {
+    const row = this.db
+      .prepare('SELECT approval_config FROM teams WHERE id = ?')
+      .get(teamId) as { approval_config: string | null } | undefined
+
+    return parseJsonOrDefault<unknown[]>(row?.approval_config, [])
+  }
+
+  emitCheckpointMerged(checkpointId: string): void {
+    this.emitSse('checkpoint.merged', { type: 'checkpoint.merged', checkpointId })
   }
 
   listAgentDirectory(): AgentDirectoryRecord[] {

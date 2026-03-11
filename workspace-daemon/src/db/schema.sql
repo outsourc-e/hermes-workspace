@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS teams (
   name TEXT NOT NULL,
   description TEXT,
   permissions TEXT NOT NULL DEFAULT '[]',
+  approval_config TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
