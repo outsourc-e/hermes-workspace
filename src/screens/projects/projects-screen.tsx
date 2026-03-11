@@ -8,7 +8,12 @@ import {
   Rocket01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -22,8 +27,8 @@ import {
 import { toast } from '@/components/ui/toast'
 import {
   type CheckpointReviewAction,
+  extractCheckpoints,
   getCheckpointReviewSuccessMessage,
-  listWorkspaceCheckpoints,
   matchesCheckpointProject,
   sortCheckpointsNewestFirst,
   submitCheckpointReview,
@@ -190,7 +195,6 @@ export function ProjectsScreen({
   routePath = '/projects',
   onProjectContextChange,
 }: ProjectsScreenProps) {
-  const [projects, setProjects] = useState<Array<WorkspaceProject>>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,
   )
@@ -202,7 +206,6 @@ export function ProjectsScreen({
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>(
     {},
   )
-  const [listLoading, setListLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
   const [phaseProject, setPhaseProject] = useState<WorkspaceProject | null>(
@@ -245,42 +248,48 @@ export function ProjectsScreen({
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
+  const projectsQuery = useQuery({
+    queryKey: ['workspace', 'projects', refreshToken],
+    queryFn: async () =>
+      extractProjects(
+        await apiRequest('http://localhost:3099/api/workspace/projects'),
+      ),
+    placeholderData: keepPreviousData,
+  })
+  const projects = projectsQuery.data ?? []
+  const listLoading = projectsQuery.isPending && projects.length === 0
+
   useEffect(() => {
-    let cancelled = false
-
-    async function fetchProjects() {
-      setListLoading(true)
-      try {
-        const nextProjects = extractProjects(
-          await apiRequest('/api/workspace/projects'),
-        )
-        if (cancelled) return
-        setProjects(nextProjects)
-        setSelectedProjectId((current) => {
-          if (current && nextProjects.some((project) => project.id === current)) {
-            return current
-          }
-          return null
-        })
-      } catch (error) {
-        if (!cancelled) {
-          toast(
-            error instanceof Error ? error.message : 'Failed to load projects',
-            {
-              type: 'error',
-            },
-          )
-        }
-      } finally {
-        if (!cancelled) setListLoading(false)
+    setSelectedProjectId((current) => {
+      if (current && projects.some((project) => project.id === current)) {
+        return current
       }
-    }
 
-    void fetchProjects()
-    return () => {
-      cancelled = true
-    }
-  }, [refreshToken])
+      const requestedProjectId =
+        replanSearch?.projectId ??
+        projects.find((project) => project.id === replanSearch?.project)?.id ??
+        replanSearch?.project
+
+      if (
+        requestedProjectId &&
+        projects.some((project) => project.id === requestedProjectId)
+      ) {
+        return requestedProjectId
+      }
+
+      return null
+    })
+  }, [projects, replanSearch?.project, replanSearch?.projectId])
+
+  useEffect(() => {
+    if (!projectsQuery.isError) return
+    toast(
+      projectsQuery.error instanceof Error
+        ? projectsQuery.error.message
+        : 'Failed to load projects',
+      { type: 'error' },
+    )
+  }, [projectsQuery.error, projectsQuery.isError])
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -408,7 +417,9 @@ export function ProjectsScreen({
   const agentsQuery = useQuery({
     queryKey: ['workspace', 'agents'],
     queryFn: async () =>
-      extractAgents(await apiRequest('/api/workspace/agents')),
+      extractAgents(
+        await apiRequest('http://localhost:3099/api/workspace/agents'),
+      ),
   })
 
   const projectSnapshotsQuery = useQuery({
@@ -435,8 +446,13 @@ export function ProjectsScreen({
   })
 
   const checkpointsQuery = useQuery({
-    queryKey: ['workspace', 'checkpoints'],
-    queryFn: () => listWorkspaceCheckpoints(),
+    queryKey: ['workspace', 'checkpoints', 'pending'],
+    queryFn: async () =>
+      extractCheckpoints(
+        await apiRequest(
+          'http://localhost:3099/api/workspace/checkpoints?status=pending',
+        ),
+      ),
   })
 
   const activityEventsQuery = useQuery({
@@ -483,10 +499,7 @@ export function ProjectsScreen({
   const allCheckpoints = checkpointsQuery.data ?? []
   const activityEvents = activityEventsQuery.data ?? []
   const pendingCheckpoints = useMemo(
-    () =>
-      sortCheckpointsNewestFirst(
-        allCheckpoints.filter((checkpoint) => checkpoint.status === 'pending'),
-      ),
+    () => sortCheckpointsNewestFirst(allCheckpoints),
     [allCheckpoints],
   )
   const projectSnapshotMap = useMemo(
@@ -1080,13 +1093,6 @@ export function ProjectsScreen({
   }
 
   useEffect(() => {
-    const requestedProjectId = replanSearch?.project ?? replanSearch?.projectId
-    if (requestedProjectId && requestedProjectId !== selectedProjectId) {
-      setSelectedProjectId(requestedProjectId)
-    }
-  }, [replanSearch?.project, replanSearch?.projectId, selectedProjectId])
-
-  useEffect(() => {
     if (routePath === '/workspace') return
     if (!replanSearch?.checkpointId) return
     const checkpoint = allCheckpoints.find(
@@ -1292,6 +1298,23 @@ export function ProjectsScreen({
       })
       toast('Mission started', { type: 'success' })
       triggerRefresh()
+      if (routePath === '/workspace') {
+        void navigate({
+          to: '/workspace',
+          hash: 'runs',
+          search: {
+            goal: undefined,
+            checkpointId: undefined,
+            phaseId: undefined,
+            phaseName: undefined,
+            project: undefined,
+            projectId:
+              projectDetail?.id ?? selectedSummary?.id ?? replanSearch?.projectId,
+            missionId,
+            showWizard: undefined,
+          },
+        })
+      }
     } catch (error) {
       toast(
         error instanceof Error ? error.message : 'Failed to start mission',
@@ -1389,12 +1412,14 @@ export function ProjectsScreen({
             ? { ...current, ...updatedProject }
             : current,
         )
-        setProjects((current) =>
-          current.map((project) =>
-            project.id === updatedProject.id
-              ? { ...project, ...updatedProject }
-              : project,
-          ),
+        queryClient.setQueryData<Array<WorkspaceProject> | undefined>(
+          ['workspace', 'projects', refreshToken],
+          (current) =>
+            current?.map((project) =>
+              project.id === updatedProject.id
+                ? { ...project, ...updatedProject }
+                : project,
+            ),
         )
         setProjectSpecDraft(updatedProject.spec ?? '')
         setProjectSpecOpen(Boolean(updatedProject.spec?.trim()))
@@ -1618,12 +1643,21 @@ export function ProjectsScreen({
               projects={projects}
               agents={agents}
               pendingCheckpointCount={pendingCheckpoints.length}
+              loading={projectsQuery.isPending || agentsQuery.isPending}
             />
 
             <DashboardProjectCards
               projectOverviews={projectOverviews}
               selectedProjectId={selectedProjectId}
               planReviewMissionIdsByProjectId={planReviewMissionIdsByProjectId}
+              loading={projectsQuery.isPending}
+              error={
+                projectsQuery.isError
+                  ? projectsQuery.error instanceof Error
+                    ? projectsQuery.error.message
+                    : 'Failed to load projects'
+                  : null
+              }
               onSelect={focusProject}
               onCreateMission={openProjectMissionComposer}
               onResume={(missionId) => void handleStartMission(missionId)}
@@ -1634,10 +1668,12 @@ export function ProjectsScreen({
             <DashboardAgentCapacity
               agents={agents}
               stats={statsQuery.data}
-              loading={agentsQuery.isLoading}
+              loading={agentsQuery.isPending}
             />
 
-            {reviewInboxItems.length > 0 && (
+            {(checkpointsQuery.isPending ||
+              checkpointsQuery.isError ||
+              reviewInboxItems.length > 0) && (
               <div className="grid grid-cols-1 gap-4">
                 <DashboardReviewInbox
                   checkpoints={reviewInboxItems}
@@ -1647,7 +1683,14 @@ export function ProjectsScreen({
                   projectFilter={reviewProjectFilter}
                   verificationFilter={reviewVerificationFilter}
                   riskFilter={reviewRiskFilter}
-                  loading={checkpointsQuery.isLoading}
+                  loading={checkpointsQuery.isPending}
+                  error={
+                    checkpointsQuery.isError
+                      ? checkpointsQuery.error instanceof Error
+                        ? checkpointsQuery.error.message
+                        : 'Failed to load pending checkpoints'
+                      : null
+                  }
                   batchApproving={batchApproving}
                   verifiedCount={verifiedReviewItems.length}
                   actionPending={projectCheckpointMutation.isPending}

@@ -7,6 +7,7 @@ type DashboardKpiBarProps = {
   projects: WorkspaceProject[]
   agents: WorkspaceAgent[]
   pendingCheckpointCount: number
+  loading?: boolean
 }
 
 type StatPill = {
@@ -21,7 +22,27 @@ export function DashboardKpiBar({
   projects,
   agents,
   pendingCheckpointCount,
+  loading = false,
 }: DashboardKpiBarProps) {
+  if (loading) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex min-w-[120px] flex-1 items-center gap-3 rounded-lg border border-primary-200 bg-white px-3 py-2 shadow-sm"
+          >
+            <div className="h-7 w-20 animate-pulse rounded bg-primary-100" />
+            <div className="min-w-0 space-y-1">
+              <div className="h-2.5 w-16 animate-pulse rounded bg-primary-100" />
+              <div className="h-2.5 w-20 animate-pulse rounded bg-primary-100" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   const pills: StatPill[] = [
     {
       label: 'Projects',

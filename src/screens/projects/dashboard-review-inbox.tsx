@@ -31,6 +31,7 @@ type DashboardReviewInboxProps = {
   verificationFilter: ReviewVerificationFilter
   riskFilter: ReviewRiskFilter
   loading: boolean
+  error?: string | null
   batchApproving: boolean
   verifiedCount: number
   actionPending: boolean
@@ -51,6 +52,7 @@ export function DashboardReviewInbox({
   verificationFilter,
   riskFilter,
   loading,
+  error,
   batchApproving,
   verifiedCount,
   actionPending,
@@ -147,6 +149,10 @@ export function DashboardReviewInbox({
               <div className="mt-3 h-5 w-3/4 animate-shimmer rounded bg-primary-200/70" />
             </div>
           ))
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">
+            {error}
+          </div>
         ) : checkpoints.length > 0 ? (
           checkpoints.map((checkpoint) => {
             const projectName = checkpoint.project_name ?? 'Workspace'

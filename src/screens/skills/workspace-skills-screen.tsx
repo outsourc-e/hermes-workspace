@@ -39,6 +39,10 @@ type SkillsResponse = {
   skills: Array<SkillItem>
 }
 
+type SkillContentResponse = {
+  content?: string | null
+}
+
 const MEMORY_FILTERS: Array<MemoryFilter> = [
   'All',
   'Workspace',
@@ -147,6 +151,16 @@ export function WorkspaceSkillsScreen() {
   })
 
   const visibleSkills = skillsQuery.data?.skills ?? []
+  const skillContentQuery = useQuery({
+    queryKey: ['workspace', 'skills', selectedSkillId, 'content'],
+    enabled: selectedSkillId.length > 0,
+    queryFn: async function fetchSkillContent(): Promise<string> {
+      const payload = (await apiRequest(
+        `http://localhost:3099/api/workspace/skills/${encodeURIComponent(selectedSkillId)}/content`,
+      )) as SkillContentResponse
+      return typeof payload.content === 'string' ? payload.content : ''
+    },
+  })
 
   const normalizedSearch = deferredSearch.trim().toLowerCase()
   const filteredMemoryFiles = useMemo(() => {
@@ -365,11 +379,35 @@ export function WorkspaceSkillsScreen() {
               </div>
 
               {selectedSkill ? (
-                <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3 text-sm text-primary-600">
-                  Selected skill:{" "}
-                  <span className="font-medium text-primary-900">
-                    {selectedSkill.name}
-                  </span>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3 text-sm text-primary-600">
+                    Selected skill:{' '}
+                    <span className="font-medium text-primary-900">
+                      {selectedSkill.name}
+                    </span>
+                  </div>
+                  <div className="rounded-xl border border-primary-200 bg-white p-3">
+                    {skillContentQuery.isPending ? (
+                      <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                          <div
+                            key={index}
+                            className="h-4 animate-pulse rounded bg-primary-100"
+                          />
+                        ))}
+                      </div>
+                    ) : skillContentQuery.isError ? (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                        {skillContentQuery.error instanceof Error
+                          ? skillContentQuery.error.message
+                          : 'Failed to load skill content'}
+                      </div>
+                    ) : (
+                      <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-primary-200 bg-primary-50 p-3 font-mono text-sm text-primary-800">
+                        {skillContentQuery.data?.trim() || 'No content available.'}
+                      </pre>
+                    )}
+                  </div>
                 </div>
               ) : null}
             </div>
