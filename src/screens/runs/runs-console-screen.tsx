@@ -1,5 +1,4 @@
 import {
-  ArrowRight01Icon,
   ArrowDown01Icon,
   FilterHorizontalIcon,
   PauseIcon,
@@ -8,7 +7,6 @@ import {
   Task01Icon,
   TimeQuarterPassIcon,
 } from '@hugeicons/core-free-icons'
-import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   useMutation,
@@ -16,21 +14,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import {
-  formatCheckpointTimestamp,
-  getWorkspaceCheckpointDetail,
-  listWorkspaceCheckpoints,
-  parseUtcTimestamp,
-  type WorkspaceCheckpoint,
-  type WorkspaceCheckpointDetail,
-  type WorkspaceCheckpointVerificationItem,
-} from '@/lib/workspace-checkpoints'
-import {
-  DialogContent,
-  DialogDescription,
-  DialogRoot,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { parseUtcTimestamp } from '@/lib/workspace-checkpoints'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -78,6 +62,20 @@ type StatusFilter =
 
 type ActivityEventMessage = {
   title?: unknown
+}
+
+function formatEventClock(value: string): string {
+  const timestamp = parseUtcTimestamp(value)
+  return timestamp.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+}
+
+function getTerminalEvents(events: Array<WorkspaceRunEvent>): Array<WorkspaceRunEvent> {
+  return events.filter((event) => event.type === 'output' || event.type === 'agent_message')
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -155,11 +153,83 @@ function RunLog({
   )
 }
 
-function getVerificationTone(status: WorkspaceCheckpointVerificationItem['status']) {
-  if (status === 'passed') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-  if (status === 'failed') return 'border-red-500/30 bg-red-500/10 text-red-300'
-  if (status === 'missing') return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-  return 'border-primary-200 bg-primary-50 text-primary-500'
+function LiveOutputPanel({
+  events,
+  isError,
+  isLoading,
+  run,
+}: {
+  events: Array<WorkspaceRunEvent>
+  isError: boolean
+  isLoading: boolean
+  run: WorkspaceTaskRun
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const terminalEvents = useMemo(() => getTerminalEvents(events), [events])
+  const finalStatus = run.status !== 'running'
+
+  useEffect(() => {
+    const node = containerRef.current
+    if (!node) return
+    node.scrollTop = node.scrollHeight
+  }, [terminalEvents])
+
+  return (
+    <div className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-primary-900">Live output</h3>
+          <p className="text-sm text-primary-500">
+            Streaming agent output for this run.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {run.status === 'running' ? (
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+              Live
+            </span>
+          ) : null}
+          {finalStatus ? (
+            <span
+              className={cn(
+                'inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.14em]',
+                getRunStatusClass(run.status),
+              )}
+            >
+              {formatRunStatus(run.status)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="max-h-80 overflow-y-auto rounded-xl bg-primary-950 p-4 font-mono text-xs text-emerald-400"
+      >
+        {isLoading ? (
+          <p>Connecting to run output...</p>
+        ) : isError ? (
+          <p className="text-red-300">Unable to load run output.</p>
+        ) : terminalEvents.length > 0 ? (
+          <div className="space-y-1.5">
+            {terminalEvents.map((event) => (
+              <p key={event.id} className="whitespace-pre-wrap break-words">
+                <span className="text-emerald-200">[{formatEventClock(event.created_at)}]</span>{' '}
+                {getRunEventMessage(event)}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-emerald-200/80">
+            {run.status === 'running'
+              ? 'Waiting for live output...'
+              : 'No terminal output was recorded for this run.'}
+          </p>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function parseActivityEvent(payload: string): ActivityEventMessage | null {
@@ -170,256 +240,6 @@ function parseActivityEvent(payload: string): ActivityEventMessage | null {
   } catch {
     return null
   }
-}
-
-function formatTokenBreakdown(run: WorkspaceTaskRun): string {
-  return `${formatRunTokens(run)} total (${run.input_tokens.toLocaleString()} in / ${run.output_tokens.toLocaleString()} out)`
-}
-
-function getLatestCheckpoint(
-  checkpoints: Array<WorkspaceCheckpoint>,
-  runId: string | null,
-): WorkspaceCheckpoint | null {
-  if (!runId) return null
-  return checkpoints
-    .filter((checkpoint) => checkpoint.task_run_id === runId)
-    .sort((left, right) => right.created_at.localeCompare(left.created_at))[0] ?? null
-}
-
-function RunDetailDialog({
-  checkpoint,
-  checkpointDetail,
-  checkpointError,
-  checkpointLoading,
-  onOpenChange,
-  open,
-  run,
-  events,
-  onReviewCheckpoint,
-}: {
-  checkpoint: WorkspaceCheckpoint | null
-  checkpointDetail: WorkspaceCheckpointDetail | null
-  checkpointError: Error | null
-  checkpointLoading: boolean
-  onOpenChange: (open: boolean) => void
-  open: boolean
-  run: WorkspaceTaskRun | null
-  events: Array<WorkspaceRunEvent>
-  onReviewCheckpoint: (checkpoint: WorkspaceCheckpoint) => void
-}) {
-  const verificationItems: Array<[string, WorkspaceCheckpointVerificationItem]> =
-    checkpointDetail
-      ? [
-          ['TypeScript', checkpointDetail.verification.tsc],
-          ['Tests', checkpointDetail.verification.tests],
-          ['Lint', checkpointDetail.verification.lint],
-          ['E2E', checkpointDetail.verification.e2e],
-        ]
-      : []
-
-  return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(92dvh,920px)] w-[min(1120px,96vw)] max-w-none overflow-hidden rounded-2xl border-primary-200 bg-primary-50 p-0 text-primary-900 shadow-2xl max-md:bottom-0 max-md:left-0 max-md:h-[92dvh] max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-2xl max-md:top-auto">
-        <div className="flex h-full flex-col">
-          <div className="border-b border-primary-200 px-5 py-4 md:px-6">
-            <DialogTitle className="text-base font-semibold text-primary-900">
-              {run?.task_name ?? 'Run detail'}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-primary-500">
-              Full task run detail, live event log, and checkpoint context.
-            </DialogDescription>
-          </div>
-
-          {!run ? null : (
-            <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6">
-              <div className="space-y-5 pb-6">
-                <section className="rounded-3xl border border-primary-200 bg-white p-4 shadow-sm">
-                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-sm font-medium text-primary-900">
-                          {run.task_name}
-                        </span>
-                        <span
-                          className={cn(
-                            'rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.14em]',
-                            getRunStatusClass(run.status),
-                          )}
-                        >
-                          {formatRunStatus(run.status)}
-                        </span>
-                        <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-500">
-                          Run {run.id}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-sm text-primary-600">
-                        <span>{run.project_name}</span>
-                        <span>·</span>
-                        <span>{run.mission_name}</span>
-                        <span>·</span>
-                        <span>{run.agent_name ?? 'Unknown agent'}</span>
-                      </div>
-                    </div>
-
-                    {run.status === 'awaiting_review' && checkpoint ? (
-                      <button
-                        type="button"
-                        onClick={() => onReviewCheckpoint(checkpoint)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-accent-500/30 bg-accent-500/10 px-3 py-2 text-sm font-medium text-accent-400 transition-colors hover:bg-accent-500/15"
-                      >
-                        Review checkpoint
-                        <HugeiconsIcon icon={ArrowRight01Icon} className="size-4" />
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Project</p>
-                      <p className="mt-1 text-sm text-primary-900">{run.project_name}</p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Agent</p>
-                      <p className="mt-1 text-sm text-primary-900">{run.agent_name ?? 'Unknown agent'}</p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Duration</p>
-                      <p className="mt-1 text-sm text-primary-900">{formatRunDuration(run)}</p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Token usage</p>
-                      <p className="mt-1 text-sm text-primary-900">{formatTokenBreakdown(run)}</p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Started</p>
-                      <p className="mt-1 text-sm text-primary-900">{formatRunTimestamp(run.started_at)}</p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Completed</p>
-                      <p className="mt-1 text-sm text-primary-900">{formatRunTimestamp(run.completed_at)}</p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Attempt</p>
-                      <p className="mt-1 text-sm text-primary-900">{run.attempt}</p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Cost</p>
-                      <p className="mt-1 text-sm text-primary-900">{formatRunCost(run.cost_cents)}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Workspace</p>
-                      <p className="mt-1 break-all text-sm text-primary-900">
-                        {run.workspace_path ?? checkpointDetail?.task_run_workspace_path ?? 'No workspace recorded'}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Error</p>
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-primary-900">
-                        {run.error ?? checkpointDetail?.task_run_error ?? 'No error recorded'}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="rounded-3xl border border-primary-200 bg-white p-4 shadow-sm">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-primary-900">Run events</h3>
-                      <p className="text-sm text-primary-500">Full execution log for this run.</p>
-                    </div>
-                  </div>
-                  <RunLog events={events} />
-                </section>
-
-                <section className="rounded-3xl border border-primary-200 bg-white p-4 shadow-sm">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-primary-900">Checkpoint</h3>
-                      <p className="text-sm text-primary-500">
-                        Summary, verification state, and review handoff for this run.
-                      </p>
-                    </div>
-                    {checkpoint ? (
-                      <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-500">
-                        {formatCheckpointTimestamp(checkpoint.created_at)}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  {!checkpoint ? (
-                    <div className="rounded-2xl border border-dashed border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-500">
-                      No checkpoint recorded for this run.
-                    </div>
-                  ) : checkpointLoading ? (
-                    <div className="rounded-2xl border border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-500">
-                      Loading checkpoint detail...
-                    </div>
-                  ) : checkpointError ? (
-                    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-5 text-sm text-red-300">
-                      {checkpointError.message}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                          <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Summary</p>
-                          <p className="mt-2 whitespace-pre-wrap text-sm text-primary-900">
-                            {checkpoint.summary?.trim() || 'No checkpoint summary provided.'}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3">
-                          <p className="text-xs uppercase tracking-[0.18em] text-primary-500">Status</p>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="rounded-full border border-primary-200 bg-white px-3 py-1 text-sm text-primary-900">
-                              {checkpoint.status.replace(/_/g, ' ')}
-                            </span>
-                            {run.status === 'awaiting_review' ? (
-                              <button
-                                type="button"
-                                onClick={() => onReviewCheckpoint(checkpoint)}
-                                className="inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-sm font-medium text-accent-400 transition-colors hover:bg-accent-500/15"
-                              >
-                                Open review
-                                <HugeiconsIcon icon={ArrowRight01Icon} className="size-4" />
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      {checkpointDetail ? (
-                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                          {verificationItems.map((entry) => {
-                            const [label, item] = entry
-
-                            return (
-                              <div
-                                key={label}
-                                className={cn(
-                                  'rounded-xl border p-3',
-                                  getVerificationTone(item.status),
-                                )}
-                              >
-                                <p className="text-xs uppercase tracking-[0.18em]">{label}</p>
-                                <p className="mt-1 text-sm font-medium">{item.label}</p>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </section>
-              </div>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </DialogRoot>
-  )
 }
 
 function FilterSelect({
@@ -454,15 +274,27 @@ function FilterSelect({
 }
 
 function ActiveRunCard({
+  isExpanded,
+  isSelected,
   run,
   events,
+  eventError,
+  eventLoading,
   actionPending,
+  onSelect,
+  onToggleExpand,
   onPause,
   onStop,
 }: {
+  isExpanded: boolean
+  isSelected: boolean
   run: WorkspaceTaskRun
   events: Array<WorkspaceRunEvent>
+  eventError: boolean
+  eventLoading: boolean
   actionPending: boolean
+  onSelect: (runId: string) => void
+  onToggleExpand: (runId: string) => void
   onPause: (runId: string) => void
   onStop: (runId: string) => void
 }) {
@@ -505,8 +337,10 @@ function ActiveRunCard({
 
   return (
     <article
+      onClick={() => onSelect(run.id)}
       className={cn(
         'rounded-xl border bg-white p-4 shadow-sm transition-shadow md:p-5',
+        isSelected && 'border-accent-500/40',
         accentClasses.cardGlow,
       )}
     >
@@ -520,7 +354,10 @@ function ActiveRunCard({
               )}
             >
               <span
-                className={cn('size-2 rounded-full shadow-[0_0_10px_currentColor]', accentClasses.dot)}
+                className={cn(
+                  'size-2 rounded-full shadow-[0_0_10px_currentColor] animate-pulse',
+                  accentClasses.dot,
+                )}
               />
               Live run
             </span>
@@ -551,8 +388,25 @@ function ActiveRunCard({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleExpand(run.id)
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm font-medium text-primary-800 transition-colors hover:border-accent-500/50 hover:text-accent-400"
+          >
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              className={cn('size-4 transition-transform', isExpanded && 'rotate-180')}
+            />
+            {isExpanded ? 'Hide output' : 'Show output'}
+          </button>
+          <button
+            type="button"
             disabled={actionPending}
-            onClick={() => onPause(run.id)}
+            onClick={(event) => {
+              event.stopPropagation()
+              onPause(run.id)
+            }}
             className="inline-flex items-center gap-2 rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm font-medium text-primary-800 transition-colors hover:border-amber-500/50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <HugeiconsIcon icon={PauseIcon} className="size-4" />
@@ -561,7 +415,10 @@ function ActiveRunCard({
           <button
             type="button"
             disabled={actionPending}
-            onClick={() => onStop(run.id)}
+            onClick={(event) => {
+              event.stopPropagation()
+              onStop(run.id)
+            }}
             className="inline-flex items-center gap-2 rounded-xl bg-accent-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <HugeiconsIcon icon={SquareArrowDown02Icon} className="size-4" />
@@ -613,68 +470,115 @@ function ActiveRunCard({
           </div>
         </div>
       </div>
+
+      {isExpanded ? (
+        <div className="mt-4">
+          <LiveOutputPanel
+            run={run}
+            events={events}
+            isLoading={eventLoading}
+            isError={eventError}
+          />
+        </div>
+      ) : null}
     </article>
   )
 }
 
 function RecentRunRow({
+  isExpanded,
+  isSelected,
+  events,
+  eventError,
+  eventLoading,
   run,
-  onOpen,
+  onSelect,
+  onToggleExpand,
 }: {
+  isExpanded: boolean
+  isSelected: boolean
+  events: Array<WorkspaceRunEvent>
+  eventError: boolean
+  eventLoading: boolean
   run: WorkspaceTaskRun
-  onOpen: () => void
+  onSelect: (runId: string) => void
+  onToggleExpand: (runId: string) => void
 }) {
   const retryNarrative = getRunRetryNarrative(run)
 
   return (
-    <article className="rounded-xl border border-primary-200 bg-white shadow-sm">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-50 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr_auto] md:items-center"
-      >
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-primary-900">{run.task_name}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <p className="text-xs text-primary-500">{run.mission_name}</p>
-            {run.attempt > 1 ? (
-              <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-600">
-                retry #{run.attempt}
-              </span>
+    <article
+      className={cn(
+        'rounded-xl border border-primary-200 bg-white shadow-sm',
+        isSelected && 'border-accent-500/40',
+      )}
+    >
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => onSelect(run.id)}
+          className="flex min-w-0 flex-1 flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-50 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr] md:items-center"
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-primary-900">{run.task_name}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-xs text-primary-500">{run.mission_name}</p>
+              {run.attempt > 1 ? (
+                <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-600">
+                  retry #{run.attempt}
+                </span>
+              ) : null}
+            </div>
+            {retryNarrative ? (
+              <p className="mt-1 truncate text-xs text-primary-500">{retryNarrative}</p>
             ) : null}
           </div>
-          {retryNarrative ? (
-            <p className="mt-1 truncate text-xs text-primary-500">{retryNarrative}</p>
-          ) : null}
+          <p className="text-sm text-primary-600">{run.project_name}</p>
+          <p className="text-sm text-primary-600">{run.agent_name ?? 'Unknown agent'}</p>
+          <div>
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getRunStatusClass(
+                run.status,
+              )}`}
+            >
+              {formatRunStatus(run.status)}
+            </span>
+          </div>
+          <p className="text-sm text-primary-600">{formatRunDuration(run)}</p>
+          <p className="text-sm text-primary-600">{formatRunInputTokens(run)}</p>
+          <p className="text-sm text-primary-600">{formatRunCost(run.cost_cents)}</p>
+          <p className="text-sm text-primary-600">
+            {formatRunTimestamp(run.completed_at ?? run.started_at)}
+          </p>
+        </button>
+        <button
+          type="button"
+          aria-label={isExpanded ? 'Collapse output panel' : 'Expand output panel'}
+          onClick={() => onToggleExpand(run.id)}
+          className="flex w-14 items-center justify-center border-l border-primary-200 text-primary-500 transition-colors hover:bg-primary-50 hover:text-accent-400"
+        >
+          <HugeiconsIcon
+            icon={ArrowDown01Icon}
+            className={cn('size-4 transition-transform', isExpanded ? 'rotate-180' : '-rotate-90')}
+          />
+        </button>
+      </div>
+
+      {isExpanded ? (
+        <div className="border-t border-primary-200 p-4">
+          <LiveOutputPanel
+            run={run}
+            events={events}
+            isLoading={eventLoading}
+            isError={eventError}
+          />
         </div>
-        <p className="text-sm text-primary-600">{run.project_name}</p>
-        <p className="text-sm text-primary-600">{run.agent_name ?? 'Unknown agent'}</p>
-        <div>
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getRunStatusClass(
-              run.status,
-            )}`}
-          >
-            {formatRunStatus(run.status)}
-          </span>
-        </div>
-        <p className="text-sm text-primary-600">{formatRunDuration(run)}</p>
-        <p className="text-sm text-primary-600">{formatRunInputTokens(run)}</p>
-        <p className="text-sm text-primary-600">{formatRunCost(run.cost_cents)}</p>
-        <p className="text-sm text-primary-600">
-          {formatRunTimestamp(run.completed_at ?? run.started_at)}
-        </p>
-        <HugeiconsIcon
-          icon={ArrowDown01Icon}
-          className="size-4 -rotate-90 text-primary-500 transition-transform"
-        />
-      </button>
+      ) : null}
     </article>
   )
 }
 
 export function RunsConsoleScreen() {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [projectFilter, setProjectFilter] = useState('all')
   const [agentFilter, setAgentFilter] = useState('all')
@@ -700,43 +604,61 @@ export function RunsConsoleScreen() {
     staleTime: 60_000,
   })
 
-  const checkpointsQuery = useQuery({
-    queryKey: ['workspace', 'checkpoints', 'for-runs'],
-    queryFn: () => listWorkspaceCheckpoints(),
-    staleTime: 30_000,
-  })
-
   const runs = runsQuery.data ?? []
   const activeRuns = useMemo(() => runs.filter(isRunningRun), [runs])
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? null,
     [runs, selectedRunId],
   )
-  const eventRunIds = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...activeRuns.map((run) => run.id),
-          ...(selectedRunId ? [selectedRunId] : []),
-        ]),
-      ),
-    [activeRuns, selectedRunId],
-  )
+  const eventRunIds = useMemo(() => {
+    const selectedActiveRunId =
+      selectedRun && isRunningRun(selectedRun) ? selectedRun.id : null
+
+    return Array.from(
+      new Set([
+        ...activeRuns.map((run) => run.id),
+        ...(selectedRunId ? [selectedRunId] : []),
+        ...(selectedActiveRunId ? [selectedActiveRunId] : []),
+      ]),
+    )
+  }, [activeRuns, selectedRun, selectedRunId])
 
   const eventQueries = useQueries({
-    queries: eventRunIds.map((runId) => ({
-      queryKey: ['workspace', 'task-runs', runId, 'events'],
-      queryFn: async () =>
-        extractRunEvents(await apiRequest(`/api/workspace/task-runs/${runId}/events`)),
-      refetchInterval: activeRuns.some((run) => run.id === runId) ? 10_000 : false,
-      staleTime: 1_000,
-    })),
+    queries: eventRunIds.map((runId) => {
+      const run = runs.find((entry) => entry.id === runId) ?? null
+      const shouldPoll = selectedRunId === runId && run?.status === 'running'
+
+      return {
+        queryKey: ['workspace', 'task-runs', runId, 'events'],
+        queryFn: async () =>
+          extractRunEvents(await apiRequest(`/api/workspace/task-runs/${runId}/events`)),
+        refetchInterval: shouldPoll ? 2_000 : false,
+        staleTime: 1_000,
+      }
+    }),
   })
 
   const eventsByRunId = useMemo(() => {
     const map = new Map<string, Array<WorkspaceRunEvent>>()
     eventRunIds.forEach((runId, index) => {
       map.set(runId, eventQueries[index]?.data ?? [])
+    })
+    return map
+  }, [eventQueries, eventRunIds])
+  const eventQueryStateByRunId = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        isError: boolean
+        isLoading: boolean
+      }
+    >()
+    eventRunIds.forEach((runId, index) => {
+      const query = eventQueries[index]
+      map.set(runId, {
+        isError: Boolean(query?.isError),
+        isLoading: Boolean(query?.isLoading),
+      })
     })
     return map
   }, [eventQueries, eventRunIds])
@@ -760,20 +682,26 @@ export function RunsConsoleScreen() {
     () => filteredRuns.filter((run) => !isRunningRun(run)),
     [filteredRuns],
   )
-  const selectedRunCheckpoint = useMemo(
-    () => getLatestCheckpoint(checkpointsQuery.data ?? [], selectedRun?.id ?? null),
-    [checkpointsQuery.data, selectedRun?.id],
-  )
-  const checkpointDetailQuery = useQuery({
-    queryKey: ['workspace', 'checkpoint-detail', selectedRunCheckpoint?.id],
-    enabled: Boolean(selectedRunCheckpoint?.id),
-    queryFn: () => getWorkspaceCheckpointDetail(selectedRunCheckpoint!.id),
-  })
   const hasFiltersApplied =
     projectFilter !== 'all' ||
     agentFilter !== 'all' ||
     statusFilter !== 'all' ||
     timeRange !== 'today'
+
+  useEffect(() => {
+    const selectedVisible = selectedRunId
+      ? filteredRuns.some((run) => run.id === selectedRunId)
+      : false
+
+    if (selectedVisible) return
+    if (visibleActiveRuns[0]) {
+      setSelectedRunId(visibleActiveRuns[0].id)
+      return
+    }
+    if (selectedRunId && !filteredRuns.some((run) => run.id === selectedRunId)) {
+      setSelectedRunId(null)
+    }
+  }, [filteredRuns, selectedRunId, visibleActiveRuns])
 
   useEffect(() => {
     const source = new EventSource('/api/events')
@@ -978,7 +906,7 @@ export function RunsConsoleScreen() {
                   Refresh
                 </p>
                 <p className="text-sm font-medium text-primary-900">
-                  SSE live updates + 10s polling fallback
+                  SSE updates + 2s live panel polling
                 </p>
               </div>
             </div>
@@ -1002,9 +930,17 @@ export function RunsConsoleScreen() {
               {visibleActiveRuns.map((run) => (
                 <ActiveRunCard
                   key={run.id}
+                  isExpanded={selectedRunId === run.id}
+                  isSelected={selectedRunId === run.id}
                   run={run}
                   events={eventsByRunId.get(run.id) ?? []}
+                  eventLoading={eventQueryStateByRunId.get(run.id)?.isLoading ?? false}
+                  eventError={eventQueryStateByRunId.get(run.id)?.isError ?? false}
                   actionPending={controlMutation.isPending}
+                  onSelect={setSelectedRunId}
+                  onToggleExpand={(runId) =>
+                    setSelectedRunId((current) => (current === runId ? null : runId))
+                  }
                   onPause={(runId) => controlMutation.mutate({ runId, action: 'pause' })}
                   onStop={(runId) => controlMutation.mutate({ runId, action: 'stop' })}
                 />
@@ -1045,8 +981,16 @@ export function RunsConsoleScreen() {
               {recentRuns.map((run) => (
                 <RecentRunRow
                   key={run.id}
+                  isExpanded={selectedRunId === run.id}
+                  isSelected={selectedRunId === run.id}
+                  events={eventsByRunId.get(run.id) ?? []}
+                  eventLoading={eventQueryStateByRunId.get(run.id)?.isLoading ?? false}
+                  eventError={eventQueryStateByRunId.get(run.id)?.isError ?? false}
                   run={run}
-                  onOpen={() => setSelectedRunId(run.id)}
+                  onSelect={setSelectedRunId}
+                  onToggleExpand={(runId) =>
+                    setSelectedRunId((current) => (current === runId ? null : runId))
+                  }
                 />
               ))}
             </div>
@@ -1060,30 +1004,6 @@ export function RunsConsoleScreen() {
           )}
         </section>
       </div>
-      <RunDetailDialog
-        open={Boolean(selectedRun)}
-        onOpenChange={(open) => {
-          if (!open) setSelectedRunId(null)
-        }}
-        run={selectedRun}
-        events={selectedRun ? eventsByRunId.get(selectedRun.id) ?? [] : []}
-        checkpoint={selectedRunCheckpoint}
-        checkpointDetail={checkpointDetailQuery.data ?? null}
-        checkpointLoading={checkpointDetailQuery.isLoading}
-        checkpointError={
-          checkpointDetailQuery.error instanceof Error ? checkpointDetailQuery.error : null
-        }
-        onReviewCheckpoint={(checkpoint) => {
-          setSelectedRunId(null)
-          void navigate({
-            to: '/projects',
-            search: {
-              projectId: selectedRun?.project_id ?? undefined,
-              checkpointId: checkpoint.id,
-            },
-          })
-        }}
-      />
     </main>
   )
 }
