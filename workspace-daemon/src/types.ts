@@ -175,6 +175,8 @@ export interface AgentRecord {
   adapter_config: string | null
   model: string | null
   status: EntityStatus
+  avatar: string | null
+  avatar_tone: 'accent' | 'green' | 'yellow' | 'primary' | null
   description: string | null
   system_prompt: string | null
   prompt_updated_at: string | null

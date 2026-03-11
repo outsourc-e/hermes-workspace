@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS agents (
   adapter_config TEXT DEFAULT '{}',
   model TEXT,
   status TEXT NOT NULL DEFAULT 'idle',
+  avatar TEXT DEFAULT '🛰️',
+  avatar_tone TEXT DEFAULT 'primary',
   description TEXT,
   system_prompt TEXT,
   prompt_updated_at TEXT,
