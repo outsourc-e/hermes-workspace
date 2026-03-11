@@ -238,7 +238,7 @@ async function registerWorkspaceAgent(form: RegisterAgentFormState): Promise<str
 }
 
 async function dispatchAgentTestRun(agentId: string): Promise<void> {
-  await workspaceRequestJson('http://localhost:3099/api/workspace/task-runs', {
+  await workspaceRequestJson('/api/task-runs/adhoc', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -246,7 +246,6 @@ async function dispatchAgentTestRun(agentId: string): Promise<void> {
     body: JSON.stringify({
       agent_id: agentId,
       task_name: 'Test run',
-      project_id: null,
     }),
   })
 }
