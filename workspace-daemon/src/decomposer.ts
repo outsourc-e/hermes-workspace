@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import Anthropic from "@anthropic-ai/sdk";
 import type { AgentAdapterType, DecomposeResult, DecomposerContext, DecomposedTask } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -112,11 +113,58 @@ function normalizeTask(value: unknown, index: number): DecomposedTask {
 export class Decomposer {
   async decompose(goal: string, context?: DecomposerContext): Promise<DecomposeResult> {
     const prompt = buildPrompt(goal, context);
-    const { stdout } = await execFileAsync("claude", ["--print", "-p", prompt], {
-      maxBuffer: 1024 * 1024,
-      timeout: 120_000,
-    });
-    const rawResponse = stdout.trim();
+
+    let rawResponse = "";
+    let cliError: unknown = null;
+
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const response = await client.messages.create({
+          model: "claude-3-5-haiku-20241022",
+          max_tokens: 2048,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const firstBlock = response.content[0];
+        if (firstBlock?.type === "text" && firstBlock.text.trim().length > 0) {
+          rawResponse = firstBlock.text.trim();
+        } else {
+          throw new Error("Anthropic SDK returned no text content");
+        }
+      } catch {
+        // Fall back to the Claude CLI below.
+      }
+    }
+
+    if (!rawResponse) {
+      try {
+        const { stdout } = await execFileAsync("claude", ["--print", "-p", prompt], {
+          maxBuffer: 1024 * 1024,
+          timeout: 120_000,
+        });
+        rawResponse = stdout.trim();
+      } catch (error) {
+        cliError = error;
+      }
+    }
+
+    if (!rawResponse) {
+      const name = goal.trim().slice(0, 80) || "Task decomposition";
+      return {
+        tasks: [
+          {
+            name,
+            description: goal.trim() || name,
+            estimated_minutes: 30,
+            depends_on: [],
+            suggested_agent_type: null,
+          },
+        ],
+        rawResponse: cliError instanceof Error ? cliError.message : "",
+        parsed: false,
+      };
+    }
+
     const jsonPayload = extractJsonArray(rawResponse);
 
     if (jsonPayload) {
