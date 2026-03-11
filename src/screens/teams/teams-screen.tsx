@@ -146,6 +146,30 @@ function clampPercentage(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)))
 }
 
+function getApprovalTierTone(tier: ApprovalTier): string {
+  const normalizedName = tier.name.trim().toLowerCase()
+
+  if (
+    normalizedName.includes('auto') ||
+    normalizedName.includes('trusted') ||
+    normalizedName.includes('low') ||
+    (tier.autoApprove && !tier.requiresHuman)
+  ) {
+    return 'border-green-200 bg-green-50 text-green-700'
+  }
+
+  if (
+    normalizedName.includes('critical') ||
+    normalizedName.includes('manual') ||
+    normalizedName.includes('high') ||
+    tier.requiresHuman
+  ) {
+    return 'border-red-200 bg-red-50 text-red-700'
+  }
+
+  return 'border-amber-200 bg-amber-50 text-amber-700'
+}
+
 function normalizeApprovalTier(
   value: unknown,
   index: number,
@@ -431,7 +455,7 @@ export function TeamsScreen() {
             </div>
             <div>
               <h1 className="text-base font-semibold text-primary-900">
-                Teams &amp; Roles
+                Teams
               </h1>
               <p className="mt-1 text-sm text-primary-500">
                 Workspace permissions, approval thresholds, and review activity
@@ -551,9 +575,23 @@ export function TeamsScreen() {
                             >
                               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_120px_140px_140px_auto] lg:items-center">
                                 <div>
-                                  <p className="text-sm font-semibold text-primary-900">
-                                    {tier.name}
-                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-semibold text-primary-900">
+                                      {tier.name}
+                                    </p>
+                                    <span
+                                      className={cn(
+                                        'rounded-full border px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-[0.12em]',
+                                        getApprovalTierTone(tier),
+                                      )}
+                                    >
+                                      {tier.autoApprove
+                                        ? 'auto'
+                                        : tier.requiresHuman
+                                          ? 'manual'
+                                          : 'review'}
+                                    </span>
+                                  </div>
                                   <p className="mt-1 text-xs text-primary-500">
                                     Confidence threshold and approval behavior.
                                   </p>

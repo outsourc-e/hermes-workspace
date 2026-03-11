@@ -247,25 +247,25 @@ function LiveOutputPanel({
       <div
         ref={containerRef}
         className={cn(
-          'max-h-80 overflow-y-auto bg-primary-950 p-4 font-mono text-xs text-emerald-400',
+          'max-h-80 overflow-y-auto border border-primary-200 bg-primary-50 p-4 font-mono text-xs text-primary-800',
           run.session_id && sessionLabel ? 'rounded-b-xl' : 'rounded-xl',
         )}
       >
         {isLoading ? (
-          <p>Connecting to run output...</p>
+          <p className="text-primary-600">Connecting to run output...</p>
         ) : isError ? (
-          <p className="text-red-300">Unable to load run output.</p>
+          <p className="text-red-600">Unable to load run output.</p>
         ) : terminalEvents.length > 0 ? (
           <div className="space-y-1.5">
             {terminalEvents.map((event) => (
               <p key={event.id} className="whitespace-pre-wrap break-words">
-                <span className="text-emerald-200">[{formatEventClock(event.created_at)}]</span>{' '}
+                <span className="text-primary-500">[{formatEventClock(event.created_at)}]</span>{' '}
                 {getRunEventMessage(event)}
               </p>
             ))}
           </div>
         ) : (
-          <p className="text-emerald-200/80">
+          <p className="text-primary-500">
             {run.status === 'running'
               ? 'Waiting for live output...'
               : 'No terminal output was recorded for this run.'}
@@ -577,8 +577,10 @@ function RecentRunRow({
   eventError,
   eventLoading,
   run,
+  retryPending,
   onSelect,
   onToggleExpand,
+  onRetry,
 }: {
   isExpanded: boolean
   isSelected: boolean
@@ -586,8 +588,10 @@ function RecentRunRow({
   eventError: boolean
   eventLoading: boolean
   run: WorkspaceTaskRun
+  retryPending: boolean
   onSelect: (runId: string) => void
   onToggleExpand: (runId: string) => void
+  onRetry: (runId: string) => void
 }) {
   const retryNarrative = getRunRetryNarrative(run)
 
@@ -643,17 +647,33 @@ function RecentRunRow({
             {formatRunTimestamp(run.completed_at ?? run.started_at)}
           </p>
         </div>
-        <button
-          type="button"
-          aria-label={isExpanded ? 'Collapse output panel' : 'Expand output panel'}
-          onClick={() => onToggleExpand(run.id)}
-          className="flex w-14 items-center justify-center border-l border-primary-200 text-primary-500 transition-colors hover:bg-primary-50 hover:text-accent-400"
-        >
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            className={cn('size-4 transition-transform', isExpanded ? 'rotate-180' : '-rotate-90')}
-          />
-        </button>
+        <div className="flex border-l border-primary-200">
+          {run.status === 'failed' ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onRetry(run.id)
+              }}
+              disabled={retryPending}
+              className="inline-flex min-w-[88px] items-center justify-center gap-2 border-r border-primary-200 px-3 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 hover:text-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <HugeiconsIcon icon={PlayCircleIcon} className="size-4" />
+              {retryPending ? 'Retrying' : 'Retry'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            aria-label={isExpanded ? 'Collapse output panel' : 'Expand output panel'}
+            onClick={() => onToggleExpand(run.id)}
+            className="flex w-14 items-center justify-center text-primary-500 transition-colors hover:bg-primary-50 hover:text-accent-400"
+          >
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              className={cn('size-4 transition-transform', isExpanded ? 'rotate-180' : '-rotate-90')}
+            />
+          </button>
+        </div>
       </div>
 
       {isExpanded ? (
@@ -848,6 +868,25 @@ export function RunsConsoleScreen() {
     },
   })
 
+  const retryRunMutation = useMutation({
+    mutationFn: async (runId: string) =>
+      apiRequest(`http://localhost:3099/api/workspace/task-runs/${runId}/retry`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+      }),
+    onSuccess: async () => {
+      toast('Run retried', { type: 'success' })
+      await queryClient.invalidateQueries({ queryKey: ['workspace', 'task-runs'] })
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to retry run', {
+        type: 'error',
+      })
+    },
+  })
+
   const projectOptions = useMemo(
     () => [
       { label: 'All projects', value: 'all' },
@@ -888,7 +927,7 @@ export function RunsConsoleScreen() {
 
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
-      <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-6">
+      <section className="mx-auto flex w-full max-w-[1480px] flex-col gap-6">
         <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
@@ -1079,10 +1118,14 @@ export function RunsConsoleScreen() {
                   eventLoading={eventQueryStateByRunId.get(run.id)?.isLoading ?? false}
                   eventError={eventQueryStateByRunId.get(run.id)?.isError ?? false}
                   run={run}
+                  retryPending={
+                    retryRunMutation.isPending && retryRunMutation.variables === run.id
+                  }
                   onSelect={setSelectedRunId}
                   onToggleExpand={(runId) =>
                     setSelectedRunId((current) => (current === runId ? null : runId))
                   }
+                  onRetry={(runId) => retryRunMutation.mutate(runId)}
                 />
               ))}
             </div>
@@ -1095,7 +1138,7 @@ export function RunsConsoleScreen() {
             </div>
           )}
         </section>
-      </div>
+      </section>
     </main>
   )
 }

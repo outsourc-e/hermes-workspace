@@ -610,7 +610,7 @@ export function AgentsScreen() {
                       setRegisterErrors((current) => ({ ...current, name: undefined }))
                     }
                   }}
-                  className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                  className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                   placeholder="Codex Builder"
                   autoFocus
                 />
@@ -628,7 +628,7 @@ export function AgentsScreen() {
                     role: event.target.value as AgentRole,
                   }))
                 }
-                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
               >
                 <option value="coder">coder</option>
                 <option value="reviewer">reviewer</option>
@@ -652,7 +652,7 @@ export function AgentsScreen() {
                       }))
                     }
                   }}
-                  className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                  className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                 >
                   <option value="codex">codex</option>
                   <option value="claude">claude</option>
@@ -670,7 +670,7 @@ export function AgentsScreen() {
                 onChange={(event) =>
                   setRegisterForm((current) => ({ ...current, model: event.target.value }))
                 }
-                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                 placeholder="gpt-5.4 or claude-sonnet-4-6"
               />
             </WorkspaceFieldLabel>
@@ -684,7 +684,7 @@ export function AgentsScreen() {
                   }))
                 }
                 rows={4}
-                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                 placeholder="Optional system prompt for this agent profile..."
               />
             </WorkspaceFieldLabel>
@@ -739,6 +739,8 @@ export function AgentsScreen() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {agents.map((agent) => {
             const isActive = agent.id === selectedAgent.id
+            const cardSubtitle = agent.role ? `${agent.role} · ${agent.adapter_type}` : agent.adapter_type
+            const modelLabel = agent.model?.trim() || 'Model not set'
 
             return (
               <button
@@ -749,33 +751,43 @@ export function AgentsScreen() {
                   setActiveTab('profile')
                 }}
                 className={cn(
-                  'rounded-xl border bg-white p-4 text-left shadow-sm transition-colors hover:border-primary-300',
-                  isActive ? 'border-accent-500/40 bg-accent-500/5' : 'border-primary-200',
+                  'rounded-xl border p-4 text-left shadow-sm transition-colors',
+                  isActive
+                    ? 'border-accent-500/50 bg-accent-500/5 ring-1 ring-accent-500/30'
+                    : 'border-primary-200 bg-white hover:bg-primary-50',
                 )}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <div
                     className={cn(
-                      'flex size-10 items-center justify-center rounded-xl text-lg',
+                      'flex size-11 items-center justify-center rounded-full text-sm font-semibold uppercase',
                       getAvatarToneClass(agent.avatar_tone),
                     )}
                   >
-                    <span aria-hidden="true">{agent.avatar}</span>
+                    <span aria-hidden="true">{agent.name.charAt(0)}</span>
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <p className="truncate text-sm font-semibold text-primary-900">
                       {agent.name}
                     </p>
                     <p className="truncate text-xs text-primary-500">
-                      {agent.role} · {agent.model ?? agent.adapter_type}
+                      {cardSubtitle}
                     </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white px-2.5 py-1 text-[11px] font-medium text-primary-600">
+                        <span
+                          className={cn(
+                            'size-2 shrink-0 rounded-full',
+                            getStatusDotClass(agent.status),
+                          )}
+                        />
+                        {agent.status}
+                      </span>
+                      <span className="truncate rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-600">
+                        {modelLabel}
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    className={cn(
-                      'size-2 shrink-0 rounded-full',
-                      getStatusDotClass(agent.status),
-                    )}
-                  />
                 </div>
               </button>
             )
@@ -798,11 +810,11 @@ export function AgentsScreen() {
                 <div className="flex min-w-0 items-center gap-3">
                   <div
                     className={cn(
-                      'flex size-12 shrink-0 items-center justify-center rounded-2xl text-xl',
+                      'flex size-12 shrink-0 items-center justify-center rounded-full text-xl font-semibold uppercase',
                       getAvatarToneClass(selectedAgent.avatar_tone),
                     )}
                   >
-                    <span aria-hidden="true">{selectedAgent.avatar}</span>
+                    <span aria-hidden="true">{selectedAgent.name.charAt(0)}</span>
                   </div>
                   <div className="min-w-0">
                     <h1 className="text-lg font-semibold text-primary-900">
@@ -1317,7 +1329,7 @@ export function AgentsScreen() {
                     setRegisterErrors((current) => ({ ...current, name: undefined }))
                   }
                 }}
-                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                 placeholder="Codex Builder"
                 autoFocus
               />
@@ -1335,7 +1347,7 @@ export function AgentsScreen() {
                   role: event.target.value as AgentRole,
                 }))
               }
-              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
             >
               <option value="coder">coder</option>
               <option value="reviewer">reviewer</option>
@@ -1359,7 +1371,7 @@ export function AgentsScreen() {
                     }))
                   }
                 }}
-                className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
               >
                 <option value="codex">codex</option>
                 <option value="claude">claude</option>
@@ -1377,7 +1389,7 @@ export function AgentsScreen() {
               onChange={(event) =>
                 setRegisterForm((current) => ({ ...current, model: event.target.value }))
               }
-              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
               placeholder="gpt-5.4 or claude-sonnet-4-6"
             />
           </WorkspaceFieldLabel>
@@ -1391,7 +1403,7 @@ export function AgentsScreen() {
                 }))
               }
               rows={4}
-              className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
               placeholder="Optional system prompt for this agent profile..."
             />
           </WorkspaceFieldLabel>

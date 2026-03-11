@@ -51,7 +51,7 @@ const MEMORY_FILTERS: Array<MemoryFilter> = [
 ]
 
 const STATUS_BADGE_CLASS: Record<SkillItem['status'], string> = {
-  active: 'border-green-500/30 bg-green-500/10 text-green-300',
+  active: 'border-green-200 bg-green-50 text-green-700',
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -219,16 +219,14 @@ export function WorkspaceSkillsScreen() {
 
   return (
     <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
-      <div className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col py-4">
+      <section className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col gap-5">
         <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
             <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
               <HugeiconsIcon icon={SparklesIcon} size={24} strokeWidth={1.6} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-primary-900">
-                Skills &amp; Memory
-              </h1>
+              <h1 className="text-base font-semibold text-primary-900">Skills</h1>
               <p className="mt-1 text-sm text-primary-500">
                 Installed skills and workspace memory sources
               </p>
@@ -546,7 +544,7 @@ export function WorkspaceSkillsScreen() {
             </div>
           </section>
         </div>
-      </div>
+      </section>
     </main>
   )
 }

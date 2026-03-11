@@ -96,9 +96,9 @@ function ReviewQueueSkeleton() {
           <div className="mt-3 animate-shimmer rounded-lg bg-primary-200/70 h-5 w-2/3" />
           <div className="mt-2 animate-shimmer rounded-lg bg-primary-200/60 h-4 w-full" />
           <div className="mt-4 grid gap-2 md:grid-cols-3">
-            <div className="animate-shimmer rounded-lg bg-primary-800/60 h-10" />
-            <div className="animate-shimmer rounded-lg bg-primary-800/60 h-10" />
-            <div className="animate-shimmer rounded-lg bg-primary-800/60 h-10" />
+            <div className="h-10 animate-shimmer rounded-lg bg-primary-200/70" />
+            <div className="h-10 animate-shimmer rounded-lg bg-primary-200/70" />
+            <div className="h-10 animate-shimmer rounded-lg bg-primary-200/70" />
           </div>
         </div>
       ))}
@@ -252,16 +252,16 @@ function ReviewRow({
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                 Created
               </p>
-              <p className="mt-1 text-sm text-primary-200">
+              <p className="mt-1 text-sm text-primary-600">
                 {formatCheckpointTimestamp(checkpoint.created_at)}
               </p>
             </div>
             {checkpoint.reviewer_notes ? (
-              <div className="rounded-xl border border-primary-800 bg-primary-800/40 px-3 py-2 md:col-span-2 xl:col-span-1">
+              <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2 md:col-span-2 xl:col-span-1">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
                   Reviewer Notes
                 </p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-primary-200">
+                <p className="mt-1 whitespace-pre-wrap text-sm text-primary-700">
                   {checkpoint.reviewer_notes}
                 </p>
               </div>
@@ -324,7 +324,7 @@ function ReviewRow({
       </div>
 
       {isComposerOpen ? (
-        <div className="mt-4 rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+        <div className="mt-4 rounded-2xl border border-primary-200 bg-primary-50/80 p-4">
           <label className="block">
             <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
               Reviewer Notes
@@ -333,7 +333,7 @@ function ReviewRow({
               value={notes}
               onChange={(event) => onNotesChange(event.target.value)}
               rows={4}
-              className="w-full rounded-xl border border-primary-700 bg-primary-900 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+              className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
               placeholder="Add the revision guidance or rejection reason..."
             />
           </label>
