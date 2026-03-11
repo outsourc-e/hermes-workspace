@@ -25,10 +25,10 @@ import {
   extractActivityEvents,
   extractProject,
   extractRunEvents,
-  extractTaskRuns,
   normalizeMission,
   normalizeActivityEvent,
   normalizeRunEvent,
+  normalizeTaskRun,
   type WorkspaceActivityEvent,
   type WorkspaceProject,
   type WorkspaceRunEvent,
@@ -86,6 +86,11 @@ type WorkflowPolicy = {
   maxConcurrentAgents: number
   checks: Record<'tsc' | 'tests' | 'lint' | 'e2e', boolean>
   tools: Array<{ label: string; enabled: boolean }>
+}
+
+type MissionConsoleTaskRun = WorkspaceTaskRun & {
+  session_id?: string | null
+  session_label?: string | null
 }
 
 const STREAM_EVENT_NAMES = [
@@ -241,6 +246,36 @@ function extractMissionList(payload: unknown): MissionListItem[] {
   })
 }
 
+function extractMissionConsoleTaskRuns(payload: unknown): MissionConsoleTaskRun[] {
+  if (Array.isArray(payload)) {
+    return payload.map((value) => {
+      const record = asRecord(value)
+      return {
+        ...normalizeTaskRun(value),
+        session_id: asString(record?.session_id),
+        session_label: asString(record?.session_label),
+      }
+    })
+  }
+
+  const record = asRecord(payload)
+  const candidates = [record?.task_runs, record?.runs, record?.data, record?.items]
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue
+    return candidate.map((value) => {
+      const runRecord = asRecord(value)
+      return {
+        ...normalizeTaskRun(value),
+        session_id: asString(runRecord?.session_id),
+        session_label: asString(runRecord?.session_label),
+      }
+    })
+  }
+
+  return []
+}
+
 function getRunEventText(event: WorkspaceRunEvent): string {
   const message = event.data?.message
   if (typeof message === 'string' && message.trim().length > 0) {
@@ -352,6 +387,45 @@ function getTaskStatusTone(status: string) {
     className: 'text-primary-400',
     label: formatStatus(status),
   }
+}
+
+function isReadableSessionLabel(value: string): boolean {
+  return (
+    value.trim().length > 0 &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  )
+}
+
+function getRunSessionLabel(run: MissionConsoleTaskRun): string | null {
+  if (!run.session_id) return null
+
+  if (run.session_label && run.session_label.trim().length > 0) {
+    return run.session_label.trim()
+  }
+
+  if (isReadableSessionLabel(run.session_id)) {
+    return run.session_id
+  }
+
+  return `Session: ${run.session_id.slice(0, 8)}`
+}
+
+function SessionBadge({
+  run,
+}: {
+  run: MissionConsoleTaskRun
+}) {
+  const label = getRunSessionLabel(run)
+  if (!run.session_id || !label) return null
+
+  return (
+    <a
+      href={`/agents?session=${encodeURIComponent(run.session_id)}`}
+      className="inline-flex items-center gap-1 rounded-full border border-accent-500/30 bg-accent-500/10 px-2 py-0.5 text-xs font-mono text-accent-600 transition-colors hover:border-accent-500/50 hover:bg-accent-500/15"
+    >
+      {label}
+    </a>
+  )
 }
 
 function getAgentTone(agentName: string | null | undefined) {
@@ -582,7 +656,9 @@ export function MissionConsoleScreen({
     queryKey: ['workspace', 'task-runs', 'mission-console', 'all'],
     enabled: missionId.length === 0,
     queryFn: async () =>
-      extractTaskRuns(await workspaceRequestJson('/api/workspace/task-runs')),
+      extractMissionConsoleTaskRuns(
+        await workspaceRequestJson('/api/workspace/task-runs'),
+      ),
     refetchInterval: 5_000,
   })
 
@@ -609,7 +685,7 @@ export function MissionConsoleScreen({
     queryKey: ['workspace', 'task-runs', 'mission-console', projectId],
     enabled: Boolean(projectId),
     queryFn: async () =>
-      extractTaskRuns(
+      extractMissionConsoleTaskRuns(
         await workspaceRequestJson(
           `/api/workspace/task-runs?project_id=${encodeURIComponent(projectId)}`,
         ),
@@ -781,7 +857,7 @@ export function MissionConsoleScreen({
   }, [liveEventsByRunId, queryEventsByRunId, runningRuns])
 
   const latestRunByTaskId = useMemo(() => {
-    const map = new Map<string, WorkspaceTaskRun>()
+    const map = new Map<string, MissionConsoleTaskRun>()
     for (const run of allMissionRuns) {
       if (!run.task_id) continue
       const current = map.get(run.task_id)
@@ -1251,9 +1327,16 @@ export function MissionConsoleScreen({
                                 {task.name}
                               </p>
                             </div>
-                            <span className="text-xs text-primary-400">
-                              {tone.label}
-                            </span>
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              {(latestRun?.status === 'running' ||
+                                latestRun?.status === 'active') &&
+                              latestRun.session_id ? (
+                                <SessionBadge run={latestRun} />
+                              ) : null}
+                              <span className="text-xs text-primary-400">
+                                {tone.label}
+                              </span>
+                            </div>
                           </div>
                           {progress !== null ? (
                             <div className="mt-3">

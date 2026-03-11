@@ -1,11 +1,13 @@
 import {
   ArrowDown01Icon,
+  Copy01Icon,
   FilterHorizontalIcon,
   PauseIcon,
   PlayCircleIcon,
   SquareArrowDown02Icon,
   Task01Icon,
   TimeQuarterPassIcon,
+  Tick02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -167,12 +169,31 @@ function LiveOutputPanel({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalEvents = useMemo(() => getTerminalEvents(events), [events])
   const finalStatus = run.status !== 'running'
+  const [copied, setCopied] = useState(false)
+  const sessionLabel = getRunSessionLabel(run)
 
   useEffect(() => {
     const node = containerRef.current
     if (!node) return
     node.scrollTop = node.scrollHeight
   }, [terminalEvents])
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 1200)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+
+  async function handleCopySessionId() {
+    if (!run.session_id || !navigator.clipboard?.writeText) return
+
+    try {
+      await navigator.clipboard.writeText(run.session_id)
+      setCopied(true)
+    } catch {
+      toast('Unable to copy session ID.', { type: 'error' })
+    }
+  }
 
   return (
     <div className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm">
@@ -203,9 +224,32 @@ function LiveOutputPanel({
         </div>
       </div>
 
+      {run.session_id && sessionLabel ? (
+        <div className="flex items-center gap-2 rounded-t-lg border border-b-0 border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-600">
+          <span className="font-medium text-primary-900">Agent session:</span>
+          <a
+            href={`/agents?session=${encodeURIComponent(run.session_id)}`}
+            className="font-mono text-accent-600 transition-colors hover:text-accent-500"
+          >
+            {sessionLabel}
+          </a>
+          <button
+            type="button"
+            onClick={() => void handleCopySessionId()}
+            className="ml-auto inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white px-2 py-0.5 text-[11px] font-medium text-primary-600 transition-colors hover:border-accent-500/40 hover:text-accent-600"
+          >
+            <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} className="size-3.5" />
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      ) : null}
+
       <div
         ref={containerRef}
-        className="max-h-80 overflow-y-auto rounded-xl bg-primary-950 p-4 font-mono text-xs text-emerald-400"
+        className={cn(
+          'max-h-80 overflow-y-auto bg-primary-950 p-4 font-mono text-xs text-emerald-400',
+          run.session_id && sessionLabel ? 'rounded-b-xl' : 'rounded-xl',
+        )}
       >
         {isLoading ? (
           <p>Connecting to run output...</p>
@@ -240,6 +284,46 @@ function parseActivityEvent(payload: string): ActivityEventMessage | null {
   } catch {
     return null
   }
+}
+
+function isReadableSessionLabel(value: string): boolean {
+  return (
+    value.trim().length > 0 &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  )
+}
+
+function getRunSessionLabel(run: WorkspaceTaskRun): string | null {
+  if (!run.session_id) return null
+
+  if (run.session_label && run.session_label.trim().length > 0) {
+    return run.session_label.trim()
+  }
+
+  if (isReadableSessionLabel(run.session_id)) {
+    return run.session_id
+  }
+
+  return `Session: ${run.session_id.slice(0, 8)}`
+}
+
+function RunSessionBadge({
+  run,
+}: {
+  run: WorkspaceTaskRun
+}) {
+  const label = getRunSessionLabel(run)
+  if (!run.session_id || !label) return null
+
+  return (
+    <a
+      href={`/agents?session=${encodeURIComponent(run.session_id)}`}
+      onClick={(event) => event.stopPropagation()}
+      className="inline-flex items-center gap-1 rounded-full border border-accent-500/30 bg-accent-500/10 px-2 py-0.5 text-xs font-mono text-accent-600 transition-colors hover:border-accent-500/50 hover:bg-accent-500/15"
+    >
+      {label}
+    </a>
+  )
 }
 
 function FilterSelect({
@@ -368,6 +452,7 @@ function ActiveRunCard({
             >
               {formatRunStatus(run.status)}
             </span>
+            <RunSessionBadge run={run} />
             <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
               {progressLabel}
             </span>
@@ -514,9 +599,15 @@ function RecentRunRow({
       )}
     >
       <div className="flex items-stretch">
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => onSelect(run.id)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            onSelect(run.id)
+          }}
           className="flex min-w-0 flex-1 flex-col gap-4 px-4 py-4 text-left transition-colors hover:bg-primary-50 md:grid md:grid-cols-[minmax(0,2fr)_1.05fr_1fr_0.9fr_0.75fr_0.7fr_0.8fr_0.95fr] md:items-center"
         >
           <div className="min-w-0">
@@ -535,7 +626,7 @@ function RecentRunRow({
           </div>
           <p className="text-sm text-primary-600">{run.project_name}</p>
           <p className="text-sm text-primary-600">{run.agent_name ?? 'Unknown agent'}</p>
-          <div>
+          <div className="flex flex-wrap items-center gap-2">
             <span
               className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getRunStatusClass(
                 run.status,
@@ -543,6 +634,7 @@ function RecentRunRow({
             >
               {formatRunStatus(run.status)}
             </span>
+            <RunSessionBadge run={run} />
           </div>
           <p className="text-sm text-primary-600">{formatRunDuration(run)}</p>
           <p className="text-sm text-primary-600">{formatRunInputTokens(run)}</p>
@@ -550,7 +642,7 @@ function RecentRunRow({
           <p className="text-sm text-primary-600">
             {formatRunTimestamp(run.completed_at ?? run.started_at)}
           </p>
-        </button>
+        </div>
         <button
           type="button"
           aria-label={isExpanded ? 'Collapse output panel' : 'Expand output panel'}

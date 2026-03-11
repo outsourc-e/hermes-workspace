@@ -12,6 +12,8 @@ export type WorkspaceTaskRun = {
   id: string
   task_id: string
   agent_id: string | null
+  session_id: string | null
+  session_label?: string | null
   status: WorkspaceRunStatus
   attempt: number
   workspace_path: string | null
@@ -69,6 +71,8 @@ export function normalizeTaskRun(value: unknown): WorkspaceTaskRun {
     id: asString(record?.id) ?? crypto.randomUUID(),
     task_id: asString(record?.task_id) ?? '',
     agent_id: asString(record?.agent_id),
+    session_id: asString(record?.session_id),
+    session_label: asString(record?.session_label),
     status: asString(record?.status) ?? 'pending',
     attempt: asNumber(record?.attempt) || 1,
     workspace_path: asString(record?.workspace_path),
