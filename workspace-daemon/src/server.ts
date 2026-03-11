@@ -11,7 +11,7 @@ import { registerEventsRoutes } from "./routes/events";
 import { createCheckpointsRouter } from "./routes/checkpoints";
 import { createPhasesRouter } from "./routes/phases";
 import { createDecomposeRouter } from "./routes/decompose";
-import { createTaskRunsRouter } from "./routes/task-runs";
+import { createAdhocTaskRunsRouter, createTaskRunsRouter } from "./routes/task-runs";
 import { createTeamsRouter } from "./routes/teams";
 import { createSkillsRouter } from "./routes/skills";
 
@@ -32,6 +32,7 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
   app.use("/api/projects", createProjectsRouter(tracker));
   app.use("/api/phases", createPhasesRouter(tracker));
   app.use("/api/tasks", createTasksRouter(tracker, orchestrator));
+  app.use("/api/task-runs/adhoc", createAdhocTaskRunsRouter(tracker, orchestrator));
   app.use("/api/task-runs", createTaskRunsRouter(tracker, orchestrator));
   app.use("/api/agents", createAgentsRouter(tracker));
   app.use("/api/missions", createMissionsRouter(tracker));
