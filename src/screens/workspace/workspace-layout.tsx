@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { usePageTitle } from '@/hooks/use-page-title'
+import { useWorkspaceSse } from '@/hooks/use-workspace-sse'
 import { cn } from '@/lib/utils'
 import { AgentsScreen } from '@/screens/agents/agents-screen'
 import { CheckpointDetailScreen } from '@/screens/checkpoints/checkpoint-detail-screen'
@@ -113,6 +114,7 @@ function writeWorkspaceHash(nextTab: WorkspaceTab) {
 
 export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   const navigate = useNavigate()
+  const { connected } = useWorkspaceSse()
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() =>
     typeof window === 'undefined'
       ? 'projects'
@@ -207,37 +209,55 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     <div className="flex h-full flex-col overflow-hidden bg-gray-50 text-primary-900">
       <div className="sticky top-0 z-20 border-b border-primary-200 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
-            {TAB_ORDER.map((tab) => {
-              const active = tab === activeTab
-              return (
-                <Button
-                  key={tab}
-                  variant={active ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => {
-                    setActiveTab(tab)
-                    void navigate({
-                      to: '/workspace',
-                      search: {
-                        goal: search.goal,
-                        project: search.project,
-                        projectId: search.projectId,
-                      },
-                      hash: tab === 'projects' ? '' : tab,
-                    })
-                  }}
-                  className={cn(
-                    'rounded-full border text-sm',
-                    active
-                      ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
-                      : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-900',
-                  )}
-                >
-                  {TAB_LABELS[tab]}
-                </Button>
-              )
-            })}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-1 flex-wrap items-center gap-2 overflow-x-auto">
+              {TAB_ORDER.map((tab) => {
+                const active = tab === activeTab
+                return (
+                  <Button
+                    key={tab}
+                    variant={active ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                      setActiveTab(tab)
+                      void navigate({
+                        to: '/workspace',
+                        search: {
+                          goal: search.goal,
+                          project: search.project,
+                          projectId: search.projectId,
+                        },
+                        hash: tab === 'projects' ? '' : tab,
+                      })
+                    }}
+                    className={cn(
+                      'rounded-full border text-sm',
+                      active
+                        ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
+                        : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-900',
+                    )}
+                  >
+                    {TAB_LABELS[tab]}
+                  </Button>
+                )
+              })}
+            </div>
+            <div
+              className={cn(
+                'inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
+                connected
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                  : 'border-amber-500/30 bg-amber-500/10 text-amber-700',
+              )}
+            >
+              <span
+                className={cn(
+                  'size-2 rounded-full',
+                  connected ? 'bg-emerald-500' : 'bg-amber-500',
+                )}
+              />
+              {connected ? 'Live' : 'Connecting...'}
+            </div>
           </div>
           {activeTab === 'projects' && (projectName || search.missionId) ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-primary-500">
