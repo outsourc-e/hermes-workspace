@@ -31,6 +31,7 @@ import type {
   TaskStatus,
   Team,
   TaskWithRelations,
+  UpdateAgentInput,
   UpdateTaskInput,
 } from './types'
 
@@ -1492,6 +1493,9 @@ export class Tracker extends EventEmitter {
         adapter_type: stored.adapter_type || seed.adapter_type,
         model: stored.model ?? seed.model,
         status: normalizeDirectoryStatus(stored.status || seed.status),
+        description: stored.description ?? seed.description,
+        system_prompt: stored.system_prompt ?? seed.system_prompt,
+        prompt_updated_at: stored.prompt_updated_at ?? seed.prompt_updated_at,
         capabilities: {
           ...seed.capabilities,
           ...parsedCapabilities,
@@ -1525,10 +1529,13 @@ export class Tracker extends EventEmitter {
           status: normalizeDirectoryStatus(agent.status),
           avatar: '🛰️',
           avatar_tone: 'primary' as const,
-          description: `${agent.role} agent registered in the workspace daemon.`,
+          description:
+            agent.description ??
+            `${agent.role} agent registered in the workspace daemon.`,
           system_prompt:
+            agent.system_prompt ??
             '# Custom agent\n\nThis agent was registered in the workspace daemon.',
-          prompt_updated_at: agent.created_at,
+          prompt_updated_at: agent.prompt_updated_at ?? agent.created_at,
           limits: {
             max_tokens: 64_000,
             cost_label: 'Workspace default',
@@ -1655,8 +1662,8 @@ export class Tracker extends EventEmitter {
   registerAgent(input: RegisterAgentInput): AgentRecord {
     const agent = this.db
       .prepare(
-        `INSERT INTO agents (name, role, adapter_type, adapter_config, model, capabilities)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO agents (name, role, adapter_type, adapter_config, model, description, system_prompt, capabilities)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING *`,
       )
       .get(
@@ -1665,10 +1672,57 @@ export class Tracker extends EventEmitter {
         input.adapter_type ?? 'codex',
         JSON.stringify(input.adapter_config ?? {}),
         input.model ?? null,
+        null,
+        null,
         JSON.stringify(input.capabilities ?? {}),
       ) as AgentRecord
     this.logActivity('registered', 'agent', agent.id, agent.id, agent)
     return agent
+  }
+
+  updateAgent(id: string, updates: UpdateAgentInput): AgentRecord | null {
+    const existing = this.getAgent(id)
+    if (!existing) {
+      return null
+    }
+
+    const hasSystemPrompt = Object.prototype.hasOwnProperty.call(
+      updates,
+      'system_prompt',
+    )
+
+    this.db
+      .prepare(
+        `UPDATE agents
+         SET name = ?, status = ?, model = ?, description = ?, system_prompt = ?, prompt_updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(
+        updates.name ?? existing.name,
+        updates.status ?? existing.status,
+        updates.model === undefined ? existing.model : updates.model,
+        updates.description === undefined
+          ? existing.description
+          : updates.description,
+        updates.system_prompt === undefined
+          ? existing.system_prompt
+          : updates.system_prompt,
+        hasSystemPrompt
+          ? new Date().toISOString()
+          : existing.prompt_updated_at,
+        id,
+      )
+
+    const agent = this.getAgent(id)
+    if (agent) {
+      this.emitSse('agent.updated', agent)
+    }
+    return agent
+  }
+
+  deleteAgent(id: string): boolean {
+    const result = this.db.prepare('DELETE FROM agents WHERE id = ?').run(id)
+    return result.changes > 0
   }
 
   setAgentStatus(id: string, status: string): AgentRecord | null {

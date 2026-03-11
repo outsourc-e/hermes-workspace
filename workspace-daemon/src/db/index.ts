@@ -68,6 +68,29 @@ function ensureProjectPolicyColumns(db: Database.Database): void {
   }
 }
 
+function ensureAgentProfileColumns(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(agents)').all() as Array<{
+    name: string
+  }>
+  const hasDescription = columns.some((column) => column.name === 'description')
+  const hasSystemPrompt = columns.some(
+    (column) => column.name === 'system_prompt',
+  )
+  const hasPromptUpdatedAt = columns.some(
+    (column) => column.name === 'prompt_updated_at',
+  )
+
+  if (!hasDescription) {
+    db.exec('ALTER TABLE agents ADD COLUMN description TEXT')
+  }
+  if (!hasSystemPrompt) {
+    db.exec('ALTER TABLE agents ADD COLUMN system_prompt TEXT')
+  }
+  if (!hasPromptUpdatedAt) {
+    db.exec('ALTER TABLE agents ADD COLUMN prompt_updated_at TEXT')
+  }
+}
+
 function ensureEventsTable(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS events (
@@ -143,6 +166,7 @@ export function getDatabase(
   db.exec(readSchemaSql())
   ensureCheckpointCommitHashColumn(db)
   ensureProjectPolicyColumns(db)
+  ensureAgentProfileColumns(db)
   ensureEventsTable(db)
   seedDefaultTeams(db)
   dbInstance = db

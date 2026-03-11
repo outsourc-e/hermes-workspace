@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS agents (
   adapter_config TEXT DEFAULT '{}',
   model TEXT,
   status TEXT NOT NULL DEFAULT 'idle',
+  description TEXT,
+  system_prompt TEXT,
+  prompt_updated_at TEXT,
   capabilities TEXT DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -175,6 +175,9 @@ export interface AgentRecord {
   adapter_config: string | null
   model: string | null
   status: EntityStatus
+  description: string | null
+  system_prompt: string | null
+  prompt_updated_at: string | null
   capabilities: string | null
   created_at: string
 }
@@ -455,6 +458,14 @@ export interface RegisterAgentInput {
   adapter_config?: Record<string, unknown>
   model?: string | null
   capabilities?: Record<string, unknown>
+}
+
+export interface UpdateAgentInput {
+  status?: AgentRecord['status']
+  system_prompt?: string | null
+  model?: string | null
+  description?: string | null
+  name?: string
 }
 
 export interface CreateTeamInput {
