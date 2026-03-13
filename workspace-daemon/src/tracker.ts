@@ -903,6 +903,36 @@ export class Tracker extends EventEmitter {
     return taskRun
   }
 
+  createPendingTaskRun(
+    taskId: string,
+    agentId: string | null,
+    workspacePath: string | null,
+    attempt: number,
+  ): TaskRun {
+    const taskRun = this.db
+      .prepare(
+        `INSERT INTO task_runs (
+           task_id,
+           agent_id,
+           status,
+           attempt,
+           workspace_path,
+           session_id,
+           started_at,
+           completed_at,
+           error,
+           input_tokens,
+           output_tokens,
+           cost_cents
+         )
+         VALUES (?, ?, 'pending', ?, ?, NULL, NULL, NULL, NULL, 0, 0, 0)
+         RETURNING *`,
+      )
+      .get(taskId, agentId, attempt, workspacePath) as TaskRun
+    this.emitSse('task_run.updated', taskRun)
+    return taskRun
+  }
+
   markTaskRunStarted(id: string): TaskRun | null {
     const current = this.getTaskRun(id)
     if (!current) {

@@ -137,6 +137,41 @@ export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrato
     res.json(tracker.listRunEvents(req.params.id));
   });
 
+  router.post("/:id/retry", async (req, res) => {
+    const taskRun = tracker.getTaskRun(req.params.id);
+    if (!taskRun) {
+      res.status(404).json({ error: "Task run not found" });
+      return;
+    }
+
+    if (taskRun.status !== "failed") {
+      res.status(400).json({ error: "Only failed task runs can be retried" });
+      return;
+    }
+
+    const retriedRun = tracker.createPendingTaskRun(
+      taskRun.task_id,
+      taskRun.agent_id,
+      null,
+      taskRun.attempt + 1,
+    );
+    const dispatched = await orchestrator.dispatchTaskRun(retriedRun.id);
+    if (!dispatched) {
+      tracker.updateTaskRun(retriedRun.id, {
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: "Failed to dispatch retried task run",
+      });
+      res.status(500).json({ error: "Failed to dispatch retried task run" });
+      return;
+    }
+
+    res.status(201).json({
+      ok: true,
+      run_id: retriedRun.id,
+    });
+  });
+
   router.post("/:id/pause", (req, res) => {
     if (!orchestrator.controlTaskRun(req.params.id, "pause")) {
       res.status(404).json({ error: "Active task run not found" });

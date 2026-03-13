@@ -11,6 +11,7 @@ import type {
   RetryEntry,
   RunningEntry,
   Task,
+  TaskRun,
   TaskRunStatus,
   TaskWithRelations,
 } from "./types";
@@ -141,6 +142,38 @@ export class Orchestrator extends EventEmitter {
     return true;
   }
 
+  async dispatchTaskRun(runId: string): Promise<boolean> {
+    const taskRun = this.tracker.getTaskRun(runId);
+    if (!taskRun || taskRun.status !== "pending") {
+      return false;
+    }
+
+    const task = this.tracker.listTasks({}).find((entry) => entry.id === taskRun.task_id) ?? null;
+    if (!task) {
+      return false;
+    }
+
+    const agent = taskRun.agent_id
+      ? this.tracker.getAgent(taskRun.agent_id)
+      : selectAgent(task, this.tracker.listAgents());
+    if (!agent) {
+      return false;
+    }
+
+    this.state.retryAttempts.delete(task.id);
+    this.state.claimed.add(task.id);
+    try {
+      await this.dispatchTask(task, {
+        taskRun,
+        agent,
+      });
+    } finally {
+      this.state.claimed.delete(task.id);
+    }
+
+    return true;
+  }
+
   controlTaskRun(runId: string, action: "pause" | "stop"): boolean {
     const runningEntry = [...this.state.running.values()].find((entry) => entry.runId === runId);
     if (!runningEntry) {
@@ -197,13 +230,19 @@ export class Orchestrator extends EventEmitter {
     }
   }
 
-  private async dispatchTask(task: TaskWithRelations): Promise<void> {
+  private async dispatchTask(
+    task: TaskWithRelations,
+    options?: {
+      taskRun?: TaskRun;
+      agent?: AgentRecord;
+    },
+  ): Promise<void> {
     const project = this.tracker.getProject(task.project_id);
     if (!project) {
       return;
     }
 
-    const agent = selectAgent(task, this.tracker.listAgents());
+    const agent = options?.agent ?? selectAgent(task, this.tracker.listAgents());
     if (!agent) {
       this.tracker.setTaskStatus(task.id, "failed");
       this.tracker.logActivity("failed", "task", task.id, null, { reason: "No agent available" });
@@ -211,12 +250,23 @@ export class Orchestrator extends EventEmitter {
     }
 
     const retryEntry = this.state.retryAttempts.get(task.id);
-    const attempt = retryEntry?.attempt ?? 1;
-    this.state.claimed.add(task.id);
+    const attempt = options?.taskRun?.attempt ?? retryEntry?.attempt ?? 1;
     this.tracker.setTaskStatus(task.id, "running");
     this.tracker.setAgentStatus(agent.id, "running");
 
-    const taskRun = this.tracker.createTaskRun(task.id, agent.id, null, attempt);
+    const taskRun =
+      options?.taskRun ??
+      this.tracker.createTaskRun(task.id, agent.id, null, attempt);
+    if (options?.taskRun) {
+      this.tracker.updateTaskRun(taskRun.id, {
+        status: "running",
+        completed_at: null,
+        error: null,
+        input_tokens: 0,
+        output_tokens: 0,
+        cost_cents: 0,
+      });
+    }
     const abortController = new AbortController();
     const runningEntry: RunningEntry = {
       taskId: task.id,
@@ -312,7 +362,6 @@ export class Orchestrator extends EventEmitter {
       this.abortControllers.delete(taskRun.id);
       this.controlRequests.delete(taskRun.id);
       this.state.running.delete(task.id);
-      this.state.claimed.delete(task.id);
       this.tracker.setAgentStatus(agent.id, "idle");
       void this.tick();
     }
