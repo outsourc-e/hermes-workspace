@@ -23,6 +23,53 @@ function readNumber(value: unknown): number | undefined {
   return undefined
 }
 
+function extractStepPayload(
+  value: unknown,
+): {
+  inputTokens?: number
+  outputTokens?: number
+  cacheRead?: number
+  cacheWrite?: number
+  contextPercent?: number
+  model?: string
+} | null {
+  if (!value || typeof value !== 'object') return null
+  const source = value as Record<string, unknown>
+
+  const inputTokens = readNumber(
+    source.tokens_in ?? source.tokensIn ?? source.inputTokens,
+  )
+  const outputTokens = readNumber(
+    source.tokens_out ?? source.tokensOut ?? source.outputTokens,
+  )
+  const cacheRead = readNumber(source.cache_read ?? source.cacheRead)
+  const cacheWrite = readNumber(source.cache_write ?? source.cacheWrite)
+  const contextPercent = readNumber(
+    source.context_percent ?? source.contextPercent,
+  )
+  const model = readString(source.model) || undefined
+
+  if (
+    inputTokens === undefined &&
+    outputTokens === undefined &&
+    cacheRead === undefined &&
+    cacheWrite === undefined &&
+    contextPercent === undefined &&
+    !model
+  ) {
+    return null
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    cacheRead,
+    cacheWrite,
+    contextPercent,
+    model,
+  }
+}
+
 function stripDataUrlPrefix(value: string): string {
   const trimmed = value.trim()
   if (!trimmed) return ''
@@ -245,6 +292,17 @@ export const Route = createFileRoute('/api/send-stream')({
                   } else if (stream === 'thinking' && data?.text) {
                     sendEvent('thinking', {
                       text: data.text,
+                      runId: agentPayload?.runId,
+                    })
+                  } else if (
+                    stream === 'step' ||
+                    stream === 'step_finish' ||
+                    stream === 'step_cost'
+                  ) {
+                    const stepPayload = extractStepPayload(data)
+                    if (!stepPayload) return
+                    sendEvent('step', {
+                      ...stepPayload,
                       runId: agentPayload?.runId,
                     })
                   }

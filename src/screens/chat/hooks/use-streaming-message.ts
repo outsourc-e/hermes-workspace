@@ -25,6 +25,15 @@ type StreamChunk = {
   chunk?: string
 }
 
+type StepUsagePayload = {
+  inputTokens?: number
+  outputTokens?: number
+  cacheRead?: number
+  cacheWrite?: number
+  contextPercent?: number
+  model?: string
+}
+
 type UseStreamingMessageOptions = {
   onStarted?: (payload: { runId: string | null }) => void
   onChunk?: (text: string, fullText: string) => void
@@ -58,6 +67,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const acceptedAtRef = useRef<number | null>(null)
   const lastActivityAtRef = useRef<number | null>(null)
   const handoffTimerRef = useRef<number | null>(null)
+  const stepUsageRef = useRef<StepUsagePayload>({})
 
   const registerSendStreamRun = useGatewayChatStore((s) => s.registerSendStreamRun)
   const unregisterSendStreamRun = useGatewayChatStore((s) => s.unregisterSendStreamRun)
@@ -273,6 +283,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         ],
         timestamp: Date.now(),
         __streamingStatus: 'complete',
+        ...stepUsageRef.current,
         ...(payload as Record<string, unknown>),
       }
 
@@ -365,6 +376,36 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             transport: 'send-stream',
           })
           onTool?.(payload)
+          break
+        }
+        case 'step': {
+          const nextUsage: StepUsagePayload = {
+            inputTokens:
+              typeof payload.inputTokens === 'number'
+                ? payload.inputTokens
+                : stepUsageRef.current.inputTokens,
+            outputTokens:
+              typeof payload.outputTokens === 'number'
+                ? payload.outputTokens
+                : stepUsageRef.current.outputTokens,
+            cacheRead:
+              typeof payload.cacheRead === 'number'
+                ? payload.cacheRead
+                : stepUsageRef.current.cacheRead,
+            cacheWrite:
+              typeof payload.cacheWrite === 'number'
+                ? payload.cacheWrite
+                : stepUsageRef.current.cacheWrite,
+            contextPercent:
+              typeof payload.contextPercent === 'number'
+                ? payload.contextPercent
+                : stepUsageRef.current.contextPercent,
+            model:
+              typeof payload.model === 'string'
+                ? payload.model
+                : stepUsageRef.current.model,
+          }
+          stepUsageRef.current = nextUsage
           break
         }
         case 'done': {
@@ -460,6 +501,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       renderedTextRef.current = ''
       targetTextRef.current = ''
       thinkingRef.current = ''
+      stepUsageRef.current = {}
       clearSendStreamRun()
       activeSessionKeyRef.current = params.sessionKey
       lifecyclePhaseRef.current = 'requesting'
@@ -584,6 +626,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     renderedTextRef.current = ''
     targetTextRef.current = ''
     thinkingRef.current = ''
+    stepUsageRef.current = {}
     lifecyclePhaseRef.current = 'idle'
     acceptedAtRef.current = null
     lastActivityAtRef.current = null
