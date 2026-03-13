@@ -191,7 +191,7 @@ export function MobileTabBar() {
         // Vertical position: above home indicator
         'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
         // Keep the pill visually isolated from page and error-state backgrounds
-        'bg-white/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/88',
+        'bg-white/95 dark:bg-neutral-900/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/88 dark:supports-[backdrop-filter]:bg-neutral-900/88',
         'rounded-full',
         'border border-primary-200/80',
         // Inner padding
