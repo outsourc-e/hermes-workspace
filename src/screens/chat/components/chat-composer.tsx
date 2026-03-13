@@ -1737,6 +1737,13 @@ function ChatComposerComponent({
                 className="min-h-[36px] max-h-[120px] flex-1 text-base leading-snug"
               />
 
+              {/* Token counter — shows when user has typed enough */}
+              {value.length >= 20 && (
+                <span className="shrink-0 self-end pb-2 text-[10px] text-primary-400 tabular-nums">
+                  ~{Math.ceil(value.length / 4)}
+                </span>
+              )}
+
               {/* Right side: stop / send / mic */}
               <div className="shrink-0">
                 {isLoading ? (
