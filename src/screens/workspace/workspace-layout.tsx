@@ -339,7 +339,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
           ) : null}
         </div>
       </div>
-      <main className="flex-1 overflow-y-auto bg-surface">
+      <main className="flex-1 overflow-y-auto bg-surface pb-[calc(var(--tabbar-h,80px)+1rem)]">
         {search.checkpointId ? (
           <CheckpointDetailScreen
             checkpointId={search.checkpointId}

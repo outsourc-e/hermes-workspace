@@ -218,7 +218,7 @@ export function WorkspaceSkillsScreen() {
   }
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+    <main className="min-h-full bg-surface px-4 pb-[calc(var(--tabbar-h,80px)+1.5rem)] pt-5 text-primary-900 md:px-6 md:pb-10 md:pt-8">
       <section className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col gap-5">
         <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
