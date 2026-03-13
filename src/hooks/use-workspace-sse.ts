@@ -43,7 +43,7 @@ export function useWorkspaceSse() {
       eventSource?.close()
       setConnected(false)
 
-      const es = new EventSource(`${DAEMON_URL}/api/events`)
+      const es = new EventSource(`${DAEMON_URL}/api/workspace/events`)
       eventSource = es
 
       es.onopen = () => {
