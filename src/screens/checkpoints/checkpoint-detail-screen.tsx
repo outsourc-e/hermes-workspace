@@ -81,10 +81,10 @@ async function apiRequest(input: string): Promise<unknown> {
 }
 
 function getVerificationTone(status: WorkspaceCheckpointVerificationItem['status']) {
-  if (status === 'passed') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-  if (status === 'failed') return 'border-red-500/30 bg-red-500/10 text-red-300'
-  if (status === 'missing') return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-  return 'border-primary-700 bg-primary-800/70 text-primary-400'
+  if (status === 'passed') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+  if (status === 'failed') return 'border-red-500/30 bg-red-500/10 text-red-700'
+  if (status === 'missing') return 'border-amber-500/30 bg-amber-500/10 text-amber-700'
+  return 'border-primary-200 bg-white text-primary-600'
 }
 
 function getVerificationBadge(status: WorkspaceCheckpointVerificationItem['status']) {
@@ -98,14 +98,14 @@ function getVerificationCardTone(status: WorkspaceCheckpointVerificationItem['st
   if (status === 'passed') return 'border-emerald-500/30 bg-emerald-500/10'
   if (status === 'failed') return 'border-red-500/30 bg-red-500/10'
   if (status === 'missing') return 'border-amber-500/30 bg-amber-500/10'
-  return 'border-primary-700 bg-primary-950/70'
+  return 'border-primary-200 bg-white'
 }
 
 function getInlineDiffLineTone(line: string) {
-  if (line.startsWith('+') && !line.startsWith('+++')) return 'bg-emerald-500/12 text-emerald-200'
-  if (line.startsWith('-') && !line.startsWith('---')) return 'bg-red-500/12 text-red-200'
-  if (line.startsWith('@@')) return 'bg-primary-800/90 text-accent-300'
-  return 'text-primary-300'
+  if (line.startsWith('+') && !line.startsWith('+++')) return 'bg-emerald-50 text-emerald-700'
+  if (line.startsWith('-') && !line.startsWith('---')) return 'bg-red-50 text-red-700'
+  if (line.startsWith('@@')) return 'bg-primary-50 text-accent-500'
+  return 'text-primary-600'
 }
 
 function getRunEventText(event: WorkspaceCheckpointDetail['run_events'][number]) {
@@ -256,23 +256,23 @@ export function CheckpointDetailScreen({
   const backLabel = returnTo === 'review' ? 'Review Queue' : 'Projects'
 
   return (
-    <div className="min-h-full bg-primary-950 text-primary-100">
-      <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-4 py-5 sm:px-6 lg:px-8">
+    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+      <section className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col space-y-5">
         <button
           type="button"
           onClick={onBack}
-          className="mb-4 inline-flex w-fit items-center gap-2 text-sm font-medium text-primary-300 transition-colors hover:text-primary-100"
+          className="inline-flex w-fit items-center gap-2 text-sm font-medium text-primary-600 transition-colors hover:text-primary-900"
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.8} />
           {backLabel}
         </button>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-primary-800 bg-primary-900/70 shadow-2xl shadow-black/20">
-          <div className="border-b border-primary-800 px-5 py-4 md:px-6">
-            <h1 className="text-base font-semibold text-primary-100">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-primary-200 bg-white shadow-sm">
+          <div className="border-b border-primary-200 px-5 py-4 md:px-6">
+            <h1 className="text-base font-semibold text-primary-900">
               {detail?.task_name ?? 'Checkpoint detail'}
             </h1>
-            <p className="text-sm text-primary-400">
+            <p className="text-sm text-primary-600">
               Full review detail before approval, revision, or rejection.
             </p>
           </div>
@@ -281,12 +281,12 @@ export function CheckpointDetailScreen({
             <div className="flex flex-1 items-center justify-center px-6">
               <div className="text-center">
                 <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-                <p className="text-sm text-primary-400">Loading checkpoint detail...</p>
+                <p className="text-sm text-primary-600">Loading checkpoint detail...</p>
               </div>
             </div>
           ) : detailQuery.isError || !detail ? (
             <div className="flex flex-1 items-center justify-center px-6">
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-center text-sm text-red-200">
+              <div className="rounded-2xl border border-red-500/30 bg-red-50 px-5 py-4 text-center text-sm text-red-700">
                 {detailQuery.error instanceof Error
                   ? detailQuery.error.message
                   : 'Checkpoint detail could not be loaded'}
@@ -296,7 +296,7 @@ export function CheckpointDetailScreen({
             <>
               <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6">
                 <div className="space-y-5 pb-28">
-                  <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
+                  <section className="rounded-3xl border border-primary-200 bg-primary-50 p-4">
                     <SectionHeader
                       title="Verification"
                       description="Checkpoint verification state across the configured checks."
@@ -324,7 +324,7 @@ export function CheckpointDetailScreen({
                             )}
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-medium text-primary-100">{label}</p>
+                              <p className="text-sm font-medium text-primary-900">{label}</p>
                               <span
                                 className={cn(
                                   'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
@@ -334,14 +334,14 @@ export function CheckpointDetailScreen({
                                 {getVerificationBadge(value.status)}
                               </span>
                             </div>
-                            <p className="mt-2 text-sm text-primary-200">{value.label}</p>
+                            <p className="mt-2 text-sm text-primary-900">{value.label}</p>
                             {value.checked_at ? (
-                              <p className="mt-1 text-xs text-primary-400">
+                              <p className="mt-1 text-xs text-primary-600">
                                 {formatCheckpointTimestamp(value.checked_at)}
                               </p>
                             ) : null}
                             {value.output ? (
-                              <pre className="mt-3 max-h-36 overflow-auto rounded-xl border border-primary-800 bg-primary-950/80 px-3 py-2 font-mono text-[11px] leading-5 text-primary-300">
+                              <pre className="mt-3 max-h-36 overflow-auto rounded-xl border border-primary-200 bg-white px-3 py-2 font-mono text-[11px] leading-5 text-primary-600">
                                 {value.output}
                               </pre>
                             ) : null}
@@ -351,14 +351,14 @@ export function CheckpointDetailScreen({
                     </div>
                   </section>
 
-                  <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
+                  <section className="rounded-3xl border border-primary-200 bg-primary-50 p-4">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-primary-700 bg-primary-950/70 px-3 py-1 text-sm font-medium text-primary-100">
+                          <span className="rounded-full border border-primary-200 bg-white px-3 py-1 text-sm font-medium text-primary-900">
                             {detail.task_name ?? 'Untitled task'}
                           </span>
-                          <span className="rounded-full border border-primary-700 bg-primary-950/70 px-3 py-1 text-xs text-primary-300">
+                          <span className="rounded-full border border-primary-200 bg-white px-3 py-1 text-xs text-primary-600">
                             {detail.id}
                           </span>
                           <span
@@ -370,9 +370,9 @@ export function CheckpointDetailScreen({
                             {formatCheckpointStatus(detail.status)}
                           </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-primary-300">
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-primary-600">
                           <span>{detail.agent_name ?? 'Unknown agent'}</span>
-                          <span className="rounded-full border border-primary-700 bg-primary-950/70 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-primary-300">
+                          <span className="rounded-full border border-primary-200 bg-white px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-primary-600">
                             {detail.agent_model ?? detail.agent_adapter_type ?? 'Model unavailable'}
                           </span>
                         </div>
@@ -397,7 +397,7 @@ export function CheckpointDetailScreen({
                     </div>
                   </section>
 
-                  <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
+                  <section className="rounded-3xl border border-primary-200 bg-primary-50 p-4">
                     <SectionHeader
                       title="Summary"
                       description="AI-generated summary of the work and the full agent log."
@@ -405,13 +405,13 @@ export function CheckpointDetailScreen({
                         <button
                           type="button"
                           onClick={() => setLogOpen((value) => !value)}
-                          className="inline-flex items-center gap-2 text-xs font-medium text-accent-300 hover:text-accent-400"
+                          className="inline-flex items-center gap-2 text-xs font-medium text-accent-500 hover:text-accent-500/80"
                         >
                           {logOpen ? 'Hide full agent log' : 'Show full agent log'}
                         </button>
                       }
                     />
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-primary-200">
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-primary-900">
                       {detail.summary?.trim() || 'No checkpoint summary provided.'}
                     </p>
 
@@ -423,10 +423,10 @@ export function CheckpointDetailScreen({
                           exit={{ opacity: 0, height: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="mt-4 space-y-3 border-t border-primary-800 pt-4">
+                          <div className="mt-4 space-y-3 border-t border-primary-200 pt-4">
                             {detail.run_events.length > 0 ? (
                               detail.run_events.map((event) => (
-                                <div key={event.id} className="rounded-2xl border border-primary-800 bg-primary-950/70 p-3">
+                                <div key={event.id} className="rounded-2xl border border-primary-200 bg-white p-3">
                                   <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-primary-500">
                                     <span>{event.type}</span>
                                     <span className="inline-flex items-center gap-1">
@@ -434,13 +434,13 @@ export function CheckpointDetailScreen({
                                       {formatCheckpointTimestamp(event.created_at)}
                                     </span>
                                   </div>
-                                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs leading-5 text-primary-300">
+                                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs leading-5 text-primary-600">
                                     {getRunEventText(event)}
                                   </pre>
                                 </div>
                               ))
                             ) : (
-                              <p className="text-sm text-primary-400">No run events were recorded.</p>
+                              <p className="text-sm text-primary-600">No run events were recorded.</p>
                             )}
                           </div>
                         </motion.div>
@@ -448,7 +448,7 @@ export function CheckpointDetailScreen({
                     </AnimatePresence>
                   </section>
 
-                  <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
+                  <section className="rounded-3xl border border-primary-200 bg-primary-50 p-4">
                     <SectionHeader
                       title="Files Changed"
                       description={`${detail.diff_files.length} file${detail.diff_files.length === 1 ? '' : 's'} in this checkpoint.`}
@@ -456,13 +456,13 @@ export function CheckpointDetailScreen({
                         <button
                           type="button"
                           onClick={() => setRawDiffOpen((value) => !value)}
-                          className="inline-flex items-center gap-2 text-xs font-medium text-accent-300 hover:text-accent-400"
+                          className="inline-flex items-center gap-2 text-xs font-medium text-accent-500 hover:text-accent-500/80"
                         >
                           {rawDiffOpen ? 'Hide diff' : 'Show diff'}
                         </button>
                       }
                     />
-                    <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-primary-800 bg-primary-950/60 px-3 py-3 font-mono text-xs leading-5 text-primary-300">
+                    <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-primary-200 bg-white px-3 py-3 font-mono text-xs leading-5 text-primary-600">
                       {diffStat?.raw ||
                         'No diff stat summary was recorded for this checkpoint.'}
                     </p>
@@ -476,11 +476,11 @@ export function CheckpointDetailScreen({
                         >
                           <div className="mt-4">
                             {rawDiffQuery.isLoading ? (
-                              <div className="rounded-2xl border border-primary-800 bg-primary-950/60 px-4 py-8 text-center text-sm text-primary-400">
+                              <div className="rounded-2xl border border-primary-200 bg-white px-4 py-8 text-center text-sm text-primary-600">
                                 Loading raw diff...
                               </div>
                             ) : rawDiffQuery.isError ? (
-                              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-200">
+                              <div className="rounded-2xl border border-red-500/30 bg-red-50 px-4 py-4 text-sm text-red-700">
                                 {rawDiffQuery.error instanceof Error
                                   ? rawDiffQuery.error.message
                                   : 'Checkpoint diff could not be loaded'}
@@ -495,25 +495,25 @@ export function CheckpointDetailScreen({
                     <div className="mt-4 space-y-3">
                       {detail.diff_files.length > 0 && hasInlineDiffs ? (
                         detail.diff_files.map((file) => (
-                          <div key={file.path} className="overflow-hidden rounded-2xl border border-primary-800 bg-primary-950/60">
+                          <div key={file.path} className="overflow-hidden rounded-2xl border border-primary-200 bg-white">
                             <button
                               type="button"
                               onClick={() =>
                                 setExpandedDiffs((current) => ({ ...current, [file.path]: !current[file.path] }))
                               }
-                              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary-900/80"
+                              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary-50"
                             >
                               <div className="min-w-0">
-                                <p className="truncate font-mono text-sm text-primary-100">{file.path}</p>
+                                <p className="truncate font-mono text-sm text-primary-900">{file.path}</p>
                                 <div className="mt-1 flex flex-wrap gap-3 text-xs">
-                                  <span className="text-emerald-300">+{file.additions ?? 0}</span>
-                                  <span className="text-red-300">-{file.deletions ?? 0}</span>
-                                  <span className="text-primary-400">
+                                  <span className="text-emerald-700">+{file.additions ?? 0}</span>
+                                  <span className="text-red-700">-{file.deletions ?? 0}</span>
+                                  <span className="text-primary-600">
                                     {file.patch.trim() ? 'Inline diff available' : 'Diff not available'}
                                   </span>
                                 </div>
                               </div>
-                              <span className="shrink-0 text-xs font-medium text-primary-400">
+                              <span className="shrink-0 text-xs font-medium text-primary-600">
                                 {expandedDiffs[file.path] ? 'Hide' : 'Show'}
                               </span>
                             </button>
@@ -524,11 +524,11 @@ export function CheckpointDetailScreen({
                                   initial={{ opacity: 0, height: 0 }}
                                   animate={{ opacity: 1, height: 'auto' }}
                                   exit={{ opacity: 0, height: 0 }}
-                                  className="overflow-hidden border-t border-primary-800"
+                                  className="overflow-hidden border-t border-primary-200"
                                 >
                                   {file.patch.trim() ? (
                                     <div className="overflow-x-auto p-3">
-                                      <div className="min-w-full overflow-hidden rounded-xl border border-primary-800 bg-primary-950">
+                                      <div className="min-w-full overflow-hidden rounded-xl border border-primary-200 bg-white">
                                         {file.patch.split('\n').map((line, index) => (
                                           <div
                                             key={`${file.path}:${index}`}
@@ -545,7 +545,7 @@ export function CheckpointDetailScreen({
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="px-4 py-4 text-sm text-primary-400">
+                                    <div className="px-4 py-4 text-sm text-primary-600">
                                       Diff not available for this file.
                                     </div>
                                   )}
@@ -555,9 +555,9 @@ export function CheckpointDetailScreen({
                           </div>
                         ))
                       ) : detail.diff_files.length > 0 ? (
-                        <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/40 px-4 py-5">
-                          <p className="text-sm font-medium text-primary-100">Diff not available</p>
-                          <p className="mt-1 text-sm text-primary-400">
+                        <div className="rounded-2xl border border-dashed border-primary-200 bg-white px-4 py-5">
+                          <p className="text-sm font-medium text-primary-900">Diff not available</p>
+                          <p className="mt-1 text-sm text-primary-600">
                             This checkpoint includes a diff summary, but no inline patch content was returned by the API.
                           </p>
                           {changedFiles.length > 0 ? (
@@ -565,7 +565,7 @@ export function CheckpointDetailScreen({
                               {changedFiles.map((path) => (
                                 <span
                                   key={path}
-                                  className="rounded-full border border-primary-700 bg-primary-950/70 px-3 py-1 font-mono text-xs text-primary-300"
+                                  className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 font-mono text-xs text-primary-600"
                                 >
                                   {path}
                                 </span>
@@ -574,28 +574,28 @@ export function CheckpointDetailScreen({
                           ) : null}
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-dashed border-primary-700 bg-primary-900/40 px-4 py-8 text-center text-sm text-primary-400">
+                        <div className="rounded-2xl border border-dashed border-primary-200 bg-white px-4 py-8 text-center text-sm text-primary-600">
                           No changed files were recorded for this checkpoint.
                         </div>
                       )}
                     </div>
                   </section>
 
-                  <section className="rounded-3xl border border-primary-800 bg-primary-800/35 p-4">
+                  <section className="rounded-3xl border border-primary-200 bg-primary-50 p-4">
                     <SectionHeader
                       title="Unblocks"
                       description="Approving this will unblock dependent tasks in the same project."
                     />
                     {unblocks.length > 0 ? (
                       <>
-                        <p className="mt-3 text-sm text-primary-200">
+                        <p className="mt-3 text-sm text-primary-900">
                           Approving this will unblock: {unblocks.map((task) => task.name).join(', ')}
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {unblocks.map((task) => (
                             <span
                               key={task.id}
-                              className="rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-xs text-accent-300"
+                              className="rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-xs text-accent-500"
                             >
                               {task.name}
                             </span>
@@ -603,7 +603,7 @@ export function CheckpointDetailScreen({
                         </div>
                       </>
                     ) : (
-                      <p className="mt-3 text-sm text-primary-400">
+                      <p className="mt-3 text-sm text-primary-600">
                         No dependent tasks were found from the loaded project detail.
                       </p>
                     )}
@@ -611,7 +611,7 @@ export function CheckpointDetailScreen({
                 </div>
               </div>
 
-              <div className="border-t border-primary-800 bg-primary-900/96 px-5 py-4 backdrop-blur md:px-6">
+              <div className="border-t border-primary-200 bg-white px-5 py-4 md:px-6">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                   <div className="space-y-3">
                     <label className="block">
@@ -622,7 +622,7 @@ export function CheckpointDetailScreen({
                         value={reviewNotes}
                         onChange={(event) => setReviewNotes(event.target.value)}
                         rows={3}
-                        className="w-full rounded-2xl border border-primary-700 bg-primary-950/80 px-4 py-3 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                        className="w-full rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                         placeholder="Add review context, concerns, or merge notes..."
                       />
                     </label>
@@ -635,40 +635,40 @@ export function CheckpointDetailScreen({
                           exit={{ opacity: 0, height: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+                          <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-50 p-4">
                             <label className="block">
-                              <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-300">
+                              <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700">
                                 What To Change
                               </span>
                               <textarea
                                 value={reviseWhat}
                                 onChange={(event) => setReviseWhat(event.target.value)}
                                 rows={3}
-                                className="w-full rounded-xl border border-primary-700 bg-primary-950/80 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                                 placeholder="Required. Describe the exact revision needed."
                               />
                             </label>
                             <label className="block">
-                              <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-300">
+                              <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700">
                                 Constraints
                               </span>
                               <textarea
                                 value={reviseConstraints}
                                 onChange={(event) => setReviseConstraints(event.target.value)}
                                 rows={2}
-                                className="w-full rounded-xl border border-primary-700 bg-primary-950/80 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                                 placeholder="Optional. Guardrails the agent must follow."
                               />
                             </label>
                             <label className="block">
-                              <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-300">
+                              <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700">
                                 Acceptance Test
                               </span>
                               <textarea
                                 value={reviseAcceptance}
                                 onChange={(event) => setReviseAcceptance(event.target.value)}
                                 rows={2}
-                                className="w-full rounded-xl border border-primary-700 bg-primary-950/80 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                                className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                                 placeholder="Optional. Define how the revision should be validated."
                               />
                             </label>
@@ -679,14 +679,14 @@ export function CheckpointDetailScreen({
                   </div>
 
                   <div className="flex flex-col justify-between gap-3">
-                    <div className="rounded-2xl border border-primary-800 bg-primary-950/70 p-4">
+                    <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4">
                       <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
                         Approve Mode
                       </p>
                       <select
                         value={approveMode}
                         onChange={(event) => setApproveMode(event.target.value as ApproveMode)}
-                        className="mt-2 w-full rounded-xl border border-primary-700 bg-primary-900 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                        className="mt-2 w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                       >
                         <option value="approve-and-commit">Approve &amp; Commit</option>
                         <option value="approve-and-pr">Approve &amp; Open PR</option>
@@ -701,7 +701,7 @@ export function CheckpointDetailScreen({
                         variant="outline"
                         onClick={() => setReviseOpen((value) => !value)}
                         disabled={reviewMutation.isPending}
-                        className="border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"
+                        className="border-amber-500/30 bg-amber-50 text-amber-700 hover:bg-amber-100"
                       >
                         <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={14} strokeWidth={1.8} />
                         {reviseOpen ? 'Hide Revise Panel' : 'Revise'}
@@ -747,7 +747,7 @@ export function CheckpointDetailScreen({
             </>
           )}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }
