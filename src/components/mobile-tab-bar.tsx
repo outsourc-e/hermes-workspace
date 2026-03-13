@@ -190,11 +190,10 @@ export function MobileTabBar() {
         'fixed bottom-0 left-0 right-0 mx-auto w-fit z-[80] md:hidden',
         // Vertical position: above home indicator
         'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
-        // Frosted glass pill
-        'bg-white/75 dark:bg-neutral-900/75 backdrop-blur-2xl',
+        // Opaque pill to avoid background bleed-through
+        'bg-white dark:bg-neutral-900 shadow-lg',
         'rounded-full',
         'border border-white/40 dark:border-white/10',
-        'shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
         // Inner padding
         'px-3 py-2',
         // Hide/show animation

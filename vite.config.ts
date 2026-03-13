@@ -129,10 +129,46 @@ const config = defineConfig(({ mode, command }) => {
 
             const distEntry = resolve('workspace-daemon/dist/server.js')
             const srcEntry = resolve('workspace-daemon/src/server.ts')
+            const maxRetries = 5
+            const retryDelayMs = 2000
+
+            const spawnWithRespawn = (commandName: string, args: string[], options: Parameters<typeof spawn>[2]) => {
+              let retryCount = 0
+
+              const startChild = () => {
+                workspaceDaemonStarted = true
+                const child = spawn(commandName, args, options)
+
+                child.on('exit', (code) => {
+                  if (code === 0) {
+                    workspaceDaemonStarted = false
+                    return
+                  }
+
+                  if (retryCount >= maxRetries) {
+                    workspaceDaemonStarted = false
+                    console.error(
+                      `[workspace-daemon] crashed with code ${code ?? 'unknown'}; max restart attempts reached.`,
+                    )
+                    return
+                  }
+
+                  retryCount += 1
+                  console.error(
+                    `[workspace-daemon] crashed with code ${code ?? 'unknown'}; restarting in ${retryDelayMs / 1000}s (${retryCount}/${maxRetries}).`,
+                  )
+
+                  setTimeout(() => {
+                    startChild()
+                  }, retryDelayMs)
+                })
+              }
+
+              startChild()
+            }
 
             if (existsSync(distEntry)) {
-              workspaceDaemonStarted = true
-              spawn('node', ['workspace-daemon/dist/server.js'], {
+              spawnWithRespawn('node', ['workspace-daemon/dist/server.js'], {
                 cwd: process.cwd(),
                 env: { ...process.env, PORT: '3099' },
                 stdio: 'inherit',
@@ -141,8 +177,7 @@ const config = defineConfig(({ mode, command }) => {
             }
 
             if (existsSync(srcEntry)) {
-              workspaceDaemonStarted = true
-              spawn('npx', ['--prefix', 'workspace-daemon', 'tsx', 'src/server.ts'], {
+              spawnWithRespawn('npx', ['--prefix', 'workspace-daemon', 'tsx', 'src/server.ts'], {
                 cwd: process.cwd(),
                 env: { ...process.env, PORT: '3099' },
                 stdio: 'inherit',
