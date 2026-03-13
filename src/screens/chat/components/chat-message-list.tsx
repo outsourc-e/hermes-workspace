@@ -447,10 +447,9 @@ function ChatMessageListComponent({
     }
   }, [])
 
-  // Filter out toolResult messages - they'll be displayed inside their associated tool calls
+  // Filter messages — toolResult handled by grouping into assistant bubble below
   const displayMessages = useMemo(() => {
     const filteredMessages = messages.filter((msg) => {
-      if (msg.role === 'toolResult') return false
 
       const cleanedText = textFromMessage(msg).trim()
 
@@ -519,7 +518,8 @@ function ChatMessageListComponent({
     const entries: Array<DisplayEntry> = []
 
     displayMessages.forEach((message, index) => {
-      if (message.role === 'tool') {
+      // Group both 'tool' and 'toolResult' roles into the preceding assistant bubble
+      if (message.role === 'tool' || message.role === 'toolResult') {
         const previousEntry = entries[entries.length - 1]
         if (previousEntry?.message.role === 'assistant') {
           previousEntry.attachedToolMessages.push(message)
@@ -785,7 +785,7 @@ function ChatMessageListComponent({
   }, [displayEntries, streamingCleared])
 
   const lastAssistantIndex = displayEntries
-    .filter(({ message }) => message.role !== 'user')
+    .filter(({ message }) => message.role === 'assistant')
     .map(({ sourceIndex }) => sourceIndex)
     .pop()
   const lastUserIndex = displayEntries
@@ -1415,6 +1415,7 @@ function ChatMessageListComponent({
                         simulateStreaming={simulateStreaming}
                         streamingKey={signature}
                         expandAllToolSections={expandAllToolSections}
+                        isLastAssistant={forceActionsVisible}
                       />
                     )
                   })}

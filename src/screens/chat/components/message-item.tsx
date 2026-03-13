@@ -126,6 +126,7 @@ type MessageItemProps = {
   simulateStreaming?: boolean
   streamingKey?: string | null
   expandAllToolSections?: boolean
+  isLastAssistant?: boolean
 }
 
 type InlineToolSection = {
@@ -490,10 +491,12 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       root.cache_write ??
       root.cacheWriteTokens ??
       root.cache_write_tokens ??
+      root.cache_creation_input_tokens ??
       usage?.cacheWrite ??
       usage?.cache_write ??
       usage?.cacheWriteTokens ??
-      usage?.cache_write_tokens,
+      usage?.cache_write_tokens ??
+      usage?.cache_creation_input_tokens,
   )
   const contextPercent = readPercent(
     root.contextPercent ??
@@ -676,6 +679,22 @@ function isImageAttachment(attachment: GatewayAttachment): boolean {
   return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)
 }
 
+function InlineToolSectionItem({
+  toolSection,
+  index,
+  forceOpen,
+}: {
+  toolSection: InlineToolSection
+  index: number
+  forceOpen?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (forceOpen) setOpen(true)
+  }, [forceOpen])
+  return renderInlineToolSection(toolSection, index, open, setOpen)
+}
+
 function renderInlineToolSection(
   toolSection: InlineToolSection,
   index: number,
@@ -778,6 +797,7 @@ function MessageItemComponent({
   simulateStreaming: _simulateStreaming = false,
   streamingKey: _streamingKey,
   expandAllToolSections = false,
+  isLastAssistant = false,
 }: MessageItemProps) {
   const role = message.role || 'assistant'
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
@@ -1098,12 +1118,6 @@ function MessageItemComponent({
     [attachedToolSections, toolParts],
   )
   const hasToolCalls = inlineToolSections.length > 0
-  const [toolCallsOpen, setToolCallsOpen] = useState(false)
-  useEffect(() => {
-    if (expandAllToolSections) {
-      setToolCallsOpen(true)
-    }
-  }, [expandAllToolSections])
 
   // 'queued' = delivered to gateway, waiting for response (busy/backlogged)
   // 'sending' = still in flight to the gateway API (should clear in <1s)
@@ -1117,6 +1131,7 @@ function MessageItemComponent({
   const hasAssistantMetadata =
     !isUser &&
     !effectiveIsStreaming &&
+    isLastAssistant &&
     (usageMetadata.inputTokens !== null ||
       usageMetadata.outputTokens !== null ||
       usageMetadata.cacheReadTokens !== null ||
@@ -1427,44 +1442,36 @@ function MessageItemComponent({
           </Message>
         )}
         {hasAssistantMetadata ? (
-          <div className="flex items-center justify-end gap-1.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-primary-400">
-            {/* Token stats */}
-            <span>
-              {[
-                usageMetadata.inputTokens !== null
-                  ? `↑${formatCompactNumber(usageMetadata.inputTokens)}`
-                  : null,
-                usageMetadata.outputTokens !== null
-                  ? `↓${formatCompactNumber(usageMetadata.outputTokens)}`
-                  : null,
-                usageMetadata.cacheReadTokens !== null
-                  ? `R${formatCompactNumber(usageMetadata.cacheReadTokens)}`
-                  : null,
-                usageMetadata.cacheWriteTokens !== null
-                  ? `W${formatCompactNumber(usageMetadata.cacheWriteTokens)}`
-                  : null,
-                usageMetadata.contextPercent !== null
-                  ? `${Math.round(usageMetadata.contextPercent)}% ctx`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-
+          <div className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-primary-400 leading-relaxed">
+            {usageMetadata.inputTokens !== null && (
+              <span>↑{formatCompactNumber(usageMetadata.inputTokens)}</span>
+            )}
+            {usageMetadata.outputTokens !== null && (
+              <span>↓{formatCompactNumber(usageMetadata.outputTokens)}</span>
+            )}
+            {usageMetadata.cacheReadTokens !== null && (
+              <span>R{formatCompactNumber(usageMetadata.cacheReadTokens)}</span>
+            )}
+            {usageMetadata.cacheWriteTokens !== null && (
+              <span>W{formatCompactNumber(usageMetadata.cacheWriteTokens)}</span>
+            )}
+            {usageMetadata.modelLabel && (
+              <span className="opacity-60">{usageMetadata.modelLabel}</span>
+            )}
           </div>
         ) : null}
 
-      {/* Render tool calls — one collapsible card per tool with input + output */}
+      {/* Render tool calls — one collapsible card per tool with independent open state */}
       {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-1 flex flex-col gap-1">
-          {inlineToolSections.map((toolSection, index) =>
-            renderInlineToolSection(
-              toolSection,
-              index,
-              toolCallsOpen,
-              setToolCallsOpen,
-            ),
-          )}
+          {inlineToolSections.map((toolSection, index) => (
+            <InlineToolSectionItem
+              key={toolSection.key || `${toolSection.type}-${index}`}
+              toolSection={toolSection}
+              index={index}
+              forceOpen={expandAllToolSections}
+            />
+          ))}
         </div>
       )}
 

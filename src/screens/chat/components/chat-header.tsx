@@ -2,8 +2,8 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
-  Maximize01Icon,
-  Minimize01Icon,
+  EyeIcon,
+  ViewOffIcon,
 } from '@hugeicons/core-free-icons'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
@@ -236,7 +236,7 @@ function ChatHeaderComponent({
               title={focusModeLabel}
             >
               <HugeiconsIcon
-                icon={isFocusMode ? Minimize01Icon : Maximize01Icon}
+                icon={isFocusMode ? ViewOffIcon : EyeIcon}
                 size={20}
                 strokeWidth={1.6}
               />
@@ -394,28 +394,7 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger
-              onClick={onToggleFocusMode}
-              render={
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="text-primary-800 hover:bg-primary-100"
-                  aria-label={focusModeLabel}
-                >
-                  <HugeiconsIcon
-                    icon={isFocusMode ? Minimize01Icon : Maximize01Icon}
-                    size={18}
-                    strokeWidth={1.5}
-                  />
-                </Button>
-              }
-            />
-            <TooltipContent side="bottom">{focusModeLabel}</TooltipContent>
-          </TooltipRoot>
-        </TooltipProvider>
+
       </div>
     </div>
   )

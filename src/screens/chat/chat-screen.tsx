@@ -1342,6 +1342,18 @@ export function ChatScreen({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [chatFocusMode, setChatFocusMode])
 
+  // ⌘. (Mac) / Ctrl+. (Win) to toggle focus mode
+  useEffect(() => {
+    if (compact) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '.' || !(event.metaKey || event.ctrlKey)) return
+      event.preventDefault()
+      setChatFocusMode(!chatFocusMode)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [compact, chatFocusMode, setChatFocusMode])
+
   useEffect(() => {
     return () => {
       useWorkspaceStore.getState().setChatFocusMode(false)
