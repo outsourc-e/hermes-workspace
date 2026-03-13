@@ -252,7 +252,7 @@ export function ProjectsScreen({
     queryKey: ['workspace', 'projects', refreshToken],
     queryFn: async () =>
       extractProjects(
-        await apiRequest('http://localhost:3099/api/workspace/projects'),
+        await apiRequest('/api/workspace/projects'),
       ),
     placeholderData: keepPreviousData,
   })
@@ -418,7 +418,7 @@ export function ProjectsScreen({
     queryKey: ['workspace', 'agents'],
     queryFn: async () =>
       extractAgents(
-        await apiRequest('http://localhost:3099/api/workspace/agents'),
+        await apiRequest('/api/workspace/agents'),
       ),
   })
 
@@ -450,7 +450,7 @@ export function ProjectsScreen({
     queryFn: async () =>
       extractCheckpoints(
         await apiRequest(
-          'http://localhost:3099/api/workspace/checkpoints?status=pending',
+          '/api/workspace/checkpoints?status=pending',
         ),
       ),
   })

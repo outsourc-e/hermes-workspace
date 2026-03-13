@@ -29,21 +29,21 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
     res.json({ ok: true });
   });
 
-  app.use("/api/projects", createProjectsRouter(tracker));
-  app.use("/api/phases", createPhasesRouter(tracker));
-  app.use("/api/tasks", createTasksRouter(tracker, orchestrator));
-  app.use("/api/task-runs/adhoc", createAdhocTaskRunsRouter(tracker, orchestrator));
-  app.use("/api/task-runs", createTaskRunsRouter(tracker, orchestrator));
-  app.use("/api/agents", createAgentsRouter(tracker));
-  app.use("/api/missions", createMissionsRouter(tracker));
-  app.use("/api/checkpoints", createCheckpointsRouter(tracker));
-  app.use("/api/decompose", createDecomposeRouter(tracker));
+  app.use("/api/workspace/projects", createProjectsRouter(tracker));
+  app.use("/api/workspace/phases", createPhasesRouter(tracker));
+  app.use("/api/workspace/tasks", createTasksRouter(tracker, orchestrator));
+  app.use("/api/workspace/task-runs/adhoc", createAdhocTaskRunsRouter(tracker, orchestrator));
+  app.use("/api/workspace/task-runs", createTaskRunsRouter(tracker, orchestrator));
+  app.use("/api/workspace/agents", createAgentsRouter(tracker));
+  app.use("/api/workspace/missions", createMissionsRouter(tracker));
+  app.use("/api/workspace/checkpoints", createCheckpointsRouter(tracker));
+  app.use("/api/workspace/decompose", createDecomposeRouter(tracker));
   app.use("/api/workspace/teams", createTeamsRouter(tracker));
   app.use("/api/workspace/skills", createSkillsRouter());
 
   const eventsRouter = Router();
   registerEventsRoutes(eventsRouter, tracker);
-  app.use("/api/events", eventsRouter);
+  app.use("/api/workspace/events", eventsRouter);
 
   return { app, tracker, orchestrator };
 }
