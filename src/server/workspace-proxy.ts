@@ -1,4 +1,4 @@
-const WORKSPACE_DAEMON_ORIGIN = 'http://127.0.0.1:3099'
+import { WORKSPACE_DAEMON_ORIGIN } from './workspace-config'
 
 type ForwardWorkspaceRequestOptions = {
   request: Request

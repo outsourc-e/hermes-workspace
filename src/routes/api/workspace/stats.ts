@@ -1,14 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { WORKSPACE_DAEMON_ORIGIN } from '../../../server/workspace-config'
 import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
   safeErrorMessage,
 } from '../../../server/rate-limit'
-
-const WORKSPACE_DAEMON_ORIGIN = 'http://127.0.0.1:3099'
 
 type ProjectRecord = {
   id?: string
