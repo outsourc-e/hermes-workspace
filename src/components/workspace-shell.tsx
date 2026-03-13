@@ -30,6 +30,7 @@ import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
@@ -416,6 +417,7 @@ export function WorkspaceShell() {
 
       {isMobile ? <MobileTabBar /> : null}
       {settings.showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
+      <CommandPalette pathname={pathname} sessions={sessions} />
     </>
   )
 }

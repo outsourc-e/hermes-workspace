@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
   EyeIcon,
+  Search01Icon,
   ViewOffIcon,
 } from '@hugeicons/core-free-icons'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
@@ -14,6 +15,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { CHAT_OPEN_MESSAGE_SEARCH_EVENT } from '@/screens/chat/chat-events'
 import { cn } from '@/lib/utils'
 
 function toTitleCase(value: string): string {
@@ -314,27 +316,30 @@ function ChatHeaderComponent({
             aria-label="Session name"
           />
         ) : (
-          <button
-            type="button"
-            onClick={startTitleEdit}
-            disabled={!canRenameTitle || renamingTitle}
-            className="flex max-w-full items-center gap-1.5 rounded-sm text-left"
-            aria-label="Rename session"
-            title={canRenameTitle ? 'Click to rename session' : undefined}
-          >
-            <span
-              className="min-w-0 truncate text-sm font-medium text-balance"
-              suppressHydrationWarning
+          <div className="flex max-w-full items-center gap-1.5">
+            {/* Session name — click to open session switcher */}
+            <button
+              type="button"
+              onClick={onOpenSessions}
+              className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
+              aria-label="Switch session"
+              title="Click to switch session"
             >
               {activeTitle}
-            </span>
-            <span
-              aria-hidden
-              className="text-xs text-primary-400 opacity-0 transition-opacity group-hover:opacity-100"
-            >
-              ✏️
-            </span>
-          </button>
+            </button>
+            {/* Pencil — click to rename */}
+            {canRenameTitle && !renamingTitle && (
+              <button
+                type="button"
+                onClick={startTitleEdit}
+                className="shrink-0 text-xs text-primary-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-primary-600"
+                aria-label="Rename session"
+                title="Rename session"
+              >
+                ✏️
+              </button>
+            )}
+          </div>
         )}
       </div>
       {renamingTitle ? (
@@ -364,6 +369,31 @@ function ChatHeaderComponent({
           </TooltipRoot>
         </TooltipProvider>
       ) : null}
+      <TooltipProvider>
+        <TooltipRoot>
+          <TooltipTrigger
+            onClick={() => {
+              window.dispatchEvent(new Event(CHAT_OPEN_MESSAGE_SEARCH_EVENT))
+            }}
+            render={
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="mr-2 text-primary-800 hover:bg-primary-100 dark:hover:bg-primary-800"
+                aria-label="Search messages"
+                title="Search messages"
+              >
+                <HugeiconsIcon
+                  icon={Search01Icon}
+                  size={18}
+                  strokeWidth={1.5}
+                />
+              </Button>
+            }
+          />
+          <TooltipContent side="bottom">Search messages</TooltipContent>
+        </TooltipRoot>
+      </TooltipProvider>
       {dataUpdatedAt > 0 ? (
           <TooltipProvider>
             <TooltipRoot>

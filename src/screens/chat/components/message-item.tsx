@@ -452,6 +452,12 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       ? (root.usage as Record<string, unknown>)
       : null
 
+  // Gateway may store step/cost data in message.details (from chat.history)
+  const details =
+    root.details && typeof root.details === 'object'
+      ? (root.details as Record<string, unknown>)
+      : null
+
   const inputTokens = readNumber(
     root.inputTokens ??
       root.input_tokens ??
@@ -462,7 +468,10 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       usage?.input ??
       usage?.promptTokens ??
       usage?.prompt_tokens ??
-      usage?.prompt,
+      usage?.prompt ??
+      details?.inputTokens ??
+      details?.input_tokens ??
+      details?.tokens_in,
   )
   const outputTokens = readNumber(
     root.outputTokens ??
@@ -474,7 +483,10 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       usage?.output ??
       usage?.completionTokens ??
       usage?.completion_tokens ??
-      usage?.completion,
+      usage?.completion ??
+      details?.outputTokens ??
+      details?.output_tokens ??
+      details?.tokens_out,
   )
   const cacheReadTokens = readNumber(
     root.cacheRead ??
@@ -484,7 +496,10 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       usage?.cacheRead ??
       usage?.cache_read ??
       usage?.cacheReadTokens ??
-      usage?.cache_read_tokens,
+      usage?.cache_read_tokens ??
+      details?.cacheRead ??
+      details?.cache_read ??
+      details?.cache_read_input_tokens,
   )
   const cacheWriteTokens = readNumber(
     root.cacheWrite ??
@@ -496,7 +511,10 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       usage?.cache_write ??
       usage?.cacheWriteTokens ??
       usage?.cache_write_tokens ??
-      usage?.cache_creation_input_tokens,
+      usage?.cache_creation_input_tokens ??
+      details?.cacheWrite ??
+      details?.cache_write ??
+      details?.cache_creation_input_tokens,
   )
   const contextPercent = readPercent(
     root.contextPercent ??
@@ -512,7 +530,9 @@ function getMessageUsageMetadata(message: GatewayMessage): {
     root.model_name ??
     usage?.model ??
     usage?.modelName ??
-    usage?.model_name
+    usage?.model_name ??
+    details?.model ??
+    details?.modelName
   const modelLabel =
     typeof rawModel === 'string' && rawModel.trim()
       ? shortenModelName(rawModel.trim())

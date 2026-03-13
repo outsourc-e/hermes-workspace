@@ -81,6 +81,11 @@ import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
+import {
+  CHAT_PENDING_COMMAND_STORAGE_KEY,
+  CHAT_RUN_COMMAND_EVENT,
+  type ChatRunCommandDetail,
+} from './chat-events'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 
@@ -208,6 +213,12 @@ function isRetryableQueuedMessage(message: GatewayMessage): boolean {
   const raw = message as Record<string, unknown>
   const status = normalizeMessageValue(raw.status)
   return status === 'error'
+}
+
+const commandHelpers: ChatComposerHelpers = {
+  reset() {},
+  setValue() {},
+  setAttachments() {},
 }
 
 function getMessageRetryAttachments(
@@ -1889,6 +1900,38 @@ export function ChatScreen({
       resolvedSessionKey,
     ],
   )
+
+  const runPaletteSlashCommand = useCallback(
+    (command: string) => {
+      const trimmedCommand = command.trim()
+      if (!trimmedCommand.startsWith('/')) return
+      send(trimmedCommand, [], false, commandHelpers)
+    },
+    [send],
+  )
+
+  useEffect(() => {
+    function handleRunCommand(event: Event) {
+      const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
+      if (!detail?.command) return
+      runPaletteSlashCommand(detail.command)
+    }
+
+    window.addEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
+    return () => {
+      window.removeEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
+    }
+  }, [runPaletteSlashCommand])
+
+  useEffect(() => {
+    const pendingCommand = window.sessionStorage.getItem(
+      CHAT_PENDING_COMMAND_STORAGE_KEY,
+    )
+    if (!pendingCommand) return
+
+    window.sessionStorage.removeItem(CHAT_PENDING_COMMAND_STORAGE_KEY)
+    runPaletteSlashCommand(pendingCommand)
+  }, [runPaletteSlashCommand])
 
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
 

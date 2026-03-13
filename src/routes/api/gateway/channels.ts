@@ -25,9 +25,23 @@ export const Route = createFileRoute('/api/gateway/channels')({
         }
 
         try {
+          const url = new URL(request.url)
+          const probe =
+            url.searchParams.get('probe') === '1' ||
+            url.searchParams.get('probe') === 'true'
+          const timeoutParam = Number(url.searchParams.get('timeoutMs'))
+          const timeoutMs =
+            Number.isFinite(timeoutParam) && timeoutParam > 0
+              ? Math.min(timeoutParam, 30_000)
+              : undefined
+
           const status = await gatewayRpcWithTimeout<Record<string, unknown>>(
             'channels.status',
-            {},
+            {
+              ...(probe ? { probe: true } : {}),
+              ...(timeoutMs ? { timeoutMs } : {}),
+            },
+            probe ? Math.max(timeoutMs ?? 20_000, 20_000) : 10_000,
           )
           return json({ ok: true, data: status })
         } catch (err) {
