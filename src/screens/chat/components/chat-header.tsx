@@ -2,6 +2,8 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
+  Maximize01Icon,
+  Minimize01Icon,
 } from '@hugeicons/core-free-icons'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
@@ -92,6 +94,8 @@ type ChatHeaderProps = {
   pullOffset?: number
   statusMode?: 'idle' | 'sending' | 'streaming' | 'tool'
   activeToolName?: string
+  isFocusMode?: boolean
+  onToggleFocusMode?: () => void
 }
 
 function ChatHeaderComponent({
@@ -112,6 +116,8 @@ function ChatHeaderComponent({
   statusMode = 'idle',
   activeToolName,
   thinkingLevel = 'low',
+  isFocusMode = false,
+  onToggleFocusMode,
 }: ChatHeaderProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -132,6 +138,7 @@ function ChatHeaderComponent({
   const mobileTitle = formatMobileSessionTitle(activeTitle)
   void _agentModel; void agentConnected; void statusMode; void activeToolName // kept for prop compat
   const showThinkingIndicator = thinkingLevel === 'adaptive'
+  const focusModeLabel = isFocusMode ? 'Exit focus mode' : 'Enter focus mode'
 
   const handleRefresh = useCallback(() => {
     if (!onRefresh) return
@@ -221,6 +228,19 @@ function ChatHeaderComponent({
           </div>
 
           <div className="ml-2 flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={onToggleFocusMode}
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary-700 transition-transform active:scale-95"
+              aria-label={focusModeLabel}
+              title={focusModeLabel}
+            >
+              <HugeiconsIcon
+                icon={isFocusMode ? Minimize01Icon : Maximize01Icon}
+                size={20}
+                strokeWidth={1.6}
+              />
+            </button>
             <button
               type="button"
               onClick={handleOpenAgentDetails}
@@ -344,7 +364,7 @@ function ChatHeaderComponent({
           </TooltipRoot>
         </TooltipProvider>
       ) : null}
-        {dataUpdatedAt > 0 ? (
+      {dataUpdatedAt > 0 ? (
           <TooltipProvider>
             <TooltipRoot>
               <TooltipTrigger
@@ -374,6 +394,28 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
+        <TooltipProvider>
+          <TooltipRoot>
+            <TooltipTrigger
+              onClick={onToggleFocusMode}
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-primary-800 hover:bg-primary-100"
+                  aria-label={focusModeLabel}
+                >
+                  <HugeiconsIcon
+                    icon={isFocusMode ? Minimize01Icon : Maximize01Icon}
+                    size={18}
+                    strokeWidth={1.5}
+                  />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">{focusModeLabel}</TooltipContent>
+          </TooltipRoot>
+        </TooltipProvider>
       </div>
     </div>
   )

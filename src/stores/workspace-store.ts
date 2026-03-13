@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 type WorkspaceState = {
   sidebarCollapsed: boolean
   fileExplorerCollapsed: boolean
+  chatFocusMode: boolean
   /** Currently active sub-page route (e.g. '/skills', '/channels') — null means chat-only */
   activeSubPage: string | null
   /** Chat panel visible alongside non-chat routes */
@@ -18,6 +19,8 @@ type WorkspaceState = {
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleFileExplorer: () => void
   setFileExplorerCollapsed: (collapsed: boolean) => void
+  toggleChatFocusMode: () => void
+  setChatFocusMode: (enabled: boolean) => void
   setActiveSubPage: (page: string | null) => void
   toggleChatPanel: () => void
   setChatPanelOpen: (open: boolean) => void
@@ -32,6 +35,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     (set) => ({
       sidebarCollapsed: false,
       fileExplorerCollapsed: true,
+      chatFocusMode: false,
       activeSubPage: null,
       chatPanelOpen: false,
       chatPanelSessionKey: 'main',
@@ -45,6 +49,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((s) => ({ fileExplorerCollapsed: !s.fileExplorerCollapsed })),
       setFileExplorerCollapsed: (collapsed) =>
         set({ fileExplorerCollapsed: collapsed }),
+      toggleChatFocusMode: () =>
+        set((s) => ({ chatFocusMode: !s.chatFocusMode })),
+      setChatFocusMode: (enabled) => set({ chatFocusMode: enabled }),
       setActiveSubPage: (page) => set({ activeSubPage: page }),
       toggleChatPanel: () => set((s) => ({ chatPanelOpen: !s.chatPanelOpen })),
       setChatPanelOpen: (open) => set({ chatPanelOpen: open }),

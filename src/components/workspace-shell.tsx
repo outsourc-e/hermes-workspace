@@ -63,6 +63,7 @@ export function WorkspaceShell() {
 
   const { settings } = useSettings()
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
+  const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
@@ -137,6 +138,7 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
 
@@ -339,12 +341,15 @@ export function WorkspaceShell() {
           </div>
         )}
         <GatewayConnectionBanner />
-        <div className={cn(
-          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
-        )}>
+        <div
+          className={cn(
+            'grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden',
+            hideChatSidebar ? 'md:grid-cols-1' : 'md:grid-cols-[auto_1fr]',
+          )}
+        >
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
-          {!isMobile && (
+          {!isMobile && !hideChatSidebar && (
             <div className="relative z-30">
               <ChatSidebar
                 sessions={sessions}
