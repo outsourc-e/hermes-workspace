@@ -1,5 +1,11 @@
 import type { CronJob, CronRun, CronRunStatus, CronSortKey } from './cron-types'
 
+export type CronScheduleDetails = {
+  kind: 'cron' | 'every' | 'at'
+  kindLabel: 'Cron' | 'Every' | 'At'
+  humanLabel: string
+}
+
 function normalizeTimestampToMs(value: string | null | undefined): number {
   if (!value) return 0
   const parsed = Date.parse(value)
@@ -85,6 +91,58 @@ export function formatCronHuman(expression: string): string {
   return expression
 }
 
+export function getScheduleDetails(schedule: string): CronScheduleDetails {
+  const trimmed = schedule.trim()
+  const everyMatch = trimmed.match(
+    /^every\s+(\d+)\s*(m|min|minute|minutes|h|hr|hour|hours|d|day|days)?$/i,
+  )
+  if (everyMatch?.[1]) {
+    const amount = Number(everyMatch[1])
+    const unitToken = (everyMatch[2] ?? 'minutes').toLowerCase()
+    const unit =
+      unitToken.startsWith('h')
+        ? amount === 1
+          ? 'hour'
+          : 'hours'
+        : unitToken.startsWith('d')
+          ? amount === 1
+            ? 'day'
+            : 'days'
+          : amount === 1
+            ? 'minute'
+            : 'minutes'
+
+    return {
+      kind: 'every',
+      kindLabel: 'Every',
+      humanLabel: `Every ${amount} ${unit}`,
+    }
+  }
+
+  if (trimmed.startsWith('at ')) {
+    const value = trimmed.slice(3).trim()
+    return {
+      kind: 'at',
+      kindLabel: 'At',
+      humanLabel: value ? `At ${formatDateTime(value)}` : 'At',
+    }
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return {
+      kind: 'at',
+      kindLabel: 'At',
+      humanLabel: `At ${formatDateTime(trimmed)}`,
+    }
+  }
+
+  return {
+    kind: 'cron',
+    kindLabel: 'Cron',
+    humanLabel: formatCronHuman(trimmed),
+  }
+}
+
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return 'Never'
   const parsed = Date.parse(value)
@@ -107,7 +165,7 @@ export function formatDuration(valueMs?: number): string {
 }
 
 export function statusLabel(status: CronRunStatus): string {
-  if (status === 'success') return 'Success'
+  if (status === 'success') return 'OK'
   if (status === 'error') return 'Error'
   if (status === 'running') return 'Running'
   if (status === 'queued') return 'Queued'
@@ -142,13 +200,13 @@ export function getLatestRun(
 
 export function statusBadgeClass(status: CronRunStatus): string {
   if (status === 'success') {
-    return 'border-primary-300 bg-primary-100 text-primary-800'
+    return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700'
   }
   if (status === 'error') {
-    return 'border-orange-500/40 bg-orange-500/15 text-orange-500'
+    return 'border-red-500/40 bg-red-500/10 text-red-700'
   }
   if (status === 'running') {
-    return 'border-primary-400 bg-primary-100 text-primary-900'
+    return 'border-blue-500/40 bg-blue-500/10 text-blue-700'
   }
   if (status === 'queued') {
     return 'border-primary-300 bg-primary-100 text-primary-700'

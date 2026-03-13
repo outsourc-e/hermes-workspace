@@ -31,6 +31,7 @@ import { Route as MissionConsoleRouteImport } from './routes/mission-console'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as InstancesRouteImport } from './routes/instances'
+import { Route as GatewayRouteImport } from './routes/gateway'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as DebugRouteImport } from './routes/debug'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -47,6 +48,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
+import { Route as GatewayLogsRouteImport } from './routes/gateway/logs'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceTasksRouteImport } from './routes/api/workspace-tasks'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
@@ -120,6 +122,7 @@ import { Route as ApiGatewayUsageRouteImport } from './routes/api/gateway/usage'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway/status'
 import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
 import { Route as ApiGatewayNodesRouteImport } from './routes/api/gateway/nodes'
+import { Route as ApiGatewayLogsRouteImport } from './routes/api/gateway/logs'
 import { Route as ApiGatewayChannelsRouteImport } from './routes/api/gateway/channels'
 import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agents'
 import { Route as ApiEventsRecentRouteImport } from './routes/api/events/recent'
@@ -127,6 +130,7 @@ import { Route as ApiDebugStatusRouteImport } from './routes/api/debug/status'
 import { Route as ApiDebugReconnectRouteImport } from './routes/api/debug/reconnect'
 import { Route as ApiCronUpsertRouteImport } from './routes/api/cron/upsert'
 import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
+import { Route as ApiCronRunIfDueRouteImport } from './routes/api/cron/run-if-due'
 import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
 import { Route as ApiCronListRouteImport } from './routes/api/cron/list'
 import { Route as ApiCronDeleteRouteImport } from './routes/api/cron/delete'
@@ -271,6 +275,11 @@ const InstancesRoute = InstancesRouteImport.update({
   path: '/instances',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GatewayRoute = GatewayRouteImport.update({
+  id: '/gateway',
+  path: '/gateway',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FilesRoute = FilesRouteImport.update({
   id: '/files',
   path: '/files',
@@ -350,6 +359,11 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
   id: '/providers',
   path: '/providers',
   getParentRoute: () => SettingsRoute,
+} as any)
+const GatewayLogsRoute = GatewayLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => GatewayRoute,
 } as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
@@ -716,6 +730,11 @@ const ApiGatewayNodesRoute = ApiGatewayNodesRouteImport.update({
   path: '/api/gateway/nodes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGatewayLogsRoute = ApiGatewayLogsRouteImport.update({
+  id: '/api/gateway/logs',
+  path: '/api/gateway/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGatewayChannelsRoute = ApiGatewayChannelsRouteImport.update({
   id: '/api/gateway/channels',
   path: '/api/gateway/channels',
@@ -749,6 +768,11 @@ const ApiCronUpsertRoute = ApiCronUpsertRouteImport.update({
 const ApiCronToggleRoute = ApiCronToggleRouteImport.update({
   id: '/toggle',
   path: '/toggle',
+  getParentRoute: () => ApiCronRoute,
+} as any)
+const ApiCronRunIfDueRoute = ApiCronRunIfDueRouteImport.update({
+  id: '/run-if-due',
+  path: '/run-if-due',
   getParentRoute: () => ApiCronRoute,
 } as any)
 const ApiCronRunRoute = ApiCronRunRouteImport.update({
@@ -951,6 +975,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
+  '/gateway': typeof GatewayRouteWithChildren
   '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
@@ -1024,6 +1049,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1037,6 +1063,7 @@ export interface FileRoutesByFullPath {
   '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
+  '/api/cron/run-if-due': typeof ApiCronRunIfDueRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
   '/api/cron/upsert': typeof ApiCronUpsertRoute
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
@@ -1044,6 +1071,7 @@ export interface FileRoutesByFullPath {
   '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/channels': typeof ApiGatewayChannelsRoute
+  '/api/gateway/logs': typeof ApiGatewayLogsRoute
   '/api/gateway/nodes': typeof ApiGatewayNodesRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
@@ -1104,6 +1132,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
+  '/gateway': typeof GatewayRouteWithChildren
   '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
@@ -1176,6 +1205,7 @@ export interface FileRoutesByTo {
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -1189,6 +1219,7 @@ export interface FileRoutesByTo {
   '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
+  '/api/cron/run-if-due': typeof ApiCronRunIfDueRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
   '/api/cron/upsert': typeof ApiCronUpsertRoute
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
@@ -1196,6 +1227,7 @@ export interface FileRoutesByTo {
   '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/channels': typeof ApiGatewayChannelsRoute
+  '/api/gateway/logs': typeof ApiGatewayLogsRoute
   '/api/gateway/nodes': typeof ApiGatewayNodesRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
@@ -1257,6 +1289,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
+  '/gateway': typeof GatewayRouteWithChildren
   '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
@@ -1330,6 +1363,7 @@ export interface FileRoutesById {
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1343,6 +1377,7 @@ export interface FileRoutesById {
   '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
+  '/api/cron/run-if-due': typeof ApiCronRunIfDueRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
   '/api/cron/upsert': typeof ApiCronUpsertRoute
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
@@ -1350,6 +1385,7 @@ export interface FileRoutesById {
   '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/channels': typeof ApiGatewayChannelsRoute
+  '/api/gateway/logs': typeof ApiGatewayLogsRoute
   '/api/gateway/nodes': typeof ApiGatewayNodesRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
@@ -1412,6 +1448,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/debug'
     | '/files'
+    | '/gateway'
     | '/instances'
     | '/logs'
     | '/memory'
@@ -1485,6 +1522,7 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
+    | '/gateway/logs'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
@@ -1498,6 +1536,7 @@ export interface FileRouteTypes {
     | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
+    | '/api/cron/run-if-due'
     | '/api/cron/toggle'
     | '/api/cron/upsert'
     | '/api/debug/reconnect'
@@ -1505,6 +1544,7 @@ export interface FileRouteTypes {
     | '/api/events/recent'
     | '/api/gateway/agents'
     | '/api/gateway/channels'
+    | '/api/gateway/logs'
     | '/api/gateway/nodes'
     | '/api/gateway/sessions'
     | '/api/gateway/status'
@@ -1565,6 +1605,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/debug'
     | '/files'
+    | '/gateway'
     | '/instances'
     | '/logs'
     | '/memory'
@@ -1637,6 +1678,7 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
+    | '/gateway/logs'
     | '/settings/providers'
     | '/chat'
     | '/settings'
@@ -1650,6 +1692,7 @@ export interface FileRouteTypes {
     | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
+    | '/api/cron/run-if-due'
     | '/api/cron/toggle'
     | '/api/cron/upsert'
     | '/api/debug/reconnect'
@@ -1657,6 +1700,7 @@ export interface FileRouteTypes {
     | '/api/events/recent'
     | '/api/gateway/agents'
     | '/api/gateway/channels'
+    | '/api/gateway/logs'
     | '/api/gateway/nodes'
     | '/api/gateway/sessions'
     | '/api/gateway/status'
@@ -1717,6 +1761,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/debug'
     | '/files'
+    | '/gateway'
     | '/instances'
     | '/logs'
     | '/memory'
@@ -1790,6 +1835,7 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
+    | '/gateway/logs'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
@@ -1803,6 +1849,7 @@ export interface FileRouteTypes {
     | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
+    | '/api/cron/run-if-due'
     | '/api/cron/toggle'
     | '/api/cron/upsert'
     | '/api/debug/reconnect'
@@ -1810,6 +1857,7 @@ export interface FileRouteTypes {
     | '/api/events/recent'
     | '/api/gateway/agents'
     | '/api/gateway/channels'
+    | '/api/gateway/logs'
     | '/api/gateway/nodes'
     | '/api/gateway/sessions'
     | '/api/gateway/status'
@@ -1871,6 +1919,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DebugRoute: typeof DebugRoute
   FilesRoute: typeof FilesRoute
+  GatewayRoute: typeof GatewayRouteWithChildren
   InstancesRoute: typeof InstancesRoute
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
@@ -1952,6 +2001,7 @@ export interface RootRouteChildren {
   ApiDebugStatusRoute: typeof ApiDebugStatusRoute
   ApiGatewayAgentsRoute: typeof ApiGatewayAgentsRoute
   ApiGatewayChannelsRoute: typeof ApiGatewayChannelsRoute
+  ApiGatewayLogsRoute: typeof ApiGatewayLogsRoute
   ApiGatewayNodesRoute: typeof ApiGatewayNodesRoute
   ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
@@ -2122,6 +2172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstancesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gateway': {
+      id: '/gateway'
+      path: '/gateway'
+      fullPath: '/gateway'
+      preLoaderRoute: typeof GatewayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/files': {
       id: '/files'
       path: '/files'
@@ -2233,6 +2290,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/providers'
       preLoaderRoute: typeof SettingsProvidersRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/gateway/logs': {
+      id: '/gateway/logs'
+      path: '/logs'
+      fullPath: '/gateway/logs'
+      preLoaderRoute: typeof GatewayLogsRouteImport
+      parentRoute: typeof GatewayRoute
     }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
@@ -2745,6 +2809,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGatewayNodesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gateway/logs': {
+      id: '/api/gateway/logs'
+      path: '/api/gateway/logs'
+      fullPath: '/api/gateway/logs'
+      preLoaderRoute: typeof ApiGatewayLogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gateway/channels': {
       id: '/api/gateway/channels'
       path: '/api/gateway/channels'
@@ -2792,6 +2863,13 @@ declare module '@tanstack/react-router' {
       path: '/toggle'
       fullPath: '/api/cron/toggle'
       preLoaderRoute: typeof ApiCronToggleRouteImport
+      parentRoute: typeof ApiCronRoute
+    }
+    '/api/cron/run-if-due': {
+      id: '/api/cron/run-if-due'
+      path: '/run-if-due'
+      fullPath: '/api/cron/run-if-due'
+      preLoaderRoute: typeof ApiCronRunIfDueRouteImport
       parentRoute: typeof ApiCronRoute
     }
     '/api/cron/run': {
@@ -3028,6 +3106,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface GatewayRouteChildren {
+  GatewayLogsRoute: typeof GatewayLogsRoute
+}
+
+const GatewayRouteChildren: GatewayRouteChildren = {
+  GatewayLogsRoute: GatewayLogsRoute,
+}
+
+const GatewayRouteWithChildren =
+  GatewayRoute._addFileChildren(GatewayRouteChildren)
+
 interface SettingsRouteChildren {
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -3076,6 +3165,7 @@ interface ApiCronRouteChildren {
   ApiCronDeleteRoute: typeof ApiCronDeleteRoute
   ApiCronListRoute: typeof ApiCronListRoute
   ApiCronRunRoute: typeof ApiCronRunRoute
+  ApiCronRunIfDueRoute: typeof ApiCronRunIfDueRoute
   ApiCronToggleRoute: typeof ApiCronToggleRoute
   ApiCronUpsertRoute: typeof ApiCronUpsertRoute
   ApiCronRunsJobIdRoute: typeof ApiCronRunsJobIdRoute
@@ -3085,6 +3175,7 @@ const ApiCronRouteChildren: ApiCronRouteChildren = {
   ApiCronDeleteRoute: ApiCronDeleteRoute,
   ApiCronListRoute: ApiCronListRoute,
   ApiCronRunRoute: ApiCronRunRoute,
+  ApiCronRunIfDueRoute: ApiCronRunIfDueRoute,
   ApiCronToggleRoute: ApiCronToggleRoute,
   ApiCronUpsertRoute: ApiCronUpsertRoute,
   ApiCronRunsJobIdRoute: ApiCronRunsJobIdRoute,
@@ -3266,6 +3357,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DebugRoute: DebugRoute,
   FilesRoute: FilesRoute,
+  GatewayRoute: GatewayRouteWithChildren,
   InstancesRoute: InstancesRoute,
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
@@ -3347,6 +3439,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDebugStatusRoute: ApiDebugStatusRoute,
   ApiGatewayAgentsRoute: ApiGatewayAgentsRoute,
   ApiGatewayChannelsRoute: ApiGatewayChannelsRoute,
+  ApiGatewayLogsRoute: ApiGatewayLogsRoute,
   ApiGatewayNodesRoute: ApiGatewayNodesRoute,
   ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,

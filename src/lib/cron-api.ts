@@ -36,6 +36,35 @@ type UpsertCronPayload = {
   jobId?: string
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  return value as Record<string, unknown>
+}
+
+function readStringCandidate(...values: Array<unknown>): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+  return undefined
+}
+
+function readNumberCandidate(...values: Array<unknown>): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
+}
+
 function normalizeStatus(value: unknown): CronRunStatus {
   if (typeof value !== 'string') return 'unknown'
   const normalized = value.trim().toLowerCase()
@@ -69,6 +98,13 @@ function normalizeTimestamp(value: unknown): string | null {
 }
 
 function normalizeRun(row: Record<string, unknown>, index: number): CronRun {
+  const output = row.output
+  const outputRecord = asRecord(output)
+  const deliveryRecord = asRecord(
+    row.delivery ?? row.deliveryResult ?? row.result ?? outputRecord.delivery,
+  )
+  const contextRecord = asRecord(row.context ?? outputRecord.context)
+
   return {
     id:
       (typeof row.id === 'string' && row.id) ||
@@ -81,19 +117,44 @@ function normalizeRun(row: Record<string, unknown>, index: number): CronRun {
     finishedAt: normalizeTimestamp(
       row.finishedAt ?? row.finished_at ?? row.completedAt,
     ),
-    durationMs:
-      typeof row.durationMs === 'number'
-        ? row.durationMs
-        : typeof row.duration === 'number'
-          ? row.duration
-          : undefined,
+    durationMs: readNumberCandidate(
+      row.durationMs,
+      row.duration,
+      outputRecord.durationMs,
+      outputRecord.duration,
+    ),
     error:
       typeof row.error === 'string'
         ? row.error
         : typeof row.message === 'string'
           ? row.message
           : undefined,
-    output: row.output,
+    deliverySummary: readStringCandidate(
+      row.deliverySummary,
+      row.summary,
+      row.deliveryText,
+      row.deliveryMessage,
+      deliveryRecord.summary,
+      deliveryRecord.text,
+      deliveryRecord.message,
+      outputRecord.deliverySummary,
+      outputRecord.summary,
+      outputRecord.text,
+      outputRecord.message,
+    ),
+    chatSessionKey: readStringCandidate(
+      row.chatSessionKey,
+      row.friendlyId,
+      row.sessionKey,
+      row.sessionId,
+      contextRecord.friendlyId,
+      contextRecord.sessionKey,
+      outputRecord.chatSessionKey,
+      outputRecord.friendlyId,
+      outputRecord.sessionKey,
+      outputRecord.sessionId,
+    ),
+    output,
   }
 }
 
@@ -188,7 +249,7 @@ export async function fetchCronJobs(): Promise<Array<CronJob>> {
 
 export async function fetchCronRuns(jobId: string): Promise<Array<CronRun>> {
   const response = await fetch(
-    `/api/cron/runs/${encodeURIComponent(jobId)}?limit=10`,
+    `/api/cron/runs/${encodeURIComponent(jobId)}?limit=20`,
   )
   if (!response.ok) {
     throw new Error(await readError(response))
@@ -203,6 +264,24 @@ export async function fetchCronRuns(jobId: string): Promise<Array<CronRun>> {
 
 export async function runCronJob(jobId: string): Promise<RunCronPayload> {
   const response = await fetch('/api/cron/run', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ jobId }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readError(response))
+  }
+
+  return readJsonAndCheckOk<RunCronPayload>(response)
+}
+
+export async function runCronJobIfDue(
+  jobId: string,
+): Promise<RunCronPayload> {
+  const response = await fetch('/api/cron/run-if-due', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

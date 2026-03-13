@@ -18,6 +18,7 @@ import {
   deleteCronJob,
   fetchCronJobs,
   fetchCronRuns,
+  runCronJobIfDue,
   runCronJob,
   toggleCronJob,
   upsertCronJob,
@@ -44,6 +45,12 @@ export function CronManagerScreen() {
     null,
   )
   const [runPendingJobId, setRunPendingJobId] = useState<string | null>(null)
+  const [runIfDuePendingJobId, setRunIfDuePendingJobId] = useState<
+    string | null
+  >(null)
+  const [clonePendingJobId, setClonePendingJobId] = useState<string | null>(
+    null,
+  )
   const [deletePendingJobId, setDeletePendingJobId] = useState<string | null>(
     null,
   )
@@ -94,6 +101,13 @@ export function CronManagerScreen() {
 
   const upsertMutation = useMutation({
     mutationFn: upsertCronJob,
+  })
+
+  const cloneMutation = useMutation({
+    mutationFn: upsertCronJob,
+    onSettled: () => {
+      setClonePendingJobId(null)
+    },
   })
 
   const deleteMutation = useMutation({
@@ -192,6 +206,46 @@ export function CronManagerScreen() {
     } catch (error) {
       setFormError(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  function handleRunIfDue(job: CronJob) {
+    setActionError(null)
+    setRunIfDuePendingJobId(job.id)
+    void (async function triggerRunIfDue() {
+      try {
+        await runCronJobIfDue(job.id)
+        await queryClient.invalidateQueries({ queryKey: cronQueryKeys.jobs })
+        await queryClient.invalidateQueries({
+          queryKey: cronQueryKeys.runs(job.id),
+        })
+        toast('Cron job checked for due run', { type: 'success' })
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setRunIfDuePendingJobId(null)
+      }
+    })()
+  }
+
+  function handleCloneJob(job: CronJob) {
+    setActionError(null)
+    setClonePendingJobId(job.id)
+    void (async function cloneJob() {
+      try {
+        await cloneMutation.mutateAsync({
+          name: `${job.name} (copy)`,
+          schedule: job.schedule,
+          enabled: job.enabled,
+          description: job.description,
+          payload: job.payload,
+          deliveryConfig: job.deliveryConfig,
+        })
+        await queryClient.invalidateQueries({ queryKey: cronQueryKeys.jobs })
+        toast('Cron job cloned', { type: 'success' })
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : String(error))
+      }
+    })()
   }
 
   async function handleDeleteJob(job: CronJob) {
@@ -317,11 +371,15 @@ export function CronManagerScreen() {
             onStatusFilterChange={setStatusFilter}
             onToggleEnabled={handleToggleEnabled}
             onRunNow={handleRunNow}
+            onRunIfDue={handleRunIfDue}
+            onClone={handleCloneJob}
             onEdit={handleStartEdit}
             onDelete={handleDeleteJob}
             onToggleExpanded={handleToggleExpanded}
             togglePendingJobId={togglePendingJobId}
             runPendingJobId={runPendingJobId}
+            runIfDuePendingJobId={runIfDuePendingJobId}
+            clonePendingJobId={clonePendingJobId}
             deletePendingJobId={deletePendingJobId}
           />
         )}

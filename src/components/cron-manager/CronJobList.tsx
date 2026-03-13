@@ -26,11 +26,15 @@ type CronJobListProps = {
   onStatusFilterChange: (value: CronStatusFilter) => void
   onToggleEnabled: (job: CronJob, enabled: boolean) => void
   onRunNow: (job: CronJob) => void
+  onRunIfDue: (job: CronJob) => void
+  onClone: (job: CronJob) => void
   onEdit: (job: CronJob) => void
   onDelete: (job: CronJob) => void
   onToggleExpanded: (jobId: string) => void
   togglePendingJobId: string | null
   runPendingJobId: string | null
+  runIfDuePendingJobId: string | null
+  clonePendingJobId: string | null
   deletePendingJobId: string | null
 }
 
@@ -64,11 +68,15 @@ export function CronJobList({
   onStatusFilterChange,
   onToggleEnabled,
   onRunNow,
+  onRunIfDue,
+  onClone,
   onEdit,
   onDelete,
   onToggleExpanded,
   togglePendingJobId,
   runPendingJobId,
+  runIfDuePendingJobId,
+  clonePendingJobId,
   deletePendingJobId,
 }: CronJobListProps) {
   const filtered = sortCronJobs(
@@ -160,9 +168,13 @@ export function CronJobList({
                 expanded={isExpanded}
                 togglePending={togglePendingJobId === job.id}
                 runPending={runPendingJobId === job.id}
+                runIfDuePending={runIfDuePendingJobId === job.id}
+                clonePending={clonePendingJobId === job.id}
                 deletePending={deletePendingJobId === job.id}
                 onToggleEnabled={onToggleEnabled}
                 onRunNow={onRunNow}
+                onRunIfDue={onRunIfDue}
+                onClone={onClone}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onToggleExpanded={onToggleExpanded}

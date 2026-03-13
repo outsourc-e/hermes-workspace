@@ -12,10 +12,10 @@ export const Route = createFileRoute('/api/cron/runs/$jobId')({
         }
         try {
           const url = new URL(request.url)
-          const limitRaw = Number(url.searchParams.get('limit') ?? '10')
+          const limitRaw = Number(url.searchParams.get('limit') ?? '20')
           const limit = Number.isFinite(limitRaw)
             ? Math.max(1, Math.min(100, Math.round(limitRaw)))
-            : 10
+            : 20
 
           const segments = url.pathname.split('/')
           const maybeJobId = decodeURIComponent(

@@ -59,8 +59,36 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
+function readStringCandidate(...values: Array<unknown>): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+  return undefined
+}
+
+function readNumberCandidate(...values: Array<unknown>): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
+}
+
 function normalizeRun(run: unknown, index: number): Record<string, unknown> {
   const row = asRecord(run)
+  const output = row.output
+  const outputRecord = asRecord(output)
+  const deliveryRecord = asRecord(
+    row.delivery ?? row.deliveryResult ?? row.result ?? outputRecord.delivery,
+  )
+  const contextRecord = asRecord(row.context ?? outputRecord.context)
   const startedAt = normalizeTimestamp(
     row.startedAt ??
       row.started_at ??
@@ -81,19 +109,44 @@ function normalizeRun(run: unknown, index: number): Record<string, unknown> {
     status: normalizeRunStatus(row.status ?? row.state ?? row.result),
     startedAt,
     finishedAt,
-    durationMs:
-      typeof row.durationMs === 'number'
-        ? row.durationMs
-        : typeof row.duration === 'number'
-          ? row.duration
-          : undefined,
+    durationMs: readNumberCandidate(
+      row.durationMs,
+      row.duration,
+      outputRecord.durationMs,
+      outputRecord.duration,
+    ),
     error:
       typeof row.error === 'string'
         ? row.error
         : typeof row.message === 'string'
           ? row.message
           : undefined,
-    output: row.output,
+    deliverySummary: readStringCandidate(
+      row.deliverySummary,
+      row.summary,
+      row.deliveryText,
+      row.deliveryMessage,
+      deliveryRecord.summary,
+      deliveryRecord.text,
+      deliveryRecord.message,
+      outputRecord.deliverySummary,
+      outputRecord.summary,
+      outputRecord.text,
+      outputRecord.message,
+    ),
+    chatSessionKey: readStringCandidate(
+      row.chatSessionKey,
+      row.friendlyId,
+      row.sessionKey,
+      row.sessionId,
+      contextRecord.friendlyId,
+      contextRecord.sessionKey,
+      outputRecord.chatSessionKey,
+      outputRecord.friendlyId,
+      outputRecord.sessionKey,
+      outputRecord.sessionId,
+    ),
+    output,
   }
 }
 

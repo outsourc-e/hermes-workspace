@@ -27,6 +27,46 @@ function resolvePayloadJobId(payload: unknown): string | undefined {
   return undefined
 }
 
+function buildSchedulePayload(schedule: string) {
+  const trimmed = schedule.trim()
+  const everyMatch = trimmed.match(
+    /^every\s+(\d+)\s*(m|min|minute|minutes|h|hr|hour|hours|d|day|days)?$/i,
+  )
+  if (everyMatch?.[1]) {
+    const unitToken = (everyMatch[2] ?? 'm').toLowerCase()
+    const unit =
+      unitToken.startsWith('h')
+        ? 'hours'
+        : unitToken.startsWith('d')
+          ? 'days'
+          : 'minutes'
+    return {
+      kind: 'every',
+      interval: Number(everyMatch[1]),
+      unit,
+    }
+  }
+
+  if (trimmed.startsWith('at ')) {
+    return {
+      kind: 'at',
+      at: trimmed.slice(3).trim(),
+    }
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return {
+      kind: 'at',
+      at: trimmed,
+    }
+  }
+
+  return {
+    kind: 'cron',
+    expr: trimmed,
+  }
+}
+
 function buildUpsertParams(
   body: Record<string, unknown>,
   jobId: string,
@@ -41,7 +81,7 @@ function buildUpsertParams(
     // cron.add format
     return {
       name,
-      schedule: { kind: 'cron', expr: schedule },
+      schedule: buildSchedulePayload(schedule),
       payload: payload || { kind: 'systemEvent', text: name },
       delivery: deliveryConfig || undefined,
       sessionTarget: 'main',
@@ -54,7 +94,7 @@ function buildUpsertParams(
     jobId,
     patch: {
       name,
-      schedule: { kind: 'cron', expr: schedule },
+      schedule: buildSchedulePayload(schedule),
       payload: payload || undefined,
       delivery: deliveryConfig || undefined,
       enabled,

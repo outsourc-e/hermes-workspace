@@ -2,13 +2,14 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowDown01Icon,
   ArrowUp01Icon,
+  Copy01Icon,
   Clock01Icon,
   PlayCircleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import {
-  formatCronHuman,
   formatDateTime,
+  getScheduleDetails,
   statusBadgeClass,
   statusLabel,
 } from './cron-utils'
@@ -23,9 +24,13 @@ type CronJobCardProps = {
   expanded: boolean
   togglePending: boolean
   runPending: boolean
+  runIfDuePending: boolean
+  clonePending: boolean
   deletePending: boolean
   onToggleEnabled: (job: CronJob, enabled: boolean) => void
   onRunNow: (job: CronJob) => void
+  onRunIfDue: (job: CronJob) => void
+  onClone: (job: CronJob) => void
   onEdit: (job: CronJob) => void
   onDelete: (job: CronJob) => void
   onToggleExpanded: (jobId: string) => void
@@ -37,14 +42,20 @@ export function CronJobCard({
   expanded,
   togglePending,
   runPending,
+  runIfDuePending,
+  clonePending,
   deletePending,
   onToggleEnabled,
   onRunNow,
+  onRunIfDue,
+  onClone,
   onEdit,
   onDelete,
   onToggleExpanded,
   children,
 }: CronJobCardProps) {
+  const scheduleDetails = getScheduleDetails(job.schedule)
+
   return (
     <motion.article
       layout
@@ -56,11 +67,16 @@ export function CronJobCard({
             {job.name}
           </h3>
           <p className="mt-1 line-clamp-1 text-sm text-primary-600 text-pretty">
-            {formatCronHuman(job.schedule)}
+            {scheduleDetails.humanLabel}
           </p>
-          <p className="mt-1 truncate text-xs text-primary-600 tabular-nums">
-            {job.schedule}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-md border border-primary-200 bg-primary-100/70 px-2 py-1 text-[11px] text-primary-700 tabular-nums">
+              {scheduleDetails.kindLabel}
+            </span>
+            <p className="min-w-0 truncate text-xs text-primary-600 tabular-nums">
+              {job.schedule}
+            </p>
+          </div>
         </div>
 
         <span
@@ -133,7 +149,30 @@ export function CronJobCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={deletePending}
+            disabled={runIfDuePending}
+            onClick={function onClickRunIfDue() {
+              onRunIfDue(job)
+            }}
+            className="tabular-nums"
+          >
+            {runIfDuePending ? 'Checking...' : 'Run If Due'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={clonePending}
+            onClick={function onClickClone() {
+              onClone(job)
+            }}
+            className="tabular-nums"
+          >
+            <HugeiconsIcon icon={Copy01Icon} size={20} strokeWidth={1.5} />
+            {clonePending ? 'Cloning...' : 'Clone'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={deletePending || clonePending}
             onClick={function onClickEdit() {
               onEdit(job)
             }}

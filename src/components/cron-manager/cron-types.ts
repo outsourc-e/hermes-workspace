@@ -12,6 +12,8 @@ export type CronRun = {
   finishedAt: string | null
   durationMs?: number
   error?: string
+  deliverySummary?: string
+  chatSessionKey?: string
   output?: unknown
 }
 
