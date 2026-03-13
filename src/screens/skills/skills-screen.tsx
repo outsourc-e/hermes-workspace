@@ -287,16 +287,16 @@ export function SkillsScreen() {
           <Tabs value={tab} onValueChange={handleTabChange}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <TabsList
-                className="rounded-xl border border-primary-200 bg-primary-100/60 p-1"
+                className="w-full rounded-xl border border-primary-200 bg-primary-100/60 p-1 sm:w-auto"
                 variant="default"
               >
-                <TabsTab value="installed" className="min-w-[132px]">
-                  Installed Skills
+                <TabsTab value="installed" className="flex-1 sm:min-w-[132px]">
+                  Installed
                 </TabsTab>
-                <TabsTab value="marketplace" className="min-w-[168px]">
-                  ClawdHub Marketplace
+                <TabsTab value="marketplace" className="flex-1 sm:min-w-[168px]">
+                  Marketplace
                 </TabsTab>
-                <TabsTab value="featured" className="min-w-[120px]">
+                <TabsTab value="featured" className="flex-1 sm:min-w-[120px]">
                   Featured
                 </TabsTab>
               </TabsList>
@@ -306,7 +306,7 @@ export function SkillsScreen() {
                   value={searchInput}
                   onChange={(event) => handleSearchChange(event.target.value)}
                   placeholder="Search by name, tags, or description"
-                  className="h-9 min-w-[220px] rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
+                  className="h-9 w-full min-w-0 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
                 />
 
                 {tab === 'marketplace' ? (
