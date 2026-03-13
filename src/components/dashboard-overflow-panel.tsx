@@ -4,12 +4,15 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ApiIcon,
   BrainIcon,
+  BotIcon,
   ChartLineData02Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
   GlobeIcon,
+  Home01Icon,
   ListViewIcon,
+  MessageMultiple01Icon,
   Moon02Icon,
   ServerStack01Icon,
   Sun02Icon,
@@ -39,6 +42,9 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
 ]
 
 const GATEWAY_ITEMS: Array<OverflowItem> = [
+  { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
+  { icon: BotIcon, label: 'Agent Hub', to: '/hub' },
+  { icon: Home01Icon, label: 'Workspace', to: '/workspace' },
   { icon: ServerStack01Icon, label: 'Channels', to: '/channels' },
   { icon: ChartLineData02Icon, label: 'Costs', to: '/costs' },
 ]
@@ -131,7 +137,7 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
         onClick={onClose}
       />
 
-      <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-primary-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl animate-in slide-in-from-bottom-4 duration-200 dark:border-gray-700 dark:bg-gray-900">
+      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-primary-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl animate-in slide-in-from-bottom-4 duration-200 dark:border-gray-700 dark:bg-gray-900">
         <div className="mb-3 h-1.5 w-10 rounded-full bg-primary-200 dark:bg-gray-700 mx-auto" />
         <div className="space-y-4">
           <section>
