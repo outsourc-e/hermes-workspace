@@ -25,6 +25,16 @@ type SessionsResolveResponse = {
   key?: string
 }
 
+const THINKING_VALUES = new Set([
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'adaptive',
+])
+
 function deriveFriendlyIdFromKey(key: unknown): string {
   if (typeof key !== 'string' || key.trim().length === 0) return 'main'
   const parts = key.split(':')
@@ -184,6 +194,20 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
           const label =
             typeof body.label === 'string' ? body.label.trim() : undefined
+          const thinkingRaw =
+            typeof body.thinking === 'string' ? body.thinking.trim() : ''
+          const thinking = THINKING_VALUES.has(thinkingRaw)
+            ? thinkingRaw
+            : undefined
+          const hasFast = Object.prototype.hasOwnProperty.call(body, 'fast')
+          const hasVerbose = Object.prototype.hasOwnProperty.call(body, 'verbose')
+          const hasReasoning = Object.prototype.hasOwnProperty.call(
+            body,
+            'reasoning',
+          )
+          const fast = body.fast === true
+          const verbose = body.verbose === true
+          const reasoning = body.reasoning === true
 
           let sessionKey = rawSessionKey
           const friendlyId = rawFriendlyId
@@ -211,6 +235,10 @@ export const Route = createFileRoute('/api/sessions')({
 
           const params: Record<string, unknown> = { key: sessionKey }
           if (label) params.label = label
+          if (thinking) params.thinking = thinking
+          if (hasFast) params.fast = fast
+          if (hasVerbose) params.verbose = verbose
+          if (hasReasoning) params.reasoning = reasoning
 
           const payload = await gatewayRpc<SessionsPatchResponse>(
             'sessions.patch',
