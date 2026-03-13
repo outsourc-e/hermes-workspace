@@ -1740,7 +1740,7 @@ function ChatComposerComponent({
               {/* Token counter — shows when user has typed enough */}
               {value.length >= 20 && (
                 <span className="shrink-0 self-end pb-2 text-[10px] text-primary-400 tabular-nums">
-                  ~{Math.ceil(value.length / 4)}
+                  ~{Math.ceil(value.length / 4)} tokens
                 </span>
               )}
 
@@ -2447,7 +2447,7 @@ function ChatComposerComponent({
                   <>
                     {value.length >= 20 && (
                       <span className="text-[10px] text-primary-400 tabular-nums mr-1">
-                        ~{Math.ceil(value.length / 4)}
+                        ~{Math.ceil(value.length / 4)} tokens
                       </span>
                     )}
                   <PromptInputAction tooltip="Send message">
