@@ -906,13 +906,13 @@ function FeaturedGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 pb-2 lg:grid-cols-2">
       {skills.map((skill) => {
         const isActing = actionSkillId === skill.id
         return (
           <article
             key={skill.id}
-            className="flex min-h-[258px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
+            className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <div className="space-y-1">
@@ -996,7 +996,7 @@ function SkillsSkeleton({
           key={index}
           className={cn(
             'animate-pulse rounded-2xl border border-primary-200 bg-primary-50/70 p-4',
-            large ? 'min-h-[258px]' : 'min-h-[220px]',
+            large ? 'min-h-[120px]' : 'min-h-[100px]',
           )}
         >
           <div className="mb-3 h-5 w-2/5 rounded-md bg-primary-100" />
