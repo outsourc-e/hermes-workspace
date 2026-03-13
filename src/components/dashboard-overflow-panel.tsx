@@ -137,7 +137,7 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
         onClick={onClose}
       />
 
-      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-primary-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl animate-in slide-in-from-bottom-4 duration-200 dark:border-gray-700 dark:bg-gray-900">
+      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-primary-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] shadow-2xl animate-in slide-in-from-bottom-4 duration-200 dark:border-gray-700 dark:bg-gray-900">
         <div className="mb-3 h-1.5 w-10 rounded-full bg-primary-200 dark:bg-gray-700 mx-auto" />
         <div className="space-y-4">
           <section>
