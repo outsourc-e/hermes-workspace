@@ -256,7 +256,7 @@ export function GatewayConnectionBanner() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed bottom-4 right-4 z-40 w-[calc(100vw-2rem)] max-w-72"
+          className="fixed right-4 z-[90] w-[calc(100vw-2rem)] max-w-72 bottom-[calc(var(--tabbar-h,0px)+1rem)] sm:bottom-4"
         >
           <div className="rounded-xl border border-amber-300 bg-amber-100/95 px-3 py-2.5 text-primary-900 shadow-lg">
             <div className="flex items-start gap-2">

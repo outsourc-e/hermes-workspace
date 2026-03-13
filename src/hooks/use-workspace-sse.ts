@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-const DAEMON_URL = 'http://localhost:3099'
+const DAEMON_URL = '/workspace-api'
 const RECONNECT_DELAY_MS = 3_000
 
 type QueryKey = Array<string>

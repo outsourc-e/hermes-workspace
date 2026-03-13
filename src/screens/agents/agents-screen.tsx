@@ -254,7 +254,7 @@ async function updateWorkspaceAgentStatus(
   agentId: string,
   status: 'online' | 'offline',
 ): Promise<void> {
-  await workspaceRequestJson(`http://localhost:3099/api/workspace/agents/${encodeURIComponent(agentId)}`, {
+  await workspaceRequestJson(`/workspace-api/api/workspace/agents/${encodeURIComponent(agentId)}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -264,7 +264,7 @@ async function updateWorkspaceAgentStatus(
 }
 
 async function deleteWorkspaceAgent(agentId: string): Promise<void> {
-  await workspaceRequestJson(`http://localhost:3099/api/workspace/agents/${encodeURIComponent(agentId)}`, {
+  await workspaceRequestJson(`/workspace-api/api/workspace/agents/${encodeURIComponent(agentId)}`, {
     method: 'DELETE',
   })
 }

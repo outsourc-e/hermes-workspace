@@ -138,7 +138,7 @@ export function GatewayReconnectBanner() {
   return (
     <div
       className={cn(
-        'fixed bottom-4 left-4 right-4 sm:left-auto sm:w-80 z-40 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 shadow-lg',
+        'fixed left-4 right-4 z-[90] bottom-[calc(var(--tabbar-h,0px)+1rem)] sm:left-auto sm:bottom-4 sm:w-80 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 shadow-lg',
         'transition-all duration-200 ease-out',
         (isVisible && !isFadingOut
           ? 'translate-y-0 opacity-100'

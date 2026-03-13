@@ -99,6 +99,11 @@ const config = defineConfig(({ mode, command }) => {
             })
           },
         },
+        '/workspace-api': {
+          target: 'http://127.0.0.1:3099',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/workspace-api/, ''),
+        },
       },
     },
     plugins: [
