@@ -67,6 +67,7 @@ type ChatComposerProps = {
   onSubmit: (
     value: string,
     attachments: Array<ChatComposerAttachment>,
+    fastMode: boolean,
     helpers: ChatComposerHelpers,
   ) => void
   isLoading: boolean
@@ -96,13 +97,13 @@ type ChatComposerHandle = {
 }
 
 function thinkingLevelLabel(level: ThinkingLevel): string {
-  if (level === 'adaptive') return '⚡ Adaptive'
+  if (level === 'adaptive') return '🧠 Auto'
   if (level === 'low') return '💡 Low'
   return '○ Off'
 }
 
 function thinkingLevelTooltip(level: ThinkingLevel): string {
-  if (level === 'adaptive') return 'Thinking: Adaptive — Claude reasons before responding'
+  if (level === 'adaptive') return 'Thinking: Auto — Claude reasons as needed'
   if (level === 'low') return 'Thinking: Low — minimal reasoning'
   return 'Thinking: Off — no extended reasoning'
 }
@@ -594,6 +595,7 @@ function ChatComposerComponent({
   const [isWebSearchMode, _setIsWebSearchMode] = useState(false)
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
+  const [fastMode, setFastMode] = useState(false)
   // Per-session thinking level — controlled externally (chat-screen owns the state)
   // Falls back to internal state if no external controller provided
   const [internalThinkingLevel, setInternalThinkingLevel] = useState<ThinkingLevel>('low')
@@ -1176,7 +1178,7 @@ function ChatComposerComponent({
       ...attachment,
     }))
     try {
-      onSubmit(body, attachmentPayload, {
+      onSubmit(body, attachmentPayload, fastMode, {
         reset,
         setValue: setComposerValue,
         setAttachments: setComposerAttachments,
@@ -1202,6 +1204,7 @@ function ChatComposerComponent({
     setComposerAttachments,
     setComposerValue,
     value,
+    fastMode,
   ])
 
   // Fire queued submit once all in-flight attachment processing finishes
@@ -1369,6 +1372,15 @@ function ChatComposerComponent({
 
   const handleSelectSlashCommand = useCallback(
     function handleSelectSlashCommand(command: SlashCommandDefinition) {
+      if (command.command === '/fast') {
+        setIsSlashMenuDismissed(false)
+        setFastMode((previous) => !previous)
+        setValue('')
+        persistDraft('')
+        focusPrompt()
+        return
+      }
+
       const nextValue = `${command.command} `
       setIsSlashMenuDismissed(false)
       setValue(nextValue)
@@ -2167,6 +2179,24 @@ function ChatComposerComponent({
                     disabled={disabled}
                   >
                     {thinkingLevelLabel(thinkingLevel)}
+                  </button>
+                  <button
+                    type="button"
+                    title={`Fast mode: ${fastMode ? 'On' : 'Off'}${fastMode ? ' — priority processing enabled' : ' — standard processing'}`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setFastMode((previous) => !previous)
+                    }}
+                    className={cn(
+                      'hidden md:inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-colors',
+                      fastMode
+                        ? 'bg-accent-500/15 text-accent-600 hover:bg-accent-500/25'
+                        : 'bg-primary-100/40 text-primary-400 hover:bg-primary-100',
+                    )}
+                    aria-label={`Fast mode ${fastMode ? 'enabled' : 'disabled'}`}
+                    disabled={disabled}
+                  >
+                    ⚡ Fast
                   </button>
                   {!isModelSwitcherDisabled && isModelMenuOpen ? (
                     <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[24rem] rounded-xl border border-primary-200 bg-surface shadow-lg">

@@ -1377,6 +1377,7 @@ export function ChatScreen({
       friendlyId: string,
       body: string,
       attachments: Array<GatewayAttachment> = [],
+      fastMode = false,
       skipOptimistic = false,
       existingClientId = '',
     ) {
@@ -1500,6 +1501,7 @@ export function ChatScreen({
         attachments:
           payloadAttachments.length > 0 ? payloadAttachments : undefined,
         thinking: currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
+        fastMode,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
       }).catch((err: unknown) => {
         const messageText = err instanceof Error ? err.message : String(err)
@@ -1553,6 +1555,7 @@ export function ChatScreen({
       pending.friendlyId,
       pending.message,
       pending.attachments,
+      false,
       true,
       typeof pending.optimisticMessage.clientId === 'string'
         ? pending.optimisticMessage.clientId
@@ -1604,6 +1607,7 @@ export function ChatScreen({
         activeFriendlyId,
         body,
         attachments,
+        false,
         true,
         existingClientId,
       )
@@ -1778,6 +1782,7 @@ export function ChatScreen({
     (
       body: string,
       attachments: Array<ChatComposerAttachment>,
+      fastMode: boolean,
       helpers: ChatComposerHelpers,
     ) => {
       const trimmedBody = body.trim()
@@ -1833,6 +1838,7 @@ export function ChatScreen({
           threadId,
           trimmedBody,
           attachmentPayload,
+          fastMode,
           true,
           typeof optimisticMessage.clientId === 'string'
             ? optimisticMessage.clientId
@@ -1854,6 +1860,7 @@ export function ChatScreen({
         activeFriendlyId,
         trimmedBody,
         attachmentPayload,
+        fastMode,
       )
     },
     [

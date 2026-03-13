@@ -27,6 +27,7 @@ const SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/model', description: 'Switch AI model' },
   { command: '/status', description: 'Show session status' },
   { command: '/reasoning', description: 'Toggle reasoning mode' },
+  { command: '/fast', description: 'Toggle fast mode (priority processing)' },
   { command: '/new', description: 'Start new session' },
   { command: '/clear', description: 'Clear conversation' },
   { command: '/help', description: 'Show available commands' },

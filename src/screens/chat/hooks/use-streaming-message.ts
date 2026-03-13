@@ -485,6 +485,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       friendlyId: string
       message: string
       thinking?: string
+      fastMode?: boolean
       attachments?: Array<GatewayAttachment>
       idempotencyKey?: string
     }) => {
@@ -526,6 +527,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             friendlyId: params.friendlyId,
             message: params.message,
             thinking: params.thinking,
+            fastMode: params.fastMode,
             attachments: params.attachments,
             idempotencyKey: params.idempotencyKey ?? crypto.randomUUID(),
           }),

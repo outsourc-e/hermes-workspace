@@ -172,6 +172,7 @@ export const Route = createFileRoute('/api/send-stream')({
         const message = String(body.message ?? '')
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
+        const fastMode = body.fastMode === true
         const attachments = normalizeAttachments(body.attachments)
         const idempotencyKey =
           typeof body.idempotencyKey === 'string'
@@ -338,6 +339,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   sessionKey,
                   message: getGatewayMessage(message, attachments),
                   thinking,
+                  fast: fastMode || undefined,
                   attachments,
                   deliver: false,
                   timeoutMs: 120_000,
