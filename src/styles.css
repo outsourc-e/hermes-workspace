@@ -1051,3 +1051,17 @@ code {
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+/* Orange glow pulse on composer when agent is actively working */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(249, 115, 22, 0.55);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

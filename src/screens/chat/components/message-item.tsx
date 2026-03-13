@@ -30,6 +30,7 @@ import {
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
 
+
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
 const STUCK_SENDING_THRESHOLD_MS = 30_000
@@ -440,6 +441,7 @@ function getMessageUsageMetadata(message: GatewayMessage): {
   inputTokens: number | null
   outputTokens: number | null
   cacheReadTokens: number | null
+  cacheWriteTokens: number | null
   contextPercent: number | null
   modelLabel: string | null
 } {
@@ -483,6 +485,16 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       usage?.cacheReadTokens ??
       usage?.cache_read_tokens,
   )
+  const cacheWriteTokens = readNumber(
+    root.cacheWrite ??
+      root.cache_write ??
+      root.cacheWriteTokens ??
+      root.cache_write_tokens ??
+      usage?.cacheWrite ??
+      usage?.cache_write ??
+      usage?.cacheWriteTokens ??
+      usage?.cache_write_tokens,
+  )
   const contextPercent = readPercent(
     root.contextPercent ??
       root.context_percent ??
@@ -507,6 +519,7 @@ function getMessageUsageMetadata(message: GatewayMessage): {
     inputTokens,
     outputTokens,
     cacheReadTokens,
+    cacheWriteTokens,
     contextPercent,
     modelLabel,
   }
@@ -1410,30 +1423,36 @@ function MessageItemComponent({
                   <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:300ms]" />
                 </div>
               )}
-              {hasAssistantMetadata ? (
-                <div className="font-mono text-[10px] tabular-nums text-primary-400">
-                  {[
-                    usageMetadata.inputTokens !== null
-                      ? `↑${formatCompactNumber(usageMetadata.inputTokens)}`
-                      : null,
-                    usageMetadata.outputTokens !== null
-                      ? `↓${formatCompactNumber(usageMetadata.outputTokens)}`
-                      : null,
-                    usageMetadata.cacheReadTokens !== null
-                      ? `R${formatCompactNumber(usageMetadata.cacheReadTokens)}`
-                      : null,
-                    usageMetadata.contextPercent !== null
-                      ? `${Math.round(usageMetadata.contextPercent)}% ctx`
-                      : null,
-                    usageMetadata.modelLabel,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </div>
-              ) : null}
             </div>
           </Message>
         )}
+        {hasAssistantMetadata ? (
+          <div className="flex items-center justify-end gap-1.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-primary-400">
+            {/* Token stats */}
+            <span>
+              {[
+                usageMetadata.inputTokens !== null
+                  ? `↑${formatCompactNumber(usageMetadata.inputTokens)}`
+                  : null,
+                usageMetadata.outputTokens !== null
+                  ? `↓${formatCompactNumber(usageMetadata.outputTokens)}`
+                  : null,
+                usageMetadata.cacheReadTokens !== null
+                  ? `R${formatCompactNumber(usageMetadata.cacheReadTokens)}`
+                  : null,
+                usageMetadata.cacheWriteTokens !== null
+                  ? `W${formatCompactNumber(usageMetadata.cacheWriteTokens)}`
+                  : null,
+                usageMetadata.contextPercent !== null
+                  ? `${Math.round(usageMetadata.contextPercent)}% ctx`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+
+          </div>
+        ) : null}
 
       {/* Render tool calls — one collapsible card per tool with input + output */}
       {hasToolCalls && (

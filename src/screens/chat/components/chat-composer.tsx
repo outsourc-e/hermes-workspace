@@ -1605,7 +1605,7 @@ function ChatComposerComponent({
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&
-            'ring-2 ring-accent-400/50 shadow-[0_0_15px_rgba(249,115,22,0.15)]',
+            'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(249,115,22,0.35)] animate-pulse-glow',
         )}
         onPaste={handlePaste}
         onDragEnter={handleDragEnter}
@@ -1737,12 +1737,7 @@ function ChatComposerComponent({
                 className="min-h-[36px] max-h-[120px] flex-1 text-base leading-snug"
               />
 
-              {/* Token counter — shows when user has typed enough */}
-              {value.length >= 20 && (
-                <span className="shrink-0 self-end pb-2 text-[10px] text-primary-400 tabular-nums">
-                  ~{Math.ceil(value.length / 4)} tokens
-                </span>
-              )}
+
 
               {/* Right side: stop / send / mic */}
               <div className="shrink-0">
@@ -2076,6 +2071,13 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 )}
+                {/* Token counter — bottom bar, mirrors OpenClaw style, triggers at ~25 tokens */}
+                {value.length >= 100 && (
+                  <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
+                    ~{Math.ceil(value.length / 4)} tokens
+                  </span>
+                )}
+
                 <div
                   className="relative ml-0.5 md:ml-1 flex min-w-0 items-center gap-1 md:gap-2"
                   ref={modelSelectorRef}
@@ -2445,11 +2447,6 @@ function ChatComposerComponent({
                   </PromptInputAction>
                 ) : (
                   <>
-                    {value.length >= 20 && (
-                      <span className="text-[10px] text-primary-400 tabular-nums mr-1">
-                        ~{Math.ceil(value.length / 4)} tokens
-                      </span>
-                    )}
                   <PromptInputAction tooltip="Send message">
                     <Button
                       type="button"

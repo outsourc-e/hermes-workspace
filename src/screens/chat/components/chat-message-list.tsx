@@ -262,6 +262,12 @@ type MessageSearchMatch = {
   messageIndex: number
 }
 
+type DisplayEntry = {
+  message: GatewayMessage
+  sourceIndex: number
+  attachedToolMessages: Array<GatewayMessage>
+}
+
 function escapeAttributeSelector(value: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
     return CSS.escape(value)
@@ -492,6 +498,28 @@ function ChatMessageListComponent({
     return deduped
   }, [hideSystemMessages, messages])
 
+  const displayEntries = useMemo<Array<DisplayEntry>>(() => {
+    const entries: Array<DisplayEntry> = []
+
+    displayMessages.forEach((message, index) => {
+      if (message.role === 'tool') {
+        const previousEntry = entries[entries.length - 1]
+        if (previousEntry?.message.role === 'assistant') {
+          previousEntry.attachedToolMessages.push(message)
+        }
+        return
+      }
+
+      entries.push({
+        message,
+        sourceIndex: index,
+        attachedToolMessages: [],
+      })
+    })
+
+    return entries
+  }, [displayMessages])
+
   // Bug 2 fix: grace-period effects — placed after displayMessages so they can
   // reference it safely.
 
@@ -508,8 +536,8 @@ function ChatMessageListComponent({
   }, [streamingText, thinkingGrace])
 
   useEffect(() => {
-    const currentAssistantCount = displayMessages.filter(
-      (m) => m.role === 'assistant',
+    const currentAssistantCount = displayEntries.filter(
+      ({ message }) => message.role === 'assistant',
     ).length
 
     // Cancel grace period early when a new assistant message appears
@@ -522,7 +550,7 @@ function ChatMessageListComponent({
     }
 
     assistantMessageCountRef.current = currentAssistantCount
-  }, [messages, thinkingGrace])
+  }, [displayEntries, messages, thinkingGrace])
 
   useEffect(() => {
     const wasWaiting = prevWaitingRef.current
@@ -530,8 +558,8 @@ function ChatMessageListComponent({
 
     if (wasWaiting && !waitingForResponse) {
       // Snapshot assistant count at the moment waiting cleared
-      assistantMessageCountRef.current = displayMessages.filter(
-        (m) => m.role === 'assistant',
+      assistantMessageCountRef.current = displayEntries.filter(
+        ({ message }) => message.role === 'assistant',
       ).length
       setThinkingGrace(true)
       if (thinkingGraceTimerRef.current) clearTimeout(thinkingGraceTimerRef.current)
@@ -546,7 +574,7 @@ function ChatMessageListComponent({
         clearTimeout(thinkingGraceTimerRef.current)
       }
     }
-  }, [waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayEntries, waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -563,17 +591,18 @@ function ChatMessageListComponent({
       if (!isMessageSearchActive) return []
 
       const matches: Array<MessageSearchMatch> = []
-      for (const [index, message] of displayMessages.entries()) {
+      for (const [index, entry] of displayEntries.entries()) {
+        const message = entry.message
         const messageText = textFromMessage(message).trim().toLocaleLowerCase()
         if (!messageText.includes(normalizedMessageSearch)) continue
         matches.push({
-          stableId: getStableMessageId(message, index),
+          stableId: getStableMessageId(message, entry.sourceIndex),
           messageIndex: index,
         })
       }
       return matches
     },
-    [displayMessages, isMessageSearchActive, normalizedMessageSearch],
+    [displayEntries, isMessageSearchActive, normalizedMessageSearch],
   )
 
   const messageSearchMatchIndexById = useMemo(
@@ -668,12 +697,12 @@ function ChatMessageListComponent({
   }, [messages])
 
   const hasUserVisibleTextMessages = useMemo(() => {
-    return displayMessages.some((message) => {
+    return displayEntries.some(({ message }) => {
       const role = message.role || 'assistant'
       if (role !== 'user' && role !== 'assistant') return false
       return textFromMessage(message).trim().length > 0
     })
-  }, [displayMessages])
+  }, [displayEntries])
 
   const toolInteractionCount = useMemo(() => {
     const seenToolCallIds = new Set<string>()
@@ -705,7 +734,7 @@ function ChatMessageListComponent({
   const showToolOnlyNotice =
     !loading &&
     !empty &&
-    displayMessages.length > 0 &&
+    displayEntries.length > 0 &&
     !hasUserVisibleTextMessages &&
     toolInteractionCount > 0
 
@@ -713,8 +742,8 @@ function ChatMessageListComponent({
     const nextSignatures = new Map<string, string>()
     const isInitialRender = initialRenderRef.current
 
-    displayMessages.forEach((message, index) => {
-      const stableId = getStableMessageId(message, index)
+    displayEntries.forEach(({ message, sourceIndex }) => {
+      const stableId = getStableMessageId(message, sourceIndex)
       const text = textFromMessage(message)
       const timestamp = getMessageTimestamp(message)
       const streamingStatus = message.__streamingStatus ?? 'idle'
@@ -736,15 +765,14 @@ function ChatMessageListComponent({
 
     return { streamingTargets: new Set<string>(), signatureById: nextSignatures }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayMessages, streamingCleared])
+  }, [displayEntries, streamingCleared])
 
-  const lastAssistantIndex = displayMessages
-    .map((message, index) => ({ message, index }))
+  const lastAssistantIndex = displayEntries
     .filter(({ message }) => message.role !== 'user')
-    .map(({ index }) => index)
+    .map(({ sourceIndex }) => sourceIndex)
     .pop()
-  const lastUserIndex = displayMessages
-    .map((message, index) => ({ message, index }))
+  const lastUserIndex = displayEntries
+    .map(({ message, sourceIndex }, index) => ({ message, sourceIndex, index }))
     .filter(({ message }) => message.role === 'user')
     .map(({ index }) => index)
     .pop()
@@ -773,9 +801,10 @@ function ChatMessageListComponent({
     if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator — response is rendering
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    const lastMessage = displayMessages[displayMessages.length - 1]
+    const lastEntry = displayEntries[displayEntries.length - 1]
+    const lastMessage = lastEntry?.message
     if (lastMessage && lastMessage.role === 'assistant') {
-      const lastId = getStableMessageId(lastMessage, displayMessages.length - 1)
+      const lastId = getStableMessageId(lastMessage, lastEntry.sourceIndex)
       const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
       if (isBeingTypewritten) return false
       // If we're in grace period waiting for a NEW response, the last assistant
@@ -796,7 +825,7 @@ function ChatMessageListComponent({
   )
 
   const shouldBottomPin =
-    displayMessages.length > 0 ||
+    displayEntries.length > 0 ||
     showToolOnlyNotice ||
     showResearchCard ||
     showTypingIndicator ||
@@ -814,7 +843,7 @@ function ChatMessageListComponent({
     if (!shouldVirtualize || scrollMetrics.clientHeight <= 0) {
       return {
         startIndex: 0,
-        endIndex: displayMessages.length,
+        endIndex: displayEntries.length,
         topSpacerHeight: 0,
         bottomSpacerHeight: 0,
       }
@@ -829,7 +858,7 @@ function ChatMessageListComponent({
       scrollMetrics.clientHeight / VIRTUAL_ROW_HEIGHT,
     )
     const endIndex = Math.min(
-      displayMessages.length,
+      displayEntries.length,
       startIndex + visibleCount + VIRTUAL_OVERSCAN * 2,
     )
 
@@ -838,9 +867,9 @@ function ChatMessageListComponent({
       endIndex,
       topSpacerHeight: startIndex * VIRTUAL_ROW_HEIGHT,
       bottomSpacerHeight:
-        (displayMessages.length - endIndex) * VIRTUAL_ROW_HEIGHT,
+        (displayEntries.length - endIndex) * VIRTUAL_ROW_HEIGHT,
     }
-  }, [displayMessages.length, scrollMetrics, shouldVirtualize])
+  }, [displayEntries.length, scrollMetrics, shouldVirtualize])
 
   function isMessageStreaming(message: GatewayMessage, index: number) {
     if (!isStreaming || !streamingMessageId) return false
@@ -851,21 +880,26 @@ function ChatMessageListComponent({
     )
   }
 
-  function renderMessage(chatMessage: GatewayMessage, realIndex: number) {
+  function renderMessage(entry: DisplayEntry, entryIndex: number) {
+    const chatMessage = entry.message
+    const realIndex = entry.sourceIndex
     const messageIsStreaming = isMessageStreaming(chatMessage, realIndex)
     const stableId = getStableMessageId(chatMessage, realIndex)
     const signature = streamingState.signatureById.get(stableId)
     const simulateStreaming =
       !messageIsStreaming && streamingState.streamingTargets.has(stableId)
     const spacingClass = cn(
-      getMessageSpacingClass(displayMessages, realIndex),
-      getToolGroupClass(displayMessages, realIndex),
+      getMessageSpacingClass(displayEntries, entryIndex),
+      getToolGroupClass(displayEntries, entryIndex),
     )
     const forceActionsVisible =
       typeof lastAssistantIndex === 'number' && realIndex === lastAssistantIndex
     const hasToolCalls =
       chatMessage.role === 'assistant' &&
-      getToolCallsFromMessage(chatMessage).length > 0
+      (
+        getToolCallsFromMessage(chatMessage).length > 0 ||
+        entry.attachedToolMessages.length > 0
+      )
 
     const searchMatchIndex = messageSearchMatchIndexById.get(stableId)
     const isSearchMatch = typeof searchMatchIndex === 'number'
@@ -876,8 +910,8 @@ function ChatMessageListComponent({
     // the send obviously succeeded — never show Retry.
     const hasAssistantReply =
       chatMessage.role === 'user' &&
-      realIndex + 1 < displayMessages.length &&
-      displayMessages[realIndex + 1]?.role === 'assistant'
+      entryIndex + 1 < displayEntries.length &&
+      displayEntries[entryIndex + 1]?.message.role === 'assistant'
     const effectiveOnRetry = hasAssistantReply ? undefined : onRetryMessage
 
     // For the live streaming placeholder: wrap in a stable div whose key never
@@ -900,6 +934,7 @@ function ChatMessageListComponent({
         >
           <MessageItem
             message={chatMessage}
+            attachedToolMessages={entry.attachedToolMessages}
             onRetryMessage={effectiveOnRetry}
             toolResultsByCallId={hasToolCalls ? toolResultsByCallId : undefined}
             forceActionsVisible={forceActionsVisible}
@@ -927,6 +962,7 @@ function ChatMessageListComponent({
       <MessageItem
         key={stableId}
         message={chatMessage}
+        attachedToolMessages={entry.attachedToolMessages}
         onRetryMessage={effectiveOnRetry}
         toolResultsByCallId={hasToolCalls ? toolResultsByCallId : undefined}
         forceActionsVisible={forceActionsVisible}
@@ -989,7 +1025,7 @@ function ChatMessageListComponent({
     }
   }, [
     loading,
-    displayMessages.length,
+    displayEntries.length,
     isStreaming,
     sessionKey,
     scrollToBottom,
@@ -1120,7 +1156,7 @@ function ChatMessageListComponent({
   )
 
   const scrollToBottomOverlay = useMemo(() => {
-    const isVisible = !isNearBottom && displayMessages.length > 0
+    const isVisible = !isNearBottom && displayEntries.length > 0
     const overlayGap = isMobileViewport ? 32 : 24
     const overlayBottom =
       typeof bottomOffset === 'number'
@@ -1140,7 +1176,7 @@ function ChatMessageListComponent({
     )
   }, [
     bottomOffset,
-    displayMessages.length,
+    displayEntries.length,
     handleScrollToBottom,
     isMobileViewport,
     isNearBottom,
@@ -1276,7 +1312,7 @@ function ChatMessageListComponent({
               </div>
             </div>
           ) : null}
-          {loading && displayMessages.length === 0 ? (
+          {loading && displayEntries.length === 0 ? (
             <div className="flex flex-col gap-4 animate-pulse">
               <div className="flex gap-3">
                 <div className="size-6 rounded-full bg-primary-200" />
@@ -1298,17 +1334,19 @@ function ChatMessageListComponent({
             (emptyState ?? <div aria-hidden></div>)
           ) : hasGroup ? (
             <>
-              {displayMessages.slice(0, groupStartIndex).map(renderMessage)}
+              {displayEntries.slice(0, groupStartIndex).map(renderMessage)}
               {/* // Keep the last exchange pinned without extra tail gap. // Account
               for space-y-6 (24px) when pinning. */}
               <div
                 className="my-2 flex flex-col gap-2 md:my-3 md:gap-3"
                 style={{ minHeight: `${Math.max(0, pinGroupMinHeight - 12)}px` }}
               >
-                {displayMessages
+                {displayEntries
                   .slice(groupStartIndex)
-                  .map((chatMessage, index) => {
-                    const realIndex = groupStartIndex + index
+                  .map((entry, index) => {
+                    const chatMessage = entry.message
+                    const realIndex = entry.sourceIndex
+                    const entryIndex = groupStartIndex + index
                     const messageIsStreaming = isMessageStreaming(
                       chatMessage,
                       realIndex,
@@ -1322,21 +1360,25 @@ function ChatMessageListComponent({
                       typeof lastAssistantIndex === 'number' &&
                       realIndex === lastAssistantIndex
                     const wrapperRef =
-                      realIndex === lastUserIndex ? lastUserRef : undefined
+                      entryIndex === lastUserIndex ? lastUserRef : undefined
                     const wrapperClassName = cn(
-                      getMessageSpacingClass(displayMessages, realIndex),
-                      getToolGroupClass(displayMessages, realIndex),
-                      realIndex === lastUserIndex ? 'scroll-mt-0' : '',
+                      getMessageSpacingClass(displayEntries, entryIndex),
+                      getToolGroupClass(displayEntries, entryIndex),
+                      entryIndex === lastUserIndex ? 'scroll-mt-0' : '',
                     )
                     const wrapperScrollMarginTop =
-                      realIndex === lastUserIndex ? headerHeight : undefined
+                      entryIndex === lastUserIndex ? headerHeight : undefined
                     const hasToolCalls =
                       chatMessage.role === 'assistant' &&
-                      getToolCallsFromMessage(chatMessage).length > 0
+                      (
+                        getToolCallsFromMessage(chatMessage).length > 0 ||
+                        entry.attachedToolMessages.length > 0
+                      )
                     return (
                       <MessageItem
                         key={stableId}
                         message={chatMessage}
+                        attachedToolMessages={entry.attachedToolMessages}
                         onRetryMessage={onRetryMessage}
                         toolResultsByCallId={
                           hasToolCalls ? toolResultsByCallId : undefined
@@ -1368,10 +1410,10 @@ function ChatMessageListComponent({
                   style={{ height: `${virtualRange.topSpacerHeight}px` }}
                 />
               ) : null}
-              {displayMessages
+              {displayEntries
                 .slice(virtualRange.startIndex, virtualRange.endIndex)
-                .map((chatMessage, index) =>
-                  renderMessage(chatMessage, virtualRange.startIndex + index),
+                .map((entry, index) =>
+                  renderMessage(entry, virtualRange.startIndex + index),
                 )}
               {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
                 <div

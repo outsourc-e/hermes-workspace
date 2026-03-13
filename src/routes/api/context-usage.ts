@@ -4,12 +4,17 @@ import { gatewayRpc } from '@/server/gateway'
 import { isAuthenticated } from '@/server/auth-middleware'
 
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-  'claude-opus-4-6': 200_000,
-  'claude-opus-4-5': 200_000,
-  'claude-sonnet-4-5': 200_000,
-  'claude-sonnet-4': 200_000,
-  'claude-haiku-3.5': 200_000,
-  'gpt-5.2-codex': 1_000_000,
+  'claude-opus-4-6': 1_000_000,
+  'claude-opus-4-5': 1_000_000,
+  'claude-sonnet-4-6': 1_000_000,
+  'claude-sonnet-4-5': 1_000_000,
+  'claude-sonnet-4': 1_000_000,
+  'claude-haiku-3.5': 1_000_000,
+  'gpt-5.4': 1_000_000,
+  'gpt-5.3-codex': 192_000,
+  'gpt-5.2-codex': 192_000,
+  'gpt-5.1-codex': 128_000,
+  'gpt-5-codex': 128_000,
   'gpt-4.1': 1_000_000,
   'gpt-4.1-mini': 1_000_000,
   'gpt-4o': 128_000,
@@ -44,7 +49,7 @@ function getContextWindow(model: string): number {
   for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
     if (model.includes(key) || key.includes(model)) return value
   }
-  return 200_000
+  return 1_000_000
 }
 
 const CHARS_PER_TOKEN = 4
@@ -97,7 +102,10 @@ export const Route = createFileRoute('/api/context-usage')({
           }
 
           const model = mainSession.model ?? ''
-          const maxTokens = getContextWindow(model)
+          // Prefer the user's configured contextTokens (what OpenClaw actually enforces)
+          // over the model's theoretical context window. Fall back to model window if unavailable.
+          const configuredContextTokens = mainSession.contextTokens ?? null
+          const maxTokens = configuredContextTokens ?? getContextWindow(model)
           const mainUsage = usageSessions.find(
             (s: any) => s.key === mainSession.key,
           )
