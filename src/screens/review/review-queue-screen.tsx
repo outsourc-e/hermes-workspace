@@ -84,6 +84,23 @@ type ReviewComposerState = {
   action: Extract<CheckpointReviewAction, 'revise' | 'reject'>
 }
 
+function getCheckpointTscStatus(
+  checkpoint: WorkspaceCheckpoint,
+): 'passed' | 'failed' | null {
+  if (!checkpoint.verification_raw) return null
+
+  try {
+    const parsed = JSON.parse(checkpoint.verification_raw) as {
+      tsc?: { status?: unknown }
+    }
+    return parsed.tsc?.status === 'passed' || parsed.tsc?.status === 'failed'
+      ? parsed.tsc.status
+      : null
+  } catch {
+    return null
+  }
+}
+
 function ReviewQueueSkeleton() {
   return (
     <div className="space-y-3">
@@ -146,6 +163,7 @@ function ReviewRow({
   const fullSummary = getCheckpointFullSummary(checkpoint)
   const isTruncated = truncatedSummary !== fullSummary
   const parsedDiff = getCheckpointDiffStatParsed(checkpoint)
+  const tscStatus = getCheckpointTscStatus(checkpoint)
 
   function handleOpen(event: React.MouseEvent) {
     const target = event.target
@@ -182,6 +200,18 @@ function ReviewRow({
             >
               {formatCheckpointStatus(checkpoint.status)}
             </span>
+            {tscStatus ? (
+              <span
+                className={cn(
+                  'inline-flex items-center border text-xs px-1.5 py-0.5 rounded',
+                  tscStatus === 'passed'
+                    ? 'border-green-200 bg-green-50 text-green-700'
+                    : 'border-red-200 bg-red-50 text-red-700',
+                )}
+              >
+                {tscStatus === 'passed' ? '✓ tsc' : '✗ tsc'}
+              </span>
+            ) : null}
           </div>
 
           <div>
@@ -583,6 +613,12 @@ export function ReviewQueueScreen() {
         return
       }
 
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        openCheckpointDetail(currentCheckpoint)
+        return
+      }
+
       if (event.key === 'j' || event.key === 'ArrowDown') {
         event.preventDefault()
         const nextCheckpoint =
@@ -736,7 +772,7 @@ export function ReviewQueueScreen() {
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1 text-xs text-primary-500">
               <p>Use the keyboard to move through the queue.</p>
-              <p>a approve · r reject · j/k navigate</p>
+              <p>Enter open · a approve · r reject · j/k navigate</p>
             </div>
             {pageItems.map((checkpoint) => (
               <ReviewRow
