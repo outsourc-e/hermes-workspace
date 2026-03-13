@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import {
   AgentRegistryCard,
   type AgentRegistryCardData,
   type AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatModelName } from '@/lib/format-model-name'
+import { fetchCronJobs } from '@/lib/cron-api'
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
 import { AgentHubLayout } from './agent-hub-layout'
@@ -54,6 +58,53 @@ type AgentDefinition = {
 
 type AgentRuntime = AgentRegistryCardData & {
   matchedSessions: Array<SessionEntry>
+}
+
+type AgentConfigToolEntry = {
+  id: string
+  enabled: boolean
+  source: 'allowed' | 'denied' | 'explicit' | 'unknown'
+}
+
+type AgentConfigSkillEntry = {
+  id: string
+  enabled: boolean
+}
+
+type AgentConfigChannelEntry = {
+  id: string
+  enabled: boolean | null
+  config: Record<string, unknown>
+}
+
+type AgentConfigData = {
+  agentId: string
+  name: string
+  workspacePath: string
+  primaryModel: string
+  fallbackModels: Array<string>
+  modelOverride: string
+  tools: Array<AgentConfigToolEntry>
+  skills: Array<AgentConfigSkillEntry>
+  channels: Array<AgentConfigChannelEntry>
+  readOnly: boolean
+  supportsPatch: boolean
+  sourceMethod?: string
+  warning?: string
+}
+
+type AgentConfigDraft = {
+  modelOverride: string
+  tools: Record<string, boolean>
+  skills: Record<string, boolean>
+  channels: Record<string, { enabled: boolean | null; config: Record<string, unknown> }>
+}
+
+type AgentConfigPatchPayload = {
+  modelOverride?: string
+  tools: Record<string, boolean>
+  skills: Record<string, boolean>
+  channels: Record<string, Record<string, unknown>>
 }
 
 type AgentsScreenVariant = 'mission-control' | 'registry'
@@ -218,6 +269,130 @@ function dedupe(values: Array<string>): Array<string> {
   })
 
   return result
+}
+
+function prettyLabel(value: string): string {
+  return value
+    .replace(/[-_.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return ''
+  }
+}
+
+function buildAgentConfigDraft(config: AgentConfigData): AgentConfigDraft {
+  return {
+    modelOverride: config.modelOverride,
+    tools: Object.fromEntries(
+      config.tools.map((entry) => [entry.id, entry.enabled]),
+    ),
+    skills: Object.fromEntries(
+      config.skills.map((entry) => [entry.id, entry.enabled]),
+    ),
+    channels: Object.fromEntries(
+      config.channels.map((entry) => [
+        entry.id,
+        { enabled: entry.enabled, config: entry.config },
+      ]),
+    ),
+  }
+}
+
+function serializeAgentConfigDraft(draft: AgentConfigDraft | null): string {
+  return JSON.stringify(draft ?? null)
+}
+
+function buildAgentConfigPatchPayload(
+  draft: AgentConfigDraft,
+): AgentConfigPatchPayload {
+  return {
+    ...(draft.modelOverride.trim()
+      ? { modelOverride: draft.modelOverride.trim() }
+      : {}),
+    tools: draft.tools,
+    skills: draft.skills,
+    channels: Object.fromEntries(
+      Object.entries(draft.channels).map(([id, value]) => [
+        id,
+        {
+          ...value.config,
+          ...(value.enabled === null ? {} : { enabled: value.enabled }),
+        },
+      ]),
+    ),
+  }
+}
+
+async function fetchAgentConfig(agentId: string): Promise<AgentConfigData> {
+  const response = await fetch(
+    `/api/gateway/agents?agentId=${encodeURIComponent(agentId)}`,
+  )
+  const payload = (await response.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+    data?: AgentConfigData
+  }
+
+  if (!response.ok || payload.ok === false || !payload.data) {
+    throw new Error(payload.error || `HTTP ${response.status}`)
+  }
+
+  return payload.data
+}
+
+async function patchAgentConfig(
+  agentId: string,
+  config: AgentConfigPatchPayload,
+): Promise<void> {
+  const response = await fetch('/api/gateway/agents', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ agentId, config }),
+  })
+  const payload = (await response.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+  }
+
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || 'Failed to save agent config')
+  }
+}
+
+function matchesAgentCronJob(
+  job: Awaited<ReturnType<typeof fetchCronJobs>>[number],
+  definition: AgentDefinition | null,
+  runtimeAgent: AgentRuntime | null,
+): boolean {
+  if (!runtimeAgent) return false
+
+  const tokens = dedupe([
+    runtimeAgent.id,
+    runtimeAgent.name,
+    ...(definition?.aliases ?? []),
+  ])
+
+  const searchBlob = normalizeToken(
+    [
+      job.id,
+      job.name,
+      job.description ?? '',
+      safeStringify(job.payload),
+      safeStringify(job.deliveryConfig),
+    ].join(' '),
+  )
+
+  return tokens.some((token) => {
+    const normalized = normalizeToken(token)
+    return normalized.length > 0 && searchBlob.includes(normalized)
+  })
 }
 
 function toAgentDefinition(
@@ -489,6 +664,7 @@ async function readResponseError(response: Response): Promise<string> {
 
 export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const missionControlEnabled = variant === 'mission-control'
   const [optimisticPausedByAgentId, setOptimisticPausedByAgentId] = useState<
     Record<string, boolean>
@@ -499,6 +675,11 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     Record<string, boolean>
   >({})
   const [historyAgentId, setHistoryAgentId] = useState<string | null>(null)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  const [detailTab, setDetailTab] = useState('overview')
+  const [agentConfigDraft, setAgentConfigDraft] = useState<AgentConfigDraft | null>(
+    null,
+  )
 
   // Mobile detection for pull-to-refresh
   const [isMobile, setIsMobile] = useState(() =>
@@ -544,6 +725,13 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     },
     refetchInterval: 10_000,
     retry: false,
+  })
+
+  const cronJobsQuery = useQuery({
+    queryKey: ['cron', 'jobs'],
+    queryFn: fetchCronJobs,
+    staleTime: 30_000,
+    retry: 1,
   })
 
   const handlePullRefresh = useCallback(() => {
@@ -721,6 +909,93 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     [historyAgentId, runtimeAgents],
   )
 
+  const selectedConfigAgent = useMemo(
+    () => runtimeAgents.find((agent) => agent.id === selectedAgentId) ?? null,
+    [runtimeAgents, selectedAgentId],
+  )
+
+  const selectedDefinition = useMemo(
+    () => registryDefinitions.find((agent) => agent.id === selectedAgentId) ?? null,
+    [registryDefinitions, selectedAgentId],
+  )
+
+  const agentConfigQuery = useQuery({
+    queryKey: ['gateway', 'agents', 'config', selectedAgentId],
+    enabled: Boolean(selectedAgentId),
+    queryFn: () => fetchAgentConfig(selectedAgentId as string),
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (!selectedAgentId) {
+      setAgentConfigDraft(null)
+      return
+    }
+    if (!agentConfigQuery.data) return
+    setAgentConfigDraft(buildAgentConfigDraft(agentConfigQuery.data))
+  }, [agentConfigQuery.data, selectedAgentId])
+
+  useEffect(() => {
+    setDetailTab('overview')
+  }, [selectedAgentId])
+
+  const saveAgentConfigMutation = useMutation({
+    mutationFn: async ({
+      agentId,
+      config,
+    }: {
+      agentId: string
+      config: AgentConfigPatchPayload
+    }) => patchAgentConfig(agentId, config),
+    onSuccess: async (_, variables) => {
+      toast('Agent config saved', { type: 'success' })
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['gateway', 'agents', 'config', variables.agentId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['gateway', 'agents'] }),
+      ])
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to save agent config', {
+        type: 'error',
+      })
+    },
+  })
+
+  const selectedCronJobs = useMemo(() => {
+    const jobs = Array.isArray(cronJobsQuery.data) ? cronJobsQuery.data : []
+    return jobs.filter((job) =>
+      matchesAgentCronJob(job, selectedDefinition, selectedConfigAgent),
+    )
+  }, [cronJobsQuery.data, selectedConfigAgent, selectedDefinition])
+
+  const selectedAgentConfig = agentConfigQuery.data
+  const draftSnapshot = serializeAgentConfigDraft(agentConfigDraft)
+  const configSnapshot = useMemo(
+    () =>
+      serializeAgentConfigDraft(
+        selectedAgentConfig ? buildAgentConfigDraft(selectedAgentConfig) : null,
+      ),
+    [selectedAgentConfig],
+  )
+  const isConfigDirty =
+    Boolean(agentConfigDraft && selectedAgentConfig) &&
+    draftSnapshot !== configSnapshot
+
+  const modelOverrideOptions = useMemo(() => {
+    const values = dedupe([
+      selectedAgentConfig?.primaryModel ?? '',
+      ...(selectedAgentConfig?.fallbackModels ?? []),
+      agentConfigDraft?.modelOverride ?? '',
+      selectedConfigAgent?.matchedSessions[0]
+        ? getSessionModelName(selectedConfigAgent.matchedSessions[0])
+        : '',
+    ]).filter((value) => value.length > 0)
+
+    return values
+  }, [agentConfigDraft?.modelOverride, selectedAgentConfig, selectedConfigAgent])
+
   async function spawnSessionForAgent(
     agent: AgentRegistryCardData,
   ): Promise<{ sessionKey: string; friendlyId: string } | null> {
@@ -881,6 +1156,73 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     }
   }
 
+  function handleOpenAgentConfig(agent: AgentRegistryCardData) {
+    setSelectedAgentId(agent.id)
+    setDetailTab('overview')
+  }
+
+  function handleCloseAgentConfig() {
+    setSelectedAgentId(null)
+    setAgentConfigDraft(null)
+  }
+
+  function handleReloadAgentConfig() {
+    if (!selectedAgentId) return
+    void agentConfigQuery.refetch()
+  }
+
+  function handleSaveAgentConfig() {
+    if (!selectedAgentId || !agentConfigDraft) return
+    void saveAgentConfigMutation.mutateAsync({
+      agentId: selectedAgentId,
+      config: buildAgentConfigPatchPayload(agentConfigDraft),
+    })
+  }
+
+  function handleToolToggle(toolId: string, enabled: boolean) {
+    setAgentConfigDraft((previous) => {
+      if (!previous) return previous
+      return {
+        ...previous,
+        tools: {
+          ...previous.tools,
+          [toolId]: enabled,
+        },
+      }
+    })
+  }
+
+  function handleSkillToggle(skillId: string, enabled: boolean) {
+    setAgentConfigDraft((previous) => {
+      if (!previous) return previous
+      return {
+        ...previous,
+        skills: {
+          ...previous.skills,
+          [skillId]: enabled,
+        },
+      }
+    })
+  }
+
+  function handleChannelToggle(channelId: string, enabled: boolean) {
+    setAgentConfigDraft((previous) => {
+      if (!previous) return previous
+      const current = previous.channels[channelId]
+      if (!current) return previous
+      return {
+        ...previous,
+        channels: {
+          ...previous.channels,
+          [channelId]: {
+            ...current,
+            enabled,
+          },
+        },
+      }
+    })
+  }
+
   function handleKilled(agent: AgentRegistryCardData) {
     setOptimisticPausedByAgentId((previous) => {
       const next = { ...previous }
@@ -1022,6 +1364,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                         key={agent.id}
                         agent={agent}
                         isSpawning={Boolean(spawningByAgentId[agent.id])}
+                        onTap={handleOpenAgentConfig}
                         onChat={handleChat}
                         onSpawn={handleSpawn}
                         onHistory={handleHistory}
@@ -1101,6 +1444,427 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
           )}
         </div>
       </div>
+
+      {selectedConfigAgent ? (
+        <div className="fixed inset-0 z-[95]">
+          <button
+            type="button"
+            aria-label="Close agent config"
+            className="absolute inset-0 bg-primary-950/25 backdrop-blur-sm"
+            onClick={handleCloseAgentConfig}
+          />
+
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col border-l border-primary-200 bg-surface shadow-2xl">
+            <header className="border-b border-primary-200 bg-primary-50/85 px-5 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-500">
+                    Agent Config
+                  </p>
+                  <h2 className="mt-1 truncate text-xl font-semibold text-primary-900">
+                    {selectedConfigAgent.name}
+                  </h2>
+                  <p className="mt-1 text-sm text-primary-600">
+                    {selectedAgentConfig?.name && selectedAgentConfig.name !== selectedConfigAgent.name
+                      ? `${selectedConfigAgent.role} · ${selectedAgentConfig.name}`
+                      : selectedConfigAgent.role}
+                  </p>
+                  {selectedAgentConfig?.warning ? (
+                    <p className="mt-2 text-xs font-medium text-amber-700">
+                      {selectedAgentConfig.warning}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReloadAgentConfig}
+                    disabled={agentConfigQuery.isFetching}
+                  >
+                    Reload
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveAgentConfig}
+                    disabled={
+                      !agentConfigDraft ||
+                      !selectedAgentConfig ||
+                      selectedAgentConfig.readOnly ||
+                      !selectedAgentConfig.supportsPatch ||
+                      !isConfigDirty ||
+                      saveAgentConfigMutation.isPending
+                    }
+                  >
+                    {saveAgentConfigMutation.isPending ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleCloseAgentConfig}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+              {agentConfigQuery.isLoading && !selectedAgentConfig ? (
+                <div className="flex h-40 items-center justify-center">
+                  <div className="flex items-center gap-2 text-primary-500">
+                    <div className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
+                    <span className="text-sm">Loading agent config...</span>
+                  </div>
+                </div>
+              ) : agentConfigQuery.isError && !selectedAgentConfig ? (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {agentConfigQuery.error instanceof Error
+                    ? agentConfigQuery.error.message
+                    : 'Failed to load agent config'}
+                </div>
+              ) : (
+                <Tabs value={detailTab} onValueChange={setDetailTab}>
+                  <TabsList className="mb-5 flex w-full flex-wrap gap-2 rounded-2xl border border-primary-200 bg-white p-1 text-primary-500 shadow-sm">
+                    <TabsTrigger value="overview" className="min-w-[110px] flex-1">
+                      Overview
+                    </TabsTrigger>
+                    <TabsTrigger value="tools" className="min-w-[92px] flex-1">
+                      Tools
+                    </TabsTrigger>
+                    <TabsTrigger value="skills" className="min-w-[92px] flex-1">
+                      Skills
+                    </TabsTrigger>
+                    <TabsTrigger value="channels" className="min-w-[102px] flex-1">
+                      Channels
+                    </TabsTrigger>
+                    <TabsTrigger value="cron" className="min-w-[102px] flex-1">
+                      Cron Jobs
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="overview" className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                          Agent ID
+                        </p>
+                        <p className="mt-2 text-sm font-medium text-primary-900">
+                          {selectedConfigAgent.id}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                          Name
+                        </p>
+                        <p className="mt-2 text-sm font-medium text-primary-900">
+                          {selectedAgentConfig?.name || selectedConfigAgent.name}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                          Workspace Path
+                        </p>
+                        <p className="mt-2 break-all text-sm font-medium text-primary-900">
+                          {selectedAgentConfig?.workspacePath || 'Unavailable'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                            Primary Model
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-primary-900">
+                            {selectedAgentConfig?.primaryModel
+                              ? formatModelName(selectedAgentConfig.primaryModel)
+                              : 'Unavailable'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                            Fallbacks
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {(selectedAgentConfig?.fallbackModels ?? []).length > 0 ? (
+                              selectedAgentConfig?.fallbackModels.map((fallback) => (
+                                <span
+                                  key={fallback}
+                                  className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700"
+                                >
+                                  {formatModelName(fallback)}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-sm text-primary-500">No fallback models</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                        <label className="block">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                            Model Override
+                          </span>
+                          <select
+                            value={agentConfigDraft?.modelOverride ?? ''}
+                            disabled={
+                              !agentConfigDraft ||
+                              selectedAgentConfig?.readOnly ||
+                              !selectedAgentConfig?.supportsPatch
+                            }
+                            onChange={(event) => {
+                              const nextValue = event.target.value
+                              setAgentConfigDraft((previous) =>
+                                previous
+                                  ? {
+                                      ...previous,
+                                      modelOverride: nextValue,
+                                    }
+                                  : previous,
+                              )
+                            }}
+                            className="mt-2 h-10 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition focus:border-primary-300"
+                          >
+                            <option value="">Use agent default</option>
+                            {modelOverrideOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {formatModelName(option)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-600">
+                          {selectedAgentConfig?.sourceMethod
+                            ? `Loaded via ${selectedAgentConfig.sourceMethod}`
+                            : selectedAgentConfig?.readOnly
+                              ? 'Read-only fallback display'
+                              : 'Config ready'}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="tools" className="space-y-3">
+                    {(selectedAgentConfig?.tools ?? []).length === 0 ? (
+                      <div className="rounded-2xl border border-primary-200 bg-white px-4 py-6 text-sm text-primary-500 shadow-sm">
+                        No tool policy was exposed for this agent.
+                      </div>
+                    ) : (
+                      selectedAgentConfig?.tools.map((tool) => (
+                        <div
+                          key={tool.id}
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-primary-200 bg-white px-4 py-3 shadow-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-primary-900">
+                              {prettyLabel(tool.id)}
+                            </p>
+                            <p className="text-xs text-primary-500">
+                              {tool.source === 'allowed'
+                                ? 'Allowed by policy'
+                                : tool.source === 'denied'
+                                  ? 'Denied by policy'
+                                  : tool.source === 'explicit'
+                                    ? 'Explicit per-agent rule'
+                                    : 'Policy source unknown'}
+                            </p>
+                          </div>
+                          <Switch
+                            checked={agentConfigDraft?.tools[tool.id] ?? tool.enabled}
+                            disabled={
+                              selectedAgentConfig.readOnly ||
+                              !selectedAgentConfig.supportsPatch
+                            }
+                            onCheckedChange={(checked) =>
+                              handleToolToggle(tool.id, Boolean(checked))
+                            }
+                          />
+                        </div>
+                      ))
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="skills" className="space-y-3">
+                    {(selectedAgentConfig?.skills ?? []).length === 0 ? (
+                      <div className="rounded-2xl border border-primary-200 bg-white px-4 py-6 text-sm text-primary-500 shadow-sm">
+                        No active skills were exposed for this agent.
+                      </div>
+                    ) : (
+                      selectedAgentConfig?.skills.map((skill) => (
+                        <div
+                          key={skill.id}
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-primary-200 bg-white px-4 py-3 shadow-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-primary-900">
+                              {prettyLabel(skill.id)}
+                            </p>
+                            <p className="text-xs text-primary-500">{skill.id}</p>
+                          </div>
+                          <Switch
+                            checked={agentConfigDraft?.skills[skill.id] ?? skill.enabled}
+                            disabled={
+                              selectedAgentConfig.readOnly ||
+                              !selectedAgentConfig.supportsPatch
+                            }
+                            onCheckedChange={(checked) =>
+                              handleSkillToggle(skill.id, Boolean(checked))
+                            }
+                          />
+                        </div>
+                      ))
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="channels" className="space-y-3">
+                    {(selectedAgentConfig?.channels ?? []).length === 0 ? (
+                      <div className="rounded-2xl border border-primary-200 bg-white px-4 py-6 text-sm text-primary-500 shadow-sm">
+                        No per-channel config was exposed for this agent.
+                      </div>
+                    ) : (
+                      selectedAgentConfig?.channels.map((channel) => {
+                        const draftChannel = agentConfigDraft?.channels[channel.id]
+                        const channelConfig = draftChannel?.config ?? channel.config
+                        const channelJson = safeStringify(channelConfig)
+                        return (
+                          <div
+                            key={channel.id}
+                            className="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-primary-900">
+                                  {prettyLabel(channel.id)}
+                                </p>
+                                <p className="text-xs text-primary-500">
+                                  Responds on {channel.id}
+                                </p>
+                              </div>
+                              {channel.enabled !== null ? (
+                                <Switch
+                                  checked={draftChannel?.enabled ?? channel.enabled}
+                                  disabled={
+                                    selectedAgentConfig.readOnly ||
+                                    !selectedAgentConfig.supportsPatch
+                                  }
+                                  onCheckedChange={(checked) =>
+                                    handleChannelToggle(channel.id, Boolean(checked))
+                                  }
+                                />
+                              ) : (
+                                <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-600">
+                                  Display only
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="mt-3 rounded-xl border border-primary-100 bg-primary-50/70 p-3">
+                              {channelJson ? (
+                                <pre className="overflow-x-auto text-xs leading-5 text-primary-700">
+                                  {channelJson}
+                                </pre>
+                              ) : (
+                                <p className="text-xs text-primary-500">
+                                  No extra channel config provided.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="cron" className="space-y-3">
+                    <div className="flex items-center justify-between rounded-2xl border border-primary-200 bg-white px-4 py-3 shadow-sm">
+                      <div>
+                        <p className="text-sm font-medium text-primary-900">
+                          Assigned cron jobs
+                        </p>
+                        <p className="text-xs text-primary-500">
+                          Matched against agent id, name, aliases, payload, and delivery config.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void navigate({ to: '/cron' })}
+                      >
+                        Open Cron Screen
+                      </Button>
+                    </div>
+
+                    {cronJobsQuery.isLoading ? (
+                      <div className="rounded-2xl border border-primary-200 bg-white px-4 py-6 text-sm text-primary-500 shadow-sm">
+                        Loading cron jobs...
+                      </div>
+                    ) : cronJobsQuery.isError ? (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-6 text-sm text-red-700 shadow-sm">
+                        {cronJobsQuery.error instanceof Error
+                          ? cronJobsQuery.error.message
+                          : 'Failed to load cron jobs'}
+                      </div>
+                    ) : selectedCronJobs.length === 0 ? (
+                      <div className="rounded-2xl border border-primary-200 bg-white px-4 py-6 text-sm text-primary-500 shadow-sm">
+                        No cron jobs matched this agent.
+                      </div>
+                    ) : (
+                      selectedCronJobs.map((job) => (
+                        <div
+                          key={job.id}
+                          className="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-primary-900">
+                                {job.name}
+                              </p>
+                              <p className="mt-1 text-xs text-primary-500">
+                                {job.id}
+                              </p>
+                            </div>
+                            <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700">
+                              {job.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 grid gap-3 text-sm text-primary-700 md:grid-cols-3">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-500">
+                                Schedule
+                              </p>
+                              <p className="mt-1">{job.schedule}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-500">
+                                Status
+                              </p>
+                              <p className="mt-1">{job.status || 'Unknown'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-500">
+                                Last Run
+                              </p>
+                              <p className="mt-1">
+                                {job.lastRun?.startedAt
+                                  ? new Date(job.lastRun.startedAt).toLocaleString()
+                                  : 'Never'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </TabsContent>
+                </Tabs>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       {selectedHistoryAgent ? (
         <div className="fixed inset-0 z-[90] md:hidden">
