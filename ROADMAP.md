@@ -1,6 +1,18 @@
 # ClawSuite Ship Roadmap
-_Updated: 2026-03-07 19:46 EST_
-_Source: 4 external audits + internal punch list_
+_Updated: 2026-03-12 00:50 EST_
+_Source: 4 external audits + internal punch list + Eric priority reset_
+
+## 🔥 Current Shipping Sequence (reset 2026-03-12)
+1. **Workspace first** — finish `/hub-beta` / Mission Control so Eric can run parallel projects without being the bottleneck.
+2. **Chat fixes + reliability** — paste duplicate, word-by-word streaming, session/missions persistence, EventSource cleanup.
+3. **Atomicbot-style onboarding** — hide the gateway, bundle stealth local OpenClaw, or connect existing / start cloud.
+4. **Electron app ship path** — native app, subscriptions, updates, polished recovery states.
+5. **Post-ship pivot** — make Workspace/backend support broader than OpenClaw, but do **not** block ship on that abstraction.
+
+## 🧭 Product Direction
+- **Near-term product:** native ClawSuite app with bundled or invisible OpenClaw gateway.
+- **User promise:** install app, choose local/existing/cloud, start using agents immediately.
+- **Strategic posture:** ship the OpenClaw-wrapped product first, then widen into a model/backend-agnostic orchestration platform.
 
 ## ✅ Done (2026-03-07)
 - [x] Chat duplication fix — singleton event bus + text-based dedup (`e939e97`, `075b473`)
@@ -16,15 +28,20 @@ _Source: 4 external audits + internal punch list_
 - [x] Audit docs + ROADMAP saved to repo
 
 ## 🔴 P0 — Ship Blockers
-- [ ] **First-run wizard rewrite** — outcome-first ("Use this Mac" / "Connect" / "Cloud"), see TASK-02 in docs/TASK-SPECS.md
+- [ ] **Workspace unpark + finish core flow** — Goal → Decompose → Execute → Quality Gate → Assemble → PR in `/hub-beta`
+- [ ] **First-run wizard rewrite** — outcome-first ("Use this Mac" / "Connect Existing" / "Start Cloud"), see TASK-02 in docs/TASK-SPECS.md
+- [ ] **Stealth gateway bundle** — local OpenClaw auto-started inside Electron, invisible to end user unless debugging
 - [ ] **Auth default hardening** — localhost-only for sensitive endpoints when no password set, see TASK-04
-
-## 🟠 P1 — Critical UX
-- [ ] **formatModelName across all surfaces** — usage modal, agents screen, remote panel, hub layout, see TASK-05
-- [ ] **Connection error taxonomy** — plain-language gateway errors, see TASK-03
 - [ ] **Mission state persistence** — Zustand+persist instead of React useState (missions die on nav)
 - [ ] **Stop deleting sessions on mission complete** — patch status instead of DELETE
+
+## 🟠 P1 — Critical UX
+- [ ] **Word-by-word streaming in chat UI** — match current OpenClaw streaming feel in ClawSuite
+- [ ] **Paste duplicate fix** — harden `gateway-chat-store.ts` dedup logic
 - [ ] **6 redundant EventSource connections** — consolidate to shared singleton client-side
+- [ ] **Connection error taxonomy** — plain-language gateway errors + actionable recovery
+- [ ] **formatModelName across all surfaces** — usage modal, agents screen, remote panel, hub layout, see TASK-05
+- [ ] **Onboarding recovery states** — if local gateway install/start/connect fails, explain exactly what to do next
 - [ ] **Usage sidebar UX** — human-readable labels, progress bars, contextual help
 - [ ] **Empty states with action steps** — see TASK-06
 
