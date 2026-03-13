@@ -662,6 +662,7 @@ function ChatSidebarComponent({
   const isMemoryActive = pathname === '/memory'
   const isDebugActive = pathname === '/debug'
   const isLogsActive = pathname === '/activity' || pathname === '/logs'
+  const isGatewayLogsActive = pathname === '/gateway/logs'
 
   // Track last-visited route per section
   const suiteRoutes = [
@@ -687,6 +688,7 @@ function ChatSidebarComponent({
     '/usage',
     '/agents',
     '/nodes',
+    '/gateway/logs',
   ]
 
   useEffect(() => {
@@ -1028,6 +1030,13 @@ function ChatSidebarComponent({
       icon: SmartPhone01Icon,
       label: 'Nodes',
       active: isNodesActive,
+    },
+    {
+      kind: 'link',
+      to: '/gateway/logs',
+      icon: Notification03Icon,
+      label: 'Logs',
+      active: isGatewayLogsActive,
     },
   ]
 
