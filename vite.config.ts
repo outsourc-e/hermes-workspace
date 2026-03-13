@@ -1,5 +1,6 @@
 import { URL, fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
 import { resolve } from 'node:path'
@@ -16,6 +17,8 @@ const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const gatewayUrl = env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
   let workspaceDaemonStarted = false
+  let workspaceDaemonStarting = false
+  let workspaceDaemonChild: ChildProcess | null = null
 
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. CLAWSUITE_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
@@ -113,7 +116,7 @@ const config = defineConfig(({ mode, command }) => {
           if (command !== 'serve') return
         },
         configureServer() {
-          if (command !== 'serve' || workspaceDaemonStarted) return
+          if (command !== 'serve' || workspaceDaemonStarted || workspaceDaemonStarting) return
 
           const checkPort = (port: number, cb: (running: boolean) => void) => {
             const socket = net.createConnection({ port, host: '127.0.0.1' })
@@ -124,11 +127,16 @@ const config = defineConfig(({ mode, command }) => {
             socket.once('error', () => cb(false))
           }
 
+          workspaceDaemonStarting = true
           checkPort(3099, (running) => {
-            if (running || workspaceDaemonStarted) return
+            if (running || workspaceDaemonStarted) {
+              workspaceDaemonStarting = false
+              return
+            }
 
-            const distEntry = resolve('workspace-daemon/dist/server.js')
+            const daemonCwd = resolve('workspace-daemon')
             const srcEntry = resolve('workspace-daemon/src/server.ts')
+            const distEntry = resolve('workspace-daemon/dist/server.js')
             const maxRetries = 5
             const retryDelayMs = 2000
 
@@ -137,9 +145,15 @@ const config = defineConfig(({ mode, command }) => {
 
               const startChild = () => {
                 workspaceDaemonStarted = true
+                workspaceDaemonStarting = false
                 const child = spawn(commandName, args, options)
+                workspaceDaemonChild = child
 
                 child.on('exit', (code) => {
+                  if (workspaceDaemonChild === child) {
+                    workspaceDaemonChild = null
+                  }
+
                   if (code === 0) {
                     workspaceDaemonStarted = false
                     return
@@ -158,32 +172,40 @@ const config = defineConfig(({ mode, command }) => {
                     `[workspace-daemon] crashed with code ${code ?? 'unknown'}; restarting in ${retryDelayMs / 1000}s (${retryCount}/${maxRetries}).`,
                   )
 
+                  workspaceDaemonStarting = true
                   setTimeout(() => {
                     startChild()
                   }, retryDelayMs)
+                })
+
+                child.on('error', (error) => {
+                  console.error(`[workspace-daemon] failed to spawn: ${error.message}`)
                 })
               }
 
               startChild()
             }
 
-            if (existsSync(distEntry)) {
-              spawnWithRespawn('node', ['workspace-daemon/dist/server.js'], {
-                cwd: process.cwd(),
+            if (existsSync(srcEntry)) {
+              spawnWithRespawn('npx', ['tsx', 'src/server.ts'], {
+                cwd: daemonCwd,
                 env: { ...process.env, PORT: '3099' },
                 stdio: 'inherit',
               })
               return
             }
 
-            if (existsSync(srcEntry)) {
-              spawnWithRespawn('npx', ['--prefix', 'workspace-daemon', 'tsx', 'src/server.ts'], {
-                cwd: process.cwd(),
+            if (existsSync(distEntry)) {
+              spawnWithRespawn('node', ['dist/server.js'], {
+                cwd: daemonCwd,
                 env: { ...process.env, PORT: '3099' },
                 stdio: 'inherit',
-                shell: true,
               })
+              return
             }
+
+            workspaceDaemonStarting = false
+            console.error('[workspace-daemon] no server entry found to spawn.')
           })
         },
       },

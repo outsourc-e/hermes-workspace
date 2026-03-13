@@ -52,6 +52,19 @@ const { app, orchestrator } = createServer();
 
 orchestrator.start();
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   process.stdout.write(`Workspace daemon listening on http://localhost:${PORT}\n`);
+});
+
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EADDRINUSE") {
+    process.stderr.write(
+      `Workspace daemon port ${PORT} is already in use; leaving the existing process running.\n`,
+    );
+    process.exit(0);
+    return;
+  }
+
+  process.stderr.write(`Workspace daemon failed to start: ${error.message}\n`);
+  process.exit(1);
 });

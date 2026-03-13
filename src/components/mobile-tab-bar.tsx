@@ -190,10 +190,10 @@ export function MobileTabBar() {
         'fixed bottom-0 left-0 right-0 mx-auto w-fit z-[80] md:hidden',
         // Vertical position: above home indicator
         'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
-        // Opaque pill to avoid background bleed-through
-        'bg-white dark:bg-neutral-900 shadow-lg',
+        // Keep the pill visually isolated from page and error-state backgrounds
+        'bg-white/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/88',
         'rounded-full',
-        'border border-white/40 dark:border-white/10',
+        'border border-primary-200/80',
         // Inner padding
         'px-3 py-2',
         // Hide/show animation
@@ -243,7 +243,7 @@ export function MobileTabBar() {
                   circleSize,
                   isActive
                     ? 'bg-accent-500 text-white shadow-sm'
-                    : 'text-neutral-400 dark:text-neutral-500',
+                    : 'text-primary-500',
                 )}
               >
                 <HugeiconsIcon

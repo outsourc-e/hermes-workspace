@@ -220,7 +220,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-gray-50 text-primary-900">
+    <div className="flex h-full flex-col overflow-hidden bg-surface text-primary-900">
       <div className="sticky top-0 z-20 border-b border-primary-200 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -273,6 +273,25 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
               {connected ? 'Live' : 'Connecting...'}
             </div>
           </div>
+          {showOfflineBanner ? (
+            <div className="relative z-0 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  Workspace daemon is offline. Start it with:{' '}
+                  <code className="rounded bg-amber-100 px-1 font-mono">
+                    npm run daemon
+                  </code>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowOfflineBanner(false)}
+                  className="shrink-0 text-amber-600 transition-colors hover:text-amber-900"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ) : null}
           {activeTab === 'projects' && (projectName || search.missionId) ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-primary-500">
               <button
@@ -320,26 +339,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
           ) : null}
         </div>
       </div>
-
-      {showOfflineBanner ? (
-        <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-          <span>
-            Workspace daemon is offline. Start it with:{' '}
-            <code className="rounded bg-amber-100 px-1 font-mono">
-              npm run daemon
-            </code>
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowOfflineBanner(false)}
-            className="ml-4 text-amber-600 hover:text-amber-900"
-          >
-            x
-          </button>
-        </div>
-      ) : null}
-
-      <main className="flex-1 overflow-y-auto bg-gray-50">
+      <main className="flex-1 overflow-y-auto bg-surface">
         {search.checkpointId ? (
           <CheckpointDetailScreen
             checkpointId={search.checkpointId}

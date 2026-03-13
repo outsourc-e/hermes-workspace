@@ -1,8 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 
-const DEFAULT_DB_DIR = path.resolve(process.cwd(), '.data')
+const DAEMON_ROOT_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+)
+const DEFAULT_DB_DIR = path.join(DAEMON_ROOT_DIR, '.data')
 const DEFAULT_DB_PATH = path.join(DEFAULT_DB_DIR, 'workspace-daemon.sqlite')
 
 let dbInstance: Database.Database | null = null
@@ -12,7 +18,7 @@ function ensureDirectory(filePath: string): void {
 }
 
 function readSchemaSql(): string {
-  const schemaPath = path.resolve(process.cwd(), 'src/db/schema.sql')
+  const schemaPath = path.join(DAEMON_ROOT_DIR, 'src/db/schema.sql')
   return fs.readFileSync(schemaPath, 'utf8')
 }
 
