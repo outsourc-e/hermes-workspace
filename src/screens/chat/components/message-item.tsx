@@ -109,6 +109,7 @@ type ExecNotification = {
 
 type MessageItemProps = {
   message: GatewayMessage
+  attachedToolMessages?: Array<GatewayMessage>
   toolResultsByCallId?: Map<string, GatewayMessage>
   toolCalls?: Array<StreamToolCall>
   onRetryMessage?: (message: GatewayMessage) => void
@@ -124,6 +125,15 @@ type MessageItemProps = {
   simulateStreaming?: boolean
   streamingKey?: string | null
   expandAllToolSections?: boolean
+}
+
+type InlineToolSection = {
+  key: string
+  type: string
+  input?: Record<string, unknown>
+  outputText: string
+  errorText?: string
+  state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error'
 }
 
 function extractToolResultText(msg: GatewayMessage | undefined): string {
@@ -345,6 +355,188 @@ function formatToolDisplayLabel(
   return lowerName.replace(/_/g, ' ')
 }
 
+function readNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function readPercent(value: unknown): number | null {
+  const numeric = readNumber(value)
+  if (numeric === null) return null
+  return Math.max(0, Math.min(numeric, 100))
+}
+
+function formatCompactNumber(value: number): string {
+  const absolute = Math.abs(value)
+  if (absolute < 1000) return `${Math.round(value)}`
+  if (absolute < 10_000) return `${(value / 1000).toFixed(1)}k`
+  if (absolute < 100_000) return `${Math.round(value / 100) / 10}k`
+  if (absolute < 1_000_000) return `${Math.round(value / 1000)}k`
+  return `${Math.round(value / 100_000) / 10}m`
+}
+
+function shortenModelName(raw: string): string {
+  if (!raw) return ''
+  let name = raw
+  const prefixes = [
+    'openrouter/anthropic/',
+    'openrouter/google/',
+    'openrouter/openai/',
+    'openrouter/',
+    'anthropic/',
+    'openai/',
+    'google-antigravity/',
+    'minimax/',
+    'moonshot/',
+  ]
+  for (const prefix of prefixes) {
+    if (name.toLowerCase().startsWith(prefix)) {
+      name = name.slice(prefix.length)
+      break
+    }
+  }
+  return name
+    .replace(/-(\d)/g, ' $1')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+    .replace(/\bGpt\b/g, 'GPT')
+}
+
+function messageMetadataSignature(message: GatewayMessage): string {
+  const root = message as Record<string, unknown>
+  return JSON.stringify({
+    model: root.model ?? root.modelName ?? root.model_name ?? null,
+    inputTokens:
+      root.inputTokens ??
+      root.input_tokens ??
+      root.promptTokens ??
+      root.prompt_tokens ??
+      null,
+    outputTokens:
+      root.outputTokens ??
+      root.output_tokens ??
+      root.completionTokens ??
+      root.completion_tokens ??
+      null,
+    cacheRead:
+      root.cacheRead ??
+      root.cache_read ??
+      root.cacheReadTokens ??
+      root.cache_read_tokens ??
+      null,
+    contextPercent: root.contextPercent ?? root.context_percent ?? root.context ?? null,
+    usage:
+      root.usage && typeof root.usage === 'object'
+        ? root.usage
+        : null,
+  })
+}
+
+function getMessageUsageMetadata(message: GatewayMessage): {
+  inputTokens: number | null
+  outputTokens: number | null
+  cacheReadTokens: number | null
+  contextPercent: number | null
+  modelLabel: string | null
+} {
+  const root = message as Record<string, unknown>
+  const usage =
+    root.usage && typeof root.usage === 'object'
+      ? (root.usage as Record<string, unknown>)
+      : null
+
+  const inputTokens = readNumber(
+    root.inputTokens ??
+      root.input_tokens ??
+      root.promptTokens ??
+      root.prompt_tokens ??
+      usage?.inputTokens ??
+      usage?.input_tokens ??
+      usage?.input ??
+      usage?.promptTokens ??
+      usage?.prompt_tokens ??
+      usage?.prompt,
+  )
+  const outputTokens = readNumber(
+    root.outputTokens ??
+      root.output_tokens ??
+      root.completionTokens ??
+      root.completion_tokens ??
+      usage?.outputTokens ??
+      usage?.output_tokens ??
+      usage?.output ??
+      usage?.completionTokens ??
+      usage?.completion_tokens ??
+      usage?.completion,
+  )
+  const cacheReadTokens = readNumber(
+    root.cacheRead ??
+      root.cache_read ??
+      root.cacheReadTokens ??
+      root.cache_read_tokens ??
+      usage?.cacheRead ??
+      usage?.cache_read ??
+      usage?.cacheReadTokens ??
+      usage?.cache_read_tokens,
+  )
+  const contextPercent = readPercent(
+    root.contextPercent ??
+      root.context_percent ??
+      root.context ??
+      usage?.contextPercent ??
+      usage?.context_percent ??
+      usage?.context,
+  )
+  const rawModel =
+    root.model ??
+    root.modelName ??
+    root.model_name ??
+    usage?.model ??
+    usage?.modelName ??
+    usage?.model_name
+  const modelLabel =
+    typeof rawModel === 'string' && rawModel.trim()
+      ? shortenModelName(rawModel.trim())
+      : null
+
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    contextPercent,
+    modelLabel,
+  }
+}
+
+function parseToolNameFromMessageText(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed) return 'tool'
+  const match = trimmed.match(/^([a-zA-Z0-9_:-]+)\s*\(/)
+  return match?.[1]?.trim() || trimmed.split(/\s+/)[0] || 'tool'
+}
+
+function readToolArgs(
+  details: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!details || typeof details !== 'object') return undefined
+  const candidates = [
+    details.args,
+    details.arguments,
+    details.input,
+    details.parameters,
+  ]
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      return candidate as Record<string, unknown>
+    }
+  }
+  return undefined
+}
+
 /** Extract the most useful single argument to display in a tool pill */
 function keyArgLabel(name: string, args?: Record<string, unknown>): string | null {
   if (!args) return null
@@ -471,8 +663,93 @@ function isImageAttachment(attachment: GatewayAttachment): boolean {
   return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)
 }
 
+function renderInlineToolSection(
+  toolSection: InlineToolSection,
+  index: number,
+  toolCallsOpen: boolean,
+  setToolCallsOpen: (open: boolean) => void,
+) {
+  const icons: Record<string, string> = {
+    exec: '⚡',
+    Read: '📖',
+    read: '📖',
+    Write: '✏️',
+    write: '✏️',
+    Edit: '✏️',
+    edit: '✏️',
+    web_search: '🔍',
+    memory_search: '🧠',
+    memory_get: '🧠',
+    browser: '🌐',
+    image: '🖼️',
+  }
+  const icon = icons[toolSection.type] ?? '🔧'
+  const isError = toolSection.state === 'output-error'
+  const headerArg = toolSection.input
+    ? keyArgLabel(toolSection.type, toolSection.input)
+    : null
+  const toolDisplayLabel = formatToolDisplayLabel(
+    toolSection.type,
+    toolSection.input,
+  )
+  const headerArgTruncated =
+    headerArg && headerArg.length > 80
+      ? `${headerArg.slice(0, 77)}…`
+      : headerArg
+
+  return (
+    <Collapsible
+      key={toolSection.key || `${toolSection.type}-${index}`}
+      open={toolCallsOpen}
+      onOpenChange={setToolCallsOpen}
+    >
+      <CollapsibleTrigger className={cn(
+        'w-full justify-start gap-1.5 rounded-md bg-transparent px-2 py-1.5 text-[11px] font-mono',
+        'hover:bg-primary-50 dark:hover:bg-primary-800/60',
+        'data-panel-open:bg-primary-50/60 dark:data-panel-open:bg-primary-800/40',
+        isError
+          ? 'text-red-500 dark:text-red-400'
+          : 'text-neutral-500 dark:text-neutral-400',
+      )}>
+        <span className="shrink-0 transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
+        <span className="shrink-0">{icon} {toolDisplayLabel}</span>
+        {headerArgTruncated && headerArgTruncated !== toolDisplayLabel ? (
+          <span className="truncate opacity-50">{headerArgTruncated}</span>
+        ) : null}
+        {isError ? <span className="ml-auto shrink-0 text-red-400">✗ error</span> : null}
+        {!isError && toolSection.state === 'output-available' ? (
+          <span className="ml-auto shrink-0 opacity-40">✓</span>
+        ) : null}
+      </CollapsibleTrigger>
+      <CollapsiblePanel>
+        <div className="mt-0.5 ml-2 flex flex-col gap-1.5 pb-1">
+          {toolSection.type === 'exec' && headerArg ? (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-800 px-2 py-1 text-[11px] font-mono text-amber-300 dark:bg-neutral-950">
+              $ {headerArg}
+            </pre>
+          ) : null}
+          {isError && toolSection.errorText ? (
+            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded bg-red-950/40 p-2 text-xs font-mono text-red-300">
+              {toolSection.errorText}
+            </pre>
+          ) : toolSection.outputText ? (
+            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-xs font-mono text-neutral-200 dark:bg-neutral-950">
+              {toolSection.outputText}
+            </pre>
+          ) : toolSection.state === 'input-available' ? (
+            <span className="text-xs italic text-neutral-400">running…</span>
+          ) : (
+            <span className="text-xs italic text-neutral-400">no output</span>
+          )}
+        </div>
+      </CollapsiblePanel>
+    </Collapsible>
+  )
+}
+
 function MessageItemComponent({
   message,
+  attachedToolMessages = [],
   toolResultsByCallId,
   toolCalls: streamToolCalls = [],
   onRetryMessage,
@@ -693,7 +970,6 @@ function MessageItemComponent({
 
   // Get tool calls from this message (for assistant messages)
   const toolCalls = role === 'assistant' ? getToolCallsFromMessage(message) : []
-  const hasToolCalls = toolCalls.length > 0
   const embeddedStreamToolCalls = useMemo(() => {
     const value = (message as any).__streamToolCalls
     if (!Array.isArray(value)) return []
@@ -710,6 +986,47 @@ function MessageItemComponent({
   const effectiveStreamToolCalls =
     streamToolCalls.length > 0 ? streamToolCalls : embeddedStreamToolCalls
   const hasStreamToolCalls = effectiveStreamToolCalls.length > 0
+  const activeStreamToolLabels = useMemo(() => {
+    const labels: string[] = []
+    const seen = new Set<string>()
+
+    for (const toolCall of effectiveStreamToolCalls) {
+      if (toolCall.phase !== 'calling' && toolCall.phase !== 'running') continue
+      const label = formatToolDisplayLabel(
+        toolCall.name,
+        toolCall.args as Record<string, unknown> | undefined,
+      )
+      if (!label || seen.has(label)) continue
+      seen.add(label)
+      labels.push(label)
+    }
+
+    return labels
+  }, [effectiveStreamToolCalls])
+  const thinkingStatusLabel =
+    activeStreamToolLabels.length > 0
+      ? `⚡ Running ${activeStreamToolLabels.join(', ')}...`
+      : '💭 Thinking...'
+  const [thinkingElapsedSeconds, setThinkingElapsedSeconds] = useState(0)
+  useEffect(() => {
+    if (!thinking || hasText) {
+      setThinkingElapsedSeconds(0)
+      return
+    }
+
+    const startedAt = rawTimestamp(message) ?? Date.now()
+    const tick = () => {
+      const elapsedSeconds = Math.max(
+        0,
+        Math.floor((Date.now() - startedAt) / 1000),
+      )
+      setThinkingElapsedSeconds(elapsedSeconds)
+    }
+
+    tick()
+    const interval = window.setInterval(tick, 1000)
+    return () => window.clearInterval(interval)
+  }, [hasText, message, thinking, thinkingStatusLabel])
   const toolParts = useMemo(() => {
     return toolCalls.map((toolCall) => {
       const resultMessage = toolCall.id
@@ -718,6 +1035,56 @@ function MessageItemComponent({
       return mapToolCallToToolPart(toolCall, resultMessage)
     })
   }, [toolCalls, toolResultsByCallId])
+  const attachedToolSections = useMemo<Array<InlineToolSection>>(
+    () =>
+      attachedToolMessages.map((toolMessage, index) => {
+        const messageText = textFromMessage(toolMessage)
+        const outputText = extractToolResultText(toolMessage) || messageText
+        const errorText = toolMessage.isError ? outputText || 'Unknown error' : undefined
+        const toolType =
+          (typeof toolMessage.toolName === 'string' && toolMessage.toolName.trim()) ||
+          parseToolNameFromMessageText(messageText)
+        return {
+          key:
+            (typeof (toolMessage as any).id === 'string' && (toolMessage as any).id) ||
+            (typeof toolMessage.toolCallId === 'string' && toolMessage.toolCallId) ||
+            `${toolType}-${index}`,
+          type: toolType,
+          input: readToolArgs(toolMessage.details),
+          outputText,
+          errorText,
+          state: toolMessage.isError ? 'output-error' : 'output-available',
+        }
+      }),
+    [attachedToolMessages],
+  )
+  const inlineToolSections = useMemo<Array<InlineToolSection>>(
+    () => [
+      ...toolParts.map((toolPart, index) => {
+        const rawOutput = toolPart.output
+        let outputText = ''
+        if (rawOutput) {
+          if (typeof rawOutput.output === 'string') {
+            outputText = rawOutput.output
+          } else {
+            outputText = JSON.stringify(rawOutput, null, 2)
+          }
+        }
+
+        return {
+          key: toolPart.toolCallId || `${toolPart.type}-${index}`,
+          type: toolPart.type,
+          input: toolPart.input as Record<string, unknown> | undefined,
+          outputText,
+          errorText: toolPart.errorText,
+          state: toolPart.state,
+        }
+      }),
+      ...attachedToolSections,
+    ],
+    [attachedToolSections, toolParts],
+  )
+  const hasToolCalls = inlineToolSections.length > 0
   const [toolCallsOpen, setToolCallsOpen] = useState(false)
   useEffect(() => {
     if (expandAllToolSections) {
@@ -730,6 +1097,18 @@ function MessageItemComponent({
   // 'error'   = gateway rejected or network failed → show retry
   const isQueued = message.status === 'queued'
   const isFailed = message.status === 'error'
+  const usageMetadata = useMemo(
+    () => getMessageUsageMetadata(message),
+    [message],
+  )
+  const hasAssistantMetadata =
+    !isUser &&
+    !effectiveIsStreaming &&
+    (usageMetadata.inputTokens !== null ||
+      usageMetadata.outputTokens !== null ||
+      usageMetadata.cacheReadTokens !== null ||
+      usageMetadata.contextPercent !== null ||
+      usageMetadata.modelLabel !== null)
 
   // Only show retry for messages genuinely stuck in 'sending' (API call hasn't
   // returned yet after 30s). 'queued' messages are delivered — never show retry.
@@ -838,7 +1217,14 @@ function MessageItemComponent({
                 strokeWidth={1.5}
                 className="opacity-70"
               />
-              <span>💭 Thinking...</span>
+              <span>{thinkingStatusLabel}</span>
+              {thinkingElapsedSeconds > 0 ? (
+                <span className="text-xs tabular-nums text-primary-400">
+                  {thinkingElapsedSeconds >= 60
+                    ? `${Math.floor(thinkingElapsedSeconds / 60)}m ${thinkingElapsedSeconds % 60}s`
+                    : `${thinkingElapsedSeconds}s`}
+                </span>
+              ) : null}
               {effectiveIsStreaming ? (
                 <span className="flex items-center gap-1">
                   <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
@@ -1024,6 +1410,27 @@ function MessageItemComponent({
                   <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:300ms]" />
                 </div>
               )}
+              {hasAssistantMetadata ? (
+                <div className="font-mono text-[10px] tabular-nums text-primary-400">
+                  {[
+                    usageMetadata.inputTokens !== null
+                      ? `↑${formatCompactNumber(usageMetadata.inputTokens)}`
+                      : null,
+                    usageMetadata.outputTokens !== null
+                      ? `↓${formatCompactNumber(usageMetadata.outputTokens)}`
+                      : null,
+                    usageMetadata.cacheReadTokens !== null
+                      ? `R${formatCompactNumber(usageMetadata.cacheReadTokens)}`
+                      : null,
+                    usageMetadata.contextPercent !== null
+                      ? `${Math.round(usageMetadata.contextPercent)}% ctx`
+                      : null,
+                    usageMetadata.modelLabel,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
+              ) : null}
             </div>
           </Message>
         )}
@@ -1031,88 +1438,14 @@ function MessageItemComponent({
       {/* Render tool calls — one collapsible card per tool with input + output */}
       {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-1 flex flex-col gap-1">
-          {toolParts.map((toolPart, index) => {
-            const icons: Record<string, string> = {
-              exec: '⚡', Read: '📖', Write: '✏️', Edit: '✏️',
-              web_search: '🔍', memory_search: '🧠', memory_get: '🧠',
-              browser: '🌐', image: '🖼️',
-            }
-            const icon = icons[toolPart.type] ?? '🔧'
-            const isError = toolPart.state === 'output-error'
-
-            // Key arg for header (command, path, query…)
-            const headerArg = toolPart.input
-              ? keyArgLabel(toolPart.type, toolPart.input as Record<string, unknown>)
-              : null
-            const toolDisplayLabel = formatToolDisplayLabel(
-              toolPart.type,
-              toolPart.input as Record<string, unknown> | undefined,
-            )
-            const headerArgTruncated = headerArg && headerArg.length > 80
-              ? `${headerArg.slice(0, 77)}…`
-              : headerArg
-
-            // Output text — prefer structured 'output' key, then full stringify
-            const rawOutput = toolPart.output
-            let outputText = ''
-            if (rawOutput) {
-              if (typeof rawOutput.output === 'string') {
-                outputText = rawOutput.output
-              } else {
-                outputText = JSON.stringify(rawOutput, null, 2)
-              }
-            }
-
-            return (
-              <Collapsible
-                key={toolPart.toolCallId || `${toolPart.type}-${index}`}
-                open={toolCallsOpen}
-                onOpenChange={setToolCallsOpen}
-              >
-                <CollapsibleTrigger className={cn(
-                  'w-full justify-start gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-mono',
-                  'bg-transparent hover:bg-primary-50 dark:hover:bg-primary-800/60',
-                  'data-panel-open:bg-primary-50/60 dark:data-panel-open:bg-primary-800/40',
-                  isError
-                    ? 'text-red-500 dark:text-red-400'
-                    : 'text-neutral-500 dark:text-neutral-400',
-                )}>
-                  <span className="transition-transform duration-150 group-data-panel-open:rotate-90 shrink-0">▶</span>
-                  <span className="shrink-0">{icon} {toolDisplayLabel}</span>
-                  {headerArgTruncated && headerArgTruncated !== toolDisplayLabel && (
-                    <span className="opacity-50 truncate">{headerArgTruncated}</span>
-                  )}
-                  {isError && <span className="ml-auto shrink-0 text-red-400">✗ error</span>}
-                  {!isError && toolPart.state === 'output-available' && (
-                    <span className="ml-auto shrink-0 opacity-40">✓</span>
-                  )}
-                </CollapsibleTrigger>
-                <CollapsiblePanel>
-                  <div className="mt-0.5 ml-2 flex flex-col gap-1.5 pb-1">
-                    {/* Show full command/input for exec — not buried in collapsed */}
-                    {toolPart.type === 'exec' && headerArg && (
-                      <pre className="text-[11px] font-mono bg-neutral-800 dark:bg-neutral-950 text-amber-300 rounded px-2 py-1 overflow-x-auto whitespace-pre-wrap break-words">
-                        $ {headerArg}
-                      </pre>
-                    )}
-                    {isError && toolPart.errorText ? (
-                      <pre className="text-xs font-mono bg-red-950/40 text-red-300 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-h-64">
-                        {toolPart.errorText}
-                      </pre>
-                    ) : outputText ? (
-                      <pre className="text-xs font-mono bg-neutral-900 dark:bg-neutral-950 text-neutral-200 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-h-64">
-                        {outputText}
-                      </pre>
-                    ) : toolPart.state === 'input-available' ? (
-                      <span className="text-xs text-neutral-400 italic">running…</span>
-                    ) : (
-                      <span className="text-xs text-neutral-400 italic">no output</span>
-                    )}
-                  </div>
-                </CollapsiblePanel>
-              </Collapsible>
-            )
-          })}
+          {inlineToolSections.map((toolSection, index) =>
+            renderInlineToolSection(
+              toolSection,
+              index,
+              toolCallsOpen,
+              setToolCallsOpen,
+            ),
+          )}
         </div>
       )}
 
@@ -1201,6 +1534,12 @@ function areMessagesEqual(
   if (
     thinkingFromMessage(prevProps.message) !==
     thinkingFromMessage(nextProps.message)
+  ) {
+    return false
+  }
+  if (
+    messageMetadataSignature(prevProps.message) !==
+    messageMetadataSignature(nextProps.message)
   ) {
     return false
   }
