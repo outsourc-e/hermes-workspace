@@ -2444,6 +2444,12 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 ) : (
+                  <>
+                    {value.length >= 20 && (
+                      <span className="text-[10px] text-primary-400 tabular-nums mr-1">
+                        ~{Math.ceil(value.length / 4)}
+                      </span>
+                    )}
                   <PromptInputAction tooltip="Send message">
                     <Button
                       type="button"
@@ -2460,6 +2466,7 @@ function ChatComposerComponent({
                       />
                     </Button>
                   </PromptInputAction>
+                  </>
                 )}
               </div>
             </PromptInputActions>
