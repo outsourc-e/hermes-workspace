@@ -75,6 +75,11 @@ type UseRealtimeChatHistoryOptions = {
   onCompactionEnd?: () => void
 }
 
+type CompactionEvent = {
+  phase?: string
+  sessionKey: string
+}
+
 /**
  * Hook that makes SSE the PRIMARY source for new messages and streaming.
  * - Streaming chunks update the gateway-chat-store (already happens)
@@ -270,6 +275,20 @@ export function useRealtimeChatHistory({
       },
       [sessionKey, friendlyId, queryClient, onCompactionEnd],
     ),
+    onCompaction: useCallback((event: CompactionEvent) => {
+      if (!event.sessionKey || event.sessionKey !== sessionKey) return
+
+      if (event.phase === 'start') {
+        lastCompactionSignalRef.current = `compaction:${event.sessionKey}:start`
+        onCompactionStart?.()
+        return
+      }
+
+      if (event.phase === 'end') {
+        lastCompactionSignalRef.current = ''
+        onCompactionEnd?.()
+      }
+    }, [onCompactionEnd, onCompactionStart, sessionKey]),
     onApprovalRequest,
   })
 

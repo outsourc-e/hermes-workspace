@@ -67,6 +67,7 @@ type ThinkingBubbleProps = {
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   liveToolActivity?: Array<{ name: string; timestamp: number }>
   researchCard?: UseResearchCardResult
+  isCompacting?: boolean
 }
 
 /**
@@ -78,6 +79,7 @@ function ThinkingBubble({
   activeToolCalls = [],
   liveToolActivity = [],
   researchCard,
+  isCompacting = false,
 }: ThinkingBubbleProps) {
   // Derive the most recent active tool name
   const activeToolName = useMemo(() => {
@@ -92,7 +94,11 @@ function ThinkingBubble({
     return null
   }, [activeToolCalls, liveToolActivity])
 
-  const statusLabel = activeToolName ? getToolStatusLabel(activeToolName) : 'Thinking…'
+  const statusLabel = isCompacting
+    ? 'Compacting context...'
+    : activeToolName
+      ? getToolStatusLabel(activeToolName)
+      : 'Thinking…'
 
   // Elapsed time counter — resets when the status label changes (new tool)
   const [elapsed, setElapsed] = useState(0)
@@ -147,9 +153,18 @@ function ThinkingBubble({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="thinking-dot thinking-dot-1" />
-                <span className="thinking-dot thinking-dot-2" />
-                <span className="thinking-dot thinking-dot-3" />
+                {isCompacting ? (
+                  <span
+                    className="inline-block size-3 rounded-full border border-primary-300 border-t-primary-500 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <>
+                    <span className="thinking-dot thinking-dot-1" />
+                    <span className="thinking-dot thinking-dot-2" />
+                    <span className="thinking-dot thinking-dot-3" />
+                  </>
+                )}
                 <span
                   className={cn(
                     'thinking-label ml-1.5 text-xs font-medium transition-opacity duration-300',
@@ -196,7 +211,7 @@ function ThinkingBubble({
             </span>
           ) : null}
 
-          {activeToolName ? (
+          {activeToolName && !isCompacting ? (
             <div
               style={{
                 opacity: visible ? 1 : 0,
@@ -301,6 +316,7 @@ type ChatMessageListProps = {
   liveToolActivity?: Array<{ name: string; timestamp: number }>
   researchCard?: UseResearchCardResult
   hideSystemMessages?: boolean
+  isCompacting?: boolean
   /** True while the HTTP send request is in-flight (before waitingForResponse
    *  can confirm the gateway received it). Keeps the thinking indicator visible
    *  during the very first render after the user submits. */
@@ -331,6 +347,7 @@ function ChatMessageListComponent({
   liveToolActivity = [],
   researchCard,
   hideSystemMessages = false,
+  isCompacting = false,
   sending = false,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
@@ -797,6 +814,7 @@ function ChatMessageListComponent({
     // on screen from send until response is complete.
     const streamingButEmpty =
       isStreaming && (!streamingText || streamingText.trim().length === 0)
+    if (isCompacting) return true
     if (streamingButEmpty) return true
     if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator — response is rendering
@@ -1425,6 +1443,7 @@ function ChatMessageListComponent({
           )}
           {showTypingIndicator ||
           showResearchCard ||
+          isCompacting ||
           liveToolActivity.length > 0 ||
           (isStreaming && !streamingText) ||
           (isStreaming && activeToolCalls.length > 0) ? (
@@ -1437,6 +1456,7 @@ function ChatMessageListComponent({
                 activeToolCalls={activeToolCalls}
                 liveToolActivity={liveToolActivity}
                 researchCard={researchCard}
+                isCompacting={isCompacting}
               />
             </div>
           ) : null}

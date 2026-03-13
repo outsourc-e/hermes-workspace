@@ -26,6 +26,8 @@ type UseGatewayChatStreamOptions = {
   ) => void
   /** Callback when a tool approval is requested */
   onApprovalRequest?: (approval: Record<string, unknown>) => void
+  /** Callback when a compaction lifecycle event is emitted */
+  onCompaction?: (event: { phase?: string; sessionKey: string }) => void
   /** Callback when the SSE connection reconnects after a prior open */
   onReconnect?: () => void
   /** Callback when the stream stays silent for too long */
@@ -42,6 +44,7 @@ export function useGatewayChatStream(
     onThinking,
     onDone,
     onApprovalRequest,
+    onCompaction,
     onReconnect,
     onSilentTimeout,
   } = options
@@ -72,6 +75,7 @@ export function useGatewayChatStream(
   const onThinkingRef = useRef(onThinking)
   const onDoneRef = useRef(onDone)
   const onApprovalRequestRef = useRef(onApprovalRequest)
+  const onCompactionRef = useRef(onCompaction)
   const onReconnectRef = useRef(onReconnect)
   const onSilentTimeoutRef = useRef(onSilentTimeout)
   onUserMessageRef.current = onUserMessage
@@ -79,6 +83,7 @@ export function useGatewayChatStream(
   onThinkingRef.current = onThinking
   onDoneRef.current = onDone
   onApprovalRequestRef.current = onApprovalRequest
+  onCompactionRef.current = onCompaction
   onReconnectRef.current = onReconnect
   onSilentTimeoutRef.current = onSilentTimeout
 
@@ -446,6 +451,20 @@ export function useGatewayChatStream(
       try {
         const data = JSON.parse(event.data) as Record<string, unknown>
         onApprovalRequestRef.current?.(data)
+      } catch {
+        // Ignore parse errors
+      }
+    })
+
+    eventSource.addEventListener('compaction', (event) => {
+      if (!mountedRef.current) return
+      try {
+        const data = JSON.parse(event.data) as {
+          phase?: string
+          sessionKey: string
+        }
+        markActivity()
+        onCompactionRef.current?.(data)
       } catch {
         // Ignore parse errors
       }
