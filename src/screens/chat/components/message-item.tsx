@@ -289,6 +289,62 @@ function readExecNotification(message: GatewayMessage): ExecNotification | null 
   }
 }
 
+function readStringArg(
+  args: Record<string, unknown> | undefined,
+  ...keys: Array<string>
+): string | null {
+  if (!args) return null
+  for (const key of keys) {
+    const value = args[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+  return null
+}
+
+function fileNameFromPath(value: string): string {
+  const normalized = value.trim().replace(/[\\/]+$/, '')
+  if (!normalized) return value.trim()
+  const parts = normalized.split(/[\\/]/)
+  return parts[parts.length - 1] || normalized
+}
+
+function formatToolDisplayLabel(
+  name: string,
+  args?: Record<string, unknown>,
+): string {
+  const normalizedName = name.trim()
+  const lowerName = normalizedName.toLowerCase()
+
+  if (lowerName === 'read') {
+    const filePath = readStringArg(args, 'file_path', 'path')
+    return filePath ? `read ${fileNameFromPath(filePath)}` : 'read'
+  }
+
+  if (lowerName === 'edit') {
+    const filePath = readStringArg(args, 'file_path', 'path')
+    return filePath ? `edit ${fileNameFromPath(filePath)}` : 'edit'
+  }
+
+  if (lowerName === 'write') {
+    const filePath = readStringArg(args, 'file_path', 'path')
+    return filePath ? `write ${fileNameFromPath(filePath)}` : 'write'
+  }
+
+  if (lowerName === 'browser') {
+    const action = readStringArg(args, 'action')
+    return action ? `browser ${action}` : 'browser'
+  }
+
+  if (lowerName === 'exec') return 'exec'
+  if (lowerName === 'memory_search') return 'memory search'
+  if (lowerName === 'web_search') return 'web search'
+  if (lowerName === 'web_fetch') return 'web fetch'
+
+  return lowerName.replace(/_/g, ' ')
+}
+
 /** Extract the most useful single argument to display in a tool pill */
 function keyArgLabel(name: string, args?: Record<string, unknown>): string | null {
   if (!args) return null
@@ -297,9 +353,12 @@ function keyArgLabel(name: string, args?: Record<string, unknown>): string | nul
     case 'exec':
       return str(args.command)
     case 'Read':
+    case 'read':
       return str(args.file_path) ?? str(args.path)
     case 'Write':
+    case 'write':
     case 'Edit':
+    case 'edit':
       return str(args.file_path) ?? str(args.path) ?? str(args.old_string ? args.file_path : null)
     case 'web_search':
       return str(args.query)
@@ -336,6 +395,10 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   const isDone = toolCall.phase === 'done'
   const isError = toolCall.phase === 'error'
   const label = keyArgLabel(toolCall.name, toolCall.args as Record<string, unknown> | undefined)
+  const displayName = formatToolDisplayLabel(
+    toolCall.name,
+    toolCall.args as Record<string, unknown> | undefined,
+  )
   // Truncate long paths/commands to keep pill readable
   const truncated = label && label.length > 60 ? `${label.slice(0, 57)}…` : label
 
@@ -351,8 +414,8 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       )}
     >
       <span className="shrink-0">{icon}</span>
-      <span className="shrink-0 not-italic">{toolCall.name}</span>
-      {truncated && (
+      <span className="shrink-0 not-italic">{displayName}</span>
+      {truncated && truncated !== displayName && (
         <span className="opacity-60 truncate">{truncated}</span>
       )}
       {isDone && <span className="shrink-0 opacity-70">✓</span>}
@@ -981,6 +1044,10 @@ function MessageItemComponent({
             const headerArg = toolPart.input
               ? keyArgLabel(toolPart.type, toolPart.input as Record<string, unknown>)
               : null
+            const toolDisplayLabel = formatToolDisplayLabel(
+              toolPart.type,
+              toolPart.input as Record<string, unknown> | undefined,
+            )
             const headerArgTruncated = headerArg && headerArg.length > 80
               ? `${headerArg.slice(0, 77)}…`
               : headerArg
@@ -1011,8 +1078,8 @@ function MessageItemComponent({
                     : 'text-neutral-500 dark:text-neutral-400',
                 )}>
                   <span className="transition-transform duration-150 group-data-panel-open:rotate-90 shrink-0">▶</span>
-                  <span className="shrink-0">{icon} {toolPart.type}</span>
-                  {headerArgTruncated && (
+                  <span className="shrink-0">{icon} {toolDisplayLabel}</span>
+                  {headerArgTruncated && headerArgTruncated !== toolDisplayLabel && (
                     <span className="opacity-50 truncate">{headerArgTruncated}</span>
                   )}
                   {isError && <span className="ml-auto shrink-0 text-red-400">✗ error</span>}

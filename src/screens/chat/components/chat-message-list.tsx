@@ -227,6 +227,36 @@ const VIRTUAL_OVERSCAN = 8
 const NEAR_BOTTOM_THRESHOLD = 200
 // Pull-to-refresh constants removed
 
+const HIDDEN_SYSTEM_USER_SUBSTRINGS = [
+  'Pre-compaction memory flush',
+  'Read HEARTBEAT.md',
+  'HEARTBEAT_OK',
+  'Execute your Session Startup sequence',
+  '[Queued messages',
+  'Heartbeat prompt',
+] as const
+
+const HIDDEN_SYSTEM_USER_PREFIXES = [
+  '[Fri ',
+  '[Mon ',
+  '[Tue ',
+  '[Wed ',
+  '[Thu ',
+  '[Sat ',
+  '[Sun ',
+] as const
+
+function shouldHideSystemInjectedUserMessage(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) {
+    return true
+  }
+  return HIDDEN_SYSTEM_USER_SUBSTRINGS.some((substring) =>
+    trimmed.includes(substring),
+  )
+}
+
 type MessageSearchMatch = {
   stableId: string
   messageIndex: number
@@ -421,6 +451,9 @@ function ChatMessageListComponent({
 
         const isSystemPrefixed = /^System:/i.test(rawText)
         if (hideSystemMessages && isSystemPrefixed) return false
+        if (hideSystemMessages && shouldHideSystemInjectedUserMessage(cleanedText)) {
+          return false
+        }
         if (!isSystemPrefixed) return true
 
         const normalizedText = cleanedText.toLowerCase()
