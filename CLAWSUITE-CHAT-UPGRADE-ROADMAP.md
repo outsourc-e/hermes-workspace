@@ -169,3 +169,88 @@
 - ✅ Electron desktop app with auto-start gateway
 
 **ClawSuite's moat = Workspace + Simplified UX + Operator-focused design. Gateway parity is table stakes; workspace is the differentiator.**
+
+---
+
+## Phase 6: New 2026.3.12 Gateway Capabilities
+
+### 6.1 Fast Mode Toggle (P0)
+**What:** `/fast` per-session flag. Maps to Anthropic `service_tier` for priority processing and OpenAI/Codex request shaping for faster inference.
+**Implementation:** Add fast mode pill next to existing thinking toggle in compose bar. Pass `params.fastMode` to gateway on each request.
+**Files:** `chat-composer.tsx`, send/stream API route
+
+### 6.2 Command Palette (P1)
+**What:** Cmd+K style palette for quick navigation — jump between screens, switch sessions, run slash commands, search settings.
+**Implementation:** Global overlay component, register actions from each screen.
+**Files:** New `command-palette.tsx` component, wire into app shell
+
+### 6.3 Slash Commands in Chat (P1)
+**What:** Type `/` in compose bar to access commands: `/fast`, `/new`, `/reset`, `/clear`, `/models`, `/status`.
+**Implementation:** Autocomplete dropdown in compose bar triggered by `/` prefix.
+**Files:** `chat-composer.tsx`
+
+### 6.4 Chat Search (P1)
+**What:** Search through message history within current session.
+**Implementation:** Search icon in chat header, opens search bar that filters/highlights messages.
+**Files:** `chat-header.tsx`, `chat-message-list.tsx`
+
+### 6.5 Chat Export (P2)
+**What:** Export conversation as markdown or JSON.
+**Implementation:** Export button in chat header or context menu. Format selection dialog.
+**Files:** `chat-header.tsx`, new export util
+
+### 6.6 Pinned Messages (P2)
+**What:** Pin important messages for quick reference. Pin icon per message, pinned messages panel.
+**Implementation:** Pin action on message context menu, pinned messages sidebar/panel.
+**Files:** `message-item.tsx`, `message-actions-bar.tsx`, new pinned panel
+
+### 6.7 Compaction Status Indicator (P1)
+**What:** Show visual indicator when gateway is auto-compacting context (instead of chat appearing frozen).
+**Implementation:** Detect compaction SSE event, show "Compacting context..." status in thinking bubble or status bar.
+**Files:** `chat-message-list.tsx`, SSE event handler
+
+### 6.8 Duplicate Message Prevention (P0)
+**What:** Same streaming run should not render duplicate assistant replies. OpenClaw fixed this in 2026.3.12.
+**Implementation:** Audit our SSE handler — ensure same `runId` doesn't create multiple assistant message components.
+**Files:** `chat-message-list.tsx`, message store, `use-streaming-message.ts`
+
+---
+
+## Execution Plan
+
+### Sprint 1: Chat Core (Codex tasks — sequential)
+1. **Unified turn rendering** — merge tool calls into assistant bubble (1.1, 1.2)
+2. **Specific tool labels** — show `browser screenshot` not `Tool output` (1.3)
+3. **Hide system messages** — filter heartbeat/memory flush/compaction prompts (1.4)
+4. **Duplicate message audit** — verify and fix if present (6.8)
+5. **Token/cost per message polish** — consistent inline pills (2.2)
+
+### Sprint 2: Compose Bar (Codex tasks — can parallel)
+6. **Token counter while typing** (2.1)
+7. **Fast mode toggle** (6.1)
+8. **Slash commands autocomplete** (6.3)
+
+### Sprint 3: Chat Features (Codex tasks)
+9. **Contextual thinking indicator** — show tool name during execution (1.5)
+10. **Compaction status indicator** (6.7)
+11. **Focus mode** (2.3)
+12. **Session switcher dropdown in chat** (2.4)
+13. **Chat search** (6.4)
+
+### Sprint 4: Gateway Screens (Codex tasks — can parallel)
+14. **Usage analytics dashboard upgrade** (3.1)
+15. **Sessions config overrides** (3.2)
+16. **Cron run history** (3.3)
+17. **Channels/Nodes depth** (3.4, 3.5)
+
+### Sprint 5: Settings & Polish (Codex tasks)
+18. **Categorized settings UI** (4.1)
+19. **Log viewer** (4.2)
+20. **Command palette** (6.2)
+21. **Chat export + pinned messages** (6.5, 6.6)
+
+### Sprint 6: Workspace Completion
+22. **Mobile 404 fix** (5.1)
+23. **Full QA pass** (5.2)
+24. **Agent hub completion** (5.3)
+25. **Push branch for Eric review**
