@@ -1771,11 +1771,25 @@ export class Tracker extends EventEmitter {
       if (checkpoint) {
         this.logAuditEvent('checkpoint.approved', checkpoint.id, 'checkpoint')
         this.emitSse('checkpoint.updated', checkpoint)
+        // Complete the task + task_run when checkpoint is approved
+        this.completeTaskRun(checkpoint.task_run_id, { status: 'completed' })
+        const taskRun = this.getTaskRun(checkpoint.task_run_id)
+        if (taskRun) {
+          this.setTaskStatus(taskRun.task_id, 'completed')
+        }
       }
       return checkpoint
     }
 
-    return this.updateCheckpointStatus(id, 'approved', reviewerNotes)
+    const checkpoint = this.updateCheckpointStatus(id, 'approved', reviewerNotes)
+    if (checkpoint) {
+      this.completeTaskRun(checkpoint.task_run_id, { status: 'completed' })
+      const taskRun = this.getTaskRun(checkpoint.task_run_id)
+      if (taskRun) {
+        this.setTaskStatus(taskRun.task_id, 'completed')
+      }
+    }
+    return checkpoint
   }
 
   async triggerQaReview(
