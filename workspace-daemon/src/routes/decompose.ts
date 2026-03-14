@@ -103,6 +103,41 @@ export function createDecomposeRouter(tracker: Tracker): Router {
 
       if (mission_id) {
         await createTasksForMission(tracker, mission_id, result.tasks);
+        res.json({
+          tasks: result.tasks,
+          ...(result.parsed ? {} : { raw_response: result.rawResponse }),
+        });
+        return;
+      }
+
+      if (project_id && result.tasks.length > 0) {
+        const projectDetail = tracker.getProjectDetail(project_id);
+        if (!projectDetail) {
+          res.status(404).json({ error: "Project not found" });
+          return;
+        }
+
+        const phase = tracker.createPhase({
+          project_id,
+          name: "Implementation",
+          sort_order: projectDetail.phases.length,
+        });
+
+        const mission = tracker.createMission({
+          phase_id: phase.id,
+          name: goal.trim().slice(0, 100),
+        });
+
+        await createTasksForMission(tracker, mission.id, result.tasks);
+
+        res.json({
+          tasks: result.tasks,
+          phase_id: phase.id,
+          mission_id: mission.id,
+          auto_created: true,
+          ...(result.parsed ? {} : { raw_response: result.rawResponse }),
+        });
+        return;
       }
 
       res.json({
