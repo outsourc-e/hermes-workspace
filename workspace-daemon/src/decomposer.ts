@@ -43,6 +43,32 @@ function buildPrompt(goal: string, context?: DecomposerContext): string {
   return lines.join("\n");
 }
 
+function buildCliPrompt(goal: string, context?: DecomposerContext): string {
+  const lines = [
+    "You are a task decomposition engine.",
+    "Return ONLY a valid JSON array.",
+    "Do not include markdown fences or any explanation.",
+    'Each item must be {"name": string, "description": string, "estimated_minutes": number, "depends_on": string[], "suggested_agent_type": "codex"|"claude"|"openclaw"|"ollama"|null}.',
+    `Goal: ${goal.trim()}`,
+  ];
+
+  if (context?.project_path) {
+    lines.push(`Project path: ${context.project_path}`);
+  }
+
+  if (context?.project_spec) {
+    lines.push("Project spec:");
+    lines.push(context.project_spec);
+  }
+
+  if (context?.existing_files && context.existing_files.length > 0) {
+    lines.push("Existing files:");
+    lines.push(...context.existing_files.map((file) => `- ${file}`));
+  }
+
+  return lines.join("\n");
+}
+
 function extractJsonArray(raw: string): string | null {
   const trimmed = raw.trim();
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
@@ -140,7 +166,7 @@ export class Decomposer {
     if (!rawResponse) {
       try {
         console.log("[decomposer] SDK unavailable, falling back to claude CLI");
-        const { stdout } = await execFileAsync("claude", ["--print", "-p", prompt], {
+        const { stdout } = await execFileAsync("claude", ["--print", "-p", buildCliPrompt(goal, context)], {
           maxBuffer: 1024 * 1024,
           timeout: 120_000,
         });
