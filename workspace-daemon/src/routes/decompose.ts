@@ -129,6 +129,7 @@ export function createDecomposeRouter(tracker: Tracker): Router {
         });
 
         await createTasksForMission(tracker, mission.id, result.tasks);
+        tracker.startMission(mission.id);
 
         res.json({
           tasks: result.tasks,
