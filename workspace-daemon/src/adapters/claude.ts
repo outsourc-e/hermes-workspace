@@ -4,6 +4,7 @@ import type { AgentExecutionRequest, AgentExecutionResult, AdapterStreamEvent } 
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const FORCE_KILL_DELAY_MS = 5_000;
+const EXIT_SETTLE_GRACE_MS = 10_000;
 
 interface ClaudeAdapterConfig {
   command?: string;
@@ -138,6 +139,7 @@ export class ClaudeAdapter implements AgentAdapter {
       let inputTokens = 0;
       let outputTokens = 0;
       let forceKillHandle: NodeJS.Timeout | null = null;
+      let exitSettleHandle: NodeJS.Timeout | null = null;
 
       const timeoutHandle = setTimeout(() => {
         void abortRun(`Claude execution timed out after ${Math.round(timeoutMs / 1000)}s`, "failed");
@@ -148,6 +150,10 @@ export class ClaudeAdapter implements AgentAdapter {
         if (forceKillHandle) {
           clearTimeout(forceKillHandle);
           forceKillHandle = null;
+        }
+        if (exitSettleHandle) {
+          clearTimeout(exitSettleHandle);
+          exitSettleHandle = null;
         }
 
         context.signal?.removeEventListener("abort", handleAbort);
@@ -262,6 +268,14 @@ export class ClaudeAdapter implements AgentAdapter {
         );
       });
 
+      proc.on("exit", () => {
+        exitSettleHandle = setTimeout(() => {
+          if (!settled) {
+            settle(buildFailureResult("", inputTokens, outputTokens, "Adapter failed to settle after process exit"));
+          }
+        }, EXIT_SETTLE_GRACE_MS);
+      });
+
       proc.on("close", (code) => {
         if (settled) {
           return;
@@ -287,7 +301,7 @@ export class ClaudeAdapter implements AgentAdapter {
           return;
         }
 
-        const failureMessage = stderr.trim() || `Process exited with code ${code ?? -1}`;
+        const failureMessage = stderr.trim() || stdout.trim() || `Process exited with code ${code ?? -1}`;
         settle(buildFailureResult(stdout.trim(), inputTokens, outputTokens, failureMessage));
       });
     });

@@ -4,6 +4,7 @@ import type { AgentExecutionRequest, AgentExecutionResult, AdapterStreamEvent } 
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const FORCE_KILL_DELAY_MS = 5_000;
+const EXIT_SETTLE_GRACE_MS = 10_000;
 const JSON_RPC_VERSION = "2.0";
 const CLIENT_NAME = "clawsuite-workspace";
 const CLIENT_VERSION = "0.1.0";
@@ -240,6 +241,7 @@ export class CodexAdapter implements AgentAdapter {
       let completedTurnMessage: string | null = null;
       let inputTokens = 0;
       let outputTokens = 0;
+      let exitSettleHandle: NodeJS.Timeout | null = null;
       const pending = new Map<JsonRpcId, PendingRequest>();
 
       const timeoutHandle = setTimeout(() => {
@@ -251,6 +253,10 @@ export class CodexAdapter implements AgentAdapter {
         if (forceKillHandle) {
           clearTimeout(forceKillHandle);
           forceKillHandle = null;
+        }
+        if (exitSettleHandle) {
+          clearTimeout(exitSettleHandle);
+          exitSettleHandle = null;
         }
 
         context.signal?.removeEventListener("abort", handleAbort);
@@ -755,6 +761,14 @@ export class CodexAdapter implements AgentAdapter {
         });
       });
 
+      proc.on("exit", () => {
+        exitSettleHandle = setTimeout(() => {
+          if (!settled) {
+            settle(buildFailureResult("", inputTokens, outputTokens, "Adapter failed to settle after process exit"));
+          }
+        }, EXIT_SETTLE_GRACE_MS);
+      });
+
       proc.on("close", (code) => {
         if (settled) {
           return;
@@ -776,7 +790,10 @@ export class CodexAdapter implements AgentAdapter {
           return;
         }
 
-        const failureMessage = stderrBuffer.trim() || `Process exited with code ${code ?? -1}`;
+        const failureMessage =
+          stderrBuffer.trim() ||
+          (completedTurnMessage ?? finalMessage).trim() ||
+          `Process exited with code ${code ?? -1}`;
         settle(
           buildFailureResult(
             completedTurnMessage ?? finalMessage,
