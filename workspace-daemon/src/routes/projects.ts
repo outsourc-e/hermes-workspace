@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Router } from 'express'
 import { Tracker } from '../tracker'
+import { runFullVerification, type FullVerificationResult } from '../verification'
 
 const execFileAsync = promisify(execFile)
 
@@ -131,6 +132,36 @@ export function createProjectsRouter(tracker: Tracker): Router {
       ...project,
       git_status: await getProjectGitStatus(project.path),
     })
+  })
+
+  const healthCache = new Map<string, { results: FullVerificationResult[]; cachedAt: number }>()
+  const HEALTH_CACHE_TTL_MS = 60_000
+
+  router.get('/:id/health', async (req, res) => {
+    const project = tracker.getProject(req.params.id)
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' })
+      return
+    }
+    if (!project.path) {
+      res.status(400).json({ error: 'Project has no path configured' })
+      return
+    }
+
+    const cached = healthCache.get(project.id)
+    if (cached && Date.now() - cached.cachedAt < HEALTH_CACHE_TTL_MS) {
+      res.json(cached.results)
+      return
+    }
+
+    try {
+      const results = await runFullVerification(project.path)
+      healthCache.set(project.id, { results, cachedAt: Date.now() })
+      res.json(results)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Verification failed'
+      res.status(500).json({ error: message })
+    }
   })
 
   router.get('/:id/git-status', async (req, res) => {
