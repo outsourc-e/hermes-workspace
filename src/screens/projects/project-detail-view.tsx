@@ -10,7 +10,7 @@ import {
   Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import type React from 'react'
 import { Button } from '@/components/ui/button'
@@ -324,6 +324,7 @@ export function ProjectDetailView({
   onRefreshActivity,
 }: ProjectDetailViewProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
   const specFileInputRef = useRef<HTMLInputElement | null>(null)
   const sourceProject = projectDetail ?? selectedSummary
@@ -380,6 +381,42 @@ export function ProjectDetailView({
   const projectRuns = useMemo(
     () => [...(runsQuery.data ?? [])].sort(sortRunsNewestFirst),
     [runsQuery.data],
+  )
+  const runningRuns = useMemo(
+    () => projectRuns.filter((run) => run.status === 'running'),
+    [projectRuns],
+  )
+  const liveOutputQueries = useQueries({
+    queries: runningRuns.map((run) => ({
+      queryKey: ['workspace', 'task-run-live-output', run.id],
+      queryFn: async () =>
+        queryClient.getQueryData<Array<string>>([
+          'workspace',
+          'task-run-live-output',
+          run.id,
+        ]) ?? [],
+      initialData:
+        queryClient.getQueryData<Array<string>>([
+          'workspace',
+          'task-run-live-output',
+          run.id,
+        ]) ?? [],
+      staleTime: Number.POSITIVE_INFINITY,
+    })),
+  })
+  const liveOutputByRunId = useMemo(() => {
+    const map = new Map<string, string[]>()
+    runningRuns.forEach((run, index) => {
+      map.set(run.id, (liveOutputQueries[index]?.data ?? []).slice(-3))
+    })
+    return map
+  }, [liveOutputQueries, runningRuns])
+  const activeRunByTaskId = useMemo(
+    () =>
+      new Map(
+        runningRuns.map((run) => [run.task_id, run] as const),
+      ),
+    [runningRuns],
   )
   const expandedRunIdList = useMemo(
     () => Object.entries(expandedRunIds).flatMap(([id, expanded]) => (expanded ? [id] : [])),
@@ -1059,49 +1096,99 @@ export function ProjectDetailView({
                                         <div
                                           key={task.id}
                                           className={cn(
-                                            'flex flex-col gap-2 rounded-xl border border-primary-200 bg-white px-3 py-3 md:flex-row md:items-start md:justify-between',
+                                            'flex flex-col gap-2 rounded-xl border border-primary-200 bg-white px-3 py-3',
                                             waveStatus === 'running' && 'bg-white/90',
                                           )}
                                         >
-                                          <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                              {isCompletedTaskStatus(task.status) ? (
-                                                <HugeiconsIcon
-                                                  icon={CheckmarkCircle02Icon}
-                                                  size={16}
-                                                  strokeWidth={1.7}
-                                                  className="shrink-0 text-emerald-400"
-                                                />
-                                              ) : (
-                                                <span
-                                                  className={cn(
-                                                    'mt-0.5 size-2.5 shrink-0 rounded-full',
-                                                    getTaskDotClass(task.status),
-                                                    waveStatus === 'running' && 'animate-pulse',
-                                                  )}
-                                                />
-                                              )}
-                                              <p className="truncate text-sm font-medium text-primary-900">
-                                                {task.name}
-                                              </p>
+                                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                            <div className="min-w-0">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                {isCompletedTaskStatus(task.status) ? (
+                                                  <HugeiconsIcon
+                                                    icon={CheckmarkCircle02Icon}
+                                                    size={16}
+                                                    strokeWidth={1.7}
+                                                    className="shrink-0 text-emerald-400"
+                                                  />
+                                                ) : (
+                                                  <span
+                                                    className={cn(
+                                                      'mt-0.5 size-2.5 shrink-0 rounded-full',
+                                                      getTaskDotClass(task.status),
+                                                      waveStatus === 'running' && 'animate-pulse',
+                                                    )}
+                                                  />
+                                                )}
+                                                <p className="truncate text-sm font-medium text-primary-900">
+                                                  {task.name}
+                                                </p>
+                                              </div>
+                                              {task.description ? (
+                                                <p className="mt-1 whitespace-pre-wrap text-xs text-primary-500">
+                                                  {task.description}
+                                                </p>
+                                              ) : null}
+                                              {task.depends_on.length > 0 ? (
+                                                <p className="mt-2 text-[11px] text-primary-500">
+                                                  Depends on:{' '}
+                                                  {task.depends_on
+                                                    .map((dependencyId) => taskNameById.get(dependencyId) ?? dependencyId)
+                                                    .join(', ')}
+                                                </p>
+                                              ) : null}
                                             </div>
-                                            {task.description ? (
-                                              <p className="mt-1 whitespace-pre-wrap text-xs text-primary-500">
-                                                {task.description}
-                                              </p>
-                                            ) : null}
-                                            {task.depends_on.length > 0 ? (
-                                              <p className="mt-2 text-[11px] text-primary-500">
-                                                Depends on:{' '}
-                                                {task.depends_on
-                                                  .map((dependencyId) => taskNameById.get(dependencyId) ?? dependencyId)
-                                                  .join(', ')}
-                                              </p>
-                                            ) : null}
+                                            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
+                                              {formatStatus(task.status)}
+                                            </span>
                                           </div>
-                                          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
-                                            {formatStatus(task.status)}
-                                          </span>
+                                          {task.status === 'running' ? (() => {
+                                            const activeRun = activeRunByTaskId.get(task.id)
+                                            const outputLines = activeRun
+                                              ? liveOutputByRunId.get(activeRun.id) ?? []
+                                              : []
+
+                                            return activeRun ? (
+                                              <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-3">
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary-500">
+                                                    Live Output
+                                                  </p>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      navigate({
+                                                        to: '/workspace',
+                                                        hash: 'runs',
+                                                        search: {
+                                                          missionId: activeRun.mission_id,
+                                                          projectId:
+                                                            projectDetail?.id ??
+                                                            selectedSummary?.id ??
+                                                            '',
+                                                        },
+                                                      })
+                                                    }
+                                                    className="text-xs font-medium text-accent-500 hover:text-accent-400"
+                                                  >
+                                                    View Full Output
+                                                  </button>
+                                                </div>
+                                                <div className="mt-2 space-y-1 rounded-lg border border-primary-200 bg-white px-3 py-2 font-mono text-xs text-primary-900">
+                                                  {outputLines.length > 0 ? (
+                                                    outputLines.map((line, index) => (
+                                                      <div key={`${activeRun.id}-${index}`} className="truncate">
+                                                        {line}
+                                                      </div>
+                                                    ))
+                                                  ) : (
+                                                    <div className="text-primary-500">
+                                                      Waiting for live output...
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ) : null
+                                          })() : null}
                                         </div>
                                       ))}
                                     </div>

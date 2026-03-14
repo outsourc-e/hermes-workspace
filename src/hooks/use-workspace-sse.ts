@@ -29,6 +29,38 @@ function parseSseData(event: MessageEvent<string>): Record<string, unknown> | nu
   }
 }
 
+function parseOutputPayload(value: unknown): Record<string, unknown> | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+      return parsed as Record<string, unknown>
+    } catch {
+      return value.trim() ? { message: value } : null
+    }
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function getOutputLines(payload: Record<string, unknown>): string[] {
+  const data = parseOutputPayload(payload.data)
+  const candidates = [
+    typeof data?.message === 'string' ? data.message : null,
+    typeof data?.summary === 'string' ? data.summary : null,
+    typeof payload.message === 'string' ? payload.message : null,
+  ]
+
+  const text = candidates.find((value) => typeof value === 'string' && value.trim().length > 0)
+  if (!text) return []
+
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
 export function useWorkspaceSse() {
   const queryClient = useQueryClient()
   const [connected, setConnected] = useState(false)
@@ -72,7 +104,14 @@ export function useWorkspaceSse() {
         setConnected(true)
       }
 
-      es.addEventListener('task_run.started', () => {
+      es.addEventListener('task_run.started', (event) => {
+        const payload = parseSseData(event)
+        const runId =
+          typeof payload?.task_run_id === 'string' ? payload.task_run_id : null
+        if (runId) {
+          queryClient.setQueryData(['workspace', 'task-run-live-output', runId], [])
+        }
+
         invalidateQueries(queryClient, [
           ['workspace', 'task-runs'],
           ['workspace', 'missions'],
@@ -95,6 +134,14 @@ export function useWorkspaceSse() {
         const runId =
           typeof payload?.task_run_id === 'string' ? payload.task_run_id : null
         if (!runId) return
+
+        const nextLines = payload ? getOutputLines(payload) : []
+        if (nextLines.length > 0) {
+          queryClient.setQueryData<Array<string>>(
+            ['workspace', 'task-run-live-output', runId],
+            (current) => [...(current ?? []), ...nextLines].slice(-12),
+          )
+        }
 
         invalidateQueries(queryClient, [
           ['workspace', 'task-runs', runId, 'events'],
