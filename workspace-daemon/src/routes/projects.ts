@@ -27,9 +27,9 @@ async function getProjectGitStatus(projectPath: string | null | undefined) {
   try {
     const [branch, commitLine] = await Promise.all([
       runGitCommand(projectPath, ['branch', '--show-current']),
-      runGitCommand(projectPath, ['log', '-1', '--format=%h|%s|%ai']),
+      runGitCommand(projectPath, ['log', '-1', '--format=%h%x00%s%x00%ai']),
     ])
-    const [commit_hash, commit_message, commit_date] = commitLine.split('|')
+    const [commit_hash, commit_message, commit_date] = commitLine.split('\x00')
 
     return {
       branch: branch || null,
@@ -74,6 +74,14 @@ export function createProjectsRouter(tracker: Tracker): Router {
     }
     if (!name || name.trim().length === 0) {
       res.status(400).json({ error: 'name is required' })
+      return
+    }
+
+    if (
+      max_concurrent !== undefined &&
+      (typeof max_concurrent !== 'number' || Number.isNaN(Number(max_concurrent)))
+    ) {
+      res.status(400).json({ error: 'max_concurrent must be a number' })
       return
     }
 

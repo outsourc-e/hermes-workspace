@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFile, execSync } from "node:child_process";
+import { execSync, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getWorktreeBranch, mergeWorktreeToMain } from "./git-ops";
 import { QARunner } from "./qa-runner";
