@@ -16,6 +16,7 @@ import { createTeamsRouter } from "./routes/teams";
 import { createSkillsRouter } from "./routes/skills";
 
 const PORT = Number(process.env.PORT ?? 3002);
+const STARTUP_TIMESTAMP = Date.now();
 
 export function createServer(): { app: express.Express; tracker: Tracker; orchestrator: Orchestrator } {
   const app = express();
@@ -27,6 +28,13 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
+  });
+
+  app.get("/api/workspace/version", (_req, res) => {
+    res.json({
+      version: STARTUP_TIMESTAMP,
+      uptime: Math.floor((Date.now() - STARTUP_TIMESTAMP) / 1000),
+    });
   });
 
   app.get("/api/workspace/config", (_req, res) => {

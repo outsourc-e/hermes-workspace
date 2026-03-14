@@ -1,5 +1,5 @@
 import { URL, fileURLToPath } from 'node:url'
-import { spawn } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
@@ -167,6 +167,30 @@ const config = defineConfig(({ mode, command }) => {
     startWorkspaceDaemon()
   }
 
+  const isPortInUse = (port: number) =>
+    new Promise<boolean>((resolvePortCheck) => {
+      const socket = net.createConnection({ port, host: '127.0.0.1' })
+      socket.once('connect', () => {
+        socket.destroy()
+        resolvePortCheck(true)
+      })
+      socket.once('error', () => resolvePortCheck(false))
+    })
+
+  const hasHealthyWorkspaceDaemon = async () => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${workspaceDaemonPort}/api/workspace/version`,
+        {
+          signal: AbortSignal.timeout(2000),
+        },
+      )
+      return response.ok
+    } catch {
+      return false
+    }
+  }
+
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. CLAWSUITE_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
   const allowedHosts: string[] | true = env.CLAWSUITE_ALLOWED_HOSTS?.trim()
@@ -307,23 +331,33 @@ const config = defineConfig(({ mode, command }) => {
 
           if (command !== 'serve' || workspaceDaemonStarted || workspaceDaemonStarting) return
 
-          const checkPort = (port: number, cb: (running: boolean) => void) => {
-            const socket = net.createConnection({ port, host: '127.0.0.1' })
-            socket.once('connect', () => {
-              socket.destroy()
-              cb(true)
-            })
-            socket.once('error', () => cb(false))
-          }
-
           workspaceDaemonStarting = true
-          checkPort(3099, (running) => {
-            if (running || workspaceDaemonStarted) {
+          void (async () => {
+            const running = await isPortInUse(Number(workspaceDaemonPort))
+            if (workspaceDaemonStarted) {
               workspaceDaemonStarting = false
               return
             }
+
+            if (running) {
+              const healthy = await hasHealthyWorkspaceDaemon()
+              if (healthy) {
+                workspaceDaemonStarting = false
+                console.log('[workspace-daemon] Reusing existing daemon')
+                return
+              }
+
+              try {
+                execSync(
+                  `lsof -ti:${workspaceDaemonPort} | xargs kill -9 2>/dev/null || true`,
+                )
+              } catch {
+                // ignore stale cleanup failures and continue with a fresh spawn
+              }
+            }
+
             startWorkspaceDaemon()
-          })
+          })()
         },
       },
       // Client-only: replace process.env references in client bundles
