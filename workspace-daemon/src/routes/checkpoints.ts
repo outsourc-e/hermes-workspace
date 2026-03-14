@@ -13,7 +13,7 @@ import {
 import { OpenClawAdapter } from "../adapters/openclaw";
 import { Orchestrator } from "../orchestrator";
 import { Tracker } from "../tracker";
-import { runVerification, type VerificationResult } from "../verification";
+import { runVerification, runFullVerification, type VerificationResult, type FullVerificationResult } from "../verification";
 
 const execFileAsync = promisify(execFile);
 
@@ -102,6 +102,26 @@ function parseStoredVerification(value: string | null): StoredCheckpointVerifica
       output: parsed.output,
       durationMs: parsed.durationMs,
     };
+  } catch {
+    return null;
+  }
+}
+
+function parseFullVerification(value: string | null): FullVerificationResult[] | null {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (item: unknown): item is FullVerificationResult =>
+        typeof item === "object" &&
+        item !== null &&
+        "check" in item &&
+        "passed" in item &&
+        "output" in item &&
+        "durationMs" in item,
+    );
   } catch {
     return null;
   }
@@ -271,31 +291,38 @@ async function buildCheckpointDetail(tracker: Tracker, checkpointId: string) {
   }));
 
   const storedVerification = parseStoredVerification(checkpoint.verification);
+  const storedFullVerification = parseFullVerification(checkpoint.verification);
+
+  const verificationMap: Record<string, { status: VerificationStatus; label: string; output?: string | null; checked_at?: string | null }> = {
+    tsc: { status: "missing", label: "Not run yet" },
+    test: { status: "not_configured", label: "Not configured" },
+    lint: { status: "not_configured", label: "Not configured" },
+    e2e: { status: "not_configured", label: "Not configured" },
+  };
+
+  if (storedFullVerification) {
+    for (const result of storedFullVerification) {
+      verificationMap[result.check] = {
+        status: result.passed ? "passed" : "failed",
+        label: result.passed ? "Passed" : "Failed",
+        output: result.output,
+        checked_at: checkpoint.created_at,
+      };
+    }
+  } else if (storedVerification) {
+    verificationMap.tsc = {
+      status: storedVerification.passed ? "passed" : "failed",
+      label: storedVerification.passed ? "Passed" : "Failed",
+      output: storedVerification.output,
+      checked_at: checkpoint.created_at,
+    };
+  }
 
   return {
     checkpoint,
     parsed_diff_stat: parsedDiffStat,
     file_diffs: fileDiffs,
-    verification: {
-      tsc: {
-        status: (storedVerification ? (storedVerification.passed ? "passed" : "failed") : "missing") satisfies VerificationStatus,
-        label: storedVerification ? (storedVerification.passed ? "Passed" : "Failed") : "Not run yet",
-        output: storedVerification?.output ?? null,
-        checked_at: storedVerification ? checkpoint.created_at : null,
-      },
-      tests: {
-        status: "not_configured" satisfies VerificationStatus,
-        label: "Not configured",
-      },
-      lint: {
-        status: "not_configured" satisfies VerificationStatus,
-        label: "Not configured",
-      },
-      e2e: {
-        status: "not_configured" satisfies VerificationStatus,
-        label: "Not configured",
-      },
-    },
+    verification: verificationMap,
     run_events: runEvents,
   };
 }
@@ -374,6 +401,33 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
       status: result.passed ? "passed" : "failed",
       label: result.passed ? "Passed" : "Failed",
       output: result.output,
+      checked_at: new Date().toISOString(),
+    });
+  });
+
+  router.post("/:id/verify", async (req, res) => {
+    const checkpoint = tracker.getCheckpointDetail(req.params.id);
+    if (!checkpoint) {
+      res.status(404).json({ error: "Checkpoint not found" });
+      return;
+    }
+
+    const cwd = checkpoint.task_run_workspace_path ?? checkpoint.project_path;
+    if (!cwd) {
+      res.status(400).json({ error: "Checkpoint workspace is unavailable" });
+      return;
+    }
+
+    const results = await runFullVerification(cwd);
+    tracker.updateCheckpointVerification(checkpoint.id, JSON.stringify(results));
+    res.json({
+      results: results.map((r) => ({
+        check: r.check,
+        status: r.passed ? "passed" : "failed",
+        label: r.passed ? "Passed" : "Failed",
+        output: r.output,
+        duration_ms: r.durationMs,
+      })),
       checked_at: new Date().toISOString(),
     });
   });

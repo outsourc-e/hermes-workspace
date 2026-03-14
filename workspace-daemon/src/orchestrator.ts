@@ -149,15 +149,21 @@ export class Orchestrator extends EventEmitter {
     return this.autoApprove;
   }
 
+  private sweepTimer: ReturnType<typeof setInterval> | null = null;
+
   start(): void {
     if (this.timer) {
       return;
     }
 
     this.reconcileRunningTasks();
+    this.sweepStaleRuns();
     this.timer = setInterval(() => {
       void this.tick();
     }, this.state.pollIntervalMs);
+    this.sweepTimer = setInterval(() => {
+      this.sweepStaleRuns();
+    }, 60_000);
     void this.tick();
   }
 
@@ -165,6 +171,32 @@ export class Orchestrator extends EventEmitter {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.sweepTimer) {
+      clearInterval(this.sweepTimer);
+      this.sweepTimer = null;
+    }
+  }
+
+  private sweepStaleRuns(): void {
+    const staleRuns = this.tracker.getStaleRunningTaskRuns(MAX_RUN_DURATION_MS);
+    for (const run of staleRuns) {
+      // Skip runs we're actively tracking in memory (they have a live watchdog)
+      if (this.abortControllers.has(run.id)) {
+        continue;
+      }
+
+      this.tracker.failTaskRun(run.id, "Process disappeared (stale run cleanup)");
+      this.tracker.setTaskStatus(run.task_id, "failed");
+      this.tracker.logAuditEvent("task.stale_cleanup", run.id, "task_run");
+
+      // Clean up in-memory state if present
+      this.state.running.delete(run.task_id);
+
+      this.emit("stale_cleanup", { taskId: run.task_id, runId: run.id });
+    }
+    if (staleRuns.length > 0) {
+      void this.tick();
     }
   }
 

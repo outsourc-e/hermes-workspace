@@ -1309,6 +1309,15 @@ export class Tracker extends EventEmitter {
       .all() as TaskRun[]
   }
 
+  getStaleRunningTaskRuns(maxAgeMs: number): TaskRun[] {
+    const maxAgeSeconds = Math.floor(maxAgeMs / 1000);
+    return this.db
+      .prepare(
+        "SELECT * FROM task_runs WHERE status = 'running' AND started_at IS NOT NULL AND started_at < datetime('now', '-' || ? || ' seconds')"
+      )
+      .all(maxAgeSeconds) as TaskRun[];
+  }
+
   listTaskRuns(
     filters: { taskId?: string; projectId?: string } = {},
   ): TaskRunWithRelations[] {
