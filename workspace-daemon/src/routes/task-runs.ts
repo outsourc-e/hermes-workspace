@@ -6,7 +6,7 @@ const ADHOC_PROJECT_NAME = "__adhoc__";
 const ADHOC_PROJECT_PATH = "/tmp/adhoc-workspace";
 const ADHOC_PHASE_NAME = "Ad-hoc";
 
-async function waitForTaskRun(tracker: Tracker, taskId: string, timeoutMs = 1_000) {
+async function waitForTaskRun(tracker: Tracker, taskId: string, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
@@ -105,7 +105,12 @@ export function createAdhocTaskRunsRouter(
 
     const taskRun = await waitForTaskRun(tracker, task.id);
     if (!taskRun) {
-      res.status(503).json({ error: "Task queued but task run was not created yet" });
+      res.status(202).json({
+        ok: true,
+        task_id: task.id,
+        mission_id: mission.id,
+        queued: true,
+      });
       return;
     }
 

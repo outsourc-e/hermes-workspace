@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
-import { execFile } from "node:child_process";
+import { execFile, execSync } from "node:child_process";
 import { promisify } from "node:util";
 import { getWorktreeBranch, mergeWorktreeToMain } from "./git-ops";
 import { QARunner } from "./qa-runner";
@@ -53,30 +52,33 @@ function notifyCheckpointReady(taskName: string, projectName: string, taskRunId:
 async function attachVerification(
   tracker: Tracker,
   checkpoint: Checkpoint,
-  projectPath: string | null,
+  workspacePath: string | null,
 ): Promise<Checkpoint> {
-  if (!projectPath) {
+  if (!workspacePath) {
     return checkpoint;
   }
 
-  tracker.updateCheckpointVerification(checkpoint.id, JSON.stringify(await runVerification(projectPath)));
+  tracker.updateCheckpointVerification(
+    checkpoint.id,
+    JSON.stringify(await runVerification(workspacePath)),
+  );
   return tracker.getCheckpoint(checkpoint.id) ?? checkpoint;
 }
 
 async function finalizeCheckpoint(
   tracker: Tracker,
   checkpoint: Checkpoint,
-  projectPath: string | null,
+  workspacePath: string | null,
   taskName: string,
   projectName: string,
   taskRunId: string,
 ): Promise<Checkpoint> {
   let latestCheckpoint = tracker.getCheckpoint(checkpoint.id) ?? checkpoint;
 
-  if (projectPath) {
+  if (workspacePath) {
     const qaResult = await new QARunner().runQA(
       latestCheckpoint.raw_diff ?? "",
-      projectPath,
+      workspacePath,
       latestCheckpoint.id,
     );
     latestCheckpoint =
@@ -121,11 +123,11 @@ export async function buildCheckpoint(
 ): Promise<Checkpoint> {
   if (!isGitDir(workspacePath)) {
     const checkpoint = tracker.createCheckpoint(taskRunId, "No git info available", null, null, null, null);
-    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);
+    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, workspacePath);
     return finalizeCheckpoint(
       tracker,
       verifiedCheckpoint,
-      projectPath,
+      workspacePath,
       taskName,
       projectName,
       taskRunId,
@@ -144,11 +146,11 @@ export async function buildCheckpoint(
 
   if (changedFiles.length === 0) {
     const checkpoint = tracker.createCheckpoint(taskRunId, "No changes detected", null, null, null, null);
-    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);
+    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, workspacePath);
     return finalizeCheckpoint(
       tracker,
       verifiedCheckpoint,
-      projectPath,
+      workspacePath,
       taskName,
       projectName,
       taskRunId,
@@ -171,11 +173,11 @@ export async function buildCheckpoint(
       ? await mergeWorktreeToMain(projectPath, getWorktreeBranch(taskRunId), taskName)
       : null;
     const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, commitHash, null, rawDiff);
-    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);
+    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, workspacePath);
     return finalizeCheckpoint(
       tracker,
       verifiedCheckpoint,
-      projectPath,
+      workspacePath,
       taskName,
       projectName,
       taskRunId,
@@ -183,13 +185,13 @@ export async function buildCheckpoint(
   } else {
     const rawDiff = getRawDiff(workspacePath, "staged");
     const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, null, null, rawDiff);
-    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, projectPath);
+    const verifiedCheckpoint = await attachVerification(tracker, checkpoint, workspacePath);
     // Unstage so reviewer can inspect before approval
     await gitExec(["reset", "HEAD"], workspacePath);
     return finalizeCheckpoint(
       tracker,
       verifiedCheckpoint,
-      projectPath,
+      workspacePath,
       taskName,
       projectName,
       taskRunId,

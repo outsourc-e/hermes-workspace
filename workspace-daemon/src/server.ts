@@ -55,7 +55,7 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
   app.use("/api/workspace/task-runs", createTaskRunsRouter(tracker, orchestrator));
   app.use("/api/workspace/agents", createAgentsRouter(tracker));
   app.use("/api/workspace/missions", createMissionsRouter(tracker));
-  app.use("/api/workspace/checkpoints", createCheckpointsRouter(tracker));
+  app.use("/api/workspace/checkpoints", createCheckpointsRouter(tracker, orchestrator));
   app.use("/api/workspace/decompose", createDecomposeRouter(tracker));
   app.use("/api/workspace/teams", createTeamsRouter(tracker));
   app.use("/api/workspace/skills", createSkillsRouter());

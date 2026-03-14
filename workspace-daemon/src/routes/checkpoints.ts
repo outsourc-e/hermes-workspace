@@ -12,6 +12,7 @@ import {
   mergeWorktreeToMain,
 } from "../git-ops";
 import { OpenClawAdapter } from "../adapters/openclaw";
+import { Orchestrator } from "../orchestrator";
 import { Tracker } from "../tracker";
 import { runVerification, type VerificationResult } from "../verification";
 
@@ -293,7 +294,7 @@ async function buildCheckpointDetail(tracker: Tracker, checkpointId: string) {
   };
 }
 
-export function createCheckpointsRouter(tracker: Tracker): Router {
+export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestrator): Router {
   const router = Router();
 
   router.get("/", (req, res) => {
@@ -370,6 +371,8 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
           console.warn(
             `[checkpoints] Failed to apply stored diff for checkpoint ${checkpoint.id}: ${message}`,
           );
+          res.status(500).json({ error: message });
+          return;
         }
       }
     }
@@ -554,7 +557,14 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
       return;
     }
 
+    const taskRun = tracker.getTaskRunApprovalContext(checkpoint.task_run_id);
+    if (!taskRun) {
+      res.status(404).json({ error: "Task run not found for checkpoint" });
+      return;
+    }
+
     const sessionId = tracker.getTaskRunSessionId(checkpoint.task_run_id);
+    let resumed = false;
     if (sessionId) {
       const reason = reviewerNotes?.trim() || "No reason provided";
 
@@ -563,6 +573,7 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
           sessionId,
           `Checkpoint rejected. Reason: ${reason}. Please revise.`,
         );
+        resumed = true;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to steer OpenClaw session";
@@ -571,20 +582,74 @@ export function createCheckpointsRouter(tracker: Tracker): Router {
       }
     }
 
-    tracker.updateTaskRun(checkpoint.task_run_id, {
-      status: "running",
-      completed_at: null,
-      error: null,
-    });
+    if (sessionId && resumed) {
+      tracker.updateTaskRun(checkpoint.task_run_id, {
+        status: "running",
+        completed_at: null,
+        error: null,
+      });
+      tracker.setTaskStatus(taskRun.task_id, "running");
+    } else {
+      tracker.updateTaskRun(checkpoint.task_run_id, {
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: "Rejected by reviewer",
+      });
+      tracker.setTaskStatus(taskRun.task_id, "failed");
+    }
     res.json(checkpoint);
   });
 
-  router.post("/:id/revise", (req, res) => {
+  router.post("/:id/revise", async (req, res) => {
+    const reviewerNotes =
+      typeof req.body?.reviewer_notes === "string" ? req.body.reviewer_notes.trim() : "";
     const checkpoint = tracker.updateCheckpointStatus(req.params.id, "revised", req.body?.reviewer_notes);
     if (!checkpoint) {
       res.status(404).json({ error: "Checkpoint not found" });
       return;
     }
+
+    const taskRun = tracker.getTaskRunApprovalContext(checkpoint.task_run_id);
+    if (!taskRun) {
+      res.status(404).json({ error: "Task run not found for checkpoint" });
+      return;
+    }
+
+    const task = tracker.getTask(taskRun.task_id);
+    if (!task) {
+      res.status(404).json({ error: "Task not found for checkpoint" });
+      return;
+    }
+
+    const revisionSuffix = reviewerNotes
+      ? `\n\nReviewer revision notes:\n${reviewerNotes}`
+      : "\n\nReviewer revision notes:\nPlease revise the previous checkpoint.";
+    const updatedTask = tracker.updateTask(task.id, {
+      description: `${task.description ?? ""}${revisionSuffix}`.trim(),
+    });
+    if (!updatedTask) {
+      res.status(500).json({ error: "Failed to update task for revision" });
+      return;
+    }
+
+    const nextRun = tracker.createPendingTaskRun(
+      task.id,
+      task.agent_id,
+      null,
+      taskRun.attempt + 1,
+    );
+    tracker.setTaskStatus(task.id, "pending");
+    const triggered = await orchestrator.triggerTask(task.id);
+    if (!triggered) {
+      tracker.updateTaskRun(nextRun.id, {
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: "Failed to dispatch revision task run",
+      });
+      res.status(500).json({ error: "Failed to dispatch revision task run" });
+      return;
+    }
+
     res.json(checkpoint);
   });
 

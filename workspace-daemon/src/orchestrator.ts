@@ -148,6 +148,14 @@ export class Orchestrator extends EventEmitter {
       return false;
     }
 
+    const pendingRun = this
+      .tracker
+      .listTaskRuns({ taskId })
+      .find((entry) => entry.status === "pending");
+    if (pendingRun) {
+      return this.dispatchTaskRun(pendingRun.id);
+    }
+
     this.tracker.setTaskStatus(taskId, "ready");
     await this.tick();
     return true;
@@ -262,6 +270,19 @@ export class Orchestrator extends EventEmitter {
 
     const retryEntry = this.state.retryAttempts.get(task.id);
     const attempt = options?.taskRun?.attempt ?? retryEntry?.attempt ?? 1;
+    const projectPath = project.path;
+    if (!projectPath || !existsSync(projectPath)) {
+      const taskRun =
+        options?.taskRun ??
+        this.tracker.createPendingTaskRun(task.id, agent.id, null, attempt);
+      const errorMessage = "Project path no longer exists";
+      this.tracker.failTaskRun(taskRun.id, errorMessage);
+      this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
+      this.tracker.setTaskStatus(task.id, "failed");
+      this.tracker.setAgentStatus(agent.id, "online");
+      return;
+    }
+
     this.tracker.setTaskStatus(task.id, "running");
     this.tracker.setAgentStatus(agent.id, "running");
 
@@ -294,15 +315,6 @@ export class Orchestrator extends EventEmitter {
     this.tracker.markTaskRunStarted(taskRun.id);
     this.tracker.logAuditEvent("task.started", taskRun.id, "task_run");
     this.emit("dispatch", { taskId: task.id, runId: taskRun.id });
-
-    const projectPath = project.path;
-    if (!projectPath || !existsSync(projectPath)) {
-      const errorMessage = "Project path no longer exists";
-      this.tracker.failTaskRun(taskRun.id, errorMessage);
-      this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
-      this.tracker.setTaskStatus(task.id, "failed");
-      return;
-    }
 
     try {
       const { result, workspacePath, checkpoint, autoApproved } = await this.agentRunner.runTask({

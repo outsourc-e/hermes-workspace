@@ -2670,7 +2670,11 @@ export class Tracker extends EventEmitter {
   }
 
   private emitTaskRunCompleted(run: TaskRun): void {
-    if (run.status !== 'completed' && run.status !== 'failed') {
+    if (
+      run.status !== 'completed' &&
+      run.status !== 'failed' &&
+      run.status !== 'awaiting_review'
+    ) {
       return
     }
 

@@ -103,8 +103,12 @@ export function useWorkspaceSse() {
             : 'Task'
         const status = payload?.status
 
-        if (status === 'completed') {
-          toast(`✅ ${taskName} completed — ready for review`, {
+        if (status === 'completed' || status === 'awaiting_review') {
+          const message =
+            status === 'awaiting_review'
+              ? `✅ ${taskName} ready for review`
+              : `✅ ${taskName} completed — ready for review`
+          toast(message, {
             type: 'success',
             icon: '✅',
           })
