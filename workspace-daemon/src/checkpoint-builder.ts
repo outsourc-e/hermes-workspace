@@ -219,7 +219,11 @@ export async function buildCheckpoint(
   });
 
   if (autoApprove) {
-    await gitExec(["commit", "-m", `chore(workspace): auto-apply task run ${taskRunId}`], workspacePath);
+    // Codex may have already committed changes — only commit if there are staged changes
+    const stagedDiff = (await gitExec(["diff", "--cached", "--quiet"], workspacePath).catch(() => "has-staged"));
+    if (stagedDiff === "has-staged") {
+      await gitExec(["commit", "-m", `chore(workspace): auto-apply task run ${taskRunId}`], workspacePath);
+    }
     const rawDiff = (await getCommittedDiff(workspacePath, projectPath)).rawDiff;
     const commitHash = projectPath
       ? await mergeWorktreeToMain(projectPath, getWorktreeBranch(taskRunId), taskName)
