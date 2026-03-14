@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getWorktreeBranch, mergeWorktreeToMain } from "./git-ops";
+import { getBaseBranch, getWorktreeBranch, mergeWorktreeToMain } from "./git-ops";
 import { QARunner } from "./qa-runner";
 import type { Tracker } from "./tracker";
 import type { Checkpoint } from "./types";
@@ -47,6 +47,73 @@ function notifyCheckpointReady(taskName: string, projectName: string, taskRunId:
   } catch {
     // Notification failures must not break checkpoint creation.
   }
+}
+
+interface DiffSnapshot {
+  diffStat: string;
+  changedFiles: string[];
+  rawDiff: string | null;
+}
+
+async function getMergeBase(workspacePath: string, projectPath: string | null): Promise<string | null> {
+  if (!projectPath) {
+    return null;
+  }
+
+  const baseBranch = await getBaseBranch(projectPath);
+  if (!baseBranch) {
+    return null;
+  }
+
+  const mergeBase = await tryGitExec(["merge-base", "HEAD", baseBranch], workspacePath);
+  return mergeBase || null;
+}
+
+function combineDiffs(primary: DiffSnapshot, secondary: DiffSnapshot): DiffSnapshot {
+  const changedFiles = Array.from(new Set([...primary.changedFiles, ...secondary.changedFiles]));
+  const diffStatParts = [primary.diffStat, secondary.diffStat].filter((value) => value.trim().length > 0);
+  const rawDiffParts = [primary.rawDiff, secondary.rawDiff].filter(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+
+  return {
+    diffStat: diffStatParts.join("\n").trim(),
+    changedFiles,
+    rawDiff: rawDiffParts.length > 0 ? rawDiffParts.join("\n").trim() : null,
+  };
+}
+
+async function getCommittedDiff(workspacePath: string, projectPath: string | null): Promise<DiffSnapshot> {
+  const mergeBase = await getMergeBase(workspacePath, projectPath);
+  if (!mergeBase) {
+    return { diffStat: "", changedFiles: [], rawDiff: null };
+  }
+
+  const [diffStat, diffNames, rawDiff] = await Promise.all([
+    tryGitExec(["diff", "--stat", mergeBase, "HEAD"], workspacePath),
+    tryGitExec(["diff", "--name-only", mergeBase, "HEAD"], workspacePath),
+    tryGitExec(["diff", mergeBase, "HEAD"], workspacePath),
+  ]);
+
+  return {
+    diffStat,
+    changedFiles: diffNames.split("\n").filter(Boolean),
+    rawDiff: rawDiff.length > 0 ? rawDiff : null,
+  };
+}
+
+async function getStagedDiff(workspacePath: string): Promise<DiffSnapshot> {
+  const [diffStat, diffNames, rawDiff] = await Promise.all([
+    tryGitExec(["diff", "--cached", "--stat"], workspacePath),
+    tryGitExec(["diff", "--cached", "--name-only"], workspacePath),
+    tryGitExec(["diff", "--cached"], workspacePath),
+  ]);
+
+  return {
+    diffStat,
+    changedFiles: diffNames.split("\n").filter(Boolean),
+    rawDiff: rawDiff.length > 0 ? rawDiff : null,
+  };
 }
 
 async function attachVerification(
@@ -98,20 +165,6 @@ async function finalizeCheckpoint(
   return tracker.getCheckpoint(latestCheckpoint.id) ?? latestCheckpoint;
 }
 
-function getRawDiff(workspacePath: string, source: "staged" | "head"): string | null {
-  try {
-    const command = source === "head" ? "git show --format=" : "git diff --cached";
-    const rawDiff = execSync(command, {
-      cwd: workspacePath,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    return rawDiff.length > 0 ? rawDiff : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function buildCheckpoint(
   workspacePath: string,
   projectPath: string | null,
@@ -137,12 +190,11 @@ export async function buildCheckpoint(
   // Stage all changes first so we capture untracked files in diff
   await gitExec(["add", "-A"], workspacePath);
 
-  const [diffStat, diffNames] = await Promise.all([
-    tryGitExec(["diff", "--cached", "--stat"], workspacePath),
-    tryGitExec(["diff", "--cached", "--name-only"], workspacePath),
-  ]);
-
-  const changedFiles = diffNames.split("\n").filter(Boolean);
+  const diffSnapshot = combineDiffs(
+    await getCommittedDiff(workspacePath, projectPath),
+    await getStagedDiff(workspacePath),
+  );
+  const changedFiles = diffSnapshot.changedFiles;
 
   if (changedFiles.length === 0) {
     const checkpoint = tracker.createCheckpoint(taskRunId, "No changes detected", null, null, null, null);
@@ -161,14 +213,14 @@ export async function buildCheckpoint(
     ? `Changed: ${changedFiles.join(", ")}`
     : `${changedFiles.length} files changed`;
   const diffStatJson = JSON.stringify({
-    raw: diffStat,
+    raw: diffSnapshot.diffStat,
     changed_files: changedFiles,
     files_changed: changedFiles.length,
   });
 
   if (autoApprove) {
     await gitExec(["commit", "-m", `chore(workspace): auto-apply task run ${taskRunId}`], workspacePath);
-    const rawDiff = getRawDiff(workspacePath, "head");
+    const rawDiff = (await getCommittedDiff(workspacePath, projectPath)).rawDiff;
     const commitHash = projectPath
       ? await mergeWorktreeToMain(projectPath, getWorktreeBranch(taskRunId), taskName)
       : null;
@@ -181,10 +233,9 @@ export async function buildCheckpoint(
       taskName,
       projectName,
       taskRunId,
-    );
+      );
   } else {
-    const rawDiff = getRawDiff(workspacePath, "staged");
-    const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, null, null, rawDiff);
+    const checkpoint = tracker.createCheckpoint(taskRunId, summary, diffStatJson, null, null, diffSnapshot.rawDiff);
     const verifiedCheckpoint = await attachVerification(tracker, checkpoint, workspacePath);
     // Unstage so reviewer can inspect before approval
     await gitExec(["reset", "HEAD"], workspacePath);
