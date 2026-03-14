@@ -882,6 +882,46 @@ export function ProjectDetailView({
         </DetailPanel>
       </div>
 
+      {/* Policies / Health / Git Cards */}
+      <div className="mt-3 grid gap-3 xl:grid-cols-3">
+        <DetailPanel title="Project Policies">
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between"><span className="text-primary-500">Branch</span><span className="font-medium text-accent-500">per-mission</span></div>
+            <div className="flex justify-between"><span className="text-primary-500">Approval</span><span className="font-medium text-blue-500">{sourceProject?.auto_approve ? 'auto' : 'manual'}</span></div>
+            <div className="flex justify-between"><span className="text-primary-500">Required</span><span className="font-medium text-emerald-500">{requiredChecks.length > 0 ? requiredChecks.join(', ') : 'tsc'}</span></div>
+            <div className="flex justify-between"><span className="text-primary-500">Shell</span><span>{allowedTools.includes('shell') ? '✅' : '❌'}</span></div>
+            <div className="flex justify-between"><span className="text-primary-500">Network</span><span>❌</span></div>
+          </div>
+        </DetailPanel>
+
+        <DetailPanel title="Health">
+          <div className="space-y-1.5 text-sm">
+            <div className={cn('flex items-center gap-1.5', healthSnapshot.tsc.status === 'passed' ? 'text-emerald-600' : healthSnapshot.tsc.status === 'failed' ? 'text-red-500' : 'text-primary-400')}>
+              {healthSnapshot.tsc.status === 'passed' ? '✅' : healthSnapshot.tsc.status === 'failed' ? '❌' : '⚪'} tsc: {healthSnapshot.tsc.status === 'passed' ? 'passed' : healthSnapshot.tsc.status === 'failed' ? 'failed' : 'not run'}
+              {healthSnapshot.tsc.checkedAt && <span className="ml-auto text-[10px] text-primary-400">{formatRelativeTime(healthSnapshot.tsc.checkedAt)}</span>}
+            </div>
+            <div className={cn('flex items-center gap-1.5', healthSnapshot.tests.status === 'passed' ? 'text-emerald-600' : healthSnapshot.tests.status === 'failed' ? 'text-red-500' : 'text-primary-400')}>
+              {healthSnapshot.tests.status === 'passed' ? '✅' : healthSnapshot.tests.status === 'failed' ? '❌' : '⚪'} {healthSnapshot.tests.label}
+            </div>
+            <div className={cn('flex items-center gap-1.5', healthSnapshot.e2e.status === 'passed' ? 'text-emerald-600' : healthSnapshot.e2e.status === 'failed' ? 'text-red-500' : 'text-primary-400')}>
+              {healthSnapshot.e2e.status === 'passed' ? '✅' : healthSnapshot.e2e.status === 'failed' ? '❌' : '⚪'} {healthSnapshot.e2e.label}
+            </div>
+          </div>
+        </DetailPanel>
+
+        <DetailPanel title="Git">
+          {gitStatus ? (
+            <div className="space-y-1 text-sm leading-relaxed text-primary-500">
+              <div>Branch: <code className="text-accent-500">{gitStatus.branch ?? 'unknown'}</code></div>
+              <div>Commit: <code className="text-primary-400">{gitStatus.commit_hash ?? '—'}</code> {gitStatus.commit_message && <span className="text-primary-600">{truncateMiddle(gitStatus.commit_message, 30)}</span>}</div>
+              {gitStatus.commit_date && <div className="text-[10px] text-primary-400">{formatRelativeTime(gitStatus.commit_date)}</div>}
+            </div>
+          ) : (
+            <p className="text-sm text-primary-500">No git info available</p>
+          )}
+        </DetailPanel>
+      </div>
+
       <Collapsible open={projectSpecOpen} onOpenChange={onSpecOpenChange}>
         <section className="mt-5 rounded-xl border border-primary-200 bg-primary-50/70">
           <CollapsibleTrigger
