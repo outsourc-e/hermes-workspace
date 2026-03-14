@@ -1,7 +1,5 @@
 import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, execSync } from "node:child_process";
 import { promisify } from "node:util";
 import { Router } from "express";
 import {
@@ -218,14 +216,19 @@ async function applyStoredDiffToProject(
     return null;
   }
 
-  const tempFile = path.join(
-    os.tmpdir(),
-    `clawsuite-checkpoint-${checkpointId}-${Date.now()}.patch`,
-  );
-
   try {
-    await fs.writeFile(tempFile, patch, "utf8");
-    await runGit(projectPath, ["apply", "--index", tempFile]);
+    execSync("git apply --check --3way", {
+      cwd: projectPath,
+      input: patch,
+      stdio: ["pipe", "ignore", "pipe"],
+      timeout: 10_000,
+    });
+    execSync("git apply --3way", {
+      cwd: projectPath,
+      input: patch,
+      stdio: ["pipe", "ignore", "pipe"],
+      timeout: 10_000,
+    });
 
     try {
       await runGit(projectPath, ["diff", "--cached", "--quiet"]);
@@ -234,8 +237,10 @@ async function applyStoredDiffToProject(
       await runGit(projectPath, ["commit", "-m", `chore: checkpoint ${checkpointId} approved`]);
       return runGit(projectPath, ["rev-parse", "HEAD"]);
     }
-  } finally {
-    await fs.rm(tempFile, { force: true });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to apply stored checkpoint diff";
+    throw new Error(message);
   }
 }
 
