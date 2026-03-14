@@ -120,7 +120,9 @@ export function DashboardProjectCards({
                         {overview.project.name}
                       </p>
                       <p className="truncate text-xs text-primary-500">
-                        {overview.project.path || 'No path configured'}
+                        {overview.project.path
+                          ? overview.project.path.split('/').slice(-2).join('/')
+                          : 'No path configured'}
                       </p>
                     </div>
                     <span
@@ -140,7 +142,7 @@ export function DashboardProjectCards({
                     <p className="text-sm font-medium text-primary-900">
                       {overview.phaseLabel}
                     </p>
-                    <p className="text-sm text-primary-600">
+                    <p className="text-sm text-primary-600 line-clamp-1">
                       {overview.missionLabel}
                     </p>
                   </div>
@@ -187,17 +189,19 @@ export function DashboardProjectCards({
                     ))}
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {overview.squad.map((agent) => (
-                      <span
-                        key={`${overview.project.id}-${agent.label}`}
-                        className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-700"
-                      >
-                        <span className={cn('size-2 rounded-full', agent.tone)} />
-                        {agent.label}
-                      </span>
-                    ))}
-                  </div>
+                  {overview.squad.length > 0 && (
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-primary-500">
+                      <div className="flex -space-x-1">
+                        {overview.squad.slice(0, 3).map((agent) => (
+                          <span
+                            key={`${overview.project.id}-${agent.label}`}
+                            className={cn('inline-block size-3 rounded-full border border-white', agent.tone)}
+                          />
+                        ))}
+                      </div>
+                      <span>{overview.squad.length} agent{overview.squad.length === 1 ? '' : 's'}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </button>
