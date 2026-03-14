@@ -35,7 +35,7 @@ export function WorkspaceFieldLabel({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-400">
+      <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-500">
         {label}
       </span>
       {children}
@@ -55,13 +55,13 @@ export function WorkspaceEntityDialog({
 }: WorkspaceEntityDialogProps) {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(540px,94vw)] border-primary-700 bg-primary-900 p-0 text-primary-100 shadow-2xl">
+      <DialogContent className="w-[min(540px,94vw)] border-primary-200 bg-white p-0 text-primary-900 shadow-2xl">
         <form onSubmit={onSubmit} className="space-y-5 p-5">
           <div className="space-y-1">
-            <DialogTitle className="text-base font-semibold text-primary-100">
+            <DialogTitle className="text-base font-semibold text-primary-900">
               {title}
             </DialogTitle>
-            <DialogDescription className="text-sm text-primary-400">
+            <DialogDescription className="text-sm text-primary-500">
               {description}
             </DialogDescription>
           </div>
@@ -132,7 +132,7 @@ export function CreateProjectDialog({
         <input
           value={form.name}
           onChange={(event) => onFormChange({ ...form, name: event.target.value })}
-          className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+          className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
           placeholder="OpenClaw Workspace Refresh"
           autoFocus
         />
@@ -141,7 +141,7 @@ export function CreateProjectDialog({
         <input
           value={form.path}
           onChange={(event) => onFormChange({ ...form, path: event.target.value })}
-          className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+          className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
           placeholder="/Users/aurora/.openclaw/workspace/clawsuite"
         />
       </WorkspaceFieldLabel>
@@ -151,7 +151,7 @@ export function CreateProjectDialog({
             value={form.spec}
             onChange={(event) => onFormChange({ ...form, spec: event.target.value })}
             rows={5}
-            className="w-full rounded-xl border border-primary-700 bg-primary-800 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+            className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
             placeholder="Optional project brief or execution spec..."
           />
           <input
@@ -169,10 +169,28 @@ export function CreateProjectDialog({
             >
               Upload SPEC.md
             </Button>
-            <p className="text-xs text-primary-400">Or upload a SPEC.md / PRD file</p>
+            <p className="text-xs text-primary-500">Or upload a SPEC.md / PRD file</p>
           </div>
         </div>
       </WorkspaceFieldLabel>
+      <label className="flex items-start gap-3 rounded-xl border border-primary-200 bg-primary-50 px-3 py-3">
+        <input
+          type="checkbox"
+          checked={form.autoDecompose}
+          onChange={(event) =>
+            onFormChange({ ...form, autoDecompose: event.target.checked })
+          }
+          className="mt-0.5 h-4 w-4 rounded border-primary-300 text-accent-500 focus:ring-accent-500"
+        />
+        <span className="space-y-1">
+          <span className="block text-sm font-medium text-primary-900">
+            Auto-create tasks with AI
+          </span>
+          <span className="block text-xs text-primary-500">
+            Create an initial mission from the spec and start agents automatically.
+          </span>
+        </span>
+      </label>
     </WorkspaceEntityDialog>
   )
 }

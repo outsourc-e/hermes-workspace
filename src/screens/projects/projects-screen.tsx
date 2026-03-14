@@ -3,9 +3,7 @@ import {
   Add01Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
-  CheckmarkCircle02Icon,
   Folder01Icon,
-  Rocket01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -41,6 +39,7 @@ import { DashboardProjectCards } from './dashboard-project-cards'
 import { DashboardReviewInbox } from './dashboard-review-inbox'
 import { CheckpointDetailModal } from './checkpoint-detail-modal'
 import {
+  CreateProjectDialog,
   WorkspaceEntityDialog,
   WorkspaceFieldLabel,
 } from './create-project-dialog'
@@ -53,6 +52,7 @@ import {
   extractProjects,
   extractTasks,
   normalizeStats,
+  type ProjectFormState,
   type DecomposedTaskDraft,
   type MissionFormState,
   type MissionLaunchState,
@@ -91,12 +91,6 @@ type ProjectsScreenProps = {
     projectId: string | null
     projectName: string | null
   }) => void
-}
-
-type NewProjectFormState = {
-  name: string
-  path: string
-  spec: string
 }
 
 type ProjectMissionComposerState = {
@@ -237,12 +231,12 @@ export function ProjectsScreen({
   const [pendingReviewCheckpoint, setPendingReviewCheckpoint] =
     useState<WorkspaceCheckpoint | null>(null)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
-  const [newProjectForm, setNewProjectForm] = useState<NewProjectFormState>({
+  const [newProjectForm, setNewProjectForm] = useState<ProjectFormState>({
     name: '',
     path: '',
     spec: '',
+    autoDecompose: true,
   })
-  const [newProjectError, setNewProjectError] = useState<string | null>(null)
   const [projectMissionComposer, setProjectMissionComposer] =
     useState<ProjectMissionComposerState | null>(null)
   const [missionStartPending, setMissionStartPending] = useState(false)
@@ -743,9 +737,58 @@ export function ProjectsScreen({
   }
 
   function openNewProjectDialog() {
-    setNewProjectForm({ name: '', path: '', spec: '' })
-    setNewProjectError(null)
+    setNewProjectForm({ name: '', path: '', spec: '', autoDecompose: true })
     setNewProjectOpen(true)
+  }
+
+  async function createInitialProjectMission(projectId: string, spec: string) {
+    const phasePayload = await apiRequest('/api/workspace/phases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: projectId,
+        name: 'Initial Build',
+        sort_order: 0,
+      }),
+    })
+    const phaseId = extractEntityId(phasePayload, 'phase')
+    if (!phaseId) throw new Error('Phase creation returned an empty response')
+
+    const missionPayload = await apiRequest('/api/workspace/missions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phase_id: phaseId,
+        name: spec.slice(0, 60) || 'Initial Build',
+      }),
+    })
+    const missionId = extractEntityId(missionPayload, 'mission')
+    if (!missionId) throw new Error('Mission response was empty')
+
+    const decomposeResult = extractDecomposeResponse(
+      await apiRequest('/api/workspace/decompose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          goal: spec,
+          spec,
+          project_id: projectId,
+          mission_id: missionId,
+        }),
+      }),
+    )
+
+    if (decomposeResult.tasks.length === 0) {
+      throw new Error('Decompose returned no tasks')
+    }
+
+    for (const id of [missionId]) {
+      await apiRequest(`/api/workspace/missions/${encodeURIComponent(id)}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+    }
   }
 
   function clearSelectedProject() {
@@ -961,38 +1004,50 @@ export function ProjectsScreen({
     event.preventDefault()
     const name = newProjectForm.name.trim()
     const path = newProjectForm.path.trim()
+    const spec = newProjectForm.spec.trim()
 
     if (!name) {
-      setNewProjectError('Project name is required.')
+      toast('Project name is required.', { type: 'warning' })
       return
     }
 
     if (!path) {
-      setNewProjectError('Local path is required.')
+      toast('Local path is required.', { type: 'warning' })
       return
     }
 
     setSubmittingKey('project')
-    setNewProjectError(null)
 
     try {
-      await apiRequest('/api/workspace/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          path,
-          spec: newProjectForm.spec.trim() || undefined,
+      const project = extractProject(
+        await apiRequest('/api/workspace/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            path,
+            spec: spec || undefined,
+          }),
         }),
-      })
+      )
+      if (!project) {
+        throw new Error('Project creation returned an empty response')
+      }
+
+      if (newProjectForm.autoDecompose && spec) {
+        await createInitialProjectMission(project.id, spec)
+        toast('Project created — agents starting...', { type: 'success' })
+      } else {
+        toast('Project created', { type: 'success' })
+      }
+
       setNewProjectOpen(false)
-      setNewProjectForm({ name: '', path: '', spec: '' })
-      toast('Project created', { type: 'success' })
+      setNewProjectForm({ name: '', path: '', spec: '', autoDecompose: true })
       triggerRefresh()
     } catch (error) {
-      setNewProjectError(
-        error instanceof Error ? error.message : 'Failed to create project',
-      )
+      toast(error instanceof Error ? error.message : 'Failed to create project', {
+        type: 'error',
+      })
     } finally {
       setSubmittingKey(null)
     }
@@ -1568,19 +1623,55 @@ export function ProjectsScreen({
             </p>
           </div>
         ) : visibleProjects.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
-              <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
-            </div>
-            <h2 className="text-lg font-semibold text-primary-900">
-              {showArchived ? 'Start your first project' : 'No active projects'}
-            </h2>
-            <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
-              {showArchived
-                ? 'Create a project, add a spec or PRD, pick your agents, and let them build.'
-                : 'All current projects are archived. Enable archived projects to view them.'}
-            </p>
-            {!showArchived ? (
+          projects.length === 0 ? (
+            <section className="rounded-xl border border-primary-200 bg-primary-50/80 p-6 shadow-sm md:p-8">
+              <div className="mx-auto max-w-3xl">
+                <div className="flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-accent-400 shadow-sm">
+                  <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
+                </div>
+                <h2 className="mt-5 text-2xl font-semibold text-primary-900">
+                  Start your first project
+                </h2>
+                <p className="mt-2 max-w-xl text-sm text-primary-600">
+                  Point agents at any git repo and describe what to build.
+                </p>
+                <ol className="mt-6 space-y-3 text-sm text-primary-900">
+                  {[
+                    'Connect a repo',
+                    'Describe the goal',
+                    'Agents run automatically',
+                  ].map((step, index) => (
+                    <li
+                      key={step}
+                      className="flex items-center gap-3 rounded-xl border border-primary-200 bg-white px-4 py-3 shadow-sm"
+                    >
+                      <span className="flex size-7 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-900">
+                        {index + 1}
+                      </span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                <Button
+                  onClick={openNewProjectDialog}
+                  className="mt-6 bg-accent-500 text-white hover:bg-accent-400"
+                >
+                  New Project
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.6} />
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
+              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
+                <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
+              </div>
+              <h2 className="text-lg font-semibold text-primary-900">
+                No active projects
+              </h2>
+              <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
+                All current projects are archived. Enable archived projects to view them.
+              </p>
               <Button
                 variant="outline"
                 onClick={() => setShowArchived(true)}
@@ -1588,50 +1679,8 @@ export function ProjectsScreen({
               >
                 Show archived
               </Button>
-            ) : null}
-            <Button
-              onClick={openNewProjectDialog}
-              className={cn(
-                'bg-accent-500 text-white hover:bg-accent-400',
-                showArchived ? 'mt-5' : 'mt-3',
-              )}
-            >
-              Create Project
-              <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.6} />
-            </Button>
-            <div className="mx-auto mt-8 grid max-w-3xl gap-3 text-left md:grid-cols-3">
-              {[
-                {
-                  icon: Add01Icon,
-                  title: '1. Create project',
-                  text: 'Add your repo path and spec.',
-                },
-                {
-                  icon: Rocket01Icon,
-                  title: '2. Launch agents',
-                  text: 'Start a mission and let the squad run.',
-                },
-                {
-                  icon: CheckmarkCircle02Icon,
-                  title: '3. Review & merge',
-                  text: 'Approve checkpoints and ship the work.',
-                },
-              ].map((step) => (
-                <div
-                  key={step.title}
-                  className="rounded-xl border border-primary-200 bg-white px-4 py-4 shadow-sm"
-                >
-                  <div className="flex size-10 items-center justify-center rounded-xl border border-accent-500/20 bg-accent-500/10 text-accent-400">
-                    <HugeiconsIcon icon={step.icon} size={18} strokeWidth={1.6} />
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-primary-900">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-sm text-primary-500">{step.text}</p>
-                </div>
-              ))}
             </div>
-          </div>
+          )
         ) : detailMode ? (
           <section className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm md:p-5">
             <ProjectDetailView
@@ -1818,100 +1867,16 @@ export function ProjectsScreen({
         />
       ) : null}
 
-      <DialogRoot
+      <CreateProjectDialog
         open={newProjectOpen}
+        submitting={submittingKey === 'project'}
+        form={newProjectForm}
         onOpenChange={(open) => {
           setNewProjectOpen(open)
-          if (!open) {
-            setNewProjectError(null)
-          }
         }}
-      >
-        <DialogContent className="w-[min(620px,94vw)] border-primary-200 bg-primary-50 p-0 text-primary-900 shadow-2xl">
-          <form onSubmit={handleCreateProject} className="space-y-5 p-5">
-            <div className="space-y-1">
-              <DialogTitle className="text-base font-semibold text-primary-900">
-                New Project
-              </DialogTitle>
-              <DialogDescription className="text-sm text-primary-600">
-                Create a project with its local path and an optional working spec.
-              </DialogDescription>
-            </div>
-
-            <div className="space-y-4">
-              <label className="block space-y-1.5">
-                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-600">
-                  Project Name
-                </span>
-                <input
-                  value={newProjectForm.name}
-                  onChange={(event) =>
-                    setNewProjectForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
-                  placeholder="OpenClaw Workspace Refresh"
-                  autoFocus
-                />
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-600">
-                  Local Path
-                </span>
-                <input
-                  value={newProjectForm.path}
-                  onChange={(event) =>
-                    setNewProjectForm((current) => ({
-                      ...current,
-                      path: event.target.value,
-                    }))
-                  }
-                  className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 font-mono text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
-                  placeholder="/Users/you/myproject"
-                />
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-600">
-                  Spec
-                </span>
-                <textarea
-                  value={newProjectForm.spec}
-                  onChange={(event) =>
-                    setNewProjectForm((current) => ({
-                      ...current,
-                      spec: event.target.value,
-                    }))
-                  }
-                  rows={5}
-                  className="w-full rounded-xl border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
-                  placeholder="Describe what this project does..."
-                />
-              </label>
-
-              {newProjectError ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {newProjectError}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              <DialogClose render={<Button variant="outline">Cancel</Button>} />
-              <Button
-                type="submit"
-                className="bg-accent-500 text-white hover:bg-accent-400"
-                disabled={submittingKey === 'project'}
-              >
-                {submittingKey === 'project' ? 'Creating...' : 'Create Project'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </DialogRoot>
+        onFormChange={setNewProjectForm}
+        onSubmit={handleCreateProject}
+      />
 
       <DialogRoot
         open={projectMissionComposer !== null}

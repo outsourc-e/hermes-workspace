@@ -147,6 +147,7 @@ export type ProjectFormState = {
   name: string
   path: string
   spec: string
+  autoDecompose: boolean
 }
 
 export type PhaseFormState = {
