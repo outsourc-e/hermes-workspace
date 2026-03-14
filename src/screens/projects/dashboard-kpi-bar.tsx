@@ -15,6 +15,7 @@ type StatPill = {
   value: string
   tone: string
   sublabel?: string
+  desktopOnly?: boolean
 }
 
 export function DashboardKpiBar({
@@ -71,11 +72,13 @@ export function DashboardKpiBar({
       value: String(stats?.policyAlerts ?? 0),
       tone: (stats?.policyAlerts ?? 0) > 0 ? 'text-amber-400' : 'text-primary-400',
       sublabel: (stats?.policyAlerts ?? 0) > 0 ? 'action required' : 'no blockers',
+      desktopOnly: true,
     },
     {
       label: 'Cost today',
       value: formatCurrency(stats?.costToday ?? 0),
       tone: 'text-emerald-400',
+      desktopOnly: true,
     },
   ]
 
@@ -84,7 +87,10 @@ export function DashboardKpiBar({
       {pills.map((pill) => (
         <div
           key={pill.label}
-          className="flex min-w-[120px] flex-1 items-center gap-3 rounded-lg border border-primary-200 bg-white px-3 py-2 shadow-sm"
+          className={cn(
+            'min-w-[120px] flex-1 items-center gap-3 rounded-lg border border-primary-200 bg-white px-3 py-2 shadow-sm',
+            pill.desktopOnly ? 'hidden md:flex' : 'flex',
+          )}
         >
           <div className={cn('text-xl font-semibold tabular-nums', pill.tone)}>
             {pill.value}

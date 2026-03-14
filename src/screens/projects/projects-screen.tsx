@@ -1890,11 +1890,13 @@ export function ProjectsScreen({
               submittingKey={submittingKey}
             />
 
-            <DashboardAgentCapacity
-              agents={agents}
-              stats={statsQuery.data}
-              loading={agentsQuery.isPending}
-            />
+            <div className="hidden lg:block">
+              <DashboardAgentCapacity
+                agents={agents}
+                stats={statsQuery.data}
+                loading={agentsQuery.isPending}
+              />
+            </div>
 
             {(checkpointsQuery.isPending ||
               checkpointsQuery.isError ||
