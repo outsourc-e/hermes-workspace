@@ -2,8 +2,6 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
-  EyeIcon,
-  ViewOffIcon,
 } from '@hugeicons/core-free-icons'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
@@ -154,9 +152,8 @@ function ChatHeaderComponent({
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
   const mobileTitle = formatMobileSessionTitle(activeTitle)
-  void _agentModel; void agentConnected; void statusMode; void activeToolName // kept for prop compat
+  void _agentModel; void agentConnected; void statusMode; void activeToolName; void isFocusMode; void onToggleFocusMode // kept for prop compat
   const showThinkingIndicator = thinkingLevel === 'adaptive'
-  const focusModeLabel = isFocusMode ? 'Exit focus mode' : 'Enter focus mode'
 
   const handleRefresh = useCallback(() => {
     if (!onRefresh) return
@@ -246,19 +243,6 @@ function ChatHeaderComponent({
           </div>
 
           <div className="ml-2 flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={onToggleFocusMode}
-              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary-700 transition-transform active:scale-95"
-              aria-label={focusModeLabel}
-              title={focusModeLabel}
-            >
-              <HugeiconsIcon
-                icon={isFocusMode ? ViewOffIcon : EyeIcon}
-                size={20}
-                strokeWidth={1.6}
-              />
-            </button>
             <button
               type="button"
               onClick={handleOpenAgentDetails}
