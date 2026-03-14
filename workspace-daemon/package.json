@@ -2,10 +2,14 @@
   "name": "@clawsuite/workspace-daemon",
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "workspace-daemon": "./bin/cli.ts"
+  },
   "scripts": {
     "build": "esbuild src/server.ts --bundle --platform=node --outfile=dist/server.js --external:better-sqlite3",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
+    "cli": "tsx bin/cli.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
