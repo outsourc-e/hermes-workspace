@@ -193,7 +193,7 @@ export function MobileTabBar() {
         // Keep the pill visually isolated from page and error-state backgrounds
         'bg-white/95 dark:bg-neutral-900/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/88 dark:supports-[backdrop-filter]:bg-neutral-900/88',
         'rounded-full',
-        'border border-primary-200/80',
+        'border border-primary-200/40',
         // Inner padding
         'px-3 py-2',
         // Hide/show animation
