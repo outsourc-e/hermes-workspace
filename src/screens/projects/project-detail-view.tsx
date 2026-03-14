@@ -638,8 +638,94 @@ export function ProjectDetailView({
     )
   }
 
+  const activeMission = useMemo(() => {
+    if (!sourceProject) return null
+    for (const phase of sourceProject.phases) {
+      for (const mission of phase.missions) {
+        if (mission.status === 'running' || mission.status === 'active') return { phase, mission }
+      }
+    }
+    return null
+  }, [sourceProject])
+
+  function getPhaseStatusIcon(phase: WorkspacePhase): string {
+    const allDone = phase.missions.length > 0 && phase.missions.every((m) => m.status === 'completed' || m.status === 'done')
+    const anyRunning = phase.missions.some((m) => m.status === 'running' || m.status === 'active')
+    if (allDone) return '✅'
+    if (anyRunning) return '🟢'
+    return '📋'
+  }
+
+  function getMissionStatusDot(status: string): string {
+    if (status === 'completed' || status === 'done') return 'bg-emerald-400'
+    if (status === 'running' || status === 'active') return 'bg-amber-400 animate-pulse'
+    if (status === 'failed') return 'bg-red-400'
+    return 'bg-primary-300'
+  }
+
   return (
-    <>
+    <div className="flex gap-0">
+      {/* Phase/Mission Sidebar */}
+      <aside className="hidden w-60 shrink-0 border-r border-primary-200 pr-4 lg:block">
+        <button
+          type="button"
+          onClick={() => navigate({ to: '/workspace' })}
+          className="mb-3 flex items-center gap-1.5 text-xs text-primary-500 hover:text-primary-700"
+        >
+          <span>←</span> All Projects
+        </button>
+        <h2 className="text-base font-bold text-primary-900 leading-tight">
+          {projectDetail?.name ?? selectedSummary.name}
+        </h2>
+        <p className="mt-0.5 truncate text-[11px] text-primary-400">
+          {projectDetail?.path || selectedSummary.path || 'No path'}
+        </p>
+
+        <div className="mt-4 space-y-1">
+          {(projectDetail ?? selectedSummary).phases.map((phase) => (
+            <div key={phase.id}>
+              <div className="flex items-center gap-1.5 py-1">
+                <span className="text-xs">{getPhaseStatusIcon(phase)}</span>
+                <span className="text-xs font-medium text-primary-800 truncate">{phase.name}</span>
+              </div>
+              <div className="ml-5 space-y-0.5">
+                {phase.missions.map((mission) => (
+                  <div key={mission.id} className="flex items-center gap-1.5 py-0.5">
+                    <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', getMissionStatusDot(mission.status))} />
+                    <span className="truncate text-[11px] text-primary-600">{mission.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          {activeMission ? (
+            <Button
+              size="sm"
+              className="flex-1 bg-accent-500 text-white hover:bg-accent-400 text-xs"
+              onClick={() => onResumeMission(activeMission.mission.id)}
+            >
+              ▶ Resume
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="flex-1 bg-accent-500 text-white hover:bg-accent-400 text-xs"
+              onClick={() => {
+                const firstPhase = (projectDetail ?? selectedSummary).phases[0]
+                if (firstPhase) onOpenMissionLauncher(firstPhase)
+              }}
+            >
+              + New Mission
+            </Button>
+          )}
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className="min-w-0 flex-1 space-y-5 lg:pl-5">
       <div className="flex flex-col gap-4 border-b border-primary-200 pb-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -678,7 +764,33 @@ export function ProjectDetailView({
         </Button>
       </div>
 
-      <section className="mt-5 rounded-xl border border-primary-200 bg-white px-4 py-3">
+      {/* Active Mission Card */}
+      {activeMission && (
+        <section className="rounded-xl border border-accent-200 bg-accent-50/50 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-primary-900">{activeMission.mission.name}</p>
+              <p className="mt-0.5 text-xs text-primary-500">
+                {activeMission.mission.tasks.filter((t) => isCompletedTaskStatus(t.status)).length}/{activeMission.mission.tasks.length} tasks ·{' '}
+                {squadEntries.filter((a) => a.isRunning).length} agent{squadEntries.filter((a) => a.isRunning).length !== 1 ? 's' : ''} active
+              </p>
+            </div>
+            <Button size="sm" variant="outline" className="text-xs" onClick={() => onOpenPlanReview(activeMission.mission.id, sourceProject?.id ?? '')}>
+              View →
+            </Button>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-primary-200">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-accent-500 to-emerald-500 transition-all"
+              style={{
+                width: `${activeMission.mission.tasks.length > 0 ? Math.round((activeMission.mission.tasks.filter((t) => isCompletedTaskStatus(t.status)).length / activeMission.mission.tasks.length) * 100) : 0}%`,
+              }}
+            />
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-xl border border-primary-200 bg-white px-4 py-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-primary-900">Pipeline</span>
@@ -1735,6 +1847,7 @@ export function ProjectDetailView({
           </div>
         )}
       </section>
-    </>
+      </div>
+    </div>
   )
 }
