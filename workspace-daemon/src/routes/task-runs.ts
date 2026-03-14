@@ -137,6 +137,14 @@ export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrato
     res.json(tracker.listRunEvents(req.params.id));
   });
 
+  router.delete("/purge", (_req, res) => {
+    const deleted = tracker.deletePurgeFailedRuns();
+    res.json({
+      ok: true,
+      deleted,
+    });
+  });
+
   router.post("/:id/retry", async (req, res) => {
     const taskRun = tracker.getTaskRun(req.params.id);
     if (!taskRun) {

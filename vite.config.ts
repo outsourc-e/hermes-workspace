@@ -18,6 +18,7 @@ const config = defineConfig(({ mode, command }) => {
   const gatewayUrl = env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
   let workspaceDaemonStarted = false
   let workspaceDaemonStarting = false
+  let workspaceDaemonShuttingDown = false
   let workspaceDaemonChild: ChildProcess | null = null
 
   // Allow access from Tailscale, LAN, or custom domains via env var
@@ -120,7 +121,17 @@ const config = defineConfig(({ mode, command }) => {
         buildStart() {
           if (command !== 'serve') return
         },
-        configureServer() {
+        configureServer(server) {
+          server.httpServer?.on('close', () => {
+            workspaceDaemonShuttingDown = true
+            workspaceDaemonStarted = false
+            workspaceDaemonStarting = false
+            if (workspaceDaemonChild) {
+              workspaceDaemonChild.kill()
+              workspaceDaemonChild = null
+            }
+          })
+
           if (command !== 'serve' || workspaceDaemonStarted || workspaceDaemonStarting) return
 
           const checkPort = (port: number, cb: (running: boolean) => void) => {
@@ -159,6 +170,12 @@ const config = defineConfig(({ mode, command }) => {
                     workspaceDaemonChild = null
                   }
 
+                  if (workspaceDaemonShuttingDown) {
+                    workspaceDaemonStarted = false
+                    workspaceDaemonStarting = false
+                    return
+                  }
+
                   if (code === 0) {
                     workspaceDaemonStarted = false
                     return
@@ -192,7 +209,7 @@ const config = defineConfig(({ mode, command }) => {
             }
 
             if (existsSync(srcEntry)) {
-              spawnWithRespawn('npx', ['tsx', 'src/server.ts'], {
+              spawnWithRespawn('npx', ['tsx', 'watch', 'src/server.ts'], {
                 cwd: daemonCwd,
                 env: { ...process.env, PORT: '3099' },
                 stdio: 'inherit',

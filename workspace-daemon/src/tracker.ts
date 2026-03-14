@@ -1188,6 +1188,27 @@ export class Tracker extends EventEmitter {
       .all(...params) as TaskRunWithRelations[]
   }
 
+  deletePurgeFailedRuns(olderThanHours = 24): number {
+    const normalizedHours =
+      Number.isFinite(olderThanHours) && olderThanHours > 0 ? olderThanHours : 24
+
+    const result = this.db
+      .prepare(
+        `DELETE FROM task_runs
+         WHERE status = 'failed'
+           AND completed_at IS NOT NULL
+           AND datetime(completed_at) <= datetime('now', ?)`,
+      )
+      .run(`-${normalizedHours} hours`)
+
+    this.emitSse('task_runs.purged', {
+      deletedCount: result.changes,
+      olderThanHours: normalizedHours,
+    })
+
+    return result.changes
+  }
+
   appendRunEvent(
     taskRunId: string,
     type: RunEventType,

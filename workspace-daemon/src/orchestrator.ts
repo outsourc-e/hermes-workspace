@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { existsSync } from "node:fs";
 import { AgentRunner } from "./agent-runner";
 import { Scheduler } from "./scheduler";
 import { Tracker } from "./tracker";
@@ -293,6 +294,15 @@ export class Orchestrator extends EventEmitter {
     this.tracker.markTaskRunStarted(taskRun.id);
     this.tracker.logAuditEvent("task.started", taskRun.id, "task_run");
     this.emit("dispatch", { taskId: task.id, runId: taskRun.id });
+
+    const projectPath = project.path;
+    if (!projectPath || !existsSync(projectPath)) {
+      const errorMessage = "Project path no longer exists";
+      this.tracker.failTaskRun(taskRun.id, errorMessage);
+      this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
+      this.tracker.setTaskStatus(task.id, "failed");
+      return;
+    }
 
     try {
       const { result, workspacePath, checkpoint, autoApproved } = await this.agentRunner.runTask({
