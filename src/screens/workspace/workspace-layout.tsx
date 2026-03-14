@@ -4,12 +4,6 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  MenuContent,
-  MenuItem,
-  MenuRoot,
-  MenuTrigger,
-} from '@/components/ui/menu'
 import { Switch } from '@/components/ui/switch'
 import {
   TooltipContent,
@@ -88,8 +82,14 @@ const TAB_ORDER: WorkspaceTab[] = [
   'teams',
 ]
 
-const PRIMARY_TABS: WorkspaceTab[] = ['projects', 'review', 'runs', 'agents']
-const OVERFLOW_TABS: WorkspaceTab[] = ['skills', 'teams']
+const PRIMARY_TABS: WorkspaceTab[] = [
+  'projects',
+  'review',
+  'runs',
+  'agents',
+  'skills',
+  'teams',
+]
 
 function readPayload(text: string): unknown {
   if (!text) return null
@@ -252,8 +252,6 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     false
   const pendingReviewCount = statsQuery.data?.checkpointsPending ?? 0
   const runningCount = statsQuery.data?.running ?? 0
-  const overflowActive = OVERFLOW_TABS.includes(activeTab)
-
   const pageTitle =
     search.checkpointId
       ? 'Checkpoint Detail'
@@ -345,41 +343,6 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                   </Button>
                 )
               })}
-              <MenuRoot>
-                <MenuTrigger
-                  render={
-                    <Button
-                      variant={overflowActive ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={cn(
-                        'rounded-full border text-sm',
-                        overflowActive
-                          ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
-                          : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-900',
-                      )}
-                    >
-                      ...
-                    </Button>
-                  }
-                />
-                <MenuContent side="bottom" align="start" className="min-w-[180px]">
-                  {OVERFLOW_TABS.map((tab) => (
-                    <MenuItem
-                      key={tab}
-                      onClick={() => {
-                        setActiveTab(tab)
-                        navigateToTab(navigate, search, tab)
-                      }}
-                      className={cn(
-                        'justify-between rounded-lg',
-                        activeTab === tab ? 'bg-primary-100 text-primary-900' : undefined,
-                      )}
-                    >
-                      <span>{TAB_LABELS[tab]}</span>
-                    </MenuItem>
-                  ))}
-                </MenuContent>
-              </MenuRoot>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <TooltipProvider>
