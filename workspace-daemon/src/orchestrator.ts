@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { AgentRunner } from "./agent-runner";
 import { Scheduler } from "./scheduler";
 import { Tracker } from "./tracker";
@@ -24,6 +25,7 @@ const FRONTEND_TASK_PATTERN = /ui|react|screen|component|style|layout|design|fro
 const BACKEND_TASK_PATTERN = /api|route|endpoint|db|database|schema|migration|backend|daemon|server/;
 const QA_TASK_PATTERN = /review|qa|verify|test|check|audit/;
 const PLANNING_TASK_PATTERN = /plan|decompose|spec|roadmap/;
+const OPENCLAW_BIN = "/Users/aurora/.nvm/versions/node/v22.22.0/bin/openclaw";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -35,6 +37,20 @@ function computeRetryDelay(attempt: number): number {
 
 function isOnlineAgent(agent: AgentRecord): boolean {
   return agent.status === "online" || agent.status === "idle";
+}
+
+function notifyCompletion(taskName: string, projectName: string, status: "completed" | "failed"): void {
+  const icon = status === "completed" ? "✅" : "❌";
+  const text = `${icon} Workspace: ${taskName} (${projectName}) — ${status}`;
+
+  try {
+    execSync(`${OPENCLAW_BIN} system event --text ${JSON.stringify(text)} --mode now`, {
+      stdio: "ignore",
+      timeout: 10_000,
+    });
+  } catch {
+    // Notification failures must not interrupt task processing.
+  }
 }
 
 function getPreferredAgentId(taskName: string): string | null {
@@ -356,6 +372,7 @@ export class Orchestrator extends EventEmitter {
           cost_cents: result.costCents,
         });
         this.tracker.logAuditEvent("task.completed", taskRun.id, "task_run");
+        notifyCompletion(task.name, project.name, "completed");
       } else {
         this.tracker.failTaskRun(taskRun.id, result.error ?? result.summary ?? null, {
           input_tokens: result.inputTokens,
@@ -363,6 +380,7 @@ export class Orchestrator extends EventEmitter {
           cost_cents: result.costCents,
         });
         this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
+        notifyCompletion(task.name, project.name, "failed");
       }
 
       if (result.status === "completed") {
@@ -392,6 +410,7 @@ export class Orchestrator extends EventEmitter {
       this.tracker.failTaskRun(taskRun.id, message);
       this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
       this.tracker.setTaskStatus(task.id, "failed");
+      notifyCompletion(task.name, project.name, "failed");
       this.queueRetry(task.id, attempt, message);
     } finally {
       this.abortControllers.delete(taskRun.id);
