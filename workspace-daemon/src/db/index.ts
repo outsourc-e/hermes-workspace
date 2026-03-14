@@ -8,8 +8,8 @@ const DAEMON_ROOT_DIR = path.resolve(
   '..',
   '..',
 )
-const DEFAULT_DB_DIR = path.join(DAEMON_ROOT_DIR, '.data')
-const DEFAULT_DB_PATH = path.join(DEFAULT_DB_DIR, 'workspace-daemon.sqlite')
+const DEFAULT_DB_DIR = path.join(DAEMON_ROOT_DIR, '.workspaces')
+const DEFAULT_DB_PATH = path.join(DEFAULT_DB_DIR, 'workspace.db')
 
 let dbInstance: Database.Database | null = null
 

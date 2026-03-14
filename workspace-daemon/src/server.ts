@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Router } from "express";
 import { Tracker } from "./tracker";
 import { Orchestrator } from "./orchestrator";
@@ -18,11 +20,17 @@ import { createSkillsRouter } from "./routes/skills";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const STARTUP_TIMESTAMP = Date.now();
+const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
+const DB_DIR = process.env.DB_PATH
+  ? path.dirname(process.env.DB_PATH)
+  : path.resolve(SERVER_DIR, "..", ".workspaces");
+const DB_FILE = process.env.DB_PATH
+  ? process.env.DB_PATH
+  : path.join(DB_DIR, "workspace.db");
 
-process.env.WORKSPACE_DAEMON_DB_PATH =
-  process.env.DB_PATH ??
-  process.env.WORKSPACE_DAEMON_DB_PATH ??
-  path.join(process.cwd(), ".workspaces", "workspace.db");
+mkdirSync(DB_DIR, { recursive: true });
+
+process.env.WORKSPACE_DAEMON_DB_PATH = DB_FILE;
 
 export function createServer(): { app: express.Express; tracker: Tracker; orchestrator: Orchestrator } {
   const app = express();

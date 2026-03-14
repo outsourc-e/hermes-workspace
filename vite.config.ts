@@ -26,6 +26,9 @@ const config = defineConfig(({ mode, command }) => {
   const daemonCwd = resolve('workspace-daemon')
   const daemonSrcEntry = resolve('workspace-daemon/src/server.ts')
   const daemonDistEntry = resolve('workspace-daemon/dist/server.js')
+  const workspaceDaemonDbPath = resolve(
+    'workspace-daemon/.workspaces/workspace.db',
+  )
 
   const getWorkspaceDaemonDelayMs = (attempt: number) =>
     Math.min(1000 * 2 ** Math.max(attempt - 1, 0), 30000)
@@ -40,7 +43,11 @@ const config = defineConfig(({ mode, command }) => {
           args: ['tsx', 'watch', 'src/server.ts'],
           options: {
             cwd: daemonCwd,
-            env: { ...process.env, PORT: workspaceDaemonPort },
+            env: {
+              ...process.env,
+              PORT: workspaceDaemonPort,
+              DB_PATH: workspaceDaemonDbPath,
+            },
             stdio: 'inherit' as const,
           },
         }
@@ -50,7 +57,11 @@ const config = defineConfig(({ mode, command }) => {
             args: ['dist/server.js'],
             options: {
               cwd: daemonCwd,
-              env: { ...process.env, PORT: workspaceDaemonPort },
+              env: {
+                ...process.env,
+                PORT: workspaceDaemonPort,
+                DB_PATH: workspaceDaemonDbPath,
+              },
               stdio: 'inherit' as const,
             },
           }
