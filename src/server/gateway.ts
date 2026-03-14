@@ -105,6 +105,7 @@ const MAX_RECONNECT_DELAY_MS = 30000
 const HEARTBEAT_INTERVAL_MS = 30000
 const HEARTBEAT_TIMEOUT_MS = 20000
 const HANDSHAKE_TIMEOUT_MS = 15000
+const RPC_TIMEOUT_MS = 30000
 
 export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
@@ -224,9 +225,10 @@ class GatewayClient {
       throw new Error('Gateway client is shut down')
     }
 
-    return new Promise<TPayload>((resolve, reject) => {
+    const requestId = randomUUID()
+    const rpcCall = new Promise<TPayload>((resolve, reject) => {
       const request: PendingRequest = {
-        id: randomUUID(),
+        id: requestId,
         method,
         params,
         resolve: resolve as (value: unknown) => void,
@@ -239,6 +241,16 @@ class GatewayClient {
       })
       this.flushQueue()
     })
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        if (!this.cleanupPendingRequest(requestId)) return
+        console.warn(`[gateway] RPC timeout after ${RPC_TIMEOUT_MS}ms for ${method}`)
+        reject(new Error('Gateway RPC timeout'))
+      }, RPC_TIMEOUT_MS)
+    })
+
+    return Promise.race([rpcCall, timeoutPromise])
   }
 
   async ensureConnected(): Promise<void> {
@@ -669,6 +681,21 @@ class GatewayClient {
       pending.reject(error)
     }
     this.inflight.clear()
+  }
+
+  private cleanupPendingRequest(requestId: string): boolean {
+    const queueIndex = this.requestQueue.findIndex((pending) => pending.id === requestId)
+    if (queueIndex >= 0) {
+      this.requestQueue.splice(queueIndex, 1)
+      return true
+    }
+
+    if (this.inflight.has(requestId)) {
+      this.inflight.delete(requestId)
+      return true
+    }
+
+    return false
   }
 }
 
