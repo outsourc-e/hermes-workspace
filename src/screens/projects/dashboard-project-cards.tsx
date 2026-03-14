@@ -13,6 +13,7 @@ import {
   getProjectTone,
   getStatusBadgeClass,
   formatStatus,
+  formatRelativeTime,
 } from './lib/workspace-utils'
 
 type DashboardProjectCardsProps = {
@@ -123,6 +124,9 @@ export function DashboardProjectCards({
                         {overview.project.path
                           ? overview.project.path.split('/').slice(-2).join('/')
                           : 'No path configured'}
+                        {overview.project.created_at && (
+                          <span className="ml-2 text-primary-400">· {formatRelativeTime(overview.project.created_at)}</span>
+                        )}
                       </p>
                     </div>
                     <span

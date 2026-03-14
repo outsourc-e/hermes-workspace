@@ -49,6 +49,8 @@ export type WorkspaceProject = {
   allowed_tools?: string
   git_status?: WorkspaceProjectGitStatus
   status: WorkspaceStatus
+  created_at?: string
+  updated_at?: string
   phases: Array<WorkspacePhase>
   phase_count: number
   mission_count: number

@@ -1004,9 +1004,16 @@ export function ProjectDetailView({
       </Collapsible>
 
       {detailLoading ? (
-        <div className="py-14 text-center">
-          <div className="mb-3 inline-block h-9 w-9 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-          <p className="text-sm text-primary-500">Loading project detail...</p>
+        <div className="mt-5 space-y-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-primary-200 bg-primary-50/70 p-4 space-y-3">
+              <div className="h-5 w-40 animate-pulse rounded bg-primary-200/80" />
+              <div className="space-y-2">
+                <div className="h-12 animate-pulse rounded-lg bg-primary-200/60" />
+                <div className="h-12 animate-pulse rounded-lg bg-primary-200/60" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : projectDetail && projectDetail.phases.length > 0 ? (
         <div className="mt-5 space-y-4">

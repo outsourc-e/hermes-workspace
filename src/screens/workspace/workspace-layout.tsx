@@ -66,11 +66,11 @@ type WorkspaceConfig = {
 
 const TAB_LABELS: Record<WorkspaceTab, string> = {
   projects: 'Projects',
-  review: 'Review Queue',
+  review: 'Review',
   runs: 'Runs',
   agents: 'Agents',
-  skills: 'Skills & Memory',
-  teams: 'Teams & Roles',
+  skills: 'Skills',
+  teams: 'Teams',
 }
 
 const TAB_ORDER: WorkspaceTab[] = [
@@ -86,6 +86,9 @@ const PRIMARY_TABS: WorkspaceTab[] = [
   'projects',
   'review',
   'runs',
+]
+
+const SECONDARY_TABS: WorkspaceTab[] = [
   'agents',
   'skills',
   'teams',
@@ -347,6 +350,30 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                         </span>
                       ) : null}
                     </span>
+                  </Button>
+                )
+              })}
+              <span className="mx-1 hidden h-4 w-px bg-primary-200 sm:inline-block" />
+              {SECONDARY_TABS.map((tab) => {
+                const active = tab === activeTab
+                const label = TAB_LABELS[tab]
+                return (
+                  <Button
+                    key={tab}
+                    variant={active ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                      setActiveTab(tab)
+                      navigateToTab(navigate, search, tab)
+                    }}
+                    className={cn(
+                      'rounded-full border text-xs px-2 sm:px-2.5',
+                      active
+                        ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
+                        : 'border-transparent text-primary-400 hover:bg-primary-100 hover:text-primary-900',
+                    )}
+                  >
+                    {label}
                   </Button>
                 )
               })}

@@ -34,6 +34,10 @@ import {
   extractProject,
   extractProjects,
 } from '@/screens/projects/lib/workspace-types'
+import {
+  deriveCheckpointRisk,
+  deriveCheckpointScope,
+} from '@/screens/projects/lib/workspace-utils'
 
 async function readPayload(response: Response): Promise<unknown> {
   const text = await response.text()
@@ -246,6 +250,8 @@ function ReviewRow({
   const isTruncated = truncatedSummary !== fullSummary
   const parsedDiff = getCheckpointDiffStatParsed(checkpoint)
   const tscStatus = getCheckpointTscStatus(checkpoint)
+  const risk = deriveCheckpointRisk(checkpoint)
+  const scope = deriveCheckpointScope(checkpoint)
 
   function handleOpen(event: React.MouseEvent) {
     const target = event.target
@@ -265,6 +271,7 @@ function ReviewRow({
         isHighlighted
           ? 'border-accent-500/60 ring-1 ring-accent-500/30'
           : 'border-primary-200',
+        risk.high && 'border-l-[3px] border-l-red-500',
       )}
       onClick={handleOpen}
       onMouseEnter={() => onHighlight(checkpoint)}
@@ -284,6 +291,17 @@ function ReviewRow({
               {formatCheckpointStatus(checkpoint.status)}
             </span>
             <VerificationBadge checkpoint={checkpoint} />
+            <span className={cn(
+              'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium',
+              scope === 'API' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-primary-200 bg-primary-50 text-primary-600',
+            )}>
+              {scope}
+            </span>
+            {risk.high && (
+              <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                {risk.label} 🔥
+              </span>
+            )}
           </div>
 
           <div>
