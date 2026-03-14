@@ -27,6 +27,7 @@ import { ReviewQueueScreen } from '@/screens/review/review-queue-screen'
 import { RunsConsoleScreen } from '@/screens/runs/runs-console-screen'
 import { WorkspaceSkillsScreen } from '@/screens/skills/workspace-skills-screen'
 import { TeamsScreen } from '@/screens/teams/teams-screen'
+import { listWorkspaceCheckpoints } from '@/lib/workspace-checkpoints'
 
 export type WorkspaceTab =
   | 'projects'
@@ -186,6 +187,11 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
       (await apiRequest('/api/workspace/config')) as WorkspaceConfig,
   })
 
+  const pendingReviewQuery = useQuery({
+    queryKey: ['workspace', 'checkpoints', 'pending'],
+    queryFn: async () => listWorkspaceCheckpoints('pending'),
+  })
+
   const autoApproveMutation = useMutation({
     mutationFn: async (enabled: boolean) =>
       (await apiRequest('/api/workspace/config', {
@@ -266,6 +272,9 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
             <div className="flex flex-1 flex-wrap items-center gap-2 overflow-x-auto">
               {TAB_ORDER.map((tab) => {
                 const active = tab === activeTab
+                const label = TAB_LABELS[tab]
+                const pendingReviewCount =
+                  tab === 'review' ? pendingReviewQuery.data?.length ?? 0 : 0
                 return (
                   <Button
                     key={tab}
@@ -290,7 +299,14 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                         : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-900',
                     )}
                   >
-                    {TAB_LABELS[tab]}
+                    <span className="inline-flex items-center gap-2">
+                      <span>{label}</span>
+                      {pendingReviewCount > 0 ? (
+                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                          {pendingReviewCount}
+                        </span>
+                      ) : null}
+                    </span>
                   </Button>
                 )
               })}

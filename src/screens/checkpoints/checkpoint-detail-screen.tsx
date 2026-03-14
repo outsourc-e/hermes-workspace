@@ -38,7 +38,7 @@ import {
 } from '@/screens/projects/checkpoint-detail-modal-parts'
 import { AnimatePresence, motion } from 'motion/react'
 
-type ApproveMode = 'approve-and-commit' | 'approve-and-pr'
+type ApproveMode = 'approve-and-commit' | 'approve-and-pr' | 'approve-and-merge'
 
 type CheckpointDetailScreenProps = {
   checkpointId: string
@@ -128,7 +128,7 @@ export function CheckpointDetailScreen({
   onBack,
 }: CheckpointDetailScreenProps) {
   const [reviewNotes, setReviewNotes] = useState('')
-  const [approveMode, setApproveMode] = useState<ApproveMode>('approve-and-commit')
+  const [approveMode, setApproveMode] = useState<ApproveMode>('approve-and-merge')
   const [reviseOpen, setReviseOpen] = useState(false)
   const [reviseWhat, setReviseWhat] = useState('')
   const [reviseConstraints, setReviseConstraints] = useState('')
@@ -143,7 +143,7 @@ export function CheckpointDetailScreen({
 
   useEffect(() => {
     setReviewNotes('')
-    setApproveMode('approve-and-commit')
+    setApproveMode('approve-and-merge')
     setReviseOpen(false)
     setReviseWhat('')
     setReviseConstraints('')
@@ -688,6 +688,7 @@ export function CheckpointDetailScreen({
                         onChange={(event) => setApproveMode(event.target.value as ApproveMode)}
                         className="mt-2 w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                       >
+                        <option value="approve-and-merge">Approve &amp; Merge</option>
                         <option value="approve-and-commit">Approve &amp; Commit</option>
                         <option value="approve-and-pr">Approve &amp; Open PR</option>
                       </select>
@@ -738,7 +739,9 @@ export function CheckpointDetailScreen({
                           ? 'Submitting...'
                           : approveMode === 'approve-and-pr'
                             ? 'Approve & Open PR'
-                            : 'Approve & Commit'}
+                            : approveMode === 'approve-and-merge'
+                              ? 'Approve & Merge'
+                              : 'Approve & Commit'}
                       </Button>
                     </div>
                   </div>

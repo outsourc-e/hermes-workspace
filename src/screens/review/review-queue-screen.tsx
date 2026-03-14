@@ -200,18 +200,6 @@ function ReviewRow({
             >
               {formatCheckpointStatus(checkpoint.status)}
             </span>
-            {tscStatus ? (
-              <span
-                className={cn(
-                  'inline-flex items-center border text-xs px-1.5 py-0.5 rounded',
-                  tscStatus === 'passed'
-                    ? 'border-green-200 bg-green-50 text-green-700'
-                    : 'border-red-200 bg-red-50 text-red-700',
-                )}
-              >
-                {tscStatus === 'passed' ? '✓ tsc' : '✗ tsc'}
-              </span>
-            ) : null}
           </div>
 
           <div>
@@ -243,9 +231,23 @@ function ReviewRow({
 
           <div className="grid gap-2 text-sm text-primary-600 md:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
-                Diff Stat
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
+                  Diff Stat
+                </p>
+                {tscStatus ? (
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                      tscStatus === 'passed'
+                        ? 'border-green-200 bg-green-50 text-green-700'
+                        : 'border-red-200 bg-red-50 text-red-700',
+                    )}
+                  >
+                    {tscStatus === 'passed' ? 'tsc ✓' : 'tsc ✗'}
+                  </span>
+                ) : null}
+              </div>
               <p className="mt-1 text-sm font-medium text-primary-800">
                 {getCheckpointDiffStat(checkpoint)}
               </p>
@@ -540,7 +542,7 @@ export function ReviewQueueScreen() {
   function handleApprove(checkpointId: string) {
     reviewMutation.mutate({
       checkpointId,
-      action: 'approve-and-commit',
+      action: 'approve-and-merge',
     })
   }
 
@@ -843,7 +845,7 @@ export function ReviewQueueScreen() {
         onApprove={(checkpointId, notes, mode) =>
           submitCheckpointReview(
             checkpointId,
-            mode ?? 'approve-and-commit',
+            mode ?? 'approve-and-merge',
             notes,
           ).then(async () => {
             await queryClient.invalidateQueries({

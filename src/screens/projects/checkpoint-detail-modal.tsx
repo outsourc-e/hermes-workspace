@@ -45,7 +45,7 @@ import {
   getStatusTone,
 } from './checkpoint-detail-modal-parts'
 
-type ApproveMode = 'approve-and-commit' | 'approve-and-pr'
+type ApproveMode = 'approve-and-commit' | 'approve-and-pr' | 'approve-and-merge'
 
 type CheckpointDetailModalProps = {
   checkpoint: WorkspaceCheckpoint | null
@@ -98,7 +98,7 @@ export function CheckpointDetailModal({
   onReject,
 }: CheckpointDetailModalProps) {
   const [reviewNotes, setReviewNotes] = useState('')
-  const [approveMode, setApproveMode] = useState<ApproveMode>('approve-and-commit')
+  const [approveMode, setApproveMode] = useState<ApproveMode>('approve-and-merge')
   const [reviseOpen, setReviseOpen] = useState(false)
   const [reviseWhat, setReviseWhat] = useState('')
   const [reviseConstraints, setReviseConstraints] = useState('')
@@ -113,7 +113,7 @@ export function CheckpointDetailModal({
   useEffect(() => {
     if (!open || !checkpoint) return
     setReviewNotes(checkpoint.reviewer_notes ?? '')
-    setApproveMode('approve-and-commit')
+    setApproveMode('approve-and-merge')
     setReviseOpen(false)
     setReviseWhat('')
     setReviseConstraints('')
@@ -159,7 +159,11 @@ export function CheckpointDetailModal({
       return onApprove(
         checkpoint.id,
         notes,
-        action === 'approve-and-pr' ? 'approve-and-pr' : 'approve-and-commit',
+        action === 'approve-and-pr'
+          ? 'approve-and-pr'
+          : action === 'approve-and-merge'
+            ? 'approve-and-merge'
+            : 'approve-and-commit',
       )
     },
     onSuccess: () => onOpenChange(false),
@@ -558,6 +562,7 @@ export function CheckpointDetailModal({
                         onChange={(event) => setApproveMode(event.target.value as ApproveMode)}
                         className="mt-2 w-full rounded-xl border border-primary-700 bg-primary-900 px-3 py-2.5 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
                       >
+                        <option value="approve-and-merge">Approve &amp; Merge</option>
                         <option value="approve-and-commit">Approve &amp; Commit</option>
                         <option value="approve-and-pr">Approve &amp; Open PR</option>
                       </select>
@@ -608,7 +613,9 @@ export function CheckpointDetailModal({
                           ? 'Submitting...'
                           : approveMode === 'approve-and-pr'
                             ? 'Approve & Open PR'
-                            : 'Approve & Commit'}
+                            : approveMode === 'approve-and-merge'
+                              ? 'Approve & Merge'
+                              : 'Approve & Commit'}
                       </Button>
                     </div>
                   </div>

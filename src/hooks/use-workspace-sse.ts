@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from '@/components/ui/toast'
 
 const DAEMON_URL = '/workspace-api'
 const RECONNECT_DELAY_MS = 3_000
@@ -12,6 +13,18 @@ function invalidateQueries(
 ) {
   for (const key of keys) {
     void queryClient.invalidateQueries({ queryKey: key })
+  }
+}
+
+function parseSseData(event: MessageEvent<string>): Record<string, unknown> | null {
+  if (!event.data) return null
+
+  try {
+    const parsed = JSON.parse(event.data) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    return parsed as Record<string, unknown>
+  } catch {
+    return null
   }
 }
 
@@ -69,7 +82,7 @@ export function useWorkspaceSse() {
         ])
       })
 
-      es.addEventListener('task_run.completed', () => {
+      es.addEventListener('task_run.completed', (event) => {
         invalidateQueries(queryClient, [
           ['workspace', 'task-runs'],
           ['workspace', 'missions'],
@@ -81,6 +94,28 @@ export function useWorkspaceSse() {
           ['workspace', 'stats'],
           ['workspace', 'events'],
         ])
+
+        const payload = parseSseData(event)
+        const taskName =
+          typeof payload?.task_name === 'string' && payload.task_name.trim().length > 0
+            ? payload.task_name.trim()
+            : 'Task'
+        const status = payload?.status
+
+        if (status === 'completed') {
+          toast(`✅ ${taskName} completed — ready for review`, {
+            type: 'success',
+            icon: '✅',
+          })
+          return
+        }
+
+        if (status === 'failed') {
+          toast(`❌ ${taskName} failed`, {
+            type: 'error',
+            icon: '❌',
+          })
+        }
       })
 
       es.addEventListener('checkpoint.created', () => {

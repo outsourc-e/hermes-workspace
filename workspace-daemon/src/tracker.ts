@@ -1137,6 +1137,7 @@ export class Tracker extends EventEmitter {
     const run = this.getTaskRun(id)
     if (run) {
       this.emitSse('task_run.updated', run)
+      this.emitTaskRunCompleted(run)
     }
     return run
   }
@@ -1173,6 +1174,7 @@ export class Tracker extends EventEmitter {
     const run = this.getTaskRun(id)
     if (run) {
       this.emitSse('task_run.updated', run)
+      this.emitTaskRunCompleted(run)
     }
     return run
   }
@@ -2660,6 +2662,17 @@ export class Tracker extends EventEmitter {
     this.emit('sse', {
       event,
       data: payload,
+    })
+  }
+
+  private emitTaskRunCompleted(run: TaskRun): void {
+    if (run.status !== 'completed' && run.status !== 'failed') {
+      return
+    }
+
+    this.emitSse('task_run.completed', {
+      ...run,
+      ...this.getTaskRunProjectContext(run.id),
     })
   }
 
