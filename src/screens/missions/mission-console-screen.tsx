@@ -1254,7 +1254,7 @@ export function MissionConsoleScreen({
           </div>
         </div>
 
-        <div className="grid min-h-0 gap-4 xl:grid-cols-[320px,minmax(0,1fr),290px]">
+        <div className="grid min-h-0 gap-4 grid-cols-1 lg:grid-cols-[280px,minmax(0,1fr)] xl:grid-cols-[320px,minmax(0,1fr),290px]">
           <section className="rounded-3xl border border-primary-800 bg-primary-900/85 p-4 shadow-[0_20px_60px_rgba(2,6,23,0.35)]">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -1473,7 +1473,7 @@ export function MissionConsoleScreen({
             </div>
           </section>
 
-          <aside className="rounded-3xl border border-primary-800 bg-primary-900/85 p-4 shadow-[0_20px_60px_rgba(2,6,23,0.35)]">
+          <aside className="hidden xl:block rounded-3xl border border-primary-800 bg-primary-900/85 p-4 shadow-[0_20px_60px_rgba(2,6,23,0.35)]">
             <p className="text-xs uppercase tracking-[0.24em] text-primary-500">
               Policy Drawer
             </p>
