@@ -12,6 +12,11 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import { Markdown } from '@/components/prompt-kit/markdown'
+
+function SkillMarkdown({ content }: { content: string }) {
+  return <Markdown>{content}</Markdown>
+}
 
 type MemoryFilter = 'All' | 'Workspace' | 'Project' | 'Agent'
 type MemorySection = 'workspace' | 'project' | 'agent'
@@ -401,9 +406,9 @@ export function WorkspaceSkillsScreen() {
                           : 'Failed to load skill content'}
                       </div>
                     ) : (
-                      <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-primary-200 bg-primary-50 p-3 font-mono text-sm text-primary-800">
-                        {skillContentQuery.data?.trim() || 'No content available.'}
-                      </pre>
+                      <div className="max-h-96 overflow-y-auto rounded-lg border border-primary-200 bg-white p-4 text-sm text-primary-800 prose prose-sm prose-primary max-w-none">
+                        <SkillMarkdown content={skillContentQuery.data?.trim() || 'No content available.'} />
+                      </div>
                     )}
                   </div>
                 </div>
