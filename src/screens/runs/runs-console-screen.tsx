@@ -870,7 +870,7 @@ export function RunsConsoleScreen() {
 
   const retryRunMutation = useMutation({
     mutationFn: async (runId: string) =>
-      apiRequest(`/workspace-api/api/workspace/task-runs/${runId}/retry`, {
+      apiRequest(`/api/workspace/task-runs/${runId}/retry`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',

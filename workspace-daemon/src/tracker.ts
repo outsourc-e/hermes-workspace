@@ -624,12 +624,165 @@ export class Tracker extends EventEmitter {
   }
 
   deleteProject(id: string): boolean {
-    const result = this.db.prepare('DELETE FROM projects WHERE id = ?').run(id)
-    if (result.changes > 0) {
-      this.logActivity('deleted', 'project', id, null, {})
-      return true
+    const project = this.getProject(id)
+    if (!project) {
+      return false
     }
-    return false
+
+    const deleteProject = this.db.transaction((projectId: string) => {
+      this.db
+        .prepare(
+          `DELETE FROM artifacts
+           WHERE checkpoint_id IN (
+             SELECT checkpoints.id
+             FROM checkpoints
+             JOIN task_runs ON task_runs.id = checkpoints.task_run_id
+             JOIN tasks ON tasks.id = task_runs.task_id
+             JOIN missions ON missions.id = tasks.mission_id
+             JOIN phases ON phases.id = missions.phase_id
+             WHERE phases.project_id = ?
+           )`,
+        )
+        .run(projectId)
+
+      this.db
+        .prepare(
+          `DELETE FROM checkpoints
+           WHERE task_run_id IN (
+             SELECT task_runs.id
+             FROM task_runs
+             JOIN tasks ON tasks.id = task_runs.task_id
+             JOIN missions ON missions.id = tasks.mission_id
+             JOIN phases ON phases.id = missions.phase_id
+             WHERE phases.project_id = ?
+           )`,
+        )
+        .run(projectId)
+
+      this.db
+        .prepare(
+          `DELETE FROM run_events
+           WHERE task_run_id IN (
+             SELECT task_runs.id
+             FROM task_runs
+             JOIN tasks ON tasks.id = task_runs.task_id
+             JOIN missions ON missions.id = tasks.mission_id
+             JOIN phases ON phases.id = missions.phase_id
+             WHERE phases.project_id = ?
+           )`,
+        )
+        .run(projectId)
+
+      this.db
+        .prepare(
+          `DELETE FROM task_runs
+           WHERE task_id IN (
+             SELECT tasks.id
+             FROM tasks
+             JOIN missions ON missions.id = tasks.mission_id
+             JOIN phases ON phases.id = missions.phase_id
+             WHERE phases.project_id = ?
+           )`,
+        )
+        .run(projectId)
+
+      this.db
+        .prepare(
+          `DELETE FROM tasks
+           WHERE mission_id IN (
+             SELECT missions.id
+             FROM missions
+             JOIN phases ON phases.id = missions.phase_id
+             WHERE phases.project_id = ?
+           )`,
+        )
+        .run(projectId)
+
+      this.db
+        .prepare(
+          `DELETE FROM missions
+           WHERE phase_id IN (
+             SELECT phases.id
+             FROM phases
+             WHERE phases.project_id = ?
+           )`,
+        )
+        .run(projectId)
+
+      this.db.prepare('DELETE FROM phases WHERE project_id = ?').run(projectId)
+      this.db.prepare('DELETE FROM projects WHERE id = ?').run(projectId)
+    })
+
+    deleteProject(id)
+    this.logActivity('deleted', 'project', id, null, {
+      id: project.id,
+      name: project.name,
+      path: project.path,
+      status: project.status,
+    })
+    this.emitSse('project.deleted', {
+      id: project.id,
+      name: project.name,
+    })
+    return true
+  }
+
+  listMissions(filters: {
+    phase_id?: string
+    project_id?: string
+    status?: Mission['status']
+  } = {}): Array<
+    Mission & {
+      phase_name: string
+      project_id: string
+      project_name: string
+      project_path: string | null
+      project_spec: string | null
+    }
+  > {
+    const clauses: string[] = []
+    const params: unknown[] = []
+
+    if (filters.phase_id) {
+      clauses.push('missions.phase_id = ?')
+      params.push(filters.phase_id)
+    }
+
+    if (filters.project_id) {
+      clauses.push('phases.project_id = ?')
+      params.push(filters.project_id)
+    }
+
+    if (filters.status) {
+      clauses.push('missions.status = ?')
+      params.push(filters.status)
+    }
+
+    const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
+
+    return this.db
+      .prepare(
+        `SELECT missions.*,
+                phases.name AS phase_name,
+                projects.id AS project_id,
+                projects.name AS project_name,
+                projects.path AS project_path,
+                projects.spec AS project_spec
+         FROM missions
+         JOIN phases ON phases.id = missions.phase_id
+         JOIN projects ON projects.id = phases.project_id
+         ${whereSql}
+         ORDER BY missions.name ASC`,
+      )
+      .all(...params) as Array<
+      Mission & {
+        phase_name: string
+        project_id: string
+        project_name: string
+        project_path: string | null
+        project_spec: string | null
+      }
+    >
   }
 
   listTasks(filters: {

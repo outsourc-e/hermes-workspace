@@ -154,12 +154,14 @@ export function createProjectsRouter(tracker: Tracker): Router {
   })
 
   router.delete('/:id', (req, res) => {
-    const deleted = tracker.deleteProject(req.params.id)
-    if (!deleted) {
+    const project = tracker.getProject(req.params.id)
+    if (!project) {
       res.status(404).json({ error: 'Project not found' })
       return
     }
-    res.status(204).send()
+
+    tracker.deleteProject(req.params.id)
+    res.json({ ok: true })
   })
 
   return router

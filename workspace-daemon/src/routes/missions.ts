@@ -1,8 +1,47 @@
 import { Router } from "express";
 import { Tracker } from "../tracker";
+import type { Mission } from "../types";
+
+const MISSION_STATUSES: Mission["status"][] = [
+  "pending",
+  "running",
+  "paused",
+  "completed",
+  "failed",
+  "blocked",
+  "stopped",
+];
+
+function isMissionStatus(value: string): value is Mission["status"] {
+  return (MISSION_STATUSES as readonly string[]).includes(value);
+}
 
 export function createMissionsRouter(tracker: Tracker): Router {
   const router = Router();
+
+  router.get("/", (req, res) => {
+    const phaseId =
+      typeof req.query.phase_id === "string" && req.query.phase_id.trim().length > 0
+        ? req.query.phase_id.trim()
+        : undefined;
+    const projectId =
+      typeof req.query.project_id === "string" && req.query.project_id.trim().length > 0
+        ? req.query.project_id.trim()
+        : undefined;
+    const statusValue =
+      typeof req.query.status === "string" && req.query.status.trim().length > 0
+        ? req.query.status.trim()
+        : undefined;
+    const status = statusValue && isMissionStatus(statusValue) ? statusValue : undefined;
+
+    res.json(
+      tracker.listMissions({
+        phase_id: phaseId,
+        project_id: projectId,
+        status,
+      }),
+    );
+  });
 
   router.post("/", (req, res) => {
     const { phase_id, name } = req.body as {

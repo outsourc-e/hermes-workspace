@@ -145,10 +145,12 @@ import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/nav
 import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gateway/approvals/index'
 import { Route as ApiWorkspaceProjectsIdRouteImport } from './routes/api/workspace/projects.$id'
 import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/workspace/checkpoints.$id'
+import { Route as ApiWorkspaceAgentsIdRouteImport } from './routes/api/workspace/agents.$id'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
 import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents.$pid.kill'
 import { Route as ApiWorkspaceTaskRunsIdStopRouteImport } from './routes/api/workspace/task-runs.$id.stop'
+import { Route as ApiWorkspaceTaskRunsIdRetryRouteImport } from './routes/api/workspace/task-runs.$id.retry'
 import { Route as ApiWorkspaceTaskRunsIdPauseRouteImport } from './routes/api/workspace/task-runs.$id.pause'
 import { Route as ApiWorkspaceTaskRunsIdEventsRouteImport } from './routes/api/workspace/task-runs.$id.events'
 import { Route as ApiWorkspaceMissionsIdStopRouteImport } from './routes/api/workspace/missions.$id.stop'
@@ -848,6 +850,11 @@ const ApiWorkspaceCheckpointsIdRoute =
     path: '/$id',
     getParentRoute: () => ApiWorkspaceCheckpointsRoute,
   } as any)
+const ApiWorkspaceAgentsIdRoute = ApiWorkspaceAgentsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiWorkspaceAgentsRoute,
+} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -868,6 +875,12 @@ const ApiWorkspaceTaskRunsIdStopRoute =
   ApiWorkspaceTaskRunsIdStopRouteImport.update({
     id: '/$id/stop',
     path: '/$id/stop',
+    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
+  } as any)
+const ApiWorkspaceTaskRunsIdRetryRoute =
+  ApiWorkspaceTaskRunsIdRetryRouteImport.update({
+    id: '/$id/retry',
+    path: '/$id/retry',
     getParentRoute: () => ApiWorkspaceTaskRunsRoute,
   } as any)
 const ApiWorkspaceTaskRunsIdPauseRoute =
@@ -1089,7 +1102,7 @@ export interface FileRoutesByFullPath {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
+  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
   '/api/workspace/config': typeof ApiWorkspaceConfigRoute
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
@@ -1104,6 +1117,7 @@ export interface FileRoutesByFullPath {
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
@@ -1123,6 +1137,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
   '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
+  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
   '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 export interface FileRoutesByTo {
@@ -1246,7 +1261,7 @@ export interface FileRoutesByTo {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
+  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
   '/api/workspace/config': typeof ApiWorkspaceConfigRoute
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
@@ -1261,6 +1276,7 @@ export interface FileRoutesByTo {
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
   '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
@@ -1280,6 +1296,7 @@ export interface FileRoutesByTo {
   '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
   '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
+  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
   '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 export interface FileRoutesById {
@@ -1405,7 +1422,7 @@ export interface FileRoutesById {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
+  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
   '/api/workspace/config': typeof ApiWorkspaceConfigRoute
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
@@ -1420,6 +1437,7 @@ export interface FileRoutesById {
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
@@ -1439,6 +1457,7 @@ export interface FileRoutesById {
   '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
   '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
   '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
+  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
   '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 export interface FileRouteTypes {
@@ -1580,6 +1599,7 @@ export interface FileRouteTypes {
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
     | '/api/gateway/approvals/'
@@ -1599,6 +1619,7 @@ export interface FileRouteTypes {
     | '/api/workspace/missions/$id/stop'
     | '/api/workspace/task-runs/$id/events'
     | '/api/workspace/task-runs/$id/pause'
+    | '/api/workspace/task-runs/$id/retry'
     | '/api/workspace/task-runs/$id/stop'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1737,6 +1758,7 @@ export interface FileRouteTypes {
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
     | '/api/gateway/approvals'
@@ -1756,6 +1778,7 @@ export interface FileRouteTypes {
     | '/api/workspace/missions/$id/stop'
     | '/api/workspace/task-runs/$id/events'
     | '/api/workspace/task-runs/$id/pause'
+    | '/api/workspace/task-runs/$id/retry'
     | '/api/workspace/task-runs/$id/stop'
   id:
     | '__root__'
@@ -1895,6 +1918,7 @@ export interface FileRouteTypes {
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
     | '/api/gateway/approvals/'
@@ -1914,6 +1938,7 @@ export interface FileRouteTypes {
     | '/api/workspace/missions/$id/stop'
     | '/api/workspace/task-runs/$id/events'
     | '/api/workspace/task-runs/$id/pause'
+    | '/api/workspace/task-runs/$id/retry'
     | '/api/workspace/task-runs/$id/stop'
   fileRoutesById: FileRoutesById
 }
@@ -2982,6 +3007,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceCheckpointsIdRouteImport
       parentRoute: typeof ApiWorkspaceCheckpointsRoute
     }
+    '/api/workspace/agents/$id': {
+      id: '/api/workspace/agents/$id'
+      path: '/$id'
+      fullPath: '/api/workspace/agents/$id'
+      preLoaderRoute: typeof ApiWorkspaceAgentsIdRouteImport
+      parentRoute: typeof ApiWorkspaceAgentsRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -3008,6 +3040,13 @@ declare module '@tanstack/react-router' {
       path: '/$id/stop'
       fullPath: '/api/workspace/task-runs/$id/stop'
       preLoaderRoute: typeof ApiWorkspaceTaskRunsIdStopRouteImport
+      parentRoute: typeof ApiWorkspaceTaskRunsRoute
+    }
+    '/api/workspace/task-runs/$id/retry': {
+      id: '/api/workspace/task-runs/$id/retry'
+      path: '/$id/retry'
+      fullPath: '/api/workspace/task-runs/$id/retry'
+      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdRetryRouteImport
       parentRoute: typeof ApiWorkspaceTaskRunsRoute
     }
     '/api/workspace/task-runs/$id/pause': {
@@ -3229,6 +3268,17 @@ const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
   ApiSessionsRouteChildren,
 )
 
+interface ApiWorkspaceAgentsRouteChildren {
+  ApiWorkspaceAgentsIdRoute: typeof ApiWorkspaceAgentsIdRoute
+}
+
+const ApiWorkspaceAgentsRouteChildren: ApiWorkspaceAgentsRouteChildren = {
+  ApiWorkspaceAgentsIdRoute: ApiWorkspaceAgentsIdRoute,
+}
+
+const ApiWorkspaceAgentsRouteWithChildren =
+  ApiWorkspaceAgentsRoute._addFileChildren(ApiWorkspaceAgentsRouteChildren)
+
 interface ApiWorkspaceCheckpointsIdRouteChildren {
   ApiWorkspaceCheckpointsIdApproveRoute: typeof ApiWorkspaceCheckpointsIdApproveRoute
   ApiWorkspaceCheckpointsIdApproveAndCommitRoute: typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
@@ -3309,12 +3359,14 @@ const ApiWorkspaceProjectsRouteWithChildren =
 interface ApiWorkspaceTaskRunsRouteChildren {
   ApiWorkspaceTaskRunsIdEventsRoute: typeof ApiWorkspaceTaskRunsIdEventsRoute
   ApiWorkspaceTaskRunsIdPauseRoute: typeof ApiWorkspaceTaskRunsIdPauseRoute
+  ApiWorkspaceTaskRunsIdRetryRoute: typeof ApiWorkspaceTaskRunsIdRetryRoute
   ApiWorkspaceTaskRunsIdStopRoute: typeof ApiWorkspaceTaskRunsIdStopRoute
 }
 
 const ApiWorkspaceTaskRunsRouteChildren: ApiWorkspaceTaskRunsRouteChildren = {
   ApiWorkspaceTaskRunsIdEventsRoute: ApiWorkspaceTaskRunsIdEventsRoute,
   ApiWorkspaceTaskRunsIdPauseRoute: ApiWorkspaceTaskRunsIdPauseRoute,
+  ApiWorkspaceTaskRunsIdRetryRoute: ApiWorkspaceTaskRunsIdRetryRoute,
   ApiWorkspaceTaskRunsIdStopRoute: ApiWorkspaceTaskRunsIdStopRoute,
 }
 
@@ -3322,7 +3374,7 @@ const ApiWorkspaceTaskRunsRouteWithChildren =
   ApiWorkspaceTaskRunsRoute._addFileChildren(ApiWorkspaceTaskRunsRouteChildren)
 
 interface ApiWorkspaceRouteChildren {
-  ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRoute
+  ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRouteWithChildren
   ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
   ApiWorkspaceConfigRoute: typeof ApiWorkspaceConfigRoute
   ApiWorkspaceDecomposeRoute: typeof ApiWorkspaceDecomposeRoute
@@ -3336,7 +3388,7 @@ interface ApiWorkspaceRouteChildren {
 }
 
 const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
-  ApiWorkspaceAgentsRoute: ApiWorkspaceAgentsRoute,
+  ApiWorkspaceAgentsRoute: ApiWorkspaceAgentsRouteWithChildren,
   ApiWorkspaceCheckpointsRoute: ApiWorkspaceCheckpointsRouteWithChildren,
   ApiWorkspaceConfigRoute: ApiWorkspaceConfigRoute,
   ApiWorkspaceDecomposeRoute: ApiWorkspaceDecomposeRoute,
