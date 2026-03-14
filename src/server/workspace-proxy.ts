@@ -37,18 +37,29 @@ export async function forwardWorkspaceRequest({
   })
 
   const responseHeaders = new Headers()
+  const contentTypeHeader = daemonResponse.headers.get('content-type')
+  const isEventStream = contentTypeHeader?.includes('text/event-stream') ?? false
 
   for (const headerName of [
     'content-type',
     'cache-control',
+    'connection',
     'etag',
     'last-modified',
     'location',
+    'x-accel-buffering',
   ]) {
     const headerValue = daemonResponse.headers.get(headerName)
     if (headerValue) {
       responseHeaders.set(headerName, headerValue)
     }
+  }
+
+  if (isEventStream) {
+    return new Response(daemonResponse.body, {
+      status: daemonResponse.status,
+      headers: responseHeaders,
+    })
   }
 
   return new Response(daemonResponse.body, {

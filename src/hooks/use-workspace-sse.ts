@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/components/ui/toast'
 
-const DAEMON_URL = '/workspace-api'
+const DAEMON_URL = ''
 const RECONNECT_DELAY_MS = 3_000
+const EVENTS_URL = DAEMON_URL ? `${DAEMON_URL}/api/workspace/events` : '/api/workspace/events'
 
 type QueryKey = Array<string>
 
@@ -56,7 +57,7 @@ export function useWorkspaceSse() {
       eventSource?.close()
       setConnected(false)
 
-      const es = new EventSource(`${DAEMON_URL}/api/workspace/events`)
+      const es = new EventSource(EVENTS_URL)
       eventSource = es
 
       es.onopen = () => {

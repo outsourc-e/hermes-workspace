@@ -145,6 +145,7 @@ import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/statu
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
 import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
 import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gateway/approvals/index'
+import { Route as ApiWorkspaceTaskRunsAdhocRouteImport } from './routes/api/workspace/task-runs.adhoc'
 import { Route as ApiWorkspaceProjectsIdRouteImport } from './routes/api/workspace/projects.$id'
 import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/workspace/checkpoints.$id'
 import { Route as ApiWorkspaceAgentsIdRouteImport } from './routes/api/workspace/agents.$id'
@@ -853,6 +854,12 @@ const ApiGatewayApprovalsIndexRoute =
     path: '/api/gateway/approvals/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiWorkspaceTaskRunsAdhocRoute =
+  ApiWorkspaceTaskRunsAdhocRouteImport.update({
+    id: '/adhoc',
+    path: '/adhoc',
+    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
+  } as any)
 const ApiWorkspaceProjectsIdRoute = ApiWorkspaceProjectsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -1148,6 +1155,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
+  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
@@ -1311,6 +1319,7 @@ export interface FileRoutesByTo {
   '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
+  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
   '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
@@ -1476,6 +1485,7 @@ export interface FileRoutesById {
   '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
+  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
@@ -1642,6 +1652,7 @@ export interface FileRouteTypes {
     | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
+    | '/api/workspace/task-runs/adhoc'
     | '/api/gateway/approvals/'
     | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
@@ -1805,6 +1816,7 @@ export interface FileRouteTypes {
     | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
+    | '/api/workspace/task-runs/adhoc'
     | '/api/gateway/approvals'
     | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
@@ -1969,6 +1981,7 @@ export interface FileRouteTypes {
     | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
+    | '/api/workspace/task-runs/adhoc'
     | '/api/gateway/approvals/'
     | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
@@ -3057,6 +3070,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGatewayApprovalsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/task-runs/adhoc': {
+      id: '/api/workspace/task-runs/adhoc'
+      path: '/adhoc'
+      fullPath: '/api/workspace/task-runs/adhoc'
+      preLoaderRoute: typeof ApiWorkspaceTaskRunsAdhocRouteImport
+      parentRoute: typeof ApiWorkspaceTaskRunsRoute
+    }
     '/api/workspace/projects/$id': {
       id: '/api/workspace/projects/$id'
       path: '/$id'
@@ -3446,6 +3466,7 @@ const ApiWorkspaceSkillsRouteWithChildren =
   ApiWorkspaceSkillsRoute._addFileChildren(ApiWorkspaceSkillsRouteChildren)
 
 interface ApiWorkspaceTaskRunsRouteChildren {
+  ApiWorkspaceTaskRunsAdhocRoute: typeof ApiWorkspaceTaskRunsAdhocRoute
   ApiWorkspaceTaskRunsIdEventsRoute: typeof ApiWorkspaceTaskRunsIdEventsRoute
   ApiWorkspaceTaskRunsIdPauseRoute: typeof ApiWorkspaceTaskRunsIdPauseRoute
   ApiWorkspaceTaskRunsIdRetryRoute: typeof ApiWorkspaceTaskRunsIdRetryRoute
@@ -3453,6 +3474,7 @@ interface ApiWorkspaceTaskRunsRouteChildren {
 }
 
 const ApiWorkspaceTaskRunsRouteChildren: ApiWorkspaceTaskRunsRouteChildren = {
+  ApiWorkspaceTaskRunsAdhocRoute: ApiWorkspaceTaskRunsAdhocRoute,
   ApiWorkspaceTaskRunsIdEventsRoute: ApiWorkspaceTaskRunsIdEventsRoute,
   ApiWorkspaceTaskRunsIdPauseRoute: ApiWorkspaceTaskRunsIdPauseRoute,
   ApiWorkspaceTaskRunsIdRetryRoute: ApiWorkspaceTaskRunsIdRetryRoute,
