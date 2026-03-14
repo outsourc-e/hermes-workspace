@@ -70,21 +70,26 @@ async function startWorkspaceDaemonIfNeeded() {
         return;
     }
     const repoDir = (0, path_1.join)(__dirname, "..");
-    const distEntry = (0, path_1.join)(repoDir, "workspace-daemon", "dist", "server.js");
+    const daemonPath = (0, path_1.join)(__dirname, "..", "workspace-daemon", "dist", "server.js");
     const srcEntry = (0, path_1.join)(repoDir, "workspace-daemon", "src", "server.ts");
-    if ((0, fs_1.existsSync)(distEntry)) {
-        workspaceDaemonProcess = (0, child_process_1.spawn)("node", ["workspace-daemon/dist/server.js"], {
-            cwd: repoDir,
-            env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT) },
-            stdio: "ignore",
-            detached: false,
+    const dbPath = (0, path_1.join)(electron_1.app.getPath("userData"), "workspace.db");
+    if ((0, fs_1.existsSync)(daemonPath)) {
+        workspaceDaemonProcess = (0, child_process_1.spawn)("node", [daemonPath], {
+            env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT), DB_PATH: dbPath },
+            stdio: "pipe",
+        });
+        workspaceDaemonProcess.stdout?.on("data", (data) => {
+            console.log(`[daemon] ${data.toString().trimEnd()}`);
+        });
+        workspaceDaemonProcess.stderr?.on("data", (data) => {
+            console.error(`[daemon] ${data.toString().trimEnd()}`);
         });
         return;
     }
     if ((0, fs_1.existsSync)(srcEntry)) {
         workspaceDaemonProcess = (0, child_process_1.spawn)("npx", ["--prefix", "workspace-daemon", "tsx", "src/server.ts"], {
             cwd: repoDir,
-            env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT) },
+            env: { ...process.env, PORT: String(WORKSPACE_DAEMON_PORT), DB_PATH: dbPath },
             stdio: "ignore",
             detached: false,
             shell: true,

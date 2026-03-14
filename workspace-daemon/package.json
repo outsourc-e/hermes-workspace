@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "build": "esbuild src/server.ts --bundle --platform=node --outfile=dist/server.js --external:better-sqlite3",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit"
@@ -19,6 +20,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
+    "esbuild": "^0.25.10",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

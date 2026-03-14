@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import path from "node:path";
 import { Router } from "express";
 import { Tracker } from "./tracker";
 import { Orchestrator } from "./orchestrator";
@@ -17,6 +18,11 @@ import { createSkillsRouter } from "./routes/skills";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const STARTUP_TIMESTAMP = Date.now();
+
+process.env.WORKSPACE_DAEMON_DB_PATH =
+  process.env.DB_PATH ??
+  process.env.WORKSPACE_DAEMON_DB_PATH ??
+  path.join(process.cwd(), ".workspaces", "workspace.db");
 
 export function createServer(): { app: express.Express; tracker: Tracker; orchestrator: Orchestrator } {
   const app = express();
