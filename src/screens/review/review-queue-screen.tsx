@@ -83,6 +83,33 @@ type ReviewComposerState = {
   action: Extract<CheckpointReviewAction, 'revise' | 'reject'>
 }
 
+function getCheckpointVerificationStatus(
+  checkpoint: WorkspaceCheckpoint,
+): 'verified' | 'failed' | 'missing' {
+  if (!checkpoint.verification_raw) return 'missing'
+
+  try {
+    const parsed = JSON.parse(checkpoint.verification_raw)
+    // Handle array format (full verification)
+    if (Array.isArray(parsed)) {
+      const allPassed = parsed.every((r: { passed?: boolean }) => r.passed === true)
+      return allPassed ? 'verified' : 'failed'
+    }
+    // Handle legacy single-check format
+    if (typeof parsed === 'object' && parsed !== null) {
+      const tsc = (parsed as { tsc?: { status?: string } }).tsc
+      if (tsc?.status === 'passed') return 'verified'
+      if (tsc?.status === 'failed') return 'failed'
+      if (typeof (parsed as { passed?: boolean }).passed === 'boolean') {
+        return (parsed as { passed: boolean }).passed ? 'verified' : 'failed'
+      }
+    }
+    return 'missing'
+  } catch {
+    return 'missing'
+  }
+}
+
 function getCheckpointTscStatus(
   checkpoint: WorkspaceCheckpoint,
 ): 'passed' | 'failed' | null {
@@ -98,6 +125,29 @@ function getCheckpointTscStatus(
   } catch {
     return null
   }
+}
+
+function VerificationBadge({ checkpoint }: { checkpoint: WorkspaceCheckpoint }) {
+  const status = getCheckpointVerificationStatus(checkpoint)
+  if (status === 'verified') {
+    return (
+      <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
+        Verified ✅
+      </span>
+    )
+  }
+  if (status === 'failed') {
+    return (
+      <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
+        Failed ❌
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+      Missing ⚠️
+    </span>
+  )
 }
 
 function ReviewQueueSkeleton() {
@@ -233,6 +283,7 @@ function ReviewRow({
             >
               {formatCheckpointStatus(checkpoint.status)}
             </span>
+            <VerificationBadge checkpoint={checkpoint} />
           </div>
 
           <div>
@@ -734,6 +785,27 @@ export function ReviewQueueScreen() {
             <span className="rounded-full border border-primary-200 bg-white px-3 py-2 text-xs font-medium text-primary-600">
               {pendingCount} pending
             </span>
+            {(() => {
+              const verifiedPending = checkpoints.filter(
+                (c) => c.status === 'pending' && getCheckpointVerificationStatus(c) === 'verified',
+              )
+              return verifiedPending.length > 0 ? (
+                <Button
+                  className="bg-emerald-500 text-white hover:bg-emerald-400 text-xs"
+                  onClick={() => {
+                    for (const c of verifiedPending) {
+                      reviewMutation.mutate({
+                        checkpointId: c.id,
+                        action: 'approve-and-merge',
+                      })
+                    }
+                  }}
+                  disabled={reviewMutation.isPending}
+                >
+                  ✅ Approve all verified ({verifiedPending.length})
+                </Button>
+              ) : null
+            })()}
             <Button
               variant="outline"
               onClick={() => checkpointsQuery.refetch()}
