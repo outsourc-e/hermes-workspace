@@ -21,6 +21,7 @@ import type {
 const MAX_RETRIES = 3;
 const BASE_RETRY_MS = 10_000;
 const MAX_RETRY_MS = 300_000;
+const MAX_RUN_DURATION_MS = 5 * 60 * 1000;
 const FRONTEND_TASK_PATTERN = /ui|react|screen|component|style|layout|design|frontend/;
 const BACKEND_TASK_PATTERN = /api|route|endpoint|db|database|schema|migration|backend|daemon|server/;
 const QA_TASK_PATTERN = /review|qa|verify|test|check|audit/;
@@ -328,6 +329,14 @@ export class Orchestrator extends EventEmitter {
     };
     this.state.running.set(task.id, runningEntry);
     this.abortControllers.set(taskRun.id, abortController);
+    const watchdogHandle = setTimeout(() => {
+      if (this.state.running.has(task.id)) {
+        const controller = this.abortControllers.get(taskRun.id);
+        if (controller) {
+          controller.abort("Watchdog: run exceeded maximum duration");
+        }
+      }
+    }, MAX_RUN_DURATION_MS);
     this.tracker.markTaskRunStarted(taskRun.id);
     this.tracker.logAuditEvent("task.started", taskRun.id, "task_run");
     this.emit("dispatch", { taskId: task.id, runId: taskRun.id });
@@ -413,6 +422,7 @@ export class Orchestrator extends EventEmitter {
       notifyCompletion(task.name, project.name, "failed");
       this.queueRetry(task.id, attempt, message);
     } finally {
+      clearTimeout(watchdogHandle);
       this.abortControllers.delete(taskRun.id);
       this.controlRequests.delete(taskRun.id);
       this.state.running.delete(task.id);
