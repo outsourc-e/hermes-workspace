@@ -303,8 +303,8 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     <div className="flex h-full flex-col overflow-hidden bg-surface text-primary-900">
       <div className="sticky top-0 z-20 border-b border-primary-200 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden">
               {PRIMARY_TABS.map((tab) => {
                 const active = tab === activeTab
                 const label = TAB_LABELS[tab]

@@ -509,20 +509,20 @@ export function AgentsScreen() {
 
   if (agentsQuery.isLoading) {
     return (
-      <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+      <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
         <section className="mx-auto w-full max-w-[1480px] space-y-5">
           <div className="rounded-xl border border-primary-200 bg-white px-6 py-16 text-center shadow-sm">
             <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
             <p className="text-sm text-primary-500">Loading agents directory...</p>
           </div>
         </section>
-      </main>
+      </div>
     )
   }
 
   if (agentsQuery.isError) {
     return (
-      <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+      <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
         <section className="mx-auto w-full max-w-[1480px] space-y-5">
           <div className="mx-auto max-w-md rounded-3xl border border-red-200 bg-red-50 p-5 text-center">
             <h2 className="text-lg font-semibold text-red-900">Agents directory unavailable</h2>
@@ -540,13 +540,13 @@ export function AgentsScreen() {
             </Button>
           </div>
         </section>
-      </main>
+      </div>
     )
   }
 
   if (!selectedAgent) {
     return (
-      <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+      <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
         <section className="mx-auto w-full max-w-[1480px] space-y-5">
           <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
@@ -690,7 +690,7 @@ export function AgentsScreen() {
             </WorkspaceFieldLabel>
           </WorkspaceEntityDialog>
         </section>
-      </main>
+      </div>
     )
   }
 
@@ -713,7 +713,7 @@ export function AgentsScreen() {
         : 'Activate'
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+    <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto w-full max-w-[1480px] space-y-5">
         <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
@@ -1409,6 +1409,6 @@ export function AgentsScreen() {
           </WorkspaceFieldLabel>
         </WorkspaceEntityDialog>
       </section>
-    </main>
+    </div>
   )
 }
