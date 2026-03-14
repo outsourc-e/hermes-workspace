@@ -109,6 +109,7 @@ import { Route as ApiWorkspaceMissionsRouteImport } from './routes/api/workspace
 import { Route as ApiWorkspaceMemoryFilesRouteImport } from './routes/api/workspace/memory-files'
 import { Route as ApiWorkspaceEventsRouteImport } from './routes/api/workspace/events'
 import { Route as ApiWorkspaceDecomposeRouteImport } from './routes/api/workspace/decompose'
+import { Route as ApiWorkspaceConfigRouteImport } from './routes/api/workspace/config'
 import { Route as ApiWorkspaceCheckpointsRouteImport } from './routes/api/workspace/checkpoints'
 import { Route as ApiWorkspaceAgentsRouteImport } from './routes/api/workspace/agents'
 import { Route as ApiWorkspaceTasksIdRouteImport } from './routes/api/workspace-tasks.$id'
@@ -665,6 +666,11 @@ const ApiWorkspaceDecomposeRoute = ApiWorkspaceDecomposeRouteImport.update({
   path: '/decompose',
   getParentRoute: () => ApiWorkspaceRoute,
 } as any)
+const ApiWorkspaceConfigRoute = ApiWorkspaceConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
 const ApiWorkspaceCheckpointsRoute = ApiWorkspaceCheckpointsRouteImport.update({
   id: '/checkpoints',
   path: '/checkpoints',
@@ -1085,6 +1091,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
@@ -1241,6 +1248,7 @@ export interface FileRoutesByTo {
   '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
@@ -1399,6 +1407,7 @@ export interface FileRoutesById {
   '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/workspace/agents': typeof ApiWorkspaceAgentsRoute
   '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
+  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
   '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
   '/api/workspace/events': typeof ApiWorkspaceEventsRoute
   '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
@@ -1558,6 +1567,7 @@ export interface FileRouteTypes {
     | '/api/workspace-tasks/$id'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/config'
     | '/api/workspace/decompose'
     | '/api/workspace/events'
     | '/api/workspace/memory-files'
@@ -1714,6 +1724,7 @@ export interface FileRouteTypes {
     | '/api/workspace-tasks/$id'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/config'
     | '/api/workspace/decompose'
     | '/api/workspace/events'
     | '/api/workspace/memory-files'
@@ -1871,6 +1882,7 @@ export interface FileRouteTypes {
     | '/api/workspace-tasks/$id'
     | '/api/workspace/agents'
     | '/api/workspace/checkpoints'
+    | '/api/workspace/config'
     | '/api/workspace/decompose'
     | '/api/workspace/events'
     | '/api/workspace/memory-files'
@@ -2718,6 +2730,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceDecomposeRouteImport
       parentRoute: typeof ApiWorkspaceRoute
     }
+    '/api/workspace/config': {
+      id: '/api/workspace/config'
+      path: '/config'
+      fullPath: '/api/workspace/config'
+      preLoaderRoute: typeof ApiWorkspaceConfigRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
     '/api/workspace/checkpoints': {
       id: '/api/workspace/checkpoints'
       path: '/checkpoints'
@@ -3305,6 +3324,7 @@ const ApiWorkspaceTaskRunsRouteWithChildren =
 interface ApiWorkspaceRouteChildren {
   ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRoute
   ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
+  ApiWorkspaceConfigRoute: typeof ApiWorkspaceConfigRoute
   ApiWorkspaceDecomposeRoute: typeof ApiWorkspaceDecomposeRoute
   ApiWorkspaceEventsRoute: typeof ApiWorkspaceEventsRoute
   ApiWorkspaceMemoryFilesRoute: typeof ApiWorkspaceMemoryFilesRoute
@@ -3318,6 +3338,7 @@ interface ApiWorkspaceRouteChildren {
 const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspaceAgentsRoute: ApiWorkspaceAgentsRoute,
   ApiWorkspaceCheckpointsRoute: ApiWorkspaceCheckpointsRouteWithChildren,
+  ApiWorkspaceConfigRoute: ApiWorkspaceConfigRoute,
   ApiWorkspaceDecomposeRoute: ApiWorkspaceDecomposeRoute,
   ApiWorkspaceEventsRoute: ApiWorkspaceEventsRoute,
   ApiWorkspaceMemoryFilesRoute: ApiWorkspaceMemoryFilesRoute,

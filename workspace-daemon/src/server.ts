@@ -29,6 +29,25 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
     res.json({ ok: true });
   });
 
+  app.get("/api/workspace/config", (_req, res) => {
+    res.json({
+      autoApprove: orchestrator.getAutoApprove(),
+    });
+  });
+
+  app.patch("/api/workspace/config", (req, res) => {
+    const autoApprove = req.body?.auto_approve;
+    if (typeof autoApprove !== "boolean") {
+      res.status(400).json({ error: "auto_approve is required" });
+      return;
+    }
+
+    orchestrator.setAutoApprove(autoApprove);
+    res.json({
+      autoApprove: orchestrator.getAutoApprove(),
+    });
+  });
+
   app.use("/api/workspace/projects", createProjectsRouter(tracker));
   app.use("/api/workspace/phases", createPhasesRouter(tracker));
   app.use("/api/workspace/tasks", createTasksRouter(tracker, orchestrator));

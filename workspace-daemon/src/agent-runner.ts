@@ -38,10 +38,14 @@ export class AgentRunner {
     taskRun: TaskRun;
     agent: AgentRecord;
     attempt: number;
+    config?: {
+      autoApprove?: boolean;
+    };
     signal?: AbortSignal;
   }): Promise<TaskRunOutcome> {
     const workflow = loadWorkflowDefinition(input.project.path);
     const workflowConfig = getWorkflowConfig(input.project.path);
+    const autoApprove = input.config?.autoApprove ?? workflowConfig.autoApprove;
     const workspace = await this.workspaceManager.ensureWorkspace(input.project, input.task, input.taskRun.id);
     this.tracker.updateTaskRunWorkspacePath(input.taskRun.id, workspace.path);
     input.taskRun.workspace_path = workspace.path;
@@ -117,7 +121,7 @@ export class AgentRunner {
           input.task.name,
           input.taskRun.id,
           this.tracker,
-          workflowConfig.autoApprove,
+          autoApprove,
         )
       : null;
     const autoApproved =

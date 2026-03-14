@@ -90,6 +90,7 @@ export class Orchestrator extends EventEmitter {
   private readonly scheduler: Scheduler;
   private readonly abortControllers: Map<string, AbortController>;
   private readonly controlRequests: Map<string, { status: Extract<TaskRunStatus, "paused" | "stopped">; reason: string }>;
+  private autoApprove: boolean;
   private timer: NodeJS.Timeout | null = null;
   readonly state: OrchestratorState;
 
@@ -101,6 +102,7 @@ export class Orchestrator extends EventEmitter {
     this.abortControllers = new Map();
     this.controlRequests = new Map();
     const workflowConfig = getWorkflowConfig();
+    this.autoApprove = workflowConfig.autoApprove;
     this.state = {
       pollIntervalMs: workflowConfig.pollIntervalMs,
       maxConcurrentAgents: workflowConfig.maxConcurrentAgents,
@@ -110,6 +112,14 @@ export class Orchestrator extends EventEmitter {
       retryAttempts: new Map(),
       completed: new Set(),
     };
+  }
+
+  setAutoApprove(enabled: boolean): void {
+    this.autoApprove = enabled;
+  }
+
+  getAutoApprove(): boolean {
+    return this.autoApprove;
   }
 
   start(): void {
@@ -291,6 +301,9 @@ export class Orchestrator extends EventEmitter {
         taskRun,
         agent,
         attempt,
+        config: {
+          autoApprove: this.autoApprove,
+        },
         signal: abortController.signal,
       });
 

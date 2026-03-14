@@ -1,9 +1,16 @@
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import {
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { useWorkspaceSse } from '@/hooks/use-workspace-sse'
 import { cn } from '@/lib/utils'
@@ -51,6 +58,10 @@ type ProjectContext = {
   projectName: string | null
 }
 
+type WorkspaceConfig = {
+  autoApprove: boolean
+}
+
 const TAB_LABELS: Record<WorkspaceTab, string> = {
   projects: 'Projects',
   review: 'Review Queue',
@@ -79,8 +90,11 @@ function readPayload(text: string): unknown {
   }
 }
 
-async function apiRequest(input: string): Promise<unknown> {
-  const response = await fetch(input)
+async function apiRequest(
+  input: string,
+  init?: RequestInit,
+): Promise<unknown> {
+  const response = await fetch(input, init)
   const payload = readPayload(await response.text())
   if (response.ok) return payload
 
@@ -114,6 +128,7 @@ function writeWorkspaceHash(nextTab: WorkspaceTab) {
 
 export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { connected } = useWorkspaceSse()
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() =>
     typeof window === 'undefined'
@@ -165,6 +180,26 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
       ),
   })
 
+  const workspaceConfigQuery = useQuery({
+    queryKey: ['workspace', 'config'],
+    queryFn: async () =>
+      (await apiRequest('/api/workspace/config')) as WorkspaceConfig,
+  })
+
+  const autoApproveMutation = useMutation({
+    mutationFn: async (enabled: boolean) =>
+      (await apiRequest('/api/workspace/config', {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ auto_approve: enabled }),
+      })) as WorkspaceConfig,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['workspace', 'config'], data)
+    },
+  })
+
   const missionName = useMemo(() => {
     if (!search.missionId || !projectDetailQuery.data) return null
     for (const phase of projectDetailQuery.data.phases) {
@@ -178,6 +213,10 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     projectContext.projectName ??
     projectDetailQuery.data?.name ??
     null
+  const autoApproveEnabled =
+    autoApproveMutation.data?.autoApprove ??
+    workspaceConfigQuery.data?.autoApprove ??
+    false
 
   const pageTitle =
     search.checkpointId
@@ -256,21 +295,60 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                 )
               })}
             </div>
-            <div
-              className={cn(
-                'inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
-                connected
-                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                  : 'border-amber-500/30 bg-amber-500/10 text-amber-700',
-              )}
-            >
-              <span
+            <div className="flex shrink-0 items-center gap-2">
+              <TooltipProvider>
+                <TooltipRoot>
+                  <TooltipTrigger
+                    render={
+                      <div
+                        className={cn(
+                          'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
+                          autoApproveEnabled
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                            : 'border-primary-200 bg-primary-50 text-primary-600',
+                        )}
+                      />
+                    }
+                  >
+                    <span>Hands-free</span>
+                    <Switch
+                      checked={autoApproveEnabled}
+                      disabled={
+                        workspaceConfigQuery.isPending ||
+                        autoApproveMutation.isPending
+                      }
+                      aria-label="Toggle hands-free mode"
+                      onCheckedChange={(checked) => {
+                        void autoApproveMutation.mutate(Boolean(checked))
+                      }}
+                      className={cn(
+                        autoApproveEnabled
+                          ? 'data-checked:bg-emerald-600'
+                          : undefined,
+                      )}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Hands-free mode auto-approves and merges completed tasks.
+                  </TooltipContent>
+                </TooltipRoot>
+              </TooltipProvider>
+              <div
                 className={cn(
-                  'size-2 rounded-full',
-                  connected ? 'bg-emerald-500' : 'bg-amber-500',
+                  'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
+                  connected
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                    : 'border-amber-500/30 bg-amber-500/10 text-amber-700',
                 )}
-              />
-              {connected ? 'Live' : 'Connecting...'}
+              >
+                <span
+                  className={cn(
+                    'size-2 rounded-full',
+                    connected ? 'bg-emerald-500' : 'bg-amber-500',
+                  )}
+                />
+                {connected ? 'Live' : 'Connecting...'}
+              </div>
             </div>
           </div>
           {showOfflineBanner ? (
