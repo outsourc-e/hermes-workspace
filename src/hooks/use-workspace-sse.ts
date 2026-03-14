@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/components/ui/toast'
 
@@ -32,6 +32,8 @@ function parseSseData(event: MessageEvent<string>): Record<string, unknown> | nu
 export function useWorkspaceSse() {
   const queryClient = useQueryClient()
   const [connected, setConnected] = useState(false)
+  const hasConnectedRef = useRef(false)
+  const disconnectToastShownRef = useRef(false)
 
   useEffect(() => {
     let eventSource: EventSource | null = null
@@ -62,6 +64,11 @@ export function useWorkspaceSse() {
 
       es.onopen = () => {
         if (disposed) return
+        if (hasConnectedRef.current && disconnectToastShownRef.current) {
+          toast('Workspace daemon reconnected', { type: 'success' })
+        }
+        hasConnectedRef.current = true
+        disconnectToastShownRef.current = false
         setConnected(true)
       }
 
@@ -176,6 +183,12 @@ export function useWorkspaceSse() {
 
       es.onerror = () => {
         if (disposed) return
+        if (hasConnectedRef.current && !disconnectToastShownRef.current) {
+          disconnectToastShownRef.current = true
+          toast('Workspace daemon disconnected — reconnecting...', {
+            type: 'warning',
+          })
+        }
         setConnected(false)
         es.close()
         if (eventSource === es) {

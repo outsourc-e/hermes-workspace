@@ -19,7 +19,153 @@ const config = defineConfig(({ mode, command }) => {
   let workspaceDaemonStarted = false
   let workspaceDaemonStarting = false
   let workspaceDaemonShuttingDown = false
+  let workspaceDaemonRestarting = false
   let workspaceDaemonChild: ChildProcess | null = null
+  let workspaceDaemonRetryCount = 0
+  const workspaceDaemonPort = '3099'
+  const daemonCwd = resolve('workspace-daemon')
+  const daemonSrcEntry = resolve('workspace-daemon/src/server.ts')
+  const daemonDistEntry = resolve('workspace-daemon/dist/server.js')
+
+  const getWorkspaceDaemonDelayMs = (attempt: number) =>
+    Math.min(1000 * 2 ** Math.max(attempt - 1, 0), 30000)
+
+  const startWorkspaceDaemon = () => {
+    if (workspaceDaemonStarted || workspaceDaemonStarting) return
+
+    const spawnCommand = existsSync(daemonSrcEntry)
+      ? {
+          commandName: 'npx',
+          args: ['tsx', 'watch', 'src/server.ts'],
+          options: {
+            cwd: daemonCwd,
+            env: { ...process.env, PORT: workspaceDaemonPort },
+            stdio: 'inherit' as const,
+          },
+        }
+      : existsSync(daemonDistEntry)
+        ? {
+            commandName: 'node',
+            args: ['dist/server.js'],
+            options: {
+              cwd: daemonCwd,
+              env: { ...process.env, PORT: workspaceDaemonPort },
+              stdio: 'inherit' as const,
+            },
+          }
+        : null
+
+    if (!spawnCommand) {
+      workspaceDaemonStarting = false
+      console.error('[workspace-daemon] no server entry found to spawn.')
+      return
+    }
+
+    workspaceDaemonStarted = true
+    workspaceDaemonStarting = false
+    const child = spawn(
+      spawnCommand.commandName,
+      spawnCommand.args,
+      spawnCommand.options,
+    )
+    workspaceDaemonChild = child
+
+    child.on('exit', (code) => {
+      if (workspaceDaemonChild === child) {
+        workspaceDaemonChild = null
+      }
+
+      if (workspaceDaemonShuttingDown || workspaceDaemonRestarting) {
+        workspaceDaemonStarted = false
+        workspaceDaemonStarting = false
+        return
+      }
+
+      if (code === 0) {
+        workspaceDaemonStarted = false
+        workspaceDaemonStarting = false
+        return
+      }
+
+      if (workspaceDaemonRetryCount >= 20) {
+        workspaceDaemonStarted = false
+        workspaceDaemonStarting = false
+        console.error(
+          `[workspace-daemon] crashed with code ${code ?? 'unknown'}; max restart attempts reached.`,
+        )
+        return
+      }
+
+      workspaceDaemonRetryCount += 1
+      const delayMs = getWorkspaceDaemonDelayMs(workspaceDaemonRetryCount)
+      console.error(
+        `[workspace-daemon] crashed with code ${code ?? 'unknown'}; restarting in ${Math.round(
+          delayMs / 1000,
+        )}s (${workspaceDaemonRetryCount}/20).`,
+      )
+
+      workspaceDaemonStarting = true
+      workspaceDaemonStarted = false
+      setTimeout(() => {
+        startWorkspaceDaemon()
+      }, delayMs)
+    })
+
+    child.on('error', (error) => {
+      console.error(`[workspace-daemon] failed to spawn: ${error.message}`)
+    })
+  }
+
+  const stopWorkspaceDaemon = async () => {
+    const child = workspaceDaemonChild
+    if (!child) {
+      workspaceDaemonStarted = false
+      workspaceDaemonStarting = false
+      return
+    }
+
+    workspaceDaemonRestarting = true
+
+    await new Promise<void>((resolve) => {
+      const exitTimer = setTimeout(() => {
+        if (!child.killed && child.pid) {
+          try {
+            process.kill(child.pid, 'SIGKILL')
+          } catch {
+            // ignore
+          }
+        }
+      }, 5000)
+
+      child.once('exit', () => {
+        clearTimeout(exitTimer)
+        resolve()
+      })
+
+      if (child.pid) {
+        try {
+          process.kill(child.pid, 'SIGTERM')
+        } catch {
+          clearTimeout(exitTimer)
+          resolve()
+        }
+      } else {
+        clearTimeout(exitTimer)
+        resolve()
+      }
+    })
+
+    workspaceDaemonStarted = false
+    workspaceDaemonStarting = false
+    workspaceDaemonRestarting = false
+  }
+
+  const restartWorkspaceDaemon = async () => {
+    workspaceDaemonRetryCount = 0
+    await stopWorkspaceDaemon()
+    workspaceDaemonStarting = true
+    startWorkspaceDaemon()
+  }
 
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. CLAWSUITE_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
@@ -122,6 +268,33 @@ const config = defineConfig(({ mode, command }) => {
           if (command !== 'serve') return
         },
         configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const requestPath = req.url?.split('?')[0]
+            if (
+              req.method !== 'POST' ||
+              requestPath !== '/api/workspace/daemon/restart'
+            ) {
+              next()
+              return
+            }
+
+            try {
+              await restartWorkspaceDaemon()
+              res.statusCode = 200
+              res.setHeader('content-type', 'application/json')
+              res.end(JSON.stringify({ ok: true }))
+            } catch (error) {
+              res.statusCode = 500
+              res.setHeader('content-type', 'application/json')
+              res.end(
+                JSON.stringify({
+                  error:
+                    error instanceof Error ? error.message : 'Internal error',
+                }),
+              )
+            }
+          })
+
           server.httpServer?.on('close', () => {
             workspaceDaemonShuttingDown = true
             workspaceDaemonStarted = false
@@ -149,85 +322,7 @@ const config = defineConfig(({ mode, command }) => {
               workspaceDaemonStarting = false
               return
             }
-
-            const daemonCwd = resolve('workspace-daemon')
-            const srcEntry = resolve('workspace-daemon/src/server.ts')
-            const distEntry = resolve('workspace-daemon/dist/server.js')
-            const maxRetries = 5
-            const retryDelayMs = 2000
-
-            const spawnWithRespawn = (commandName: string, args: string[], options: Parameters<typeof spawn>[2]) => {
-              let retryCount = 0
-
-              const startChild = () => {
-                workspaceDaemonStarted = true
-                workspaceDaemonStarting = false
-                const child = spawn(commandName, args, options)
-                workspaceDaemonChild = child
-
-                child.on('exit', (code) => {
-                  if (workspaceDaemonChild === child) {
-                    workspaceDaemonChild = null
-                  }
-
-                  if (workspaceDaemonShuttingDown) {
-                    workspaceDaemonStarted = false
-                    workspaceDaemonStarting = false
-                    return
-                  }
-
-                  if (code === 0) {
-                    workspaceDaemonStarted = false
-                    return
-                  }
-
-                  if (retryCount >= maxRetries) {
-                    workspaceDaemonStarted = false
-                    console.error(
-                      `[workspace-daemon] crashed with code ${code ?? 'unknown'}; max restart attempts reached.`,
-                    )
-                    return
-                  }
-
-                  retryCount += 1
-                  console.error(
-                    `[workspace-daemon] crashed with code ${code ?? 'unknown'}; restarting in ${retryDelayMs / 1000}s (${retryCount}/${maxRetries}).`,
-                  )
-
-                  workspaceDaemonStarting = true
-                  setTimeout(() => {
-                    startChild()
-                  }, retryDelayMs)
-                })
-
-                child.on('error', (error) => {
-                  console.error(`[workspace-daemon] failed to spawn: ${error.message}`)
-                })
-              }
-
-              startChild()
-            }
-
-            if (existsSync(srcEntry)) {
-              spawnWithRespawn('npx', ['tsx', 'watch', 'src/server.ts'], {
-                cwd: daemonCwd,
-                env: { ...process.env, PORT: '3099' },
-                stdio: 'inherit',
-              })
-              return
-            }
-
-            if (existsSync(distEntry)) {
-              spawnWithRespawn('node', ['dist/server.js'], {
-                cwd: daemonCwd,
-                env: { ...process.env, PORT: '3099' },
-                stdio: 'inherit',
-              })
-              return
-            }
-
-            workspaceDaemonStarting = false
-            console.error('[workspace-daemon] no server entry found to spawn.')
+            startWorkspaceDaemon()
           })
         },
       },

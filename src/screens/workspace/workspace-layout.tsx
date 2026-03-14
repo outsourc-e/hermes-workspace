@@ -233,6 +233,13 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     },
   })
 
+  const restartDaemonMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest('/api/workspace/daemon/restart', {
+        method: 'POST',
+      }),
+  })
+
   const missionName = useMemo(() => {
     if (!search.missionId || !projectDetailQuery.data) return null
     for (const phase of projectDetailQuery.data.phases) {
@@ -409,13 +416,28 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                     npm run daemon
                   </code>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setShowOfflineBanner(false)}
-                  className="shrink-0 text-amber-600 transition-colors hover:text-amber-900"
-                >
-                  Dismiss
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={restartDaemonMutation.isPending}
+                    onClick={() => {
+                      void restartDaemonMutation.mutateAsync()
+                    }}
+                    className="border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                  >
+                    {restartDaemonMutation.isPending
+                      ? 'Restarting...'
+                      : 'Restart Daemon'}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setShowOfflineBanner(false)}
+                    className="shrink-0 text-amber-600 transition-colors hover:text-amber-900"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}
