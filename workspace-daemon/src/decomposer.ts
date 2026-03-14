@@ -119,6 +119,7 @@ export class Decomposer {
 
     if (process.env.ANTHROPIC_API_KEY) {
       try {
+        console.log("[decomposer] Using Anthropic SDK");
         const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         const response = await client.messages.create({
           model: "claude-3-5-haiku-20241022",
@@ -138,6 +139,7 @@ export class Decomposer {
 
     if (!rawResponse) {
       try {
+        console.log("[decomposer] SDK unavailable, falling back to claude CLI");
         const { stdout } = await execFileAsync("claude", ["--print", "-p", prompt], {
           maxBuffer: 1024 * 1024,
           timeout: 120_000,
