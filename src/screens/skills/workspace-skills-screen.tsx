@@ -116,7 +116,7 @@ export function WorkspaceSkillsScreen() {
   const skillsQuery = useQuery({
     queryKey: ['workspace', 'skills'],
     queryFn: async function fetchSkills(): Promise<SkillsResponse> {
-      const payload = await apiRequest('/workspace-api/api/workspace/skills')
+      const payload = await apiRequest('/api/workspace/skills')
 
       return {
         skills: Array.isArray((payload as SkillsResponse).skills)
@@ -156,7 +156,7 @@ export function WorkspaceSkillsScreen() {
     enabled: selectedSkillId.length > 0,
     queryFn: async function fetchSkillContent(): Promise<string> {
       const payload = (await apiRequest(
-        `/workspace-api/api/workspace/skills/${encodeURIComponent(selectedSkillId)}/content`,
+        `/api/workspace/skills/${encodeURIComponent(selectedSkillId)}/content`,
       )) as SkillContentResponse
       return typeof payload.content === 'string' ? payload.content : ''
     },

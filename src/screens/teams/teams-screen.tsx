@@ -254,7 +254,7 @@ function formatAuditTimestamp(timestamp: string): string {
 }
 
 async function fetchWorkspaceTeams(): Promise<WorkspaceTeamWithApproval[]> {
-  const response = await fetch('/workspace-api/api/workspace/teams')
+  const response = await fetch('/api/workspace/teams')
   const payload = await readPayload(response)
 
   if (!response.ok) {
@@ -287,7 +287,7 @@ async function updateApprovalConfig(
   tiers: ApprovalTier[],
 ): Promise<WorkspaceTeamWithApproval> {
   const payload = await workspaceRequestJson(
-    `/workspace-api/api/workspace/teams/${encodeURIComponent(teamId)}/approval-config`,
+    `/api/workspace/teams/${encodeURIComponent(teamId)}/approval-config`,
     {
       method: 'PATCH',
       headers: {

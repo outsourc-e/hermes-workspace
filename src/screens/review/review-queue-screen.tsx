@@ -5,7 +5,6 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -398,7 +397,6 @@ function ReviewRow({
 }
 
 export function ReviewQueueScreen() {
-  const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<'all' | CheckpointStatus>(
     'all',
   )
@@ -542,6 +540,13 @@ export function ReviewQueueScreen() {
   function handleApprove(checkpointId: string) {
     reviewMutation.mutate({
       checkpointId,
+      action: 'approve-and-commit',
+    })
+  }
+
+  function handleApproveAndMerge(checkpointId: string) {
+    reviewMutation.mutate({
+      checkpointId,
       action: 'approve-and-merge',
     })
   }
@@ -565,13 +570,7 @@ export function ReviewQueueScreen() {
   }
 
   function openCheckpointDetail(checkpoint: WorkspaceCheckpoint) {
-    void navigate({
-      to: '/workspace',
-      search: {
-        checkpointId: checkpoint.id,
-        returnTo: 'review',
-      },
-    })
+    setSelectedCheckpoint(checkpoint)
   }
 
   useEffect(() => {
@@ -603,6 +602,14 @@ export function ReviewQueueScreen() {
         event.preventDefault()
         if (isCheckpointReviewable(currentCheckpoint) && !reviewMutation.isPending) {
           handleApprove(currentCheckpoint.id)
+        }
+        return
+      }
+
+      if (event.key === 'm') {
+        event.preventDefault()
+        if (isCheckpointReviewable(currentCheckpoint) && !reviewMutation.isPending) {
+          handleApproveAndMerge(currentCheckpoint.id)
         }
         return
       }
@@ -774,7 +781,7 @@ export function ReviewQueueScreen() {
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1 text-xs text-primary-500">
               <p>Use the keyboard to move through the queue.</p>
-              <p>Enter open · a approve · r reject · j/k navigate</p>
+              <p>Enter open · a approve · m merge · r reject · j/k navigate</p>
             </div>
             {pageItems.map((checkpoint) => (
               <ReviewRow

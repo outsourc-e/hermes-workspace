@@ -92,6 +92,10 @@ function ensureProjectPolicyColumns(db: Database.Database): void {
       "ALTER TABLE projects ADD COLUMN allowed_tools TEXT DEFAULT 'git,shell'",
     )
   }
+  const hasStatus = columns.some((column) => column.name === 'status')
+  if (!hasStatus) {
+    db.exec("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'active'")
+  }
 }
 
 function ensureAgentProfileColumns(db: Database.Database): void {
