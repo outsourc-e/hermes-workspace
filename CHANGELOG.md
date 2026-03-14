@@ -105,3 +105,11 @@ All tool tabs verified and fixed:
 - Community PRs merged (#23, #24, #26)
 - Chat streaming, sidebar, exec approval, kanban, settings
 - Dark mode, theme routing, UI polish
+
+---
+
+## [0.1.0] — 2026-02-16
+
+### Initial Preview
+- Established the first ClawSuite project baseline before the `1.0.0` release
+- Added the initial chat, agent workspace, and app shell foundations
