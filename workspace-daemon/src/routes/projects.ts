@@ -145,7 +145,20 @@ export function createProjectsRouter(tracker: Tracker): Router {
   })
 
   router.patch('/:id', (req, res) => {
-    const project = tracker.updateProject(req.params.id, req.body)
+    const updates = req.body as {
+      status?: unknown
+      [key: string]: unknown
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(updates, 'status') &&
+      typeof updates.status !== 'string'
+    ) {
+      res.status(400).json({ error: 'status must be a string' })
+      return
+    }
+
+    const project = tracker.updateProject(req.params.id, updates as Partial<import('../types').CreateProjectInput>)
     if (!project) {
       res.status(404).json({ error: 'Project not found' })
       return

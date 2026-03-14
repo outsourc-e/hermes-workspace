@@ -599,11 +599,14 @@ export class Tracker extends EventEmitter {
     )
       ? updates.allowed_tools
       : existing.allowed_tools
+    const nextStatus = Object.prototype.hasOwnProperty.call(updates, 'status')
+      ? updates.status
+      : existing.status
 
     this.db
       .prepare(
         `UPDATE projects
-         SET name = ?, path = ?, spec = ?, auto_approve = ?, max_concurrent = ?, required_checks = ?, allowed_tools = ?
+         SET name = ?, path = ?, spec = ?, auto_approve = ?, max_concurrent = ?, required_checks = ?, allowed_tools = ?, status = ?
          WHERE id = ?`,
       )
       .run(
@@ -614,6 +617,7 @@ export class Tracker extends EventEmitter {
         nextMaxConcurrent,
         nextRequiredChecks,
         nextAllowedTools,
+        nextStatus,
         id,
       )
     const project = this.getProject(id)

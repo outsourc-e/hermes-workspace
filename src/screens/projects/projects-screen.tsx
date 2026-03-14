@@ -24,6 +24,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
 import {
   type CheckpointReviewAction,
@@ -245,6 +246,7 @@ export function ProjectsScreen({
   const [projectMissionComposer, setProjectMissionComposer] =
     useState<ProjectMissionComposerState | null>(null)
   const [missionStartPending, setMissionStartPending] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -257,6 +259,13 @@ export function ProjectsScreen({
     placeholderData: keepPreviousData,
   })
   const projects = projectsQuery.data ?? []
+  const visibleProjects = useMemo(
+    () =>
+      showArchived
+        ? projects
+        : projects.filter((project) => project.status !== 'archived'),
+    [projects, showArchived],
+  )
   const listLoading = projectsQuery.isPending && projects.length === 0
 
   useEffect(() => {
@@ -514,19 +523,19 @@ export function ProjectsScreen({
   )
   const projectOverviews = useMemo(
     () =>
-      projects.map((project) =>
+      visibleProjects.map((project) =>
         buildProjectOverview(
           project,
           projectSnapshotMap.get(project.id),
           pendingCheckpoints,
           agents,
         ),
-    ),
-    [agents, pendingCheckpoints, projectSnapshotMap, projects],
+      ),
+    [agents, pendingCheckpoints, projectSnapshotMap, visibleProjects],
   )
   const planReviewMissionIdsByProjectId = useMemo(
     () =>
-      projects.reduce<Record<string, string>>((accumulator, project) => {
+      visibleProjects.reduce<Record<string, string>>((accumulator, project) => {
         const mission = findPlanReviewMission(
           projectSnapshotMap.get(project.id) ?? (projectDetail?.id === project.id ? projectDetail : project),
         )
@@ -535,7 +544,7 @@ export function ProjectsScreen({
         }
         return accumulator
       }, {}),
-    [projectDetail, projectSnapshotMap, projects],
+    [projectDetail, projectSnapshotMap, visibleProjects],
   )
   const reviewProjectOptions = useMemo(
     () =>
@@ -687,6 +696,39 @@ export function ProjectsScreen({
                   : 'Failed to decompose goal',
             }
           : current,
+      )
+    },
+  })
+
+  const archiveProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      setSubmittingKey(`archive:${projectId}`)
+      return apiRequest(`/api/workspace/projects/${encodeURIComponent(projectId)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'archived' }),
+      })
+    },
+    onSuccess: async () => {
+      toast('Project archived', { type: 'success' })
+      clearSelectedProject()
+      await queryClient.invalidateQueries({ queryKey: ['workspace', 'projects'] })
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'project-snapshots'],
+      })
+      triggerRefresh()
+    },
+    onError: (error) => {
+      toast(
+        error instanceof Error ? error.message : 'Failed to archive project',
+        { type: 'error' },
+      )
+    },
+    onSettled: () => {
+      setSubmittingKey((current) =>
+        current?.startsWith('archive:') ? null : current,
       )
     },
   })
@@ -1525,21 +1567,34 @@ export function ProjectsScreen({
               Loading workspace projects...
             </p>
           </div>
-        ) : projects.length === 0 ? (
+        ) : visibleProjects.length === 0 ? (
           <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-500">
               <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
             </div>
             <h2 className="text-lg font-semibold text-primary-900">
-              Start your first project
+              {showArchived ? 'Start your first project' : 'No active projects'}
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
-              Create a project, add a spec or PRD, pick your agents, and let them
-              build.
+              {showArchived
+                ? 'Create a project, add a spec or PRD, pick your agents, and let them build.'
+                : 'All current projects are archived. Enable archived projects to view them.'}
             </p>
+            {!showArchived ? (
+              <Button
+                variant="outline"
+                onClick={() => setShowArchived(true)}
+                className="mt-5"
+              >
+                Show archived
+              </Button>
+            ) : null}
             <Button
               onClick={openNewProjectDialog}
-              className="mt-5 bg-accent-500 text-white hover:bg-accent-400"
+              className={cn(
+                'bg-accent-500 text-white hover:bg-accent-400',
+                showArchived ? 'mt-5' : 'mt-3',
+              )}
             >
               Create Project
               <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.6} />
@@ -1638,6 +1693,17 @@ export function ProjectsScreen({
           </section>
         ) : (
           <>
+            <div className="flex items-center justify-end">
+              <label className="inline-flex items-center gap-3 rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-600 shadow-sm">
+                <span>Show archived</span>
+                <Switch
+                  checked={showArchived}
+                  onCheckedChange={(checked) => setShowArchived(Boolean(checked))}
+                  aria-label="Show archived projects"
+                />
+              </label>
+            </div>
+
             <DashboardKpiBar
               stats={statsQuery.data}
               projects={projects}
@@ -1662,6 +1728,7 @@ export function ProjectsScreen({
               onCreateMission={openProjectMissionComposer}
               onResume={(missionId) => void handleStartMission(missionId)}
               onReviewPlan={openPlanReview}
+              onArchive={(projectId) => archiveProjectMutation.mutate(projectId)}
               submittingKey={submittingKey}
             />
 

@@ -1,5 +1,6 @@
 export type EntityStatus =
   | 'active'
+  | 'archived'
   | 'pending'
   | 'ready'
   | 'running'
@@ -447,6 +448,7 @@ export interface CreateProjectInput {
   max_concurrent?: number
   required_checks?: string | null
   allowed_tools?: string | null
+  status?: EntityStatus
 }
 
 export interface CreatePhaseInput {

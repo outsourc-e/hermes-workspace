@@ -25,6 +25,7 @@ type DashboardProjectCardsProps = {
   onCreateMission: (projectId: string) => void
   onResume: (missionId: string) => void
   onReviewPlan: (missionId: string, projectId: string) => void
+  onArchive: (projectId: string) => void
   submittingKey: string | null
 }
 
@@ -38,6 +39,7 @@ export function DashboardProjectCards({
   onCreateMission,
   onResume,
   onReviewPlan,
+  onArchive,
   submittingKey,
 }: DashboardProjectCardsProps) {
   if (loading) {
@@ -238,6 +240,19 @@ export function DashboardProjectCards({
                 <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.6} />
                 View
               </Button>
+              {overview.project.status !== 'archived' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onArchive(overview.project.id)}
+                  disabled={submittingKey === `archive:${overview.project.id}`}
+                  className="border-primary-300 text-primary-600 hover:bg-primary-50"
+                >
+                  {submittingKey === `archive:${overview.project.id}`
+                    ? 'Archiving...'
+                    : 'Archive'}
+                </Button>
+              ) : null}
             </div>
           </article>
         )

@@ -83,6 +83,9 @@ export function findPlanReviewMission(
 }
 
 export function getStatusBadgeClass(status: WorkspaceStatus): string {
+  if (status === 'archived') {
+    return 'border-primary-200 bg-primary-50 text-primary-600'
+  }
   if (status === 'ready') {
     return 'border-blue-500/30 bg-blue-500/10 text-blue-300'
   }
@@ -102,6 +105,7 @@ export function getStatusBadgeClass(status: WorkspaceStatus): string {
 }
 
 export function getTaskDotClass(status: WorkspaceStatus): string {
+  if (status === 'archived') return 'bg-primary-300'
   if (status === 'ready') return 'bg-blue-400'
   if (status === 'running' || status === 'in_progress' || status === 'active') {
     return 'bg-emerald-400'
