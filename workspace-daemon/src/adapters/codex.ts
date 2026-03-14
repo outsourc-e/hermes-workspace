@@ -176,6 +176,27 @@ function createDataEvent(type: AdapterStreamEvent["type"], data: Record<string, 
   return { type, data };
 }
 
+function consumeBufferedLines(
+  chunk: string,
+  currentBuffer: string,
+  onLine: (line: string) => void,
+): string {
+  let buffer = currentBuffer + chunk;
+
+  while (true) {
+    const newlineIndex = buffer.indexOf("\n");
+    if (newlineIndex === -1) {
+      break;
+    }
+
+    const rawLine = buffer.slice(0, newlineIndex).replace(/\r$/, "");
+    buffer = buffer.slice(newlineIndex + 1);
+    onLine(rawLine);
+  }
+
+  return buffer;
+}
+
 export class CodexAdapter implements AgentAdapter {
   readonly type = "codex";
 
@@ -210,6 +231,7 @@ export class CodexAdapter implements AgentAdapter {
       let settled = false;
       let stdoutBuffer = "";
       let stderrBuffer = "";
+      let stderrLineBuffer = "";
       let nextRequestId = 1;
       let forceKillHandle: NodeJS.Timeout | null = null;
       let currentThreadId: string | null = null;
@@ -646,29 +668,28 @@ export class CodexAdapter implements AgentAdapter {
         }
       };
 
-      const parseStdoutChunk = (chunk: string): void => {
-        stdoutBuffer += chunk;
-
-        while (true) {
-          const newlineIndex = stdoutBuffer.indexOf("\n");
-          if (newlineIndex === -1) {
-            break;
-          }
-
-          const line = stdoutBuffer.slice(0, newlineIndex).trim();
-          stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
-
-          if (!line) {
-            continue;
-          }
-
-          try {
-            handleJsonRpcMessage(JSON.parse(line) as unknown);
-          } catch {
-            finalMessage += `${line}\n`;
-            context.onEvent({ type: "output", message: `${line}\n` });
-          }
+      const handleStdoutLine = (line: string): void => {
+        const normalized = line.trim();
+        if (!normalized) {
+          return;
         }
+
+        try {
+          handleJsonRpcMessage(JSON.parse(normalized) as unknown);
+        } catch {
+          finalMessage += `${line}\n`;
+          context.onEvent({ type: "output", message: line });
+        }
+      };
+
+      const handleStderrLine = (line: string): void => {
+        const normalized = line.trim();
+        if (!normalized) {
+          return;
+        }
+
+        stderrBuffer += `${line}\n`;
+        context.onEvent({ type: "output", message: line });
       };
 
       const bootstrap = async (): Promise<void> => {
@@ -714,13 +735,12 @@ export class CodexAdapter implements AgentAdapter {
 
       proc.stdout.setEncoding("utf8");
       proc.stdout.on("data", (chunk: string) => {
-        parseStdoutChunk(chunk);
+        stdoutBuffer = consumeBufferedLines(chunk, stdoutBuffer, handleStdoutLine);
       });
 
       proc.stderr.setEncoding("utf8");
       proc.stderr.on("data", (chunk: string) => {
-        stderrBuffer += chunk;
-        context.onEvent({ type: "error", message: chunk });
+        stderrLineBuffer = consumeBufferedLines(chunk, stderrLineBuffer, handleStderrLine);
       });
 
       proc.on("error", (error) => {
@@ -740,9 +760,15 @@ export class CodexAdapter implements AgentAdapter {
           return;
         }
 
-        const trailingOutput = stdoutBuffer.trim();
-        if (trailingOutput) {
-          finalMessage += `${trailingOutput}\n`;
+        const trailingOutput = stdoutBuffer.replace(/\r$/, "");
+        if (trailingOutput.trim()) {
+          handleStdoutLine(trailingOutput);
+        }
+
+        const trailingError = stderrLineBuffer.replace(/\r$/, "");
+        if (trailingError.trim()) {
+          handleStderrLine(trailingError);
+          stderrLineBuffer = "";
         }
 
         if (code === 0 && (completedTurnMessage ?? finalMessage).trim().length > 0) {

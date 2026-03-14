@@ -1379,6 +1379,9 @@ export class Tracker extends EventEmitter {
       )
       .get(taskRunId, type, data ? JSON.stringify(data) : null) as RunEvent
     this.emitSse('run_event', event)
+    if (type === 'output') {
+      this.emitSse('task_run.output', event)
+    }
     return event
   }
 
@@ -1664,6 +1667,7 @@ export class Tracker extends EventEmitter {
   listCheckpoints(
     status?: string,
     projectId?: string,
+    taskRunId?: string,
   ): Array<
     Checkpoint & {
       task_name?: string
@@ -1684,6 +1688,11 @@ export class Tracker extends EventEmitter {
     if (projectId) {
       whereClauses.push('p.id = ?')
       params.push(projectId)
+    }
+
+    if (taskRunId) {
+      whereClauses.push('c.task_run_id = ?')
+      params.push(taskRunId)
     }
 
     const query = `

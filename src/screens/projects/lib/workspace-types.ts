@@ -67,6 +67,7 @@ export type WorkspaceAgent = {
   name: string
   role?: string
   adapter_type?: string
+  model?: string
   status: string
   assigned_projects?: string[]
 }
@@ -393,6 +394,7 @@ export function normalizeAgent(value: unknown): WorkspaceAgent {
     name: asString(record?.name) ?? 'Unnamed agent',
     role: asString(record?.role),
     adapter_type: asString(record?.adapter_type),
+    model: asString(record?.model),
     status: asString(record?.status) ?? 'offline',
     assigned_projects: asArray(record?.assigned_projects).flatMap((item) =>
       typeof item === 'string' && item.trim().length > 0 ? [item] : [],

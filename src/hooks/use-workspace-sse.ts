@@ -83,6 +83,17 @@ export function useWorkspaceSse() {
         ])
       })
 
+      es.addEventListener('task_run.output', (event) => {
+        const payload = parseSseData(event)
+        const runId =
+          typeof payload?.task_run_id === 'string' ? payload.task_run_id : null
+        if (!runId) return
+
+        invalidateQueries(queryClient, [
+          ['workspace', 'task-runs', runId, 'events'],
+        ])
+      })
+
       es.addEventListener('task_run.completed', (event) => {
         invalidateQueries(queryClient, [
           ['workspace', 'task-runs'],

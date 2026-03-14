@@ -16,8 +16,15 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { parseUtcTimestamp } from '@/lib/workspace-checkpoints'
+import { useNavigate } from '@tanstack/react-router'
+import {
+  extractCheckpoints,
+  parseUtcTimestamp,
+  workspaceRequestJson,
+  type WorkspaceCheckpoint,
+} from '@/lib/workspace-checkpoints'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import {
@@ -78,6 +85,18 @@ function formatEventClock(value: string): string {
 
 function getTerminalEvents(events: Array<WorkspaceRunEvent>): Array<WorkspaceRunEvent> {
   return events.filter((event) => event.type === 'output' || event.type === 'agent_message')
+}
+
+function formatTokenTotal(value: number): string {
+  return Math.max(0, value).toLocaleString()
+}
+
+function formatRunCostValue(costCents: number): string {
+  if (!Number.isFinite(costCents) || costCents <= 0) {
+    return 'Not reported'
+  }
+
+  return `$${(costCents / 100).toFixed(2)}`
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -170,13 +189,22 @@ function LiveOutputPanel({
   const terminalEvents = useMemo(() => getTerminalEvents(events), [events])
   const finalStatus = run.status !== 'running'
   const [copied, setCopied] = useState(false)
+  const [followOutput, setFollowOutput] = useState(true)
   const sessionLabel = getRunSessionLabel(run)
 
   useEffect(() => {
+    if (!followOutput) return
     const node = containerRef.current
     if (!node) return
     node.scrollTop = node.scrollHeight
-  }, [terminalEvents])
+  }, [followOutput, terminalEvents.length])
+
+  useEffect(() => {
+    if (!followOutput) return
+    const node = containerRef.current
+    if (!node) return
+    node.scrollTop = node.scrollHeight
+  }, [followOutput])
 
   useEffect(() => {
     if (!copied) return
@@ -205,6 +233,15 @@ function LiveOutputPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant={followOutput ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => setFollowOutput((current) => !current)}
+            className="h-8 rounded-full px-3 text-xs"
+          >
+            Follow {followOutput ? 'On' : 'Off'}
+          </Button>
           {run.status === 'running' ? (
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -225,53 +262,150 @@ function LiveOutputPanel({
       </div>
 
       {run.session_id && sessionLabel ? (
-        <div className="flex items-center gap-2 rounded-t-lg border border-b-0 border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-600">
-          <span className="font-medium text-primary-900">Agent session:</span>
+        <div className="flex items-center gap-2 rounded-t-lg border border-b-0 border-primary-200 bg-gray-900 px-3 py-2 text-xs text-gray-300">
+          <span className="font-medium text-white">Agent session:</span>
           <a
             href={`/agents?session=${encodeURIComponent(run.session_id)}`}
-            className="font-mono text-accent-600 transition-colors hover:text-accent-500"
+            className="font-mono text-green-300 transition-colors hover:text-green-200"
           >
             {sessionLabel}
           </a>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => void handleCopySessionId()}
-            className="ml-auto inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white px-2 py-0.5 text-[11px] font-medium text-primary-600 transition-colors hover:border-accent-500/40 hover:text-accent-600"
+            className="ml-auto h-7 rounded-full border-gray-700 bg-gray-950 px-2 text-[11px] font-medium text-gray-200 hover:border-gray-600 hover:bg-gray-900 hover:text-white"
           >
             <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} className="size-3.5" />
             {copied ? 'Copied!' : 'Copy'}
-          </button>
+          </Button>
         </div>
       ) : null}
 
       <div
         ref={containerRef}
         className={cn(
-          'max-h-80 overflow-y-auto border border-primary-200 bg-primary-50 p-4 font-mono text-xs text-primary-800',
+          'min-h-[200px] max-h-[400px] overflow-y-auto border border-gray-800 bg-gray-950 p-4 font-mono text-xs text-green-400',
           run.session_id && sessionLabel ? 'rounded-b-xl' : 'rounded-xl',
         )}
       >
         {isLoading ? (
-          <p className="text-primary-600">Connecting to run output...</p>
+          <p className="text-green-300/80">Connecting to run output...</p>
         ) : isError ? (
-          <p className="text-red-600">Unable to load run output.</p>
+          <p className="text-red-400">Unable to load run output.</p>
         ) : terminalEvents.length > 0 ? (
           <div className="space-y-1.5">
             {terminalEvents.map((event) => (
               <p key={event.id} className="whitespace-pre-wrap break-words">
-                <span className="text-primary-500">[{formatEventClock(event.created_at)}]</span>{' '}
+                <span className="text-green-700">[{formatEventClock(event.created_at)}]</span>{' '}
                 {getRunEventMessage(event)}
               </p>
             ))}
           </div>
         ) : (
-          <p className="text-primary-500">
+          <p className="text-green-300/70">
             {run.status === 'running'
               ? 'Waiting for live output...'
               : 'No terminal output was recorded for this run.'}
           </p>
         )}
       </div>
+    </div>
+  )
+}
+
+function RunDetailMetric({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-xl border border-primary-200 bg-white p-3">
+      <p className="text-xs uppercase tracking-[0.18em] text-primary-500">{label}</p>
+      <p className="mt-1 text-sm font-medium text-primary-900">{value}</p>
+    </div>
+  )
+}
+
+function RunDetailPanel({
+  agentModel,
+  checkpoint,
+  checkpointLoading,
+  events,
+  eventError,
+  eventLoading,
+  onViewCheckpoint,
+  run,
+}: {
+  agentModel: string | null
+  checkpoint: WorkspaceCheckpoint | null
+  checkpointLoading: boolean
+  events: Array<WorkspaceRunEvent>
+  eventError: boolean
+  eventLoading: boolean
+  onViewCheckpoint: (checkpointId: string) => void
+  run: WorkspaceTaskRun
+}) {
+  return (
+    <div className="space-y-4 rounded-xl border border-primary-200 bg-primary-50/60 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-primary-900">
+              {run.agent_name ?? 'Unknown agent'}
+            </span>
+            {agentModel ? (
+              <span className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-xs font-medium text-primary-600">
+                {agentModel}
+              </span>
+            ) : null}
+            <span
+              className={cn(
+                'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium',
+                getRunStatusClass(run.status),
+              )}
+            >
+              {formatRunStatus(run.status)}
+            </span>
+          </div>
+          <p className="text-sm text-primary-600">
+            {run.project_name} · {run.mission_name} · attempt {run.attempt}
+          </p>
+          {run.error ? (
+            <p className="text-sm text-red-600">{run.error}</p>
+          ) : null}
+        </div>
+
+        {checkpoint ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onViewCheckpoint(checkpoint.id)}
+            className="shrink-0"
+          >
+            View Checkpoint
+          </Button>
+        ) : checkpointLoading ? (
+          <span className="text-sm text-primary-500">Loading checkpoint…</span>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <RunDetailMetric label="Input Tokens" value={formatTokenTotal(run.input_tokens)} />
+        <RunDetailMetric label="Output Tokens" value={formatTokenTotal(run.output_tokens)} />
+        <RunDetailMetric label="Duration" value={formatRunDuration(run)} />
+        <RunDetailMetric label="Cost" value={formatRunCostValue(run.cost_cents)} />
+      </div>
+
+      <LiveOutputPanel
+        run={run}
+        events={events}
+        isLoading={eventLoading}
+        isError={eventError}
+      />
     </div>
   )
 }
@@ -358,6 +492,9 @@ function FilterSelect({
 }
 
 function ActiveRunCard({
+  agentModel,
+  checkpoint,
+  checkpointLoading,
   isExpanded,
   isSelected,
   run,
@@ -369,7 +506,11 @@ function ActiveRunCard({
   onToggleExpand,
   onPause,
   onStop,
+  onViewCheckpoint,
 }: {
+  agentModel: string | null
+  checkpoint: WorkspaceCheckpoint | null
+  checkpointLoading: boolean
   isExpanded: boolean
   isSelected: boolean
   run: WorkspaceTaskRun
@@ -381,6 +522,7 @@ function ActiveRunCard({
   onToggleExpand: (runId: string) => void
   onPause: (runId: string) => void
   onStop: (runId: string) => void
+  onViewCheckpoint: (checkpointId: string) => void
 }) {
   const progress = getRunProgress(run, events)
   const progressLabel = getRunProgressLabel(run, events)
@@ -558,11 +700,15 @@ function ActiveRunCard({
 
       {isExpanded ? (
         <div className="mt-4">
-          <LiveOutputPanel
+          <RunDetailPanel
             run={run}
+            agentModel={agentModel}
+            checkpoint={checkpoint}
+            checkpointLoading={checkpointLoading}
             events={events}
-            isLoading={eventLoading}
-            isError={eventError}
+            eventLoading={eventLoading}
+            eventError={eventError}
+            onViewCheckpoint={onViewCheckpoint}
           />
         </div>
       ) : null}
@@ -571,6 +717,9 @@ function ActiveRunCard({
 }
 
 function RecentRunRow({
+  agentModel,
+  checkpoint,
+  checkpointLoading,
   isExpanded,
   isSelected,
   events,
@@ -581,7 +730,11 @@ function RecentRunRow({
   onSelect,
   onToggleExpand,
   onRetry,
+  onViewCheckpoint,
 }: {
+  agentModel: string | null
+  checkpoint: WorkspaceCheckpoint | null
+  checkpointLoading: boolean
   isExpanded: boolean
   isSelected: boolean
   events: Array<WorkspaceRunEvent>
@@ -592,6 +745,7 @@ function RecentRunRow({
   onSelect: (runId: string) => void
   onToggleExpand: (runId: string) => void
   onRetry: (runId: string) => void
+  onViewCheckpoint: (checkpointId: string) => void
 }) {
   const retryNarrative = getRunRetryNarrative(run)
 
@@ -678,11 +832,15 @@ function RecentRunRow({
 
       {isExpanded ? (
         <div className="border-t border-primary-200 p-4">
-          <LiveOutputPanel
+          <RunDetailPanel
             run={run}
+            agentModel={agentModel}
+            checkpoint={checkpoint}
+            checkpointLoading={checkpointLoading}
             events={events}
-            isLoading={eventLoading}
-            isError={eventError}
+            eventLoading={eventLoading}
+            eventError={eventError}
+            onViewCheckpoint={onViewCheckpoint}
           />
         </div>
       ) : null}
@@ -691,6 +849,7 @@ function RecentRunRow({
 }
 
 export function RunsConsoleScreen() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [projectFilter, setProjectFilter] = useState('all')
   const [agentFilter, setAgentFilter] = useState('all')
@@ -714,6 +873,18 @@ export function RunsConsoleScreen() {
     queryKey: ['workspace', 'agents', 'for-runs'],
     queryFn: async () => extractAgents(await apiRequest('/api/workspace/agents')),
     staleTime: 60_000,
+  })
+
+  const runCheckpointsQuery = useQuery({
+    queryKey: ['workspace', 'checkpoints', 'task-run', selectedRunId],
+    enabled: Boolean(selectedRunId),
+    queryFn: async () =>
+      extractCheckpoints(
+        await workspaceRequestJson(
+          `/api/workspace/checkpoints?task_run_id=${encodeURIComponent(selectedRunId ?? '')}`,
+        ),
+      ),
+    staleTime: 5_000,
   })
 
   const runs = runsQuery.data ?? []
@@ -799,6 +970,33 @@ export function RunsConsoleScreen() {
     agentFilter !== 'all' ||
     statusFilter !== 'all' ||
     timeRange !== 'today'
+  const agentsById = useMemo(
+    () => new Map((agentsQuery.data ?? []).map((agent) => [agent.id, agent])),
+    [agentsQuery.data],
+  )
+  const selectedCheckpoint = runCheckpointsQuery.data?.[0] ?? null
+
+  function getAgentModel(run: WorkspaceTaskRun): string | null {
+    if (!run.agent_id) return null
+    return agentsById.get(run.agent_id)?.model ?? null
+  }
+
+  function getRunCheckpoint(run: WorkspaceTaskRun): WorkspaceCheckpoint | null {
+    if (selectedRunId !== run.id) return null
+    return selectedCheckpoint
+  }
+
+  function handleViewCheckpoint(checkpointId: string) {
+    void navigate({
+      to: '/workspace',
+      search: {
+        checkpointId,
+        projectId: selectedRun?.project_id ?? undefined,
+        returnTo: 'review',
+      },
+      hash: 'review',
+    })
+  }
 
   useEffect(() => {
     const selectedVisible = selectedRunId
@@ -1061,6 +1259,11 @@ export function RunsConsoleScreen() {
               {visibleActiveRuns.map((run) => (
                 <ActiveRunCard
                   key={run.id}
+                  agentModel={getAgentModel(run)}
+                  checkpoint={getRunCheckpoint(run)}
+                  checkpointLoading={
+                    selectedRunId === run.id && runCheckpointsQuery.isLoading
+                  }
                   isExpanded={selectedRunId === run.id}
                   isSelected={selectedRunId === run.id}
                   run={run}
@@ -1074,6 +1277,7 @@ export function RunsConsoleScreen() {
                   }
                   onPause={(runId) => controlMutation.mutate({ runId, action: 'pause' })}
                   onStop={(runId) => controlMutation.mutate({ runId, action: 'stop' })}
+                  onViewCheckpoint={handleViewCheckpoint}
                 />
               ))}
             </div>
@@ -1112,6 +1316,11 @@ export function RunsConsoleScreen() {
               {recentRuns.map((run) => (
                 <RecentRunRow
                   key={run.id}
+                  agentModel={getAgentModel(run)}
+                  checkpoint={getRunCheckpoint(run)}
+                  checkpointLoading={
+                    selectedRunId === run.id && runCheckpointsQuery.isLoading
+                  }
                   isExpanded={selectedRunId === run.id}
                   isSelected={selectedRunId === run.id}
                   events={eventsByRunId.get(run.id) ?? []}
@@ -1126,6 +1335,7 @@ export function RunsConsoleScreen() {
                     setSelectedRunId((current) => (current === runId ? null : runId))
                   }
                   onRetry={(runId) => retryRunMutation.mutate(runId)}
+                  onViewCheckpoint={handleViewCheckpoint}
                 />
               ))}
             </div>
