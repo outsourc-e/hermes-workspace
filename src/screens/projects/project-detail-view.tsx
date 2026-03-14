@@ -726,36 +726,39 @@ export function ProjectDetailView({
 
       {/* Main Content */}
       <div className="min-w-0 flex-1 space-y-5 lg:pl-5">
-      <div className="flex flex-col gap-4 border-b border-primary-200 pb-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold text-primary-900">
-              {projectDetail?.name ?? selectedSummary.name}
-            </h2>
-            <span
-              className={cn(
-                'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                getStatusBadgeClass(projectDetail?.status ?? selectedSummary.status),
-              )}
-            >
-              {formatStatus(projectDetail?.status ?? selectedSummary.status)}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-primary-500">
-            <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1">
-              {projectDetail?.path || selectedSummary.path || 'No path configured'}
-            </span>
-            <span className="rounded-full border border-primary-200 bg-white px-3 py-1">
-              {projectTasks.length} task{projectTasks.length === 1 ? '' : 's'}
-            </span>
-            <span className="rounded-full border border-primary-200 bg-white px-3 py-1">
-              {projectDetail?.phases.length ?? selectedSummary.phase_count} phase
-              {(projectDetail?.phases.length ?? selectedSummary.phase_count) === 1 ? '' : 's'}
-            </span>
-          </div>
+      {/* Mobile-only project header (sidebar hidden on mobile) */}
+      <div className="flex flex-col gap-4 border-b border-primary-200 pb-4 lg:hidden">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold text-primary-900">
+            {projectDetail?.name ?? selectedSummary.name}
+          </h2>
+          <span
+            className={cn(
+              'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+              getStatusBadgeClass(projectDetail?.status ?? selectedSummary.status),
+            )}
+          >
+            {formatStatus(projectDetail?.status ?? selectedSummary.status)}
+          </span>
         </div>
-
+      </div>
+      {/* Desktop: compact summary bar */}
+      <div className="hidden lg:flex items-center justify-between border-b border-primary-200 pb-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-primary-500">
+          <span
+            className={cn(
+              'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+              getStatusBadgeClass(projectDetail?.status ?? selectedSummary.status),
+            )}
+          >
+            {formatStatus(projectDetail?.status ?? selectedSummary.status)}
+          </span>
+          <span>{projectTasks.length} task{projectTasks.length === 1 ? '' : 's'}</span>
+          <span>·</span>
+          <span>{projectDetail?.phases.length ?? selectedSummary.phase_count} phase{(projectDetail?.phases.length ?? selectedSummary.phase_count) === 1 ? '' : 's'}</span>
+        </div>
         <Button
+          size="sm"
           onClick={() => onAddPhase(projectDetail ?? selectedSummary)}
           className="bg-accent-500 text-white hover:bg-accent-400"
         >

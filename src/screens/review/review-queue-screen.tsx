@@ -273,7 +273,7 @@ function ReviewRow({
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-primary-600">
-              Run {checkpoint.task_run_id}
+              {checkpoint.agent_name ?? 'Agent'}
             </span>
             <span
               className={cn(
