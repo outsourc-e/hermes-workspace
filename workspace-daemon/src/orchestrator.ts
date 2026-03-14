@@ -80,10 +80,16 @@ export function selectAgent(task: Task, agents: AgentRecord[]): AgentRecord | nu
   }
 
   const onlineAgents = agents.filter(isOnlineAgent);
+  console.log(
+    `[orchestrator] selectAgent for "${task.name}": ${onlineAgents.length} online agents: ${onlineAgents
+      .map((agent) => `${agent.id}(${agent.adapter_type}/${agent.status})`)
+      .join(", ")}`,
+  );
   const preferredAgentId = getPreferredAgentId(task.name.toLowerCase());
   if (preferredAgentId) {
     const preferredAgent = onlineAgents.find((agent) => agent.id === preferredAgentId);
     if (preferredAgent) {
+      console.log(`[orchestrator] selected: ${preferredAgent.id}`);
       return preferredAgent;
     }
   }
@@ -91,15 +97,18 @@ export function selectAgent(task: Task, agents: AgentRecord[]): AgentRecord | nu
   if (task.suggested_agent_type) {
     const suggestedAgent = onlineAgents.find((agent) => agent.adapter_type === task.suggested_agent_type);
     if (suggestedAgent) {
+      console.log(`[orchestrator] selected: ${suggestedAgent.id}`);
       return suggestedAgent;
     }
   }
 
-  return (
+  const selected = (
     onlineAgents.find((agent) => agent.adapter_type === "codex") ??
     onlineAgents[0] ??
     null
   );
+  console.log(`[orchestrator] selected: ${selected?.id ?? "none"}`);
+  return selected;
 }
 
 export class Orchestrator extends EventEmitter {
