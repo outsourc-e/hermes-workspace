@@ -54,7 +54,7 @@ function parseJson(text: string): unknown {
 }
 
 async function daemonJson(path: string): Promise<unknown> {
-  const response = await fetch(new URL(`/api${path}`, WORKSPACE_DAEMON_ORIGIN), {
+  const response = await fetch(new URL(`/api/workspace${path}`, WORKSPACE_DAEMON_ORIGIN), {
     headers: {
       accept: 'application/json',
     },

@@ -11,7 +11,7 @@ export async function forwardWorkspaceRequest({
   path,
   searchParams,
 }: ForwardWorkspaceRequestOptions): Promise<Response> {
-  const targetUrl = new URL(`/api${path}`, WORKSPACE_DAEMON_ORIGIN)
+  const targetUrl = new URL(`/api/workspace${path}`, WORKSPACE_DAEMON_ORIGIN)
 
   if (searchParams) {
     for (const [key, value] of searchParams.entries()) {
