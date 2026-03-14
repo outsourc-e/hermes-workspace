@@ -31,6 +31,7 @@ const config = defineConfig(({ mode, command }) => {
     Math.min(1000 * 2 ** Math.max(attempt - 1, 0), 30000)
 
   const startWorkspaceDaemon = () => {
+    if (workspaceDaemonShuttingDown) return
     if (workspaceDaemonStarted || workspaceDaemonStarting) return
 
     const spawnCommand = existsSync(daemonSrcEntry)
@@ -163,7 +164,8 @@ const config = defineConfig(({ mode, command }) => {
   const restartWorkspaceDaemon = async () => {
     workspaceDaemonRetryCount = 0
     await stopWorkspaceDaemon()
-    workspaceDaemonStarting = true
+    workspaceDaemonStarted = false
+    workspaceDaemonStarting = false
     startWorkspaceDaemon()
   }
 
