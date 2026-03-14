@@ -331,7 +331,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                       'rounded-full border text-sm',
                       active
                         ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
-                        : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-900',
+                        : 'border-transparent text-primary-500 hover:bg-primary-100 hover:text-primary-900',
                     )}
                   >
                     <span className="inline-flex items-center gap-2">
