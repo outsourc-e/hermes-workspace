@@ -309,6 +309,13 @@ const config = defineConfig(({ mode, command }) => {
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
             const requestPath = req.url?.split('?')[0]
+            if (req.method === 'GET' && requestPath === '/api/healthcheck') {
+              res.statusCode = 200
+              res.setHeader('content-type', 'application/json')
+              res.end(JSON.stringify({ ok: true }))
+              return
+            }
+
             if (
               req.method !== 'POST' ||
               requestPath !== '/api/workspace/daemon/restart'
