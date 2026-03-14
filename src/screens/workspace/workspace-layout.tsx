@@ -432,6 +432,18 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                 />
                 {connected ? 'Live' : 'Connecting...'}
               </div>
+              {pendingReviewCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('review')
+                    navigateToTab(navigate, search, 'review')
+                  }}
+                  className="relative inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                >
+                  🔔 {pendingReviewCount} to review
+                </button>
+              )}
             </div>
           </div>
           {showOfflineBanner ? (

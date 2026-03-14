@@ -902,10 +902,13 @@ export function ReviewQueueScreen() {
               />
             </div>
             <h2 className="text-lg font-semibold text-primary-900">
-              No checkpoints waiting
+              All clear
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-primary-500">
-              When agents finish a task, their work appears here for your review.
+              No checkpoints waiting for review. Start a mission from Projects — agent output will appear here automatically.
+            </p>
+            <p className="mt-3 text-xs text-primary-400">
+              Keyboard: <kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono">a</kbd> approve · <kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono">m</kbd> merge · <kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono">r</kbd> reject · <kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono">j/k</kbd> navigate
             </p>
           </div>
         ) : visibleCheckpoints.length === 0 ? (

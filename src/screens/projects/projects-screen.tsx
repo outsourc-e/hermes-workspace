@@ -1862,6 +1862,20 @@ export function ProjectsScreen({
               </label>
             </div>
 
+            {!projectsQuery.isPending && projects.length === 0 && (
+              <div className="rounded-xl border border-accent-500/30 bg-gradient-to-r from-accent-500/5 to-transparent px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">👋</span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-primary-900">Welcome to Workspace</h3>
+                    <p className="mt-1 text-sm text-primary-600">
+                      Create your first project to get started. Describe what you want to build, and AI agents will decompose it into tasks, execute them, and submit checkpoints for your review.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <DashboardKpiBar
               stats={statsQuery.data}
               projects={projects}

@@ -76,8 +76,28 @@ export function DashboardProjectCards({
 
   if (projectOverviews.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-12 text-center">
-        <p className="text-sm text-primary-500">No projects found yet.</p>
+      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-16 text-center">
+        <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl border border-accent-500/30 bg-accent-500/10 text-accent-400">
+          <HugeiconsIcon icon={Folder01Icon} size={26} strokeWidth={1.5} />
+        </div>
+        <h3 className="text-base font-semibold text-primary-900">No projects yet</h3>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-primary-500">
+          Get started in 3 steps:
+        </p>
+        <div className="mx-auto mt-4 max-w-xs space-y-2 text-left text-sm text-primary-600">
+          <div className="flex items-center gap-3 rounded-lg border border-primary-200 bg-white px-3 py-2">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-500/10 text-xs font-bold text-accent-500">1</span>
+            <span>Create a project with a spec or PRD</span>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg border border-primary-200 bg-white px-3 py-2">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-500/10 text-xs font-bold text-accent-500">2</span>
+            <span>AI decomposes it into tasks</span>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg border border-primary-200 bg-white px-3 py-2">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-500/10 text-xs font-bold text-accent-500">3</span>
+            <span>Agents execute, you review &amp; approve</span>
+          </div>
+        </div>
       </div>
     )
   }
