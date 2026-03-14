@@ -101,6 +101,11 @@ type ProjectMissionComposerState = {
   error: string | null
 }
 
+type CreateProjectProgressStage =
+  | 'creating-project'
+  | 'decomposing-tasks'
+  | 'starting-mission'
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
@@ -237,12 +242,29 @@ export function ProjectsScreen({
     spec: '',
     autoDecompose: true,
   })
+  const [createProjectError, setCreateProjectError] = useState<string | null>(null)
+  const [createProjectProgressStage, setCreateProjectProgressStage] =
+    useState<CreateProjectProgressStage | null>(null)
+  const [createProjectLongRunning, setCreateProjectLongRunning] = useState(false)
   const [projectMissionComposer, setProjectMissionComposer] =
     useState<ProjectMissionComposerState | null>(null)
   const [missionStartPending, setMissionStartPending] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (createProjectProgressStage !== 'decomposing-tasks') {
+      setCreateProjectLongRunning(false)
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setCreateProjectLongRunning(true)
+    }, 10_000)
+
+    return () => window.clearTimeout(timeout)
+  }, [createProjectProgressStage])
 
   const projectsQuery = useQuery({
     queryKey: ['workspace', 'projects', refreshToken],
@@ -737,6 +759,9 @@ export function ProjectsScreen({
   }
 
   function openNewProjectDialog() {
+    setCreateProjectError(null)
+    setCreateProjectProgressStage(null)
+    setCreateProjectLongRunning(false)
     setNewProjectForm({ name: '', path: '', spec: '', autoDecompose: true })
     setNewProjectOpen(true)
   }
@@ -765,6 +790,7 @@ export function ProjectsScreen({
     const missionId = extractEntityId(missionPayload, 'mission')
     if (!missionId) throw new Error('Mission response was empty')
 
+    setCreateProjectProgressStage('decomposing-tasks')
     const decomposeResult = extractDecomposeResponse(
       await apiRequest('/api/workspace/decompose', {
         method: 'POST',
@@ -782,12 +808,18 @@ export function ProjectsScreen({
       throw new Error('Decompose returned no tasks')
     }
 
+    setCreateProjectProgressStage('starting-mission')
     for (const id of [missionId]) {
       await apiRequest(`/api/workspace/missions/${encodeURIComponent(id)}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
+    }
+
+    return {
+      missionId,
+      taskCount: decomposeResult.tasks.length,
     }
   }
 
@@ -1005,6 +1037,7 @@ export function ProjectsScreen({
     const name = newProjectForm.name.trim()
     const path = newProjectForm.path.trim()
     const spec = newProjectForm.spec.trim()
+    setCreateProjectError(null)
 
     if (!name) {
       toast('Project name is required.', { type: 'warning' })
@@ -1017,6 +1050,8 @@ export function ProjectsScreen({
     }
 
     setSubmittingKey('project')
+    setCreateProjectProgressStage('creating-project')
+    setCreateProjectLongRunning(false)
 
     try {
       const project = extractProject(
@@ -1035,19 +1070,42 @@ export function ProjectsScreen({
       }
 
       if (newProjectForm.autoDecompose && spec) {
-        await createInitialProjectMission(project.id, spec)
-        toast('Project created — agents starting...', { type: 'success' })
+        const missionResult = await createInitialProjectMission(project.id, spec)
+        toast(`Project created with ${missionResult.taskCount} task${missionResult.taskCount === 1 ? '' : 's'}`, {
+          type: 'success',
+        })
       } else {
         toast('Project created', { type: 'success' })
       }
 
+      setSelectedProjectId(project.id)
       setNewProjectOpen(false)
       setNewProjectForm({ name: '', path: '', spec: '', autoDecompose: true })
+      setCreateProjectProgressStage(null)
+      setCreateProjectLongRunning(false)
       triggerRefresh()
+
+      if (routePath === '/workspace') {
+        void navigate({
+          to: '/workspace',
+          search: {
+            goal: undefined,
+            checkpointId: undefined,
+            phaseId: undefined,
+            phaseName: undefined,
+            project: undefined,
+            projectId: project.id,
+            missionId: undefined,
+            showWizard: undefined,
+          },
+        })
+      }
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to create project', {
-        type: 'error',
-      })
+      setCreateProjectProgressStage(null)
+      setCreateProjectLongRunning(false)
+      setCreateProjectError(
+        error instanceof Error ? error.message : 'Failed to create project',
+      )
     } finally {
       setSubmittingKey(null)
     }
@@ -1871,7 +1929,36 @@ export function ProjectsScreen({
         open={newProjectOpen}
         submitting={submittingKey === 'project'}
         form={newProjectForm}
+        submitLabel={
+          createProjectProgressStage === 'creating-project'
+            ? 'Creating project...'
+            : createProjectProgressStage === 'decomposing-tasks'
+              ? 'Decomposing tasks with AI...'
+              : createProjectProgressStage === 'starting-mission'
+                ? 'Starting mission...'
+                : 'Create Project'
+        }
+        errorMessage={createProjectError}
+        progressMessage={
+          createProjectProgressStage === 'creating-project'
+            ? 'Creating project...'
+            : createProjectProgressStage === 'decomposing-tasks'
+              ? 'Decomposing tasks with AI...'
+              : createProjectProgressStage === 'starting-mission'
+                ? 'Starting mission...'
+                : null
+        }
+        progressHint={
+          createProjectLongRunning
+            ? 'AI is analyzing your spec and creating tasks. This usually takes 30-60 seconds.'
+            : null
+        }
         onOpenChange={(open) => {
+          if (!open) {
+            setCreateProjectError(null)
+            setCreateProjectProgressStage(null)
+            setCreateProjectLongRunning(false)
+          }
           setNewProjectOpen(open)
         }}
         onFormChange={setNewProjectForm}

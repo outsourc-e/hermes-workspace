@@ -3,7 +3,6 @@ import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import {
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogRoot,
@@ -24,6 +23,9 @@ type WorkspaceEntityDialogProps = {
   children: React.ReactNode
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   submitLabel: string
+  errorMessage?: string | null
+  progressMessage?: string | null
+  progressHint?: string | null
 }
 
 export function WorkspaceFieldLabel({
@@ -52,9 +54,18 @@ export function WorkspaceEntityDialog({
   children,
   onSubmit,
   submitLabel,
+  errorMessage,
+  progressMessage,
+  progressHint,
 }: WorkspaceEntityDialogProps) {
   return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
+    <DialogRoot
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (submitting && !nextOpen) return
+        onOpenChange(nextOpen)
+      }}
+    >
       <DialogContent className="w-[min(540px,94vw)] border-primary-200 bg-white p-0 text-primary-900 shadow-2xl">
         <form onSubmit={onSubmit} className="space-y-5 p-5">
           <div className="space-y-1">
@@ -68,15 +79,45 @@ export function WorkspaceEntityDialog({
 
           <div className="space-y-4">{children}</div>
 
-          <div className="flex items-center justify-end gap-2">
-            <DialogClose render={<Button variant="outline">Cancel</Button>} />
+          {errorMessage ? (
+            <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-3 text-sm text-primary-900">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
             <Button
               type="submit"
               className="bg-accent-500 text-white hover:bg-accent-400"
               disabled={submitting}
             >
-              {submitting ? 'Saving...' : submitLabel}
+                {submitLabel}
             </Button>
+            </div>
+
+            {submitting && progressMessage ? (
+              <div className="space-y-2">
+                <div className="overflow-hidden rounded-full border border-primary-200 bg-primary-50">
+                  <div className="h-2 w-2/3 animate-shimmer rounded-full bg-accent-500" />
+                </div>
+                <div className="flex items-center gap-2 text-sm font-medium text-primary-900">
+                  <span className="size-3 animate-spin rounded-full border-2 border-accent-500 border-r-transparent" />
+                  <span>{progressMessage}</span>
+                </div>
+                {progressHint ? (
+                  <p className="text-xs leading-5 text-primary-500">{progressHint}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </form>
       </DialogContent>
@@ -88,6 +129,10 @@ type CreateProjectDialogProps = {
   open: boolean
   submitting: boolean
   form: ProjectFormState
+  submitLabel?: string
+  errorMessage?: string | null
+  progressMessage?: string | null
+  progressHint?: string | null
   onOpenChange: (open: boolean) => void
   onFormChange: (next: ProjectFormState) => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
@@ -97,6 +142,10 @@ export function CreateProjectDialog({
   open,
   submitting,
   form,
+  submitLabel = 'Create Project',
+  errorMessage,
+  progressMessage,
+  progressHint,
   onOpenChange,
   onFormChange,
   onSubmit,
@@ -126,7 +175,10 @@ export function CreateProjectDialog({
       description="Define a new workspace project with an optional path and project spec."
       submitting={submitting}
       onSubmit={onSubmit}
-      submitLabel="Create Project"
+      submitLabel={submitLabel}
+      errorMessage={errorMessage}
+      progressMessage={progressMessage}
+      progressHint={progressHint}
     >
       <WorkspaceFieldLabel label="Name">
         <input
