@@ -403,7 +403,7 @@ export function ProjectsScreen({
   useEffect(() => {
     const spec = projectDetail?.spec ?? selectedSummary?.spec ?? ''
     setProjectSpecDraft(spec)
-    setProjectSpecOpen(spec.trim().length > 0)
+    setProjectSpecOpen(false)
   }, [
     projectDetail?.id,
     projectDetail?.spec,
@@ -1519,7 +1519,7 @@ export function ProjectsScreen({
             ),
         )
         setProjectSpecDraft(updatedProject.spec ?? '')
-        setProjectSpecOpen(Boolean(updatedProject.spec?.trim()))
+        setProjectSpecOpen(false)
       }
       toast('Project spec saved', { type: 'success' })
       triggerRefresh()

@@ -116,6 +116,13 @@ function truncateMiddle(value: string, maxLength: number): string {
   return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
 }
 
+function getSpecPreview(value: string, maxLength = 180): string {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (!normalized) return 'No spec yet. Add a brief or PRD for this project.'
+  if (normalized.length <= maxLength) return normalized
+  return `${normalized.slice(0, maxLength).trimEnd()}…`
+}
+
 function isQaAgent(agent: Pick<WorkspaceAgent, 'name' | 'role' | 'adapter_type'>): boolean {
   const haystack = `${agent.name} ${agent.role ?? ''} ${agent.adapter_type ?? ''}`.toLowerCase()
   return haystack.includes('qa') || haystack.includes('quality')
@@ -461,6 +468,22 @@ export function ProjectDetailView({
       ) ?? [],
     [sourceProject],
   )
+  const completedTaskCount = useMemo(
+    () => projectTasks.filter((task) => isCompletedTaskStatus(task.status)).length,
+    [projectTasks],
+  )
+  const runningTaskCount = useMemo(
+    () => projectTasks.filter((task) => isRunningTaskStatus(task.status)).length,
+    [projectTasks],
+  )
+  const queuedTaskCount = useMemo(
+    () =>
+      projectTasks.filter(
+        (task) =>
+          !isCompletedTaskStatus(task.status) && !isRunningTaskStatus(task.status),
+      ).length,
+    [projectTasks],
+  )
   const openCheckpointList = useMemo(
     () => checkpoints.filter((checkpoint) => checkpoint.status === 'pending').slice(0, 3),
     [checkpoints],
@@ -580,8 +603,8 @@ export function ProjectDetailView({
 
   return (
     <>
-      <div className="flex flex-col gap-4 border-b border-primary-200 pb-5 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-3">
+      <div className="flex flex-col gap-4 border-b border-primary-200 pb-4 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold text-primary-900">
               {projectDetail?.name ?? selectedSummary.name}
@@ -595,8 +618,17 @@ export function ProjectDetailView({
               {formatStatus(projectDetail?.status ?? selectedSummary.status)}
             </span>
           </div>
-          <div className="space-y-1 text-sm text-primary-500">
-            <p>{projectDetail?.path || selectedSummary.path || 'No path configured'}</p>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-primary-500">
+            <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1">
+              {projectDetail?.path || selectedSummary.path || 'No path configured'}
+            </span>
+            <span className="rounded-full border border-primary-200 bg-white px-3 py-1">
+              {projectTasks.length} task{projectTasks.length === 1 ? '' : 's'}
+            </span>
+            <span className="rounded-full border border-primary-200 bg-white px-3 py-1">
+              {projectDetail?.phases.length ?? selectedSummary.phase_count} phase
+              {(projectDetail?.phases.length ?? selectedSummary.phase_count) === 1 ? '' : 's'}
+            </span>
           </div>
         </div>
 
@@ -609,81 +641,30 @@ export function ProjectDetailView({
         </Button>
       </div>
 
-      <Collapsible open={projectSpecOpen} onOpenChange={onSpecOpenChange}>
-        <section className="mt-5 rounded-xl border border-primary-200 bg-primary-50/70">
-          <CollapsibleTrigger
-            render={
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-              />
-            }
-            className="w-full bg-transparent p-0 hover:bg-transparent"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-primary-900">Project Spec / PRD</p>
-              <p className="text-xs text-primary-500">
-                {projectSpecDraft.trim()
-                  ? 'Execution context and product requirements'
-                  : 'No spec yet. Add a brief or PRD for this project.'}
-              </p>
-            </div>
-            <HugeiconsIcon
-              icon={projectSpecOpen ? ArrowDown01Icon : ArrowRight01Icon}
-              size={16}
-              strokeWidth={1.7}
-              className="text-primary-500"
-            />
-          </CollapsibleTrigger>
-          <CollapsiblePanel
-            className="pt-0"
-            contentClassName="border-t border-primary-200 px-4 py-4"
-          >
-            <div className="space-y-3">
-              {!projectSpecDraft.trim() ? (
-                <div className="rounded-xl border border-dashed border-primary-200 bg-white px-4 py-4 text-sm text-primary-500">
-                  No spec yet — add one to improve decomposition quality
-                </div>
-              ) : null}
-              <textarea
-                value={projectSpecDraft}
-                onChange={(event) => onSpecDraftChange(event.target.value)}
-                rows={10}
-                className="min-h-[220px] w-full rounded-xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
-                placeholder="Add the project spec, PRD, or execution brief..."
-              />
-              <input
-                ref={specFileInputRef}
-                type="file"
-                accept={ACCEPTED_SPEC_FILE_TYPES}
-                className="hidden"
-                onChange={(event) => void handleSpecFileSelect(event)}
-              />
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-primary-500">Markdown supported. Upload `.md` or `.txt`.</p>
-                <div className="flex flex-wrap justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => specFileInputRef.current?.click()}
-                    disabled={submittingKey === 'project-spec'}
-                  >
-                    Upload spec file
-                  </Button>
-                <Button
-                  type="button"
-                  onClick={() => onSaveSpec()}
-                  disabled={submittingKey === 'project-spec'}
-                  className="bg-accent-500 text-white hover:bg-accent-400"
-                >
-                  {submittingKey === 'project-spec' ? 'Saving...' : 'Save Spec'}
-                </Button>
-                </div>
-              </div>
-            </div>
-          </CollapsiblePanel>
-        </section>
-      </Collapsible>
+      <section className="mt-5 rounded-xl border border-primary-200 bg-white px-4 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-primary-900">Pipeline</span>
+            <span className="text-sm text-primary-500">
+              Tasks: {projectTasks.length} total
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-primary-900">
+            <span className="inline-flex items-center gap-2">
+              <span className="size-2 rounded-full bg-primary-900" />
+              {completedTaskCount} done
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
+              {runningTaskCount} running
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="size-2 rounded-full bg-primary-200" />
+              {queuedTaskCount} queued
+            </span>
+          </div>
+        </div>
+      </section>
 
       <div className="mt-5 grid gap-3 xl:grid-cols-3">
         <DetailPanel title="Open Checkpoints">
@@ -751,6 +732,84 @@ export function ProjectDetailView({
           )}
         </DetailPanel>
       </div>
+
+      <Collapsible open={projectSpecOpen} onOpenChange={onSpecOpenChange}>
+        <section className="mt-5 rounded-xl border border-primary-200 bg-primary-50/70">
+          <CollapsibleTrigger
+            render={
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+              />
+            }
+            className="w-full bg-transparent p-0 hover:bg-transparent"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-primary-900">Project Spec / PRD</p>
+              <p className="mt-1 text-xs leading-5 text-primary-500">
+                {projectSpecOpen
+                  ? projectSpecDraft.trim()
+                    ? 'Execution context and product requirements'
+                    : 'No spec yet. Add a brief or PRD for this project.'
+                  : getSpecPreview(projectSpecDraft)}
+              </p>
+            </div>
+            <HugeiconsIcon
+              icon={projectSpecOpen ? ArrowDown01Icon : ArrowRight01Icon}
+              size={16}
+              strokeWidth={1.7}
+              className="text-primary-500"
+            />
+          </CollapsibleTrigger>
+          <CollapsiblePanel
+            className="pt-0"
+            contentClassName="border-t border-primary-200 px-4 py-4"
+          >
+            <div className="space-y-3">
+              {!projectSpecDraft.trim() ? (
+                <div className="rounded-xl border border-dashed border-primary-200 bg-white px-4 py-4 text-sm text-primary-500">
+                  No spec yet — add one to improve decomposition quality
+                </div>
+              ) : null}
+              <textarea
+                value={projectSpecDraft}
+                onChange={(event) => onSpecDraftChange(event.target.value)}
+                rows={10}
+                className="min-h-[220px] w-full rounded-xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
+                placeholder="Add the project spec, PRD, or execution brief..."
+              />
+              <input
+                ref={specFileInputRef}
+                type="file"
+                accept={ACCEPTED_SPEC_FILE_TYPES}
+                className="hidden"
+                onChange={(event) => void handleSpecFileSelect(event)}
+              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-primary-500">Markdown supported. Upload `.md` or `.txt`.</p>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => specFileInputRef.current?.click()}
+                    disabled={submittingKey === 'project-spec'}
+                  >
+                    Upload spec file
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => onSaveSpec()}
+                    disabled={submittingKey === 'project-spec'}
+                    className="bg-accent-500 text-white hover:bg-accent-400"
+                  >
+                    {submittingKey === 'project-spec' ? 'Saving...' : 'Save Spec'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CollapsiblePanel>
+        </section>
+      </Collapsible>
 
       {detailLoading ? (
         <div className="py-14 text-center">
