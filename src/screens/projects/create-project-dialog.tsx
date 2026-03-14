@@ -1,5 +1,6 @@
 import type React from 'react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import {
@@ -8,11 +9,19 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { workspaceRequestJson } from '@/lib/workspace-checkpoints'
 import type { ProjectFormState } from './lib/workspace-types'
 import {
   ACCEPTED_SPEC_FILE_TYPES,
   readSpecFile,
 } from './lib/spec-file'
+
+function extractRecentPaths(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
+  const paths = (payload as { paths?: unknown }).paths
+  if (!Array.isArray(paths)) return []
+  return paths.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+}
 
 type WorkspaceEntityDialogProps = {
   open: boolean
@@ -151,6 +160,15 @@ export function CreateProjectDialog({
   onSubmit,
 }: CreateProjectDialogProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const pathFieldRef = useRef<HTMLDivElement | null>(null)
+  const [pathDropdownOpen, setPathDropdownOpen] = useState(false)
+  const recentPathsQuery = useQuery({
+    queryKey: ['workspace', 'recent-paths'],
+    queryFn: async () =>
+      extractRecentPaths(await workspaceRequestJson('/api/workspace/recent-paths')),
+    enabled: false,
+    staleTime: 60_000,
+  })
 
   async function handleSpecFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -165,6 +183,21 @@ export function CreateProjectDialog({
         type: 'error',
       })
     }
+  }
+
+  async function openPathDropdown() {
+    setPathDropdownOpen(true)
+    try {
+      await recentPathsQuery.refetch()
+    } catch {
+      // Query state is surfaced below.
+    }
+  }
+
+  function handlePathBlur(event: React.FocusEvent<HTMLDivElement>) {
+    const nextTarget = event.relatedTarget
+    if (nextTarget instanceof Node && pathFieldRef.current?.contains(nextTarget)) return
+    window.setTimeout(() => setPathDropdownOpen(false), 0)
   }
 
   return (
@@ -190,12 +223,61 @@ export function CreateProjectDialog({
         />
       </WorkspaceFieldLabel>
       <WorkspaceFieldLabel label="Path">
-        <input
-          value={form.path}
-          onChange={(event) => onFormChange({ ...form, path: event.target.value })}
-          className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
-          placeholder="/Users/aurora/.openclaw/workspace/clawsuite"
-        />
+        <div
+          ref={pathFieldRef}
+          className="relative"
+          onBlur={handlePathBlur}
+        >
+          <div className="flex gap-2">
+            <input
+              value={form.path}
+              onChange={(event) => onFormChange({ ...form, path: event.target.value })}
+              onFocus={() => void openPathDropdown()}
+              className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
+              placeholder="/Users/aurora/.openclaw/workspace/clawsuite"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void openPathDropdown()}
+              disabled={recentPathsQuery.isFetching}
+            >
+              Browse
+            </Button>
+          </div>
+          {pathDropdownOpen ? (
+            <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-lg border border-primary-200 bg-white p-2 shadow-sm">
+              {recentPathsQuery.isFetching ? (
+                <p className="px-2 py-2 text-sm text-primary-500">Loading recent paths...</p>
+              ) : recentPathsQuery.isError ? (
+                <p className="px-2 py-2 text-sm text-primary-500">
+                  {recentPathsQuery.error instanceof Error
+                    ? recentPathsQuery.error.message
+                    : 'Failed to load recent paths'}
+                </p>
+              ) : (recentPathsQuery.data ?? []).length > 0 ? (
+                <div className="space-y-1">
+                  {(recentPathsQuery.data ?? []).map((path) => (
+                    <button
+                      key={path}
+                      type="button"
+                      className="block w-full rounded-md px-2 py-2 text-left text-sm text-primary-900 transition-colors hover:bg-primary-50"
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        onFormChange({ ...form, path })
+                        setPathDropdownOpen(false)
+                      }}
+                    >
+                      {path}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-2 py-2 text-sm text-primary-500">No recent paths yet.</p>
+              )}
+            </div>
+          ) : null}
+        </div>
       </WorkspaceFieldLabel>
       <WorkspaceFieldLabel label="Spec">
         <div className="space-y-2">

@@ -70,6 +70,18 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
     });
   });
 
+  app.get("/api/workspace/recent-paths", (_req, res) => {
+    const projects = tracker.listProjects();
+    const suggestions = [
+      ...projects.map((project) => project.path).filter((value): value is string => Boolean(value)),
+      process.cwd(),
+    ];
+
+    res.json({
+      paths: [...new Set(suggestions)],
+    });
+  });
+
   app.use("/api/workspace/projects", createProjectsRouter(tracker));
   app.use("/api/workspace/phases", createPhasesRouter(tracker));
   app.use("/api/workspace/tasks", createTasksRouter(tracker, orchestrator));
