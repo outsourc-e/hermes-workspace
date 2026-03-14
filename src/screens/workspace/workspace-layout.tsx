@@ -303,8 +303,8 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     <div className="flex h-full flex-col overflow-hidden bg-surface text-primary-900">
       <div className="sticky top-0 z-20 border-b border-primary-200 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [&::-webkit-scrollbar]:hidden">
               {PRIMARY_TABS.map((tab) => {
                 const active = tab === activeTab
                 const label = TAB_LABELS[tab]
@@ -328,7 +328,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                       navigateToTab(navigate, search, tab)
                     }}
                     className={cn(
-                      'rounded-full border text-sm',
+                      'rounded-full border text-xs sm:text-sm px-2.5 sm:px-3',
                       active
                         ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
                         : 'border-transparent text-primary-500 hover:bg-primary-100 hover:text-primary-900',
