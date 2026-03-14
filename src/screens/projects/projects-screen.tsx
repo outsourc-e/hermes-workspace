@@ -27,10 +27,10 @@ import { toast } from '@/components/ui/toast'
 import {
   type CheckpointReviewAction,
   extractCheckpoints,
-  getCheckpointReviewSuccessMessage,
   matchesCheckpointProject,
   sortCheckpointsNewestFirst,
   submitCheckpointReview,
+  type WorkspaceCheckpointReviewResult,
   type WorkspaceCheckpoint,
 } from '@/lib/workspace-checkpoints'
 import { DashboardAgentCapacity } from './dashboard-agent-capacity'
@@ -113,6 +113,39 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null
+}
+
+function formatApprovalToast(result: WorkspaceCheckpointReviewResult, action: CheckpointReviewAction): string {
+  const branch = result.target_branch?.trim()
+  const commitHash = result.commit_hash?.trim()
+  const commitLabel = commitHash ? ` (${commitHash.slice(0, 7)})` : ''
+
+  if (action === 'approve-and-merge') {
+    return `Checkpoint approved — changes merged to ${branch ?? 'main'}${commitLabel}`
+  }
+  if (action === 'approve-and-pr') {
+    return `Checkpoint approved — PR opened from ${branch ?? 'task branch'}${commitLabel}`
+  }
+  if (action === 'approve' || action === 'approve-and-commit') {
+    return `Checkpoint approved — changes committed on ${branch ?? 'task branch'}${commitLabel}`
+  }
+  if (action === 'revise') return 'Checkpoint sent back for revision'
+  return 'Checkpoint rejected'
+}
+
+function isMissionNowComplete(
+  checkpoints: WorkspaceCheckpoint[],
+  updatedCheckpoint: WorkspaceCheckpoint,
+): boolean {
+  if (!updatedCheckpoint.mission_name || !updatedCheckpoint.project_name) return false
+
+  const missionCheckpoints = checkpoints.filter(
+    (checkpoint) =>
+      checkpoint.project_name === updatedCheckpoint.project_name &&
+      checkpoint.mission_name === updatedCheckpoint.mission_name,
+  )
+
+  return missionCheckpoints.length > 0 && missionCheckpoints.every((checkpoint) => checkpoint.status !== 'pending')
 }
 
 function extractEntityRecord(
@@ -502,10 +535,28 @@ export function ProjectsScreen({
       action: CheckpointReviewAction
       reviewerNotes?: string
     }) => submitCheckpointReview(checkpointId, action, reviewerNotes),
-    onSuccess: (_checkpoint, variables) => {
-      toast(getCheckpointReviewSuccessMessage(variables.action), {
+    onSuccess: (result, variables) => {
+      queryClient.setQueriesData<Array<WorkspaceCheckpoint> | undefined>(
+        { queryKey: ['workspace', 'checkpoints'] },
+        (current) =>
+          current?.map((checkpoint) =>
+            checkpoint.id === result.checkpoint.id ? result.checkpoint : checkpoint,
+          ),
+      )
+
+      toast(formatApprovalToast(result, variables.action), {
         type: 'success',
       })
+      const nextCheckpoints = (queryClient.getQueryData(['workspace', 'checkpoints']) ??
+        allCheckpoints) as Array<WorkspaceCheckpoint>
+      if (
+        (variables.action === 'approve' ||
+          variables.action === 'approve-and-commit' ||
+          variables.action === 'approve-and-merge') &&
+        isMissionNowComplete(nextCheckpoints, result.checkpoint)
+      ) {
+        toast('Mission complete — all tasks approved', { type: 'success' })
+      }
       setSelectedCheckpoint(null)
       void queryClient.invalidateQueries({ queryKey: ['workspace'] })
       triggerRefresh()

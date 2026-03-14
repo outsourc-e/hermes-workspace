@@ -1,10 +1,11 @@
 import fs from "node:fs/promises";
 import { execFile, execSync } from "node:child_process";
 import { promisify } from "node:util";
-import { Router } from "express";
+import { type Response, Router } from "express";
 import {
   cleanupWorktree,
   createPullRequest,
+  getBaseBranch,
   getWorktreeBranch,
   hasGitRemote,
   mergeWorktreeToMain,
@@ -302,6 +303,30 @@ async function buildCheckpointDetail(tracker: Tracker, checkpointId: string) {
 export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestrator): Router {
   const router = Router();
 
+  function sendApprovedResponse(
+    res: Response,
+    checkpoint: ReturnType<Tracker["approveCheckpoint"]>,
+    options: {
+      commitHash?: string | null;
+      targetBranch?: string | null;
+      prUrl?: string | null;
+    } = {},
+  ) {
+    if (!checkpoint) {
+      res.status(500).json({ error: "Failed to update checkpoint" });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      status: "approved",
+      checkpoint,
+      commit_hash: options.commitHash ?? checkpoint.commit_hash ?? null,
+      target_branch: options.targetBranch ?? null,
+      pr_url: options.prUrl ?? null,
+    });
+  }
+
   router.get("/", (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const projectId = typeof req.query.project_id === "string" ? req.query.project_id : undefined;
@@ -388,12 +413,10 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
       req.body?.reviewer_notes,
       commitHash,
     );
-    if (!updatedCheckpoint) {
-      res.status(500).json({ error: "Failed to update checkpoint" });
-      return;
-    }
-
-    res.json(updatedCheckpoint);
+    sendApprovedResponse(res, updatedCheckpoint, {
+      commitHash,
+      targetBranch: taskRun?.project_path ? await getBaseBranch(taskRun.project_path) : null,
+    });
   });
 
   router.post("/:id/approve-and-commit", async (req, res) => {
@@ -421,13 +444,10 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
         req.body?.reviewer_notes,
         commitHash,
       );
-
-      if (!updatedCheckpoint) {
-        res.status(500).json({ error: "Failed to update checkpoint" });
-        return;
-      }
-
-      res.json(updatedCheckpoint);
+      sendApprovedResponse(res, updatedCheckpoint, {
+        commitHash,
+        targetBranch: getWorktreeBranch(taskRun.id),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to approve and commit checkpoint";
       res.status(500).json({ error: message });
@@ -480,15 +500,10 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
         req.body?.reviewer_notes,
         commitHash,
       );
-
-      if (!updatedCheckpoint) {
-        res.status(500).json({ error: "Failed to update checkpoint" });
-        return;
-      }
-
-      res.json({
-        ...updatedCheckpoint,
-        pr_url: prUrl,
+      sendApprovedResponse(res, updatedCheckpoint, {
+        commitHash,
+        targetBranch: "main",
+        prUrl,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to approve and open PR";
@@ -518,6 +533,7 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
 
     try {
       let commitHash: string | null = null;
+      const targetBranch = await getBaseBranch(taskRun.project_path);
       const workspaceExists = await pathExists(taskRun.workspace_path);
 
       if (taskRun.workspace_path && workspaceExists) {
@@ -540,14 +556,11 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
         req.body?.reviewer_notes,
         commitHash,
       );
-
-      if (!updatedCheckpoint) {
-        res.status(500).json({ error: "Failed to update checkpoint" });
-        return;
-      }
-
       tracker.emitCheckpointMerged(checkpoint.id);
-      res.json(updatedCheckpoint);
+      sendApprovedResponse(res, updatedCheckpoint, {
+        commitHash,
+        targetBranch,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to approve and merge checkpoint";
       res.status(500).json({ error: message });

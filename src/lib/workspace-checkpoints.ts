@@ -31,6 +31,14 @@ export type WorkspaceCheckpoint = {
   agent_name: string | null
 }
 
+export type WorkspaceCheckpointReviewResult = {
+  checkpoint: WorkspaceCheckpoint
+  status: CheckpointStatus
+  commit_hash: string | null
+  target_branch: string | null
+  pr_url: string | null
+}
+
 export type WorkspaceCheckpointRunEvent = {
   id: number
   type: string
@@ -244,7 +252,7 @@ export async function submitCheckpointReview(
   id: string,
   action: CheckpointReviewAction,
   reviewerNotes?: string,
-): Promise<WorkspaceCheckpoint> {
+): Promise<WorkspaceCheckpointReviewResult> {
   const payload = await workspaceRequestJson(
     `/api/workspace/checkpoints/${encodeURIComponent(id)}/${action}`,
     {
@@ -260,11 +268,18 @@ export async function submitCheckpointReview(
     },
   )
 
-  const checkpoint = extractSingleCheckpoint(payload)
+  const record = asRecord(payload)
+  const checkpoint = extractSingleCheckpoint(record?.checkpoint ?? payload)
   if (!checkpoint) {
     throw new Error('Checkpoint response was empty')
   }
-  return checkpoint
+  return {
+    checkpoint,
+    status: asString(record?.status) ?? checkpoint.status,
+    commit_hash: asString(record?.commit_hash) ?? checkpoint.commit_hash,
+    target_branch: asString(record?.target_branch) ?? null,
+    pr_url: asString(record?.pr_url) ?? null,
+  }
 }
 
 export async function getWorkspaceCheckpointDetail(
