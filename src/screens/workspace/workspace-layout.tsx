@@ -300,7 +300,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-surface text-primary-900">
+    <div className="flex h-full flex-col overflow-hidden bg-white text-primary-900">
       <div className="sticky top-0 z-20 border-b border-primary-200 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -488,7 +488,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
           ) : null}
         </div>
       </div>
-      <main className="flex-1 overflow-y-auto bg-surface pb-[calc(var(--tabbar-h,80px)+1rem)]">
+      <main className="flex-1 overflow-y-auto bg-white pb-[calc(var(--tabbar-h,80px)+1rem)]">
         {search.checkpointId ? (
           <CheckpointDetailScreen
             checkpointId={search.checkpointId}
