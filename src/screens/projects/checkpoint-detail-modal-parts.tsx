@@ -33,14 +33,14 @@ export function getStatusTone(status: string) {
   if (status === 'approved') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
   if (status === 'revised') return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
   if (status === 'rejected') return 'border-red-500/30 bg-red-500/10 text-red-300'
-  return 'border-primary-700 bg-primary-800/80 text-primary-300'
+  return 'border-primary-200 bg-primary-50 text-primary-900'
 }
 
 export function getDiffLineClass(line: string) {
   if (line.startsWith('+')) return 'bg-emerald-500/12 text-emerald-200'
   if (line.startsWith('-')) return 'bg-red-500/12 text-red-200'
   if (line.startsWith('@@')) return 'bg-sky-500/12 text-sky-200'
-  return 'text-primary-300'
+  return 'text-primary-500'
 }
 
 export function DetailStat({ label, value }: { label: string; value: string }) {
@@ -146,7 +146,7 @@ export function FileDiffCard({
 
 export function RawDiffViewer({ diff }: { diff: string }) {
   if (!diff.trim()) {
-    return <p className="text-sm text-primary-400">No raw diff was available for this checkpoint.</p>
+    return <p className="text-sm text-primary-500">No raw diff was available for this checkpoint.</p>
   }
 
   return (

@@ -292,7 +292,7 @@ function getBadgeClass(badge: string): string {
     return 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
   if (badge === 'security')
     return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-  return 'border-primary-700 bg-primary-800 text-primary-300'
+  return 'border-primary-200 bg-primary-50 text-primary-900'
 }
 
 function WizardField({
@@ -307,7 +307,7 @@ function WizardField({
   return (
     <label className="block space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-400">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
           {label}
         </span>
         {hint ? <span className="text-xs text-primary-500">{hint}</span> : null}
@@ -319,11 +319,11 @@ function WizardField({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-primary-800 bg-primary-900/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-1 rounded-xl border border-primary-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
         {label}
       </span>
-      <span className="text-sm text-primary-100 sm:text-right">{value}</span>
+      <span className="text-sm text-primary-900 sm:text-right">{value}</span>
     </div>
   )
 }
@@ -545,20 +545,20 @@ export function NewProjectWizardContent({
   }
 
   return (
-    <main className="min-h-full bg-primary-950 px-4 py-6 text-primary-100 md:px-6 md:py-8">
+    <main className="min-h-full bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-primary-100">
+            <h1 className="text-2xl font-semibold text-primary-900">
               New Project
             </h1>
-            <p className="mt-1 text-sm text-primary-400">
+            <p className="mt-1 text-sm text-primary-500">
               Set up a new project in 5 steps.
             </p>
           </div>
           <Button
             variant="outline"
-            className="border-primary-700 bg-primary-900 text-primary-200 hover:bg-primary-800"
+            className="border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
             onClick={() => {
               if (onClose) {
                 onClose()
@@ -599,7 +599,7 @@ export function NewProjectWizardContent({
                   state === 'active' &&
                     'border-accent-500/40 bg-accent-500/10 text-accent-300',
                   state === 'pending' &&
-                    'border-primary-800 bg-primary-900/60 text-primary-500',
+                    'border-primary-200 bg-white text-primary-500',
                   !isClickable && 'cursor-default',
                   isClickable && 'cursor-pointer',
                 )}
@@ -641,7 +641,7 @@ export function NewProjectWizardContent({
           </div>
         ) : null}
 
-        <section className="rounded-[28px] border border-primary-800 bg-primary-900/80 p-5 shadow-2xl shadow-black/20 md:p-7">
+        <section className="rounded-[28px] border border-primary-200 bg-primary-50/80 p-5 shadow-sm md:p-7">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -657,10 +657,10 @@ export function NewProjectWizardContent({
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
                       Step 1
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold text-primary-100">
+                    <h2 className="mt-2 text-xl font-semibold text-primary-900">
                       Source
                     </h2>
-                    <p className="mt-1 text-sm text-primary-400">
+                    <p className="mt-1 text-sm text-primary-500">
                       Start with the project identity and working directory.
                     </p>
                   </div>
@@ -672,7 +672,7 @@ export function NewProjectWizardContent({
                         onChange={(event) => setName(event.target.value)}
                         placeholder="ClawSuite Workspace Refresh"
                         autoFocus
-                        className="w-full rounded-2xl border border-primary-700 bg-primary-800 px-4 py-3 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                        className="w-full rounded-2xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                       />
                     </WizardField>
 
@@ -681,8 +681,8 @@ export function NewProjectWizardContent({
                       hint="Paste an absolute path from Finder or Terminal"
                     >
                       <div className="space-y-2">
-                        <div className="rounded-2xl border border-primary-800 bg-primary-950/60 p-1">
-                          <div className="flex items-center gap-3 rounded-[18px] border border-primary-800 bg-primary-900 px-3 py-3">
+                        <div className="rounded-2xl border border-primary-200 bg-primary-50 p-1">
+                          <div className="flex items-center gap-3 rounded-[18px] border border-primary-200 bg-white px-3 py-3">
                             <HugeiconsIcon
                               icon={Folder01Icon}
                               size={18}
@@ -693,7 +693,7 @@ export function NewProjectWizardContent({
                               value={path}
                               onChange={(event) => setPath(event.target.value)}
                               placeholder="/Users/aurora/.openclaw/workspace/clawsuite"
-                              className="w-full bg-transparent text-sm text-primary-100 outline-none placeholder:text-primary-500"
+                              className="w-full bg-transparent text-sm text-primary-900 outline-none placeholder:text-primary-500"
                             />
                           </div>
                         </div>
@@ -713,10 +713,10 @@ export function NewProjectWizardContent({
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
                       Step 2
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold text-primary-100">
+                    <h2 className="mt-2 text-xl font-semibold text-primary-900">
                       Spec
                     </h2>
-                    <p className="mt-1 text-sm text-primary-400">
+                    <p className="mt-1 text-sm text-primary-500">
                       Paste your PRD, spec, or a concise build brief.
                     </p>
                   </div>
@@ -731,7 +731,7 @@ export function NewProjectWizardContent({
                         onChange={(event) => setSpec(event.target.value)}
                         rows={12}
                         placeholder="Paste your PRD, spec, or describe what you want to build"
-                        className="w-full rounded-2xl border border-primary-700 bg-primary-800 px-4 py-3 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                        className="w-full rounded-2xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                       />
                       <input
                         ref={fileInputRef}
@@ -744,7 +744,7 @@ export function NewProjectWizardContent({
                         <Button
                           type="button"
                           variant="outline"
-                          className="border-primary-700 bg-primary-900 text-primary-200 hover:bg-primary-800"
+                          className="border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
                           onClick={() => fileInputRef.current?.click()}
                         >
                           <HugeiconsIcon
@@ -756,7 +756,7 @@ export function NewProjectWizardContent({
                         </Button>
                         <button
                           type="button"
-                          className="text-sm font-medium text-primary-400 transition-colors hover:text-primary-200"
+                          className="text-sm font-medium text-primary-500 transition-colors hover:text-primary-900"
                           onClick={() => setSpec('')}
                         >
                           Skip for now
@@ -777,10 +777,10 @@ export function NewProjectWizardContent({
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
                       Step 3
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold text-primary-100">
+                    <h2 className="mt-2 text-xl font-semibold text-primary-900">
                       Agent Squad
                     </h2>
-                    <p className="mt-1 text-sm text-primary-400">
+                    <p className="mt-1 text-sm text-primary-500">
                       Choose a squad template or customize the roster.
                     </p>
                     <p className="mt-2 text-xs text-primary-500">
@@ -799,14 +799,14 @@ export function NewProjectWizardContent({
                           'rounded-2xl border px-4 py-4 text-left transition-all',
                           preset === option.id
                             ? 'border-accent-500/50 bg-accent-500/10 shadow-lg shadow-accent-500/10'
-                            : 'border-primary-800 bg-primary-950/50 hover:border-primary-700 hover:bg-primary-800/70',
+                            : 'border-primary-200 bg-white hover:border-primary-300 hover:bg-primary-50',
                         )}
                       >
                         <div className="text-2xl">{option.emoji}</div>
-                        <div className="mt-3 text-base font-semibold text-primary-100">
+                        <div className="mt-3 text-base font-semibold text-primary-900">
                           {option.name}
                         </div>
-                        <div className="mt-1 text-sm text-primary-400">
+                        <div className="mt-1 text-sm text-primary-500">
                           {option.description}
                         </div>
                       </button>
@@ -825,14 +825,14 @@ export function NewProjectWizardContent({
                         assignedAgents.map((agent) => (
                           <div
                             key={agent.key}
-                            className="flex items-center gap-3 rounded-2xl border border-primary-800 bg-primary-950/70 px-4 py-3"
+                            className="flex items-center gap-3 rounded-2xl border border-primary-200 bg-white px-4 py-3"
                           >
                             <span className="text-xl">{agent.emoji}</span>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-primary-100">
+                              <p className="truncate text-sm font-semibold text-primary-900">
                                 {agent.name}
                               </p>
-                              <p className="truncate text-xs text-primary-400">
+                              <p className="truncate text-xs text-primary-500">
                                 {agent.detail}
                               </p>
                             </div>
@@ -847,7 +847,7 @@ export function NewProjectWizardContent({
                           </div>
                         ))
                       ) : (
-                        <div className="rounded-2xl border border-dashed border-primary-800 bg-primary-950/40 px-4 py-5 text-sm text-primary-500">
+                        <div className="rounded-2xl border border-dashed border-primary-200 bg-white px-4 py-5 text-sm text-primary-500">
                           Pick one or more agents to build a custom squad.
                         </div>
                       )}
@@ -855,10 +855,10 @@ export function NewProjectWizardContent({
                   </div>
 
                   {preset === 'custom' ? (
-                    <div className="space-y-3 rounded-2xl border border-primary-800 bg-primary-950/50 p-4">
+                    <div className="space-y-3 rounded-2xl border border-primary-200 bg-white p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-primary-100">
+                          <p className="text-sm font-semibold text-primary-900">
                             Custom Picker
                           </p>
                           <p className="text-xs text-primary-500">
@@ -884,24 +884,24 @@ export function NewProjectWizardContent({
                                 'flex items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors',
                                 selected
                                   ? 'border-accent-500/50 bg-accent-500/10'
-                                  : 'border-primary-800 bg-primary-900 hover:border-primary-700 hover:bg-primary-800',
+                                  : 'border-primary-200 bg-primary-50 hover:border-primary-300 hover:bg-white',
                               )}
                             >
                               <div
                                 className={cn(
                                   'mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border text-[11px]',
                                   selected
-                                    ? 'border-accent-500 bg-accent-500 text-primary-950'
-                                    : 'border-primary-700 text-transparent',
+                                    ? 'border-accent-500 bg-accent-500 text-white'
+                                    : 'border-primary-200 text-transparent',
                                 )}
                               >
                                 ✓
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-primary-100">
+                                <p className="truncate text-sm font-semibold text-primary-900">
                                   {agent.name}
                                 </p>
-                                <p className="truncate text-xs text-primary-400">
+                                <p className="truncate text-xs text-primary-500">
                                   {[
                                     agent.role,
                                     agent.adapter_type,
@@ -926,17 +926,17 @@ export function NewProjectWizardContent({
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
                       Step 4
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold text-primary-100">
+                    <h2 className="mt-2 text-xl font-semibold text-primary-900">
                       Policies
                     </h2>
-                    <p className="mt-1 text-sm text-primary-400">
+                    <p className="mt-1 text-sm text-primary-500">
                       Configure approval mode, checks, concurrency, and
                       workspace execution mode.
                     </p>
                   </div>
 
                   <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="space-y-5 rounded-2xl border border-primary-800 bg-primary-950/50 p-4">
+                    <div className="space-y-5 rounded-2xl border border-primary-200 bg-white p-4">
                       <WizardField label="Approval Mode">
                         <div className="grid grid-cols-2 gap-2">
                           {[
@@ -956,7 +956,7 @@ export function NewProjectWizardContent({
                                 'rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors',
                                 policy.autoApprove === option.value
                                   ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
-                                  : 'border-primary-800 bg-primary-900 text-primary-300 hover:bg-primary-800',
+                                  : 'border-primary-200 bg-primary-50 text-primary-900 hover:bg-white',
                               )}
                             >
                               {option.label}
@@ -979,12 +979,12 @@ export function NewProjectWizardContent({
                               ),
                             }))
                           }
-                          className="w-full rounded-2xl border border-primary-700 bg-primary-800 px-4 py-3 text-sm text-primary-100 outline-none transition-colors focus:border-accent-500"
+                          className="w-full rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                         />
                       </WizardField>
                     </div>
 
-                    <div className="space-y-5 rounded-2xl border border-primary-800 bg-primary-950/50 p-4">
+                    <div className="space-y-5 rounded-2xl border border-primary-200 bg-white p-4">
                       <WizardField label="Required Checks">
                         <div className="grid grid-cols-2 gap-2">
                           {CHECK_OPTIONS.map((check) => {
@@ -1000,7 +1000,7 @@ export function NewProjectWizardContent({
                                   'flex items-center justify-between rounded-2xl border px-4 py-3 text-sm transition-colors',
                                   selected
                                     ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                                    : 'border-primary-800 bg-primary-900 text-primary-300 hover:bg-primary-800',
+                                    : 'border-primary-200 bg-primary-50 text-primary-900 hover:bg-white',
                                 )}
                               >
                                 <span>{check.label}</span>
@@ -1030,7 +1030,7 @@ export function NewProjectWizardContent({
                                 'rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors',
                                 policy.workspaceMode === option.id
                                   ? 'border-accent-500/50 bg-accent-500/10 text-accent-300'
-                                  : 'border-primary-800 bg-primary-900 text-primary-300 hover:bg-primary-800',
+                                  : 'border-primary-200 bg-primary-50 text-primary-900 hover:bg-white',
                               )}
                             >
                               {option.label}
@@ -1049,10 +1049,10 @@ export function NewProjectWizardContent({
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
                       Step 5
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold text-primary-100">
+                    <h2 className="mt-2 text-xl font-semibold text-primary-900">
                       Create + Decompose
                     </h2>
-                    <p className="mt-1 text-sm text-primary-400">
+                    <p className="mt-1 text-sm text-primary-500">
                       Review the setup, create the project, and generate a plan
                       if a spec is present.
                     </p>
@@ -1110,11 +1110,11 @@ export function NewProjectWizardContent({
                       />
                     </div>
 
-                    <div className="rounded-[24px] border border-primary-800 bg-primary-950/60 p-5">
-                      <p className="text-sm font-semibold text-primary-100">
+                    <div className="rounded-[24px] border border-primary-200 bg-white p-5">
+                      <p className="text-sm font-semibold text-primary-900">
                         Launch behavior
                       </p>
-                      <div className="mt-4 space-y-3 text-sm text-primary-400">
+                      <div className="mt-4 space-y-3 text-sm text-primary-500">
                         <div className="flex items-start gap-3">
                           <HugeiconsIcon
                             icon={Folder01Icon}
@@ -1148,11 +1148,11 @@ export function NewProjectWizardContent({
             </motion.div>
           </AnimatePresence>
 
-          <div className="mt-8 flex flex-col gap-3 border-t border-primary-800 pt-5 sm:flex-row">
+          <div className="mt-8 flex flex-col gap-3 border-t border-primary-200 pt-5 sm:flex-row">
             <Button
               type="button"
               variant="outline"
-              className="border-primary-700 bg-primary-900 text-primary-200 hover:bg-primary-800 sm:flex-1"
+              className="border-primary-200 bg-white text-primary-900 hover:bg-primary-50 sm:flex-1"
               onClick={handleBack}
               disabled={step === 1 || submissionStage !== 'idle'}
             >
@@ -1167,7 +1167,7 @@ export function NewProjectWizardContent({
             {step < 5 ? (
               <Button
                 type="button"
-                className="bg-accent-500 text-primary-950 hover:bg-accent-400 sm:flex-[1.4]"
+                className="bg-accent-500 text-white hover:bg-accent-400 sm:flex-[1.4]"
                 onClick={handleNext}
               >
                 Next
@@ -1180,7 +1180,7 @@ export function NewProjectWizardContent({
             ) : (
               <Button
                 type="button"
-                className="bg-accent-500 text-primary-950 hover:bg-accent-400 sm:flex-[1.4]"
+                className="bg-accent-500 text-white hover:bg-accent-400 sm:flex-[1.4]"
                 onClick={() => void handleCreateProject()}
                 disabled={submissionStage !== 'idle'}
               >

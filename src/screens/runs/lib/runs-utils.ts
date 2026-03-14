@@ -20,7 +20,7 @@ export function getRunStatusClass(status: WorkspaceRunStatus): string {
   if (status === 'failed' || status === 'stopped') {
     return 'border-red-500/30 bg-red-500/10 text-red-300'
   }
-  return 'border-primary-700 bg-primary-800/70 text-primary-300'
+  return 'border-primary-200 bg-primary-50 text-primary-900'
 }
 
 export function formatRunDuration(run: WorkspaceTaskRun): string {
@@ -118,7 +118,7 @@ export function getRunEventLineClass(event: WorkspaceRunEvent): string {
   if (event.type === 'started' || event.type === 'status') {
     return 'text-emerald-300'
   }
-  return 'text-primary-200'
+  return 'text-primary-500'
 }
 
 export function getRunProgress(

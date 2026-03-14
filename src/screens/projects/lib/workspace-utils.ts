@@ -101,7 +101,7 @@ export function getStatusBadgeClass(status: WorkspaceStatus): string {
   if (status === 'failed') {
     return 'border-red-500/30 bg-red-500/10 text-red-300'
   }
-  return 'border-primary-700 bg-primary-800/70 text-primary-300'
+  return 'border-primary-200 bg-primary-50 text-primary-900'
 }
 
 export function getTaskDotClass(status: WorkspaceStatus): string {
@@ -210,7 +210,7 @@ export function getActivityEventTone(eventType: string): {
   return {
     dotClass: 'bg-primary-500 ring-4 ring-primary-500/10',
     icon: Clock01Icon,
-    iconClass: 'text-primary-300',
+    iconClass: 'text-primary-500',
   }
 }
 
@@ -332,7 +332,7 @@ export function getGateClass(tone: ProjectOverview['gates'][number]['tone']): st
   if (tone === 'accent') {
     return 'border-accent-500/30 bg-accent-500/10 text-accent-300'
   }
-  return 'border-primary-700 bg-primary-800/80 text-primary-300'
+  return 'border-primary-200 bg-primary-50 text-primary-900'
 }
 
 function getSquadFromProject(
@@ -547,7 +547,7 @@ export function getAgentBadgeClass(agentType: string | null): string {
   if (agentType === 'openclaw') {
     return 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300'
   }
-  return 'border-primary-700 bg-primary-800/80 text-primary-300'
+  return 'border-primary-200 bg-primary-50 text-primary-900'
 }
 
 export function getAgentUtilization(agent: WorkspaceAgent): {
@@ -580,6 +580,6 @@ export function formatCurrency(amount: number): string {
 export function getPanelButtonClass(active: boolean, tone: string, idle?: string) {
   return cn(
     'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-    active ? tone : idle ?? 'border-primary-700 bg-primary-800/70 text-primary-300',
+    active ? tone : idle ?? 'border-primary-200 bg-primary-50 text-primary-900',
   )
 }

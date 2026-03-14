@@ -717,7 +717,7 @@ export function ProjectDetailView({
           {nextUpTasks.length > 0 ? (
             nextUpTasks.map((task) => (
               <div key={task.id} className="flex items-center gap-2 text-sm text-primary-600">
-                <span className="text-primary-400">⏸</span>
+                <span className="text-primary-500">⏸</span>
                 <span className="truncate">{task.name}</span>
               </div>
             ))
@@ -984,7 +984,7 @@ export function ProjectDetailView({
                                           waveStatus === 'running' &&
                                             'border-sky-500/30 bg-sky-500/10 text-sky-300',
                                           waveStatus === 'pending' &&
-                                            'border-primary-700 bg-primary-800/70 text-primary-300',
+                                            'border-primary-200 bg-white text-primary-900',
                                         )}
                                       >
                                         {waveStatus === 'complete'
@@ -1550,7 +1550,7 @@ export function ProjectDetailView({
                   >
                     <span
                       className={cn(
-                        'absolute -left-[26px] top-4 block size-3 rounded-full border border-primary-950',
+                        'absolute -left-[26px] top-4 block size-3 rounded-full border border-primary-200',
                         tone.dotClass,
                       )}
                     />

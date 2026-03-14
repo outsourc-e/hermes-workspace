@@ -119,7 +119,7 @@ export function DecomposeDialog({
                     {Array.from({ length: 3 }).map((_, index) => (
                       <div
                         key={index}
-                        className="h-12 animate-shimmer rounded-xl bg-primary-800/80"
+                        className="h-12 animate-shimmer rounded-xl bg-primary-200/80"
                       />
                     ))}
                   </div>
@@ -140,43 +140,43 @@ export function DecomposeDialog({
           ) : (
             <div className="space-y-6 p-5">
               <div className="space-y-1">
-                <DialogTitle className="text-base font-semibold text-primary-100">
+                <DialogTitle className="text-base font-semibold text-primary-900">
                   Review Task Plan
                 </DialogTitle>
-                <DialogDescription className="text-sm text-primary-400">
+                <DialogDescription className="text-sm text-primary-500">
                   Review and edit the generated plan before creating the mission.
                 </DialogDescription>
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+                <div className="rounded-2xl border border-primary-200 bg-white p-4">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
                     Tasks
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-primary-100">
+                  <p className="mt-1 text-2xl font-semibold text-primary-900">
                     {missionLauncher.tasks.length}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+                <div className="rounded-2xl border border-primary-200 bg-white p-4">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
                     Estimate
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-primary-100">
+                  <p className="mt-1 text-2xl font-semibold text-primary-900">
                     {formatMinutes(missionLaunchMinutes)}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4">
+                <div className="rounded-2xl border border-primary-200 bg-white p-4">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
                     Waves
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-primary-100">
+                  <p className="mt-1 text-2xl font-semibold text-primary-900">
                     {missionLaunchWaves}
                   </p>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-primary-800 bg-primary-800/35 px-4 py-3">
-                <p className="text-sm text-primary-300">
+              <div className="rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3">
+                <p className="text-sm text-primary-900">
                   {missionLauncher.tasks.length} tasks, ~
                   {formatMinutes(missionLaunchMinutes)} estimated, {missionLaunchWaves}{' '}
                   execution wave{missionLaunchWaves === 1 ? '' : 's'}.
@@ -191,12 +191,12 @@ export function DecomposeDialog({
                   return (
                     <article
                       key={task.id}
-                      className="rounded-2xl border border-primary-800 bg-primary-800/35 p-4"
+                      className="rounded-2xl border border-primary-200 bg-white p-4"
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex size-7 items-center justify-center rounded-xl border border-primary-700 bg-primary-900 text-xs font-semibold text-primary-300">
+                            <span className="inline-flex size-7 items-center justify-center rounded-xl border border-primary-200 bg-primary-50 text-xs font-semibold text-primary-900">
                               {index + 1}
                             </span>
                             <input
@@ -204,11 +204,11 @@ export function DecomposeDialog({
                               onChange={(event) =>
                                 onTaskDraftChange(task.id, { name: event.target.value })
                               }
-                              className="min-w-0 flex-1 rounded-xl border border-primary-700 bg-primary-900/80 px-3 py-2 text-sm font-medium text-primary-100 outline-none transition-colors focus:border-accent-500"
+                              className="min-w-0 flex-1 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-900 outline-none transition-colors focus:border-accent-500"
                             />
                           </div>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <span className="inline-flex rounded-full border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-[11px] font-medium text-primary-300">
+                            <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-900">
                               {formatMinutes(task.estimated_minutes)}
                             </span>
                             <span
@@ -220,11 +220,11 @@ export function DecomposeDialog({
                               {getAgentBadgeLabel(task.suggested_agent_type)}
                             </span>
                             {task.depends_on.length > 0 ? (
-                              <span className="inline-flex rounded-full border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-[11px] font-medium text-primary-300">
+                              <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-900">
                                 Depends on: {task.depends_on.join(', ')}
                               </span>
                             ) : (
-                              <span className="inline-flex rounded-full border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-[11px] font-medium text-primary-500">
+                              <span className="inline-flex rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-500">
                                 Ready in wave 1
                               </span>
                             )}
@@ -255,7 +255,7 @@ export function DecomposeDialog({
                               })
                             }
                             rows={4}
-                            className="w-full rounded-xl border border-primary-700 bg-primary-900/80 px-3 py-2.5 text-sm text-primary-200 outline-none transition-colors focus:border-accent-500"
+                            className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                           />
                         </div>
                       ) : null}
@@ -265,11 +265,11 @@ export function DecomposeDialog({
               </div>
 
               {missionLauncher.rawResponse ? (
-                <div className="rounded-2xl border border-primary-800 bg-primary-800/25 p-4">
+                <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-primary-500">
                     Fallback output
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-primary-300">
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-primary-900">
                     {missionLauncher.rawResponse}
                   </p>
                 </div>

@@ -4,6 +4,12 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  MenuContent,
+  MenuItem,
+  MenuRoot,
+  MenuTrigger,
+} from '@/components/ui/menu'
 import { Switch } from '@/components/ui/switch'
 import {
   TooltipContent,
@@ -21,13 +27,14 @@ import { NewProjectWizardContent } from '@/screens/projects/new-project-wizard'
 import { ProjectsScreen } from '@/screens/projects/projects-screen'
 import {
   extractProject,
+  normalizeStats,
+  type WorkspaceStats,
 } from '@/screens/projects/lib/workspace-types'
 import { PlanReviewScreen } from '@/screens/plan-review/plan-review-screen'
 import { ReviewQueueScreen } from '@/screens/review/review-queue-screen'
 import { RunsConsoleScreen } from '@/screens/runs/runs-console-screen'
 import { WorkspaceSkillsScreen } from '@/screens/skills/workspace-skills-screen'
 import { TeamsScreen } from '@/screens/teams/teams-screen'
-import { listWorkspaceCheckpoints } from '@/lib/workspace-checkpoints'
 
 export type WorkspaceTab =
   | 'projects'
@@ -81,6 +88,9 @@ const TAB_ORDER: WorkspaceTab[] = [
   'teams',
 ]
 
+const PRIMARY_TABS: WorkspaceTab[] = ['projects', 'review', 'runs', 'agents']
+const OVERFLOW_TABS: WorkspaceTab[] = ['skills', 'teams']
+
 function readPayload(text: string): unknown {
   if (!text) return null
 
@@ -125,6 +135,22 @@ function writeWorkspaceHash(nextTab: WorkspaceTab) {
   const finalUrl = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`
   window.history.pushState(window.history.state, '', finalUrl)
   window.dispatchEvent(new HashChangeEvent('hashchange'))
+}
+
+function navigateToTab(
+  navigate: ReturnType<typeof useNavigate>,
+  search: WorkspaceSearch,
+  tab: WorkspaceTab,
+) {
+  void navigate({
+    to: '/workspace',
+    search: {
+      goal: search.goal,
+      project: search.project,
+      projectId: search.projectId,
+    },
+    hash: tab === 'projects' ? '' : tab,
+  })
 }
 
 export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
@@ -187,9 +213,10 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
       (await apiRequest('/api/workspace/config')) as WorkspaceConfig,
   })
 
-  const pendingReviewQuery = useQuery({
-    queryKey: ['workspace', 'checkpoints', 'pending'],
-    queryFn: async () => listWorkspaceCheckpoints('pending'),
+  const statsQuery = useQuery({
+    queryKey: ['workspace', 'stats'],
+    queryFn: async () =>
+      normalizeStats(await apiRequest('/api/workspace/stats')) as WorkspaceStats,
   })
 
   const autoApproveMutation = useMutation({
@@ -223,6 +250,9 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     autoApproveMutation.data?.autoApprove ??
     workspaceConfigQuery.data?.autoApprove ??
     false
+  const pendingReviewCount = statsQuery.data?.checkpointsPending ?? 0
+  const runningCount = statsQuery.data?.running ?? 0
+  const overflowActive = OVERFLOW_TABS.includes(activeTab)
 
   const pageTitle =
     search.checkpointId
@@ -270,11 +300,19 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-1 flex-wrap items-center gap-2 overflow-x-auto">
-              {TAB_ORDER.map((tab) => {
+              {PRIMARY_TABS.map((tab) => {
                 const active = tab === activeTab
                 const label = TAB_LABELS[tab]
-                const pendingReviewCount =
-                  tab === 'review' ? pendingReviewQuery.data?.length ?? 0 : 0
+                const badgeCount =
+                  tab === 'review'
+                    ? pendingReviewCount
+                    : tab === 'runs'
+                      ? runningCount
+                      : 0
+                const badgeClass =
+                  tab === 'review'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-blue-500 text-white'
                 return (
                   <Button
                     key={tab}
@@ -282,15 +320,7 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                     size="sm"
                     onClick={() => {
                       setActiveTab(tab)
-                      void navigate({
-                        to: '/workspace',
-                        search: {
-                          goal: search.goal,
-                          project: search.project,
-                          projectId: search.projectId,
-                        },
-                        hash: tab === 'projects' ? '' : tab,
-                      })
+                      navigateToTab(navigate, search, tab)
                     }}
                     className={cn(
                       'rounded-full border text-sm',
@@ -301,15 +331,55 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
                   >
                     <span className="inline-flex items-center gap-2">
                       <span>{label}</span>
-                      {pendingReviewCount > 0 ? (
-                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                          {pendingReviewCount}
+                      {badgeCount > 0 ? (
+                        <span
+                          className={cn(
+                            'inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+                            badgeClass,
+                          )}
+                        >
+                          {badgeCount}
                         </span>
                       ) : null}
                     </span>
                   </Button>
                 )
               })}
+              <MenuRoot>
+                <MenuTrigger
+                  render={
+                    <Button
+                      variant={overflowActive ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={cn(
+                        'rounded-full border text-sm',
+                        overflowActive
+                          ? 'border-accent-500/40 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15'
+                          : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-900',
+                      )}
+                    >
+                      ...
+                    </Button>
+                  }
+                />
+                <MenuContent side="bottom" align="start" className="min-w-[180px]">
+                  {OVERFLOW_TABS.map((tab) => (
+                    <MenuItem
+                      key={tab}
+                      onClick={() => {
+                        setActiveTab(tab)
+                        navigateToTab(navigate, search, tab)
+                      }}
+                      className={cn(
+                        'justify-between rounded-lg',
+                        activeTab === tab ? 'bg-primary-100 text-primary-900' : undefined,
+                      )}
+                    >
+                      <span>{TAB_LABELS[tab]}</span>
+                    </MenuItem>
+                  ))}
+                </MenuContent>
+              </MenuRoot>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <TooltipProvider>
