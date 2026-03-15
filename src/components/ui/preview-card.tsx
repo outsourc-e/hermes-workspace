@@ -41,10 +41,15 @@ function PreviewCardPopup({
       >
         <PreviewCardPrimitive.Popup
           className={cn(
-            'relative w-64 origin-(--transform-origin) rounded-lg bg-primary-50 p-3 text-sm text-pretty text-primary-900 outline outline-primary-950/10 shadow-2xs',
+            'relative w-64 origin-(--transform-origin) rounded-lg p-3 text-sm text-pretty outline shadow-2xs',
             className,
           )}
           data-slot="preview-card-content"
+          style={{
+            background: 'var(--theme-card)',
+            color: 'var(--theme-text)',
+            outlineColor: 'var(--theme-border)',
+          }}
           {...props}
         >
           {children}

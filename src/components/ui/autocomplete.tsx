@@ -32,7 +32,10 @@ function AutocompleteInput({
   const sizeValue = size ?? 'default'
 
   return (
-    <div className="relative not-has-[>*.w-full]:w-fit w-full text-primary-900 has-disabled:opacity-64">
+    <div
+      className="relative not-has-[>*.w-full]:w-fit w-full has-disabled:opacity-64"
+      style={{ color: 'var(--theme-text)' }}
+    >
       {startAddon && (
         <div
           aria-hidden="true"
@@ -105,12 +108,18 @@ function AutocompletePopup({
       >
         <span
           className={cn(
-            'relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg border border-primary-200 bg-surface not-dark:bg-clip-padding shadow-lg/5 transition-[scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-ink/6%)] dark:before:shadow-[0_-1px_--theme(--color-surface/6%)]',
+            'relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg transition-[scale,opacity]',
             className,
           )}
+          style={{
+            background: 'var(--theme-card)',
+            color: 'var(--theme-text)',
+            border: '1px solid var(--theme-border)',
+            boxShadow: 'var(--theme-shadow-2)',
+          }}
         >
           <AutocompletePrimitive.Popup
-            className="flex max-h-[min(var(--available-height),23rem)] flex-1 flex-col text-primary-900"
+            className="flex max-h-[min(var(--available-height),23rem)] flex-1 flex-col"
             data-slot="autocomplete-popup"
             {...props}
           >
@@ -130,10 +139,11 @@ function AutocompleteItem({
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        'flex min-h-8 cursor-default select-none items-center rounded-sm px-2 py-1 text-base outline-none data-disabled:pointer-events-none data-highlighted:bg-primary-100 data-highlighted:text-primary-900 data-disabled:opacity-64 sm:min-h-7 sm:text-sm',
+        'flex min-h-8 cursor-default select-none items-center rounded-sm px-2 py-1 text-base outline-none data-disabled:pointer-events-none data-highlighted:bg-[var(--theme-card2)] data-disabled:opacity-64 sm:min-h-7 sm:text-sm',
         className,
       )}
       data-slot="autocomplete-item"
+      style={{ color: 'var(--theme-text)' }}
       {...props}
     >
       {children}
@@ -174,10 +184,11 @@ function AutocompleteGroupLabel({
   return (
     <AutocompletePrimitive.GroupLabel
       className={cn(
-        'px-2 py-1.5 font-medium text-primary-600 text-xs',
+        'px-2 py-1.5 font-medium text-xs',
         className,
       )}
       data-slot="autocomplete-group-label"
+      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )
@@ -190,10 +201,11 @@ function AutocompleteEmpty({
   return (
     <AutocompletePrimitive.Empty
       className={cn(
-        'not-empty:p-2 text-center text-base text-primary-600 sm:text-sm',
+        'not-empty:p-2 text-center text-base sm:text-sm',
         className,
       )}
       data-slot="autocomplete-empty"
+      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )
@@ -266,10 +278,11 @@ function AutocompleteStatus({
   return (
     <AutocompletePrimitive.Status
       className={cn(
-        'px-3 py-2 font-medium text-primary-600 text-xs empty:m-0 empty:p-0',
+        'px-3 py-2 font-medium text-xs empty:m-0 empty:p-0',
         className,
       )}
       data-slot="autocomplete-status"
+      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )

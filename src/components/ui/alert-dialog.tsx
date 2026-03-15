@@ -24,16 +24,23 @@ type AlertDialogContentProps = {
 function AlertDialogContent({ className, children }: AlertDialogContentProps) {
   return (
     <AlertDialog.Portal>
-      <AlertDialog.Backdrop className="fixed inset-0 bg-primary-950/20 transition-all duration-150 data-[state=open]:opacity-100 data-[state=closed]:opacity-0" />
+      <AlertDialog.Backdrop
+        className="fixed inset-0 transition-all duration-150 data-[state=open]:opacity-100 data-[state=closed]:opacity-0"
+        style={{ background: 'rgba(0,0,0,0.5)' }}
+      />
       <AlertDialog.Popup
         className={cn(
           'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
-          'w-[min(400px,92vw)] rounded-xl border border-primary-200 bg-primary-50 p-0 shadow-xl',
+          'w-[min(400px,92vw)] rounded-xl border p-0 shadow-xl',
           'transition-all duration-150',
           'data-[state=open]:opacity-100 data-[state=closed]:opacity-0',
           'data-[state=open]:scale-100 data-[state=closed]:scale-95',
           className,
         )}
+        style={{
+          background: 'var(--theme-panel)',
+          borderColor: 'var(--theme-border)',
+        }}
       >
         {children}
       </AlertDialog.Popup>
@@ -46,7 +53,8 @@ type AlertDialogTitleProps = React.ComponentProps<typeof AlertDialog.Title>
 function AlertDialogTitle({ className, ...props }: AlertDialogTitleProps) {
   return (
     <AlertDialog.Title
-      className={cn('text-lg font-medium text-primary-900', className)}
+      className={cn('text-lg font-medium', className)}
+      style={{ color: 'var(--theme-text)' }}
       {...props}
     />
   )
@@ -62,7 +70,8 @@ function AlertDialogDescription({
 }: AlertDialogDescriptionProps) {
   return (
     <AlertDialog.Description
-      className={cn('text-sm text-primary-600', className)}
+      className={cn('text-sm', className)}
+      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )

@@ -29,11 +29,11 @@ const buttonVariants = cva(
         default:
           'bg-primary-950 text-primary-50 hover:bg-primary-900 shadow-sm outline outline-primary-900/10 shadow-2xs',
         secondary:
-          'bg-primary-50 text-primary-950 hover:bg-primary-200 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-primary-800 outline outline-primary-900/10 dark:outline-neutral-700 shadow-2xs',
+          'bg-primary-50 text-primary-950 hover:bg-primary-200 outline outline-primary-900/10 shadow-2xs',
         outline:
-          'border-primary-200 bg-transparent text-primary-900 hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-primary-800 shadow-2xs outline outline-primary-900/10 dark:outline-neutral-700',
+          'border-primary-200 bg-transparent text-primary-900 hover:bg-primary-50 shadow-2xs outline outline-primary-900/10',
         ghost:
-          'text-primary-900 hover:bg-primary-200 dark:text-neutral-100 dark:hover:bg-primary-800 hover:text-primary-950 dark:hover:text-neutral-100',
+          'text-primary-900 hover:bg-primary-200 hover:text-primary-950',
         destructive: 'bg-red-600 text-primary-50 hover:bg-red-700 shadow-sm',
       },
     },
