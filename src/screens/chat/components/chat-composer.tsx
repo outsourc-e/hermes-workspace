@@ -6,7 +6,6 @@ import {
   Cancel01Icon,
   Delete01Icon,
   Mic01Icon,
-  PinIcon,
   StopIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -40,7 +39,6 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
 import { fetchModels, switchModel } from '@/lib/gateway-api'
 import type {
-  GatewayModelCatalogEntry,
   GatewayModelSwitchResponse,
 } from '@/lib/gateway-api'
 import { usePinnedModels } from '@/hooks/use-pinned-models'
@@ -49,7 +47,6 @@ import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 import { toast } from '@/components/ui/toast'
-import { getConnectionErrorInfo } from '@/lib/connection-errors'
 
 type ChatComposerAttachment = {
   id: string
@@ -109,12 +106,6 @@ function nextThinkingLevel(level: ThinkingLevel): ThinkingLevel {
 function isClaude46Model(model: string): boolean {
   const normalized = model.toLowerCase()
   return normalized.includes('4-6') || normalized.includes('claude-4.6')
-}
-
-type ModelOption = {
-  value: string
-  label: string
-  provider: string
 }
 
 type SessionStatusApiResponse = {
@@ -403,33 +394,6 @@ function readModelFromStatusPayload(payload: unknown): string {
   return ''
 }
 
-function toModelOption(entry: GatewayModelCatalogEntry): ModelOption | null {
-  if (typeof entry === 'string') {
-    const value = entry.trim()
-    if (!value) return null
-    return { value, label: value, provider: 'unknown' }
-  }
-
-  const alias = readText(entry.alias)
-  const provider = readText(entry.provider)
-  const id = readText(entry.id)
-
-  if (!provider || !id) return null
-
-  // Gateway expects provider/model format for sessions.patch
-  // Always prepend provider — even if id contains "/" (e.g., openrouter models
-  // have ids like "google/gemini-2.5-flash" but need "openrouter/google/gemini-2.5-flash")
-  const value = `${provider}/${id}`
-
-  const display =
-    readText(entry.label) ||
-    readText(entry.displayName) ||
-    readText(entry.name) ||
-    alias ||
-    id
-
-  return { value, label: display || value, provider }
-}
 
 function normalizeDraftSessionKey(sessionKey?: string): string {
   if (typeof sessionKey !== 'string') return 'new'
@@ -450,42 +414,9 @@ function readSlashCommandQuery(inputValue: string): string | null {
   return firstLine.slice(1)
 }
 
-function isSameModel(option: ModelOption, currentModel: string): boolean {
-  const normalizedCurrent = currentModel.trim().toLowerCase()
-  if (!normalizedCurrent) return false
-  return (
-    option.value.trim().toLowerCase() === normalizedCurrent ||
-    option.label.trim().toLowerCase() === normalizedCurrent
-  )
-}
 
-/** Shorten "anthropic/claude-opus-4-6" → "Claude Opus 4.6" */
-function shortenModelName(raw: string): string {
-  if (!raw) return ''
-  let name = raw
-  const prefixes = [
-    'openrouter/anthropic/',
-    'openrouter/google/',
-    'openrouter/openai/',
-    'openrouter/',
-    'anthropic/',
-    'openai/',
-    'google-antigravity/',
-    'minimax/',
-    'moonshot/',
-  ]
-  for (const prefix of prefixes) {
-    if (name.toLowerCase().startsWith(prefix)) {
-      name = name.slice(prefix.length)
-      break
-    }
-  }
-  return name
-    .replace(/-(\d)/g, ' $1')
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .replace(/\bGpt\b/g, 'GPT')
-}
+
+
 
 function isTimeoutErrorMessage(message: string): boolean {
   const normalized = message.toLowerCase()
@@ -610,8 +541,8 @@ function ChatComposerComponent({
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
 
-  // Phase 4.2: Pinned models
-  const { pinned, togglePin, isPinned } = usePinnedModels()
+  // Phase 4.2: Pinned models (kept for future use)
+  const { pinned, isPinned } = usePinnedModels()
 
   const modelsQuery = useQuery({
     queryKey: ['gateway', 'models'],
@@ -626,63 +557,10 @@ function ChatComposerComponent({
     retry: false,
   })
 
-  const modelOptions = useMemo(
-    function buildModelOptions(): Array<ModelOption> {
-      const rows = Array.isArray(modelsQuery.data?.models)
-        ? modelsQuery.data.models
-        : []
-      const seen = new Set<string>()
-      const options: Array<ModelOption> = []
-      for (const row of rows) {
-        const option = toModelOption(row)
-        if (!option) continue
-        if (seen.has(option.value)) continue
-        seen.add(option.value)
-        options.push(option)
-      }
-      return options
-    },
-    [modelsQuery.data?.models],
-  )
-
-  const groupedModels = useMemo(
-    function groupModelsByProvider() {
-      const groups = new Map<string, Array<ModelOption>>()
-      for (const option of modelOptions) {
-        const existing = groups.get(option.provider) ?? []
-        existing.push(option)
-        groups.set(option.provider, existing)
-      }
-      return Array.from(groups.entries()).sort((a, b) =>
-        a[0].localeCompare(b[0]),
-      )
-    },
-    [modelOptions],
-  )
-
-  // Phase 4.2: Split pinned and unpinned models
-  const availableModelIds = useMemo(() => {
-    return new Set(modelOptions.map((opt) => opt.value))
-  }, [modelOptions])
-
-  const pinnedModels = useMemo(() => {
-    return modelOptions.filter((option) => isPinned(option.value))
-  }, [modelOptions, pinned])
-
-  const unavailablePinnedModels = useMemo(() => {
-    return pinned.filter((modelId) => !availableModelIds.has(modelId))
-  }, [pinned, availableModelIds])
-
-  const unpinnedGroupedModels = useMemo(() => {
-    const groups = new Map<string, Array<ModelOption>>()
-    for (const option of modelOptions) {
-      if (isPinned(option.value)) continue // Skip pinned models
-      const existing = groups.get(option.provider) ?? []
-      existing.push(option)
-      groups.set(option.provider, existing)
-    }
-    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [modelOptions, pinned])
+  // Phase 4.2: (pinned model tracking kept for future use)
+  void isPinned
+  void pinned
+  void modelsQuery.data
 
   const modelSwitchMutation = useMutation({
     mutationFn: async function switchGatewayModel(payload: {
@@ -767,25 +645,21 @@ function ChatComposerComponent({
     }
   }, [currentModel, thinkingLevel, onThinkingLevelChange])
 
-  const modelsUnavailable = modelsQuery.isError
   const isModelSwitcherDisabled =
-    disabled || modelsQuery.isLoading || modelSwitchMutation.isPending
+    disabled || modelSwitchMutation.isPending
   const draftStorageKey = useMemo(
     () => toDraftStorageKey(sessionKey),
     [sessionKey],
   )
   const modelButtonLabel = (() => {
-    const base = shortenModelName(currentModel) || (currentModelQuery.isLoading ? '…' : 'Model')
+    const base = '⚕ Hermes Agent'
     const suffix = [
       thinkingLevel === 'low' ? '🧠 Low' : thinkingLevel === 'off' ? '🧠 Off' : null,
       fastMode ? '⚡' : null,
     ].filter(Boolean).join(' ')
     return suffix ? `${base} · ${suffix}` : base
   })()
-  // Don't show "Gateway disconnected" for models query failures - it's confusing
-  // since the main gateway connection might be fine. Show a subtler message instead.
-  const modelAvailabilityLabel = modelsUnavailable ? 'Click to configure' : null
-  const modelConnectionError = getConnectionErrorInfo()
+
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1948,77 +1822,12 @@ function ChatComposerComponent({
                       <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
                         Model
                       </div>
-                      {groupedModels.length === 0 && modelsUnavailable ? (
-                        <div className="p-4 text-center text-sm text-primary-500">
-                          <p className="mb-1 font-medium text-primary-700">
-                            {modelConnectionError.title}
-                          </p>
-                          <p className="text-xs">{modelConnectionError.description}</p>
-                          {modelConnectionError.action ? (
-                            <p className="mt-2 text-xs font-medium text-primary-700">
-                              {modelConnectionError.action}
-                            </p>
-                          ) : null}
+                      <div className="pb-4">
+                        <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm bg-accent-50 text-accent-700 font-medium">
+                          <span className="flex-1 truncate">⚕ Hermes Agent</span>
+                          <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
                         </div>
-                      ) : groupedModels.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-primary-500">
-                          <p className="font-medium text-primary-700 mb-1">No models configured</p>
-                          <p className="text-xs mb-3">Add API keys for providers in your OpenClaw config to unlock more models.</p>
-                          <a href="https://docs.openclaw.ai/configuration" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600">Setup Guide →</a>
-                        </div>
-                      ) : (
-                        <div className="max-h-[60dvh] overflow-y-auto overflow-x-hidden pb-4">
-                          {(pinnedModels.length > 0 || unavailablePinnedModels.length > 0) && (
-                            <div className="mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                              <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
-                                <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={1.5} className="text-accent-500" />
-                                <span>Pinned</span>
-                              </div>
-                              {pinnedModels.map((option) => {
-                                const optionActive = isSameModel(option, currentModel)
-                                return (
-                                  <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setIsModelMenuOpen(false); handleModelSelect(option.value) }}
-                                    className={cn('flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors', optionActive ? 'bg-accent-50 text-accent-700 font-medium' : 'text-neutral-700 dark:text-neutral-200')}
-                                    role="option" aria-selected={optionActive}
-                                  >
-                                    <span className="flex-1 truncate">{option.label}</span>
-                                    {optionActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
-                                    <button type="button" onClick={(e) => { e.stopPropagation(); togglePin(option.value) }} className="shrink-0 p-1 text-accent-500 hover:bg-accent-50 rounded" aria-label={`Unpin ${option.label}`}>
-                                      <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={2} />
-                                    </button>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )}
-                          {unpinnedGroupedModels.map(([provider, models]) => (
-                            <div key={provider}>
-                              <div className="px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-400">{provider}</div>
-                              {models.map((option) => {
-                                const optionActive = isSameModel(option, currentModel)
-                                return (
-                                  <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setIsModelMenuOpen(false); handleModelSelect(option.value) }}
-                                    className={cn('flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors', optionActive ? 'bg-accent-50 text-accent-700 font-medium' : 'text-neutral-700 dark:text-neutral-200')}
-                                    role="option" aria-selected={optionActive}
-                                  >
-                                    <span className="flex-1 truncate">{option.label}</span>
-                                    {optionActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
-                                    <button type="button" onClick={(e) => { e.stopPropagation(); togglePin(option.value) }} className="shrink-0 p-1 text-neutral-400 hover:text-accent-500 hover:bg-neutral-100 rounded" aria-label={`Pin ${option.label}`}>
-                                      <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={2} />
-                                    </button>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </>,
                   document.body,
@@ -2110,7 +1919,7 @@ function ChatComposerComponent({
                     }
                     aria-disabled={isModelSwitcherDisabled}
                     disabled={isModelSwitcherDisabled}
-                    title={currentModel || modelAvailabilityLabel || 'Select model'}
+                    title={currentModel || 'Hermes Agent'}
                   >
                     <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
                       {modelButtonLabel}
@@ -2123,11 +1932,7 @@ function ChatComposerComponent({
                     />
                   </button>
 
-                  {modelAvailabilityLabel ? (
-                    <span className="hidden text-xs text-primary-500 text-pretty md:inline">
-                      {modelAvailabilityLabel}
-                    </span>
-                  ) : null}
+
                   {modelNotice ? (
                     <span
                       className={cn(
@@ -2160,202 +1965,12 @@ function ChatComposerComponent({
 
                   {!isModelSwitcherDisabled && isModelMenuOpen ? (
                     <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border border-primary-200 bg-surface shadow-lg">
-                      {groupedModels.length === 0 && modelsUnavailable ? (
-                        <div className="p-4 text-center text-sm text-primary-500">
-                          <p className="font-medium text-primary-700 mb-1">
-                            {modelConnectionError.title}
-                          </p>
-                          <p className="text-xs">{modelConnectionError.description}</p>
-                          {modelConnectionError.action ? (
-                            <p className="mt-2 text-xs font-medium text-primary-700">
-                              {modelConnectionError.action}
-                            </p>
-                          ) : null}
+                      <div className="p-1">
+                        <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-neutral-700 border-l-2 border-accent-500 bg-neutral-100 rounded-lg">
+                          <span className="flex-1 truncate">⚕ Hermes Agent</span>
+                          <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-label="Currently active" />
                         </div>
-                      ) : groupedModels.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-primary-500">
-                          <p className="font-medium text-primary-700 mb-1">
-                            No models configured
-                          </p>
-                          <p className="text-xs mb-2">
-                            Add API keys for providers in your OpenClaw config to
-                            unlock more models.
-                          </p>
-                          <a
-                            href="https://docs.openclaw.ai/configuration"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600 hover:bg-accent-50 dark:hover:bg-accent-900/300/20 transition-colors"
-                          >
-                            Setup Guide →
-                          </a>
-                        </div>
-                      ) : (
-                        <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
-                          {/* Phase 4.2: Pinned models section */}
-                          {(pinnedModels.length > 0 ||
-                            unavailablePinnedModels.length > 0) && (
-                            <div className="mb-2 border-t border-neutral-200 bg-neutral-50 py-2">
-                              <div className="mb-1.5 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-                                <HugeiconsIcon
-                                  icon={PinIcon}
-                                  size={14}
-                                  strokeWidth={1.5}
-                                  className="text-accent-500"
-                                />
-                                <span>Pinned</span>
-                              </div>
-                              {pinnedModels.map((option) => {
-                                const optionActive = isSameModel(
-                                  option,
-                                  currentModel,
-                                )
-                                return (
-                                  <div
-                                    key={option.value}
-                                    className="group relative flex items-center"
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation()
-                                        setIsModelMenuOpen(false)
-                                        handleModelSelect(option.value)
-                                      }}
-                                      className={cn(
-                                        'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
-                                        optionActive &&
-                                          'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
-                                      )}
-                                      role="option"
-                                      aria-selected={optionActive}
-                                      aria-label={`Select ${option.label}`}
-                                    >
-                                      <span className="flex-1 truncate font-medium">
-                                        {option.label}
-                                      </span>
-                                      {optionActive && (
-                                        <span
-                                          className="h-1.5 w-1.5 rounded-full bg-accent-500"
-                                          aria-label="Currently active"
-                                        />
-                                      )}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation()
-                                        togglePin(option.value)
-                                      }}
-                                      className="absolute right-3 rounded px-1 text-xs leading-none text-accent-500 opacity-80 transition-opacity hover:bg-accent-50 dark:hover:bg-accent-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300"
-                                      aria-label={`Unpin ${option.label}`}
-                                      title="Unpin"
-                                    >
-                                      <HugeiconsIcon
-                                        icon={PinIcon}
-                                        size={12}
-                                        strokeWidth={2}
-                                      />
-                                    </button>
-                                  </div>
-                                )
-                              })}
-                              {/* Unavailable pinned models */}
-                              {unavailablePinnedModels.map((modelId) => (
-                                <div
-                                  key={modelId}
-                                  className="group relative flex items-center"
-                                >
-                                  <div className="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-400 opacity-60">
-                                    <span className="flex-1 truncate font-medium">
-                                      {modelId}
-                                    </span>
-                                    <span className="text-xs text-red-500">
-                                      Unavailable
-                                    </span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation()
-                                      togglePin(modelId)
-                                    }}
-                                    className="absolute right-3 rounded px-2 py-0.5 text-[10px] text-red-500 opacity-80 transition-opacity hover:bg-red-50 dark:hover:bg-red-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-red-300"
-                                    aria-label={`Remove unavailable pinned model ${modelId}`}
-                                    title="Remove"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Regular models grouped by provider */}
-                          {unpinnedGroupedModels.map(([provider, models]) => (
-                            <div key={provider} className="mb-2 last:mb-0">
-                              <div className="border-t border-neutral-100 px-3 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
-                                {provider}
-                              </div>
-                              {models.map((option) => {
-                                const optionActive = isSameModel(
-                                  option,
-                                  currentModel,
-                                )
-                                return (
-                                  <div
-                                    key={option.value}
-                                    className="group relative flex items-center"
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation()
-                                        setIsModelMenuOpen(false)
-                                        handleModelSelect(option.value)
-                                      }}
-                                      className={cn(
-                                        'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
-                                        optionActive &&
-                                          'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
-                                      )}
-                                      role="option"
-                                      aria-selected={optionActive}
-                                      aria-label={`Select ${option.label}`}
-                                    >
-                                      <span className="flex-1 truncate font-medium">
-                                        {option.label}
-                                      </span>
-                                      {optionActive && (
-                                        <span
-                                          className="h-1.5 w-1.5 rounded-full bg-accent-500"
-                                          aria-label="Currently active"
-                                        />
-                                      )}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation()
-                                        togglePin(option.value)
-                                      }}
-                                      className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
-                                      aria-label={`Pin ${option.label}`}
-                                      title="Pin"
-                                    >
-                                      <HugeiconsIcon
-                                        icon={PinIcon}
-                                        size={12}
-                                        strokeWidth={2}
-                                      />
-                                    </button>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      </div>
                       {/* Settings footer — thinking + fast mode */}
                       <div className="border-t border-neutral-100 dark:border-neutral-800 px-3 py-2 flex items-center gap-2">
                         {fastMode && thinkingLevel !== 'off' && (
@@ -2391,15 +2006,7 @@ function ChatComposerComponent({
                     </div>
                   ) : null}
                 </div>
-                {/* ModeSelector disabled — needs UX refinement
-                <ModeSelector
-                  currentModel={currentModel}
-                  onModelSwitch={handleModelSelect}
-                  disabled={disabled || isLoading}
-                  availableModels={modelOptions.map(m => m.value)}
-                  isStreaming={isLoading}
-                />
-                */}
+
               </div>
               <div className="ml-1 flex shrink-0 items-center gap-0.5 md:gap-1">
                 {voiceInput.isSupported || voiceRecorder.isSupported ? (

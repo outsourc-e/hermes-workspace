@@ -5,30 +5,19 @@ import {
   ArrowDown01Icon,
   BotIcon,
   BrainIcon,
-  ChartLineData01Icon,
-  ChartLineData02Icon,
-  Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
-  GlobeIcon,
   Home01Icon,
   ListViewIcon,
-  Notification03Icon,
   PencilEdit02Icon,
   PuzzleIcon,
   Search01Icon,
   ApiIcon,
   Settings01Icon,
-  ServerStack01Icon,
-  SmartPhone01Icon,
-  Task01Icon,
-  UserGroupIcon,
-  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
@@ -109,47 +98,10 @@ type ChatSidebarProps = {
   onRetrySessions: () => void
 }
 
-type RecentEventsResponse = {
-  events?: Array<unknown>
-}
-
-const DEBUG_ERROR_WINDOW_MS = 5 * 60 * 1000
-
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') return null
   if (Array.isArray(value)) return null
   return value as Record<string, unknown>
-}
-
-function hasRecentIssueEvent(item: unknown, cutoffMs: number): boolean {
-  const record = toRecord(item)
-  if (!record) return false
-
-  const level = record.level
-  const timestamp = record.timestamp
-  if (level !== 'warn' && level !== 'error') return false
-  if (typeof timestamp !== 'number') return false
-  if (!Number.isFinite(timestamp)) return false
-  return timestamp >= cutoffMs
-}
-
-async function fetchHasRecentIssues(): Promise<boolean> {
-  try {
-    const response = await fetch('/api/events/recent?count=40')
-    if (!response.ok) return false
-
-    const payload = (await response.json()) as RecentEventsResponse
-    const events = Array.isArray(payload.events) ? payload.events : []
-    const cutoffMs = Date.now() - DEBUG_ERROR_WINDOW_MS
-
-    for (const item of events) {
-      if (hasRecentIssueEvent(item, cutoffMs)) return true
-    }
-
-    return false
-  } catch {
-    return false
-  }
 }
 
 // ── Reusable nav item ───────────────────────────────────────────────────
@@ -644,73 +596,37 @@ function ChatSidebarComponent({
   const isAgentSwarmActive = pathname === '/agent-swarm'
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
-  const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
-  const isTasksActive = pathname === '/tasks'
-  // Gateway
   const isCronActive = pathname === '/cron'
-  const isChannelsActive = pathname === '/channels'
-  const isSessionsActive = pathname === '/sessions'
-  const isUsageActive = pathname === '/usage'
-  const isCostsActive = pathname === '/costs'
-  const isInstancesActive = pathname === '/instances'
-  const isAgentsActive = pathname === '/agents'
-  const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isMemoryActive = pathname === '/memory'
-  const isDebugActive = pathname === '/debug'
-  const isLogsActive = pathname === '/activity' || pathname === '/logs'
-  const isGatewayLogsActive = pathname === '/gateway/logs'
 
   // Track last-visited route per section
   const suiteRoutes = [
     '/dashboard',
     '/agent-swarm',
     '/new',
-    '/browser',
     '/terminal',
-    '/tasks',
     '/skills',
     '/cron',
-    '/activity',
-    '/logs',
-    '/debug',
     '/files',
     '/memory',
-    '/costs',
-  ]
-  const gatewayRoutes = [
-    '/channels',
-    '/instances',
-    '/sessions',
-    '/usage',
-    '/agents',
-    '/nodes',
-    '/gateway/logs',
   ]
 
   useEffect(() => {
     if (suiteRoutes.includes(pathname)) setLastRoute('suite', pathname)
-    else if (gatewayRoutes.includes(pathname)) setLastRoute('gateway', pathname)
   }, [pathname])
 
   // Resolve navigation targets (last visited or default)
   const suiteNav = getLastRoute('suite') || '/dashboard'
-  const gatewayNav = getLastRoute('gateway') || '/channels'
 
   const transition = {
     duration: 0.15,
     ease: isCollapsed ? 'easeIn' : 'easeOut',
   } as const
 
-  const recentIssuesQuery = useQuery({
-    queryKey: ['activity', 'recent-issues-indicator'],
-    queryFn: fetchHasRecentIssues,
-    refetchInterval: 20_000,
-    retry: false,
-  })
-  const showDebugErrorDot = Boolean(recentIssuesQuery.data)
+
 
   // Collapsible section states
   const [suiteExpanded, toggleSuite] = usePersistedBool(
@@ -723,10 +639,6 @@ function ChatSidebarComponent({
   )
   const [systemExpanded, toggleSystem] = usePersistedBool(
     'openclaw-sidebar-system-expanded',
-    false,
-  )
-  const [gatewayExpanded, toggleGateway] = usePersistedBool(
-    'openclaw-sidebar-gateway-expanded',
     false,
   )
 
@@ -904,55 +816,11 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/browser',
-      icon: GlobeIcon,
-      label: 'Browser',
-      active: isBrowserActive,
-    },
-    {
-      kind: 'link',
       to: '/terminal',
       icon: ComputerTerminal01Icon,
       label: 'Terminal',
       active: isTerminalActive,
       dataTour: 'terminal',
-    },
-    {
-      kind: 'link',
-      to: '/tasks',
-      icon: Task01Icon,
-      label: 'Tasks',
-      active: isTasksActive,
-    },
-    {
-      kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: 'Skills',
-      active: isSkillsActive,
-      dataTour: 'skills',
-    },
-    {
-      kind: 'link',
-      to: '/cron',
-      icon: Clock01Icon,
-      label: 'Cron Jobs',
-      active: isCronActive,
-    },
-    {
-      kind: 'link',
-      to: '/activity',
-      icon: ListViewIcon,
-      label: 'Logs',
-      active: isLogsActive,
-    },
-    {
-      kind: 'link',
-      to: '/debug',
-      icon: Notification03Icon,
-      label: 'Debug',
-      active: isDebugActive,
-      badge: showDebugErrorDot ? 'error-dot' : undefined,
     },
     {
       kind: 'link',
@@ -970,10 +838,18 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/costs',
-      icon: ChartLineData02Icon,
-      label: 'Cost & Usage',
-      active: isCostsActive,
+      to: '/skills',
+      icon: PuzzleIcon,
+      label: 'Skills',
+      active: isSkillsActive,
+      dataTour: 'skills',
+    },
+    {
+      kind: 'link',
+      to: '/cron',
+      icon: Clock01Icon,
+      label: 'Cron Jobs',
+      active: isCronActive,
     },
   ]
 
@@ -987,68 +863,12 @@ function ChatSidebarComponent({
     },
   ]
 
-  const gatewayItems: NavItemDef[] = [
-    {
-      kind: 'link',
-      to: '/channels',
-      icon: Chat01Icon,
-      label: 'Channels',
-      active: isChannelsActive,
-    },
-    {
-      kind: 'link',
-      to: '/instances',
-      icon: ServerStack01Icon,
-      label: 'Instances',
-      active: isInstancesActive,
-    },
-    {
-      kind: 'link',
-      to: '/sessions',
-      icon: UserMultipleIcon,
-      label: 'Sessions',
-      active: isSessionsActive,
-    },
-    {
-      kind: 'link',
-      to: '/usage',
-      icon: ChartLineData01Icon,
-      label: 'Usage',
-      active: isUsageActive,
-    },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: isAgentsActive,
-    },
-    {
-      kind: 'link',
-      to: '/nodes',
-      icon: SmartPhone01Icon,
-      label: 'Nodes',
-      active: isNodesActive,
-    },
-    {
-      kind: 'link',
-      to: '/gateway/logs',
-      icon: Notification03Icon,
-      label: 'Logs',
-      active: isGatewayLogsActive,
-    },
-  ]
-
   // Auto-expand mobile System section if any child route is active.
   const mobileSystemLabels = [
     'Files',
     'Memory',
-    'Tasks',
     'Terminal',
-    'Browser',
     'Cron Jobs',
-    'Logs',
-    'Debug',
   ]
   const mobileSecondarySuite = mobileSystemLabels
     .map((label) => suiteItems.find((item) => item.label === label))
@@ -1241,23 +1061,6 @@ function ChatSidebarComponent({
           <CollapsibleSection
             expanded={workspaceExpanded || isCollapsed}
             items={workspaceItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-          {/* GATEWAY */}
-          <SectionLabel
-            label="Gateway"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={gatewayExpanded}
-            onToggle={toggleGateway}
-            navigateTo={gatewayNav}
-          />
-          <CollapsibleSection
-            expanded={gatewayExpanded || isCollapsed}
-            items={gatewayItems}
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
