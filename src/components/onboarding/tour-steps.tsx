@@ -1,15 +1,14 @@
 import { Step } from 'react-joyride'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 
 export const tourSteps: Step[] = [
   // Step 1: Welcome
   {
     target: 'body',
     placement: 'center',
-    title: 'Welcome to Hermes Workspace! 👋',
+    title: 'Welcome to Hermes Workspace! ⚕',
     content: (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-        <OpenClawStudioIcon className="size-12 rounded-xl shadow-sm" />
+        <img src="/hermes-icon.png" alt="Hermes" style={{ width: 48, height: 48, borderRadius: 12 }} />
         <p style={{ textAlign: 'center', margin: 0 }}>
           Your AI-powered command center for managing agents, chats, files, and more. Let&apos;s take a quick tour!
         </p>

@@ -1,5 +1,4 @@
 import { useId } from 'react'
-import { cn } from '@/lib/utils'
 
 export type OpenClawStudioIconProps = {
   className?: string
@@ -7,15 +6,17 @@ export type OpenClawStudioIconProps = {
   dotClassName?: string
 }
 
+/**
+ * Hermes Agent icon — Nous Research blue gradient with gold caduceus.
+ * Replaces the original ClawSuite orange terminal icon.
+ */
 export function OpenClawStudioIcon({
   className,
   animateDots = false,
-  dotClassName,
+  dotClassName: _dotClassName,
 }: OpenClawStudioIconProps) {
-  // Each instance gets a unique gradient ID to prevent SVG defs collision
-  // when the icon is rendered multiple times on the same page.
   const uid = useId().replace(/:/g, '')
-  const gradId = `orangeBg-${uid}`
+  const gradId = `hermesBg-${uid}`
 
   return (
     <svg
@@ -26,101 +27,51 @@ export function OpenClawStudioIcon({
     >
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style={{ stopColor: '#ea580c', stopOpacity: 1 }} />
-          <stop offset="50%" style={{ stopColor: '#f97316', stopOpacity: 1 }} />
-          <stop
-            offset="100%"
-            style={{ stopColor: '#fb923c', stopOpacity: 1 }}
-          />
+          <stop offset="0%" style={{ stopColor: '#1E30AA', stopOpacity: 1 }} />
+          <stop offset="50%" style={{ stopColor: '#3050FF', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#5070FF', stopOpacity: 1 }} />
         </linearGradient>
       </defs>
 
-      {/* Orange background — edge to edge, shape controlled by container's rounded + overflow-hidden */}
-      <rect
-        x="0"
-        y="0"
-        width="100"
-        height="100"
-        rx="0"
-        fill={`url(#${gradId})`}
-      />
+      {/* Blue background */}
+      <rect x="0" y="0" width="100" height="100" rx="0" fill={`url(#${gradId})`} />
 
-      {/* Terminal window frame - dark outline, no fill */}
-      <rect
-        x="20"
-        y="25"
-        width="60"
-        height="50"
-        rx="4"
-        stroke="#1e293b"
-        strokeWidth="3"
-        fill="none"
-      />
+      {/* Caduceus staff */}
+      <rect x="47" y="18" width="6" height="64" rx="3" fill="#FFD700" />
 
-      {/* Terminal header dots - dark fill */}
-      <circle
-        cx="28"
-        cy="32"
-        r="2.5"
-        fill="#1e293b"
-        className={cn(
-          animateDots ? 'logo-loader-dot' : undefined,
-          dotClassName,
-        )}
-        style={animateDots ? { animationDelay: '0s' } : undefined}
-      />
-      <circle
-        cx="37"
-        cy="32"
-        r="2.5"
-        fill="#1e293b"
-        className={cn(
-          animateDots ? 'logo-loader-dot' : undefined,
-          dotClassName,
-        )}
-        style={animateDots ? { animationDelay: '0.2s' } : undefined}
-      />
-      <circle
-        cx="46"
-        cy="32"
-        r="2.5"
-        fill="#1e293b"
-        className={cn(
-          animateDots ? 'logo-loader-dot' : undefined,
-          dotClassName,
-        )}
-        style={animateDots ? { animationDelay: '0.4s' } : undefined}
-      />
+      {/* Top wings */}
+      <path d="M 32 28 Q 50 18, 50 28" stroke="#FFD700" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <path d="M 68 28 Q 50 18, 50 28" stroke="#FFD700" strokeWidth="3.5" fill="none" strokeLinecap="round" />
 
-      {/* Left claw bracket - dark */}
+      {/* Left snake */}
       <path
-        d="M 38 45 L 32 50 L 38 55"
-        stroke="#1e293b"
+        d="M 36 62 Q 26 52, 36 42 Q 46 32, 50 36"
+        stroke="#E8ECFF"
         strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
         fill="none"
+        strokeLinecap="round"
       />
 
-      {/* Right claw bracket - dark */}
+      {/* Right snake */}
       <path
-        d="M 62 45 L 68 50 L 62 55"
-        stroke="#1e293b"
+        d="M 64 62 Q 74 52, 64 42 Q 54 32, 50 36"
+        stroke="#E8ECFF"
         strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
         fill="none"
+        strokeLinecap="round"
       />
 
-      {/* Center cursor bar - dark fill */}
-      <rect x="47" y="46" width="4" height="10" rx="2" fill="#1e293b">
-        <animate
-          attributeName="opacity"
-          values="1;0.4;1"
-          dur="1.5s"
-          repeatCount="indefinite"
-        />
-      </rect>
+      {/* Top orb */}
+      <circle cx="50" cy="18" r="6" fill="#FFD700">
+        {animateDots && (
+          <animate
+            attributeName="opacity"
+            values="1;0.5;1"
+            dur="1.5s"
+            repeatCount="indefinite"
+          />
+        )}
+      </circle>
     </svg>
   )
 }
