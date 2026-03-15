@@ -862,11 +862,11 @@ code {
   --chat-user-bg: #EEF2FF;
   --chat-user-border: #C7D2FE;
   --chat-user-foreground: #111827;
-  --chat-assistant-bg: #FFFFFF;
+  --chat-assistant-bg: #EDF0F8;
   --chat-assistant-border: #D7DEEE;
   --chat-assistant-foreground: #111827;
   --composer-bg: #FFFFFF;
-  --composer-border: #D7DEEE;
+  --composer-border: #C7D2FE;
   --composer-placeholder: #6B7280;
   --tool-card-bg: #F3F6FF;
   --tool-card-border: #D6DDF0;

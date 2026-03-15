@@ -1394,12 +1394,17 @@ function MessageItemComponent({
                 'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
                 '',
                 !isUser
-                  ? 'bg-primary-50 border border-primary-200 rounded-2xl rounded-tl-sm text-primary-900'
-                  : 'bg-accent-500 text-white rounded-2xl rounded-tr-sm',
+                  ? 'border rounded-2xl rounded-tl-sm'
+                  : 'text-white rounded-2xl rounded-tr-sm',
                 isQueued && isUser && !isFailed && 'opacity-70',
                 isFailed && isUser && 'bg-red-50/50 border border-red-300',
                 bubbleClassName,
               )}
+              style={
+                !isUser
+                  ? { background: 'var(--chat-assistant-bg)', borderColor: 'var(--chat-assistant-border)', color: 'var(--chat-assistant-foreground)' }
+                  : { background: 'var(--chat-user-bg)', borderColor: 'var(--chat-user-border)', color: 'var(--chat-user-foreground)' }
+              }
             >
               {hasAttachments && (
                 <div className="flex flex-wrap gap-2">
