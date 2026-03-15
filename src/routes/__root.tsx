@@ -271,14 +271,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               }
             } catch(e){}
 
-            var quips = ["Warming up the claws...","Brewing agent espresso...","Deploying crustacean intelligence...","Loading forbidden knowledge...","Calibrating sarcasm module...","Spinning up the hive mind...","Polishing the shell...","Teaching agents to behave...","Summoning the swarm...","Initializing world domination...","Crunching the numbers (with claws)...","Consulting the oracle lobster...","Booting the lobster mainframe...","Decrypting the claw protocol..."];
+            var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning Hermes...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
             var quip = quips[Math.floor(Math.random() * quips.length)];
 
             var d = document.createElement('div');
             d.id = 'splash-screen';
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.8s ease;';
-            d.innerHTML = '<div style="width:96px;height:96px;margin-bottom:20px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))"><svg width="96" height="96" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sOB" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="'+accent+'"/><stop offset="100%" stop-color="'+accent+'"/></linearGradient></defs><rect x="5" y="5" width="90" height="90" rx="16" fill="url(#sOB)" fill-opacity="0.18" stroke="'+accent+'" stroke-width="2"/><path d="M36 24C33 24 31 26 31 29C31 32 33 34 36 34C39 34 41 32 41 29C41 26 39 24 36 24ZM64 24C61 24 59 26 59 29C59 32 61 34 64 34C67 34 69 32 69 29C69 26 67 24 64 24ZM50 27C47 27 45 29 45 32V40L34 46C30 48 28 52 28 56C28 61 31 64 36 64H43V76C43 79 45 81 48 81H52C55 81 57 79 57 76V64H64C69 64 72 61 72 56C72 52 70 48 66 46L55 40V32C55 29 53 27 50 27ZM36 39C33 39 31 41 31 44C31 47 33 49 36 49C39 49 41 47 41 44C41 41 39 39 36 39ZM64 39C61 39 59 41 59 44C59 47 61 49 64 49C67 49 69 47 69 44C69 41 67 39 64 39Z" fill="'+accent+'"/></svg></div>'
-              + '<div style="font:700 24px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.06em;color:'+txt+'">Hermes Workspace</div>'
+            d.innerHTML = '<img src="/hermes-avatar.webp" alt="Hermes" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
+              + '<img src="/hermes-banner.png" alt="HERMES-AGENT" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5))" />'
+              + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+';margin-bottom:4px">Workspace</div>'
               + '<div style="margin-top:10px;font:italic 13px/1 system-ui,-apple-system,sans-serif;color:'+muted+'">'+quip+'</div>'
               + '<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
             document.body.prepend(d);

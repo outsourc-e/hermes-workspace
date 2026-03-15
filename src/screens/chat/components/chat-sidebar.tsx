@@ -829,7 +829,7 @@ function ChatSidebarComponent({
                   'w-full pl-1.5 justify-start',
                 )}
               >
-                <img src="/hermes-icon.png" alt="Hermes" className="size-5 rounded-lg" />
+                <img src="/hermes-avatar.webp" alt="Hermes" className="size-5 rounded-lg" />
                 Hermes
               </Link>
             </motion.div>

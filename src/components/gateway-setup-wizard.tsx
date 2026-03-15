@@ -392,7 +392,7 @@ function GatewayStepContent() {
       <div className="mb-6 flex flex-col items-center text-center">
         <div className="mb-4 flex size-20 items-center justify-center rounded-2xl shadow-lg">
           <img
-            src="/hermes-icon.png"
+            src="/hermes-avatar.webp"
             alt="Hermes Workspace logo"
             width={64}
             height={64}

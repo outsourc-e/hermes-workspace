@@ -8,7 +8,7 @@ export const tourSteps: Step[] = [
     title: 'Welcome to Hermes Workspace! ⚕',
     content: (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-        <img src="/hermes-icon.png" alt="Hermes" style={{ width: 48, height: 48, borderRadius: 12 }} />
+        <img src="/hermes-avatar.webp" alt="Hermes" style={{ width: 48, height: 48, borderRadius: 12 }} />
         <p style={{ textAlign: 'center', margin: 0 }}>
           Your AI-powered command center for managing agents, chats, files, and more. Let&apos;s take a quick tour!
         </p>

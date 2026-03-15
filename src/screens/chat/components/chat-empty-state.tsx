@@ -6,7 +6,7 @@ import {
   PuzzleIcon,
 } from '@hugeicons/core-free-icons'
 import { motion } from 'motion/react'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
+
 
 type SuggestionChip = {
   label: string
@@ -54,7 +54,7 @@ export function ChatEmptyState({
       className="flex h-full flex-col items-center justify-center px-4 py-8"
     >
       <div className="flex max-w-xl flex-col items-center text-center">
-        <OpenClawStudioIcon className="mb-4 size-12 overflow-hidden rounded-xl opacity-80" />
+        <img src="/hermes-avatar.webp" alt="Hermes" className="mb-4 size-16 rounded-xl opacity-90" />
         <h2 className="text-lg font-semibold text-[var(--theme-text)]">
           Hermes Workspace
         </h2>
