@@ -444,8 +444,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           break
         }
         case 'error': {
-          // Ignore late error events after stream already completed
-          if (lifecyclePhaseRef.current === 'idle' || lifecyclePhaseRef.current === 'error') {
+          // Ignore late error events after stream already completed or finished
+          if (finishedRef.current || lifecyclePhaseRef.current === 'idle' || lifecyclePhaseRef.current === 'error') {
             break
           }
           const errorMessage =
