@@ -403,6 +403,14 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
               })}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShortcutsOpen(true)}
+                className="hidden sm:flex size-7 items-center justify-center rounded-full border border-primary-200 bg-primary-50 text-xs font-medium text-primary-500 hover:bg-primary-100 transition-colors"
+                title="Keyboard shortcuts (?)"
+              >
+                ?
+              </button>
               <TooltipProvider>
                 <TooltipRoot>
                   <TooltipTrigger

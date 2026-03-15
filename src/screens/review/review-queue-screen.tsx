@@ -331,98 +331,33 @@ function ReviewRow({
             </div>
           </div>
 
-          <div className="grid gap-2 text-sm text-primary-600 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
-                  Diff Stat
-                </p>
-                {tscStatus ? (
-                  <span
-                    className={cn(
-                      'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                      tscStatus === 'passed'
-                        ? 'border-green-200 bg-green-50 text-green-700'
-                        : 'border-red-200 bg-red-50 text-red-700',
-                    )}
-                  >
-                    {tscStatus === 'passed' ? 'tsc ✓' : 'tsc ✗'}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 text-sm font-medium text-primary-800">
-                {getCheckpointDiffStat(checkpoint)}
-              </p>
-              {parsedDiff && parsedDiff.changedFiles.length > 0 && (
-                <div className="mt-2 space-y-0.5">
-                  {parsedDiff.changedFiles.slice(0, 5).map((file) => (
-                    <p key={file} className="truncate font-mono text-xs text-primary-500">
-                      {file}
-                    </p>
-                  ))}
-                  {parsedDiff.changedFiles.length > 5 && (
-                    <p className="text-xs text-primary-500">
-                      +{parsedDiff.changedFiles.length - 5} more
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
-                Commit
-              </p>
-              <div className="mt-1">
-                {commitHashLabel ? (
-                  <code className="inline-flex items-center rounded-md border border-primary-200 bg-white px-2 py-1 font-mono text-xs text-primary-700 tabular-nums">
-                    {commitHashLabel}
-                  </code>
-                ) : (
-                  <p className="text-sm text-primary-500">pending</p>
-                )}
-                {checkpoint.status === 'approved' && commitHashLabel ? (
-                  <p className="mt-2 text-xs text-primary-500">
-                    Merged at {commitHashLabel}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
-                Created
-              </p>
-              <p className="mt-1 text-sm text-primary-600">
-                {formatCheckpointTimestamp(checkpoint.created_at)}
-              </p>
-            </div>
-            {checkpoint.reviewer_notes ? (
-              <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-3 py-2 md:col-span-2 xl:col-span-1">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-primary-500">
-                  Reviewer Notes
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-primary-700">
-                  {checkpoint.reviewer_notes}
-                </p>
-              </div>
-            ) : null}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-primary-500">
+            <span className="font-medium text-primary-700">{getCheckpointDiffStat(checkpoint)}</span>
+            {commitHashLabel && (
+              <code className="rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 font-mono text-[11px] tabular-nums">{commitHashLabel}</code>
+            )}
+            {tscStatus && (
+              <span className={tscStatus === 'passed' ? 'text-emerald-600' : 'text-red-500'}>
+                tsc {tscStatus === 'passed' ? '✓' : '✗'}
+              </span>
+            )}
+            <span>{formatCheckpointTimestamp(checkpoint.created_at)}</span>
+            {parsedDiff && parsedDiff.changedFiles.length > 0 && (
+              <span className="font-mono text-primary-400 truncate max-w-xs">
+                {parsedDiff.changedFiles.slice(0, 3).join(', ')}
+                {parsedDiff.changedFiles.length > 3 && ` +${parsedDiff.changedFiles.length - 3}`}
+              </span>
+            )}
           </div>
+          {checkpoint.reviewer_notes && (
+            <p className="mt-1.5 text-xs text-primary-600 italic">
+              Note: {checkpoint.reviewer_notes}
+            </p>
+          )}
         </div>
 
         {canReview ? (
           <div className="flex flex-wrap items-center gap-2 md:justify-end">
-            <Button
-              variant="outline"
-              onClick={(event) => {
-                if (event.shiftKey) {
-                  onQuickPreview(checkpoint)
-                  return
-                }
-                onOpenDetail(checkpoint)
-              }}
-              disabled={mutationPending}
-            >
-              Review
-            </Button>
             <button
               type="button"
               onClick={() => onApprove(checkpoint.id)}
