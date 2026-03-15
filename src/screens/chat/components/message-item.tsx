@@ -1515,9 +1515,16 @@ function MessageItemComponent({
                   ))}
                 </div>
               ) : effectiveIsStreaming && !hasRevealedText ? (
-                <div className="mb-2 flex items-center gap-2 text-xs text-neutral-400">
-                  <span className="animate-pulse">⚡</span>
-                  <span>Working...</span>
+                <div className="mb-2 flex items-center gap-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
+                  <span className="size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
+                  <span>
+                    {effectiveStreamToolCalls.length > 0
+                      ? formatToolDisplayLabel(
+                          effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].name,
+                          effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].args as Record<string, unknown> | undefined,
+                        )
+                      : 'Working\u2026'}
+                  </span>
                 </div>
               ) : null}
               {/* Sent indicator — message delivered, waiting for response */}

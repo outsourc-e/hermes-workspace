@@ -367,8 +367,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             const toolName = typeof payload.name === 'string' ? payload.name : 'tool'
             const phase = typeof payload.phase === 'string' ? payload.phase : 'calling'
             const isMemory = /memory|remember|recall|save_memory/i.test(toolName)
-            const isFile = /file|read_file|write_file|search_files/i.test(toolName)
-            const eventType = isMemory ? 'memory_write' : isFile ? 'file_write' : 'tool_call'
+            const isFileWrite = /^(write_file|write|edit|Edit|Write)$/i.test(toolName)
+            const isFileRead = /^(read_file|read|Read|search_files)$/i.test(toolName)
+            const eventType = isMemory ? 'memory_write' : isFileWrite ? 'file_write' : isFileRead ? 'file_read' : 'tool_call'
             pushActivity({ type: eventType, time: new Date().toLocaleTimeString(), text: `${toolName} (${phase})` })
           }
           processStoreEvent({
