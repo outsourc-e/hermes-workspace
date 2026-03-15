@@ -716,18 +716,25 @@ function isImageAttachment(attachment: GatewayAttachment): boolean {
 }
 
 const TOOL_ICONS: Record<string, string> = {
-  exec: '⚡',
-  Read: '📖',
-  read: '📖',
-  Write: '✏️',
-  write: '✏️',
-  Edit: '✏️',
-  edit: '✏️',
-  web_search: '🔍',
-  memory_search: '🧠',
-  memory_get: '🧠',
-  browser: '🌐',
-  image: '🖼️',
+  exec: '\u2699',
+  terminal: '\u2699',
+  Read: '\u25c7',
+  read: '\u25c7',
+  read_file: '\u25c7',
+  Write: '\u270e',
+  write: '\u270e',
+  write_file: '\u270e',
+  Edit: '\u270e',
+  edit: '\u270e',
+  web_search: '\u25ce',
+  search_files: '\u25ce',
+  memory_search: '\u2726',
+  memory_get: '\u2726',
+  save_memory: '\u2726',
+  browser: '\u25a3',
+  browser_navigate: '\u25a3',
+  image: '\u25ce',
+  skill_view: '\u26a1',
 }
 
 function InlineToolSectionItem({
@@ -769,12 +776,12 @@ function InlineToolSectionItem({
       onOpenChange={setOpen}
     >
       {/* ── Collapsed row ── */}
-      <CollapsibleTrigger className={cn(
-        'w-full justify-start gap-1.5 rounded-md bg-transparent px-2 py-1 text-[11px] font-mono',
-        'hover:bg-primary-50 dark:hover:bg-primary-800/60',
-        'data-panel-open:bg-primary-50/60 dark:data-panel-open:bg-primary-800/40',
-        isError ? 'text-red-500 dark:text-red-400' : 'text-neutral-500 dark:text-neutral-400',
-      )}>
+      <CollapsibleTrigger
+        className="w-full justify-start gap-1.5 rounded-md bg-transparent px-2 py-1 text-[11px] font-mono hover:opacity-80"
+        style={{
+          color: isError ? 'var(--theme-danger)' : 'var(--theme-muted)',
+        }}
+      >
         {/* chevron */}
         <span className="shrink-0 text-[9px] transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
         {/* icon + name */}
