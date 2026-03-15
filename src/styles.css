@@ -955,3 +955,55 @@ code {
   background-color: var(--theme-bg);
   color: var(--theme-text);
 }
+
+/* ── Tailwind primary token remaps for dark themes ─────────────────────
+   Maps bg-primary-50, text-primary-900, border-primary-200 etc.
+   to theme-appropriate values so ALL existing Tailwind classes work.
+   Dark: 50=darkest surface, 950=lightest text (already set above) */
+
+[data-theme="hermes-dark"],
+[data-theme="hermes-slate"],
+[data-theme="hermes-mono"] {
+  --color-primary-50: var(--theme-panel);
+  --color-primary-100: var(--theme-card);
+  --color-primary-200: var(--theme-border);
+  --color-primary-300: var(--theme-border-subtle);
+  --color-primary-400: var(--theme-muted);
+  --color-primary-500: var(--theme-muted);
+  --color-primary-600: var(--theme-muted);
+  --color-primary-700: var(--theme-text);
+  --color-primary-800: var(--theme-text);
+  --color-primary-900: var(--theme-text);
+  --color-primary-950: var(--theme-text);
+  --color-surface: var(--theme-bg);
+  --color-surface-deep: var(--theme-bg);
+  --color-ink: var(--theme-text);
+  --color-accent-400: var(--theme-accent-secondary);
+  --color-accent-500: var(--theme-accent);
+  --color-accent-600: var(--theme-accent);
+}
+
+/* ── Tailwind primary token remaps for light themes ────────────────────
+   Light: 50=lightest surface, 950=darkest text */
+
+[data-theme="hermes-dark-light"],
+[data-theme="hermes-slate-light"],
+[data-theme="hermes-mono-light"] {
+  --color-primary-50: var(--theme-card);
+  --color-primary-100: var(--theme-card2);
+  --color-primary-200: var(--theme-border);
+  --color-primary-300: var(--theme-border-subtle);
+  --color-primary-400: var(--theme-muted);
+  --color-primary-500: var(--theme-muted);
+  --color-primary-600: var(--theme-muted);
+  --color-primary-700: var(--theme-text);
+  --color-primary-800: var(--theme-text);
+  --color-primary-900: var(--theme-text);
+  --color-primary-950: var(--theme-text);
+  --color-surface: var(--theme-bg);
+  --color-surface-deep: var(--theme-bg);
+  --color-ink: var(--theme-text);
+  --color-accent-400: var(--theme-accent-secondary);
+  --color-accent-500: var(--theme-accent);
+  --color-accent-600: var(--theme-accent);
+}
