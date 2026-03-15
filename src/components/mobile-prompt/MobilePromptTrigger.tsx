@@ -99,7 +99,7 @@ export function MobilePromptTrigger() {
             <div className="px-4 py-3">
               <div className="flex items-center gap-3">
               <div className="flex shrink-0 items-center gap-1.5">
-                <OpenClawStudioIcon className="size-8 overflow-hidden rounded-lg" />
+                <img src="/hermes-avatar.webp" alt="Hermes" className="size-8 rounded-lg" />
                 <span className="text-xs text-primary-600">+</span>
                 <div className="flex size-8 items-center justify-center rounded-lg bg-[#232b3b]">
                   <svg viewBox="0 0 100 100" className="size-5">
