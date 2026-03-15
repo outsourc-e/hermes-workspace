@@ -203,7 +203,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 sessionKey,
                 {
                   message: getGatewayMessage(message, attachments),
-                  model: fastMode ? undefined : undefined,
+                  model: typeof body.model === 'string' ? body.model : undefined,
                   system_message: thinking,
                 },
                 {

@@ -52,26 +52,10 @@ const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
   
-  // Gateway connection via Hermes Workspace server proxy.
-  // Clients connect to /ws-gateway on the Hermes Workspace server (same host:port as the page).
-  // The server proxies internally to ws://127.0.0.1:18789 — so phone/LAN/Docker
-  // users never need direct access to port 18789.
-  // Manual override: set gatewayUrl in settings to skip proxy (e.g. wss:// remote).
+  // Hermes Workspace — API is same-origin REST/SSE, no WebSocket needed.
+  // __GATEWAY_URL__ kept as stub for any legacy code that references it.
   if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('openclaw-settings')
-      const parsed = stored ? JSON.parse(stored) : null
-      const manualUrl = parsed?.state?.settings?.gatewayUrl
-      if (manualUrl && typeof manualUrl === 'string' && manualUrl.startsWith('ws')) {
-        window.__GATEWAY_URL__ = manualUrl
-      } else {
-        // Use proxy path — works from any device that can reach Hermes Workspace
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        window.__GATEWAY_URL__ = proto + '//' + window.location.host + '/ws-gateway'
-      }
-    } catch {
-      window.__GATEWAY_URL__ = 'ws://127.0.0.1:18789'
-    }
+    window.__GATEWAY_URL__ = ''
   }
   
   try {
