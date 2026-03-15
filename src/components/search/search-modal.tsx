@@ -1,6 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  AiBrain01Icon,
   Chat01Icon,
   Clock01Icon,
   CommandIcon,
@@ -78,7 +77,7 @@ export function SearchModal() {
   const deferredQuery = useDeferredValue(debouncedQuery)
 
   // Real data (Phase 3.2)
-  const { sessions, files, skills, activity } = useSearchData(scope)
+  const { sessions, files, skills } = useSearchData(scope)
   const searchableFiles = useMemo(
     () => files.filter((entry) => entry.type === 'file'),
     [files],
@@ -124,16 +123,6 @@ export function SearchModal() {
         onSelect: () => {
           closeModal()
           navigate({ to: '/memory' })
-        },
-      },
-      {
-        id: 'qa-health',
-        emoji: '🩺',
-        label: 'Health',
-        description: 'Open the operational health view',
-        onSelect: () => {
-          closeModal()
-          navigate({ to: '/activity' })
         },
       },
       {
@@ -250,24 +239,7 @@ export function SearchModal() {
     }))
 
     // Real activity data
-    const activityResults = filterResults(
-      activity,
-      normalized,
-      ['title', 'detail', 'source'],
-      RESULT_LIMITS.agents,
-    ).map<SearchResultItemData>((entry) => ({
-      id: entry.id,
-      scope: 'agents',
-      icon: <HugeiconsIcon icon={AiBrain01Icon} size={20} strokeWidth={1.5} />,
-      title: entry.title,
-      snippet: entry.detail || '',
-      meta: new Date(entry.timestamp).toLocaleTimeString(),
-      badge: entry.level,
-      onSelect: () => {
-        closeModal()
-        navigate({ to: '/activity' })
-      },
-    }))
+    const activityResults: Array<SearchResultItemData> = []
 
     // Real skills data (static)
     const skillResults = filterResults(
@@ -333,7 +305,6 @@ export function SearchModal() {
       ...actions,
     ].slice(0, RESULT_LIMITS.total)
   }, [
-    activity,
     closeModal,
     deferredQuery,
     navigate,

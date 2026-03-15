@@ -76,7 +76,7 @@ async function callGatewayRestart(): Promise<void> {
   })
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new Error(body.error || 'Gateway restart request failed')
+    throw new Error(body.error || 'Hermes restart request failed')
   }
 }
 
@@ -114,7 +114,7 @@ export function GatewayRestartProvider({
     timeoutTimerRef.current = setTimeout(() => {
       clearTimers()
       setPhase('error')
-      setErrorMsg('Gateway did not come back within 30 seconds.')
+      setErrorMsg('Hermes did not come back within 30 seconds.')
     }, RESTART_TIMEOUT_MS)
 
     pollTimerRef.current = setInterval(() => {
@@ -273,13 +273,13 @@ function ProviderRestartConfirmDialog({
               id="provider-restart-title"
               className="text-sm font-semibold text-primary-900 dark:text-neutral-100"
             >
-              Gateway restart required
+              Hermes restart required
             </h2>
             <p
               id="provider-restart-desc"
               className="mt-1 text-sm text-primary-600 text-pretty dark:text-neutral-400"
             >
-              Adding or removing a provider requires a gateway restart. Active
+              Adding or removing a provider requires a Hermes restart. Active
               sessions will be paused briefly. Continue?
             </p>
           </div>
@@ -322,10 +322,10 @@ function GatewayRestartOverlayView({
       aria-live="polite"
       aria-label={
         phase === 'restarting'
-          ? 'Gateway restarting'
+          ? 'Hermes restarting'
           : phase === 'ready'
-            ? 'Gateway ready'
-            : 'Gateway restart failed'
+            ? 'Hermes ready'
+            : 'Hermes restart failed'
       }
     >
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-primary-200/60 bg-primary-50/95 px-8 py-8 shadow-2xl backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/95">
@@ -335,11 +335,11 @@ function GatewayRestartOverlayView({
               preset="claw"
               size={32}
               className="text-accent-500"
-              label="Gateway restarting"
+              label="Hermes restarting"
             />
             <div className="text-center">
               <p className="text-base font-semibold text-primary-900 dark:text-neutral-100">
-                Gateway restarting…
+                Hermes restarting…
               </p>
               <p className="mt-1 text-sm text-primary-500 dark:text-neutral-400">
                 Applying provider changes. Active sessions are paused.
@@ -359,7 +359,7 @@ function GatewayRestartOverlayView({
             </span>
             <div className="text-center">
               <p className="text-base font-semibold text-primary-900 dark:text-neutral-100">
-                Gateway ready ✓
+                Hermes ready ✓
               </p>
               <p className="mt-1 text-sm text-primary-500 dark:text-neutral-400">
                 Provider changes applied. Resuming…
@@ -378,10 +378,10 @@ function GatewayRestartOverlayView({
             </span>
             <div className="text-center">
               <p className="text-base font-semibold text-primary-900 dark:text-neutral-100">
-                Gateway restart failed
+                Hermes restart failed
               </p>
               <p className="mt-1 text-sm text-primary-500 dark:text-neutral-400 text-pretty">
-                {errorMsg || 'Gateway did not come back in time.'}
+                {errorMsg || 'Hermes did not come back in time.'}
               </p>
             </div>
             <div className="flex items-center gap-2">

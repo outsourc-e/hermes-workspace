@@ -69,7 +69,7 @@ function toChatMessages(
 }
 
 function buildDemoReply(agentName: string, text: string): string {
-  return `${agentName} (demo): Received "${text}". Gateway is unavailable, so this is a simulated response.`
+  return `${agentName} (demo): Received "${text}". Hermes is unavailable, so this is a simulated response.`
 }
 
 export function AgentChatModal({
@@ -145,7 +145,7 @@ export function AgentChatModal({
             {
               id: `demo-intro-${sessionKey}`,
               role: 'agent',
-              text: 'Gateway unavailable. Running in demo mode with simulated responses.',
+              text: 'Hermes is unavailable. Running in demo mode with simulated responses.',
               timestamp: Date.now(),
             },
           ])

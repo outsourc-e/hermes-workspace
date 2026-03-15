@@ -213,9 +213,9 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
   getParentRoute: () => SettingsRoute,
 } as any)
 const GatewayLogsRoute = GatewayLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => GatewayRoute,
+  id: '/gateway/logs',
+  path: '/gateway/logs',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
@@ -1755,6 +1755,7 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
   ApiWorkspaceTasksRoute: typeof ApiWorkspaceTasksRouteWithChildren
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
+  GatewayLogsRoute: typeof GatewayLogsRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiCloudProvisionRoute: typeof ApiCloudProvisionRoute
   ApiCloudStatusRoute: typeof ApiCloudStatusRoute
@@ -1873,10 +1874,10 @@ declare module '@tanstack/react-router' {
     }
     '/gateway/logs': {
       id: '/gateway/logs'
-      path: '/logs'
+      path: '/gateway/logs'
       fullPath: '/gateway/logs'
       preLoaderRoute: typeof GatewayLogsRouteImport
-      parentRoute: typeof GatewayRoute
+      parentRoute: typeof rootRouteImport
     }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
@@ -3074,6 +3075,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
   ApiWorkspaceTasksRoute: ApiWorkspaceTasksRouteWithChildren,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
+  GatewayLogsRoute: GatewayLogsRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiCloudProvisionRoute: ApiCloudProvisionRoute,
   ApiCloudStatusRoute: ApiCloudStatusRoute,

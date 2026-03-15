@@ -227,7 +227,7 @@ export function OpenClawUpdateNotifier() {
                 {phase === 'done'
                   ? 'OpenClaw Updated!'
                   : phase === 'restarting'
-                    ? 'Restarting gateway...'
+                    ? 'Restarting Hermes...'
                     : phase === 'updating'
                       ? 'Updating OpenClaw...'
                       : phase === 'error'

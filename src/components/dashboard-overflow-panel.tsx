@@ -161,7 +161,7 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
             </button>
           </section>
           <OverflowGrid title="System" items={SYSTEM_ITEMS} onSelect={handleSelect} />
-          <OverflowGrid title="Gateway" items={GATEWAY_ITEMS} onSelect={handleSelect} />
+          <OverflowGrid title="Hermes" items={GATEWAY_ITEMS} onSelect={handleSelect} />
         </div>
       </div>
     </div>

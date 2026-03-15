@@ -533,11 +533,9 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isMemoryActive = pathname === '/memory'
-  const isHealthActive = pathname === '/activity' || pathname === '/logs'
-
   const mainRoutes = ['/chat', '/new', '/sessions', '/files', '/cron']
   const knowledgeRoutes = ['/memory', '/skills']
-  const systemRoutes = ['/settings', '/activity', '/logs']
+  const systemRoutes = ['/settings', '/logs']
 
   useEffect(() => {
     if (mainRoutes.includes(pathname)) setLastRoute('main', pathname)
@@ -796,13 +794,6 @@ function ChatSidebarComponent({
       icon: Settings01Icon,
       label: 'Settings',
       active: isSettingsActive,
-    },
-    {
-      kind: 'link',
-      to: '/activity',
-      icon: ApiIcon,
-      label: 'Health',
-      active: isHealthActive,
     },
   ]
 

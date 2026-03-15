@@ -337,13 +337,13 @@ function SettingsRoute() {
     const result = await autoDetectGateway()
     if (!result.ok || !result.url) {
       setAutoDetectError(
-        result.error || 'No gateway found on localhost ports 18789-18800.',
+        result.error || 'No Hermes endpoint found on localhost ports 18789-18800.',
       )
       setAutoDetectingGateway(false)
       return
     }
 
-    setAutoDetectMessage(`Detected gateway at ${result.url}`)
+    setAutoDetectMessage(`Detected Hermes at ${result.url}`)
     setAutoDetectingGateway(false)
   }
 
@@ -594,13 +594,13 @@ function SettingsRoute() {
           {activeSection === 'advanced' && (
             <>
               <SettingsSection
-                title="Gateway Connection"
-                description="Edit the saved gateway connection, reconnect, and rerun setup if needed."
+                title="Hermes Connection"
+                description="Edit the saved Hermes connection, reconnect, and rerun setup if needed."
                 icon={CloudIcon}
               >
                 <SettingsRow
-                  label="Gateway URL"
-                  description="Saved gateway WebSocket endpoint."
+                  label="Hermes URL"
+                  description="Saved Hermes WebSocket endpoint."
                 >
                   <div className="w-full md:max-w-md">
                     <Input
@@ -609,13 +609,13 @@ function SettingsRoute() {
                       value={gatewayUrl}
                       onChange={(e) => setGatewayUrl(e.target.value)}
                       className="h-9 w-full"
-                      aria-label="Gateway URL"
+                      aria-label="Hermes URL"
                     />
                   </div>
                 </SettingsRow>
                 <SettingsRow
-                  label="Gateway Token"
-                  description="Saved token for the gateway connection."
+                  label="Hermes Token"
+                  description="Saved token for the Hermes connection."
                 >
                   <div className="w-full md:max-w-md">
                     <Input
@@ -624,13 +624,13 @@ function SettingsRoute() {
                       value={gatewayToken}
                       onChange={(e) => setGatewayToken(e.target.value)}
                       className="h-9 w-full"
-                      aria-label="Gateway Token"
+                      aria-label="Hermes Token"
                     />
                   </div>
                 </SettingsRow>
                 <SettingsRow
                   label="Connection status"
-                  description="Current gateway reachability."
+                  description="Current Hermes reachability."
                 >
                   <div className="flex w-full flex-col items-start gap-2 md:w-auto">
                     <span

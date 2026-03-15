@@ -37,7 +37,7 @@ function getLevelBorderClass(level: ActivityEvent['level']): string {
 }
 
 function getTypeLabel(eventType: ActivityEvent['type']): string {
-  if (eventType === 'gateway') return 'Gateway'
+  if (eventType === 'gateway') return 'Hermes'
   if (eventType === 'model') return 'Model'
   if (eventType === 'usage') return 'Usage'
   if (eventType === 'cron') return 'Cron'

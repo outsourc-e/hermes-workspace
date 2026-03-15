@@ -25,7 +25,7 @@ function classifyConnectionError(
   if (!normalizedError && !status) {
     return {
       title: 'Not connected',
-      description: "Hermes Workspace can't reach the gateway.",
+      description: "Hermes Workspace can't reach Hermes.",
       action: 'Check that OpenClaw is running, then try again.',
     }
   }
@@ -38,8 +38,8 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Authentication required',
-      description: 'The gateway rejected the connection token.',
-      action: 'Go to Settings -> Advanced -> Gateway to update your token.',
+      description: 'Hermes rejected the connection token.',
+      action: 'Go to Settings -> Advanced -> Hermes to update your token.',
     }
   }
 
@@ -50,8 +50,8 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Pairing required',
-      description: "This device isn't paired with the gateway yet.",
-      action: 'Run "openclaw pair" on the gateway machine.',
+      description: "This device isn't paired with Hermes yet.",
+      action: 'Run "openclaw pair" on the Hermes machine.',
     }
   }
 
@@ -63,8 +63,8 @@ function classifyConnectionError(
     lower.includes('timeout')
   ) {
     return {
-      title: 'Gateway unreachable',
-      description: "Can't connect to the gateway at the configured URL.",
+      title: 'Hermes unreachable',
+      description: "Can't connect to Hermes at the configured URL.",
       action: 'Make sure OpenClaw is running and the URL is correct.',
     }
   }
@@ -72,7 +72,7 @@ function classifyConnectionError(
   return {
     title: 'Connection error',
     description: normalizedError || 'Something went wrong.',
-    action: 'Try refreshing or check Settings -> Advanced -> Gateway.',
+    action: 'Try refreshing or check Settings -> Advanced -> Hermes.',
   }
 }
 
@@ -124,7 +124,7 @@ export function GatewayStatusMessage({
         />
         <div className="flex-1 text-xs">
           <p className="font-medium">
-            {isChecking ? 'Connecting to gateway...' : errorInfo.title}
+            {isChecking ? 'Connecting to Hermes...' : errorInfo.title}
           </p>
           {!isChecking ? (
             <>

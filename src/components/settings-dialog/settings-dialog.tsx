@@ -714,10 +714,10 @@ function AdvancedContent() {
     <div className="space-y-4">
       <SectionHeader
         title="Advanced"
-        description="Gateway endpoint and connectivity."
+        description="Hermes endpoint and connectivity."
       />
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Gateway URL" description="Used for API requests from Studio">
+        <Row label="Hermes URL" description="Used for API requests from Studio">
           <div className="w-full max-w-sm">
             <Input
               type="url"
@@ -725,7 +725,7 @@ function AdvancedContent() {
               value={settings.gatewayUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
-              aria-label="Gateway URL"
+              aria-label="Hermes URL"
               aria-invalid={!!urlError}
               aria-describedby={urlError ? urlErrorId : undefined}
             />

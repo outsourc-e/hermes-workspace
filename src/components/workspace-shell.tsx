@@ -25,7 +25,6 @@ import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
-import { GatewayConnectionBanner } from '@/components/gateway-connection-banner'
 import { HermesHealthBanner } from '@/components/hermes-health-banner'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
@@ -277,7 +276,7 @@ export function WorkspaceShell() {
           </p>
           {showGatewayTip ? (
             <p className="mt-3 text-sm text-accent-400">
-              Make sure OpenClaw gateway is running:{' '}
+              Make sure Hermes is running:{' '}
               <code className="rounded bg-primary-900 px-1.5 py-0.5 text-xs text-primary-200">
                 openclaw gateway start
               </code>
@@ -342,7 +341,6 @@ export function WorkspaceShell() {
             <div className="w-[78px] shrink-0" />
           </div>
         )}
-        <GatewayConnectionBanner />
         <HermesHealthBanner />
         <div
           className={cn(

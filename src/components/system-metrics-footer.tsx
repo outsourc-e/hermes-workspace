@@ -119,7 +119,7 @@ export function SystemMetricsFooter() {
             'w-1.5 h-1.5 rounded-full flex-shrink-0',
             gatewayConnected ? 'bg-emerald-400' : 'bg-red-400',
           ].join(' ')}
-          title={gatewayConnected ? 'Gateway connected' : 'Gateway disconnected'}
+          title={gatewayConnected ? 'Hermes connected' : 'Hermes disconnected'}
         />
         <span className={gatewayConnected ? 'text-emerald-400' : 'text-red-400'}>
           {gatewayConnected ? 'GW' : 'GW✗'}

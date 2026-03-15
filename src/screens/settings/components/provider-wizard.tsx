@@ -267,7 +267,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
       // Move to verify step, then trigger the restart flow
       setSaveState('saved')
       setVerifyState('checking')
-      setVerificationMessage(`${providerName} API key saved. Gateway is restarting…`)
+      setVerificationMessage(`${providerName} API key saved. Hermes is restarting…`)
       setStep('verify')
 
       // Shows confirm dialog: user can click "Restart & Apply" or "Cancel"
@@ -286,7 +286,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
         } else {
           setVerifyState('warning')
           setVerificationMessage(
-            `Gateway restarted, but ${providerName} models haven't appeared yet. ` +
+            `Hermes restarted, but ${providerName} models haven't appeared yet. ` +
               `Check your API key or wait a moment and refresh.`,
           )
         }
@@ -555,7 +555,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
                             'Run "openclaw configure" in the terminal and select Google OAuth when prompted. ' +
-                              'A browser window will open for sign-in. Once complete, the gateway will restart automatically.',
+                              'A browser window will open for sign-in. Once complete, Hermes will restart automatically.',
                           )
                           setVerifyState('warning')
                           setStep('verify')
@@ -706,7 +706,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                             strokeWidth={1.5}
                             className="inline mr-1"
                           />
-                          Key saved! Gateway is restarting to apply changes.
+                          Key saved! Hermes is restarting to apply changes.
                         </p>
                       ) : null}
                     </div>
@@ -832,7 +832,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                   </p>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
                     {verificationMessage ||
-                      'Waiting for gateway to respond…'}
+                      'Waiting for Hermes to respond…'}
                   </p>
                 </div>
 

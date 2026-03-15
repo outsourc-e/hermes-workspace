@@ -245,7 +245,7 @@ export function ActivityScreen() {
           <EmptyState
             icon={WifiDisconnected02Icon}
             title="Stream disconnected"
-            description="Check your Gateway connection and refresh"
+            description="Check your Hermes connection and refresh"
           />
         ) : events.length === 0 ? (
           <EmptyState

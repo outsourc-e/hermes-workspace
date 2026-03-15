@@ -1186,7 +1186,7 @@ export function ChatScreen({
           }
         : gatewayStatusQuery.data && !gatewayStatusQuery.data.ok
           ? {
-              message: gatewayStatusQuery.data.error || 'Gateway unavailable',
+              message: gatewayStatusQuery.data.error || 'Hermes unavailable',
               status: gatewayStatusQuery.data.status,
             }
           : null
@@ -1303,7 +1303,7 @@ export function ChatScreen({
       : historyError
         ? `Failed to load history. ${historyError}`
         : gatewayStatusError
-          ? `Gateway unavailable. ${gatewayStatusError.message}`
+          ? `Hermes unavailable. ${gatewayStatusError.message}`
           : null
     if (message) setError(message)
   }, [

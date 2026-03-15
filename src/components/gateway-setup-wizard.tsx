@@ -235,7 +235,7 @@ function GatewayStepContent() {
     const result = await autoDetectGateway()
     if (!result.ok || !result.url) {
       setAutoDetectError(
-        result.error || 'No gateway found on localhost ports 18789-18800.',
+        result.error || 'No Hermes endpoint found on localhost ports 18789-18800.',
       )
       setAutoDetecting(false)
       return
@@ -243,7 +243,7 @@ function GatewayStepContent() {
 
     setGatewayUrl(result.url)
     setGatewayToken(result.token || '')
-    setAutoDetectMessage(`Detected gateway at ${result.url}`)
+    setAutoDetectMessage(`Detected Hermes at ${result.url}`)
     setAutoDetecting(false)
   }
 
@@ -283,7 +283,7 @@ function GatewayStepContent() {
     const normalizedEmail = waitlistEmail.trim()
     if (!normalizedEmail) {
       setCloudProvisionStatus('error')
-      setCloudProvisionError('Enter your email to provision a Hermes Workspace Cloud gateway.')
+      setCloudProvisionError('Enter your email to provision Hermes Workspace Cloud.')
       return
     }
 
@@ -309,7 +309,7 @@ function GatewayStepContent() {
         const errorMessage =
           data && 'error' in data && typeof data.error === 'string'
             ? data.error
-            : 'Failed to provision your free Hermes Workspace Cloud gateway.'
+            : 'Failed to provision your free Hermes Workspace Cloud workspace.'
         setCloudProvisionStatus('error')
         setCloudProvisionError(errorMessage)
         return
@@ -322,14 +322,14 @@ function GatewayStepContent() {
       const saveResult = await saveAndTest()
       if (!saveResult) {
         setCloudProvisionStatus('error')
-        setCloudProvisionError('Provisioned gateway, but the connection test failed.')
+        setCloudProvisionError('Provisioned Hermes, but the connection test failed.')
         return
       }
 
       setCloudProvisionStatus('success')
     } catch {
       setCloudProvisionStatus('error')
-      setCloudProvisionError('Failed to provision your free Hermes Workspace Cloud gateway.')
+      setCloudProvisionError('Failed to provision your free Hermes Workspace Cloud workspace.')
     }
   }
 
@@ -371,7 +371,7 @@ function GatewayStepContent() {
     },
     {
       id: 'starting',
-      label: 'Starting gateway...',
+      label: 'Starting Hermes...',
     },
     {
       id: 'ready',
@@ -708,7 +708,7 @@ function GatewayStepContent() {
                 htmlFor="gateway-url"
                 className="mb-1.5 block text-sm font-medium text-primary-900"
               >
-                Gateway URL
+                Hermes URL
               </label>
               <Input
                 id="gateway-url"
@@ -727,7 +727,7 @@ function GatewayStepContent() {
                 disabled={autoDetecting}
                 className="mt-3 w-full"
               >
-                {autoDetecting ? 'Scanning localhost...' : 'Auto-detect Gateway'}
+                {autoDetecting ? 'Scanning localhost...' : 'Auto-detect Hermes'}
               </Button>
             </div>
 
@@ -736,12 +736,12 @@ function GatewayStepContent() {
                 htmlFor="gateway-token"
                 className="mb-1.5 block text-sm font-medium text-primary-900"
               >
-                Gateway Token
+                Hermes Token
               </label>
               <Input
                 id="gateway-token"
                 type="password"
-                placeholder="Paste your gateway token here"
+                placeholder="Paste your Hermes token here"
                 value={gatewayToken}
                 onChange={(e) => setGatewayToken(e.target.value)}
                 className="h-10"

@@ -4,12 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 
 async function pingGateway(): Promise<boolean> {
   try {
-    const response = await fetch('/api/ping', {
+    const response = await fetch('http://localhost:8642/health', {
       signal: AbortSignal.timeout(5000),
     })
     if (!response.ok) return false
-    const data = (await response.json()) as { ok?: boolean }
-    return Boolean(data.ok)
+    const data = (await response.json()) as { ok?: boolean; status?: string }
+    return data.ok === true || data.status === 'ok'
   } catch {
     return false
   }
@@ -21,7 +21,7 @@ async function pingGateway(): Promise<boolean> {
  */
 export function GatewayStatusDot() {
   const { data: isConnected, isLoading } = useQuery({
-    queryKey: ['gateway', 'ping'],
+    queryKey: ['hermes', 'health'],
     queryFn: pingGateway,
     refetchInterval: 15_000,
     retry: false,
@@ -40,7 +40,7 @@ export function GatewayStatusDot() {
       : 'Offline'
 
   return (
-    <span className="relative flex h-2 w-2 shrink-0" title={`Gateway: ${label}`}>
+    <span className="relative flex h-2 w-2 shrink-0" title={`Hermes: ${label}`}>
       {isConnected && (
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/40" />
       )}
@@ -57,7 +57,7 @@ export function GatewayStatusIndicator({
   inline?: boolean
 }) {
   const { data: isConnected, isLoading } = useQuery({
-    queryKey: ['gateway', 'ping'],
+    queryKey: ['hermes', 'health'],
     queryFn: pingGateway,
     refetchInterval: 15_000,
     retry: false,
@@ -83,7 +83,7 @@ export function GatewayStatusIndicator({
 
   if (inline) {
     return (
-      <span className="flex items-center gap-1.5" title={`Gateway ${label}`}>
+      <span className="flex items-center gap-1.5" title={`Hermes ${label}`}>
         <span className="relative flex h-1.5 w-1.5 shrink-0">
           {(isLoading || isConnected) && (
             <span
@@ -100,7 +100,7 @@ export function GatewayStatusIndicator({
   }
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5" title={`Gateway ${label}`}>
+    <div className="flex items-center gap-2 px-2 py-1.5" title={`Hermes ${label}`}>
       <span className="relative flex h-2 w-2 shrink-0">
         {(isLoading || isConnected) && (
           <span
