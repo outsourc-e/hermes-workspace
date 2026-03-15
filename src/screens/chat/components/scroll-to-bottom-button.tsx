@@ -28,9 +28,13 @@ function ScrollToBottomButton({
           size="icon-sm"
           aria-label="Scroll to bottom"
           className={cn(
-            'pointer-events-auto relative rounded-full bg-gradient-to-br from-accent-500 via-accent-500 to-amber-500 text-white shadow-lg shadow-accent-500/30 transition-colors hover:from-accent-500 hover:to-accent-600 focus-visible:ring-2 focus-visible:ring-accent-400/70',
+            'pointer-events-auto relative rounded-full text-white shadow-lg transition-colors hover:opacity-90',
             className,
           )}
+          style={{
+            background: 'var(--theme-accent)',
+            boxShadow: '0 4px 12px color-mix(in srgb, var(--theme-accent) 35%, transparent)',
+          }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
