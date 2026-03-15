@@ -879,7 +879,34 @@ export function ChatScreen({
 
   refreshHistoryRef.current = function refreshHistory() {
     if (historyQuery.isFetching) return
-    void historyQuery.refetch()
+
+    // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
+    // The refetch replaces the query cache with server data — if the server
+    // hasn't processed the user's POST yet, the optimistic message vanishes.
+    const currentMessages = (historyQuery.data as any)?.messages as GatewayMessage[] | undefined
+    const pendingOptimistic = (currentMessages ?? []).filter((msg) => {
+      const raw = msg as Record<string, unknown>
+      return (
+        msg.role === 'user' &&
+        (normalizeMessageValue(raw.__optimisticId).startsWith('opt-') ||
+          normalizeMessageValue(raw.status) === 'sending')
+      )
+    })
+
+    void historyQuery.refetch().then(() => {
+      // Re-inject optimistic messages that weren't in the server response
+      if (pendingOptimistic.length === 0) return
+      if (!activeFriendlyId || !activeSessionKey) return
+
+      for (const optimistic of pendingOptimistic) {
+        appendHistoryMessage(
+          queryClient,
+          activeFriendlyId,
+          activeSessionKey,
+          optimistic,
+        )
+      }
+    })
   }
 
   // Track message count when waiting started — only clear when NEW assistant msg appears
