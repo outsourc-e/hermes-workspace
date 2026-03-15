@@ -13,7 +13,7 @@ type BrowserTab = {
 }
 
 const BROWSER_TABS_METHODS = [
-  'browser',           // Current OpenClaw API — single method with action param
+  'browser',           // Current Hermes API — single method with action param
   'browser.tabs',
   'browser_tabs',
   'browser.get_tabs',
@@ -63,7 +63,7 @@ async function callBrowserTabs(): Promise<unknown> {
   let lastError: unknown = null
   for (const method of BROWSER_TABS_METHODS) {
     try {
-      // Current OpenClaw uses single 'browser' method with action param
+      // Current Hermes uses single 'browser' method with action param
       const params = method === 'browser' ? { action: 'tabs' } : undefined
       return await gatewayRpc(method, params)
     } catch (error) {

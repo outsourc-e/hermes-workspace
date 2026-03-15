@@ -17,7 +17,7 @@ const UNSUPPORTED_MESSAGE =
   'Browser control available when gateway supports browser RPC'
 const NO_ACTIVE_SESSION_MESSAGE = 'No active browser session'
 const BROWSER_STATUS_METHODS = [
-  'browser',           // Current OpenClaw API — single method with action param
+  'browser',           // Current Hermes API — single method with action param
   'browser.status',
   'browser_status',
   'browser.get_status',

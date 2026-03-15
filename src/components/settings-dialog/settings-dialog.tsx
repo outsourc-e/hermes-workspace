@@ -290,7 +290,7 @@ function AppearanceContent() {
   }
 
   function handleAccentColorChange(selectedAccent: AccentColor) {
-    localStorage.setItem('clawsuite-accent', selectedAccent)
+    localStorage.setItem('hermes-accent', selectedAccent)
     document.documentElement.setAttribute('data-accent', selectedAccent)
     applyAccentColor(selectedAccent)
     updateSettings({ accentColor: selectedAccent })

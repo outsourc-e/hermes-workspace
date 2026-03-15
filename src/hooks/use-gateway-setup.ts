@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-const SETUP_STORAGE_KEY = 'clawsuite-gateway-configured'
+const SETUP_STORAGE_KEY = 'hermes-gateway-configured'
 
 type GatewaySetupState = {
   isOpen: boolean
@@ -89,8 +89,8 @@ async function saveConfig(url: string, token: string): Promise<{ ok: boolean; er
 
   // Persist to localStorage so token survives page refresh
   try {
-    localStorage.setItem('clawsuite-gateway-url', normalizedUrl)
-    localStorage.setItem('clawsuite-gateway-token', token)
+    localStorage.setItem('hermes-gateway-url', normalizedUrl)
+    localStorage.setItem('hermes-gateway-token', token)
   } catch {
     // Ignore localStorage write failures (private browsing, etc.)
   }
@@ -169,11 +169,11 @@ function readSavedGatewayConfig(): SavedGatewayConfig | null {
   }
 
   const url =
-    localStorage.getItem('clawsuite-gateway-url')?.trim() ||
+    localStorage.getItem('hermes-gateway-url')?.trim() ||
     localStorage.getItem('gateway-url')?.trim() ||
     ''
   const token =
-    localStorage.getItem('clawsuite-gateway-token')?.trim() ||
+    localStorage.getItem('hermes-gateway-token')?.trim() ||
     localStorage.getItem('gateway-token')?.trim() ||
     ''
 

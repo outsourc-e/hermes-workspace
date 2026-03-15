@@ -122,7 +122,6 @@ export const Route = createFileRoute('/api/send-stream')({
         const message = String(body.message ?? '')
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
-        const fastMode = body.fastMode === true
         const attachments = normalizeAttachments(body.attachments)
         if (!message.trim() && (!attachments || attachments.length === 0)) {
           return new Response(

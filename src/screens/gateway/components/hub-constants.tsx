@@ -25,9 +25,9 @@ export type MissionPlanItem = {
   enabled: boolean
 }
 
-export const TEAM_STORAGE_KEY = 'clawsuite:hub-team'
-export const TEAM_CONFIGS_STORAGE_KEY = 'clawsuite:hub-team-configs'
-export const MISSION_REPORTS_STORAGE_KEY = 'clawsuite-mission-reports'
+export const TEAM_STORAGE_KEY = 'hermes:hub-team'
+export const TEAM_CONFIGS_STORAGE_KEY = 'hermes:hub-team-configs'
+export const MISSION_REPORTS_STORAGE_KEY = 'hermes-mission-reports'
 export const MAX_MISSION_REPORTS = 10
 
 export type SavedTeamConfig = {

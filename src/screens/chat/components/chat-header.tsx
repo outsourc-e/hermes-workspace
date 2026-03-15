@@ -168,7 +168,7 @@ function ChatHeaderComponent({
       onOpenAgentDetails()
       return
     }
-    window.dispatchEvent(new CustomEvent('clawsuite:chat-agent-details'))
+    window.dispatchEvent(new CustomEvent('hermes:chat-agent-details'))
   }, [onOpenAgentDetails])
 
   useEffect(() => {

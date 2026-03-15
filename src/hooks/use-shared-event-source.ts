@@ -20,7 +20,7 @@ interface SharedEventSourceState {
   connecting: boolean
 }
 
-const STATE_KEY = '__clawsuite_shared_eventsource__' as const
+const STATE_KEY = '__hermes_shared_eventsource__' as const
 
 function getState(): SharedEventSourceState {
   if (!(window as any)[STATE_KEY]) {

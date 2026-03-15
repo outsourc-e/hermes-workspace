@@ -16,10 +16,10 @@ type PresenceLeave = {
 
 type PresenceMessage = PresenceHeartbeat | PresenceLeave
 
-const CHANNEL_NAME = 'clawsuite-presence'
-const LOCAL_STORAGE_KEY = 'clawsuite:presence:users'
-const SESSION_USER_ID_KEY = 'clawsuite:presence:user-id'
-const SESSION_COLOR_KEY = 'clawsuite:presence:color'
+const CHANNEL_NAME = 'hermes-presence'
+const LOCAL_STORAGE_KEY = 'hermes:presence:users'
+const SESSION_USER_ID_KEY = 'hermes:presence:user-id'
+const SESSION_COLOR_KEY = 'hermes:presence:color'
 const HEARTBEAT_INTERVAL_MS = 3000
 const STALE_AFTER_MS = 10000
 

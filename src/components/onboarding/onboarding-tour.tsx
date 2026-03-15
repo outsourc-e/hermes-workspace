@@ -6,7 +6,7 @@ import { tourSteps } from './tour-steps'
 import { useSettingsStore } from '@/hooks/use-settings'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
 
-const TOUR_STORAGE_KEY = 'clawsuite-onboarding-completed'
+const TOUR_STORAGE_KEY = 'hermes-onboarding-completed'
 
 // Accent color mapping to hex values
 const ACCENT_COLORS = {
@@ -44,7 +44,7 @@ export function OnboardingTour() {
       if (hasCompletedTour) return
 
       // Wait for gateway wizard to finish before starting tour
-      const GATEWAY_SETUP_KEY = 'clawsuite-gateway-configured'
+      const GATEWAY_SETUP_KEY = 'hermes-gateway-configured'
       const checkAndStart = () => {
         const gatewayConfigured = localStorage.getItem(GATEWAY_SETUP_KEY) === 'true'
         if (gatewayConfigured) {

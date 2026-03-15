@@ -12,7 +12,7 @@ import {
   safeErrorMessage,
 } from '../../../server/rate-limit'
 
-// Use workspace-level tasks file so all OpenClaw agents share one source of truth
+// Use workspace-level tasks file so all Hermes agents share one source of truth
 const TASKS_FILE =
   process.env.OPENCLAW_WORKSPACE
     ? path.join(process.env.OPENCLAW_WORKSPACE, 'data', 'tasks.json')

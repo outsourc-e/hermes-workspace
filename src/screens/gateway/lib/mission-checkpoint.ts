@@ -19,8 +19,8 @@ export type MissionCheckpoint = {
   report?: string
 }
 
-const CURRENT_KEY = 'clawsuite:mission-checkpoint'
-const HISTORY_KEY = 'clawsuite:mission-history'
+const CURRENT_KEY = 'hermes:mission-checkpoint'
+const HISTORY_KEY = 'hermes:mission-history'
 const MAX_HISTORY = 20
 
 export function saveMissionCheckpoint(cp: MissionCheckpoint): void {

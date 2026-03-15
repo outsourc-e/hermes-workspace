@@ -6,7 +6,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon, Tick01Icon, Sent02Icon } from '@hugeicons/core-free-icons';
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite';
 
-const STORAGE_KEY_SEEN = 'clawsuite-mobile-setup-seen';
+const STORAGE_KEY_SEEN = 'hermes-mobile-setup-seen';
 
 interface MobileSetupModalProps {
   isOpen: boolean;
@@ -93,8 +93,8 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       ),
     },
     {
-      title: 'Make OpenClaw discoverable',
-      body: 'Send this to your OpenClaw agent so it exposes itself on the network for your phone to find it.',
+      title: 'Make Hermes discoverable',
+      body: 'Send this to your Hermes agent so it exposes itself on the network for your phone to find it.',
       showTailscaleIcon: false,
       action: (
         <div className="space-y-3">
@@ -115,7 +115,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
             ) : (
               <>
                 <HugeiconsIcon icon={Sent02Icon} size={16} strokeWidth={2} />
-                {exposeSending ? 'Sending…' : 'Send to OpenClaw'}
+                {exposeSending ? 'Sending…' : 'Send to Hermes'}
               </>
             )}
           </button>

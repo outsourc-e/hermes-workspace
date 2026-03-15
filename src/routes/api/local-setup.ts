@@ -162,7 +162,7 @@ async function waitForGatewayReady() {
     await wait(POLL_INTERVAL_MS)
   }
 
-  throw new Error('OpenClaw gateway did not become reachable in time')
+  throw new Error('Hermes gateway did not become reachable in time')
 }
 
 async function waitForGatewayToken() {
@@ -240,21 +240,21 @@ export const Route = createFileRoute('/api/local-setup')({
               try {
                 emit({
                   status: 'checking',
-                  message: 'Checking for OpenClaw...',
+                  message: 'Checking for Hermes...',
                 })
 
                 let installed = await isOpenClawInstalled()
                 if (!installed) {
                   emit({
                     status: 'installing',
-                    message: 'Installing OpenClaw...',
+                    message: 'Installing Hermes...',
                   })
                   await installOpenClaw()
                   installed = await isOpenClawInstalled()
                 }
 
                 if (!installed) {
-                  throw new Error('OpenClaw is still unavailable after installation')
+                  throw new Error('Hermes is still unavailable after installation')
                 }
 
                 const initialConfig = await readGatewayConfig()
@@ -273,7 +273,7 @@ export const Route = createFileRoute('/api/local-setup')({
                       formatCommandError(
                         'openclaw gateway start --bind lan',
                         error,
-                        'Failed to launch the OpenClaw gateway',
+                        'Failed to launch the Hermes gateway',
                       ),
                     )
                   }
@@ -292,7 +292,7 @@ export const Route = createFileRoute('/api/local-setup')({
                 emit({
                   status: 'error',
                   message:
-                    error instanceof Error ? error.message : 'Local OpenClaw setup failed',
+                    error instanceof Error ? error.message : 'Local Hermes setup failed',
                 })
               } finally {
                 cleanup()

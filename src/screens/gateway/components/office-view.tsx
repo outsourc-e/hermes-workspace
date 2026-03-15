@@ -435,7 +435,7 @@ export function OfficeView({
   const [remoteCollapsed, setRemoteCollapsed] = useState(true)
   const [layoutTemplate, setLayoutTemplate] = useState<OfficeLayoutTemplate>(() => {
     if (typeof window === 'undefined') return 'grid'
-    const saved = window.localStorage.getItem('clawsuite:office-layout')
+    const saved = window.localStorage.getItem('hermes:office-layout')
     return saved === 'roundtable' || saved === 'warroom' || saved === 'grid' ? saved : 'grid'
   })
 
@@ -450,7 +450,7 @@ export function OfficeView({
   const changeLayout = (nextTemplate: OfficeLayoutTemplate) => {
     setLayoutTemplate(nextTemplate)
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('clawsuite:office-layout', nextTemplate)
+      window.localStorage.setItem('hermes:office-layout', nextTemplate)
     }
   }
 

@@ -366,7 +366,7 @@ export function ChatScreen({
   // Per-session thinking level — stored in sessionStorage keyed by session
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
     if (typeof window === 'undefined') return 'low'
-    const key = `clawsuite-thinking-${activeFriendlyId || 'new'}`
+    const key = `hermes-thinking-${activeFriendlyId || 'new'}`
     const stored = window.sessionStorage.getItem(key)
     if (stored === 'off' || stored === 'low' || stored === 'adaptive') return stored
     return 'low'
@@ -386,7 +386,7 @@ export function ChatScreen({
   } | null>(null)
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
-    const stored = localStorage.getItem('clawsuite-file-explorer-collapsed')
+    const stored = localStorage.getItem('hermes-file-explorer-collapsed')
     return stored === null ? true : stored === 'true'
   })
   const { isMobile } = useChatMobile(queryClient)
@@ -1022,7 +1022,7 @@ export function ChatScreen({
     thinkingInitializedRef.current = true
     const is46 = currentModel.toLowerCase().includes('4-6') || currentModel.toLowerCase().includes('claude-4.6')
     if (is46) {
-      const key = `clawsuite-thinking-${activeFriendlyId || 'new'}`
+      const key = `hermes-thinking-${activeFriendlyId || 'new'}`
       const stored = typeof window !== 'undefined' ? window.sessionStorage.getItem(key) : null
       // Only auto-set if not explicitly configured
       if (!stored) {
@@ -1035,7 +1035,7 @@ export function ChatScreen({
   const handleThinkingLevelChange = useCallback((level: ThinkingLevel) => {
     setThinkingLevel(level)
     if (typeof window !== 'undefined') {
-      const key = `clawsuite-thinking-${activeFriendlyId || 'new'}`
+      const key = `hermes-thinking-${activeFriendlyId || 'new'}`
       window.sessionStorage.setItem(key, level)
     }
   }, [activeFriendlyId])
@@ -1208,9 +1208,9 @@ export function ChatScreen({
     const handleRefreshRequest = () => {
       void historyQuery.refetch()
     }
-    window.addEventListener('clawsuite:chat-refresh', handleRefreshRequest)
+    window.addEventListener('hermes:chat-refresh', handleRefreshRequest)
     return () => {
-      window.removeEventListener('clawsuite:chat-refresh', handleRefreshRequest)
+      window.removeEventListener('hermes:chat-refresh', handleRefreshRequest)
     }
   }, [historyQuery])
 
@@ -1228,9 +1228,9 @@ export function ChatScreen({
     function handleSSEDrop() {
       void historyQuery.refetch()
     }
-    window.addEventListener('clawsuite:sse-dropped', handleSSEDrop)
+    window.addEventListener('hermes:sse-dropped', handleSSEDrop)
     return () => {
-      window.removeEventListener('clawsuite:sse-dropped', handleSSEDrop)
+      window.removeEventListener('hermes:sse-dropped', handleSSEDrop)
     }
   }, [historyQuery])
 
@@ -1967,7 +1967,7 @@ export function ChatScreen({
     setFileExplorerCollapsed((prev) => {
       const next = !prev
       if (typeof window !== 'undefined') {
-        localStorage.setItem('clawsuite-file-explorer-collapsed', String(next))
+        localStorage.setItem('hermes-file-explorer-collapsed', String(next))
       }
       return next
     })
@@ -2058,8 +2058,8 @@ export function ChatScreen({
   // Listen for mobile header agent-details tap
   useEffect(() => {
     const handler = () => { /* agent view removed */ }
-    window.addEventListener('clawsuite:chat-agent-details', handler)
-    return () => window.removeEventListener('clawsuite:chat-agent-details', handler)
+    window.addEventListener('hermes:chat-agent-details', handler)
+    return () => window.removeEventListener('hermes:chat-agent-details', handler)
   }, [])
 
   return (

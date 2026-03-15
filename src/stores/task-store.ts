@@ -276,7 +276,7 @@ export const useTaskStore = create<TaskStore>()(
       },
     }),
     {
-      name: 'clawsuite-tasks-v1',
+      name: 'hermes-tasks-v1',
     },
   ),
 )

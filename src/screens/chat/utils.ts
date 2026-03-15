@@ -47,7 +47,7 @@ function stripChannelPrefix(text: string): string {
 }
 
 /**
- * Strip OpenClaw system metadata from user messages.
+ * Strip Hermes system metadata from user messages.
  * Removes [media attached: ...] blocks, image-send instructions,
  * and [Telegram/Signal/etc ...] headers, leaving just the user's text.
  */

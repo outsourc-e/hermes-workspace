@@ -17,7 +17,7 @@ function showNotification(title: string, body: string) {
 
   // Fallback: dispatch custom event for in-app toast
   window.dispatchEvent(
-    new CustomEvent('clawsuite:toast', {
+    new CustomEvent('hermes:toast', {
       detail: { title, body, type: 'warning' },
     }),
   )

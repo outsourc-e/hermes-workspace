@@ -6,7 +6,7 @@ import { gatewayRpc } from '../../../server/gateway'
 type UnknownRecord = Record<string, unknown>
 
 const BROWSER_SCREENSHOT_METHODS = [
-  'browser',           // Current OpenClaw API — single method with action param
+  'browser',           // Current Hermes API — single method with action param
   'browser.screenshot',
   'browser_screenshot',
   'browser.snapshot',
@@ -53,7 +53,7 @@ async function callBrowserScreenshot(params?: unknown): Promise<unknown> {
   let lastError: unknown = null
   for (const method of BROWSER_SCREENSHOT_METHODS) {
     try {
-      // Current OpenClaw uses single 'browser' method with action param
+      // Current Hermes uses single 'browser' method with action param
       const rpcParams = method === 'browser'
         ? { action: 'screenshot', ...(params && typeof params === 'object' ? params : {}) }
         : params

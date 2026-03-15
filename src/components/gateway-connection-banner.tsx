@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 const HEALTH_CHECK_INTERVAL_MS = 15_000
 const HEALTH_CHECK_DELAY_MS = 1_000
 const REQUIRED_FAILURES = 4
-const DISMISS_STORAGE_KEY = 'clawsuite-gateway-banner-dismissed-until'
+const DISMISS_STORAGE_KEY = 'hermes-gateway-banner-dismissed-until'
 const DISMISS_TTL_MS = 60 * 60 * 1000
 
 type GatewayConnectionSetupFormProps = {
@@ -33,7 +33,7 @@ type GatewayConnectionSetupFormProps = {
 
 export function GatewayConnectionSetupForm({
   variant = 'card',
-  title = 'Connect to OpenClaw Gateway',
+  title = 'Connect to Hermes Gateway',
   description = 'Enter your gateway URL and token to test the connection and save it.',
   className,
   onSuccess,

@@ -23,7 +23,7 @@ const TIPS = [
     emoji: '🧠',
     text: 'Your agent has memory — it remembers context across sessions',
   },
-  { emoji: '🚀', text: 'Hermes Workspace works with any OpenClaw gateway instance' },
+  { emoji: '🚀', text: 'Hermes Workspace works with any Hermes gateway instance' },
   {
     emoji: '🎯',
     text: 'Pin important sessions to keep them at the top of your sidebar',
@@ -40,7 +40,7 @@ export function ActivityTicker() {
   const [fading, setFading] = useState(false)
   const [dismissed, setDismissed] = useState(() => {
     if (typeof window === 'undefined') return false
-    return localStorage.getItem('clawsuite-ticker-dismissed') === 'true'
+    return localStorage.getItem('hermes-ticker-dismissed') === 'true'
   })
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function ActivityTicker() {
   const handleDismiss = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
     setDismissed(true)
-    localStorage.setItem('clawsuite-ticker-dismissed', 'true')
+    localStorage.setItem('hermes-ticker-dismissed', 'true')
   }
 
   if (dismissed) return null

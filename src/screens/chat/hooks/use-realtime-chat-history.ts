@@ -352,7 +352,7 @@ export function useRealtimeChatHistory({
       .join('\n')
       .toLowerCase()
 
-    // Only trigger on OpenClaw's actual mid-compaction signal.
+    // Only trigger on Hermes's actual mid-compaction signal.
     // "pre-compaction memory flush" and "store durable memories now" are routine
     // heartbeat messages — do NOT match those here.
     if (!textCandidates.includes('compacting context')) return

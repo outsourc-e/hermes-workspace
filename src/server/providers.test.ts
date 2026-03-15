@@ -24,7 +24,7 @@ describe('providers config parsing', function suite() {
   })
 
   it('parses configured providers from auth profiles', async function test() {
-    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clawsuite-test-'))
+    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-test-'))
     vi.spyOn(os, 'homedir').mockReturnValue(homeDir)
 
     writeConfig(homeDir, {
@@ -46,7 +46,7 @@ describe('providers config parsing', function suite() {
   })
 
   it('parses configured model ids from legacy models.providers schema', async function test() {
-    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clawsuite-test-'))
+    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-test-'))
     vi.spyOn(os, 'homedir').mockReturnValue(homeDir)
 
     writeConfig(homeDir, {
@@ -71,7 +71,7 @@ describe('providers config parsing', function suite() {
   })
 
   it('parses configured model ids from agents.defaults schema', async function test() {
-    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clawsuite-test-'))
+    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-test-'))
     vi.spyOn(os, 'homedir').mockReturnValue(homeDir)
 
     writeConfig(homeDir, {

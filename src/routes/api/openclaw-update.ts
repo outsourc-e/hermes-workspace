@@ -21,7 +21,7 @@ export const Route = createFileRoute('/api/openclaw-update')({
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         return json(
-          { ok: false, error: 'OpenClaw updates are not available in Hermes Workspace.' },
+          { ok: false, error: 'Hermes updates are not available in Hermes Workspace.' },
           { status: 501 },
         )
       },

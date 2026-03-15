@@ -126,7 +126,7 @@ function normalizeString(value: unknown): string {
 }
 
 /**
- * Strip <final>...</final> wrapper tags that the OpenClaw gateway emits as a
+ * Strip <final>...</final> wrapper tags that the Hermes gateway emits as a
  * streaming-completion sentinel in agent chunk events.
  *
  * The gateway sometimes wraps the last streaming chunk (or a standalone

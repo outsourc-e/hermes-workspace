@@ -28,7 +28,7 @@ type TaskBoardProps = {
   /** When set, board defaults to showing only tasks with this missionId */
   activeMissionId?: string
 }
-const STORAGE_KEY = 'clawsuite:hub-tasks'
+const STORAGE_KEY = 'hermes:hub-tasks'
 const COLUMNS: Array<{ key: TaskStatus; label: string }> = [
   { key: 'inbox', label: 'Inbox' },
   { key: 'assigned', label: 'Assigned' },

@@ -73,9 +73,9 @@ type MissionPlanItem = {
   enabled: boolean
 }
 
-const TEAM_STORAGE_KEY = 'clawsuite:hub-team'
-const TEAM_CONFIGS_STORAGE_KEY = 'clawsuite:hub-team-configs'
-const MISSION_REPORTS_STORAGE_KEY = 'clawsuite-mission-reports'
+const TEAM_STORAGE_KEY = 'hermes:hub-team'
+const TEAM_CONFIGS_STORAGE_KEY = 'hermes:hub-team-configs'
+const MISSION_REPORTS_STORAGE_KEY = 'hermes-mission-reports'
 const MAX_MISSION_REPORTS = 10
 
 type SavedTeamConfig = {
@@ -3280,7 +3280,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setSpawnState({})
     setAgentSessionStatus({})
     if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('clawsuite:hub-agent-sessions')
+      window.localStorage.removeItem('hermes:hub-agent-sessions')
     }
     if (reason === 'completed') {
       completeMission()
@@ -3533,7 +3533,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const model = agentSessionModelMap[id]
       combined[id] = model ? { sessionKey, model } : { sessionKey }
     }
-    window.localStorage.setItem('clawsuite:hub-agent-sessions', JSON.stringify(combined))
+    window.localStorage.setItem('hermes:hub-agent-sessions', JSON.stringify(combined))
   }, [agentSessionMap, agentSessionModelMap])
 
   useEffect(() => {

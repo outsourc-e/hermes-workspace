@@ -5,7 +5,7 @@ import { gatewayRpc } from '../../../server/gateway'
 import { requireJsonContentType } from '../../../server/rate-limit'
 
 const BROWSER_NAVIGATE_METHODS = [
-  'browser',           // Current OpenClaw API — single method with action param
+  'browser',           // Current Hermes API — single method with action param
   'browser.navigate',
   'browser_navigate',
   'browser.go',

@@ -28,9 +28,9 @@ export function MobilePromptTrigger() {
     }
 
     const isDismissed =
-      localStorage.getItem('clawsuite-mobile-access-dismissed') === 'true' ||
-      localStorage.getItem('clawsuite-mobile-prompt-dismissed') === 'true';
-    const isSetup = localStorage.getItem('clawsuite-mobile-setup-seen') === 'true';
+      localStorage.getItem('hermes-mobile-access-dismissed') === 'true' ||
+      localStorage.getItem('hermes-mobile-prompt-dismissed') === 'true';
+    const isSetup = localStorage.getItem('hermes-mobile-setup-seen') === 'true';
 
     if (isDismissed || isSetup) {
       return;
@@ -57,7 +57,7 @@ export function MobilePromptTrigger() {
 
   const persistDismissalPreference = () => {
     if (dontShowAgain) {
-      localStorage.setItem('clawsuite-mobile-access-dismissed', 'true');
+      localStorage.setItem('hermes-mobile-access-dismissed', 'true');
     }
   };
 

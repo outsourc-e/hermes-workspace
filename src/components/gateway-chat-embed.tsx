@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const GATEWAY_UI_URL = '/gateway-ui/'
-const STORAGE_KEY = 'clawsuite-chat-mode'
+const STORAGE_KEY = 'hermes-chat-mode'
 
 export type ChatMode = 'native' | 'gateway'
 
@@ -53,7 +53,7 @@ function GatewayChatEmbedComponent({ className }: { className?: string }) {
               Unable to connect to gateway
             </p>
             <p className="text-xs text-primary-500">
-              Make sure OpenClaw is running on port 18789
+              Make sure Hermes is running on port 18789
             </p>
           </div>
         </div>
@@ -65,7 +65,7 @@ function GatewayChatEmbedComponent({ className }: { className?: string }) {
           'h-full w-full border-0 transition-opacity duration-300',
           loaded ? 'opacity-100' : 'opacity-0',
         )}
-        title="OpenClaw Chat"
+        title="Hermes Chat"
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
         allow="clipboard-read; clipboard-write"

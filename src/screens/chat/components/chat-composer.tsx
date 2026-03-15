@@ -499,7 +499,7 @@ function normalizeDraftSessionKey(sessionKey?: string): string {
 }
 
 function toDraftStorageKey(sessionKey?: string): string {
-  return `clawsuite-draft-${normalizeDraftSessionKey(sessionKey)}`
+  return `hermes-draft-${normalizeDraftSessionKey(sessionKey)}`
 }
 
 function readSlashCommandQuery(inputValue: string): string | null {
@@ -1997,7 +1997,7 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 )}
-                {/* Token counter — bottom bar, mirrors OpenClaw style, triggers at ~25 tokens */}
+                {/* Token counter — bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
                 {value.length >= 100 && (
                   <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
                     ~{Math.ceil(value.length / 4)} tokens

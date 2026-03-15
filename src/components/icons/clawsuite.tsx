@@ -8,7 +8,7 @@ export type OpenClawStudioIconProps = {
 
 /**
  * Hermes Agent icon — Nous Research blue gradient with gold caduceus.
- * Replaces the original ClawSuite orange terminal icon.
+ * Replaces the original Hermes Workspace orange terminal icon.
  */
 export function OpenClawStudioIcon({
   className,

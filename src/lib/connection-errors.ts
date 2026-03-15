@@ -1,5 +1,5 @@
 export type ConnectionErrorKind =
-  | 'clawsuite_auth_required'
+  | 'hermes_auth_required'
   | 'gateway_auth_rejected'
   | 'gateway_pairing_required'
   | 'gateway_unreachable'
@@ -15,7 +15,7 @@ export function classifyConnectionError(
   const msg = typeof error === 'string' ? error : error?.message ?? ''
   const lower = msg.toLowerCase()
   if (!lower && !status) return 'gateway_unreachable'
-  if (status === 401) return 'clawsuite_auth_required'
+  if (status === 401) return 'hermes_auth_required'
   if (
     status === 403 ||
     lower.includes('pair') ||
@@ -64,7 +64,7 @@ export function getConnectionErrorMessage(
   kind: ConnectionErrorKind,
 ): ConnectionErrorInfo {
   switch (kind) {
-    case 'clawsuite_auth_required':
+    case 'hermes_auth_required':
       return {
         title: 'Hermes Workspace Login Required',
         description: 'This instance requires a password to access.',
@@ -87,8 +87,8 @@ export function getConnectionErrorMessage(
     case 'gateway_unreachable':
       return {
         title: 'Gateway unreachable',
-        description: 'Hermes Workspace cannot reach the configured OpenClaw gateway.',
-        action: 'Check that OpenClaw is running and the gateway URL is correct.',
+        description: 'Hermes Workspace cannot reach the configured Hermes gateway.',
+        action: 'Check that Hermes is running and the gateway URL is correct.',
       }
     case 'handshake_failed':
       return {
@@ -136,7 +136,7 @@ export function getConnectionErrorInfo(
       'forbidden',
       'failed to fetch',
       'gateway not reachable',
-      'could not reach clawsuite server',
+      'could not reach hermes server',
     ].includes(details.toLowerCase())
 
   return {

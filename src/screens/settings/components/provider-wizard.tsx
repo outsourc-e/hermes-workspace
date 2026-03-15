@@ -336,7 +336,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                 </DialogTitle>
                 <DialogDescription className="text-pretty">
                   Add provider credentials safely. API keys stay local in your
-                  OpenClaw config file and are never sent to Studio.
+                  Hermes config file and are never sent to Studio.
                 </DialogDescription>
               </div>
               <Button
@@ -587,7 +587,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the OpenClaw docs
+                            See the Hermes docs
                           </a>{' '}
                           for setup instructions.
                         </p>
@@ -598,7 +598,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                   <>
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
                       If you have Claude Code or the Claude CLI installed,
-                      OpenClaw can use the same auth token. Run the configure
+                      Hermes can use the same auth token. Run the configure
                       command to detect and import it automatically.
                     </p>
 
@@ -651,7 +651,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the OpenClaw docs
+                            See the Hermes docs
                           </a>{' '}
                           for CLI token setup instructions.
                         </p>

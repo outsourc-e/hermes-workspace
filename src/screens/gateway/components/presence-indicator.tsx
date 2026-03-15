@@ -32,7 +32,7 @@ function getPresenceId(): string {
 
 function getPresenceName(): string {
   // Try to get a user-friendly name
-  return localStorage.getItem('clawsuite-username') || 'You'
+  return localStorage.getItem('hermes-username') || 'You'
 }
 
 function getPresenceColor(id: string): string {
@@ -65,7 +65,7 @@ export function PresenceIndicator({ currentTab }: { currentTab: string }) {
   useEffect(() => {
     // BroadcastChannel for cross-tab communication
     try {
-      const channel = new BroadcastChannel('clawsuite-presence')
+      const channel = new BroadcastChannel('hermes-presence')
       channelRef.current = channel
 
       channel.onmessage = (event) => {

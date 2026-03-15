@@ -52,7 +52,7 @@ type OpenAIChatResponse = {
 }
 
 const ANALYZER_SYSTEM_PROMPT =
-  'You are a debugging assistant for OpenClaw. Analyze the error output and suggest fixes. Be concise. Return JSON with: summary, rootCause, suggestedCommands (array of {command: string, description: string}), docsLink (optional).'
+  'You are a debugging assistant for Hermes. Analyze the error output and suggest fixes. Be concise. Return JSON with: summary, rootCause, suggestedCommands (array of {command: string, description: string}), docsLink (optional).'
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
@@ -101,7 +101,7 @@ function buildPrompt(terminalOutput: string, logContent: string): string {
     'Terminal output:',
     terminalBlock || '(empty)',
     '',
-    'OpenClaw logs (last 200 lines):',
+    'Hermes logs (last 200 lines):',
     logBlock || '(empty)',
     '',
     'Return JSON only.',

@@ -26,7 +26,7 @@ function classifyConnectionError(
     return {
       title: 'Not connected',
       description: "Hermes Workspace can't reach Hermes.",
-      action: 'Check that OpenClaw is running, then try again.',
+      action: 'Check that Hermes is running, then try again.',
     }
   }
 
@@ -65,7 +65,7 @@ function classifyConnectionError(
     return {
       title: 'Hermes unreachable',
       description: "Can't connect to Hermes at the configured URL.",
-      action: 'Make sure OpenClaw is running and the URL is correct.',
+      action: 'Make sure Hermes is running and the URL is correct.',
     }
   }
 

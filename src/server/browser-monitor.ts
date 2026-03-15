@@ -31,14 +31,14 @@ export type BrowserScreenshotResponse = {
 }
 
 const BROWSER_TABS_METHODS = [
-  'browser',            // Current OpenClaw API — single method with action param
+  'browser',            // Current Hermes API — single method with action param
   'browser.tabs',
   'browser.list_tabs',
   'browser.get_tabs',
 ]
 
 const BROWSER_SCREENSHOT_METHODS = [
-  'browser',            // Current OpenClaw API — single method with action param
+  'browser',            // Current Hermes API — single method with action param
   'browser.screenshot',
   'browser.capture',
   'browser.take_screenshot',
@@ -190,7 +190,7 @@ async function callGatewayRpcWithFallbackMethods(
   let lastError: unknown = null
   for (const method of methods) {
     try {
-      // Current OpenClaw uses single 'browser' method with action param
+      // Current Hermes uses single 'browser' method with action param
       const rpcParams = method === 'browser' && action
         ? { action, ...(params && typeof params === 'object' ? params : {}) }
         : params
@@ -263,7 +263,7 @@ export function buildDemoScreenshotResponse(params?: {
     tabs[0]
 
   const currentUrl = params?.currentUrl || selectedTab.url || 'about:blank'
-  const title = selectedTab.title || 'OpenClaw Browser Demo'
+  const title = selectedTab.title || 'Hermes Browser Demo'
   const reason = readErrorReason(params?.error)
 
   return {

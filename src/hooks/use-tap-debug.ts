@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import type { RefObject } from 'react'
 
-const TAP_DEBUG_STORAGE_KEY = 'clawsuite:tap-debug'
-const TAP_DEBUG_EVENT = 'clawsuite:tap-debug-change'
+const TAP_DEBUG_STORAGE_KEY = 'hermes:tap-debug'
+const TAP_DEBUG_EVENT = 'hermes:tap-debug-change'
 
 function describeElement(value: Element | null): string {
   if (!value) return 'null'

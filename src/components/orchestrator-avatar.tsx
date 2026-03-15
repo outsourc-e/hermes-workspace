@@ -35,7 +35,7 @@ const AVATAR_OPTIONS: Array<{ id: AvatarStyle; label: string; emoji: string }> =
     { id: 'panda', label: 'Panda', emoji: '🐼' },
   ]
 
-const STORAGE_KEY = 'clawsuite-orchestrator-avatar'
+const STORAGE_KEY = 'hermes-orchestrator-avatar'
 
 function getStoredAvatar(): AvatarStyle {
   try {

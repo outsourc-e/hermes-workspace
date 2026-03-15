@@ -1,7 +1,7 @@
 /**
  * Gateway Auto-Discovery
  *
- * Automatically finds a local OpenClaw gateway by:
+ * Automatically finds a local Hermes gateway by:
  * 1. Reading ~/.openclaw/openclaw.json for port + auth token
  * 2. Falling back to `openclaw config get` CLI commands
  * 3. Probing default port 18789
@@ -198,7 +198,7 @@ async function probeGatewayChallenge(url: string): Promise<boolean> {
     ws.on('error', () => finish(false))
     ws.on('close', (code) => {
       // Newer gateways reject anonymous probes before sending connect.challenge.
-      // A 1008 close still proves a real OpenClaw gateway is listening.
+      // A 1008 close still proves a real Hermes gateway is listening.
       if (code === 1008) {
         finish(true)
         return
@@ -225,7 +225,7 @@ async function scanLocalGatewayRange(): Promise<DiscoveryResult> {
     return {
       found: false,
       source: 'none',
-      error: 'No local OpenClaw gateway found on localhost ports 18789-18800.',
+      error: 'No local Hermes gateway found on localhost ports 18789-18800.',
     }
   }
 
@@ -239,8 +239,8 @@ async function scanLocalGatewayRange(): Promise<DiscoveryResult> {
 /**
  * Main discovery function. Tries all methods in order:
  * 1. Existing env vars (already configured)
- * 2. OpenClaw config file (~/.openclaw/openclaw.json)
- * 3. OpenClaw CLI (`openclaw config get`)
+ * 2. Hermes config file (~/.openclaw/openclaw.json)
+ * 3. Hermes CLI (`openclaw config get`)
  *
  * If token is found, also writes it to process.env so the gateway client picks it up.
  */
@@ -290,7 +290,7 @@ export async function discoverGateway(): Promise<DiscoveryResult> {
   return {
     found: false,
     source: 'none',
-    error: 'No local OpenClaw gateway found. Please start OpenClaw or enter connection details manually.',
+    error: 'No local Hermes gateway found. Please start Hermes or enter connection details manually.',
   }
 }
 

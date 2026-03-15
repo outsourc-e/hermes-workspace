@@ -5,7 +5,7 @@
  *
  * Listens to the /api/chat-events SSE stream for gateway `compaction` events
  * (stream="compaction", phase="start"|"end") — the exact same signal the
- * OpenClaw control UI uses. No polling, no heuristics.
+ * Hermes control UI uses. No polling, no heuristics.
  *
  * Shows a toast on any screen:
  *   - phase "start"  → amber "Compacting context…" (dismissible)

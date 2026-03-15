@@ -350,7 +350,7 @@ const SETTINGS: Array<SettingDefinition> = [
     id: 'fast-default',
     tab: 'session',
     label: 'Fast mode default',
-    description: 'OpenClaw does not currently expose a persisted fast-mode default in agent defaults.',
+    description: 'Hermes does not currently expose a persisted fast-mode default in agent defaults.',
     kind: 'boolean',
     unsupported: true,
   },
@@ -467,7 +467,7 @@ function buildProviderSummaries(payload: {
       name: getProviderDisplayName(providerId),
       description:
         metadata?.description ||
-        'Configured provider in your local OpenClaw setup.',
+        'Configured provider in your local Hermes setup.',
       modelCount,
       status: modelCount > 0 ? 'active' : 'configured',
     })
@@ -853,7 +853,7 @@ function ProviderManagementSection(props: {
               Configured Providers
             </h3>
             <p className="mt-1 text-xs text-primary-600">
-              API keys stay in your local OpenClaw config and are never sent to Studio.
+              API keys stay in your local Hermes config and are never sent to Studio.
             </p>
           </div>
           <p className="text-xs text-primary-600 tabular-nums">
@@ -1148,7 +1148,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
                 Settings
               </h1>
               <p className="text-sm text-primary-600">
-                Configure providers plus OpenClaw agent defaults in one place.
+                Configure providers plus Hermes agent defaults in one place.
               </p>
             </div>
 

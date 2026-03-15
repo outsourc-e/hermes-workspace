@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 
-const TOUR_STORAGE_KEY = 'clawsuite-onboarding-completed'
+const TOUR_STORAGE_KEY = 'hermes-onboarding-completed'
 
 export function useOnboardingTour() {
   // Always initialize as false to match server render — read localStorage in useEffect

@@ -11,7 +11,7 @@ import type { Browser, BrowserContext, Page } from 'playwright'
 
 const WS_PORT = 9223
 const VIEWPORT = { width: 1280, height: 800 }
-const PROFILE_DIR = path.join(os.homedir(), '.clawsuite', 'browser-profile')
+const PROFILE_DIR = path.join(os.homedir(), '.hermes-workspace', 'browser-profile')
 
 let server: http.Server | null = null
 let browser: Browser | null = null

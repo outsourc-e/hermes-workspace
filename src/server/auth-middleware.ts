@@ -78,8 +78,8 @@ export function getSessionTokenFromCookie(
 
   const cookies = cookieHeader.split(';').map((c) => c.trim())
   for (const cookie of cookies) {
-    if (cookie.startsWith('clawsuite-auth=')) {
-      return cookie.substring('clawsuite-auth='.length)
+    if (cookie.startsWith('hermes-auth=')) {
+      return cookie.substring('hermes-auth='.length)
     }
   }
   return null
@@ -132,5 +132,5 @@ export function createSessionCookie(token: string): string {
   // sameSite=strict: CSRF protection
   // path=/: available everywhere
   // maxAge: 30 days
-  return `clawsuite-auth=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${30 * 24 * 60 * 60}`
+  return `hermes-auth=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${30 * 24 * 60 * 60}`
 }

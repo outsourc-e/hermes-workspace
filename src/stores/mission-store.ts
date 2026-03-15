@@ -620,7 +620,7 @@ export const useMissionStore = create<MissionStore>()(
         set({ beforeUnloadRegistered }),
     }),
     {
-      name: 'clawsuite:mission-store',
+      name: 'hermes:mission-store',
       onRehydrateStorage: () => (state) => {
         if (!state) return
         if (state.activeMission && !state.restoreCheckpoint) {

@@ -35,7 +35,7 @@ const APP_CSP = [
   "frame-src 'self' http: https:",
 ].join('; ')
 
-const THEME_STORAGE_KEY = 'clawsuite-theme'
+const THEME_STORAGE_KEY = 'hermes-theme'
 const DEFAULT_THEME = 'hermes-official'
 const VALID_THEMES = [
   'hermes-official',
@@ -127,7 +127,7 @@ export const Route = createRootRoute({
       {
         name: 'description',
         content:
-          'Supercharged chat interface for OpenClaw AI agents with file explorer, terminal, and usage tracking',
+          'Supercharged chat interface for Hermes AI agents with file explorer, terminal, and usage tracking',
       },
       {
         property: 'og:image',
@@ -370,7 +370,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 8000);
             // Fast dismiss: if returning user (has gateway config in localStorage), skip splash quickly
             try {
-              if (localStorage.getItem('clawsuite-gateway-url') || localStorage.getItem('gateway-url')) {
+              if (localStorage.getItem('hermes-gateway-url') || localStorage.getItem('gateway-url')) {
                 setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 800);
               }
             } catch(e) {}

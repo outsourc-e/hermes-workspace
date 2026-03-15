@@ -18,7 +18,7 @@ import { ProviderSelectStep } from '@/components/onboarding/provider-select-step
 import type { CloudPlan, CloudProvisionResponse } from '@/lib/cloud-types'
 import { getConnectionErrorInfo } from '@/lib/connection-errors'
 
-const CLOUD_WAITLIST_STORAGE_KEY = 'clawsuite-cloud-waitlist-email'
+const CLOUD_WAITLIST_STORAGE_KEY = 'hermes-cloud-waitlist-email'
 const LOCAL_GATEWAY_URL = 'ws://127.0.0.1:18789'
 
 type SetupMode = 'local' | 'remote' | 'cloud'
@@ -175,7 +175,7 @@ function GatewayStepContent() {
 
     closeLocalSetupStream()
     setLocalSetupStatus('checking')
-    setLocalSetupMessage('Checking for OpenClaw...')
+    setLocalSetupMessage('Checking for Hermes...')
     setLocalSetupError(null)
     setAutoDetectMessage(null)
     setAutoDetectError(null)
@@ -363,11 +363,11 @@ function GatewayStepContent() {
   const localSetupSteps = [
     {
       id: 'checking',
-      label: 'Checking for OpenClaw...',
+      label: 'Checking for Hermes...',
     },
     {
       id: 'installing',
-      label: 'Installing OpenClaw...',
+      label: 'Installing Hermes...',
     },
     {
       id: 'starting',
@@ -419,7 +419,7 @@ function GatewayStepContent() {
           <SetupModeCard
             icon={CloudIcon}
             title="Connect another machine"
-            description="Connect to OpenClaw running on a server, Pi, or another computer."
+            description="Connect to Hermes running on a server, Pi, or another computer."
             selected={setupMode === 'remote'}
             onClick={() => handleSetupModeChange('remote')}
           />
@@ -582,7 +582,7 @@ function GatewayStepContent() {
             <div className="mb-4">
               <h3 className="text-base font-semibold text-primary-900">Setting up local gateway</h3>
               <p className="mt-1 text-sm text-primary-600">
-                Hermes Workspace is installing and starting OpenClaw in the background.
+                Hermes Workspace is installing and starting Hermes in the background.
               </p>
             </div>
 
@@ -719,7 +719,7 @@ function GatewayStepContent() {
                 className="h-10"
               />
               <p className="mt-1 text-xs text-primary-500">
-                Default: ws://127.0.0.1:18789 for local OpenClaw (18790 for nanobot)
+                Default: ws://127.0.0.1:18789 for local Hermes (18790 for nanobot)
               </p>
               <Button
                 variant="outline"

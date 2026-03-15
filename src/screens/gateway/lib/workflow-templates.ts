@@ -15,7 +15,7 @@ export type WorkflowTemplate = {
   isBuiltIn?: boolean
 }
 
-const STORAGE_KEY = 'clawsuite:workflow-templates'
+const STORAGE_KEY = 'hermes:workflow-templates'
 
 // Built-in templates that ship with Hermes Workspace
 export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [

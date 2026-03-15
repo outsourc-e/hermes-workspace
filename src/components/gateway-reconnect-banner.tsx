@@ -8,7 +8,7 @@ import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
 import { getConnectionErrorInfo } from '@/lib/connection-errors'
 import { cn } from '@/lib/utils'
 
-const BANNER_STORAGE_KEY = 'clawsuite-gateway-banner-dismissed'
+const BANNER_STORAGE_KEY = 'hermes-gateway-banner-dismissed'
 const CHECK_INTERVAL_MS = 5_000 // Check every 5 seconds
 const DISMISS_ANIMATION_MS = 220
 

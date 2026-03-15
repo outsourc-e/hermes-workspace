@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 const POLL_MS = 15_000
-const STORAGE_KEY = 'clawsuite-ctx-alert'
+const STORAGE_KEY = 'hermes-ctx-alert'
 // 35% threshold fires BEFORE the gateway compacts (~40% / 80k on 200k window)
 const THRESHOLDS = [90, 75, 35] as const
 

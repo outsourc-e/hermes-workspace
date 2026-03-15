@@ -225,14 +225,14 @@ export function OpenClawUpdateNotifier() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">
                 {phase === 'done'
-                  ? 'OpenClaw Updated!'
+                  ? 'Hermes Updated!'
                   : phase === 'restarting'
                     ? 'Restarting Hermes...'
                     : phase === 'updating'
-                      ? 'Updating OpenClaw...'
+                      ? 'Updating Hermes...'
                       : phase === 'error'
                         ? 'Update Failed'
-                        : 'OpenClaw Update'}
+                        : 'Hermes Update'}
               </p>
               <p className="text-xs text-primary-400 truncate">
                 {phase === 'error'
@@ -288,7 +288,7 @@ export function OpenClawUpdateNotifier() {
                   className="text-primary-500"
                 />
                 <span className="text-xs text-primary-400">
-                  Auto-update OpenClaw
+                  Auto-update Hermes
                 </span>
               </div>
               <button

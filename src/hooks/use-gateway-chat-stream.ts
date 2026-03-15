@@ -3,9 +3,9 @@ import { useGatewayChatStore } from '../stores/gateway-chat-store'
 import type { StreamingState } from '../stores/gateway-chat-store'
 import type { GatewayMessage } from '../screens/chat/types'
 
-export const CHAT_TOOL_CALL_EVENT = 'clawsuite:chat-tool-call'
-export const CHAT_TOOL_RESULT_EVENT = 'clawsuite:chat-tool-result'
-export const CHAT_STREAM_DONE_EVENT = 'clawsuite:chat-stream-done'
+export const CHAT_TOOL_CALL_EVENT = 'hermes:chat-tool-call'
+export const CHAT_TOOL_RESULT_EVENT = 'hermes:chat-tool-result'
+export const CHAT_STREAM_DONE_EVENT = 'hermes:chat-stream-done'
 
 type UseGatewayChatStreamOptions = {
   /** Session key to filter events for (optional - receives all if not specified) */
@@ -89,7 +89,7 @@ export function useGatewayChatStream(
 
   const dispatchSSEDroppedEvent = useCallback(() => {
     if (typeof window === 'undefined') return
-    window.dispatchEvent(new CustomEvent('clawsuite:sse-dropped'))
+    window.dispatchEvent(new CustomEvent('hermes:sse-dropped'))
   }, [])
 
   const dispatchChatToolEvent = useCallback(

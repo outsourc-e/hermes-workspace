@@ -719,7 +719,7 @@ function SettingsRoute() {
                         try {
                           const keys = Object.keys(localStorage)
                           for (const key of keys) {
-                            if (key.startsWith('clawsuite-') || key.startsWith('gateway-')) {
+                            if (key.startsWith('hermes-') || key.startsWith('gateway-')) {
                               localStorage.removeItem(key)
                             }
                           }
