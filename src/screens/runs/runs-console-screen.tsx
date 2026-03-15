@@ -1283,9 +1283,10 @@ export function RunsConsoleScreen() {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-6 py-14 text-center">
+              <div className="mx-auto mb-4 text-3xl">⚡</div>
               <p className="text-lg font-semibold text-primary-900">No active runs</p>
-              <p className="mt-2 text-sm text-primary-500">
-                Start a mission from a project to see live agent activity here.
+              <p className="mx-auto mt-2 max-w-md text-sm text-primary-500">
+                When you start a mission, agents execute tasks in parallel. Their live terminal output, progress, and results stream here in real-time.
               </p>
             </div>
           )}

@@ -114,10 +114,10 @@ export function DashboardProjectCards({
           <article
             key={overview.project.id}
             className={cn(
-              'rounded-xl border bg-white p-5 shadow-sm transition-colors',
+              'rounded-xl border bg-white p-5 shadow-sm transition-all duration-200',
               active
                 ? 'border-accent-500/50 shadow-[0_0_0_1px_rgba(251,146,60,0.12)]'
-                : 'border-primary-200 hover:border-primary-300',
+                : 'border-primary-200 hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5',
             )}
           >
             <button
