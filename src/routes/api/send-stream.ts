@@ -399,9 +399,12 @@ export const Route = createFileRoute('/api/send-stream')({
                 }
               }, SEND_STREAM_RUN_TIMEOUT_MS)
             } catch (err) {
-              const errorMsg = err instanceof Error ? err.message : String(err)
-              sendEvent('error', { message: errorMsg })
-              closeStream()
+              // Only send error if stream hasn't already completed successfully
+              if (!streamClosed) {
+                const errorMsg = err instanceof Error ? err.message : String(err)
+                sendEvent('error', { message: errorMsg })
+                closeStream()
+              }
             }
           },
           cancel() {

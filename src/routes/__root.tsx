@@ -166,8 +166,8 @@ export const Route = createRootRoute({
       },
       {
         rel: 'icon',
-        type: 'image/svg+xml',
-        href: '/favicon.svg',
+        type: 'image/webp',
+        href: '/hermes-avatar.webp',
       },
       // PWA manifest and icons
       {

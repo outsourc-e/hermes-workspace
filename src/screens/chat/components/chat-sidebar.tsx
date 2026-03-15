@@ -747,21 +747,6 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/memory',
-      icon: BrainIcon,
-      label: 'Memory',
-      active: isMemoryActive,
-    },
-    {
-      kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: 'Skills',
-      active: isSkillsActive,
-      dataTour: 'skills',
-    },
-    {
-      kind: 'link',
       to: '/cron',
       icon: Clock01Icon,
       label: 'Jobs',
