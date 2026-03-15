@@ -15,18 +15,18 @@ type SuggestionChip = {
 
 const SUGGESTIONS: SuggestionChip[] = [
   {
-    label: 'Inspect this repo',
-    prompt: 'Inspect this repo and tell me how it is structured.',
+    label: 'Analyze workspace',
+    prompt: 'Analyze this workspace structure and give me 3 engineering risks. Use tools and keep it concise.',
     icon: CodeIcon,
   },
   {
-    label: 'Summarize session memory',
-    prompt: 'Search your memory and summarize what you know about our current context.',
+    label: 'Save a preference',
+    prompt: 'Save this to memory exactly: "For demos, respond in 3 bullets max and put risk first." Then confirm saved.',
     icon: BrainIcon,
   },
   {
-    label: 'Run a tool pipeline',
-    prompt: 'Browse the available skills and run the most relevant one for this workspace.',
+    label: 'Create a file',
+    prompt: 'Create demo-checklist.md with 5 launch checks for this app.',
     icon: PuzzleIcon,
   },
 ]

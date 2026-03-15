@@ -85,6 +85,13 @@ const themeScript = `
     root.setAttribute('data-theme', theme)
     root.setAttribute('data-accent', 'orange')
     root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
+
+    // Demo mode
+    try {
+      if (new URLSearchParams(window.location.search).get('demo') === '1') {
+        document.documentElement.setAttribute('data-demo', 'true');
+      }
+    } catch {}
   } catch {}
 })()
 `

@@ -674,8 +674,8 @@ code {
   --theme-stripe: rgba(36, 48, 74, 0.48);
   --theme-header-bg: #0D1220;
   --theme-header-border: #24304A;
-  --chat-user-bg: #151D32;
-  --chat-user-border: #24304A;
+  --chat-user-bg: #1A2340;
+  --chat-user-border: #3A4B78;
   --chat-user-foreground: #E6EAF2;
   --chat-assistant-bg: #11182A;
   --chat-assistant-border: #1B2740;
@@ -1108,4 +1108,24 @@ code {
   --color-accent-400: var(--theme-accent-secondary);
   --color-accent-500: var(--theme-accent);
   --color-accent-600: var(--theme-accent);
+}
+
+/* Composer focus ring for all themes */
+[data-theme] .composer-input:focus-within {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 65%, transparent);
+  border-color: var(--theme-accent);
+}
+
+/* Demo mode — activated via ?demo=1 query param */
+[data-demo="true"] {
+  font-size: 105%;
+}
+[data-demo="true"] .tool-card-collapsed {
+  display: none;
+}
+[data-demo="true"] .tool-card-expanded {
+  display: block !important;
+}
+[data-demo="true"] * {
+  transition-duration: 0.05s !important;
 }
