@@ -101,34 +101,12 @@ export function resolveTheme(theme: SettingsThemeMode): 'light' | 'dark' {
     : 'light'
 }
 
-export function applyTheme(theme: SettingsThemeMode) {
-  if (typeof document === 'undefined') return
-
-  const root = document.documentElement
-  const media = window.matchMedia('(prefers-color-scheme: dark)')
-
-  root.classList.remove('light', 'dark', 'system')
-  root.classList.add(theme)
-
-  if (theme === 'system' && media.matches) {
+export function applyTheme() {
+    const root = document.documentElement
+    root.classList.remove('light', 'system')
     root.classList.add('dark')
-  }
-
-  // Sync data-theme so CSS variable overrides don't fight Tailwind dark: classes.
-  // paper-light CSS has !important overrides that win over dark: variants unless data-theme is correct.
-  const resolvedDark =
-    theme === 'dark' || (theme === 'system' && media.matches)
-  if (resolvedDark) {
-    // Preserve user's enterprise dark theme if set, otherwise default to ops-dark
-    const stored = localStorage.getItem('clawsuite-theme')
-    const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand', 'hermes']
-    root.setAttribute('data-theme', darkThemes.includes(stored ?? '') ? (stored as string) : 'hermes')
-  } else {
-    root.setAttribute('data-theme', 'paper-light')
-  }
-
-  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent')) || 'orange'
-  root.setAttribute('data-accent', storedAccent)
+    root.setAttribute('data-theme', 'hermes')
+    root.setAttribute('data-accent', 'orange')
 }
 
 function applySettingsAppearance(settings: StudioSettings) {
@@ -140,29 +118,9 @@ function applySettingsAppearance(settings: StudioSettings) {
 let didInitializeSettingsAppearance = false
 
 export function initializeSettingsAppearance() {
-  if (didInitializeSettingsAppearance) return
-  if (typeof window === 'undefined') return
-
-  didInitializeSettingsAppearance = true
-
-  // Rehydrate persisted settings from localStorage (skipHydration: true requires manual call)
-  void useSettingsStore.persist.rehydrate()
-
-  applySettingsAppearance(useSettingsStore.getState().settings)
-
-  useSettingsStore.subscribe(
-    function handleSettingsChange(state, previousState) {
-      const nextSettings = state.settings
-      const previousSettings = previousState.settings
-
-      if (nextSettings.theme !== previousSettings.theme) {
-        applyTheme(nextSettings.theme)
-      }
-
-      if (nextSettings.accentColor !== previousSettings.accentColor) {
-        localStorage.setItem('clawsuite-accent', nextSettings.accentColor)
-        applyAccentColor(nextSettings.accentColor)
-      }
-    },
-  )
+    const root = document.documentElement
+    root.classList.remove('light', 'system')
+    root.classList.add('dark')
+    root.setAttribute('data-theme', 'hermes')
+    root.setAttribute('data-accent', 'orange')
 }

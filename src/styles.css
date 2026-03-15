@@ -258,6 +258,24 @@
   --theme-stripe: rgba(229, 229, 229, 0.55);
   --theme-header-bg: #ffffff;
   --theme-header-border: #e5e5e5;
+  --theme-sidebar: #11151A;
+  --chat-user-bg: #1A2533;
+  --chat-user-border: #35506D;
+  --chat-user-foreground: #EAF2FB;
+  --chat-assistant-bg: #151A21;
+  --chat-assistant-border: #2B333D;
+  --chat-assistant-foreground: #ECEFF4;
+  --composer-bg: #10141A;
+  --composer-border: #2D3640;
+  --composer-placeholder: #7F8A96;
+  --tool-card-bg: #121820;
+  --tool-card-border: #2A3440;
+  --tool-card-title: #DCE6F2;
+  --tool-card-muted: #8FA1B5;
+  --code-bg: #0F1318;
+  --code-border: #28313B;
+  --code-foreground: #D7DEE7;
+  --theme-input: #232A33;
 }
 
 /* ── Clean / Paper Light ── */
