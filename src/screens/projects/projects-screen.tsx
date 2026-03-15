@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import {
   Add01Icon,
-  ArrowLeft01Icon,
+
   ArrowRight01Icon,
   Folder01Icon,
 } from '@hugeicons/core-free-icons'
@@ -1658,22 +1658,7 @@ export function ProjectsScreen({
             <div>
               {detailMode ? (
                 <>
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearSelectedProject}
-                      className="-ml-3 h-auto px-3 py-1.5 text-primary-600 hover:bg-primary-100 hover:text-primary-900"
-                    >
-                      <HugeiconsIcon
-                        icon={ArrowLeft01Icon}
-                        size={16}
-                        strokeWidth={1.6}
-                      />
-                      Back to Projects
-                    </Button>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-primary-500">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-primary-500">
                     <button
                       type="button"
                       onClick={clearSelectedProject}

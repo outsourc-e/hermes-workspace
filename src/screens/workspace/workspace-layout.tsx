@@ -3,6 +3,12 @@ import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
+import {
+  DialogContent,
+  DialogDescription,
+  DialogRoot,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -302,7 +308,25 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
     })
   }
 
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.target instanceof HTMLElement) {
+        const tag = event.target.tagName.toLowerCase()
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || event.target.isContentEditable) return
+      }
+      if (event.key === '?' && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault()
+        setShortcutsOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
+    <DialogRoot open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
     <div className="flex h-full flex-col overflow-hidden text-primary-900">
       <div className="sticky top-0 z-20 border-b border-primary-200 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
@@ -569,5 +593,31 @@ export function WorkspaceLayout({ search }: WorkspaceLayoutProps) {
         {activeTab === 'teams' ? <TeamsScreen /> : null}
       </main>
     </div>
+    <DialogContent className="w-[min(480px,90vw)] rounded-2xl border-primary-200 bg-white p-0 text-primary-900 shadow-2xl">
+      <div className="border-b border-primary-200 px-5 py-4">
+        <DialogTitle className="text-base font-semibold">Keyboard Shortcuts</DialogTitle>
+        <DialogDescription className="text-sm text-primary-500">Navigate the workspace faster.</DialogDescription>
+      </div>
+      <div className="px-5 py-4 space-y-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-400 mb-2">Global</p>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between"><span className="text-primary-600">Command palette</span><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">⌘K</kbd></div>
+            <div className="flex justify-between"><span className="text-primary-600">Show shortcuts</span><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">?</kbd></div>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-400 mb-2">Review Queue</p>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between"><span className="text-primary-600">Approve checkpoint</span><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">A</kbd></div>
+            <div className="flex justify-between"><span className="text-primary-600">Approve &amp; merge</span><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">M</kbd></div>
+            <div className="flex justify-between"><span className="text-primary-600">Reject</span><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">R</kbd></div>
+            <div className="flex justify-between"><span className="text-primary-600">Navigate up/down</span><div className="flex gap-1"><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">J</kbd><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">K</kbd></div></div>
+            <div className="flex justify-between"><span className="text-primary-600">Open detail</span><kbd className="rounded border border-primary-200 bg-primary-50 px-2 py-0.5 font-mono text-xs">Enter</kbd></div>
+          </div>
+        </div>
+      </div>
+    </DialogContent>
+    </DialogRoot>
   )
 }
