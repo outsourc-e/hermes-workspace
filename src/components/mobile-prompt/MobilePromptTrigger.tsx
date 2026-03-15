@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { MobileSetupModal } from './MobileSetupModal';
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite';
+
 
 export function MobilePromptTrigger() {
   const [showPrompt, setShowPrompt] = useState(false);
