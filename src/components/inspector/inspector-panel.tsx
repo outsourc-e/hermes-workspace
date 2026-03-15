@@ -345,7 +345,8 @@ export function InspectorPanel() {
       )}
       style={{
         background: 'var(--theme-panel)',
-        borderLeft: '1px solid var(--theme-border)',
+        borderLeft: '2px solid var(--theme-border)',
+        boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.2)',
       }}
     >
       {isOpen && (
