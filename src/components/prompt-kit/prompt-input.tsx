@@ -156,10 +156,15 @@ function PromptInput({
           onClick={handleClick}
           onPointerDown={handlePointerDown}
           className={cn(
-            'bg-surface cursor-text rounded-3xl outline outline-ink/10 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.05)] py-3 gap-3 flex flex-col touch-manipulation',
+            'cursor-text rounded-3xl py-3 gap-3 flex flex-col touch-manipulation mb-2',
             disabled && 'cursor-not-allowed opacity-60',
             className,
           )}
+          style={{
+            background: 'var(--composer-bg)',
+            border: '1px solid var(--composer-border)',
+            boxShadow: 'var(--theme-shadow-1)',
+          }}
           {...props}
         >
           {children}

@@ -42,43 +42,23 @@ function UserAvatarComponent({
       style={{ width: size, height: size }}
     >
       <defs>
-        <linearGradient id="avu-slate" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#1e293b" />
-          <stop offset="100%" stopColor="#334155" />
+        <linearGradient id="avu-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1A2340" />
+          <stop offset="100%" stopColor="#24304A" />
         </linearGradient>
-        <linearGradient id="avu-orange" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ea580c" />
-          <stop offset="50%" stopColor="#f97316" />
-          <stop offset="100%" stopColor="#fb923c" />
+        <linearGradient id="avu-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#818CF8" />
+          <stop offset="100%" stopColor="#6366F1" />
         </linearGradient>
       </defs>
-      {/* Dark background */}
-      <rect x="5" y="5" width="90" height="90" rx="20" fill="url(#avu-slate)" />
+      {/* Dark navy background */}
+      <rect x="5" y="5" width="90" height="90" rx="20" fill="url(#avu-bg)" />
       {/* Person head */}
-      <circle cx="50" cy="38" r="12" fill="url(#avu-orange)" />
+      <circle cx="50" cy="38" r="12" fill="url(#avu-accent)" />
       {/* Person body/shoulders */}
       <path
         d="M 28 78 C 28 62 38 55 50 55 C 62 55 72 62 72 78"
-        fill="url(#avu-orange)"
-      />
-      {/* Subtle claw accent — small brackets at bottom corners */}
-      <path
-        d="M 18 72 L 14 78 L 18 84"
-        stroke="#fb923c"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-        opacity="0.4"
-      />
-      <path
-        d="M 82 72 L 86 78 L 82 84"
-        stroke="#fb923c"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-        opacity="0.4"
+        fill="url(#avu-accent)"
       />
     </svg>
   )
