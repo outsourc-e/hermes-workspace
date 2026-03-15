@@ -855,9 +855,13 @@ export function ReviewQueueScreen() {
           })}
         </div>
 
-        <div className="mb-5 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm text-primary-500 shadow-sm">
-          Approving merges agent work into your project. Review the diff before
-          approving.
+        <div className="mb-5 hidden sm:flex items-center gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-2.5 text-xs text-primary-500 shadow-sm">
+          <span className="font-medium text-primary-700">Keyboard</span>
+          <span><kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono text-[11px]">A</kbd> approve</span>
+          <span><kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono text-[11px]">M</kbd> merge</span>
+          <span><kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono text-[11px]">R</kbd> reject</span>
+          <span><kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono text-[11px]">J</kbd><kbd className="ml-0.5 rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono text-[11px]">K</kbd> navigate</span>
+          <span><kbd className="rounded border border-primary-200 bg-white px-1.5 py-0.5 font-mono text-[11px]">Enter</kbd> open</span>
         </div>
 
         <div className="mb-5 flex flex-wrap gap-2">
@@ -930,8 +934,8 @@ export function ReviewQueueScreen() {
         ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1 text-xs text-primary-500">
-              <p>Use the keyboard to move through the queue.</p>
-              <p>Enter open · a approve · m merge · r reject · j/k navigate</p>
+              <p>{visibleCheckpoints.length} checkpoint{visibleCheckpoints.length === 1 ? '' : 's'}</p>
+              <p className="sm:hidden">Tap to review</p>
             </div>
             {pageItems.map((checkpoint) => (
               <ReviewRow
