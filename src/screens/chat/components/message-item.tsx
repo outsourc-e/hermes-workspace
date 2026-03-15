@@ -608,46 +608,59 @@ function keyArgLabel(name: string, args?: Record<string, unknown>): string | nul
 
 function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   const icons: Record<string, string> = {
-    web_search: '🔍',
-    Read: '📖',
-    exec: '⚡',
-    memory_search: '🧠',
-    memory_get: '🧠',
-    Write: '✏️',
-    Edit: '✏️',
-    browser: '🌐',
-    image: '🖼️',
+    web_search: '\u25ce',
+    search_files: '\u25ce',
+    Read: '\u25c7',
+    read_file: '\u25c7',
+    exec: '\u2699',
+    terminal: '\u2699',
+    memory_search: '\u2726',
+    memory_get: '\u2726',
+    save_memory: '\u2726',
+    Write: '\u270e',
+    write_file: '\u270e',
+    Edit: '\u270e',
+    browser: '\u25a3',
+    image: '\u25ce',
+    skill_view: '\u26a1',
   }
 
-  const icon = icons[toolCall.name] ?? '🔧'
+  const icon = icons[toolCall.name] ?? '\u2694'
   const isDone = toolCall.phase === 'done'
   const isError = toolCall.phase === 'error'
+  const isRunning = !isDone && !isError
   const label = keyArgLabel(toolCall.name, toolCall.args as Record<string, unknown> | undefined)
   const displayName = formatToolDisplayLabel(
     toolCall.name,
     toolCall.args as Record<string, unknown> | undefined,
   )
-  // Truncate long paths/commands to keep pill readable
-  const truncated = label && label.length > 60 ? `${label.slice(0, 57)}…` : label
+  const truncated = label && label.length > 60 ? `${label.slice(0, 57)}\u2026` : label
+
+  const statusColor = isDone
+    ? 'var(--theme-success)'
+    : isError
+      ? 'var(--theme-danger)'
+      : 'var(--theme-accent)'
 
   const pill = (
     <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium font-mono max-w-full',
-        isDone
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
-          : isError
-            ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400'
-            : 'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
-      )}
+      className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium max-w-full"
+      style={{
+        background: 'var(--theme-card2)',
+        borderColor: isDone ? 'color-mix(in srgb, var(--theme-success) 30%, var(--theme-border))' : isError ? 'color-mix(in srgb, var(--theme-danger) 30%, var(--theme-border))' : 'var(--theme-border)',
+        color: 'var(--theme-text)',
+      }}
     >
-      <span className="shrink-0">{icon}</span>
-      <span className="shrink-0 not-italic">{displayName}</span>
+      <span className="shrink-0" style={{ color: statusColor }}>{icon}</span>
+      <span className="shrink-0">{displayName}</span>
       {truncated && truncated !== displayName && (
-        <span className="opacity-60 truncate">{truncated}</span>
+        <span className="opacity-50 truncate font-mono text-[10px]">{truncated}</span>
       )}
-      {isDone && <span className="shrink-0 opacity-70">✓</span>}
-      {isError && <span className="shrink-0 opacity-70">✗</span>}
+      {isRunning && (
+        <span className="shrink-0 size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
+      )}
+      {isDone && <span className="shrink-0" style={{ color: 'var(--theme-success)' }}>{'\u2714'}</span>}
+      {isError && <span className="shrink-0" style={{ color: 'var(--theme-danger)' }}>{'\u2718'}</span>}
     </span>
   )
 
@@ -657,7 +670,10 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
           {pill}
         </summary>
-        <pre className="mt-1 max-h-40 overflow-y-auto rounded-md bg-neutral-900 px-2 py-1.5 text-xs font-mono text-neutral-200 whitespace-pre-wrap break-words">
+        <pre
+          className="mt-1 max-h-40 overflow-y-auto rounded-lg px-2.5 py-1.5 text-xs font-mono whitespace-pre-wrap break-words"
+          style={{ background: 'var(--code-bg)', color: 'var(--code-foreground)', border: '1px solid var(--code-border)' }}
+        >
           {toolCall.result}
         </pre>
       </details>
