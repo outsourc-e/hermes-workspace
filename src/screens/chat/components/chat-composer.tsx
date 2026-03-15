@@ -631,6 +631,16 @@ function ChatComposerComponent({
 
   const currentModel = currentModelQuery.data ?? ''
 
+  // Auto-switch to hermes-agent model on mount (Hermes Workspace always uses Hermes)
+  const hermesAutoSwitched = useRef(false)
+  useEffect(() => {
+    if (hermesAutoSwitched.current) return
+    if (!currentModel) return
+    if (currentModel.includes('hermes-agent')) return // already on hermes
+    hermesAutoSwitched.current = true
+    handleModelSelect('hermes-agent/hermes-agent')
+  }, [currentModel, handleModelSelect])
+
   // When model switches to Claude 4.6 and thinking is 'off', auto-upgrade to 'adaptive'
   const prevModelRef = useRef('')
   useEffect(() => {
