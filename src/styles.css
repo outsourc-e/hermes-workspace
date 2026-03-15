@@ -1091,23 +1091,37 @@ code {
 [data-theme="hermes-classic-light"],
 [data-theme="hermes-slate-light"],
 [data-theme="hermes-mono-light"] {
-  --color-primary-50: var(--theme-card);
-  --color-primary-100: var(--theme-card2);
-  --color-primary-200: var(--theme-border);
-  --color-primary-300: var(--theme-border-subtle);
-  --color-primary-400: var(--theme-muted);
-  --color-primary-500: var(--theme-muted);
-  --color-primary-600: var(--theme-muted);
-  --color-primary-700: var(--theme-text);
-  --color-primary-800: var(--theme-text);
-  --color-primary-900: var(--theme-text);
-  --color-primary-950: var(--theme-text);
-  --color-surface: var(--theme-bg);
-  --color-surface-deep: var(--theme-bg);
-  --color-ink: var(--theme-text);
-  --color-accent-400: var(--theme-accent-secondary);
-  --color-accent-500: var(--theme-accent);
-  --color-accent-600: var(--theme-accent);
+  color-scheme: light !important;
+  --color-primary-50: var(--theme-card) !important;
+  --color-primary-100: var(--theme-card2) !important;
+  --color-primary-200: var(--theme-border) !important;
+  --color-primary-300: var(--theme-border-subtle) !important;
+  --color-primary-400: var(--theme-muted) !important;
+  --color-primary-500: var(--theme-muted) !important;
+  --color-primary-600: var(--theme-muted) !important;
+  --color-primary-700: var(--theme-text) !important;
+  --color-primary-800: var(--theme-text) !important;
+  --color-primary-900: var(--theme-text) !important;
+  --color-primary-950: var(--theme-text) !important;
+  --color-surface: var(--theme-bg) !important;
+  --color-surface-deep: var(--theme-bg) !important;
+  --color-ink: var(--theme-text) !important;
+  --color-accent-400: var(--theme-accent-secondary) !important;
+  --color-accent-500: var(--theme-accent) !important;
+  --color-accent-600: var(--theme-accent) !important;
+}
+
+/* Force light theme text and backgrounds to prevent dark mode leakage */
+[data-theme$="-light"] * {
+  --tw-text-opacity: 1;
+}
+[data-theme$="-light"] .text-white {
+  color: var(--theme-text) !important;
+}
+/* Keep text-white on accent-bg buttons */
+[data-theme$="-light"] [style*="--theme-accent"] .text-white,
+[data-theme$="-light"] .bg-accent-500 .text-white {
+  color: #fff !important;
 }
 
 /* Composer focus ring for all themes */
