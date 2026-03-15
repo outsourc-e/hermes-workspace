@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { applyAccentColor } from '@/lib/accent-colors'
 
 export type SettingsThemeMode = 'system' | 'light' | 'dark'
 export type AccentColor = 'orange' | 'purple' | 'blue' | 'green'
@@ -47,11 +46,6 @@ export const defaultStudioSettings: StudioSettings = {
   mobileChatNavMode: 'dock',
 }
 
-function resolveStoredAccent(value: string | null): AccentColor | null {
-  return value === 'purple' || value === 'blue' || value === 'green' || value === 'orange'
-    ? value
-    : null
-}
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -101,26 +95,18 @@ export function resolveTheme(theme: SettingsThemeMode): 'light' | 'dark' {
     : 'light'
 }
 
-export function applyTheme() {
-    const root = document.documentElement
-    root.classList.remove('light', 'system')
-    root.classList.add('dark')
-    root.setAttribute('data-theme', 'hermes')
-    root.setAttribute('data-accent', 'orange')
+export function applyTheme(_theme?: SettingsThemeMode) {
+  const root = document.documentElement
+  root.classList.remove('light', 'system')
+  root.classList.add('dark')
+  root.setAttribute('data-theme', 'hermes')
+  root.setAttribute('data-accent', 'orange')
 }
-
-function applySettingsAppearance(settings: StudioSettings) {
-  applyTheme(settings.theme)
-  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent'))
-  applyAccentColor(storedAccent ?? settings.accentColor)
-}
-
-let didInitializeSettingsAppearance = false
 
 export function initializeSettingsAppearance() {
-    const root = document.documentElement
-    root.classList.remove('light', 'system')
-    root.classList.add('dark')
-    root.setAttribute('data-theme', 'hermes')
-    root.setAttribute('data-accent', 'orange')
+  const root = document.documentElement
+  root.classList.remove('light', 'system')
+  root.classList.add('dark')
+  root.setAttribute('data-theme', 'hermes')
+  root.setAttribute('data-accent', 'orange')
 }

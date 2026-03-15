@@ -88,37 +88,15 @@ const themeScript = `
       }
     }
     const root = document.documentElement
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    // Hermes Workspace theme class + data-theme attribute
-    const enterpriseTheme = localStorage.getItem('clawsuite-theme')
-    const isValidEnterpriseTheme =
-      enterpriseTheme === 'ops-dark' ||
-      enterpriseTheme === 'premium-dark' ||
-      enterpriseTheme === 'paper-light'
-    root.classList.remove('paper-light', 'ops-dark', 'premium-dark')
-    if (isValidEnterpriseTheme) {
-      root.setAttribute('data-theme', enterpriseTheme)
-      root.classList.add(enterpriseTheme)
-      if (enterpriseTheme === 'ops-dark' || enterpriseTheme === 'premium-dark') {
-        theme = 'dark'
-      } else {
-        theme = 'light'
-      }
-    } else {
-      root.removeAttribute('data-theme')
-    }
+    root.classList.add('dark')
+    root.setAttribute('data-theme', 'hermes')
+    root.setAttribute('data-accent', 'orange')
     const apply = () => {
       root.classList.remove('light', 'dark', 'system')
       root.classList.add(theme)
       root.setAttribute('data-accent', accent)
-      if (theme === 'system' && media.matches) {
-        root.classList.add('dark')
-      }
     }
     apply()
-    media.addEventListener('change', () => {
-      if (theme === 'system') apply()
-    })
   } catch {}
 })()
 `
