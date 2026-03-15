@@ -1,54 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayRpc } from '../../../server/gateway'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { requireJsonContentType } from '../../../server/rate-limit'
-
-type SessionsResolveResponse = {
-  ok?: boolean
-  key?: string
-}
-
-type SendGatewayResponse = {
-  runId?: string
-}
-
-function looksLikeMethodMissingError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return (
-    message.includes('method') &&
-    (message.includes('not found') || message.includes('unknown'))
-  )
-}
-
-async function sendMessageViaGateway(payload: {
-  sessionKey: string
-  message: string
-  idempotencyKey: string
-}) {
-  try {
-    return await gatewayRpc<SendGatewayResponse>('sessions.send', {
-      sessionKey: payload.sessionKey,
-      message: payload.message,
-      timeoutMs: 120_000,
-      idempotencyKey: payload.idempotencyKey,
-    })
-  } catch (error) {
-    if (!looksLikeMethodMissingError(error)) {
-      throw error
-    }
-
-    return gatewayRpc<SendGatewayResponse>('chat.send', {
-      sessionKey: payload.sessionKey,
-      message: payload.message,
-      deliver: false,
-      timeoutMs: 120_000,
-      idempotencyKey: payload.idempotencyKey,
-    })
-  }
-}
+import { sendChat } from '../../../server/hermes-api'
+import { resolveSessionKey } from '../../../server/session-utils'
 
 export const Route = createFileRoute('/api/sessions/send')({
   server: {
@@ -79,31 +35,11 @@ export const Route = createFileRoute('/api/sessions/send')({
             )
           }
 
-          let sessionKey = rawSessionKey.length > 0 ? rawSessionKey : ''
-
-          if (!sessionKey && friendlyId) {
-            const resolved = await gatewayRpc<SessionsResolveResponse>(
-              'sessions.resolve',
-              {
-                key: friendlyId,
-                includeUnknown: true,
-                includeGlobal: true,
-              },
-            )
-            const resolvedKey =
-              typeof resolved.key === 'string' ? resolved.key.trim() : ''
-            if (!resolvedKey) {
-              return json(
-                { ok: false, error: 'session not found' },
-                { status: 404 },
-              )
-            }
-            sessionKey = resolvedKey
-          }
-
-          if (!sessionKey) {
-            sessionKey = 'main'
-          }
+          const { sessionKey } = await resolveSessionKey({
+            rawSessionKey,
+            friendlyId,
+            defaultKey: 'main',
+          })
 
           const idempotencyKey =
             typeof body.idempotencyKey === 'string' &&
@@ -111,13 +47,11 @@ export const Route = createFileRoute('/api/sessions/send')({
               ? body.idempotencyKey.trim()
               : randomUUID()
 
-          const result = await sendMessageViaGateway({
-            sessionKey,
+          const result = await sendChat(sessionKey, {
             message,
-            idempotencyKey,
           })
 
-          return json({ ok: true, sessionKey, runId: result.runId ?? null })
+          return json({ ok: true, sessionKey, runId: result.run_id ?? idempotencyKey })
         } catch (error) {
           return json(
             {

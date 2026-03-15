@@ -1,16 +1,13 @@
-import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  gatewayRpc,
-  onGatewayEvent,
-  gatewayConnectCheck,
-  registerActiveSendRun,
-  unregisterActiveSendRun,
-} from '../../server/gateway'
-import type { GatewayFrame } from '../../server/gateway'
+// Active run tracking (replaces gateway.ts imports)
+const _activeSendRuns = new Set<string>()
+function registerActiveSendRun(runId: string): void { if (runId) _activeSendRuns.add(runId) }
+function unregisterActiveSendRun(runId: string): void { if (runId) _activeSendRuns.delete(runId) }
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
+import { publishChatEvent } from '../../server/chat-event-bus'
+import { streamChat } from '../../server/hermes-api'
 
 const SEND_STREAM_RUN_TIMEOUT_MS = 180_000
 
@@ -21,53 +18,6 @@ function readString(value: unknown): string {
 function readNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   return undefined
-}
-
-function extractStepPayload(
-  value: unknown,
-): {
-  inputTokens?: number
-  outputTokens?: number
-  cacheRead?: number
-  cacheWrite?: number
-  contextPercent?: number
-  model?: string
-} | null {
-  if (!value || typeof value !== 'object') return null
-  const source = value as Record<string, unknown>
-
-  const inputTokens = readNumber(
-    source.tokens_in ?? source.tokensIn ?? source.inputTokens,
-  )
-  const outputTokens = readNumber(
-    source.tokens_out ?? source.tokensOut ?? source.outputTokens,
-  )
-  const cacheRead = readNumber(source.cache_read ?? source.cacheRead)
-  const cacheWrite = readNumber(source.cache_write ?? source.cacheWrite)
-  const contextPercent = readNumber(
-    source.context_percent ?? source.contextPercent,
-  )
-  const model = readString(source.model) || undefined
-
-  if (
-    inputTokens === undefined &&
-    outputTokens === undefined &&
-    cacheRead === undefined &&
-    cacheWrite === undefined &&
-    contextPercent === undefined &&
-    !model
-  ) {
-    return null
-  }
-
-  return {
-    inputTokens,
-    outputTokens,
-    cacheRead,
-    cacheWrite,
-    contextPercent,
-    model,
-  }
 }
 
 function stripDataUrlPrefix(value: string): string {
@@ -174,11 +124,6 @@ export const Route = createFileRoute('/api/send-stream')({
           typeof body.thinking === 'string' ? body.thinking : undefined
         const fastMode = body.fastMode === true
         const attachments = normalizeAttachments(body.attachments)
-        const idempotencyKey =
-          typeof body.idempotencyKey === 'string'
-            ? body.idempotencyKey
-            : randomUUID()
-
         if (!message.trim() && (!attachments || attachments.length === 0)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'message required' }),
@@ -218,9 +163,9 @@ export const Route = createFileRoute('/api/send-stream')({
         // Create streaming response using the SHARED gateway connection
         const encoder = new TextEncoder()
         let streamClosed = false
-        let cleanupListener: (() => void) | null = null
         let activeRunId: string | null = null
         let unregisterTimer: ReturnType<typeof setTimeout> | null = null
+        const abortController = new AbortController()
         let closeStream = () => {
           streamClosed = true
         }
@@ -244,10 +189,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 unregisterActiveSendRun(activeRunId)
                 activeRunId = null
               }
-              if (cleanupListener) {
-                cleanupListener()
-                cleanupListener = null
-              }
+              abortController.abort()
               try {
                 controller.close()
               } catch {
@@ -256,113 +198,198 @@ export const Route = createFileRoute('/api/send-stream')({
             }
 
             try {
-              // Ensure shared gateway connection is active
-              await gatewayConnectCheck()
-
-              // Listen for events on the shared connection
-              cleanupListener = onGatewayEvent((frame: GatewayFrame) => {
-                if (frame.type !== 'evt' && frame.type !== 'event') return
-                const eventName = (frame as any).event as string
-                const payload = parsePayload(frame)
-
-                if (eventName === 'agent') {
-                  const agentPayload = payload as any
-                  if (
-                    activeRunId &&
-                    agentPayload?.runId &&
-                    agentPayload.runId !== activeRunId
-                  ) {
-                    return
-                  }
-                  const stream = agentPayload?.stream
-                  const data = agentPayload?.data
-
-                  if (stream === 'assistant' && data?.text) {
-                    sendEvent('assistant', {
-                      text: data.text,
-                      runId: agentPayload?.runId,
-                    })
-                  } else if (stream === 'tool') {
-                    sendEvent('tool', {
-                      phase: data?.phase,
-                      name: data?.name,
-                      toolCallId: data?.toolCallId,
-                      args: data?.args,
-                      runId: agentPayload?.runId,
-                    })
-                  } else if (stream === 'thinking' && data?.text) {
-                    sendEvent('thinking', {
-                      text: data.text,
-                      runId: agentPayload?.runId,
-                    })
-                  } else if (
-                    stream === 'step' ||
-                    stream === 'step_finish' ||
-                    stream === 'step_cost'
-                  ) {
-                    const stepPayload = extractStepPayload(data)
-                    if (!stepPayload) return
-                    sendEvent('step', {
-                      ...stepPayload,
-                      runId: agentPayload?.runId,
-                    })
-                  }
-                } else if (eventName === 'chat') {
-                  const chatPayload = payload as any
-                  if (
-                    activeRunId &&
-                    chatPayload?.runId &&
-                    chatPayload.runId !== activeRunId
-                  ) {
-                    return
-                  }
-                  const state = chatPayload?.state
-                  if (
-                    state === 'final' ||
-                    state === 'aborted' ||
-                    state === 'error'
-                  ) {
-                    sendEvent('done', {
-                      state,
-                      errorMessage: chatPayload?.errorMessage,
-                      runId: chatPayload?.runId,
-                    })
-                    closeStream()
-                  }
-                }
-              })
-
-              // Send the chat message via shared RPC
-              const sendResult = await gatewayRpc<{ runId?: string }>(
-                'chat.send',
+              let startedSent = false
+              await streamChat(
+                sessionKey,
                 {
-                  sessionKey,
                   message: getGatewayMessage(message, attachments),
-                  thinking,
-                  fast: fastMode || undefined,
-                  attachments,
-                  deliver: false,
-                  timeoutMs: 120_000,
-                  idempotencyKey,
+                  model: fastMode ? undefined : undefined,
+                  system_message: thinking,
+                },
+                {
+                  signal: abortController.signal,
+                  onEvent({ event, data }) {
+                    const sessionKeyFromEvent =
+                      typeof data.session_id === 'string' && data.session_id.trim()
+                        ? data.session_id
+                        : sessionKey
+                    const runId =
+                      typeof data.run_id === 'string' && data.run_id.trim()
+                        ? data.run_id
+                        : activeRunId ?? undefined
+
+                    if (runId && !activeRunId) {
+                      activeRunId = runId
+                      registerActiveSendRun(runId)
+                      unregisterTimer = setTimeout(() => {
+                        if (activeRunId) {
+                          unregisterActiveSendRun(activeRunId)
+                          activeRunId = null
+                        }
+                      }, SEND_STREAM_RUN_TIMEOUT_MS)
+                    }
+
+                    if (!startedSent && runId) {
+                      startedSent = true
+                      sendEvent('started', { runId, sessionKey: sessionKeyFromEvent })
+                    }
+
+                    if (event === 'run.started') {
+                      const userMessage =
+                        data.user_message && typeof data.user_message === 'object'
+                          ? (data.user_message as Record<string, unknown>)
+                          : null
+                      if (userMessage) {
+                        publishChatEvent('user_message', {
+                          message: {
+                            id: userMessage.id,
+                            role: userMessage.role ?? 'user',
+                            content: [
+                              {
+                                type: 'text',
+                                text:
+                                  typeof userMessage.content === 'string'
+                                    ? userMessage.content
+                                    : '',
+                              },
+                            ],
+                          },
+                          sessionKey: sessionKeyFromEvent,
+                          source: 'hermes',
+                          runId,
+                        })
+                      }
+                      return
+                    }
+
+                    if (event === 'message.started') {
+                      const message =
+                        data.message && typeof data.message === 'object'
+                          ? (data.message as Record<string, unknown>)
+                          : {}
+                      const translated = {
+                        message: {
+                          id: message.id,
+                          role: 'assistant',
+                          content: [],
+                        },
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('message', translated)
+                      publishChatEvent('message', translated)
+                      return
+                    }
+
+                    if (event === 'assistant.delta') {
+                      const delta = typeof data.delta === 'string' ? data.delta : ''
+                      if (!delta) return
+                      const translated = {
+                        text: delta,
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('chunk', translated)
+                      publishChatEvent('chunk', translated)
+                      return
+                    }
+
+                    if (event === 'tool.pending' || event === 'tool.started') {
+                      const translated = {
+                        phase: 'start',
+                        name:
+                          readString((data.tool_call as Record<string, unknown> | undefined)?.tool_name) ||
+                          readString(data.tool_name) ||
+                          'tool',
+                        toolCallId:
+                          readString((data.tool_call as Record<string, unknown> | undefined)?.id) ||
+                          readString(data.tool_call_id) ||
+                          undefined,
+                        args:
+                          ((data.tool_call as Record<string, unknown> | undefined)?.arguments as unknown) ??
+                          data.args,
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('tool', translated)
+                      publishChatEvent('tool', translated)
+                      return
+                    }
+
+                    if (event === 'tool.progress') {
+                      const delta = readString(data.delta)
+                      if (!delta) return
+                      const toolName = readString(data.tool_name)
+                      if (toolName === '_thinking' || !toolName) {
+                        const translated = {
+                          text: delta,
+                          sessionKey: sessionKeyFromEvent,
+                          runId,
+                        }
+                        sendEvent('thinking', translated)
+                        publishChatEvent('thinking', translated)
+                        return
+                      }
+                      return
+                    }
+
+                    if (event === 'tool.completed') {
+                      const translated = {
+                        phase: 'complete',
+                        name: readString(data.tool_name) || 'tool',
+                        toolCallId: readString(data.tool_call_id) || undefined,
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('tool', translated)
+                      publishChatEvent('tool', translated)
+                      return
+                    }
+
+                    if (event === 'tool.failed') {
+                      const translated = {
+                        phase: 'error',
+                        name: readString(data.tool_name) || 'tool',
+                        toolCallId: readString(data.tool_call_id) || undefined,
+                        args: undefined,
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('tool', translated)
+                      publishChatEvent('tool', translated)
+                      return
+                    }
+
+                    if (event === 'error') {
+                      const errorMessage =
+                        readString(
+                          (data.error as Record<string, unknown> | undefined)?.message,
+                        ) || 'Hermes stream error'
+                      const translated = {
+                        state: 'error',
+                        errorMessage,
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('done', translated)
+                      publishChatEvent('done', translated)
+                      closeStream()
+                      return
+                    }
+
+                    if (event === 'run.completed') {
+                      const translated = {
+                        state: 'complete',
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('done', translated)
+                      publishChatEvent('done', translated)
+                      closeStream()
+                    }
+                  },
                 },
               )
-
-              // Send initial event with runId
-              if (typeof sendResult.runId === 'string' && sendResult.runId.trim()) {
-                activeRunId = sendResult.runId
-                registerActiveSendRun(activeRunId)
-                unregisterTimer = setTimeout(() => {
-                  if (activeRunId) {
-                    unregisterActiveSendRun(activeRunId)
-                    activeRunId = null
-                  }
-                }, SEND_STREAM_RUN_TIMEOUT_MS)
-              }
-
-              sendEvent('started', {
-                runId: sendResult.runId,
-                sessionKey,
-              })
 
               // Set a timeout to close the stream if no completion event
               setTimeout(() => {
@@ -393,11 +420,3 @@ export const Route = createFileRoute('/api/send-stream')({
     },
   },
 })
-
-function parsePayload(frame: any): unknown {
-  if (frame.payload !== undefined) return frame.payload
-  if (typeof frame.payloadJSON === 'string') {
-    try { return JSON.parse(frame.payloadJSON) } catch { return null }
-  }
-  return null
-}

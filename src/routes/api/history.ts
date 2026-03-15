@@ -1,19 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '@/server/auth-middleware'
-
-type ChatHistoryResponse = {
-  sessionKey: string
-  sessionId?: string
-  messages: Array<any>
-  thinkingLevel?: string
-}
-
-type SessionsResolveResponse = {
-  ok?: boolean
-  key?: string
-}
+import { getMessages, toGatewayMessage } from '../../server/hermes-api'
+import { resolveSessionKey } from '../../server/session-utils'
 
 export const Route = createFileRoute('/api/history')({
   server: {
@@ -27,40 +16,19 @@ export const Route = createFileRoute('/api/history')({
           const limit = Number(url.searchParams.get('limit') || '200')
           const rawSessionKey = url.searchParams.get('sessionKey')?.trim()
           const friendlyId = url.searchParams.get('friendlyId')?.trim()
+          const { sessionKey } = await resolveSessionKey({
+            rawSessionKey,
+            friendlyId,
+            defaultKey: 'main',
+          })
+          const messages = await getMessages(sessionKey)
+          const boundedMessages = limit > 0 ? messages.slice(-limit) : messages
 
-          let sessionKey =
-            rawSessionKey && rawSessionKey.length > 0 ? rawSessionKey : ''
-
-          if (!sessionKey && friendlyId) {
-            const resolved = await gatewayRpc<SessionsResolveResponse>(
-              'sessions.resolve',
-              {
-                key: friendlyId,
-                includeUnknown: true,
-                includeGlobal: true,
-              },
-            )
-            const resolvedKey =
-              typeof resolved.key === 'string' ? resolved.key.trim() : ''
-            if (resolvedKey.length === 0) {
-              return json({ error: 'session not found' }, { status: 404 })
-            }
-            sessionKey = resolvedKey
-          }
-
-          if (sessionKey.length === 0) {
-            sessionKey = 'main'
-          }
-
-          const payload = await gatewayRpc<ChatHistoryResponse>(
-            'chat.history',
-            {
-              sessionKey,
-              limit,
-            },
-          )
-
-          return json(payload)
+          return json({
+            sessionKey,
+            sessionId: sessionKey,
+            messages: boundedMessages.map(toGatewayMessage),
+          })
         } catch (err) {
           return json(
             {

@@ -1,74 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-
-type SessionsListGatewayResponse = {
-  sessions?: Array<Record<string, unknown>>
-}
-
-type SessionsListResponse = {
-  sessions: Array<Record<string, unknown>>
-}
-
-type SessionsPatchResponse = {
-  ok?: boolean
-  key?: string
-  path?: string
-  entry?: Record<string, unknown>
-}
-
-type SessionsResolveResponse = {
-  ok?: boolean
-  key?: string
-}
-
-const THINKING_VALUES = new Set([
-  'off',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'adaptive',
-])
-
-function deriveFriendlyIdFromKey(key: unknown): string {
-  if (typeof key !== 'string' || key.trim().length === 0) return 'main'
-  const parts = key.split(':')
-  const tail = parts[parts.length - 1]
-  return tail && tail.trim().length > 0 ? tail.trim() : key
-}
-
-function normalizeSessions(
-  payload: SessionsListGatewayResponse,
-): SessionsListResponse {
-  const sessions: Array<Record<string, unknown>> = Array.isArray(
-    payload.sessions,
-  )
-    ? payload.sessions
-    : []
-  const normalized = sessions.map((session) => {
-    const rawKey = session.key
-    const key = typeof rawKey === 'string' ? rawKey : ''
-    const rawFriendly = session.friendlyId
-    const friendlyIdFromPayload =
-      typeof rawFriendly === 'string' ? rawFriendly.trim() : ''
-    const friendlyId =
-      friendlyIdFromPayload.length > 0
-        ? friendlyIdFromPayload
-        : deriveFriendlyIdFromKey(key)
-    return {
-      ...session,
-      key,
-      friendlyId,
-    }
-  })
-
-  return { sessions: normalized }
-}
+import {
+  createSession,
+  deleteSession,
+  listSessions,
+  toSessionSummary,
+  updateSession,
+} from '../../server/hermes-api'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -80,16 +21,8 @@ export const Route = createFileRoute('/api/sessions')({
         }
 
         try {
-          const payload = await gatewayRpc<SessionsListGatewayResponse>(
-            'sessions.list',
-            {
-              limit: 50,
-              includeLastMessage: true,
-              includeDerivedTitles: true,
-            },
-          )
-
-          return json(normalizeSessions(payload))
+          const sessions = await listSessions(50, 0)
+          return json({ sessions: sessions.map(toSessionSummary) })
         } catch (err) {
           return json(
             {
@@ -122,49 +55,18 @@ export const Route = createFileRoute('/api/sessions')({
           const requestedModel =
             typeof body.model === 'string' ? body.model.trim() : ''
           const model = requestedModel || undefined
-          const isolated = body.isolated === true
-          const requestedExec =
-            typeof body.exec === 'string' ? body.exec.trim() : ''
-          const exec = requestedExec || undefined
-
-          // Create the session with its full config in one patch so
-          // subagent settings remain scoped to that session.
-          const baseParams: Record<string, unknown> = { key: friendlyId }
-          if (label) baseParams.label = label
-          if (model) baseParams.model = model
-          if (isolated) baseParams.isolated = true
-          if (exec) baseParams.exec = exec
-
-          const payload = await gatewayRpc<SessionsPatchResponse>(
-            'sessions.patch',
-            baseParams,
-          )
-
-          const returnedKeyRaw = payload.key
-          const returnedKey =
-            typeof returnedKeyRaw === 'string' && returnedKeyRaw.trim().length > 0
-              ? returnedKeyRaw.trim()
-              : ''
-          const resolvedSessionKey = returnedKey || friendlyId
-          if (!resolvedSessionKey) {
-            throw new Error('gateway returned an invalid response')
-          }
-
-          const modelApplied = !model || payload.ok !== false
-
-          // Register the friendly id so subsequent lookups resolve quickly.
-          await gatewayRpc<SessionsResolveResponse>('sessions.resolve', {
-            key: friendlyId,
-            includeUnknown: true,
-            includeGlobal: true,
-          }).catch(() => ({ ok: false }))
+          const session = await createSession({
+            id: friendlyId || randomUUID(),
+            title: label,
+            model,
+          })
 
           return json({
             ok: true,
-            sessionKey: resolvedSessionKey,
-            friendlyId,
-            entry: payload.entry,
-            modelApplied,
+            sessionKey: session.id,
+            friendlyId: session.id,
+            entry: toSessionSummary(session),
+            modelApplied: true,
           })
         } catch (err) {
           return json(
@@ -194,37 +96,7 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
           const label =
             typeof body.label === 'string' ? body.label.trim() : undefined
-          const thinkingRaw =
-            typeof body.thinking === 'string' ? body.thinking.trim() : ''
-          const thinking = THINKING_VALUES.has(thinkingRaw)
-            ? thinkingRaw
-            : undefined
-          const hasFast = Object.prototype.hasOwnProperty.call(body, 'fast')
-          const hasVerbose = Object.prototype.hasOwnProperty.call(body, 'verbose')
-          const hasReasoning = Object.prototype.hasOwnProperty.call(
-            body,
-            'reasoning',
-          )
-          const fast = body.fast === true
-          const verbose = body.verbose === true
-          const reasoning = body.reasoning === true
-
-          let sessionKey = rawSessionKey
-          const friendlyId = rawFriendlyId
-
-          if (friendlyId) {
-            const resolved = await gatewayRpc<SessionsResolveResponse>(
-              'sessions.resolve',
-              {
-                key: friendlyId,
-                includeUnknown: true,
-                includeGlobal: true,
-              },
-            )
-            const resolvedKey =
-              typeof resolved.key === 'string' ? resolved.key.trim() : ''
-            if (resolvedKey.length > 0) sessionKey = resolvedKey
-          }
+          const sessionKey = rawSessionKey || rawFriendlyId
 
           if (!sessionKey) {
             return json(
@@ -233,22 +105,14 @@ export const Route = createFileRoute('/api/sessions')({
             )
           }
 
-          const params: Record<string, unknown> = { key: sessionKey }
-          if (label) params.label = label
-          if (thinking) params.thinking = thinking
-          if (hasFast) params.fast = fast
-          if (hasVerbose) params.verbose = verbose
-          if (hasReasoning) params.reasoning = reasoning
-
-          const payload = await gatewayRpc<SessionsPatchResponse>(
-            'sessions.patch',
-            params,
-          )
+          const session = await updateSession(sessionKey, {
+            title: label,
+          })
 
           return json({
             ok: true,
             sessionKey,
-            entry: payload.entry,
+            entry: toSessionSummary(session),
           })
         } catch (err) {
           return json(
@@ -268,22 +132,7 @@ export const Route = createFileRoute('/api/sessions')({
           const url = new URL(request.url)
           const rawSessionKey = url.searchParams.get('sessionKey') ?? ''
           const rawFriendlyId = url.searchParams.get('friendlyId') ?? ''
-          let sessionKey = rawSessionKey.trim()
-          const friendlyId = rawFriendlyId.trim()
-
-          if (friendlyId) {
-            const resolved = await gatewayRpc<SessionsResolveResponse>(
-              'sessions.resolve',
-              {
-                key: friendlyId,
-                includeUnknown: true,
-                includeGlobal: true,
-              },
-            )
-            const resolvedKey =
-              typeof resolved.key === 'string' ? resolved.key.trim() : ''
-            if (resolvedKey.length > 0) sessionKey = resolvedKey
-          }
+          const sessionKey = rawSessionKey.trim() || rawFriendlyId.trim()
 
           if (!sessionKey) {
             return json(
@@ -292,12 +141,7 @@ export const Route = createFileRoute('/api/sessions')({
             )
           }
 
-          await gatewayRpc('sessions.delete', { key: sessionKey })
-          if (friendlyId && friendlyId !== sessionKey) {
-            await gatewayRpc('sessions.delete', { key: friendlyId }).catch(
-              () => ({}),
-            )
-          }
+          await deleteSession(sessionKey)
 
           return json({ ok: true, sessionKey })
         } catch (err) {

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayConnectCheck } from '../../server/gateway'
 import { isAuthenticated } from '@/server/auth-middleware'
+import { checkHealth } from '../../server/hermes-api'
 
 export const Route = createFileRoute('/api/ping')({
   server: {
@@ -11,13 +11,9 @@ export const Route = createFileRoute('/api/ping')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          await gatewayConnectCheck()
+          await checkHealth()
           return json({ ok: true })
         } catch (err) {
-          // Don't call gatewayReconnect() here — it destroys the existing
-          // connection and creates a new one, which evicts the current
-          // connection from the gateway (same device ID).
-          // Just report the failure and let the client's own reconnect logic handle it.
           return json(
             {
               ok: false,

@@ -1,11 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayRpc } from '../../../server/gateway'
 import { isAuthenticated } from '../../../server/auth-middleware'
-
-type SessionsListGatewayResponse = {
-  sessions?: Array<Record<string, unknown>>
-}
+import { getSession, toSessionSummary } from '../../../server/hermes-api'
 
 export const Route = createFileRoute('/api/sessions/$sessionKey/status')({
   server: {
@@ -22,26 +18,13 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/status')({
         }
 
         try {
-          // sessions.get does not exist on the gateway — use sessions.list and filter by key
-          const payload = await gatewayRpc<SessionsListGatewayResponse>(
-            'sessions.list',
-            { limit: 100 },
-          )
-
-          const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
-          const session = sessions.find(
-            (s) =>
-              s.key === sessionKey ||
-              s.key === `agent:main:${sessionKey}` ||
-              String(s.key ?? '').endsWith(`:${sessionKey}`),
-          )
-
-          if (!session) {
-            return json({ ok: false, status: 'not_found' }, { status: 404 })
-          }
-
-          const result: Record<string, unknown> = { ...session }
-          return json({ ok: true, status: result.status ?? 'unknown', ...result })
+          const session = await getSession(sessionKey)
+          const result = toSessionSummary(session)
+          return json({
+            ok: true,
+            status: result.status ?? 'idle',
+            ...result,
+          })
         } catch (err) {
           return json(
             {
