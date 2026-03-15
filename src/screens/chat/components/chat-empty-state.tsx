@@ -76,13 +76,7 @@ export function ChatEmptyState({
               Agent chat · live tools · memory · full observability
             </p>
 
-            {/* Pixel banner as subtle accent */}
-            <img
-              src="/hermes-banner.png"
-              alt=""
-              className="mt-3 h-4 w-auto opacity-15"
-              style={{ filter: 'grayscale(0.5)' }}
-            />
+
           </>
         )}
 
