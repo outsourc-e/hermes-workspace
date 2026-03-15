@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { getTheme, setTheme } from '@/lib/theme'
 
 export type SettingsThemeMode = 'system' | 'light' | 'dark'
 export type AccentColor = 'orange' | 'purple' | 'blue' | 'green'
@@ -96,17 +97,11 @@ export function resolveTheme(theme: SettingsThemeMode): 'light' | 'dark' {
 }
 
 export function applyTheme(_theme?: SettingsThemeMode) {
-  const root = document.documentElement
-  root.classList.remove('light', 'system')
-  root.classList.add('dark')
-  root.setAttribute('data-theme', 'hermes')
-  root.setAttribute('data-accent', 'orange')
+  setTheme(getTheme())
+  document.documentElement.setAttribute('data-accent', 'orange')
 }
 
 export function initializeSettingsAppearance() {
-  const root = document.documentElement
-  root.classList.remove('light', 'system')
-  root.classList.add('dark')
-  root.setAttribute('data-theme', 'hermes')
-  root.setAttribute('data-accent', 'orange')
+  setTheme(getTheme())
+  document.documentElement.setAttribute('data-accent', 'orange')
 }

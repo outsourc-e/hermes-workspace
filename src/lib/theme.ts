@@ -1,18 +1,4 @@
-export type ThemeId =
-  | 'paper-light'
-  | 'ops-dark'
-  | 'premium-dark'
-  | 'sunset-brand'
-  | 'hermes'
-
-const DARK_THEMES: ThemeId[] = ['ops-dark', 'premium-dark', 'sunset-brand', 'hermes']
-const THEME_SET = new Set<ThemeId>([
-  'paper-light',
-  'ops-dark',
-  'premium-dark',
-  'sunset-brand',
-  'hermes',
-])
+export type ThemeId = 'hermes-dark' | 'hermes-slate' | 'hermes-mono'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -20,35 +6,49 @@ export const THEMES: Array<{
   description: string
   icon: string
 }> = [
-  { id: 'paper-light', label: 'Paper Light', description: 'Clean warm gray with soft shadows', icon: '☀️' },
-  { id: 'ops-dark', label: 'Ops Dark', description: 'Slate dark with teal secondary accents', icon: '🖥️' },
-  { id: 'premium-dark', label: 'Premium Dark', description: 'OLED black with high contrast', icon: '✨' },
-  { id: 'sunset-brand', label: 'Sunset Brand', description: 'Warm brown immersion with amber accents', icon: '🌇' },
-  { id: 'hermes', label: 'Hermes', description: 'Dark charcoal with restrained gold accents', icon: '⚕' },
+  {
+    id: 'hermes-dark',
+    label: 'Hermes Dark',
+    description: 'Bronze accents on dark charcoal',
+    icon: '⚕',
+  },
+  {
+    id: 'hermes-slate',
+    label: 'Slate',
+    description: 'Cool blue developer theme',
+    icon: '🔷',
+  },
+  {
+    id: 'hermes-mono',
+    label: 'Mono',
+    description: 'Clean monochrome grayscale',
+    icon: '◐',
+  },
 ]
 
 const STORAGE_KEY = 'clawsuite-theme'
+const DEFAULT_THEME: ThemeId = 'hermes-dark'
+const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
 
-export function getStoredTheme(): ThemeId {
-  if (typeof window === 'undefined') return 'hermes'
+export function isValidTheme(value: string | null | undefined): value is ThemeId {
+  return typeof value === 'string' && THEME_SET.has(value as ThemeId)
+}
+
+export function isDarkTheme(_theme: ThemeId): boolean {
+  return true
+}
+
+export function getTheme(): ThemeId {
+  if (typeof window === 'undefined') return DEFAULT_THEME
   const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored && THEME_SET.has(stored as ThemeId)) return stored as ThemeId
-  return 'hermes'
+  return isValidTheme(stored) ? stored : DEFAULT_THEME
 }
 
-export function applyTheme(theme: ThemeId): void {
-  const html = document.documentElement
-  html.setAttribute('data-theme', theme)
-  if (DARK_THEMES.includes(theme)) {
-    html.classList.add('dark')
-    html.classList.remove('light')
-  } else {
-    html.classList.add('light')
-    html.classList.remove('dark')
-  }
+export function setTheme(theme: ThemeId): void {
+  const root = document.documentElement
+  root.setAttribute('data-theme', theme)
+  root.classList.remove('light', 'system')
+  root.classList.add('dark')
+  root.style.setProperty('color-scheme', 'dark')
   localStorage.setItem(STORAGE_KEY, theme)
-}
-
-export function initTheme(): void {
-  applyTheme(getStoredTheme())
 }

@@ -3,6 +3,7 @@ import {
   BrainIcon,
   CodeIcon,
   Edit02Icon,
+  PuzzleIcon,
 } from '@hugeicons/core-free-icons'
 import { motion } from 'motion/react'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
@@ -15,19 +16,24 @@ type SuggestionChip = {
 
 const SUGGESTIONS: SuggestionChip[] = [
   {
-    label: 'Write code',
-    prompt: 'Help me write a function that',
+    label: 'Inspect this repo',
+    prompt: 'Inspect this repo and tell me how it is structured.',
     icon: CodeIcon,
   },
   {
-    label: 'Analyze',
-    prompt: 'Analyze this and give me insights:',
+    label: 'Draft a plan',
+    prompt: 'Draft a plan for the work I need to do next.',
+    icon: Edit02Icon,
+  },
+  {
+    label: 'Search memory',
+    prompt: 'Search memory for relevant prior context about this workspace.',
     icon: BrainIcon,
   },
   {
-    label: 'Draft',
-    prompt: 'Help me draft a',
-    icon: Edit02Icon,
+    label: 'Browse skills',
+    prompt: 'Browse the available skills and suggest the best one for this task.',
+    icon: PuzzleIcon,
   },
 ]
 
@@ -38,45 +44,47 @@ type ChatEmptyStateProps = {
 
 export function ChatEmptyState({
   onSuggestionClick,
-  compact: _compact,
+  compact = false,
 }: ChatEmptyStateProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="flex h-full flex-col items-center justify-center px-3 py-4 md:px-4 md:py-0"
+      className="flex h-full flex-col items-center justify-center px-4 py-8"
     >
-      <div className="flex flex-col items-center text-center">
-        <motion.div
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-        >
-          <OpenClawStudioIcon className="mb-3 size-10 rounded-xl overflow-hidden opacity-60 md:mb-4 md:size-12" />
-        </motion.div>
-
-        <h2 className="mb-4 text-sm font-semibold text-neutral-300">
-          Start a conversation
+      <div className="flex max-w-xl flex-col items-center text-center">
+        <OpenClawStudioIcon className="mb-4 size-12 overflow-hidden rounded-xl opacity-80" />
+        <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+          Hermes Workspace
         </h2>
+        {!compact ? (
+          <>
+            <p className="mt-2 text-sm text-[var(--theme-muted)]">
+              Research, build, and operate in one thread.
+            </p>
+            <p className="mt-2 text-xs text-[var(--theme-muted)] opacity-60">
+              Sessions, tools, memory, skills, and files are all live.
+            </p>
+          </>
+        ) : null}
 
-        <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
           {SUGGESTIONS.map((suggestion) => (
-            <motion.button
+            <button
               key={suggestion.label}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              type="button"
               onClick={() => onSuggestionClick?.(suggestion.prompt)}
-              className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800 md:gap-2 md:px-3.5 md:py-2 md:text-sm"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
             >
               <HugeiconsIcon
                 icon={suggestion.icon as any}
                 size={14}
                 strokeWidth={1.5}
-                className="text-primary-500"
+                className="text-[var(--theme-muted)]"
               />
               {suggestion.label}
-            </motion.button>
+            </button>
           ))}
         </div>
       </div>

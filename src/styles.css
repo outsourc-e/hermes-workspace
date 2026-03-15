@@ -646,8 +646,8 @@ code {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ── Hermes / Nous Research ── */
-[data-theme="hermes"] {
+/* ── Hermes Workspace Themes ── */
+[data-theme="hermes-dark"] {
   --theme-bg: #0d0f12;
   --theme-sidebar: #13171c;
   --theme-panel: #13171c;
@@ -694,10 +694,110 @@ code {
   --theme-input: #232A33;
 }
 
-[data-theme="hermes"] html,
-[data-theme="hermes"] body,
-[data-theme="hermes"] #root,
-[data-theme="hermes"] .dark {
+[data-theme="hermes-slate"] {
+  --theme-bg: #0d1117;
+  --theme-sidebar: #0d1117;
+  --theme-panel: #161b22;
+  --theme-card: #1c2128;
+  --theme-card2: #21262d;
+  --theme-border: #30363d;
+  --theme-border-subtle: #21262d;
+  --theme-text: #c9d1d9;
+  --theme-muted: #8b949e;
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.52);
+  --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.62);
+  --theme-glass: rgba(13, 17, 23, 0.88);
+  --theme-focus: #7eb8f6;
+  --theme-accent: #7eb8f6;
+  --theme-accent-secondary: #8EA8FF;
+  --theme-accent-subtle: rgba(126, 184, 246, 0.14);
+  --theme-accent-border: rgba(126, 184, 246, 0.3);
+  --theme-active: #7eb8f6;
+  --theme-link: #8EA8FF;
+  --theme-success: #63D0A6;
+  --theme-warning: #e6a855;
+  --theme-danger: #F7A072;
+  --theme-stripe: rgba(48, 54, 61, 0.48);
+  --theme-header-bg: #161b22;
+  --theme-header-border: #30363d;
+  --chat-user-bg: #1a2233;
+  --chat-user-border: #35506D;
+  --chat-user-foreground: #EAF2FB;
+  --chat-assistant-bg: #161b22;
+  --chat-assistant-border: #2B333D;
+  --chat-assistant-foreground: #ECEFF4;
+  --composer-bg: #0d1117;
+  --composer-border: #2D3640;
+  --composer-placeholder: #7F8A96;
+  --tool-card-bg: #121820;
+  --tool-card-border: #2A3440;
+  --tool-card-title: #DCE6F2;
+  --tool-card-muted: #8FA1B5;
+  --code-bg: #0d1117;
+  --code-border: #28313B;
+  --code-foreground: #D7DEE7;
+  --theme-input: #232A33;
+}
+
+[data-theme="hermes-mono"] {
+  --theme-bg: #111111;
+  --theme-sidebar: #111111;
+  --theme-panel: #1a1a1a;
+  --theme-card: #222222;
+  --theme-card2: #2a2a2a;
+  --theme-border: #333333;
+  --theme-border-subtle: #222222;
+  --theme-text: #e6edf3;
+  --theme-muted: #888888;
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.52);
+  --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.62);
+  --theme-glass: rgba(17, 17, 17, 0.88);
+  --theme-focus: #aaaaaa;
+  --theme-accent: #aaaaaa;
+  --theme-accent-secondary: #cccccc;
+  --theme-accent-subtle: rgba(170, 170, 170, 0.14);
+  --theme-accent-border: rgba(170, 170, 170, 0.3);
+  --theme-active: #aaaaaa;
+  --theme-link: #cccccc;
+  --theme-success: #888888;
+  --theme-warning: #999999;
+  --theme-danger: #cccccc;
+  --theme-stripe: rgba(51, 51, 51, 0.48);
+  --theme-header-bg: #1a1a1a;
+  --theme-header-border: #333333;
+  --chat-user-bg: #1e1e1e;
+  --chat-user-border: #4a4a4a;
+  --chat-user-foreground: #E6EDF3;
+  --chat-assistant-bg: #1a1a1a;
+  --chat-assistant-border: #333333;
+  --chat-assistant-foreground: #E6EDF3;
+  --composer-bg: #111111;
+  --composer-border: #333333;
+  --composer-placeholder: #888888;
+  --tool-card-bg: #1a1a1a;
+  --tool-card-border: #333333;
+  --tool-card-title: #E6EDF3;
+  --tool-card-muted: #A0A0A0;
+  --code-bg: #111111;
+  --code-border: #333333;
+  --code-foreground: #E6EDF3;
+  --theme-input: #222222;
+}
+
+[data-theme="hermes-dark"] html,
+[data-theme="hermes-dark"] body,
+[data-theme="hermes-dark"] #root,
+[data-theme="hermes-dark"] .dark,
+[data-theme="hermes-slate"] html,
+[data-theme="hermes-slate"] body,
+[data-theme="hermes-slate"] #root,
+[data-theme="hermes-slate"] .dark,
+[data-theme="hermes-mono"] html,
+[data-theme="hermes-mono"] body,
+[data-theme="hermes-mono"] #root,
+[data-theme="hermes-mono"] .dark {
   background-color: var(--theme-bg);
   color: var(--theme-text);
 }

@@ -2,26 +2,22 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   CheckmarkCircle02Icon,
   CloudIcon,
-  ComputerIcon,
   MessageMultiple01Icon,
-  Moon01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Settings02Icon,
   SourceCodeSquareIcon,
-  Sun01Icon,
   UserIcon,
 } from '@hugeicons/core-free-icons'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import type * as React from 'react'
-import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
+import type { AccentColor } from '@/hooks/use-settings'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
-import { applyTheme, useSettings } from '@/hooks/use-settings'
-import type { ThemeId } from '@/lib/theme'
+import { useSettings } from '@/hooks/use-settings'
+import { THEMES, getTheme, setTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -42,45 +38,16 @@ export const Route = createFileRoute('/settings/')({
   component: SettingsRoute,
 })
 
-// ── Enterprise Theme Picker (P1-2) ─────────────────────────────────────
-
-const ENTERPRISE_THEMES_PAGE = [
-  {
-    id: 'paper-light' as ThemeId,
-    label: 'Clean',
-    icon: '☀️',
-    desc: 'Warm gray canvas with white cards',
-    preview: { bg: '#f5f5f5', panel: '#ffffff', border: '#e5e5e5', accent: '#f97316', text: '#1a1a1a' },
-  },
-  {
-    id: 'ops-dark' as ThemeId,
-    label: 'Slate',
-    icon: '🖥️',
-    desc: 'Deep slate with teal secondary glow',
-    preview: { bg: '#1e1e2e', panel: '#2a2a3e', border: '#3a3a4e', accent: '#14b8a6', text: '#e5e5e5' },
-  },
-  {
-    id: 'premium-dark' as ThemeId,
-    label: 'Midnight',
-    icon: '✨',
-    desc: 'OLED true black with high contrast',
-    preview: { bg: '#000000', panel: '#0a0a0a', border: '#1a1a1a', accent: '#f97316', text: '#f5f5f5' },
-  },
-  {
-    id: 'sunset-brand' as ThemeId,
-    label: 'Sunset',
-    icon: '🌇',
-    desc: 'Warm brown brand immersion',
-    preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
-  },
-] as const
-
-const DARK_ENTERPRISE_SET = new Set<ThemeId>(['ops-dark', 'premium-dark', 'sunset-brand'])
-
 function PageThemeSwatch({
   colors,
 }: {
-  colors: (typeof ENTERPRISE_THEMES_PAGE)[number]['preview']
+  colors: {
+    bg: string
+    panel: string
+    border: string
+    accent: string
+    text: string
+  }
 }) {
   return (
     <div
@@ -117,60 +84,71 @@ function PageThemeSwatch({
   )
 }
 
-function EnterpriseThemePickerPage() {
-  const { updateSettings } = useSettings()
-  const [current, setCurrent] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'paper-light'
-    const stored = localStorage.getItem('clawsuite-theme')
-    return ENTERPRISE_THEMES_PAGE.some((t) => t.id === stored) ? (stored as string) : 'paper-light'
-  })
+const THEME_PREVIEWS: Record<
+  ThemeId,
+  { bg: string; panel: string; border: string; accent: string; text: string }
+> = {
+  'hermes-dark': {
+    bg: '#0d0f12',
+    panel: '#1a1f26',
+    border: '#2a313b',
+    accent: '#b98a44',
+    text: '#eceff4',
+  },
+  'hermes-slate': {
+    bg: '#0d1117',
+    panel: '#1c2128',
+    border: '#30363d',
+    accent: '#7eb8f6',
+    text: '#c9d1d9',
+  },
+  'hermes-mono': {
+    bg: '#111111',
+    panel: '#222222',
+    border: '#333333',
+    accent: '#aaaaaa',
+    text: '#e6edf3',
+  },
+}
 
-  function applyEnterpriseTheme(id: ThemeId) {
-    const html = document.documentElement
-    html.setAttribute('data-theme', id)
-    if (DARK_ENTERPRISE_SET.has(id)) {
-      html.classList.add('dark')
-      html.classList.remove('light')
-      updateSettings({ theme: 'dark' })
-    } else {
-      html.classList.add('light')
-      html.classList.remove('dark')
-      updateSettings({ theme: 'light' })
-    }
-    localStorage.setItem('clawsuite-theme', id)
+function WorkspaceThemePicker() {
+  const { updateSettings } = useSettings()
+  const [current, setCurrent] = useState<ThemeId>(() => getTheme())
+
+  function applyWorkspaceTheme(id: ThemeId) {
+    setTheme(id)
+    updateSettings({ theme: 'dark' })
     setCurrent(id)
   }
 
   return (
-    <div className="grid w-full grid-cols-2 gap-2">
-      {ENTERPRISE_THEMES_PAGE.map((t) => {
+    <div className="grid w-full gap-2 md:grid-cols-3">
+      {THEMES.map((t) => {
         const isActive = current === t.id
         return (
           <button
             key={t.id}
             type="button"
-            onClick={() => applyEnterpriseTheme(t.id)}
+            onClick={() => applyWorkspaceTheme(t.id)}
             className={cn(
-              'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
+              'flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
               isActive
-                ? 'border-accent-500 bg-accent-50 text-accent-700'
-                : 'border-primary-200 bg-primary-50/80 hover:bg-primary-100',
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-subtle)] text-[var(--theme-text)]'
+                : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
             )}
           >
-            <PageThemeSwatch colors={t.preview} />
-            <div className="flex items-center gap-1">
+            <PageThemeSwatch colors={THEME_PREVIEWS[t.id]} />
+            <div className="flex items-center gap-1.5">
               <span className="text-xs">{t.icon}</span>
-              <span className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
-                {t.label}
-              </span>
+              <span className="text-xs font-semibold">{t.label}</span>
               {isActive && (
-                <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-accent-600">
+                <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-[var(--theme-accent)]">
                   Active
                 </span>
               )}
             </div>
-            <p className="text-[10px] leading-tight text-primary-500 dark:text-neutral-400">
-              {t.desc}
+            <p className="text-[10px] leading-tight text-[var(--theme-muted)]">
+              {t.description}
             </p>
           </button>
         )
@@ -334,23 +312,6 @@ function SettingsRoute() {
     setAutoDetectingGateway(false)
   }
 
-  function handleThemeChange(value: string) {
-    const theme = value as SettingsThemeMode
-    applyTheme(theme)
-    updateSettings({ theme })
-
-    // P1-1: Persist enterprise theme to localStorage, mirroring settings-dialog behaviour
-    if (theme === 'light') {
-      localStorage.setItem('clawsuite-theme', 'paper-light')
-    } else if (theme === 'dark') {
-      const current = localStorage.getItem('clawsuite-theme')
-      const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
-      if (!darkThemes.includes(current ?? '')) {
-        localStorage.setItem('clawsuite-theme', 'ops-dark')
-      }
-    }
-  }
-
   function getAccentBadgeClass(color: AccentColor): string {
     if (color === 'orange') return 'bg-orange-500'
     if (color === 'purple') return 'bg-purple-500'
@@ -434,44 +395,16 @@ function SettingsRoute() {
             <>
               <SettingsSection
                 title="Appearance"
-                description="Choose app theme and accent color."
+                description="Choose a workspace theme and accent color."
                 icon={PaintBoardIcon}
               >
                 <SettingsRow
                   label="Theme"
-                  description="Apply light, dark, or follow system preference."
+                  description="All workspace themes are dark. Pick the palette you want to use."
                 >
-                  <Tabs
-                    value={settings.theme}
-                    onValueChange={handleThemeChange}
-                  >
-                    <TabsList variant="default" className="gap-1">
-                      <TabsTab value="system">
-                        <HugeiconsIcon
-                          icon={ComputerIcon}
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        <span>System</span>
-                      </TabsTab>
-                      <TabsTab value="light">
-                        <HugeiconsIcon
-                          icon={Sun01Icon}
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        <span>Light</span>
-                      </TabsTab>
-                      <TabsTab value="dark">
-                        <HugeiconsIcon
-                          icon={Moon01Icon}
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        <span>Dark</span>
-                      </TabsTab>
-                    </TabsList>
-                  </Tabs>
+                  <div className="w-full">
+                    <WorkspaceThemePicker />
+                  </div>
                 </SettingsRow>
 
                 <SettingsRow
@@ -509,15 +442,6 @@ function SettingsRoute() {
                   </div>
                 </SettingsRow>
 
-                {/* P1-2: Enterprise theme picker — mobile-only settings UI needs this */}
-                <SettingsRow
-                  label="Enterprise theme"
-                  description="Full brand theme presets with custom color palettes."
-                >
-                  <div className="w-full">
-                    <EnterpriseThemePickerPage />
-                  </div>
-                </SettingsRow>
               </SettingsSection>
               <LoaderStyleSection />
             </>

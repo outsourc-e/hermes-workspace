@@ -20,7 +20,7 @@ import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
-import type { ThemeId } from '@/lib/theme'
+import { THEMES, getTheme, setTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -60,10 +60,10 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
-  'ops-dark',
-  'premium-dark',
-  'sunset-brand',
-  'hermes',])
+  'hermes-dark',
+  'hermes-slate',
+  'hermes-mono',
+])
 
 function isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
   if (!theme) return false
@@ -271,23 +271,12 @@ function AppearanceContent() {
     
     // If user switches to light/dark via the standard toggle, update enterprise theme too
     const currentEnterpriseTheme = localStorage.getItem('clawsuite-theme')
-    if (
-      theme === 'light' &&
-      currentEnterpriseTheme &&
-      isDarkEnterpriseTheme(currentEnterpriseTheme)
-    ) {
-      // Switch to Paper Light when going light
-      const html = document.documentElement
-      html.setAttribute('data-theme', 'paper-light')
-      localStorage.setItem('clawsuite-theme', 'paper-light')
-    } else if (
-      theme === 'dark' &&
-      (!currentEnterpriseTheme || !isDarkEnterpriseTheme(currentEnterpriseTheme))
-    ) {
-      // Switch to Ops Dark when going dark (default)
-      const html = document.documentElement
-      html.setAttribute('data-theme', 'ops-dark')
-      localStorage.setItem('clawsuite-theme', 'ops-dark')
+    if (theme === 'dark' || theme === 'light' || theme === 'system') {
+      const nextTheme = isDarkEnterpriseTheme(currentEnterpriseTheme)
+        ? currentEnterpriseTheme
+        : 'hermes-dark'
+      setTheme(nextTheme)
+      updateSettings({ theme: 'dark' })
     }
   }
 
@@ -398,43 +387,16 @@ function AppearanceContent() {
   )
 }
 
-const ENTERPRISE_THEMES = [
-  {
-    id: 'paper-light',
-    label: 'Clean',
-    icon: '☀️',
-    desc: 'Warm gray canvas with white cards',
-    preview: { bg: '#f5f5f5', panel: '#ffffff', border: '#e5e5e5', accent: '#f97316', text: '#1a1a1a' },
-  },
-  {
-    id: 'ops-dark',
-    label: 'Slate',
-    icon: '🖥️',
-    desc: 'Deep slate with teal secondary glow',
-    preview: { bg: '#1e1e2e', panel: '#2a2a3e', border: '#3a3a4e', accent: '#14b8a6', text: '#e5e5e5' },
-  },
-  {
-    id: 'premium-dark',
-    label: 'Midnight',
-    icon: '✨',
-    desc: 'OLED true black with high contrast',
-    preview: { bg: '#000000', panel: '#0a0a0a', border: '#1a1a1a', accent: '#f97316', text: '#f5f5f5' },
-  },
-  {
-    id: 'sunset-brand',
-    label: 'Sunset',
-    icon: '🌇',
-    desc: 'Warm brown brand immersion',
-    preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
-  },
-  {
-    id: 'hermes',
-    label: 'Hermes',
-    icon: '⚕',
-    desc: 'Nous Research deep blue',
-    preview: { bg: '#0A0E1A', panel: '#1A2240', border: 'rgba(48,80,255,0.18)', accent: '#3050FF', text: '#E8ECFF' },
-  },
-] as const
+const ENTERPRISE_THEMES = THEMES.map((theme) => ({
+  ...theme,
+  desc: theme.description,
+  preview:
+    theme.id === 'hermes-dark'
+      ? { bg: '#0d0f12', panel: '#1a1f26', border: '#2a313b', accent: '#b98a44', text: '#eceff4' }
+      : theme.id === 'hermes-slate'
+        ? { bg: '#0d1117', panel: '#1c2128', border: '#30363d', accent: '#7eb8f6', text: '#c9d1d9' }
+        : { bg: '#111111', panel: '#222222', border: '#333333', accent: '#aaaaaa', text: '#e6edf3' },
+}))
 
 function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['preview'] }) {
   return (
@@ -459,28 +421,15 @@ function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['pre
 function EnterpriseThemePicker() {
   const { updateSettings } = useSettings()
   const [current, setCurrent] = useState(() => {
-    if (typeof window === 'undefined') return 'paper-light'
-    const stored = localStorage.getItem('clawsuite-theme')
-    return ENTERPRISE_THEMES.some((theme) => theme.id === stored)
-      ? stored
-      : 'paper-light'
+    if (typeof window === 'undefined') return 'hermes-dark'
+    return getTheme()
   })
 
   function applyEnterpriseTheme(id: ThemeId) {
-    const html = document.documentElement
-    html.setAttribute('data-theme', id)
+    setTheme(id)
     if (DARK_ENTERPRISE_THEMES.has(id)) {
-      html.classList.add('dark')
-      html.classList.remove('light')
-      // Sync with settings store
       updateSettings({ theme: 'dark' })
-    } else {
-      html.classList.add('light')
-      html.classList.remove('dark')
-      // Sync with settings store
-      updateSettings({ theme: 'light' })
     }
-    localStorage.setItem('clawsuite-theme', id)
     setCurrent(id)
   }
 
