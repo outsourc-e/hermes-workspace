@@ -37,7 +37,14 @@ const APP_CSP = [
 
 const THEME_STORAGE_KEY = 'clawsuite-theme'
 const DEFAULT_THEME = 'hermes-dark'
-const VALID_THEMES = ['hermes-dark', 'hermes-slate', 'hermes-mono']
+const VALID_THEMES = [
+  'hermes-dark',
+  'hermes-dark-light',
+  'hermes-slate',
+  'hermes-slate-light',
+  'hermes-mono',
+  'hermes-mono-light',
+]
 
 const themeScript = `
 (() => {
@@ -69,11 +76,12 @@ const themeScript = `
     const root = document.documentElement
     const storedTheme = localStorage.getItem('${THEME_STORAGE_KEY}')
     const theme = ${JSON.stringify(VALID_THEMES)}.includes(storedTheme) ? storedTheme : '${DEFAULT_THEME}'
-    root.classList.add('dark')
-    root.classList.remove('light', 'system')
+    const isDark = !theme.endsWith('-light')
+    root.classList.remove('light', 'dark', 'system')
+    root.classList.add(isDark ? 'dark' : 'light')
     root.setAttribute('data-theme', theme)
     root.setAttribute('data-accent', 'orange')
-    root.style.setProperty('color-scheme', 'dark')
+    root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
   } catch {}
 })()
 `
@@ -82,7 +90,17 @@ const themeColorScript = `
 (() => {
   try {
     const root = document.documentElement
-    const nextColor = '#0d0f12'
+    const theme = root.getAttribute('data-theme') || '${DEFAULT_THEME}'
+    const colors = {
+      'hermes-dark': '#0d0f12',
+      'hermes-dark-light': '#F5F2ED',
+      'hermes-slate': '#0d1117',
+      'hermes-slate-light': '#F6F8FA',
+      'hermes-mono': '#111111',
+      'hermes-mono-light': '#FAFAFA',
+    }
+    const nextColor = colors[theme] || colors['${DEFAULT_THEME}']
+    const isDark = !String(theme).endsWith('-light')
 
     let meta = document.querySelector('meta[name="theme-color"]')
     if (!meta) {
@@ -91,7 +109,7 @@ const themeColorScript = `
       document.head.appendChild(meta)
     }
     meta.setAttribute('content', nextColor)
-    root.style.setProperty('color-scheme', 'dark')
+    root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
   } catch {}
 })()
 `
@@ -263,11 +281,26 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 txt = '#c9d1d9';
                 muted = '#8b949e';
                 accent = '#7eb8f6';
+              } else if (theme === 'hermes-dark-light') {
+                bg = '#F5F2ED';
+                txt = '#1a1f26';
+                muted = '#6F675E';
+                accent = '#b98a44';
+              } else if (theme === 'hermes-slate-light') {
+                bg = '#F6F8FA';
+                txt = '#24292f';
+                muted = '#57606A';
+                accent = '#3b82f6';
               } else if (theme === 'hermes-mono') {
                 bg = '#111111';
                 txt = '#e6edf3';
                 muted = '#888888';
                 accent = '#aaaaaa';
+              } else if (theme === 'hermes-mono-light') {
+                bg = '#FAFAFA';
+                txt = '#1a1a1a';
+                muted = '#666666';
+                accent = '#666666';
               }
             } catch(e){}
 

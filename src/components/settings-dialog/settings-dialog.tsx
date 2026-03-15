@@ -20,7 +20,14 @@ import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
-import { THEMES, getTheme, setTheme, type ThemeId } from '@/lib/theme'
+import {
+  THEMES,
+  getTheme,
+  getThemeVariant,
+  isDarkTheme,
+  setTheme,
+  type ThemeId,
+} from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -65,10 +72,11 @@ const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
   'hermes-mono',
 ])
 
-function isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
+function _isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
   if (!theme) return false
   return DARK_ENTERPRISE_THEMES.has(theme as ThemeId)
 }
+void _isDarkEnterpriseTheme
 
 // ── Shared building blocks ──────────────────────────────────────────────
 
@@ -267,17 +275,10 @@ function AppearanceContent() {
   function handleThemeChange(value: string) {
     const theme = value as SettingsThemeMode
     applyTheme(theme)
-    updateSettings({ theme })
-    
-    // If user switches to light/dark via the standard toggle, update enterprise theme too
-    const currentEnterpriseTheme = localStorage.getItem('clawsuite-theme')
-    if (theme === 'dark' || theme === 'light' || theme === 'system') {
-      const nextTheme = isDarkEnterpriseTheme(currentEnterpriseTheme)
-        ? currentEnterpriseTheme
-        : 'hermes-dark'
-      setTheme(nextTheme)
-      updateSettings({ theme: 'dark' })
+    if (theme === 'light' || theme === 'dark') {
+      setTheme(getThemeVariant(getTheme(), theme))
     }
+    updateSettings({ theme })
   }
 
   function badgeClass(color: AccentColor): string {
@@ -387,15 +388,27 @@ function AppearanceContent() {
   )
 }
 
+const ENTERPRISE_THEME_FAMILIES: ThemeId[] = [
+  'hermes-dark',
+  'hermes-slate',
+  'hermes-mono',
+]
+
 const ENTERPRISE_THEMES = THEMES.map((theme) => ({
   ...theme,
   desc: theme.description,
   preview:
     theme.id === 'hermes-dark'
       ? { bg: '#0d0f12', panel: '#1a1f26', border: '#2a313b', accent: '#b98a44', text: '#eceff4' }
+      : theme.id === 'hermes-dark-light'
+        ? { bg: '#F5F2ED', panel: '#FCFAF7', border: '#D8CCBC', accent: '#b98a44', text: '#1a1f26' }
       : theme.id === 'hermes-slate'
         ? { bg: '#0d1117', panel: '#1c2128', border: '#30363d', accent: '#7eb8f6', text: '#c9d1d9' }
-        : { bg: '#111111', panel: '#222222', border: '#333333', accent: '#aaaaaa', text: '#e6edf3' },
+        : theme.id === 'hermes-slate-light'
+          ? { bg: '#F6F8FA', panel: '#FFFFFF', border: '#D0D7DE', accent: '#3b82f6', text: '#24292f' }
+          : theme.id === 'hermes-mono'
+            ? { bg: '#111111', panel: '#222222', border: '#333333', accent: '#aaaaaa', text: '#e6edf3' }
+            : { bg: '#FAFAFA', panel: '#FFFFFF', border: '#D4D4D4', accent: '#666666', text: '#1a1a1a' },
 }))
 
 function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['preview'] }) {
@@ -424,18 +437,60 @@ function EnterpriseThemePicker() {
     if (typeof window === 'undefined') return 'hermes-dark'
     return getTheme()
   })
+  const currentMode = isDarkTheme(current) ? 'dark' : 'light'
+
+  useEffect(() => {
+    setCurrent(getTheme())
+  }, [])
 
   function applyEnterpriseTheme(id: ThemeId) {
     setTheme(id)
-    if (DARK_ENTERPRISE_THEMES.has(id)) {
-      updateSettings({ theme: 'dark' })
-    }
+    updateSettings({ theme: isDarkTheme(id) ? 'dark' : 'light' })
     setCurrent(id)
   }
 
+  function toggleEnterpriseThemeMode() {
+    const nextMode = currentMode === 'dark' ? 'light' : 'dark'
+    applyEnterpriseTheme(getThemeVariant(current, nextMode))
+  }
+
+  const visibleThemes = ENTERPRISE_THEME_FAMILIES.map((themeId) =>
+    ENTERPRISE_THEMES.find(
+      (theme) => theme.id === getThemeVariant(themeId, currentMode),
+    ),
+  ).filter(Boolean) as typeof ENTERPRISE_THEMES
+
   return (
-    <div className="grid w-full grid-cols-2 gap-2">
-      {ENTERPRISE_THEMES.map((t) => {
+    <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-lg border border-primary-200 bg-white px-3 py-2">
+        <div>
+          <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+            {currentMode === 'dark' ? 'Dark mode' : 'Light mode'}
+          </p>
+          <p className="text-[11px] text-primary-500 dark:text-neutral-400">
+            Toggle the current theme family between paired light and dark variants.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleEnterpriseThemeMode}
+          className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-900 transition-colors hover:bg-primary-100"
+          aria-label={
+            currentMode === 'dark'
+              ? 'Switch enterprise theme to light mode'
+              : 'Switch enterprise theme to dark mode'
+          }
+        >
+          <HugeiconsIcon
+            icon={currentMode === 'dark' ? Sun01Icon : Moon01Icon}
+            size={16}
+            strokeWidth={1.5}
+          />
+          {currentMode === 'dark' ? 'Light' : 'Dark'}
+        </button>
+      </div>
+      <div className="grid w-full grid-cols-2 gap-2">
+      {visibleThemes.map((t) => {
         const isActive = current === t.id
         return (
           <button
@@ -461,6 +516,7 @@ function EnterpriseThemePicker() {
           </button>
         )
       })}
+      </div>
     </div>
   )
 }

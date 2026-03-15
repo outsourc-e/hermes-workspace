@@ -786,6 +786,144 @@ code {
   --theme-input: #222222;
 }
 
+[data-theme="hermes-dark-light"] {
+  --theme-bg: #F5F2ED;
+  --theme-sidebar: #EEE8DF;
+  --theme-panel: #F0EBE4;
+  --theme-card: #FCFAF7;
+  --theme-card2: #F7F2EB;
+  --theme-border: #D8CCBC;
+  --theme-border-subtle: #E7DDD0;
+  --theme-text: #1a1f26;
+  --theme-muted: #6F675E;
+  --theme-shadow-1: 0 1px 2px rgba(31, 24, 18, 0.08);
+  --theme-shadow-2: 0 8px 24px rgba(31, 24, 18, 0.1);
+  --theme-shadow-3: 0 18px 40px rgba(31, 24, 18, 0.14);
+  --theme-glass: rgba(245, 242, 237, 0.84);
+  --theme-focus: #b98a44;
+  --theme-accent: #b98a44;
+  --theme-accent-secondary: #D3A45A;
+  --theme-accent-subtle: rgba(185, 138, 68, 0.12);
+  --theme-accent-border: rgba(185, 138, 68, 0.28);
+  --theme-active: #4C88C7;
+  --theme-link: #8E6428;
+  --theme-success: #3E8B59;
+  --theme-warning: #B67A24;
+  --theme-danger: #B55252;
+  --theme-stripe: rgba(216, 204, 188, 0.4);
+  --theme-header-bg: #F3EEE7;
+  --theme-header-border: #D8CCBC;
+  --chat-user-bg: #E9DFC9;
+  --chat-user-border: #C6A97A;
+  --chat-user-foreground: #2B2115;
+  --chat-assistant-bg: #FBF8F3;
+  --chat-assistant-border: #DCCFBE;
+  --chat-assistant-foreground: #1a1f26;
+  --composer-bg: #FFFCF8;
+  --composer-border: #D6C8B6;
+  --composer-placeholder: #7B7267;
+  --tool-card-bg: #F8F3EC;
+  --tool-card-border: #D7CAB7;
+  --tool-card-title: #2A2F36;
+  --tool-card-muted: #756B61;
+  --code-bg: #F4EEE6;
+  --code-border: #D8CCBC;
+  --code-foreground: #2B3139;
+  --theme-input: #FFFDF9;
+}
+
+[data-theme="hermes-slate-light"] {
+  --theme-bg: #F6F8FA;
+  --theme-sidebar: #F3F5F7;
+  --theme-panel: #EEF2F6;
+  --theme-card: #FFFFFF;
+  --theme-card2: #F6F8FA;
+  --theme-border: #D0D7DE;
+  --theme-border-subtle: #E2E8F0;
+  --theme-text: #24292f;
+  --theme-muted: #57606A;
+  --theme-shadow-1: 0 1px 2px rgba(36, 41, 47, 0.08);
+  --theme-shadow-2: 0 8px 24px rgba(36, 41, 47, 0.1);
+  --theme-shadow-3: 0 18px 40px rgba(36, 41, 47, 0.14);
+  --theme-glass: rgba(246, 248, 250, 0.84);
+  --theme-focus: #3b82f6;
+  --theme-accent: #3b82f6;
+  --theme-accent-secondary: #60A5FA;
+  --theme-accent-subtle: rgba(59, 130, 246, 0.12);
+  --theme-accent-border: rgba(59, 130, 246, 0.25);
+  --theme-active: #2563EB;
+  --theme-link: #2563EB;
+  --theme-success: #2DA44E;
+  --theme-warning: #BF8700;
+  --theme-danger: #CF222E;
+  --theme-stripe: rgba(208, 215, 222, 0.42);
+  --theme-header-bg: #F6F8FA;
+  --theme-header-border: #D0D7DE;
+  --chat-user-bg: #DBEAFE;
+  --chat-user-border: #93C5FD;
+  --chat-user-foreground: #1E3A8A;
+  --chat-assistant-bg: #FFFFFF;
+  --chat-assistant-border: #D8DEE4;
+  --chat-assistant-foreground: #24292f;
+  --composer-bg: #FFFFFF;
+  --composer-border: #D0D7DE;
+  --composer-placeholder: #6E7781;
+  --tool-card-bg: #F6F8FA;
+  --tool-card-border: #D0D7DE;
+  --tool-card-title: #1F2328;
+  --tool-card-muted: #57606A;
+  --code-bg: #F6F8FA;
+  --code-border: #D0D7DE;
+  --code-foreground: #1F2328;
+  --theme-input: #FFFFFF;
+}
+
+[data-theme="hermes-mono-light"] {
+  --theme-bg: #FAFAFA;
+  --theme-sidebar: #F5F5F5;
+  --theme-panel: #F0F0F0;
+  --theme-card: #FFFFFF;
+  --theme-card2: #F7F7F7;
+  --theme-border: #D4D4D4;
+  --theme-border-subtle: #E5E5E5;
+  --theme-text: #1a1a1a;
+  --theme-muted: #666666;
+  --theme-shadow-1: 0 1px 2px rgba(26, 26, 26, 0.06);
+  --theme-shadow-2: 0 8px 20px rgba(26, 26, 26, 0.09);
+  --theme-shadow-3: 0 18px 38px rgba(26, 26, 26, 0.12);
+  --theme-glass: rgba(250, 250, 250, 0.86);
+  --theme-focus: #666666;
+  --theme-accent: #666666;
+  --theme-accent-secondary: #8A8A8A;
+  --theme-accent-subtle: rgba(102, 102, 102, 0.1);
+  --theme-accent-border: rgba(102, 102, 102, 0.22);
+  --theme-active: #4A4A4A;
+  --theme-link: #4A4A4A;
+  --theme-success: #5C5C5C;
+  --theme-warning: #7A7A7A;
+  --theme-danger: #8A8A8A;
+  --theme-stripe: rgba(212, 212, 212, 0.38);
+  --theme-header-bg: #F5F5F5;
+  --theme-header-border: #D4D4D4;
+  --chat-user-bg: #ECECEC;
+  --chat-user-border: #C7C7C7;
+  --chat-user-foreground: #1a1a1a;
+  --chat-assistant-bg: #FFFFFF;
+  --chat-assistant-border: #DDDDDD;
+  --chat-assistant-foreground: #1a1a1a;
+  --composer-bg: #FFFFFF;
+  --composer-border: #D4D4D4;
+  --composer-placeholder: #7A7A7A;
+  --tool-card-bg: #F5F5F5;
+  --tool-card-border: #D6D6D6;
+  --tool-card-title: #1a1a1a;
+  --tool-card-muted: #666666;
+  --code-bg: #F5F5F5;
+  --code-border: #D4D4D4;
+  --code-foreground: #1a1a1a;
+  --theme-input: #FFFFFF;
+}
+
 [data-theme="hermes-dark"] html,
 [data-theme="hermes-dark"] body,
 [data-theme="hermes-dark"] #root,
@@ -798,6 +936,22 @@ code {
 [data-theme="hermes-mono"] body,
 [data-theme="hermes-mono"] #root,
 [data-theme="hermes-mono"] .dark {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+[data-theme="hermes-dark-light"] html,
+[data-theme="hermes-dark-light"] body,
+[data-theme="hermes-dark-light"] #root,
+[data-theme="hermes-dark-light"] .light,
+[data-theme="hermes-slate-light"] html,
+[data-theme="hermes-slate-light"] body,
+[data-theme="hermes-slate-light"] #root,
+[data-theme="hermes-slate-light"] .light,
+[data-theme="hermes-mono-light"] html,
+[data-theme="hermes-mono-light"] body,
+[data-theme="hermes-mono-light"] #root,
+[data-theme="hermes-mono-light"] .light {
   background-color: var(--theme-bg);
   color: var(--theme-text);
 }

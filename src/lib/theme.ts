@@ -1,4 +1,10 @@
-export type ThemeId = 'hermes-dark' | 'hermes-slate' | 'hermes-mono'
+export type ThemeId =
+  | 'hermes-dark'
+  | 'hermes-dark-light'
+  | 'hermes-slate'
+  | 'hermes-slate-light'
+  | 'hermes-mono'
+  | 'hermes-mono-light'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -13,10 +19,22 @@ export const THEMES: Array<{
     icon: '⚕',
   },
   {
+    id: 'hermes-dark-light',
+    label: 'Hermes Light',
+    description: 'Warm parchment with bronze accents',
+    icon: '☀',
+  },
+  {
     id: 'hermes-slate',
     label: 'Slate',
     description: 'Cool blue developer theme',
     icon: '🔷',
+  },
+  {
+    id: 'hermes-slate-light',
+    label: 'Slate Light',
+    description: 'GitHub-light palette with blue accents',
+    icon: '☀',
   },
   {
     id: 'hermes-mono',
@@ -24,18 +42,46 @@ export const THEMES: Array<{
     description: 'Clean monochrome grayscale',
     icon: '◐',
   },
+  {
+    id: 'hermes-mono-light',
+    label: 'Mono Light',
+    description: 'Bright monochrome grayscale',
+    icon: '☀',
+  },
 ]
 
 const STORAGE_KEY = 'clawsuite-theme'
 const DEFAULT_THEME: ThemeId = 'hermes-dark'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
+const LIGHT_THEME_MAP: Record<Exclude<ThemeId, `${string}-light`>, Extract<ThemeId, `${string}-light`>> = {
+  'hermes-dark': 'hermes-dark-light',
+  'hermes-slate': 'hermes-slate-light',
+  'hermes-mono': 'hermes-mono-light',
+}
+const DARK_THEME_MAP: Record<Extract<ThemeId, `${string}-light`>, Exclude<ThemeId, `${string}-light`>> = {
+  'hermes-dark-light': 'hermes-dark',
+  'hermes-slate-light': 'hermes-slate',
+  'hermes-mono-light': 'hermes-mono',
+}
 
 export function isValidTheme(value: string | null | undefined): value is ThemeId {
   return typeof value === 'string' && THEME_SET.has(value as ThemeId)
 }
 
-export function isDarkTheme(_theme: ThemeId): boolean {
-  return true
+export function isDarkTheme(theme: ThemeId): boolean {
+  return !theme.endsWith('-light')
+}
+
+export function getThemeVariant(theme: ThemeId, mode: 'light' | 'dark'): ThemeId {
+  if (mode === 'light') {
+    return isDarkTheme(theme)
+      ? LIGHT_THEME_MAP[theme as keyof typeof LIGHT_THEME_MAP]
+      : theme
+  }
+
+  return isDarkTheme(theme)
+    ? theme
+    : DARK_THEME_MAP[theme as keyof typeof DARK_THEME_MAP]
 }
 
 export function getTheme(): ThemeId {
@@ -47,8 +93,9 @@ export function getTheme(): ThemeId {
 export function setTheme(theme: ThemeId): void {
   const root = document.documentElement
   root.setAttribute('data-theme', theme)
-  root.classList.remove('light', 'system')
-  root.classList.add('dark')
-  root.style.setProperty('color-scheme', 'dark')
+  root.classList.remove('light', 'dark', 'system')
+  const nextMode = isDarkTheme(theme) ? 'dark' : 'light'
+  root.classList.add(nextMode)
+  root.style.setProperty('color-scheme', nextMode)
   localStorage.setItem(STORAGE_KEY, theme)
 }

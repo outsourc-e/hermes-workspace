@@ -109,6 +109,27 @@ const THEME_PREVIEWS: Record<
     accent: '#aaaaaa',
     text: '#e6edf3',
   },
+  'hermes-dark-light': {
+    bg: '#F5F2ED',
+    panel: '#FFFFFF',
+    border: '#D9D0C4',
+    accent: '#b98a44',
+    text: '#1a1f26',
+  },
+  'hermes-slate-light': {
+    bg: '#F6F8FA',
+    panel: '#FFFFFF',
+    border: '#D0D7DE',
+    accent: '#3b82f6',
+    text: '#1F2328',
+  },
+  'hermes-mono-light': {
+    bg: '#FAFAFA',
+    panel: '#FFFFFF',
+    border: '#D4D4D4',
+    accent: '#666666',
+    text: '#1a1a1a',
+  },
 }
 
 function WorkspaceThemePicker() {
