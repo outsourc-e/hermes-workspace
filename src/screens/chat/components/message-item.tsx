@@ -329,30 +329,44 @@ function formatToolDisplayLabel(
   const normalizedName = name.trim()
   const lowerName = normalizedName.toLowerCase()
 
-  if (lowerName === 'read') {
-    const filePath = readStringArg(args, 'file_path', 'path')
-    return filePath ? `read ${fileNameFromPath(filePath)}` : 'read'
+  if (lowerName === 'read' || lowerName === 'read_file') {
+    const filePath = readStringArg(args, 'file_path', 'path', 'target_file')
+    return filePath ? `read ${fileNameFromPath(filePath)}` : 'read file'
   }
 
-  if (lowerName === 'edit') {
-    const filePath = readStringArg(args, 'file_path', 'path')
-    return filePath ? `edit ${fileNameFromPath(filePath)}` : 'edit'
+  if (lowerName === 'edit' || lowerName === 'patch_file') {
+    const filePath = readStringArg(args, 'file_path', 'path', 'target_file')
+    return filePath ? `edit ${fileNameFromPath(filePath)}` : 'edit file'
   }
 
-  if (lowerName === 'write') {
-    const filePath = readStringArg(args, 'file_path', 'path')
-    return filePath ? `write ${fileNameFromPath(filePath)}` : 'write'
+  if (lowerName === 'write' || lowerName === 'write_file' || lowerName === 'create_file') {
+    const filePath = readStringArg(args, 'file_path', 'path', 'target_file')
+    return filePath ? `write ${fileNameFromPath(filePath)}` : 'write file'
   }
 
-  if (lowerName === 'browser') {
-    const action = readStringArg(args, 'action')
+  if (lowerName === 'search_files') {
+    const pattern = readStringArg(args, 'pattern', 'query', 'regex')
+    return pattern ? `search "${pattern}"` : 'search files'
+  }
+
+  if (lowerName === 'browser' || lowerName === 'browser_navigate') {
+    const action = readStringArg(args, 'action', 'url')
     return action ? `browser ${action}` : 'browser'
   }
 
-  if (lowerName === 'exec') return 'exec'
-  if (lowerName === 'memory_search') return 'memory search'
+  if (lowerName === 'terminal' || lowerName === 'exec') {
+    const cmd = readStringArg(args, 'command', 'cmd')
+    return cmd ? `exec ${cmd.length > 30 ? cmd.slice(0, 27) + '…' : cmd}` : 'exec'
+  }
+
+  if (lowerName === 'memory_search' || lowerName === 'session_search') return 'memory search'
+  if (lowerName === 'save_memory') return 'save memory'
+  if (lowerName === 'memory_get') return 'memory get'
   if (lowerName === 'web_search') return 'web search'
-  if (lowerName === 'web_fetch') return 'web fetch'
+  if (lowerName === 'web_fetch' || lowerName === 'web_extract') return 'web fetch'
+  if (lowerName === 'skill_view') return 'view skill'
+  if (lowerName === 'skill_manage') return 'manage skill'
+  if (lowerName === 'delegate_task') return 'delegate'
 
   return lowerName.replace(/_/g, ' ')
 }

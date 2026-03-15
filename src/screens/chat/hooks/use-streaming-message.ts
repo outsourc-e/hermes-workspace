@@ -444,6 +444,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           break
         }
         case 'error': {
+          // Ignore late error events after stream already completed
+          if (lifecyclePhaseRef.current === 'idle' || lifecyclePhaseRef.current === 'error') {
+            break
+          }
           const errorMessage =
             (payload as { message?: string }).message ?? 'Stream error'
           markFailed(errorMessage)
