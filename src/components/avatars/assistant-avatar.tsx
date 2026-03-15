@@ -12,7 +12,7 @@ type AvatarProps = {
 function AssistantAvatarComponent({ size = 28, className }: AvatarProps) {
   return (
     <img
-      src="/hermes-caduceus.png"
+      src="/hermes-avatar.webp"
       alt="Hermes"
       className={cn('shrink-0', className)}
       style={{
