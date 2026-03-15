@@ -67,7 +67,8 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
-  'hermes-dark',
+  'hermes-official',
+  'hermes-classic',
   'hermes-slate',
   'hermes-mono',
 ])
@@ -389,7 +390,8 @@ function AppearanceContent() {
 }
 
 const ENTERPRISE_THEME_FAMILIES: ThemeId[] = [
-  'hermes-dark',
+  'hermes-official',
+  'hermes-classic',
   'hermes-slate',
   'hermes-mono',
 ]
@@ -398,9 +400,13 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
   ...theme,
   desc: theme.description,
   preview:
-    theme.id === 'hermes-dark'
+    theme.id === 'hermes-official'
+      ? { bg: '#0A0E1A', panel: '#11182A', border: '#24304A', accent: '#6366F1', text: '#E6EAF2' }
+      : theme.id === 'hermes-official-light'
+        ? { bg: '#F6F8FC', panel: '#FFFFFF', border: '#D7DEEE', accent: '#4F46E5', text: '#111827' }
+        : theme.id === 'hermes-classic'
       ? { bg: '#0d0f12', panel: '#1a1f26', border: '#2a313b', accent: '#b98a44', text: '#eceff4' }
-      : theme.id === 'hermes-dark-light'
+      : theme.id === 'hermes-classic-light'
         ? { bg: '#F5F2ED', panel: '#FCFAF7', border: '#D8CCBC', accent: '#b98a44', text: '#1a1f26' }
       : theme.id === 'hermes-slate'
         ? { bg: '#0d1117', panel: '#1c2128', border: '#30363d', accent: '#7eb8f6', text: '#c9d1d9' }
@@ -434,7 +440,7 @@ function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['pre
 function EnterpriseThemePicker() {
   const { updateSettings } = useSettings()
   const [current, setCurrent] = useState(() => {
-    if (typeof window === 'undefined') return 'hermes-dark'
+    if (typeof window === 'undefined') return 'hermes-official'
     return getTheme()
   })
   const currentMode = isDarkTheme(current) ? 'dark' : 'light'

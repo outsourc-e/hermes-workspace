@@ -1,6 +1,8 @@
 export type ThemeId =
-  | 'hermes-dark'
-  | 'hermes-dark-light'
+  | 'hermes-official'
+  | 'hermes-official-light'
+  | 'hermes-classic'
+  | 'hermes-classic-light'
   | 'hermes-slate'
   | 'hermes-slate-light'
   | 'hermes-mono'
@@ -13,16 +15,28 @@ export const THEMES: Array<{
   icon: string
 }> = [
   {
-    id: 'hermes-dark',
-    label: 'Hermes Dark',
-    description: 'Bronze accents on dark charcoal',
+    id: 'hermes-official',
+    label: 'Hermes Official',
+    description: 'Navy and indigo flagship theme',
     icon: '⚕',
   },
   {
-    id: 'hermes-dark-light',
-    label: 'Hermes Light',
+    id: 'hermes-official-light',
+    label: 'Hermes Official Light',
+    description: 'Soft indigo light palette',
+    icon: '⚕',
+  },
+  {
+    id: 'hermes-classic',
+    label: 'Hermes Classic',
+    description: 'Bronze accents on dark charcoal',
+    icon: '🔶',
+  },
+  {
+    id: 'hermes-classic-light',
+    label: 'Classic Light',
     description: 'Warm parchment with bronze accents',
-    icon: '☀',
+    icon: '🔶',
   },
   {
     id: 'hermes-slate',
@@ -34,7 +48,7 @@ export const THEMES: Array<{
     id: 'hermes-slate-light',
     label: 'Slate Light',
     description: 'GitHub-light palette with blue accents',
-    icon: '☀',
+    icon: '🔷',
   },
   {
     id: 'hermes-mono',
@@ -46,30 +60,39 @@ export const THEMES: Array<{
     id: 'hermes-mono-light',
     label: 'Mono Light',
     description: 'Bright monochrome grayscale',
-    icon: '☀',
+    icon: '◐',
   },
 ]
 
 const STORAGE_KEY = 'clawsuite-theme'
-const DEFAULT_THEME: ThemeId = 'hermes-dark'
+const DEFAULT_THEME: ThemeId = 'hermes-official'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
 const LIGHT_THEME_MAP: Record<Exclude<ThemeId, `${string}-light`>, Extract<ThemeId, `${string}-light`>> = {
-  'hermes-dark': 'hermes-dark-light',
+  'hermes-official': 'hermes-official-light',
+  'hermes-classic': 'hermes-classic-light',
   'hermes-slate': 'hermes-slate-light',
   'hermes-mono': 'hermes-mono-light',
 }
 const DARK_THEME_MAP: Record<Extract<ThemeId, `${string}-light`>, Exclude<ThemeId, `${string}-light`>> = {
-  'hermes-dark-light': 'hermes-dark',
+  'hermes-official-light': 'hermes-official',
+  'hermes-classic-light': 'hermes-classic',
   'hermes-slate-light': 'hermes-slate',
   'hermes-mono-light': 'hermes-mono',
 }
+
+const LIGHT_THEMES = new Set<ThemeId>([
+  'hermes-official-light',
+  'hermes-classic-light',
+  'hermes-slate-light',
+  'hermes-mono-light',
+])
 
 export function isValidTheme(value: string | null | undefined): value is ThemeId {
   return typeof value === 'string' && THEME_SET.has(value as ThemeId)
 }
 
 export function isDarkTheme(theme: ThemeId): boolean {
-  return !theme.endsWith('-light')
+  return !LIGHT_THEMES.has(theme)
 }
 
 export function getThemeVariant(theme: ThemeId, mode: 'light' | 'dark'): ThemeId {

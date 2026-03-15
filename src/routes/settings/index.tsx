@@ -17,7 +17,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useSettings } from '@/hooks/use-settings'
-import { THEMES, getTheme, setTheme, type ThemeId } from '@/lib/theme'
+import { THEMES, getTheme, isDarkTheme, setTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -88,7 +88,21 @@ const THEME_PREVIEWS: Record<
   ThemeId,
   { bg: string; panel: string; border: string; accent: string; text: string }
 > = {
-  'hermes-dark': {
+  'hermes-official': {
+    bg: '#0A0E1A',
+    panel: '#11182A',
+    border: '#24304A',
+    accent: '#6366F1',
+    text: '#E6EAF2',
+  },
+  'hermes-official-light': {
+    bg: '#F6F8FC',
+    panel: '#FFFFFF',
+    border: '#D7DEEE',
+    accent: '#4F46E5',
+    text: '#111827',
+  },
+  'hermes-classic': {
     bg: '#0d0f12',
     panel: '#1a1f26',
     border: '#2a313b',
@@ -109,7 +123,7 @@ const THEME_PREVIEWS: Record<
     accent: '#aaaaaa',
     text: '#e6edf3',
   },
-  'hermes-dark-light': {
+  'hermes-classic-light': {
     bg: '#F5F2ED',
     panel: '#FFFFFF',
     border: '#D9D0C4',
@@ -138,7 +152,7 @@ function WorkspaceThemePicker() {
 
   function applyWorkspaceTheme(id: ThemeId) {
     setTheme(id)
-    updateSettings({ theme: 'dark' })
+    updateSettings({ theme: isDarkTheme(id) ? 'dark' : 'light' })
     setCurrent(id)
   }
 

@@ -647,7 +647,53 @@ code {
 }
 
 /* ── Hermes Workspace Themes ── */
-[data-theme="hermes-dark"] {
+[data-theme="hermes-official"] {
+  --theme-bg: #0A0E1A;
+  --theme-sidebar: #0D1220;
+  --theme-panel: #0D1220;
+  --theme-card: #11182A;
+  --theme-card2: #151D32;
+  --theme-border: #24304A;
+  --theme-border-subtle: #1B2740;
+  --theme-text: #E6EAF2;
+  --theme-muted: #9AA5BD;
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.52);
+  --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.62);
+  --theme-glass: rgba(10, 14, 26, 0.88);
+  --theme-focus: #818CF8;
+  --theme-accent: #6366F1;
+  --theme-accent-secondary: #818CF8;
+  --theme-accent-subtle: rgba(99, 102, 241, 0.14);
+  --theme-accent-border: rgba(99, 102, 241, 0.3);
+  --theme-active: #60A5FA;
+  --theme-link: #818CF8;
+  --theme-success: #22C55E;
+  --theme-warning: #F59E0B;
+  --theme-danger: #EF4444;
+  --theme-stripe: rgba(36, 48, 74, 0.48);
+  --theme-header-bg: #0D1220;
+  --theme-header-border: #24304A;
+  --chat-user-bg: #151D32;
+  --chat-user-border: #24304A;
+  --chat-user-foreground: #E6EAF2;
+  --chat-assistant-bg: #11182A;
+  --chat-assistant-border: #1B2740;
+  --chat-assistant-foreground: #E6EAF2;
+  --composer-bg: #0F1728;
+  --composer-border: #2A3550;
+  --composer-placeholder: #7D88A2;
+  --tool-card-bg: #0F1728;
+  --tool-card-border: #2A3550;
+  --tool-card-title: #E6EAF2;
+  --tool-card-muted: #9AA5BD;
+  --code-bg: #0F1728;
+  --code-border: #2A3550;
+  --code-foreground: #E6EAF2;
+  --theme-input: #0F1728;
+}
+
+[data-theme="hermes-classic"] {
   --theme-bg: #0d0f12;
   --theme-sidebar: #13171c;
   --theme-panel: #13171c;
@@ -786,7 +832,53 @@ code {
   --theme-input: #222222;
 }
 
-[data-theme="hermes-dark-light"] {
+[data-theme="hermes-official-light"] {
+  --theme-bg: #F6F8FC;
+  --theme-sidebar: #EEF2FF;
+  --theme-panel: #EEF2FF;
+  --theme-card: #FFFFFF;
+  --theme-card2: #F8FAFF;
+  --theme-border: #D7DEEE;
+  --theme-border-subtle: #E6EBF7;
+  --theme-text: #111827;
+  --theme-muted: #4B5563;
+  --theme-shadow-1: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --theme-shadow-2: 0 8px 20px rgba(17, 24, 39, 0.09);
+  --theme-shadow-3: 0 18px 38px rgba(17, 24, 39, 0.12);
+  --theme-glass: rgba(246, 248, 252, 0.86);
+  --theme-focus: #6366F1;
+  --theme-accent: #4F46E5;
+  --theme-accent-secondary: #6366F1;
+  --theme-accent-subtle: rgba(79, 70, 229, 0.1);
+  --theme-accent-border: rgba(79, 70, 229, 0.22);
+  --theme-active: #2563EB;
+  --theme-link: #4F46E5;
+  --theme-success: #16A34A;
+  --theme-warning: #D97706;
+  --theme-danger: #DC2626;
+  --theme-stripe: rgba(215, 222, 238, 0.38);
+  --theme-header-bg: #EEF2FF;
+  --theme-header-border: #D7DEEE;
+  --chat-user-bg: #EEF2FF;
+  --chat-user-border: #C7D2FE;
+  --chat-user-foreground: #111827;
+  --chat-assistant-bg: #FFFFFF;
+  --chat-assistant-border: #D7DEEE;
+  --chat-assistant-foreground: #111827;
+  --composer-bg: #FFFFFF;
+  --composer-border: #D7DEEE;
+  --composer-placeholder: #6B7280;
+  --tool-card-bg: #F3F6FF;
+  --tool-card-border: #D6DDF0;
+  --tool-card-title: #111827;
+  --tool-card-muted: #4B5563;
+  --code-bg: #F3F6FF;
+  --code-border: #D6DDF0;
+  --code-foreground: #111827;
+  --theme-input: #FFFFFF;
+}
+
+[data-theme="hermes-classic-light"] {
   --theme-bg: #F5F2ED;
   --theme-sidebar: #EEE8DF;
   --theme-panel: #F0EBE4;
@@ -924,10 +1016,14 @@ code {
   --theme-input: #FFFFFF;
 }
 
-[data-theme="hermes-dark"] html,
-[data-theme="hermes-dark"] body,
-[data-theme="hermes-dark"] #root,
-[data-theme="hermes-dark"] .dark,
+[data-theme="hermes-official"] html,
+[data-theme="hermes-official"] body,
+[data-theme="hermes-official"] #root,
+[data-theme="hermes-official"] .dark,
+[data-theme="hermes-classic"] html,
+[data-theme="hermes-classic"] body,
+[data-theme="hermes-classic"] #root,
+[data-theme="hermes-classic"] .dark,
 [data-theme="hermes-slate"] html,
 [data-theme="hermes-slate"] body,
 [data-theme="hermes-slate"] #root,
@@ -940,10 +1036,14 @@ code {
   color: var(--theme-text);
 }
 
-[data-theme="hermes-dark-light"] html,
-[data-theme="hermes-dark-light"] body,
-[data-theme="hermes-dark-light"] #root,
-[data-theme="hermes-dark-light"] .light,
+[data-theme="hermes-official-light"] html,
+[data-theme="hermes-official-light"] body,
+[data-theme="hermes-official-light"] #root,
+[data-theme="hermes-official-light"] .light,
+[data-theme="hermes-classic-light"] html,
+[data-theme="hermes-classic-light"] body,
+[data-theme="hermes-classic-light"] #root,
+[data-theme="hermes-classic-light"] .light,
 [data-theme="hermes-slate-light"] html,
 [data-theme="hermes-slate-light"] body,
 [data-theme="hermes-slate-light"] #root,
@@ -961,7 +1061,8 @@ code {
    to theme-appropriate values so ALL existing Tailwind classes work.
    Dark: 50=darkest surface, 950=lightest text (already set above) */
 
-[data-theme="hermes-dark"],
+[data-theme="hermes-official"],
+[data-theme="hermes-classic"],
 [data-theme="hermes-slate"],
 [data-theme="hermes-mono"] {
   --color-primary-50: var(--theme-panel);
@@ -986,7 +1087,8 @@ code {
 /* ── Tailwind primary token remaps for light themes ────────────────────
    Light: 50=lightest surface, 950=darkest text */
 
-[data-theme="hermes-dark-light"],
+[data-theme="hermes-official-light"],
+[data-theme="hermes-classic-light"],
 [data-theme="hermes-slate-light"],
 [data-theme="hermes-mono-light"] {
   --color-primary-50: var(--theme-card);
