@@ -71,8 +71,7 @@ import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
-import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
-import { useAgentViewStore } from '@/hooks/use-agent-view'
+import { InspectorPanel } from '@/components/inspector/inspector-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
@@ -395,8 +394,6 @@ export function ChatScreen({
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const mobileKeyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   void mobileKeyboardActive // kept for future use
-  const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
-  const setAgentViewOpen = useAgentViewStore((state) => state.setOpen)
   const isTerminalPanelOpen = useTerminalPanelStore(
     (state) => state.isPanelOpen,
   )
@@ -1096,7 +1093,7 @@ export function ChatScreen({
         setSending(false)
         if (isMissingGatewayAuth(messageText)) {
           try {
-            navigate({ to: '/connect', replace: true })
+            navigate({ to: '/', replace: true })
           } catch {
             /* router not ready */
           }
@@ -1299,7 +1296,7 @@ export function ChatScreen({
       return
     }
     if (isMissingGatewayAuth(messageText)) {
-      navigate({ to: '/connect', replace: true })
+      navigate({ to: '/', replace: true })
     }
     const message = sessionsError
       ? `Failed to load sessions. ${sessionsError}`
@@ -1339,7 +1336,7 @@ export function ChatScreen({
     if (!shouldRedirectToNew) return
     resetPendingSend()
     clearHistoryMessages(queryClient, activeFriendlyId, sessionKeyForHistory)
-    navigate({ to: '/new', replace: true })
+    navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' }, replace: true })
   }, [
     activeFriendlyId,
     historyQuery.isFetching,
@@ -2045,8 +2042,8 @@ export function ChatScreen({
   // Pull-to-refresh offset removed
 
   const handleOpenAgentDetails = useCallback(() => {
-    setAgentViewOpen(true)
-  }, [setAgentViewOpen])
+    // agent view panel removed
+  }, [])
 
   const handleRenameActiveSessionTitle = useCallback(
     async (nextTitle: string) => {
@@ -2060,10 +2057,10 @@ export function ChatScreen({
 
   // Listen for mobile header agent-details tap
   useEffect(() => {
-    const handler = () => setAgentViewOpen(true)
+    const handler = () => { /* agent view removed */ }
     window.addEventListener('clawsuite:chat-agent-details', handler)
     return () => window.removeEventListener('clawsuite:chat-agent-details', handler)
-  }, [setAgentViewOpen])
+  }, [])
 
   return (
     <div
@@ -2093,7 +2090,7 @@ export function ChatScreen({
         <main
           className={cn(
             'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
-            !compact && isAgentViewOpen && !isFocusMode ? 'min-[1024px]:mr-72' : 'mr-0',
+            'mr-0',
             (isRealtimeStreaming || hasPendingGeneration()) && 'chat-streaming-glow',
           )}
           style={{
@@ -2242,9 +2239,10 @@ export function ChatScreen({
             />
           ) : null}
         </main>
-        {!compact && !isFocusMode && <AgentViewPanel />}
+
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
+      <InspectorPanel />
 
       {suggestion && (
         <ModelSuggestionToast

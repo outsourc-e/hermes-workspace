@@ -93,7 +93,7 @@ export function SearchModal() {
         description: 'Start a new conversation session',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/new' })
+          navigate({ to: '/chat' })
         },
       },
       {

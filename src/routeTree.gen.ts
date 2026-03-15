@@ -9,39 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WorkspaceTeamsRouteImport } from './routes/workspace-teams'
-import { Route as WorkspaceSkillsRouteImport } from './routes/workspace-skills'
-import { Route as WorkspaceAgentsRouteImport } from './routes/workspace-agents'
-import { Route as WorkspaceRouteImport } from './routes/workspace'
-import { Route as WizardRouteImport } from './routes/wizard'
-import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
-import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionsRouteImport } from './routes/sessions'
-import { Route as RunsRouteImport } from './routes/runs'
-import { Route as ReviewRouteImport } from './routes/review'
-import { Route as ProjectsRouteImport } from './routes/projects'
-import { Route as PlanReviewRouteImport } from './routes/plan-review'
-import { Route as NodesRouteImport } from './routes/nodes'
-import { Route as NewProjectRouteImport } from './routes/new-project'
-import { Route as NewRouteImport } from './routes/new'
-import { Route as MissionConsoleRouteImport } from './routes/mission-console'
 import { Route as MemoryRouteImport } from './routes/memory'
-import { Route as LogsRouteImport } from './routes/logs'
-import { Route as InstancesRouteImport } from './routes/instances'
-import { Route as GatewayRouteImport } from './routes/gateway'
 import { Route as FilesRouteImport } from './routes/files'
-import { Route as DebugRouteImport } from './routes/debug'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CronRouteImport } from './routes/cron'
-import { Route as CostsRouteImport } from './routes/costs'
-import { Route as ConnectRouteImport } from './routes/connect'
-import { Route as ChannelsRouteImport } from './routes/channels'
-import { Route as BrowserRouteImport } from './routes/browser'
-import { Route as AgentsRouteImport } from './routes/agents'
-import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
@@ -173,44 +147,9 @@ import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from '.
 import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
-const WorkspaceTeamsRoute = WorkspaceTeamsRouteImport.update({
-  id: '/workspace-teams',
-  path: '/workspace-teams',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WorkspaceSkillsRoute = WorkspaceSkillsRouteImport.update({
-  id: '/workspace-skills',
-  path: '/workspace-skills',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WorkspaceAgentsRoute = WorkspaceAgentsRouteImport.update({
-  id: '/workspace-agents',
-  path: '/workspace-agents',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WorkspaceRoute = WorkspaceRouteImport.update({
-  id: '/workspace',
-  path: '/workspace',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WizardRoute = WizardRouteImport.update({
-  id: '/wizard',
-  path: '/wizard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UsageRoute = UsageRouteImport.update({
-  id: '/usage',
-  path: '/usage',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
   path: '/terminal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TasksRoute = TasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SkillsRoute = SkillsRouteImport.update({
@@ -228,64 +167,9 @@ const SessionsRoute = SessionsRouteImport.update({
   path: '/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RunsRoute = RunsRouteImport.update({
-  id: '/runs',
-  path: '/runs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReviewRoute = ReviewRouteImport.update({
-  id: '/review',
-  path: '/review',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsRoute = ProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlanReviewRoute = PlanReviewRouteImport.update({
-  id: '/plan-review',
-  path: '/plan-review',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NodesRoute = NodesRouteImport.update({
-  id: '/nodes',
-  path: '/nodes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewProjectRoute = NewProjectRouteImport.update({
-  id: '/new-project',
-  path: '/new-project',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewRoute = NewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MissionConsoleRoute = MissionConsoleRouteImport.update({
-  id: '/mission-console',
-  path: '/mission-console',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MemoryRoute = MemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LogsRoute = LogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InstancesRoute = InstancesRouteImport.update({
-  id: '/instances',
-  path: '/instances',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GatewayRoute = GatewayRouteImport.update({
-  id: '/gateway',
-  path: '/gateway',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -293,49 +177,9 @@ const FilesRoute = FilesRouteImport.update({
   path: '/files',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DebugRoute = DebugRouteImport.update({
-  id: '/debug',
-  path: '/debug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const CronRoute = CronRouteImport.update({
   id: '/cron',
   path: '/cron',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CostsRoute = CostsRouteImport.update({
-  id: '/costs',
-  path: '/costs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConnectRoute = ConnectRouteImport.update({
-  id: '/connect',
-  path: '/connect',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChannelsRoute = ChannelsRouteImport.update({
-  id: '/channels',
-  path: '/channels',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BrowserRoute = BrowserRouteImport.update({
-  id: '/browser',
-  path: '/browser',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentsRoute = AgentsRouteImport.update({
-  id: '/agents',
-  path: '/agents',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentSwarmRoute = AgentSwarmRouteImport.update({
-  id: '/agent-swarm',
-  path: '/agent-swarm',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ActivityRoute = ActivityRouteImport.update({
@@ -1017,39 +861,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/activity': typeof ActivityRoute
-  '/agent-swarm': typeof AgentSwarmRoute
-  '/agents': typeof AgentsRoute
-  '/browser': typeof BrowserRoute
-  '/channels': typeof ChannelsRoute
-  '/connect': typeof ConnectRoute
-  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
-  '/dashboard': typeof DashboardRoute
-  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
-  '/gateway': typeof GatewayRouteWithChildren
-  '/instances': typeof InstancesRoute
-  '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
-  '/mission-console': typeof MissionConsoleRoute
-  '/new': typeof NewRoute
-  '/new-project': typeof NewProjectRoute
-  '/nodes': typeof NodesRoute
-  '/plan-review': typeof PlanReviewRoute
-  '/projects': typeof ProjectsRoute
-  '/review': typeof ReviewRoute
-  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
-  '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
-  '/usage': typeof UsageRoute
-  '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRoute
-  '/workspace-agents': typeof WorkspaceAgentsRoute
-  '/workspace-skills': typeof WorkspaceSkillsRoute
-  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1182,38 +1000,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/activity': typeof ActivityRoute
-  '/agent-swarm': typeof AgentSwarmRoute
-  '/agents': typeof AgentsRoute
-  '/browser': typeof BrowserRoute
-  '/channels': typeof ChannelsRoute
-  '/connect': typeof ConnectRoute
-  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
-  '/dashboard': typeof DashboardRoute
-  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
-  '/gateway': typeof GatewayRouteWithChildren
-  '/instances': typeof InstancesRoute
-  '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
-  '/mission-console': typeof MissionConsoleRoute
-  '/new': typeof NewRoute
-  '/new-project': typeof NewProjectRoute
-  '/nodes': typeof NodesRoute
-  '/plan-review': typeof PlanReviewRoute
-  '/projects': typeof ProjectsRoute
-  '/review': typeof ReviewRoute
-  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
-  '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
-  '/usage': typeof UsageRoute
-  '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRoute
-  '/workspace-agents': typeof WorkspaceAgentsRoute
-  '/workspace-skills': typeof WorkspaceSkillsRoute
-  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1347,39 +1139,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/activity': typeof ActivityRoute
-  '/agent-swarm': typeof AgentSwarmRoute
-  '/agents': typeof AgentsRoute
-  '/browser': typeof BrowserRoute
-  '/channels': typeof ChannelsRoute
-  '/connect': typeof ConnectRoute
-  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
-  '/dashboard': typeof DashboardRoute
-  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
-  '/gateway': typeof GatewayRouteWithChildren
-  '/instances': typeof InstancesRoute
-  '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
-  '/mission-console': typeof MissionConsoleRoute
-  '/new': typeof NewRoute
-  '/new-project': typeof NewProjectRoute
-  '/nodes': typeof NodesRoute
-  '/plan-review': typeof PlanReviewRoute
-  '/projects': typeof ProjectsRoute
-  '/review': typeof ReviewRoute
-  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
-  '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
-  '/usage': typeof UsageRoute
-  '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRoute
-  '/workspace-agents': typeof WorkspaceAgentsRoute
-  '/workspace-skills': typeof WorkspaceSkillsRoute
-  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1514,39 +1280,13 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/activity'
-    | '/agent-swarm'
-    | '/agents'
-    | '/browser'
-    | '/channels'
-    | '/connect'
-    | '/costs'
     | '/cron'
-    | '/dashboard'
-    | '/debug'
     | '/files'
-    | '/gateway'
-    | '/instances'
-    | '/logs'
     | '/memory'
-    | '/mission-console'
-    | '/new'
-    | '/new-project'
-    | '/nodes'
-    | '/plan-review'
-    | '/projects'
-    | '/review'
-    | '/runs'
     | '/sessions'
     | '/settings'
     | '/skills'
-    | '/tasks'
     | '/terminal'
-    | '/usage'
-    | '/wizard'
-    | '/workspace'
-    | '/workspace-agents'
-    | '/workspace-skills'
-    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1679,38 +1419,12 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/activity'
-    | '/agent-swarm'
-    | '/agents'
-    | '/browser'
-    | '/channels'
-    | '/connect'
-    | '/costs'
     | '/cron'
-    | '/dashboard'
-    | '/debug'
     | '/files'
-    | '/gateway'
-    | '/instances'
-    | '/logs'
     | '/memory'
-    | '/mission-console'
-    | '/new'
-    | '/new-project'
-    | '/nodes'
-    | '/plan-review'
-    | '/projects'
-    | '/review'
-    | '/runs'
     | '/sessions'
     | '/skills'
-    | '/tasks'
     | '/terminal'
-    | '/usage'
-    | '/wizard'
-    | '/workspace'
-    | '/workspace-agents'
-    | '/workspace-skills'
-    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1843,39 +1557,13 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/activity'
-    | '/agent-swarm'
-    | '/agents'
-    | '/browser'
-    | '/channels'
-    | '/connect'
-    | '/costs'
     | '/cron'
-    | '/dashboard'
-    | '/debug'
     | '/files'
-    | '/gateway'
-    | '/instances'
-    | '/logs'
     | '/memory'
-    | '/mission-console'
-    | '/new'
-    | '/new-project'
-    | '/nodes'
-    | '/plan-review'
-    | '/projects'
-    | '/review'
-    | '/runs'
     | '/sessions'
     | '/settings'
     | '/skills'
-    | '/tasks'
     | '/terminal'
-    | '/usage'
-    | '/wizard'
-    | '/workspace'
-    | '/workspace-agents'
-    | '/workspace-skills'
-    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -2009,39 +1697,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   ActivityRoute: typeof ActivityRoute
-  AgentSwarmRoute: typeof AgentSwarmRoute
-  AgentsRoute: typeof AgentsRoute
-  BrowserRoute: typeof BrowserRoute
-  ChannelsRoute: typeof ChannelsRoute
-  ConnectRoute: typeof ConnectRoute
-  CostsRoute: typeof CostsRoute
   CronRoute: typeof CronRoute
-  DashboardRoute: typeof DashboardRoute
-  DebugRoute: typeof DebugRoute
   FilesRoute: typeof FilesRoute
-  GatewayRoute: typeof GatewayRouteWithChildren
-  InstancesRoute: typeof InstancesRoute
-  LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
-  MissionConsoleRoute: typeof MissionConsoleRoute
-  NewRoute: typeof NewRoute
-  NewProjectRoute: typeof NewProjectRoute
-  NodesRoute: typeof NodesRoute
-  PlanReviewRoute: typeof PlanReviewRoute
-  ProjectsRoute: typeof ProjectsRoute
-  ReviewRoute: typeof ReviewRoute
-  RunsRoute: typeof RunsRoute
   SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
-  TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
-  UsageRoute: typeof UsageRoute
-  WizardRoute: typeof WizardRoute
-  WorkspaceRoute: typeof WorkspaceRoute
-  WorkspaceAgentsRoute: typeof WorkspaceAgentsRoute
-  WorkspaceSkillsRoute: typeof WorkspaceSkillsRoute
-  WorkspaceTeamsRoute: typeof WorkspaceTeamsRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
@@ -2118,60 +1780,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/workspace-teams': {
-      id: '/workspace-teams'
-      path: '/workspace-teams'
-      fullPath: '/workspace-teams'
-      preLoaderRoute: typeof WorkspaceTeamsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/workspace-skills': {
-      id: '/workspace-skills'
-      path: '/workspace-skills'
-      fullPath: '/workspace-skills'
-      preLoaderRoute: typeof WorkspaceSkillsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/workspace-agents': {
-      id: '/workspace-agents'
-      path: '/workspace-agents'
-      fullPath: '/workspace-agents'
-      preLoaderRoute: typeof WorkspaceAgentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/workspace': {
-      id: '/workspace'
-      path: '/workspace'
-      fullPath: '/workspace'
-      preLoaderRoute: typeof WorkspaceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/wizard': {
-      id: '/wizard'
-      path: '/wizard'
-      fullPath: '/wizard'
-      preLoaderRoute: typeof WizardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/usage': {
-      id: '/usage'
-      path: '/usage'
-      fullPath: '/usage'
-      preLoaderRoute: typeof UsageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/terminal': {
       id: '/terminal'
       path: '/terminal'
       fullPath: '/terminal'
       preLoaderRoute: typeof TerminalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tasks': {
-      id: '/tasks'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof TasksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/skills': {
@@ -2195,88 +1808,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/runs': {
-      id: '/runs'
-      path: '/runs'
-      fullPath: '/runs'
-      preLoaderRoute: typeof RunsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/review': {
-      id: '/review'
-      path: '/review'
-      fullPath: '/review'
-      preLoaderRoute: typeof ReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects': {
-      id: '/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof ProjectsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/plan-review': {
-      id: '/plan-review'
-      path: '/plan-review'
-      fullPath: '/plan-review'
-      preLoaderRoute: typeof PlanReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/nodes': {
-      id: '/nodes'
-      path: '/nodes'
-      fullPath: '/nodes'
-      preLoaderRoute: typeof NodesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/new-project': {
-      id: '/new-project'
-      path: '/new-project'
-      fullPath: '/new-project'
-      preLoaderRoute: typeof NewProjectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/new': {
-      id: '/new'
-      path: '/new'
-      fullPath: '/new'
-      preLoaderRoute: typeof NewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mission-console': {
-      id: '/mission-console'
-      path: '/mission-console'
-      fullPath: '/mission-console'
-      preLoaderRoute: typeof MissionConsoleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/memory': {
       id: '/memory'
       path: '/memory'
       fullPath: '/memory'
       preLoaderRoute: typeof MemoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/logs': {
-      id: '/logs'
-      path: '/logs'
-      fullPath: '/logs'
-      preLoaderRoute: typeof LogsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/instances': {
-      id: '/instances'
-      path: '/instances'
-      fullPath: '/instances'
-      preLoaderRoute: typeof InstancesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/gateway': {
-      id: '/gateway'
-      path: '/gateway'
-      fullPath: '/gateway'
-      preLoaderRoute: typeof GatewayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/files': {
@@ -2286,67 +1822,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/debug': {
-      id: '/debug'
-      path: '/debug'
-      fullPath: '/debug'
-      preLoaderRoute: typeof DebugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/cron': {
       id: '/cron'
       path: '/cron'
       fullPath: '/cron'
       preLoaderRoute: typeof CronRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/costs': {
-      id: '/costs'
-      path: '/costs'
-      fullPath: '/costs'
-      preLoaderRoute: typeof CostsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/connect': {
-      id: '/connect'
-      path: '/connect'
-      fullPath: '/connect'
-      preLoaderRoute: typeof ConnectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/channels': {
-      id: '/channels'
-      path: '/channels'
-      fullPath: '/channels'
-      preLoaderRoute: typeof ChannelsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/browser': {
-      id: '/browser'
-      path: '/browser'
-      fullPath: '/browser'
-      preLoaderRoute: typeof BrowserRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agents': {
-      id: '/agents'
-      path: '/agents'
-      fullPath: '/agents'
-      preLoaderRoute: typeof AgentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agent-swarm': {
-      id: '/agent-swarm'
-      path: '/agent-swarm'
-      fullPath: '/agent-swarm'
-      preLoaderRoute: typeof AgentSwarmRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/activity': {
@@ -3262,17 +2742,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface GatewayRouteChildren {
-  GatewayLogsRoute: typeof GatewayLogsRoute
-}
-
-const GatewayRouteChildren: GatewayRouteChildren = {
-  GatewayLogsRoute: GatewayLogsRoute,
-}
-
-const GatewayRouteWithChildren =
-  GatewayRoute._addFileChildren(GatewayRouteChildren)
-
 interface SettingsRouteChildren {
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -3547,39 +3016,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   ActivityRoute: ActivityRoute,
-  AgentSwarmRoute: AgentSwarmRoute,
-  AgentsRoute: AgentsRoute,
-  BrowserRoute: BrowserRoute,
-  ChannelsRoute: ChannelsRoute,
-  ConnectRoute: ConnectRoute,
-  CostsRoute: CostsRoute,
   CronRoute: CronRoute,
-  DashboardRoute: DashboardRoute,
-  DebugRoute: DebugRoute,
   FilesRoute: FilesRoute,
-  GatewayRoute: GatewayRouteWithChildren,
-  InstancesRoute: InstancesRoute,
-  LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
-  MissionConsoleRoute: MissionConsoleRoute,
-  NewRoute: NewRoute,
-  NewProjectRoute: NewProjectRoute,
-  NodesRoute: NodesRoute,
-  PlanReviewRoute: PlanReviewRoute,
-  ProjectsRoute: ProjectsRoute,
-  ReviewRoute: ReviewRoute,
-  RunsRoute: RunsRoute,
   SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
-  TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
-  UsageRoute: UsageRoute,
-  WizardRoute: WizardRoute,
-  WorkspaceRoute: WorkspaceRoute,
-  WorkspaceAgentsRoute: WorkspaceAgentsRoute,
-  WorkspaceSkillsRoute: WorkspaceSkillsRoute,
-  WorkspaceTeamsRoute: WorkspaceTeamsRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,

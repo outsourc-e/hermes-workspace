@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { InspectorToggleButton } from '@/components/inspector/inspector-panel'
 
 function toTitleCase(value: string): string {
   return value
@@ -416,7 +417,7 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
-
+        <InspectorToggleButton className="ml-2" />
       </div>
     </div>
   )

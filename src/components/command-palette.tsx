@@ -11,8 +11,6 @@ import {
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
-  Folder01Icon,
-  ListViewIcon,
   Notification03Icon,
   PuzzleIcon,
   Settings01Icon,
@@ -113,13 +111,13 @@ export function CommandPalette({
 
   const runSlashCommand = (command: string) => {
     if (command === '/new') {
-      void navigate({ to: '/new' })
+      void navigate({ to: '/chat' })
       return
     }
 
     if (
       pathname.startsWith('/chat') ||
-      pathname === '/new' ||
+      pathname.startsWith('/chat') ||
       pathname === '/'
     ) {
       window.dispatchEvent(
@@ -131,7 +129,7 @@ export function CommandPalette({
     }
 
     window.sessionStorage.setItem(CHAT_PENDING_COMMAND_STORAGE_KEY, command)
-    void navigate({ to: '/new' })
+    void navigate({ to: '/chat' })
   }
 
   const screenActions = useMemo<Array<CommandAction>>(
@@ -143,7 +141,7 @@ export function CommandPalette({
         keywords: 'conversation new session home',
         shortcut: 'Go',
         icon: Chat01Icon,
-        onSelect: () => void navigate({ to: '/new' }),
+        onSelect: () => void navigate({ to: '/chat' }),
       },
       {
         id: 'screen-sessions',
@@ -153,42 +151,6 @@ export function CommandPalette({
         shortcut: 'Go',
         icon: UserMultipleIcon,
         onSelect: () => void navigate({ to: '/sessions' }),
-      },
-      {
-        id: 'screen-workspace',
-        group: 'Screens',
-        label: 'Workspace',
-        keywords: 'projects reviews runs teams',
-        shortcut: 'Go',
-        icon: Folder01Icon,
-        onSelect: () => void navigate({ to: '/workspace' }),
-      },
-      {
-        id: 'workspace-review',
-        group: 'Screens',
-        label: 'Review Queue',
-        keywords: 'checkpoints approve merge review workspace',
-        shortcut: 'Go',
-        icon: ListViewIcon,
-        onSelect: () => void navigate({ to: '/workspace', hash: 'review' }),
-      },
-      {
-        id: 'workspace-runs',
-        group: 'Screens',
-        label: 'Active Runs',
-        keywords: 'running tasks agents codex workspace',
-        shortcut: 'Go',
-        icon: CommandLineIcon,
-        onSelect: () => void navigate({ to: '/workspace', hash: 'runs' }),
-      },
-      {
-        id: 'workspace-agents',
-        group: 'Screens',
-        label: 'Agents Config',
-        keywords: 'codex claude ollama agent config workspace',
-        shortcut: 'Go',
-        icon: UserMultipleIcon,
-        onSelect: () => void navigate({ to: '/workspace', hash: 'agents' }),
       },
       {
         id: 'screen-skills',

@@ -699,6 +699,21 @@ function isImageAttachment(attachment: GatewayAttachment): boolean {
   return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)
 }
 
+const TOOL_ICONS: Record<string, string> = {
+  exec: '⚡',
+  Read: '📖',
+  read: '📖',
+  Write: '✏️',
+  write: '✏️',
+  Edit: '✏️',
+  edit: '✏️',
+  web_search: '🔍',
+  memory_search: '🧠',
+  memory_get: '🧠',
+  browser: '🌐',
+  image: '🖼️',
+}
+
 function InlineToolSectionItem({
   toolSection,
   index,
@@ -709,95 +724,133 @@ function InlineToolSectionItem({
   forceOpen?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [showRawJson, setShowRawJson] = useState(false)
   useEffect(() => {
     if (forceOpen) setOpen(true)
   }, [forceOpen])
-  return renderInlineToolSection(toolSection, index, open, setOpen)
-}
 
-function renderInlineToolSection(
-  toolSection: InlineToolSection,
-  index: number,
-  toolCallsOpen: boolean,
-  setToolCallsOpen: (open: boolean) => void,
-) {
-  const icons: Record<string, string> = {
-    exec: '⚡',
-    Read: '📖',
-    read: '📖',
-    Write: '✏️',
-    write: '✏️',
-    Edit: '✏️',
-    edit: '✏️',
-    web_search: '🔍',
-    memory_search: '🧠',
-    memory_get: '🧠',
-    browser: '🌐',
-    image: '🖼️',
-  }
-  const icon = icons[toolSection.type] ?? '🔧'
+  const icon = TOOL_ICONS[toolSection.type] ?? '🔧'
   const isError = toolSection.state === 'output-error'
+  const isRunning = toolSection.state === 'input-available' || toolSection.state === 'input-streaming'
+  const isDone = toolSection.state === 'output-available'
   const headerArg = toolSection.input
     ? keyArgLabel(toolSection.type, toolSection.input)
     : null
-  const toolDisplayLabel = formatToolDisplayLabel(
-    toolSection.type,
-    toolSection.input,
-  )
+  const toolDisplayLabel = formatToolDisplayLabel(toolSection.type, toolSection.input)
   const headerArgTruncated =
-    headerArg && headerArg.length > 80
-      ? `${headerArg.slice(0, 77)}…`
-      : headerArg
+    headerArg && headerArg.length > 60 ? `${headerArg.slice(0, 57)}…` : headerArg
+
+  const rawJsonPayload = JSON.stringify(
+    { type: toolSection.type, input: toolSection.input ?? {}, output: toolSection.outputText || toolSection.errorText || null },
+    null,
+    2,
+  )
 
   return (
     <Collapsible
       key={toolSection.key || `${toolSection.type}-${index}`}
-      open={toolCallsOpen}
-      onOpenChange={setToolCallsOpen}
+      open={open}
+      onOpenChange={setOpen}
     >
+      {/* ── Collapsed row ── */}
       <CollapsibleTrigger className={cn(
-        'w-full justify-start gap-1.5 rounded-md bg-transparent px-2 py-1.5 text-[11px] font-mono',
+        'w-full justify-start gap-1.5 rounded-md bg-transparent px-2 py-1 text-[11px] font-mono',
         'hover:bg-primary-50 dark:hover:bg-primary-800/60',
         'data-panel-open:bg-primary-50/60 dark:data-panel-open:bg-primary-800/40',
-        isError
-          ? 'text-red-500 dark:text-red-400'
-          : 'text-neutral-500 dark:text-neutral-400',
+        isError ? 'text-red-500 dark:text-red-400' : 'text-neutral-500 dark:text-neutral-400',
       )}>
-        <span className="shrink-0 transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
-        <span className="shrink-0">{icon} {toolDisplayLabel}</span>
+        {/* chevron */}
+        <span className="shrink-0 text-[9px] transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
+        {/* icon + name */}
+        <span className="shrink-0">{icon}</span>
+        <span className="shrink-0 font-semibold">{toolDisplayLabel}</span>
+        {/* summary arg */}
         {headerArgTruncated && headerArgTruncated !== toolDisplayLabel ? (
-          <span className="truncate opacity-50">{headerArgTruncated}</span>
+          <span className="truncate opacity-40 text-[10px]">{headerArgTruncated}</span>
         ) : null}
-        {isError ? <span className="ml-auto shrink-0 text-red-400">✗ error</span> : null}
-        {!isError && toolSection.state === 'output-available' ? (
-          <span className="ml-auto shrink-0 opacity-40">✓</span>
-        ) : null}
-      </CollapsibleTrigger>
-      <CollapsiblePanel>
-        <div className="mt-0.5 ml-2 flex flex-col gap-1.5 pb-1">
-          {toolSection.type === 'exec' && headerArg ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-800 px-2 py-1 text-[11px] font-mono text-amber-300 dark:bg-neutral-950">
-              $ {headerArg}
-            </pre>
-          ) : null}
-          {isError && toolSection.errorText ? (
-            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded bg-red-950/40 p-2 text-xs font-mono text-red-300">
-              {toolSection.errorText}
-            </pre>
-          ) : toolSection.outputText ? (
-            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-xs font-mono text-neutral-200 dark:bg-neutral-950">
-              {toolSection.outputText}
-            </pre>
-          ) : toolSection.state === 'input-available' ? (
-            <span className="text-xs italic text-neutral-400">running…</span>
-          ) : (
-            <span className="text-xs italic text-neutral-400">no output</span>
+        {/* status badge */}
+        <span className="ml-auto shrink-0">
+          {isError && (
+            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-sans font-medium bg-red-950/40 text-red-400">
+              error
+            </span>
           )}
+          {isRunning && (
+            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-sans font-medium bg-amber-950/30 text-amber-400 animate-pulse">
+              running
+            </span>
+          )}
+          {isDone && (
+            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-sans font-medium bg-emerald-950/30 text-emerald-500">
+              ✓ done
+            </span>
+          )}
+        </span>
+      </CollapsibleTrigger>
+
+      {/* ── Expanded section ── */}
+      <CollapsiblePanel>
+        <div className="mt-0.5 ml-3 flex flex-col gap-1.5 pb-1.5 border-l border-neutral-800/60 pl-2">
+          {/* Args */}
+          {toolSection.input && Object.keys(toolSection.input).length > 0 && !showRawJson ? (
+            <div>
+              <div className="text-[9px] uppercase tracking-widest text-neutral-500 mb-0.5 font-sans">Arguments</div>
+              {toolSection.type === 'exec' && headerArg ? (
+                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-800 px-2 py-1 text-[11px] font-mono text-amber-300 dark:bg-neutral-950">
+                  $ {headerArg}
+                </pre>
+              ) : (
+                <pre className="max-h-32 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-[11px] font-mono text-neutral-300 dark:bg-neutral-950">
+                  {JSON.stringify(toolSection.input, null, 2)}
+                </pre>
+              )}
+            </div>
+          ) : null}
+
+          {/* Output / error */}
+          {!showRawJson ? (
+            isError && toolSection.errorText ? (
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">Error</div>
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded bg-red-950/40 p-2 text-xs font-mono text-red-300">
+                  {toolSection.errorText}
+                </pre>
+              </div>
+            ) : toolSection.outputText ? (
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-neutral-500 mb-0.5 font-sans">Result</div>
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-xs font-mono text-neutral-200 dark:bg-neutral-950">
+                  {toolSection.outputText.length > 800
+                    ? `${toolSection.outputText.slice(0, 800)}…`
+                    : toolSection.outputText}
+                </pre>
+              </div>
+            ) : isRunning ? (
+              <span className="text-xs italic text-neutral-400">running…</span>
+            ) : (
+              <span className="text-xs italic text-neutral-400">no output</span>
+            )
+          ) : (
+            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-[11px] font-mono text-neutral-400 dark:bg-neutral-950">
+              {rawJsonPayload}
+            </pre>
+          )}
+
+          {/* Raw JSON toggle */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowRawJson((v) => !v) }}
+            className="self-start text-[9px] font-sans text-neutral-500 hover:text-neutral-300 transition-colors"
+          >
+            {showRawJson ? '← formatted' : 'raw JSON →'}
+          </button>
         </div>
       </CollapsiblePanel>
     </Collapsible>
   )
 }
+
+
 
 function MessageItemComponent({
   message,
