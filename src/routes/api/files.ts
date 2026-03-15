@@ -21,7 +21,7 @@ const execFileAsync = promisify(execFile)
 
 const WORKSPACE_ROOT = (
   process.env.OPENCLAW_WORKSPACE_DIR ||
-  path.join(os.homedir(), '.openclaw', 'workspace')
+  path.join(os.homedir(), '.hermes')
 ).trim()
 
 type FileEntry = {

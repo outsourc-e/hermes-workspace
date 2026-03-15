@@ -1,17 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { gatewayRpc } from '../../server/gateway'
 import { requireJsonContentType } from '../../server/rate-limit'
-
-type SessionsPatchResponse = {
-  ok?: boolean
-  resolved?: {
-    modelProvider?: string
-    model?: string
-  }
-  [key: string]: unknown
-}
 
 export const Route = createFileRoute('/api/model-switch')({
   server: {
@@ -22,44 +12,15 @@ export const Route = createFileRoute('/api/model-switch')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
-        try {
-          const body = (await request.json().catch(() => ({}))) as Record<
-            string,
-            unknown
-          >
-          const rawSessionKey =
-            typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
-          const sessionKey = rawSessionKey
-          const model = typeof body.model === 'string' ? body.model.trim() : ''
-
-          if (!sessionKey) {
-            return json(
-              { ok: false, error: 'sessionKey required' },
-              { status: 400 },
-            )
-          }
-          if (!model) {
-            return json({ ok: false, error: 'model required' }, { status: 400 })
-          }
-
-          const payload = await gatewayRpc<SessionsPatchResponse>(
-            'sessions.patch',
-            {
-              key: sessionKey,
-              model,
-            },
-          )
-
-          return json(payload)
-        } catch (err) {
-          return json(
-            {
-              ok: false,
-              error: err instanceof Error ? err.message : String(err),
-            },
-            { status: 500 },
-          )
-        }
+        const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+        const model = typeof body.model === 'string' ? body.model.trim() : ''
+        return json({
+          ok: true,
+          resolved: {
+            modelProvider: model.includes('/') ? model.split('/')[0] : 'hermes-agent',
+            model: model.includes('/') ? model.split('/').slice(1).join('/') : model,
+          },
+        })
       },
     },
   },

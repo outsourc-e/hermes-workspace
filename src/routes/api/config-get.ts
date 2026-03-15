@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { gatewayRpc } from '../../server/gateway'
+
+const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
 export const Route = createFileRoute('/api/config-get')({
   server: {
@@ -11,9 +12,12 @@ export const Route = createFileRoute('/api/config-get')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          const result = await gatewayRpc<{ defaultModel?: string }>(
-            'config.get',
-          )
+          const response = await fetch(`${HERMES_API_URL}/api/config`)
+          if (!response.ok) {
+            const body = await response.text().catch(() => '')
+            throw new Error(body || `Hermes config request failed (${response.status})`)
+          }
+          const result = (await response.json()) as { defaultModel?: string }
           return json({ ok: true, payload: result })
         } catch (err) {
           return json(

@@ -9,21 +9,14 @@ export type ServiceHealthItem = {
   latencyMs?: number
 }
 
-type GatewayStatusResponse = {
-  ok?: boolean
-}
-
-type GatewayNodesResponse = {
-  ok?: boolean
-  data?: unknown
-}
-
 type ServicesHealthProbe = {
   missionControlApi: { status: 'up' | 'down'; latencyMs?: number }
   clawSuiteUi: { status: 'up' | 'down'; latencyMs?: number }
   gateway: { status: 'up' | 'down'; latencyMs?: number }
   ollama: { status: 'up' | 'down'; latencyMs?: number }
 }
+
+const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now()
@@ -64,21 +57,10 @@ async function timedJsonFetch<T>(
   }
 }
 
-function extractNodeCount(value: unknown): number {
-  if (Array.isArray(value)) return value.length
-  if (!value || typeof value !== 'object') return 0
-  const record = value as Record<string, unknown>
-  if (Array.isArray(record.nodes)) return record.nodes.length
-  if (Array.isArray(record.items)) return record.items.length
-  if (Array.isArray(record.data)) return record.data.length
-  return 0
-}
-
 async function fetchServicesHealthProbe(): Promise<ServicesHealthProbe> {
-  const [uiProbe, gatewayStatus, gatewayNodes] = await Promise.all([
+  const [uiProbe, hermesHealth] = await Promise.all([
     timedJsonFetch<Record<string, unknown>>('/api/ping', 2500),
-    timedJsonFetch<GatewayStatusResponse>('/api/gateway/status', 2500),
-    timedJsonFetch<GatewayNodesResponse>('/api/gateway/nodes', 2500),
+    timedJsonFetch<Record<string, unknown>>(`${HERMES_API_URL}/health`, 2500),
   ])
 
   const clawSuiteUi = uiProbe.ok
@@ -86,27 +68,19 @@ async function fetchServicesHealthProbe(): Promise<ServicesHealthProbe> {
     : { status: 'down' as const, latencyMs: uiProbe.latencyMs }
 
   const missionControlApi =
-    gatewayStatus.ok && gatewayStatus.data?.ok === true
-      ? { status: 'up' as const, latencyMs: gatewayStatus.latencyMs }
-      : { status: 'down' as const, latencyMs: gatewayStatus.latencyMs }
+    hermesHealth.ok
+      ? { status: 'up' as const, latencyMs: hermesHealth.latencyMs }
+      : { status: 'down' as const, latencyMs: hermesHealth.latencyMs }
 
-  const gateway = gatewayStatus.ok
-    ? { status: 'up' as const, latencyMs: gatewayStatus.latencyMs }
-    : { status: 'down' as const, latencyMs: gatewayStatus.latencyMs }
+  const gateway = hermesHealth.ok
+    ? { status: 'up' as const, latencyMs: hermesHealth.latencyMs }
+    : { status: 'down' as const, latencyMs: hermesHealth.latencyMs }
 
-  const hasOllamaNodes =
-    gatewayNodes.ok &&
-    gatewayNodes.data?.ok === true &&
-    extractNodeCount(gatewayNodes.data.data) > 0
-
-  const ollamaProbe = hasOllamaNodes
-    ? await timedJsonFetch<{ ok?: boolean }>('/api/ollama-health', 2500)
-    : null
-
+  const ollamaProbe = await timedJsonFetch<{ ok?: boolean }>('/api/ollama-health', 2500)
   const ollama =
-    hasOllamaNodes && ollamaProbe?.ok && ollamaProbe.data?.ok === true
+    ollamaProbe.ok && ollamaProbe.data?.ok === true
       ? { status: 'up' as const, latencyMs: ollamaProbe.latencyMs }
-      : { status: 'down' as const, latencyMs: ollamaProbe?.latencyMs ?? gatewayNodes.latencyMs }
+      : { status: 'down' as const, latencyMs: ollamaProbe.latencyMs }
 
   return { missionControlApi, clawSuiteUi, gateway, ollama }
 }
@@ -130,7 +104,7 @@ export function useServicesHealth(gatewayConnected: boolean) {
         latencyMs: probe?.clawSuiteUi.latencyMs,
       },
       {
-        name: 'OpenClaw Gateway',
+        name: 'Hermes Agent',
         status: isChecking
           ? 'checking'
           : (probe?.gateway.status ?? (gatewayConnected ? 'up' : 'down')),

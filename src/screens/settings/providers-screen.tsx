@@ -18,7 +18,6 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
-import { fetchModels } from '@/lib/gateway-api'
 import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
 import {
   getProviderDisplayName,
@@ -85,6 +84,97 @@ type SaveSettingPayload = {
   path: string
   value: unknown
   label: string
+}
+
+const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+
+type HermesCatalogEntry =
+  | string
+  | {
+      id: string
+      provider: string
+      name: string
+      [key: string]: unknown
+    }
+
+function isHermesCatalogEntry(
+  entry: HermesCatalogEntry | null,
+): entry is HermesCatalogEntry {
+  return entry !== null
+}
+
+async function fetchModels(): Promise<{
+  ok?: boolean
+  models?: Array<GatewayModelCatalogEntry>
+  configuredProviders?: Array<string>
+}> {
+  const response = await fetch(`${HERMES_API_URL}/v1/models`)
+  if (!response.ok) {
+    throw new Error(`Hermes models request failed (${response.status})`)
+  }
+
+  const payload = (await response.json()) as
+    | Array<unknown>
+    | { data?: Array<Record<string, unknown>>; models?: Array<Record<string, unknown>> }
+  const rawModels = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload.data)
+      ? payload.data
+      : Array.isArray(payload.models)
+        ? payload.models
+        : []
+
+  const models = rawModels
+    .map((entry) => {
+      if (typeof entry === 'string') return entry
+      if (!entry || typeof entry !== 'object') return null
+      const record = entry as Record<string, unknown>
+      const id =
+        typeof record.id === 'string'
+          ? record.id.trim()
+          : typeof record.name === 'string'
+            ? record.name.trim()
+            : typeof record.model === 'string'
+              ? record.model.trim()
+              : ''
+      if (!id) return null
+      const provider =
+        typeof record.provider === 'string' && record.provider.trim()
+          ? record.provider.trim()
+          : typeof record.owned_by === 'string' && record.owned_by.trim()
+            ? record.owned_by.trim()
+            : id.includes('/')
+              ? id.split('/')[0]
+              : 'hermes-agent'
+
+      return {
+        ...record,
+        id,
+        provider,
+        name:
+          typeof record.name === 'string' && record.name.trim()
+            ? record.name.trim()
+            : typeof record.display_name === 'string' && record.display_name.trim()
+              ? record.display_name.trim()
+              : typeof record.label === 'string' && record.label.trim()
+                ? record.label.trim()
+                : id,
+      }
+    })
+    .filter(isHermesCatalogEntry)
+
+  const configuredProviders = Array.from(
+    new Set(
+      models.flatMap((entry) => {
+        if (typeof entry === 'string') return []
+        return typeof entry.provider === 'string' && entry.provider
+          ? [entry.provider]
+          : []
+      }),
+    ),
+  )
+
+  return { ok: true, models: models as Array<GatewayModelCatalogEntry>, configuredProviders }
 }
 
 const TAB_ORDER: Array<{ id: SettingsTabId; label: string }> = [

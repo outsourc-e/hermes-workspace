@@ -1,137 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { writeFile, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
-import { discoverGateway, discoverGatewayUrl } from '../../server/gateway-discovery'
 
 export const Route = createFileRoute('/api/gateway-discover')({
   server: {
     handlers: {
-      /**
-       * POST /api/gateway-discover
-       *
-       * Auto-discover local OpenClaw gateway, configure .env, and test connection.
-       * Returns { ok, url, source, error } — if ok=true, gateway is ready to use.
-       */
-      POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
-        const csrfCheck = requireJsonContentType(request)
-        if (csrfCheck) return csrfCheck
-        try {
-          const body = (await request.json().catch(() => ({}))) as { mode?: string }
-          const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : ''
-
-          if (mode === 'scan') {
-            // Try full discovery first (config file + CLI = gets token too)
-            const fullResult = await discoverGateway()
-            if (fullResult.found && fullResult.url) {
-              return json({
-                ok: true,
-                url: fullResult.url,
-                token: fullResult.token,
-                source: fullResult.source,
-              })
-            }
-            // Fall back to port scan
-            const scanResult = await discoverGatewayUrl()
-            if (!scanResult.found || !scanResult.url) {
-              return json({
-                ok: false,
-                source: scanResult.source || fullResult.source,
-                error: scanResult.error || fullResult.error || 'No gateway found',
-              })
-            }
-
-            return json({
-              ok: true,
-              url: scanResult.url,
-              source: scanResult.source,
-            })
-          }
-
-          const result = await discoverGateway()
-
-          if (!result.found) {
-            return json({
-              ok: false,
-              url: result.url,
-              source: result.source,
-              error: result.error || 'No gateway found',
-              portOpen: Boolean(result.url),
-            })
-          }
-
-          // Write discovered config to .env so it persists across restarts
-          const envPath = join(process.cwd(), '.env')
-          let envContent = ''
-
-          try {
-            envContent = await readFile(envPath, 'utf-8')
-          } catch {
-            try {
-              envContent = await readFile(join(process.cwd(), '.env.example'), 'utf-8')
-            } catch {
-              envContent = ''
-            }
-          }
-
-          if (result.url) {
-            if (envContent.match(/^CLAWDBOT_GATEWAY_URL=/m)) {
-              envContent = envContent.replace(
-                /^CLAWDBOT_GATEWAY_URL=.*/m,
-                `CLAWDBOT_GATEWAY_URL=${result.url}`,
-              )
-            } else {
-              envContent += `\nCLAWDBOT_GATEWAY_URL=${result.url}`
-            }
-          }
-
-          if (result.token) {
-            if (envContent.match(/^CLAWDBOT_GATEWAY_TOKEN=/m)) {
-              envContent = envContent.replace(
-                /^CLAWDBOT_GATEWAY_TOKEN=.*/m,
-                `CLAWDBOT_GATEWAY_TOKEN=${result.token}`,
-              )
-            } else {
-              envContent += `\nCLAWDBOT_GATEWAY_TOKEN=${result.token}`
-            }
-          }
-
-          // Only write .env if content actually changed — avoids Vite restart loops
-          let existingContent = ''
-          try { existingContent = await readFile(envPath, 'utf-8') } catch { /* */ }
-          if (envContent !== existingContent) {
-            await writeFile(envPath, envContent, 'utf-8')
-          }
-
-          // Now test the actual connection
-          const { gatewayConnectCheck } = await import('../../server/gateway')
-          try {
-            await gatewayConnectCheck()
-            return json({
-              ok: true,
-              url: result.url,
-              source: result.source,
-            })
-          } catch (connErr) {
-            return json({
-              ok: false,
-              url: result.url,
-              source: result.source,
-              error: `Found config but connection failed: ${connErr instanceof Error ? connErr.message : String(connErr)}`,
-            })
-          }
-        } catch (err) {
-          return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
-            { status: 500 },
-          )
-        }
-      },
+      POST: async () =>
+        json(
+          { ok: false, error: 'Gateway discovery is not available in Hermes Workspace.' },
+          { status: 501 },
+        ),
     },
   },
 })

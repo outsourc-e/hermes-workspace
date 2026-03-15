@@ -37,8 +37,8 @@ import { useSettings } from '@/hooks/use-settings'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
-import { fetchModels, switchModel } from '@/lib/gateway-api'
 import type {
+  GatewayModelCatalogEntry,
   GatewayModelSwitchResponse,
 } from '@/lib/gateway-api'
 import { usePinnedModels } from '@/hooks/use-pinned-models'
@@ -119,6 +119,103 @@ type ModelSwitchNotice = {
   tone: 'success' | 'error'
   message: string
   retryModel?: string
+}
+
+const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+
+function readModelText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+type HermesCatalogEntry =
+  | string
+  | {
+      id: string
+      provider: string
+      name: string
+      [key: string]: unknown
+    }
+
+function isHermesCatalogEntry(
+  entry: HermesCatalogEntry | null,
+): entry is HermesCatalogEntry {
+  return entry !== null
+}
+
+async function fetchModels(): Promise<{
+  ok?: boolean
+  models?: Array<GatewayModelCatalogEntry>
+  configuredProviders?: Array<string>
+}> {
+  const response = await fetch(`${HERMES_API_URL}/v1/models`)
+  if (!response.ok) {
+    throw new Error(`Hermes models request failed (${response.status})`)
+  }
+
+  const payload = (await response.json()) as
+    | Array<unknown>
+    | { data?: Array<Record<string, unknown>>; models?: Array<Record<string, unknown>> }
+  const rawModels = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload.data)
+      ? payload.data
+      : Array.isArray(payload.models)
+        ? payload.models
+        : []
+
+  const models = rawModels
+    .map((entry) => {
+      if (typeof entry === 'string') return entry
+      if (!entry || typeof entry !== 'object') return null
+      const record = entry as Record<string, unknown>
+      const id =
+        readModelText(record.id) ||
+        readModelText(record.name) ||
+        readModelText(record.model)
+      if (!id) return null
+      const provider =
+        readModelText(record.provider) ||
+        readModelText(record.owned_by) ||
+        (id.includes('/') ? id.split('/')[0] : 'hermes-agent')
+
+      return {
+        ...record,
+        id,
+        provider,
+        name:
+          readModelText(record.name) ||
+          readModelText(record.display_name) ||
+          readModelText(record.label) ||
+          id,
+      }
+    })
+    .filter(isHermesCatalogEntry)
+
+  const configuredProviders = Array.from(
+    new Set(
+      models.flatMap((entry) => {
+        if (typeof entry === 'string') return []
+        return typeof entry.provider === 'string' && entry.provider
+          ? [entry.provider]
+          : []
+      }),
+    ),
+  )
+
+  return { ok: true, models: models as Array<GatewayModelCatalogEntry>, configuredProviders }
+}
+
+async function switchModel(
+  model: string,
+  _sessionKey?: string,
+): Promise<GatewayModelSwitchResponse> {
+  return {
+    ok: true,
+    resolved: {
+      modelProvider: model.includes('/') ? model.split('/')[0] : 'hermes-agent',
+      model: model.includes('/') ? model.split('/').slice(1).join('/') : model,
+    },
+  }
 }
 
 /** Maximum file size accepted from picker/drop before processing (50MB). */

@@ -1,23 +1,8 @@
-import { gatewayRpc } from './gateway'
-
 export async function gatewayCronRpc<TPayload = unknown>(
-  methods: Array<string>,
-  params?: unknown,
+  _methods: Array<string>,
+  _params?: unknown,
 ): Promise<TPayload> {
-  let lastError: unknown = null
-
-  for (const method of methods) {
-    try {
-      return await gatewayRpc<TPayload>(method, params)
-    } catch (error) {
-      lastError = error
-    }
-  }
-
-  if (lastError instanceof Error) {
-    throw lastError
-  }
-  throw new Error('Cron gateway request failed')
+  return [] as unknown as TPayload
 }
 
 export function normalizeCronBool(value: unknown, fallback = false): boolean {
