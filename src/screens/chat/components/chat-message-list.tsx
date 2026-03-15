@@ -409,7 +409,7 @@ function ChatMessageListComponent({
       ...contentStyle,
       paddingBottom:
         contentStyle?.paddingBottom ??
-        'calc(var(--chat-composer-height, 96px) + var(--safe-b) + 20px)',
+        'calc(var(--chat-composer-height, 56px) + var(--safe-b) + 8px)',
     }
   }, [contentStyle, isMobileViewport])
 
