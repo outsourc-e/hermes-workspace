@@ -66,7 +66,7 @@ export function getConnectionErrorMessage(
   switch (kind) {
     case 'clawsuite_auth_required':
       return {
-        title: 'ClawSuite Login Required',
+        title: 'Hermes Workspace Login Required',
         description: 'This instance requires a password to access.',
         action: 'Enter your password to continue',
       }
@@ -87,7 +87,7 @@ export function getConnectionErrorMessage(
     case 'gateway_unreachable':
       return {
         title: 'Gateway unreachable',
-        description: 'ClawSuite cannot reach the configured OpenClaw gateway.',
+        description: 'Hermes Workspace cannot reach the configured OpenClaw gateway.',
         action: 'Check that OpenClaw is running and the gateway URL is correct.',
       }
     case 'handshake_failed':

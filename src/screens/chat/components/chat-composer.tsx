@@ -1615,7 +1615,7 @@ function ChatComposerComponent({
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&
-            'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(249,115,22,0.35)] animate-pulse-glow',
+            'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(48,80,255,0.35)] animate-pulse-glow',
         )}
         onPaste={handlePaste}
         onDragEnter={handleDragEnter}

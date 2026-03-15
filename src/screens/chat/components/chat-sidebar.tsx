@@ -47,7 +47,6 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { UserAvatar } from '@/components/avatars'
 import { SEARCH_MODAL_EVENTS, useSearchModal } from '@/hooks/use-search-modal'
 import {
@@ -1099,8 +1098,8 @@ function ChatSidebarComponent({
                   'w-full pl-1.5 justify-start',
                 )}
               >
-                <OpenClawStudioIcon className="size-5 rounded-lg overflow-hidden" />
-                ClawSuite
+                <img src="/hermes-icon.png" alt="Hermes" className="size-5 rounded-lg" />
+                Hermes Workspace
               </Link>
             </motion.div>
           ) : null}

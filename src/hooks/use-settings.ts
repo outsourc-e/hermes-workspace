@@ -33,7 +33,7 @@ export const defaultStudioSettings: StudioSettings = {
   gatewayUrl: '',
   gatewayToken: '',
   theme: 'system',
-  accentColor: 'orange',
+  accentColor: 'blue',
   editorFontSize: 13,
   editorWordWrap: true,
   editorMinimap: false,
@@ -121,8 +121,8 @@ export function applyTheme(theme: SettingsThemeMode) {
   if (resolvedDark) {
     // Preserve user's enterprise dark theme if set, otherwise default to ops-dark
     const stored = localStorage.getItem('clawsuite-theme')
-    const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
-    root.setAttribute('data-theme', darkThemes.includes(stored ?? '') ? (stored as string) : 'ops-dark')
+    const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand', 'hermes']
+    root.setAttribute('data-theme', darkThemes.includes(stored ?? '') ? (stored as string) : 'hermes')
   } else {
     root.setAttribute('data-theme', 'paper-light')
   }

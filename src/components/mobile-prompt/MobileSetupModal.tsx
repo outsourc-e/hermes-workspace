@@ -79,7 +79,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
   const steps = [
     {
       title: 'Install Tailscale on your desktop',
-      body: 'Install Tailscale on the machine running ClawSuite, then sign in.',
+      body: 'Install Tailscale on the machine running Hermes Workspace, then sign in.',
       showTailscaleIcon: true,
       action: (
         <a
@@ -148,7 +148,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       ),
     },
     {
-      title: 'Open ClawSuite on your phone',
+      title: 'Open Hermes Workspace on your phone',
       body: networkUrl?.source === 'tailscale'
         ? 'Your Tailscale address — open this on your phone browser.'
         : networkUrl?.source === 'lan'

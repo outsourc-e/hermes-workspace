@@ -69,7 +69,7 @@ function generateMarkdown(report: ExportableMissionReport): string {
   }
 
   lines.push('---')
-  lines.push(`*Exported from ClawSuite Agent Hub on ${new Date().toLocaleString()}*`)
+  lines.push(`*Exported from Hermes Workspace Agent Hub on ${new Date().toLocaleString()}*`)
 
   return lines.join('\n')
 }

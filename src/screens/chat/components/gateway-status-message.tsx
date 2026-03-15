@@ -25,7 +25,7 @@ function classifyConnectionError(
   if (!normalizedError && !status) {
     return {
       title: 'Not connected',
-      description: "ClawSuite can't reach the gateway.",
+      description: "Hermes Workspace can't reach the gateway.",
       action: 'Check that OpenClaw is running, then try again.',
     }
   }

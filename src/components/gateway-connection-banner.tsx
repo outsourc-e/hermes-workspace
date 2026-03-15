@@ -72,8 +72,8 @@ export function GatewayConnectionSetupForm({
     >
       <div className={cn('flex gap-3', isBanner ? 'items-start' : 'items-start sm:items-center')}>
         <img
-          src="/logo-icon.png"
-          alt="ClawSuite logo"
+          src="/hermes-icon.png"
+          alt="Hermes Workspace logo"
           width={isBanner ? 24 : 32}
           height={isBanner ? 24 : 32}
           className={cn(

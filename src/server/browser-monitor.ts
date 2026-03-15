@@ -97,7 +97,7 @@ function getDemoTabs(): Array<BrowserTab> {
   return [
     {
       id: 'demo-tab-1',
-      title: 'ClawSuite',
+      title: 'Hermes Workspace',
       url: 'https://openclaw.local/studio',
       isActive: true,
     },

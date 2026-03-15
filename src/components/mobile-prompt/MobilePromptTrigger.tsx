@@ -113,7 +113,7 @@ export function MobilePromptTrigger() {
               <div className="min-w-0 flex-1 text-center">
                 <p className="text-sm font-semibold text-white">Set up mobile access</p>
                 <p className="text-xs text-primary-300">
-                  Connect your phone to this ClawSuite instance in a few steps.
+                  Connect your phone to this Hermes Workspace instance in a few steps.
                 </p>
               </div>
 

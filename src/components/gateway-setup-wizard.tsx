@@ -44,7 +44,7 @@ const CLOUD_PLAN_OPTIONS: Array<{
     plan: 'free',
     name: 'Free',
     price: '$0/mo',
-    description: 'Try ClawSuite Cloud with free AI models',
+    description: 'Try Hermes Workspace Cloud with free AI models',
     cta: 'Start Free',
   },
   {
@@ -283,7 +283,7 @@ function GatewayStepContent() {
     const normalizedEmail = waitlistEmail.trim()
     if (!normalizedEmail) {
       setCloudProvisionStatus('error')
-      setCloudProvisionError('Enter your email to provision a ClawSuite Cloud gateway.')
+      setCloudProvisionError('Enter your email to provision a Hermes Workspace Cloud gateway.')
       return
     }
 
@@ -309,7 +309,7 @@ function GatewayStepContent() {
         const errorMessage =
           data && 'error' in data && typeof data.error === 'string'
             ? data.error
-            : 'Failed to provision your free ClawSuite Cloud gateway.'
+            : 'Failed to provision your free Hermes Workspace Cloud gateway.'
         setCloudProvisionStatus('error')
         setCloudProvisionError(errorMessage)
         return
@@ -329,7 +329,7 @@ function GatewayStepContent() {
       setCloudProvisionStatus('success')
     } catch {
       setCloudProvisionStatus('error')
-      setCloudProvisionError('Failed to provision your free ClawSuite Cloud gateway.')
+      setCloudProvisionError('Failed to provision your free Hermes Workspace Cloud gateway.')
     }
   }
 
@@ -392,15 +392,15 @@ function GatewayStepContent() {
       <div className="mb-6 flex flex-col items-center text-center">
         <div className="mb-4 flex size-20 items-center justify-center rounded-2xl shadow-lg">
           <img
-            src="/logo-icon.png"
-            alt="ClawSuite logo"
+            src="/hermes-icon.png"
+            alt="Hermes Workspace logo"
             width={64}
             height={64}
             className="size-16"
           />
         </div>
         <h2 className="mb-2 text-2xl font-semibold text-primary-900">
-          Welcome to ClawSuite
+          Welcome to Hermes Workspace
         </h2>
         <p className="max-w-md text-sm leading-relaxed text-primary-600">
           Your AI command center
@@ -425,7 +425,7 @@ function GatewayStepContent() {
           />
           <SetupModeCard
             icon={CloudIcon}
-            title="ClawSuite Cloud"
+            title="Hermes Workspace Cloud"
             description="No setup needed. Managed hosting with one click. (Coming soon)"
             selected={setupMode === 'cloud'}
             onClick={() => handleSetupModeChange('cloud')}
@@ -438,7 +438,7 @@ function GatewayStepContent() {
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="text-base font-semibold text-primary-900">
-                  ClawSuite Cloud Plans
+                  Hermes Workspace Cloud Plans
                 </h3>
                 <p className="mt-1 text-sm text-primary-600">
                   Use this email as your Cloud login, then start free or continue to
@@ -582,7 +582,7 @@ function GatewayStepContent() {
             <div className="mb-4">
               <h3 className="text-base font-semibold text-primary-900">Setting up local gateway</h3>
               <p className="mt-1 text-sm text-primary-600">
-                ClawSuite is installing and starting OpenClaw in the background.
+                Hermes Workspace is installing and starting OpenClaw in the background.
               </p>
             </div>
 

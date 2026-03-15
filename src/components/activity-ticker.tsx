@@ -23,7 +23,7 @@ const TIPS = [
     emoji: '🧠',
     text: 'Your agent has memory — it remembers context across sessions',
   },
-  { emoji: '🚀', text: 'ClawSuite works with any OpenClaw gateway instance' },
+  { emoji: '🚀', text: 'Hermes Workspace works with any OpenClaw gateway instance' },
   {
     emoji: '🎯',
     text: 'Pin important sessions to keep them at the top of your sidebar',

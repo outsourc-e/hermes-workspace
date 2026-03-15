@@ -1,5 +1,5 @@
 /**
- * Sound Notification System for ClawSuite
+ * Sound Notification System for Hermes Workspace
  * Uses Web Audio API to synthesize unique sounds without audio files.
  */
 

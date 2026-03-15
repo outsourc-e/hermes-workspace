@@ -39,8 +39,8 @@ const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
   
-  // Gateway connection via ClawSuite server proxy.
-  // Clients connect to /ws-gateway on the ClawSuite server (same host:port as the page).
+  // Gateway connection via Hermes Workspace server proxy.
+  // Clients connect to /ws-gateway on the Hermes Workspace server (same host:port as the page).
   // The server proxies internally to ws://127.0.0.1:18789 — so phone/LAN/Docker
   // users never need direct access to port 18789.
   // Manual override: set gatewayUrl in settings to skip proxy (e.g. wss:// remote).
@@ -52,7 +52,7 @@ const themeScript = `
       if (manualUrl && typeof manualUrl === 'string' && manualUrl.startsWith('ws')) {
         window.__GATEWAY_URL__ = manualUrl
       } else {
-        // Use proxy path — works from any device that can reach ClawSuite
+        // Use proxy path — works from any device that can reach Hermes Workspace
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
         window.__GATEWAY_URL__ = proto + '//' + window.location.host + '/ws-gateway'
       }
@@ -89,7 +89,7 @@ const themeScript = `
     }
     const root = document.documentElement
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    // ClawSuite theme class + data-theme attribute
+    // Hermes Workspace theme class + data-theme attribute
     const enterpriseTheme = localStorage.getItem('clawsuite-theme')
     const isValidEnterpriseTheme =
       enterpriseTheme === 'ops-dark' ||
@@ -169,7 +169,7 @@ export const Route = createRootRoute({
           'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual',
       },
       {
-        title: 'ClawSuite',
+        title: 'Hermes Workspace',
       },
       {
         name: 'description',
@@ -340,7 +340,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             d.id = 'splash-screen';
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.8s ease;';
             d.innerHTML = '<div style="width:96px;height:96px;margin-bottom:20px;filter:drop-shadow(0 8px 32px rgba(249,115,22,0.5))"><svg width="96" height="96" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sOB" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ea580c"/><stop offset="50%" stop-color="#f97316"/><stop offset="100%" stop-color="#fb923c"/></linearGradient></defs><rect x="5" y="5" width="90" height="90" rx="16" fill="url(#sOB)"/><rect x="20" y="25" width="60" height="50" rx="4" stroke="#1e293b" stroke-width="3" fill="none"/><circle cx="28" cy="32" r="2.5" fill="#1e293b"/><circle cx="37" cy="32" r="2.5" fill="#1e293b"/><circle cx="46" cy="32" r="2.5" fill="#1e293b"/><path d="M38 45L32 50L38 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M62 45L68 50L62 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="47" y="46" width="4" height="10" rx="2" fill="#1e293b"><animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/></rect></svg></div>'
-              + '<div style="font:700 24px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.06em;color:'+txt+'">ClawSuite</div>'
+              + '<div style="font:700 24px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.06em;color:'+txt+'">Hermes Workspace</div>'
               + '<div style="margin-top:10px;font:italic 13px/1 system-ui,-apple-system,sans-serif;color:'+muted+'">'+quip+'</div>'
               + '<div style="margin-top:28px;width:140px;height:3px;background:#1e293b;border-radius:3px;overflow:hidden"><div id=splash-bar style="width:0%;height:100%;background:linear-gradient(90deg,#ea580c,#f97316,#fb923c);border-radius:3px;transition:width 0.4s ease"></div></div>';
             document.body.prepend(d);

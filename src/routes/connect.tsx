@@ -11,7 +11,7 @@ function ConnectRoute() {
       <div className="max-w-2xl mx-auto px-6 py-10 space-y-10">
         <div className="space-y-3">
           <h1 className="text-3xl font-medium tracking-[-0.02em] text-center mb-10">
-            Connect to ClawSuite
+            Connect to Hermes Workspace
           </h1>
           <p className="text-primary-700">
             This client needs access to your OpenClaw gateway before you can

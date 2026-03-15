@@ -270,7 +270,7 @@ export async function fetchClaudeUsage(): Promise<ProviderUsageResult> {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         'anthropic-beta': 'oauth-2025-04-20',
-        'User-Agent': 'ClawSuite',
+        'User-Agent': 'Hermes Workspace',
       },
     })
   } catch (e) {
@@ -295,7 +295,7 @@ export async function fetchClaudeUsage(): Promise<ProviderUsageResult> {
             Accept: 'application/json',
             'Content-Type': 'application/json',
             'anthropic-beta': 'oauth-2025-04-20',
-            'User-Agent': 'ClawSuite',
+            'User-Agent': 'Hermes Workspace',
           },
         })
       }
@@ -568,7 +568,7 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     Accept: 'application/json',
-    'User-Agent': 'ClawSuite',
+    'User-Agent': 'Hermes Workspace',
   }
   if (auth.tokens.account_id) {
     headers['ChatGPT-Account-Id'] = auth.tokens.account_id

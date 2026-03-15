@@ -6,7 +6,7 @@ export const tourSteps: Step[] = [
   {
     target: 'body',
     placement: 'center',
-    title: 'Welcome to ClawSuite! 👋',
+    title: 'Welcome to Hermes Workspace! 👋',
     content: (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
         <OpenClawStudioIcon className="size-12 rounded-xl shadow-sm" />
@@ -63,7 +63,7 @@ export const tourSteps: Step[] = [
     placement: 'right',
     title: 'Built-in Terminal',
     content:
-      'Built-in terminal for quick commands. Execute shell commands without leaving ClawSuite.',
+      'Built-in terminal for quick commands. Execute shell commands without leaving Hermes Workspace.',
   },
   // Step 9: Usage Meter (in header)
   {
@@ -79,7 +79,7 @@ export const tourSteps: Step[] = [
     placement: 'right',
     title: 'Settings & Customization',
     content:
-      'Configure providers, themes, accent colors, and more. Make ClawSuite yours.',
+      'Configure providers, themes, accent colors, and more. Make Hermes Workspace yours.',
   },
   // Step 11: Finish
   {
@@ -87,6 +87,6 @@ export const tourSteps: Step[] = [
     placement: 'center',
     title: "You're all set! 🎉",
     content:
-      'Start chatting with your AI, explore the tools, and customize ClawSuite to fit your workflow. Need help? Press ? to see all keyboard shortcuts.',
+      'Start chatting with your AI, explore the tools, and customize Hermes Workspace to fit your workflow. Need help? Press ? to see all keyboard shortcuts.',
   },
 ]

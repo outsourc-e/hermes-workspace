@@ -47,7 +47,7 @@ export async function launchBrowser(): Promise<BrowserState> {
   isLaunching = true
   try {
     const pw = await getPlaywright()
-    // Headless browser — rendered inside ClawSuite via CDP screencast
+    // Headless browser — rendered inside Hermes Workspace via CDP screencast
     browserInstance = await pw.chromium.launch({
       headless: true,
       args: [

@@ -1,5 +1,5 @@
 /**
- * React hook for sound notifications in ClawSuite
+ * React hook for sound notifications in Hermes Workspace
  * Integrates with the agent swarm store to auto-play sounds on state changes
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react'

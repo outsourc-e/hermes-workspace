@@ -63,7 +63,7 @@ const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
   'ops-dark',
   'premium-dark',
   'sunset-brand',
-])
+  'hermes',])
 
 function isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
   if (!theme) return false
@@ -426,6 +426,13 @@ const ENTERPRISE_THEMES = [
     icon: '🌇',
     desc: 'Warm brown brand immersion',
     preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
+  },
+  {
+    id: 'hermes',
+    label: 'Hermes',
+    icon: '⚕',
+    desc: 'Nous Research deep blue',
+    preview: { bg: '#0A0E1A', panel: '#1A2240', border: 'rgba(48,80,255,0.18)', accent: '#3050FF', text: '#E8ECFF' },
   },
 ] as const
 
@@ -839,7 +846,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 Settings
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Configure ClawSuite
+                Configure Hermes Workspace
               </DialogDescription>
             </div>
             <DialogClose

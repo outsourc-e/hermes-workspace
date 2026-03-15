@@ -125,7 +125,7 @@ export function useServicesHealth(gatewayConnected: boolean) {
 
     return [
       {
-        name: 'ClawSuite UI',
+        name: 'Hermes Workspace UI',
         status: isChecking ? 'checking' : (probe?.clawSuiteUi.status ?? 'down'),
         latencyMs: probe?.clawSuiteUi.latencyMs,
       },

@@ -260,7 +260,7 @@ export function UpdateNotifier() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">
                 {phase === 'idle' || phase === 'error'
-                  ? 'ClawSuite Update'
+                  ? 'Hermes Workspace Update'
                   : PHASE_LABELS[phase]}
               </p>
               <p className="text-xs text-primary-400 truncate">

@@ -6,7 +6,7 @@
  * 2. Falling back to `openclaw config get` CLI commands
  * 3. Probing default port 18789
  *
- * This lets ClawSuite connect seamlessly without manual config.
+ * This lets Hermes Workspace connect seamlessly without manual config.
  */
 
 import { readFile } from 'node:fs/promises'

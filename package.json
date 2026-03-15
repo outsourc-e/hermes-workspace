@@ -1,7 +1,7 @@
 {
-  "name": "clawsuite",
-  "version": "4.0.0",
-  "description": "Supercharged dashboard for OpenClaw AI agents — chat, file explorer, terminal, and usage tracking",
+  "name": "hermes-workspace",
+  "version": "1.0.0-hackathon",
+  "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
   "repository": {

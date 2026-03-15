@@ -56,7 +56,7 @@ export async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
     const data = (await response.json()) as { ok?: boolean; error?: string }
     return { ok: Boolean(data.ok), error: data.error }
   } catch {
-    return { ok: false, error: 'Could not reach ClawSuite server' }
+    return { ok: false, error: 'Could not reach Hermes Workspace server' }
   }
 }
 
@@ -354,7 +354,7 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
 
     set({
       testStatus: 'error',
-      testError: error || 'Gateway not reachable after saving config. You may need to restart ClawSuite.',
+      testError: error || 'Gateway not reachable after saving config. You may need to restart Hermes Workspace.',
     })
     return false
   },

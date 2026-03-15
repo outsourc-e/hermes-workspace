@@ -45,7 +45,6 @@ import { useVisibleWidgets } from './hooks/use-visible-widgets'
 import { useDashboardData, buildUsageSummaryText } from './hooks/use-dashboard-data'
 import { formatMoney, formatRelativeTime } from './lib/formatters'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { DashboardOverflowPanel } from '@/components/dashboard-overflow-panel'
@@ -643,7 +642,7 @@ export function DashboardScreen() {
                     className="shrink-0 cursor-pointer rounded-xl transition-transform active:scale-95"
                     aria-label="Open quick menu"
                   >
-                    <OpenClawStudioIcon className="size-8 rounded-xl overflow-hidden shadow-sm" />
+                    <img src="/hermes-icon.png" alt="Hermes" className="size-8 rounded-xl shadow-sm" />
                     {shouldShowLogoTip ? (
                       <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duration-300">
                         <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md">
@@ -663,11 +662,11 @@ export function DashboardScreen() {
                     ) : null}
                   </button>
                 ) : (
-                  <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl overflow-hidden shadow-sm" />
+                  <img src="/hermes-icon.png" alt="Hermes" className="size-8 shrink-0 rounded-xl shadow-sm" />
                 )}
                 <div className="flex min-w-0 items-center gap-2">
                   <h1 className="text-sm font-semibold text-ink text-balance md:text-base truncate">
-                    ClawSuite
+                    Hermes Workspace
                   </h1>
                   {isMobile ? (
                     <span
@@ -697,6 +696,11 @@ export function DashboardScreen() {
                         )}
                       />
                       {dashboardData.connection.connected ? 'Connected' : 'Disconnected'}
+                    </span>
+                  )}
+                  {!isMobile && (
+                    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ borderColor: 'var(--theme-accent-border)', color: 'var(--theme-accent)', background: 'var(--theme-accent-subtle)' }}>
+                      ⚕ Powered by Hermes Agent
                     </span>
                   )}
                 </div>

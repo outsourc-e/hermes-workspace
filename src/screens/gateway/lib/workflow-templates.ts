@@ -17,7 +17,7 @@ export type WorkflowTemplate = {
 
 const STORAGE_KEY = 'clawsuite:workflow-templates'
 
-// Built-in templates that ship with ClawSuite
+// Built-in templates that ship with Hermes Workspace
 export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'tpl-code-review',

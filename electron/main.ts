@@ -1,5 +1,5 @@
 /**
- * ClawSuite Electron Main Process
+ * Hermes Workspace Electron Main Process
  * Wraps the Vite-built web app in a native desktop window
  */
 
@@ -104,7 +104,7 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: 'ClawSuite',
+    title: 'Hermes Workspace',
     icon: existsSync(iconPath) ? iconPath : undefined,
     titleBarStyle: 'hiddenInset', // macOS native title bar
     trafficLightPosition: { x: 16, y: 16 },
@@ -155,10 +155,10 @@ function createTray() {
   if (!existsSync(iconPath)) return
 
   tray = new Tray(nativeImage.createFromPath(iconPath))
-  tray.setToolTip('ClawSuite')
+  tray.setToolTip('Hermes Workspace')
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open ClawSuite', click: () => mainWindow?.show() },
+    { label: 'Open Hermes Workspace', click: () => mainWindow?.show() },
     { type: 'separator' },
     { label: 'Gateway Status', enabled: false },
     { type: 'separator' },
@@ -269,4 +269,4 @@ app.on('before-quit', () => {
 })
 
 // Set app name
-app.setName('ClawSuite')
+app.setName('Hermes Workspace')

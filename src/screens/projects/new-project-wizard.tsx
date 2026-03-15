@@ -670,7 +670,7 @@ export function NewProjectWizardContent({
                       <input
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="ClawSuite Workspace Refresh"
+                        placeholder="Hermes Workspace Workspace Refresh"
                         autoFocus
                         className="w-full rounded-2xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500"
                       />

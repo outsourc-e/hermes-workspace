@@ -383,54 +383,54 @@
   color: var(--theme-text);
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is(.border-primary-200, .border-neutral-200, .border-neutral-700, .border-neutral-800, .border-slate-700) {
   border-color: var(--theme-border) !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is(.bg-primary-50, .bg-neutral-50, .bg-slate-800) {
   background-color: var(--theme-panel) !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is(.bg-white, .bg-primary-100, .bg-neutral-800, .bg-neutral-900) {
   background-color: var(--theme-card) !important;
 }
 
-:is([data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is(.bg-neutral-900\/60, .bg-neutral-900\/40) {
   background-color: var(--theme-card2) !important;
   opacity: 1 !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is(.text-primary-900, .text-neutral-100, .text-neutral-200) {
   color: var(--theme-text) !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is(.text-primary-500, .text-primary-600, .text-neutral-300, .text-neutral-400, .text-neutral-500) {
   color: var(--theme-muted) !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is(.ring-orange-300, .ring-accent-500\/20, .border-accent-500) {
   --tw-ring-color: var(--theme-accent) !important;
   border-color: var(--theme-accent) !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   :is([aria-selected="true"], [data-selected="true"], .border-primary-500) {
   border-color: var(--theme-accent) !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   .bg-surface {
   background-color: var(--theme-bg) !important;
 }
 
-:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"])
+:is([data-theme="paper-light"], [data-theme="ops-dark"], [data-theme="premium-dark"], [data-theme="sunset-brand"], [data-theme="hermes"])
   .text-ink {
   color: var(--theme-text) !important;
 }
@@ -1055,13 +1055,46 @@ code {
 /* Orange glow pulse on composer when agent is actively working */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 12px rgba(249, 115, 22, 0.25);
+    box-shadow: 0 0 12px var(--theme-accent-subtle, rgba(48, 80, 255, 0.25));
   }
   50% {
-    box-shadow: 0 0 28px rgba(249, 115, 22, 0.55);
+    box-shadow: 0 0 28px var(--theme-accent-border, rgba(48, 80, 255, 0.55));
   }
 }
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Hermes / Nous Research ── */
+[data-theme="hermes"] {
+  --theme-bg: #0A0E1A;
+  --theme-sidebar: #080C16;
+  --theme-panel: #12182A;
+  --theme-card: #1A2240;
+  --theme-card2: #202850;
+  --theme-border: rgba(48, 80, 255, 0.18);
+  --theme-border-subtle: rgba(48, 80, 255, 0.1);
+  --theme-text: #E8ECFF;
+  --theme-muted: #8090BB;
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.52);
+  --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.62);
+  --theme-glass: rgba(10, 14, 26, 0.88);
+  --theme-focus: #3050FF;
+  --theme-accent: #3050FF;
+  --theme-accent-secondary: #5070FF;
+  --theme-accent-subtle: rgba(48, 80, 255, 0.14);
+  --theme-accent-border: rgba(48, 80, 255, 0.32);
+  --theme-stripe: rgba(48, 80, 255, 0.06);
+  --theme-header-bg: #080C16;
+  --theme-header-border: rgba(48, 80, 255, 0.18);
+}
+
+[data-theme="hermes"] html,
+[data-theme="hermes"] body,
+[data-theme="hermes"] #root,
+[data-theme="hermes"] .dark {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
 }
