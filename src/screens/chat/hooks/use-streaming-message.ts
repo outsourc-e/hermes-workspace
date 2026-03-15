@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 import type { GatewayAttachment, GatewayMessage } from '../types'
+import { pushActivity } from '@/components/inspector/activity-store'
 
 type StreamingState = {
   isStreaming: boolean
@@ -305,6 +306,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             registerSendStreamRun(runId)
           }
           markActivity()
+          pushActivity({ type: 'assistant_start', time: new Date().toLocaleTimeString(), text: 'Assistant started' })
           processStoreEvent({
             type: 'chunk',
             text: '',
@@ -361,6 +363,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'tool': {
           markActivity()
+          {
+            const toolName = typeof payload.name === 'string' ? payload.name : 'tool'
+            const phase = typeof payload.phase === 'string' ? payload.phase : 'calling'
+            pushActivity({ type: 'tool_call', time: new Date().toLocaleTimeString(), text: `${toolName} (${phase})` })
+          }
           processStoreEvent({
             type: 'tool',
             phase:
@@ -412,6 +419,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const doneState = (payload as { state?: string }).state
           const errorMessage = (payload as { errorMessage?: string })
             .errorMessage
+          pushActivity({ type: 'assistant_complete', time: new Date().toLocaleTimeString(), text: doneState === 'error' ? `Error: ${errorMessage}` : 'Complete' })
           processStoreEvent({
             type: 'done',
             state: doneState ?? 'final',

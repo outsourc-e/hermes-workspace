@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { create } from 'zustand'
+import { useActivityStore, type ActivityEvent } from './activity-store'
+
+const HERMES_API = 'http://localhost:8642'
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
@@ -28,20 +31,53 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'logs', label: 'Logs' },
 ]
 
-// ── Placeholder content ───────────────────────────────────────────────────────
+// ── Shared loading / error ────────────────────────────────────────────────────
+
+function LoadingState({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 p-4">
+      <div
+        className="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
+        style={{ borderColor: 'var(--theme-accent)', borderTopColor: 'transparent' }}
+      />
+      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>{text}</span>
+    </div>
+  )
+}
+
+function ErrorState({ text }: { text: string }) {
+  return (
+    <div className="p-4">
+      <span className="text-xs" style={{ color: 'var(--theme-danger)' }}>{text}</span>
+    </div>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="p-4">
+      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>{text}</span>
+    </div>
+  )
+}
+
+// ── Activity Tab ──────────────────────────────────────────────────────────────
 
 function ActivityTab() {
+  const events = useActivityStore((s) => s.events)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [events.length])
+
+  if (events.length === 0) {
+    return <EmptyState text="No activity yet — start a conversation" />
+  }
+
   return (
-    <div className="space-y-2 p-3">
-      <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
-        Event stream will appear here during active sessions.
-      </p>
-      {[
-        { type: 'assistant_start', time: '12:34:01', text: 'Assistant started' },
-        { type: 'tool_call', time: '12:34:03', text: 'Tool: read_file' },
-        { type: 'memory_write', time: '12:34:05', text: 'Memory updated' },
-        { type: 'assistant_complete', time: '12:34:08', text: 'Assistant complete' },
-      ].map((event, i) => (
+    <div ref={scrollRef} className="space-y-1 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      {events.map((event: ActivityEvent, i: number) => (
         <div
           key={i}
           className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs"
@@ -51,7 +87,7 @@ function ActivityTab() {
             {event.time}
           </span>
           <span style={{ color: 'var(--theme-muted)' }}>{event.type}</span>
-          <span className="ml-auto" style={{ color: 'var(--theme-text)' }}>
+          <span className="ml-auto truncate" style={{ color: 'var(--theme-text)' }}>
             {event.text}
           </span>
         </div>
@@ -60,80 +96,237 @@ function ActivityTab() {
   )
 }
 
-function FilesTab() {
-  return (
-    <div className="space-y-1 p-3">
-      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
-        Recently touched files
-      </p>
-      {['src/screens/chat/chat-screen.tsx', 'src/components/inspector/inspector-panel.tsx', 'src/styles.css'].map(
-        (file, i) => (
-          <div
-            key={i}
-            className="rounded px-2 py-1 text-xs font-mono truncate"
-            style={{ color: 'var(--theme-text)', background: 'var(--theme-card2)' }}
-          >
-            {file}
-          </div>
-        ),
-      )}
-    </div>
-  )
-}
+// ── Files Tab ─────────────────────────────────────────────────────────────────
 
-function MemoryTab() {
+function FilesTab() {
+  const events = useActivityStore((s) => s.events)
+
+  // Extract file paths from activity events
+  const files = Array.from(
+    new Set(
+      events
+        .filter((e: ActivityEvent) => e.type === 'tool_call' || e.type === 'file_read' || e.type === 'file_write')
+        .map((e: ActivityEvent) => e.text)
+        .filter(Boolean)
+    )
+  )
+
+  if (files.length === 0) {
+    return <EmptyState text="No files touched yet — activity will appear during chat" />
+  }
+
   return (
     <div className="space-y-1 p-3">
       <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
-        Memory entries loaded in session
+        Files touched in session ({files.length})
       </p>
-      {['SOUL.md', 'USER.md', 'MEMORY.md', 'memory/2026-03-15.md'].map((entry, i) => (
+      {files.map((file: string, i: number) => (
         <div
           key={i}
-          className="flex items-center gap-2 rounded px-2 py-1 text-xs"
-          style={{ background: 'var(--theme-card2)' }}
+          className="rounded px-2 py-1 text-xs font-mono truncate"
+          style={{ color: 'var(--theme-text)', background: 'var(--theme-card2)' }}
         >
-          <span className="shrink-0 h-1.5 w-1.5 rounded-full" style={{ background: 'var(--theme-accent)' }} />
-          <span style={{ color: 'var(--theme-text)' }}>{entry}</span>
+          {file}
         </div>
       ))}
     </div>
   )
+}
+
+// ── Memory Tab ────────────────────────────────────────────────────────────────
+
+function MemoryTab() {
+  const [data, setData] = useState<Record<string, unknown> | unknown[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${HERMES_API}/api/memory`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        if (!cancelled) {
+          setData(json)
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || 'Failed to load memory')
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) return <LoadingState text="Loading memory…" />
+  if (error) return <ErrorState text={`Memory: ${error}`} />
+  if (!data) return <EmptyState text="No memory entries" />
+
+  // Render memory data
+  const entries = Array.isArray(data) ? data : Object.entries(data)
+
+  if (entries.length === 0) return <EmptyState text="No memory entries" />
+
+  return (
+    <div className="space-y-1 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
+        Memory entries ({entries.length})
+      </p>
+      {Array.isArray(data)
+        ? data.map((item: unknown, i: number) => {
+            const label = typeof item === 'string' ? item : typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded px-2 py-1 text-xs"
+                style={{ background: 'var(--theme-card2)' }}
+              >
+                <span className="shrink-0 h-1.5 w-1.5 rounded-full" style={{ background: 'var(--theme-accent)' }} />
+                <span className="truncate" style={{ color: 'var(--theme-text)' }}>{label}</span>
+              </div>
+            )
+          })
+        : Object.entries(data).map(([key, value]) => (
+            <div
+              key={key}
+              className="rounded px-2 py-1.5 text-xs"
+              style={{ background: 'var(--theme-card2)' }}
+            >
+              <span className="font-semibold" style={{ color: 'var(--theme-accent)' }}>{key}</span>
+              <span style={{ color: 'var(--theme-muted)' }}> → </span>
+              <span className="truncate" style={{ color: 'var(--theme-text)' }}>
+                {typeof value === 'string' ? value : JSON.stringify(value)}
+              </span>
+            </div>
+          ))}
+    </div>
+  )
+}
+
+// ── Skills Tab ────────────────────────────────────────────────────────────────
+
+type SkillItem = {
+  name: string
+  category?: string
+  description?: string
 }
 
 function SkillsTab() {
+  const [skills, setSkills] = useState<SkillItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${HERMES_API}/api/skills`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        if (!cancelled) {
+          // Handle array of skills or object with skills property
+          const list = Array.isArray(json) ? json : (json.skills || json.data || [])
+          setSkills(list)
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || 'Failed to load skills')
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) return <LoadingState text="Loading skills…" />
+  if (error) return <ErrorState text={`Skills: ${error}`} />
+  if (skills.length === 0) return <EmptyState text="No skills found" />
+
+  // Group by category
+  const grouped: Record<string, SkillItem[]> = {}
+  for (const skill of skills) {
+    const cat = skill.category || 'Uncategorized'
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push(skill)
+  }
+
   return (
-    <div className="space-y-1 p-3">
-      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
-        Loaded skills
+    <div className="space-y-3 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {skills.length} skills loaded
       </p>
-      {['coding-agent', 'discord', 'weather', 'self-improvement', 'context-anchor'].map((skill, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-2 rounded px-2 py-1 text-xs"
-          style={{ background: 'var(--theme-card2)' }}
-        >
-          <span style={{ color: 'var(--theme-accent)' }}>⚡</span>
-          <span style={{ color: 'var(--theme-text)' }}>{skill}</span>
+      {Object.entries(grouped).map(([category, items]) => (
+        <div key={category}>
+          <p className="text-[10px] uppercase tracking-wider mb-1 font-semibold" style={{ color: 'var(--theme-accent)' }}>
+            {category}
+          </p>
+          {items.map((skill) => (
+            <button
+              key={skill.name}
+              type="button"
+              onClick={() => setExpanded(expanded === skill.name ? null : skill.name)}
+              className="w-full text-left rounded px-2 py-1.5 text-xs mb-0.5 transition-colors"
+              style={{
+                background: expanded === skill.name ? 'var(--theme-card2)' : 'transparent',
+                color: 'var(--theme-text)',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span style={{ color: 'var(--theme-accent)' }}>⚡</span>
+                <span>{skill.name}</span>
+              </div>
+              {expanded === skill.name && skill.description && (
+                <p className="mt-1 pl-5 text-[11px]" style={{ color: 'var(--theme-muted)' }}>
+                  {skill.description}
+                </p>
+              )}
+            </button>
+          ))}
         </div>
       ))}
     </div>
   )
 }
 
+// ── Logs Tab ──────────────────────────────────────────────────────────────────
+
 function LogsTab() {
+  const events = useActivityStore((s) => s.events)
+  const scrollRef = useRef<HTMLPreElement>(null)
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [events.length])
+
+  if (events.length === 0) {
+    return (
+      <div className="p-3">
+        <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+          Raw event stream — waiting for activity…
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="p-3">
       <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
-        Raw event stream
+        Raw events ({events.length})
       </p>
       <pre
+        ref={scrollRef}
         className="text-xs rounded p-2 overflow-auto max-h-[400px] font-mono"
         style={{ background: 'var(--theme-card2)', color: 'var(--theme-muted)' }}
-      >{`{"type":"assistant_start","ts":1710000000000}
-{"type":"tool_call","name":"read_file","ts":1710000002000}
-{"type":"tool_result","name":"read_file","ts":1710000003500}
-{"type":"assistant_complete","ts":1710000008000}`}</pre>
+      >
+        {events.map((e: ActivityEvent) => JSON.stringify(e)).join('\n')}
+      </pre>
     </div>
   )
 }
