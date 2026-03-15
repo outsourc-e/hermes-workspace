@@ -4,14 +4,14 @@ import { CronManagerScreen } from '@/screens/cron/cron-manager-screen'
 
 export const Route = createFileRoute('/cron')({
   component: function CronRoute() {
-    usePageTitle('Cron Manager')
+    usePageTitle('Jobs')
     return <CronManagerScreen />
   },
   errorComponent: function CronError({ error }) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
         <h2 className="text-xl font-semibold text-primary-900 mb-3">
-          Failed to Load Cron Manager
+          Failed to Load Jobs
         </h2>
         <p className="text-sm text-primary-600 mb-4 max-w-md">
           {error instanceof Error
@@ -32,7 +32,7 @@ export const Route = createFileRoute('/cron')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-3" />
-          <p className="text-sm text-primary-500">Loading cron jobs...</p>
+          <p className="text-sm text-primary-500">Loading jobs...</p>
         </div>
       </div>
     )

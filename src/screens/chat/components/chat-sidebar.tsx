@@ -3,12 +3,10 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   ArrowDown01Icon,
-  BotIcon,
   BrainIcon,
   Clock01Icon,
-  ComputerTerminal01Icon,
   File01Icon,
-  Home01Icon,
+  MessageMultiple01Icon,
   ListViewIcon,
   PencilEdit02Icon,
   PuzzleIcon,
@@ -592,34 +590,31 @@ function ChatSidebarComponent({
   )
 
   // Route active states
-  const isDashboardActive = pathname === '/dashboard'
-  const isAgentSwarmActive = pathname === '/agent-swarm'
+  const isChatActive =
+    pathname === '/' || pathname === '/new' || pathname.startsWith('/chat')
+  const isSessionsActive = pathname === '/sessions'
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
-  const isTerminalActive = pathname === '/terminal'
+  const isSettingsActive = pathname === '/settings'
   const isCronActive = pathname === '/cron'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isMemoryActive = pathname === '/memory'
+  const isHealthActive = pathname === '/activity' || pathname === '/logs'
 
-  // Track last-visited route per section
-  const suiteRoutes = [
-    '/dashboard',
-    '/agent-swarm',
-    '/new',
-    '/terminal',
-    '/skills',
-    '/cron',
-    '/files',
-    '/memory',
-  ]
+  const mainRoutes = ['/chat/main', '/new', '/sessions', '/files', '/cron']
+  const knowledgeRoutes = ['/memory', '/skills']
+  const systemRoutes = ['/settings', '/activity', '/logs']
 
   useEffect(() => {
-    if (suiteRoutes.includes(pathname)) setLastRoute('suite', pathname)
+    if (mainRoutes.includes(pathname)) setLastRoute('main', pathname)
+    if (knowledgeRoutes.includes(pathname)) setLastRoute('knowledge', pathname)
+    if (systemRoutes.includes(pathname)) setLastRoute('system', pathname)
   }, [pathname])
 
-  // Resolve navigation targets (last visited or default)
-  const suiteNav = getLastRoute('suite') || '/dashboard'
+  const mainNav = getLastRoute('main') || '/chat/main'
+  const knowledgeNav = getLastRoute('knowledge') || '/memory'
+  const systemNav = getLastRoute('system') || '/settings'
 
   const transition = {
     duration: 0.15,
@@ -629,12 +624,12 @@ function ChatSidebarComponent({
 
 
   // Collapsible section states
-  const [suiteExpanded, toggleSuite] = usePersistedBool(
-    'openclaw-sidebar-suite-expanded',
+  const [mainExpanded, toggleMain] = usePersistedBool(
+    'openclaw-sidebar-main-expanded',
     true,
   )
-  const [workspaceExpanded, toggleWorkspace] = usePersistedBool(
-    'openclaw-sidebar-workspace-expanded',
+  const [knowledgeExpanded, toggleKnowledge] = usePersistedBool(
+    'openclaw-sidebar-knowledge-expanded',
     true,
   )
   const [systemExpanded, toggleSystem] = usePersistedBool(
@@ -797,30 +792,20 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
-  const suiteItems: NavItemDef[] = [
+  const mainItems: NavItemDef[] = [
     {
       kind: 'link',
-      to: '/dashboard',
-      icon: Home01Icon,
-      label: 'Dashboard',
-      active: isDashboardActive,
-      dataTour: 'dashboard',
+      to: '/chat/main',
+      icon: MessageMultiple01Icon,
+      label: 'Chat',
+      active: isChatActive,
     },
     {
       kind: 'link',
-      to: '/agent-swarm',
-      icon: BotIcon,
-      label: 'Agent Hub',
-      active: isAgentSwarmActive,
-      dataTour: 'agent-hub',
-    },
-    {
-      kind: 'link',
-      to: '/terminal',
-      icon: ComputerTerminal01Icon,
-      label: 'Terminal',
-      active: isTerminalActive,
-      dataTour: 'terminal',
+      to: '/sessions',
+      icon: ListViewIcon,
+      label: 'Sessions',
+      active: isSessionsActive,
     },
     {
       kind: 'link',
@@ -848,32 +833,45 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/cron',
       icon: Clock01Icon,
-      label: 'Cron Jobs',
+      label: 'Jobs',
       active: isCronActive,
     },
   ]
 
-  const workspaceItems: NavItemDef[] = [
+  const knowledgeItems: NavItemDef[] = [
     {
       kind: 'link',
-      to: '/workspace',
-      icon: ListViewIcon,
-      label: 'Workspace',
-      active: pathname.startsWith('/workspace'),
+      to: '/memory',
+      icon: BrainIcon,
+      label: 'Memory',
+      active: isMemoryActive,
+    },
+    {
+      kind: 'link',
+      to: '/skills',
+      icon: PuzzleIcon,
+      label: 'Skills',
+      active: isSkillsActive,
+      dataTour: 'skills',
     },
   ]
 
-  // Auto-expand mobile System section if any child route is active.
-  const mobileSystemLabels = [
-    'Files',
-    'Memory',
-    'Terminal',
-    'Cron Jobs',
+  const systemItems: NavItemDef[] = [
+    {
+      kind: 'link',
+      to: '/settings',
+      icon: Settings01Icon,
+      label: 'Settings',
+      active: isSettingsActive,
+    },
+    {
+      kind: 'link',
+      to: '/activity',
+      icon: ApiIcon,
+      label: 'Health',
+      active: isHealthActive,
+    },
   ]
-  const mobileSecondarySuite = mobileSystemLabels
-    .map((label) => suiteItems.find((item) => item.label === label))
-    .filter((item): item is NavItemDef => Boolean(item))
-  const isAnySystemActive = mobileSecondarySuite.some((item) => item.active)
 
   return (
     <motion.aside
@@ -919,7 +917,7 @@ function ChatSidebarComponent({
                 )}
               >
                 <img src="/hermes-icon.png" alt="Hermes" className="size-5 rounded-lg" />
-                Hermes Workspace
+                Hermes
               </Link>
             </motion.div>
           ) : null}
@@ -1007,60 +1005,52 @@ function ChatSidebarComponent({
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
         <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
-          {!isMobile && (
-            <>
-              {/* SUITE */}
-              <SectionLabel
-                label="Suite"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={suiteExpanded}
-                onToggle={toggleSuite}
-                navigateTo={suiteNav}
-              />
-              <CollapsibleSection
-                expanded={suiteExpanded || isCollapsed}
-                items={suiteItems}
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                onSelectSession={onSelectSession}
-              />
-            </>
-          )}
-
-          {isMobile && mobileSecondarySuite.length > 0 && (
-            <>
-              <SectionLabel
-                label="System"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={systemExpanded || isAnySystemActive}
-                onToggle={toggleSystem}
-              />
-              <CollapsibleSection
-                expanded={systemExpanded || isAnySystemActive || isCollapsed}
-                items={mobileSecondarySuite}
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                onSelectSession={onSelectSession}
-              />
-            </>
-          )}
-
-          {/* WORKSPACE */}
           <SectionLabel
-            label="Workspace"
+            label="Main"
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
-            expanded={workspaceExpanded}
-            onToggle={toggleWorkspace}
+            expanded={mainExpanded}
+            onToggle={toggleMain}
+            navigateTo={mainNav}
           />
           <CollapsibleSection
-            expanded={workspaceExpanded || isCollapsed}
-            items={workspaceItems}
+            expanded={mainExpanded || isCollapsed}
+            items={mainItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+
+          <SectionLabel
+            label="Knowledge"
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            collapsible
+            expanded={knowledgeExpanded}
+            onToggle={toggleKnowledge}
+            navigateTo={knowledgeNav}
+          />
+          <CollapsibleSection
+            expanded={knowledgeExpanded || isCollapsed}
+            items={knowledgeItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+
+          <SectionLabel
+            label="System"
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            collapsible
+            expanded={systemExpanded}
+            onToggle={toggleSystem}
+            navigateTo={systemNav}
+          />
+          <CollapsibleSection
+            expanded={systemExpanded || isCollapsed}
+            items={systemItems}
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}

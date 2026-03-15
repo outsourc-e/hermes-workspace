@@ -24,7 +24,7 @@ export const THEMES: Array<{
   { id: 'ops-dark', label: 'Ops Dark', description: 'Slate dark with teal secondary accents', icon: '🖥️' },
   { id: 'premium-dark', label: 'Premium Dark', description: 'OLED black with high contrast', icon: '✨' },
   { id: 'sunset-brand', label: 'Sunset Brand', description: 'Warm brown immersion with amber accents', icon: '🌇' },
-  { id: 'hermes', label: 'Hermes', description: 'Nous Research deep blue palette', icon: '⚕' },
+  { id: 'hermes', label: 'Hermes', description: 'Dark charcoal with restrained gold accents', icon: '⚕' },
 ]
 
 const STORAGE_KEY = 'clawsuite-theme'

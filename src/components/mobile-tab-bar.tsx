@@ -1,10 +1,10 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BotIcon,
   Chat01Icon,
-  Home01Icon,
-  PuzzleIcon,
+  Clock01Icon,
+  File01Icon,
+  ListViewIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -34,20 +34,6 @@ type TabItem = {
 
 const TABS: TabItem[] = [
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: Home01Icon,
-    to: '/dashboard',
-    match: (p) => p.startsWith('/dashboard'),
-  },
-  {
-    id: 'agents',
-    label: 'Agent Hub',
-    icon: BotIcon,
-    to: '/agent-swarm',
-    match: (p) => p.startsWith('/agent-swarm') || p.startsWith('/agents'),
-  },
-  {
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
@@ -55,11 +41,25 @@ const TABS: TabItem[] = [
     match: (p) => p.startsWith('/chat') || p === '/new' || p === '/',
   },
   {
-    id: 'skills',
-    label: 'Skills',
-    icon: PuzzleIcon,
-    to: '/skills',
-    match: (p) => p.startsWith('/skills'),
+    id: 'sessions',
+    label: 'Sessions',
+    icon: ListViewIcon,
+    to: '/sessions',
+    match: (p) => p.startsWith('/sessions'),
+  },
+  {
+    id: 'files',
+    label: 'Files',
+    icon: File01Icon,
+    to: '/files',
+    match: (p) => p.startsWith('/files'),
+  },
+  {
+    id: 'jobs',
+    label: 'Jobs',
+    icon: Clock01Icon,
+    to: '/cron',
+    match: (p) => p.startsWith('/cron'),
   },
   {
     id: 'settings',

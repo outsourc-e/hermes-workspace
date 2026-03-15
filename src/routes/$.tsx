@@ -46,11 +46,11 @@ function NotFoundPage() {
             Go Back
           </button>
           <Link
-            to="/dashboard"
+            to={"/chat/main" as string}
             className={buttonVariants({ variant: 'default', size: 'default' })}
           >
             <HugeiconsIcon icon={Home01Icon} size={18} strokeWidth={1.5} />
-            Dashboard
+            Chat
           </Link>
         </div>
 
@@ -65,10 +65,10 @@ function NotFoundPage() {
               Chat
             </Link>
             <Link
-              to="/dashboard"
+              to="/sessions"
               className="text-accent-500 hover:text-accent-600 hover:underline"
             >
-              Dashboard
+              Sessions
             </Link>
             <Link
               to="/files"
@@ -77,10 +77,10 @@ function NotFoundPage() {
               Files
             </Link>
             <Link
-              to="/terminal"
+              to="/cron"
               className="text-accent-500 hover:text-accent-600 hover:underline"
             >
-              Terminal
+              Jobs
             </Link>
           </div>
         </div>

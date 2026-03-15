@@ -84,10 +84,10 @@ export function WorkspaceShell() {
 
   // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
   const getTabIndex = useCallback((path: string): number => {
-    if (path.startsWith('/dashboard')) return 0
-    if (path.startsWith('/agent-swarm') || path.startsWith('/agents')) return 1
-    if (path.startsWith('/chat') || path === '/new' || path === '/') return 2
-    if (path.startsWith('/skills')) return 3
+    if (path.startsWith('/chat') || path === '/new' || path === '/') return 0
+    if (path.startsWith('/sessions')) return 1
+    if (path.startsWith('/files')) return 2
+    if (path.startsWith('/cron')) return 3
     if (path.startsWith('/settings')) return 4
     return -1
   }, [])
@@ -114,7 +114,7 @@ export function WorkspaceShell() {
         }
         throw error instanceof Error
           ? error
-          : new Error('Failed to connect to Hermes Workspace server')
+          : new Error('Failed to connect to Hermes server')
       } finally {
         globalThis.clearTimeout(timeout)
       }
@@ -247,7 +247,7 @@ export function WorkspaceShell() {
       <div className="flex items-center justify-center h-screen bg-surface">
         <div className="text-center">
           <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-4" />
-          <p className="text-sm text-primary-500">Initializing Hermes Workspace...</p>
+          <p className="text-sm text-primary-500">Initializing Hermes...</p>
         </div>
       </div>
     )
@@ -257,7 +257,7 @@ export function WorkspaceShell() {
     const errorMessage =
       authQuery.error instanceof Error
         ? authQuery.error.message
-        : 'Failed to connect to Hermes Workspace server'
+        : 'Failed to connect to Hermes server'
     const showGatewayTip = /gateway|websocket/i.test(errorMessage)
 
     return (
@@ -269,7 +269,7 @@ export function WorkspaceShell() {
             </span>
           </div>
           <h1 className="text-2xl font-semibold text-primary-100">
-            Could not connect to Hermes Workspace server
+            Could not connect to Hermes server
           </h1>
           <p className="mt-3 text-sm text-primary-300">
             The server may still be starting up. Wait a moment and try again.
@@ -335,7 +335,7 @@ export function WorkspaceShell() {
             <div className="w-[78px] shrink-0" />
             {/* Centered title */}
             <div className="flex-1 text-center">
-              <span className="text-[13px] font-medium select-none" style={{ color: "var(--theme-accent, #3050FF)" }}>⚕ Hermes Workspace</span>
+              <span className="text-[13px] font-medium select-none" style={{ color: 'var(--theme-accent, #B98A44)' }}>Hermes</span>
             </div>
             {/* Right spacer to balance */}
             <div className="w-[78px] shrink-0" />

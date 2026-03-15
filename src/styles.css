@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:opsz,wght@8..120,400..800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:opsz,wght@8..120,400..800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 
 /* Hide scrollbars until scroll (cross-browser) */
@@ -45,67 +45,63 @@
 @theme {
   --color-transparent: transparent;
   --color-current: currentColor;
-  --color-surface: var(--color-white);
-  --color-ink: var(--color-black);
+  --color-surface: #0d0f12;
+  --color-ink: #eceff4;
 
-  --color-primary-50: oklch(0.992 0.002 80);
-  --color-primary-100: oklch(0.9821 0 89.88);
-  --color-primary-200: oklch(0.9461 0 89.88);
-  --color-primary-300: oklch(0.95 0.004 80);
-  --color-primary-400: oklch(0.875 0.005 80);
-  --color-primary-500: oklch(0.785 0.006 80);
-  --color-primary-600: oklch(0.67 0.007 80);
-  --color-primary-700: oklch(0.56 0.006 80);
-  --color-primary-800: oklch(0.45 0.005 80);
-  --color-primary-900: oklch(0.35 0.004 80);
-  --color-primary-950: oklch(0.25 0.003 80);
-  /* Accent color palette — swapped via data-accent attribute */
-  --color-accent-50: oklch(0.98 0.015 60);
-  --color-accent-100: oklch(0.94 0.04 60);
-  --color-accent-200: oklch(0.87 0.08 55);
-  --color-accent-300: oklch(0.79 0.12 52);
-  --color-accent-400: oklch(0.72 0.16 48);
-  --color-accent-500: oklch(0.65 0.19 45);
-  --color-accent-600: oklch(0.58 0.17 42);
-  --color-accent-700: oklch(0.5 0.14 40);
-  --color-accent-800: oklch(0.42 0.1 38);
-  --color-accent-900: oklch(0.34 0.07 36);
+  --color-primary-50: #13171c;
+  --color-primary-100: #1a1f26;
+  --color-primary-200: #2a313b;
+  --color-primary-300: #394450;
+  --color-primary-400: #7f8a96;
+  --color-primary-500: #7f8a96;
+  --color-primary-600: #b5bec9;
+  --color-primary-700: #cbd3dc;
+  --color-primary-800: #dde3ea;
+  --color-primary-900: #eceff4;
+  --color-primary-950: #f6f8fb;
+  --color-accent-50: #f4e8cf;
+  --color-accent-100: #ead2a3;
+  --color-accent-200: #d3a45a;
+  --color-accent-300: #c79a52;
+  --color-accent-400: #b98a44;
+  --color-accent-500: #b98a44;
+  --color-accent-600: #8e6a33;
+  --color-accent-700: #6d5229;
+  --color-accent-800: #4c391e;
+  --color-accent-900: #2f2415;
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
   --font-serif: 'EB Garamond', serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
 .dark {
   color-scheme: dark;
-  --color-primary-50: oklch(0.16 0.006 80);
-  --color-primary-100: oklch(0.2 0.006 80);
-  --color-primary-200: oklch(0.28 0.008 80);
-  --color-primary-300: oklch(0.36 0.008 80);
-  --color-primary-400: oklch(0.46 0.008 80);
-  --color-primary-500: oklch(0.56 0.008 80);
-  --color-primary-600: oklch(0.68 0.007 80);
-  --color-primary-700: oklch(0.78 0.006 80);
-  --color-primary-800: oklch(0.86 0.004 80);
-  --color-primary-900: oklch(0.92 0.003 80);
-  --color-primary-950: oklch(0.96 0.002 80);
+  --color-primary-50: #13171c;
+  --color-primary-100: #1a1f26;
+  --color-primary-200: #2a313b;
+  --color-primary-300: #394450;
+  --color-primary-400: #7f8a96;
+  --color-primary-500: #7f8a96;
+  --color-primary-600: #b5bec9;
+  --color-primary-700: #cbd3dc;
+  --color-primary-800: #dde3ea;
+  --color-primary-900: #eceff4;
+  --color-primary-950: #f6f8fb;
 
-  --color-surface: oklch(0.12 0.006 80);
-  --color-ink: oklch(0.96 0.002 80);
-
-  /* Accent colors brighter in dark mode */
-  --color-accent-50: oklch(0.2 0.02 60);
-  --color-accent-100: oklch(0.28 0.04 58);
-  --color-accent-200: oklch(0.38 0.08 55);
-  --color-accent-300: oklch(0.5 0.12 52);
-  --color-accent-400: oklch(0.62 0.16 48);
-  --color-accent-500: oklch(0.72 0.18 45);
-  --color-accent-600: oklch(0.8 0.16 42);
-  --color-accent-700: oklch(0.86 0.12 40);
-  --color-accent-800: oklch(0.9 0.08 38);
-  --color-accent-900: oklch(0.94 0.04 36);
+  --color-surface: #0d0f12;
+  --color-ink: #eceff4;
+  --color-accent-50: #f4e8cf;
+  --color-accent-100: #ead2a3;
+  --color-accent-200: #d3a45a;
+  --color-accent-300: #c79a52;
+  --color-accent-400: #b98a44;
+  --color-accent-500: #b98a44;
+  --color-accent-600: #8e6a33;
+  --color-accent-700: #6d5229;
+  --color-accent-800: #4c391e;
+  --color-accent-900: #2f2415;
 }
 
 [data-accent='orange'] {
@@ -1068,27 +1064,32 @@ code {
 
 /* ── Hermes / Nous Research ── */
 [data-theme="hermes"] {
-  --theme-bg: #0A0E1A;
-  --theme-sidebar: #080C16;
-  --theme-panel: #12182A;
-  --theme-card: #1A2240;
-  --theme-card2: #202850;
-  --theme-border: rgba(48, 80, 255, 0.18);
-  --theme-border-subtle: rgba(48, 80, 255, 0.1);
-  --theme-text: #E8ECFF;
-  --theme-muted: #8090BB;
+  --theme-bg: #0d0f12;
+  --theme-sidebar: #13171c;
+  --theme-panel: #13171c;
+  --theme-card: #1a1f26;
+  --theme-card2: #1f252d;
+  --theme-border: #2a313b;
+  --theme-border-subtle: #222933;
+  --theme-text: #eceff4;
+  --theme-muted: #7f8a96;
   --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
   --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.52);
   --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.62);
-  --theme-glass: rgba(10, 14, 26, 0.88);
-  --theme-focus: #3050FF;
-  --theme-accent: #3050FF;
-  --theme-accent-secondary: #5070FF;
-  --theme-accent-subtle: rgba(48, 80, 255, 0.14);
-  --theme-accent-border: rgba(48, 80, 255, 0.32);
-  --theme-stripe: rgba(48, 80, 255, 0.06);
-  --theme-header-bg: #080C16;
-  --theme-header-border: rgba(48, 80, 255, 0.18);
+  --theme-glass: rgba(13, 15, 18, 0.88);
+  --theme-focus: #b98a44;
+  --theme-accent: #b98a44;
+  --theme-accent-secondary: #d3a45a;
+  --theme-accent-subtle: rgba(185, 138, 68, 0.14);
+  --theme-accent-border: rgba(185, 138, 68, 0.3);
+  --theme-active: #4c88c7;
+  --theme-link: #6fa8c9;
+  --theme-success: #4fa36c;
+  --theme-warning: #c28a2e;
+  --theme-danger: #b55252;
+  --theme-stripe: rgba(42, 49, 59, 0.48);
+  --theme-header-bg: #13171c;
+  --theme-header-border: #2a313b;
 }
 
 [data-theme="hermes"] html,

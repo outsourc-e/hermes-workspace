@@ -97,13 +97,13 @@ export function SearchModal() {
         },
       },
       {
-        id: 'qa-dashboard',
-        emoji: '🏠',
-        label: 'Dashboard',
-        description: 'Open the dashboard workspace',
+        id: 'qa-sessions',
+        emoji: '🗂️',
+        label: 'Sessions',
+        description: 'Open the session archive',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/dashboard' })
+          navigate({ to: '/sessions' })
         },
       },
       {
@@ -117,30 +117,30 @@ export function SearchModal() {
         },
       },
       {
-        id: 'qa-terminal',
-        emoji: '🖥️',
-        label: 'Terminal',
-        description: 'Jump into terminal view',
+        id: 'qa-memory',
+        emoji: '🧠',
+        label: 'Memory',
+        description: 'Browse durable memory entries',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/terminal' })
+          navigate({ to: '/memory' })
         },
       },
       {
-        id: 'qa-logs',
-        emoji: '📄',
-        label: 'Logs',
-        description: 'Open the real-time activity log viewer',
+        id: 'qa-health',
+        emoji: '🩺',
+        label: 'Health',
+        description: 'Open the operational health view',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/logs' })
+          navigate({ to: '/activity' })
         },
       },
       {
-        id: 'qa-cron',
+        id: 'qa-jobs',
         emoji: '⏰',
-        label: 'Cron',
-        description: 'Open cron job manager and run history',
+        label: 'Jobs',
+        description: 'Open scheduled jobs and run history',
         onSelect: () => {
           closeModal()
           navigate({ to: '/cron' })
@@ -164,16 +164,6 @@ export function SearchModal() {
         onSelect: () => {
           closeModal()
           navigate({ to: '/settings' })
-        },
-      },
-      {
-        id: 'qa-spawn-agent',
-        emoji: '🤖',
-        label: 'Spawn Agent',
-        description: 'Placeholder action for agent orchestration',
-        onSelect: () => {
-          closeModal()
-          window.alert('Spawn Agent is coming soon.')
         },
       },
       {

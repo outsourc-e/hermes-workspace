@@ -80,7 +80,7 @@ export function useChatSessions({
       if (activeSession.titleStatus === 'error') return 'New Session'
       return 'New Session'
     }
-    return activeFriendlyId === 'main' ? 'Hermes Workspace' : activeFriendlyId
+    return activeFriendlyId === 'main' ? 'Hermes' : activeFriendlyId
   }, [activeFriendlyId, activeSession])
 
   const sessionsError =
