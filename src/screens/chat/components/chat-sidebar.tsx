@@ -984,7 +984,7 @@ function ChatSidebarComponent({
         {/* Sessions list */}
         <div
           className={cn(
-            'shrink-0 border-t border-primary-200/60 mt-1',
+            'shrink-0 mt-1',
             isMobile && 'order-1',
           )}
         >
