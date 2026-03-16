@@ -52,18 +52,16 @@ import {
 // ── Types ───────────────────────────────────────────────────────────────
 
 type SectionId =
-  | 'profile'
+  | 'hermes'
   | 'appearance'
   | 'chat'
   | 'notifications'
-  | 'advanced'
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
-  { id: 'profile', label: 'Profile', icon: UserIcon },
+  { id: 'hermes', label: 'Hermes Agent', icon: CloudIcon },
   { id: 'appearance', label: 'Appearance', icon: PaintBoardIcon },
   { id: 'chat', label: 'Chat', icon: MessageMultiple01Icon },
   { id: 'notifications', label: 'Notifications', icon: Notification03Icon },
-  { id: 'advanced', label: 'Advanced', icon: CloudIcon },
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
@@ -133,6 +131,180 @@ const SETTINGS_CARD_CLASS =
   'rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm'
 
 // ── Section components ──────────────────────────────────────────────────
+
+function HermesContent() {
+  const [config, setConfig] = useState<Record<string, unknown> | null>(null)
+  const [providers, setProviders] = useState<Array<{id:string; name:string; envKeys:string[]; configured:boolean; maskedKeys:Record<string,string>}>>([])
+  const [activeModel, setActiveModel] = useState('')
+  const [activeProvider, setActiveProvider] = useState('')
+  const [modelInput, setModelInput] = useState('')
+  const [providerInput, setProviderInput] = useState('')
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [keyInput, setKeyInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/hermes-config')
+      .then((r) => r.json())
+      .then((d: any) => {
+        setConfig(d.config)
+        setProviders(d.providers || [])
+        setActiveModel(d.activeModel || '')
+        setActiveProvider(d.activeProvider || '')
+        setModelInput(d.activeModel || '')
+        setProviderInput(d.activeProvider || '')
+      })
+      .catch(() => {})
+  }, [])
+
+  const save = async (updates: { config?: Record<string, unknown>; env?: Record<string, string> }) => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await fetch('/api/hermes-config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) })
+      const r = await res.json() as { message?: string }
+      setMsg(r.message || 'Saved')
+      // Refresh
+      const ref = await fetch('/api/hermes-config')
+      const d = await ref.json() as any
+      setConfig(d.config); setProviders(d.providers || []); setActiveModel(d.activeModel || ''); setActiveProvider(d.activeProvider || '')
+      setTimeout(() => setMsg(null), 3000)
+    } catch { setMsg('Failed to save') }
+    setSaving(false)
+  }
+
+  const memConfig = (config?.memory as Record<string, unknown>) || {}
+
+  return (
+    <div className="space-y-4">
+      {msg && (
+        <div className={cn('rounded-lg px-3 py-2 text-sm font-medium', msg.includes('Failed') ? 'bg-red-500/15 text-red-400' : 'bg-green-500/15 text-green-400')}>
+          {msg}
+        </div>
+      )}
+
+      {/* Model */}
+      <div className={SETTINGS_CARD_CLASS}>
+        <h3 className="text-sm font-semibold text-primary-900 mb-2">Model & Provider</h3>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-primary-500 w-16 shrink-0">Model</label>
+            <input
+              value={modelInput}
+              onChange={(e) => setModelInput(e.target.value)}
+              className="flex-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none focus:border-accent-500"
+              placeholder="e.g. gpt-5.3-codex"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-primary-500 w-16 shrink-0">Provider</label>
+            <input
+              value={providerInput}
+              onChange={(e) => setProviderInput(e.target.value)}
+              className="flex-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none focus:border-accent-500"
+              placeholder="e.g. openai-codex"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => save({ config: { model: { default: modelInput, provider: providerInput } } })}
+              className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-600 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* API Keys */}
+      <div className={SETTINGS_CARD_CLASS}>
+        <h3 className="text-sm font-semibold text-primary-900 mb-2">API Keys</h3>
+        <p className="text-xs text-primary-500 mb-3">Stored in ~/.hermes/.env</p>
+        <div className="space-y-2">
+          {providers.filter((p) => p.envKeys.length > 0).map((provider) => (
+            <div key={provider.id} className="flex items-center justify-between gap-2 py-1">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-primary-900">{provider.name}</div>
+                <div className="text-xs text-primary-500">
+                  {provider.configured ? '✅ Configured' : '❌ Not set'}
+                  {provider.configured && provider.maskedKeys[provider.envKeys[0]] && (
+                    <span className="ml-1 font-mono">{provider.maskedKeys[provider.envKeys[0]]}</span>
+                  )}
+                </div>
+              </div>
+              {editingKey === provider.envKeys[0] ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="password"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    className="w-48 rounded-lg border border-primary-200 bg-primary-50 px-2 py-1 text-xs outline-none focus:border-accent-500"
+                    placeholder={`Enter ${provider.envKeys[0]}`}
+                  />
+                  <button type="button" onClick={() => { save({ env: { [provider.envKeys[0]]: keyInput } }); setEditingKey(null); setKeyInput('') }} className="rounded bg-accent-500 px-2 py-1 text-xs text-white">Save</button>
+                  <button type="button" onClick={() => { setEditingKey(null); setKeyInput('') }} className="rounded px-2 py-1 text-xs text-primary-500 hover:text-primary-900">✕</button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setEditingKey(provider.envKeys[0]); setKeyInput('') }}
+                  className="rounded-lg border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+                >
+                  {provider.configured ? 'Change' : 'Add Key'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Memory */}
+      <div className={SETTINGS_CARD_CLASS}>
+        <h3 className="text-sm font-semibold text-primary-900 mb-2">Memory</h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-primary-900">Memory enabled</div>
+              <div className="text-xs text-primary-500">Store memories across sessions</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => save({ config: { memory: { memory_enabled: !(memConfig.memory_enabled !== false) } } })}
+              className={cn('rounded-full px-3 py-1 text-xs font-medium', memConfig.memory_enabled !== false ? 'bg-green-500/15 text-green-500' : 'bg-primary-200 text-primary-500')}
+            >
+              {memConfig.memory_enabled !== false ? 'On' : 'Off'}
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-primary-900">User profile</div>
+              <div className="text-xs text-primary-500">Remember preferences</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => save({ config: { memory: { user_profile_enabled: !(memConfig.user_profile_enabled !== false) } } })}
+              className={cn('rounded-full px-3 py-1 text-xs font-medium', memConfig.user_profile_enabled !== false ? 'bg-green-500/15 text-green-500' : 'bg-primary-200 text-primary-500')}
+            >
+              {memConfig.user_profile_enabled !== false ? 'On' : 'Off'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className={SETTINGS_CARD_CLASS}>
+        <h3 className="text-sm font-semibold text-primary-900 mb-2">Runtime</h3>
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between"><span className="text-primary-500">Model</span><span className="font-mono text-primary-900">{activeModel}</span></div>
+          <div className="flex justify-between"><span className="text-primary-500">Provider</span><span className="font-mono text-primary-900">{activeProvider}</span></div>
+          <div className="flex justify-between"><span className="text-primary-500">Config</span><span className="font-mono text-primary-900">~/.hermes/config.yaml</span></div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ProfileContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
@@ -329,29 +501,7 @@ function AppearanceContent() {
           ))}
         </div>
       </div>
-      <div className={SETTINGS_CARD_CLASS}>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-          Accent Color
-        </p>
-        <div className="flex items-center gap-2">
-          {(['orange', 'purple', 'blue', 'green'] as const).map((color) => (
-            <button
-              key={color}
-              type="button"
-              onClick={() => handleAccentColorChange(color)}
-              aria-label={`Set accent color to ${color}`}
-              className={cn(
-                'inline-flex size-8 items-center justify-center rounded-full border transition-colors',
-                settings.accentColor === color
-                  ? 'border-primary-900 bg-primary-100'
-                  : 'border-primary-200 bg-white hover:bg-primary-100',
-              )}
-            >
-              <span className={cn('size-4 rounded-full', badgeClass(color))} />
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Accent color removed — themes control accent */}
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
           Enterprise Theme
@@ -370,20 +520,7 @@ function AppearanceContent() {
           />
         </Row>
 
-        <Row
-          label="Mobile chat nav"
-          description="How the bottom nav behaves on chat screens."
-        >
-          <select
-            value={settings.mobileChatNavMode ?? 'dock'}
-            onChange={(e) => updateSettings({ mobileChatNavMode: e.target.value as 'dock' | 'integrated' | 'scroll-hide' })}
-            className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-          >
-            <option value="dock">Dock (iMessage)</option>
-            <option value="scroll-hide">Scroll-hide (B)</option>
-            <option value="integrated">Integrated (C)</option>
-          </select>
-        </Row>
+        {/* Mobile chat nav removed — not relevant for Hermes */}
       </div>
     </div>
   )
@@ -626,9 +763,7 @@ function ChatContent() {
           />
         </Row>
       </div>
-      <div className={SETTINGS_CARD_CLASS}>
-        <LoaderContent />
-      </div>
+      {/* Loading animation removed — not relevant for Hermes */}
     </div>
   )
 }
@@ -819,11 +954,10 @@ class SettingsErrorBoundary extends Component<
 // ── Main Dialog ─────────────────────────────────────────────────────────
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
-  profile: ProfileContent,
+  hermes: HermesContent,
   appearance: AppearanceContent,
   chat: ChatContent,
   notifications: NotificationsContent,
-  advanced: AdvancedContent,
 }
 
 type SettingsDialogProps = {
@@ -832,7 +966,7 @@ type SettingsDialogProps = {
 }
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const [active, setActive] = useState<SectionId>('profile')
+  const [active, setActive] = useState<SectionId>('hermes')
   const [mobileView, setMobileView] = useState<'nav' | 'content'>('nav')
   const ActiveContent = CONTENT_MAP[active]
 
