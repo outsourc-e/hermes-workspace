@@ -40,7 +40,9 @@ export const Route = createFileRoute('/api/history')({
           return json({
             sessionKey,
             sessionId: sessionKey,
-            messages: boundedMessages.map(toGatewayMessage),
+            messages: boundedMessages.map((message, index) =>
+              toGatewayMessage(message, { historyIndex: index }),
+            ),
           })
         } catch (err) {
           return json(

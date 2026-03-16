@@ -273,6 +273,74 @@ function shouldHideSystemInjectedUserMessage(text: string): boolean {
   )
 }
 
+function getChronologyRank(message: GatewayMessage): number {
+  const role = typeof message.role === 'string' ? message.role.toLowerCase() : ''
+  const content = Array.isArray(message.content) ? message.content : []
+  const hasToolCalls =
+    content.some((part) => part.type === 'toolCall') ||
+    (Array.isArray((message as any).streamToolCalls) &&
+      (message as any).streamToolCalls.length > 0) ||
+    (Array.isArray((message as any).__streamToolCalls) &&
+      (message as any).__streamToolCalls.length > 0)
+
+  if (role === 'user') return 0
+  if (role === 'assistant' && hasToolCalls) return 1
+  if (role === 'tool' || role === 'toolresult' || role === 'tool_result') return 2
+  if (role === 'assistant') return 3
+  return 4
+}
+
+function sortMessagesChronologically(
+  messages: Array<GatewayMessage>,
+): Array<GatewayMessage> {
+  return messages
+    .map((message, index) => ({ message, index }))
+    .sort((left, right) => {
+      const leftTimestamp = getMessageTimestamp(left.message)
+      const rightTimestamp = getMessageTimestamp(right.message)
+      if (leftTimestamp !== rightTimestamp) return leftTimestamp - rightTimestamp
+
+      const leftRank = getChronologyRank(left.message)
+      const rightRank = getChronologyRank(right.message)
+      if (leftRank !== rightRank) return leftRank - rightRank
+
+      const leftHistoryIndex =
+        typeof (left.message as any).__historyIndex === 'number'
+          ? (left.message as any).__historyIndex
+          : undefined
+      const rightHistoryIndex =
+        typeof (right.message as any).__historyIndex === 'number'
+          ? (right.message as any).__historyIndex
+          : undefined
+      if (
+        leftHistoryIndex !== undefined &&
+        rightHistoryIndex !== undefined &&
+        leftHistoryIndex !== rightHistoryIndex
+      ) {
+        return leftHistoryIndex - rightHistoryIndex
+      }
+
+      const leftRealtimeSequence =
+        typeof (left.message as any).__realtimeSequence === 'number'
+          ? (left.message as any).__realtimeSequence
+          : undefined
+      const rightRealtimeSequence =
+        typeof (right.message as any).__realtimeSequence === 'number'
+          ? (right.message as any).__realtimeSequence
+          : undefined
+      if (
+        leftRealtimeSequence !== undefined &&
+        rightRealtimeSequence !== undefined &&
+        leftRealtimeSequence !== rightRealtimeSequence
+      ) {
+        return leftRealtimeSequence - rightRealtimeSequence
+      }
+
+      return left.index - right.index
+    })
+    .map(({ message }) => message)
+}
+
 type MessageSearchMatch = {
   stableId: string
   messageIndex: number
@@ -514,7 +582,7 @@ function ChatMessageListComponent({
       seenMessageIds.add(scopedId)
       return true
     })
-    return deduped
+    return sortMessagesChronologically(deduped)
   }, [hideSystemMessages, messages])
 
   const displayEntries = useMemo<Array<DisplayEntry>>(() => {

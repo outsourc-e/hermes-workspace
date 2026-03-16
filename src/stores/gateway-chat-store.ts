@@ -121,6 +121,8 @@ const createEmptyStreamingState = (): StreamingState => ({
   toolCalls: [],
 })
 
+let realtimeMessageSequence = 0
+
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -247,14 +249,88 @@ function getMessageReceiveTime(msg: GatewayMessage | null | undefined): number |
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
+function getMessageHistoryIndex(msg: GatewayMessage | null | undefined): number | undefined {
+  if (!msg) return undefined
+  const value = (msg as Record<string, unknown>).__historyIndex
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function getMessageRealtimeSequence(
+  msg: GatewayMessage | null | undefined,
+): number | undefined {
+  if (!msg) return undefined
+  const value = (msg as Record<string, unknown>).__realtimeSequence
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function hasToolCalls(msg: GatewayMessage | null | undefined): boolean {
+  if (!msg) return false
+  if (Array.isArray(msg.content)) {
+    const contentHasToolCalls = msg.content.some((part) => part.type === 'toolCall')
+    if (contentHasToolCalls) return true
+  }
+
+  const raw = msg as Record<string, unknown>
+  return (
+    (Array.isArray(raw.streamToolCalls) && raw.streamToolCalls.length > 0) ||
+    (Array.isArray(raw.__streamToolCalls) && raw.__streamToolCalls.length > 0)
+  )
+}
+
+function getMessageChronologyRank(msg: GatewayMessage): number {
+  const role = normalizeString(msg.role).toLowerCase()
+  if (role === 'user') return 0
+  if (role === 'assistant' && hasToolCalls(msg)) return 1
+  if (role === 'tool' || role === 'toolresult' || role === 'tool_result') return 2
+  if (role === 'assistant') return 3
+  return 4
+}
+
 function compareMessagesByTime(left: GatewayMessage, right: GatewayMessage): number {
   const leftTime = getMessageEventTime(left) ?? getMessageReceiveTime(left) ?? 0
   const rightTime = getMessageEventTime(right) ?? getMessageReceiveTime(right) ?? 0
   if (leftTime !== rightTime) return leftTime - rightTime
 
+  const leftRank = getMessageChronologyRank(left)
+  const rightRank = getMessageChronologyRank(right)
+  if (leftRank !== rightRank) return leftRank - rightRank
+
+  const leftHistoryIndex = getMessageHistoryIndex(left)
+  const rightHistoryIndex = getMessageHistoryIndex(right)
+  if (
+    leftHistoryIndex !== undefined &&
+    rightHistoryIndex !== undefined &&
+    leftHistoryIndex !== rightHistoryIndex
+  ) {
+    return leftHistoryIndex - rightHistoryIndex
+  }
+
+  const leftRealtimeSequence = getMessageRealtimeSequence(left)
+  const rightRealtimeSequence = getMessageRealtimeSequence(right)
+  if (
+    leftRealtimeSequence !== undefined &&
+    rightRealtimeSequence !== undefined &&
+    leftRealtimeSequence !== rightRealtimeSequence
+  ) {
+    return leftRealtimeSequence - rightRealtimeSequence
+  }
+
   const leftId = getMessageId(left) ?? ''
   const rightId = getMessageId(right) ?? ''
   return leftId.localeCompare(rightId)
+}
+
+function sortMessagesChronologically(
+  messages: Array<GatewayMessage>,
+): Array<GatewayMessage> {
+  return messages
+    .map((message, index) => ({ message, index }))
+    .sort((left, right) => {
+      const byTime = compareMessagesByTime(left.message, right.message)
+      if (byTime !== 0) return byTime
+      return left.index - right.index
+    })
+    .map(({ message }) => message)
 }
 
 function isExternalInboundUserSource(source: unknown): boolean {
@@ -486,6 +562,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           __realtimeSource:
             event.type === 'user_message' ? (event as any).source : undefined,
           __receiveTime: incomingReceiveTime,
+          __realtimeSequence: realtimeMessageSequence++,
           status: undefined,
         }
 
@@ -496,7 +573,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             __optimisticId: undefined,
             status: undefined,
           }
-          messages.set(sessionKey, sessionMessages)
+          messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
           set({ realtimeMessages: messages, lastEventAt: now })
           break
         }
@@ -519,7 +596,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
         if (duplicateIndex === -1) {
           sessionMessages.push(incomingMessage)
-          messages.set(sessionKey, sessionMessages)
+          messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
           set({ realtimeMessages: messages, lastEventAt: now })
         }
         break
@@ -623,7 +700,9 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             : undefined
           completeMessage = {
             ...cleanedMessage,
-            timestamp: now,
+            timestamp: getMessageEventTime(cleanedMessage) ?? now,
+            __receiveTime: now,
+            __realtimeSequence: realtimeMessageSequence++,
             __streamingStatus: 'complete' as any,
             ...(streamToolCallsToEmbed ? { __streamToolCalls: streamToolCallsToEmbed } : {}),
           }
@@ -660,6 +739,8 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             role: 'assistant',
             content,
             timestamp: now,
+            __receiveTime: now,
+            __realtimeSequence: realtimeMessageSequence++,
             __streamingStatus: 'complete',
           }
         }
@@ -683,7 +764,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
           if (!isDuplicate) {
             sessionMessages.push(completeMessage)
-            messages.set(sessionKey, sessionMessages)
+            messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
             set({ realtimeMessages: messages })
           } else {
             // If there IS a duplicate (e.g. a tagged pre-final message was stored),
@@ -700,7 +781,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
                 ...sessionMessages[existingIdx],
                 ...completeMessage,
               }
-              messages.set(sessionKey, sessionMessages)
+              messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
               set({ realtimeMessages: messages })
             }
           }
@@ -756,7 +837,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     const realtimeMessages = get().realtimeMessages.get(sessionKey) ?? []
 
     if (realtimeMessages.length === 0) {
-      return historyMessages
+      return sortMessagesChronologically(historyMessages)
     }
 
     // Find messages in realtime that aren't in history yet.
@@ -844,10 +925,10 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     })
 
     if (newRealtimeMessages.length === 0) {
-      return historyMessages
+      return sortMessagesChronologically(historyMessages)
     }
 
-    return [...historyMessages, ...newRealtimeMessages].sort(compareMessagesByTime)
+    return sortMessagesChronologically([...historyMessages, ...newRealtimeMessages])
   },
 }))
 

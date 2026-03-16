@@ -159,7 +159,10 @@ export async function forkSession(
 // ── Conversion helpers (Hermes → Gateway format) ─────────────────
 
 /** Convert a HermesMessage to the GatewayMessage format the frontend expects */
-export function toGatewayMessage(msg: HermesMessage): Record<string, unknown> {
+export function toGatewayMessage(
+  msg: HermesMessage,
+  options?: { historyIndex?: number },
+): Record<string, unknown> {
   // Accept either parsed arrays from FastAPI or legacy JSON strings.
   let toolCalls: unknown[] | undefined
   if (Array.isArray(msg.tool_calls)) {
@@ -212,6 +215,9 @@ export function toGatewayMessage(msg: HermesMessage): Record<string, unknown> {
     timestamp: msg.timestamp ? msg.timestamp * 1000 : Date.now(),
     createdAt: msg.timestamp ? new Date(msg.timestamp * 1000).toISOString() : undefined,
     sessionKey: msg.session_id,
+    ...(typeof options?.historyIndex === 'number'
+      ? { __historyIndex: options.historyIndex }
+      : {}),
     ...(streamToolCallsArr.length > 0 ? { streamToolCalls: streamToolCallsArr } : {}),
   }
 }
