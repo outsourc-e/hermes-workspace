@@ -1,8 +1,52 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+
+// Well-known models for providers available via auth store
+const AUTH_STORE_MODELS: Record<string, ModelEntry[]> = {
+  anthropic: [
+    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
+    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
+  ],
+  openai: [
+    { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
+  ],
+  xai: [
+    { id: 'grok-3', name: 'Grok 3', provider: 'xai' },
+  ],
+}
+
+function getAuthStoreModels(): ModelEntry[] {
+  const extra: ModelEntry[] = []
+  for (const storePath of [
+    path.join(os.homedir(), '.hermes', 'auth-profiles.json'),
+    path.join(os.homedir(), '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json'),
+  ]) {
+    try {
+      if (!fs.existsSync(storePath)) continue
+      const store = JSON.parse(fs.readFileSync(storePath, 'utf-8'))
+      const profiles = store?.profiles || {}
+      const seen = new Set<string>()
+      for (const key of Object.keys(profiles)) {
+        const providerId = key.split(':')[0]
+        if (seen.has(providerId)) continue
+        const p = profiles[key]
+        const token = String(p?.token || p?.key || p?.access || '').trim()
+        if (!token) continue
+        seen.add(providerId)
+        const models = AUTH_STORE_MODELS[providerId]
+        if (models) extra.push(...models)
+      }
+      if (extra.length > 0) break // Use first store that has data
+    } catch {}
+  }
+  return extra
+}
 
 type ModelEntry = {
   provider?: string
@@ -54,6 +98,14 @@ export const Route = createFileRoute('/api/models')({
         }
         try {
           const models = await fetchHermesModels()
+          // Add models from auth store providers (Anthropic, OpenAI, etc.)
+          const authModels = getAuthStoreModels()
+          const existingIds = new Set(models.map((m) => m.id))
+          for (const m of authModels) {
+            if (!existingIds.has(m.id)) {
+              models.push(m)
+            }
+          }
           return json({ ok: true, models })
         } catch (err) {
           return json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 503 })

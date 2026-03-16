@@ -78,6 +78,31 @@ function maskKey(key: string): string {
   return key.slice(0, 4) + '...' + key.slice(-4)
 }
 
+function checkAuthStore(providerId: string): { hasToken: boolean; source: string; maskedKey?: string } {
+  // Check Hermes auth store
+  for (const storePath of [
+    path.join(os.homedir(), '.hermes', 'auth-profiles.json'),
+    path.join(os.homedir(), '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json'),
+  ]) {
+    try {
+      if (!fs.existsSync(storePath)) continue
+      const store = JSON.parse(fs.readFileSync(storePath, 'utf-8'))
+      const profiles = store?.profiles || {}
+      for (const [key, value] of Object.entries(profiles)) {
+        if (!key.startsWith(`${providerId}:`)) continue
+        if (typeof value !== 'object' || value === null) continue
+        const p = value as Record<string, unknown>
+        const token = String(p.token || p.key || p.access || '').trim()
+        if (token) {
+          const source = storePath.includes('.hermes') ? 'hermes-auth-store' : 'openclaw-auth-store'
+          return { hasToken: true, source, maskedKey: maskKey(token) }
+        }
+      }
+    } catch {}
+  }
+  return { hasToken: false, source: '' }
+}
+
 export const Route = createFileRoute('/api/hermes-config')({
   server: {
     handlers: {
@@ -90,14 +115,20 @@ export const Route = createFileRoute('/api/hermes-config')({
 
         // Build provider status
         const providerStatus = PROVIDERS.map((p) => {
-          const hasKey = p.envKeys.length === 0 || p.envKeys.some((k) => !!env[k])
+          const hasEnvKey = p.envKeys.length === 0 || p.envKeys.some((k) => !!env[k])
+          const authStoreCheck = checkAuthStore(p.id)
+          const hasKey = hasEnvKey || authStoreCheck.hasToken || p.authType === 'none'
           const maskedKeys: Record<string, string> = {}
           for (const k of p.envKeys) {
             if (env[k]) maskedKeys[k] = maskKey(env[k])
           }
+          if (authStoreCheck.hasToken && authStoreCheck.maskedKey) {
+            maskedKeys['auth-store'] = authStoreCheck.maskedKey
+          }
           return {
             ...p,
             configured: hasKey,
+            authSource: authStoreCheck.hasToken ? authStoreCheck.source : (hasEnvKey ? 'env' : 'none'),
             maskedKeys,
           }
         })
