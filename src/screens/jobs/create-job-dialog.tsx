@@ -124,6 +124,7 @@ export function CreateJobDialog({
           <div
             className="absolute inset-0"
             style={{ background: 'rgba(0, 0, 0, 0.68)' }}
+            onClick={() => onOpenChange(false)}
           />
           <motion.form
             initial={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -279,19 +280,21 @@ export function CreateJobDialog({
                   <div className="flex flex-wrap gap-2">
                     {DELIVERY_OPTIONS.map((option) => {
                       const isActive = form.deliver.includes(option)
+                      const needsGateway = option === 'telegram' || option === 'discord'
                       return (
                         <button
                           key={option}
                           type="button"
                           onClick={() => toggleDelivery(option)}
+                          title={needsGateway ? `Requires Hermes Gateway with ${option} configured` : undefined}
                           className="rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors"
                           style={{
                             background: isActive ? 'var(--theme-accent)' : 'var(--theme-card)',
                             borderColor: isActive ? 'var(--theme-accent)' : 'var(--theme-border)',
-                            color: isActive ? '#fff' : 'var(--theme-text)',
+                            color: isActive ? '#fff' : needsGateway ? 'var(--theme-muted)' : 'var(--theme-text)',
                           }}
                         >
-                          {option}
+                          {option}{needsGateway ? ' ⚡' : ''}
                         </button>
                       )
                     })}
