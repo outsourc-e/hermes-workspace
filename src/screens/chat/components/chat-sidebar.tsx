@@ -933,22 +933,7 @@ function ChatSidebarComponent({
             onSelectSession={onSelectSession}
           />
 
-          <SectionLabel
-            label="System"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={systemExpanded}
-            onToggle={toggleSystem}
-            navigateTo={systemNav}
-          />
-          <CollapsibleSection
-            expanded={systemExpanded || isCollapsed}
-            items={systemItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
+          {/* System section removed — settings is a popup now */}
         </div>
 
         {/* Sessions list */}
