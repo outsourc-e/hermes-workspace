@@ -254,8 +254,8 @@ const config = defineConfig(({ mode, command }) => {
     },
     server: {
       // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking gateway connectivity
-      host: allowedHosts.length > 0 ? '0.0.0.0' : '127.0.0.1',
-      allowedHosts: allowedHosts.length > 0 ? [...allowedHosts, '127.0.0.1', 'localhost'] : ['127.0.0.1', 'localhost'],
+      host: '0.0.0.0',
+      allowedHosts: true,
       proxy: {
         // WebSocket proxy: clients connect to /ws-gateway on the ClawSuite
         // server (any IP/port), which internally forwards to the local gateway.
