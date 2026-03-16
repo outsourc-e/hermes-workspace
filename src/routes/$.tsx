@@ -46,7 +46,7 @@ function NotFoundPage() {
             Go Back
           </button>
           <Link
-            to={"/chat/main" as string}
+            to={"/chat" as string}
             className={buttonVariants({ variant: 'default', size: 'default' })}
           >
             <HugeiconsIcon icon={Home01Icon} size={18} strokeWidth={1.5} />
@@ -59,7 +59,7 @@ function NotFoundPage() {
           <p className="text-sm text-primary-500 mb-3">Quick Links</p>
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
             <Link
-              to={'/chat/main' as string}
+              to={'/chat' as string}
               className="text-accent-500 hover:text-accent-600 hover:underline"
             >
               Chat

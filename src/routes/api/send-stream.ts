@@ -372,12 +372,75 @@ export const Route = createFileRoute('/api/send-stream')({
                       return
                     }
 
+                    if (event === 'artifact.created') {
+                      const artifact =
+                        data.artifact && typeof data.artifact === 'object'
+                          ? (data.artifact as Record<string, unknown>)
+                          : {}
+                      const translated = {
+                        phase: 'complete',
+                        name: readString(data.tool_name) || 'artifact',
+                        toolCallId: readString(data.tool_call_id) || undefined,
+                        result:
+                          readString(artifact.title) ||
+                          readString(artifact.path) ||
+                          readString(data.path) ||
+                          'Artifact created',
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('tool', translated)
+                      publishChatEvent('tool', translated)
+                      return
+                    }
+
+                    if (event === 'memory.updated') {
+                      const translated = {
+                        phase: 'complete',
+                        name: 'memory',
+                        toolCallId: readString(data.tool_call_id) || undefined,
+                        result:
+                          readString(data.message) ||
+                          `Updated ${readString(data.target) || 'memory'}`,
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('tool', translated)
+                      publishChatEvent('tool', translated)
+                      return
+                    }
+
+                    if (event === 'skill.loaded') {
+                      const skill =
+                        data.skill && typeof data.skill === 'object'
+                          ? (data.skill as Record<string, unknown>)
+                          : {}
+                      const translated = {
+                        phase: 'complete',
+                        name: 'skill',
+                        toolCallId: readString(data.tool_call_id) || undefined,
+                        result:
+                          readString(skill.name) ||
+                          readString(data.skill_name) ||
+                          'Skill loaded',
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('tool', translated)
+                      publishChatEvent('tool', translated)
+                      return
+                    }
+
                     if (event === 'tool.failed') {
+                      const errorMessage =
+                        readString(
+                          (data.error as Record<string, unknown> | undefined)?.message,
+                        ) || readString(data.message)
                       const translated = {
                         phase: 'error',
                         name: readString(data.tool_name) || 'tool',
                         toolCallId: readString(data.tool_call_id) || undefined,
-                        args: undefined,
+                        result: errorMessage,
                         sessionKey: sessionKeyFromEvent,
                         runId,
                       }

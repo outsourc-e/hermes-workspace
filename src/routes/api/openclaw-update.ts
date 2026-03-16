@@ -13,6 +13,8 @@ export const Route = createFileRoute('/api/openclaw-update')({
           latestVersion: '',
           updateAvailable: false,
           installType: 'unknown',
+          deprecated: true,
+          message: 'Legacy compatibility endpoint. Hermes Workspace updates are managed separately.',
         }),
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
@@ -21,7 +23,7 @@ export const Route = createFileRoute('/api/openclaw-update')({
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         return json(
-          { ok: false, error: 'Hermes updates are not available in Hermes Workspace.' },
+          { ok: false, error: 'Legacy compatibility endpoint. Hermes Workspace updates are managed separately.' },
           { status: 501 },
         )
       },

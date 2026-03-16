@@ -32,7 +32,7 @@ export type HermesMessage = {
   role: string
   content: string | null
   tool_call_id?: string | null
-  tool_calls?: string | null
+  tool_calls?: unknown[] | string | null
   tool_name?: string | null
   timestamp: number
   token_count?: number | null
@@ -160,9 +160,11 @@ export async function forkSession(
 
 /** Convert a HermesMessage to the GatewayMessage format the frontend expects */
 export function toGatewayMessage(msg: HermesMessage): Record<string, unknown> {
-  // Parse tool_calls JSON string if present
+  // Accept either parsed arrays from FastAPI or legacy JSON strings.
   let toolCalls: unknown[] | undefined
-  if (msg.tool_calls && typeof msg.tool_calls === 'string') {
+  if (Array.isArray(msg.tool_calls)) {
+    toolCalls = msg.tool_calls
+  } else if (msg.tool_calls && typeof msg.tool_calls === 'string') {
     try {
       toolCalls = JSON.parse(msg.tool_calls)
     } catch {

@@ -20,6 +20,7 @@ import {
 const execFileAsync = promisify(execFile)
 
 const WORKSPACE_ROOT = (
+  process.env.HERMES_WORKSPACE_DIR ||
   process.env.OPENCLAW_WORKSPACE_DIR ||
   path.join(os.homedir(), '.hermes')
 ).trim()

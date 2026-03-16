@@ -9,10 +9,17 @@ type ResolveSessionResult = {
   resolvedVia: 'raw' | 'friendly' | 'default'
 }
 
+const SYNTHETIC_SESSION_KEYS = new Set(['main', 'new'])
+
+export function isSyntheticSessionKey(value: string | null | undefined): boolean {
+  if (!value) return false
+  return SYNTHETIC_SESSION_KEYS.has(value.trim())
+}
+
 export async function resolveSessionKey({
   rawSessionKey,
   friendlyId,
-  defaultKey = 'main',
+  defaultKey = 'new',
 }: ResolveSessionKeyInput): Promise<ResolveSessionResult> {
   const trimmedRaw = rawSessionKey?.trim() ?? ''
   if (trimmedRaw.length > 0) {

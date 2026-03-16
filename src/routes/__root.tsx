@@ -61,7 +61,6 @@ const themeScript = `
     root.classList.remove('light', 'dark', 'system')
     root.classList.add(isDark ? 'dark' : 'light')
     root.setAttribute('data-theme', theme)
-    root.setAttribute('data-accent', 'orange')
     root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
 
     // Demo mode
@@ -116,12 +115,12 @@ export const Route = createRootRoute({
           'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual',
       },
       {
-        title: 'Hermes Workspace',
+        title: 'Hermes Agent Workspace',
       },
       {
         name: 'description',
         content:
-          'Hermes Agent workspace',
+          'Hermes Agent workspace for chat, tools, files, memory, and jobs.',
       },
       {
         property: 'og:image',
