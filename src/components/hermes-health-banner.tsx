@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const HERMES_API = 'http://localhost:8642'
-const POLL_INTERVAL = 15_000
+const POLL_INTERVAL = 30_000
 
 export function HermesHealthBanner() {
   const [status, setStatus] = useState<'ok' | 'error' | 'checking'>('checking')
@@ -12,7 +11,8 @@ export function HermesHealthBanner() {
 
     async function check() {
       try {
-        const res = await fetch(`${HERMES_API}/health`, { signal: AbortSignal.timeout(5000) })
+        // Check via same-origin gateway proxy (works from any device)
+        const res = await fetch('/api/auth-check', { signal: AbortSignal.timeout(5000) })
         if (!cancelled) {
           if (res.ok) {
             setStatus('ok')
@@ -56,7 +56,7 @@ export function HermesHealthBanner() {
         type="button"
         onClick={() => {
           setStatus('checking')
-          fetch(`${HERMES_API}/health`, { signal: AbortSignal.timeout(5000) })
+          fetch('/api/auth-check', { signal: AbortSignal.timeout(5000) })
             .then((res) => {
               setStatus(res.ok ? 'ok' : 'error')
               if (!res.ok) setLastError(`HTTP ${res.status}`)
