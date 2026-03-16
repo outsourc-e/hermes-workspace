@@ -256,6 +256,11 @@ const config = defineConfig(({ mode, command }) => {
       // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking gateway connectivity
       host: '0.0.0.0',
       allowedHosts: true,
+      watch: {
+        // Exclude generated route tree — TanStack Router's file watcher
+        // detects its own output as a change → infinite regeneration loop
+        ignored: ['**/routeTree.gen.ts'],
+      },
       proxy: {
         // WebSocket proxy: clients connect to /ws-gateway on the ClawSuite
         // server (any IP/port), which internally forwards to the local gateway.
