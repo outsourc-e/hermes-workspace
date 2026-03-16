@@ -6,6 +6,7 @@ import {
   BrainIcon,
   Chat01Icon,
   Clock01Icon,
+  Activity01Icon,
   ComputerTerminal01Icon,
   File01Icon,
   MessageMultiple01Icon,
@@ -551,6 +552,7 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isTerminalActive = pathname === '/terminal'
+  const isHealthActive = pathname === '/health'
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
@@ -792,8 +794,14 @@ function ChatSidebarComponent({
     },
   ]
 
-  const _systemItems: NavItemDef[] = [
-    // Settings is now a popup dialog, not a nav route
+  const systemItems: NavItemDef[] = [
+    {
+      kind: 'link',
+      to: '/health',
+      icon: Activity01Icon,
+      label: 'Health',
+      active: isHealthActive,
+    },
   ]
 
   return (
@@ -962,7 +970,14 @@ function ChatSidebarComponent({
             onSelectSession={onSelectSession}
           />
 
-          {/* System section removed — settings is a popup now */}
+          {/* System */}
+          <CollapsibleSection
+            expanded={true}
+            items={systemItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
         </div>
 
         {/* Sessions list */}

@@ -91,6 +91,7 @@ export function WorkspaceShell() {
     if (path.startsWith('/memory')) return 4
     if (path.startsWith('/skills')) return 5
     if (path.startsWith('/settings')) return 6
+    if (path.startsWith('/health')) return 7
     return -1
   }, [])
 
