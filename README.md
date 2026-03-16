@@ -51,24 +51,27 @@
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **Hermes Agent** running locally — [Setup Guide](https://github.com/NousResearch/hermes-agent)
+- **OpenClaw Gateway** running locally — [Setup Guide](https://github.com/nichochar/openclaw)
 
 ### Install & Run
 
 ```bash
 git clone https://github.com/outsourc-e/hermes-workspace.git
 cd hermes-workspace
-npm install
-cp .env.example .env       # Add your gateway URL + password
-npm run dev                # Starts on http://localhost:3000
+pnpm install
+cp .env.example .env       # Add your gateway URL + token
+pnpm dev                   # Starts on http://localhost:3000
 ```
 
 ### Environment Variables
 
 ```env
-GATEWAY_URL=http://localhost:18789
-GATEWAY_TOKEN=your_gateway_token
-STUDIO_PASSWORD=your_dashboard_password
+# Hermes Gateway connection (OpenClaw gateway)
+HERMES_GATEWAY_URL=ws://127.0.0.1:18789
+HERMES_GATEWAY_TOKEN=your_gateway_token
+
+# Optional: password-protect the web UI
+# HERMES_PASSWORD=your_password
 ```
 
 ---
@@ -166,55 +169,44 @@ Features pending cloud infrastructure:
 
 ## ✨ Features
 
-### 🤖 Mission Control & Agent Hub
-- Full multi-agent orchestration — spawn, pause, resume, abort
-- **Isometric office view** — see your agents working in real time
-- Live SSE output streaming per agent
-- Mission reports with success rate, token count, and artifacts
-- Exec approval prompts — approve/deny sensitive commands in-UI
-
 ### 💬 Chat
-- Real-time token streaming (no waiting for full response)
+- Real-time SSE streaming with tool call rendering
 - Multi-session management with full history
-- File and image attachments
 - Markdown + syntax highlighting
-- Message search (Cmd+F)
+- Chronological message ordering with merge dedup
+- Inspector panel for session activity, memory, and skills
 
-### 📊 Dashboard & Cost Analytics
-- Per-agent spend breakdown with daily trend charts
-- MTD totals and projected EOM cost
-- Provider-specific breakdowns (OpenAI, Anthropic, Google, etc.)
-- Gateway health, uptime, and system metrics footer
+### 🧠 Memory
+- Browse and edit agent memory files
+- Search across memory entries
+- Markdown preview with live editing
 
-### 🌐 Built-in Browser
-- Headed Chromium with stealth anti-detection
-- Agent handoff — share live pages with your AI
-- Persistent sessions (cookies survive restarts)
+### 🧩 Skills
+- Browse 2,000+ skills from the registry
+- View skill details, categories, and documentation
+- Skill management per session
 
-### 🛒 Skills Marketplace
-- 2,000+ skills from ClawdHub registry
-- Security scanning before install — every skill audited
-- One-click install with dependency resolution
+### 📁 Files
+- Full workspace file browser
+- Navigate directories, preview and edit files
+- Monaco editor integration
 
-### 🛠️ Developer Tools
-- **Terminal** — Full PTY with cross-platform support
-- **File Browser** — Navigate workspace, preview and edit files (Monaco editor)
-- **Memory Browser** — Browse and edit agent memory files
-- **Cron Manager** — Schedule recurring tasks and automations
-- **Debug Console** — Gateway diagnostics and pattern-based troubleshooter
+### 💻 Terminal
+- Full PTY terminal with cross-platform support
+- Persistent shell sessions
+- Direct workspace access
 
 ### 🎨 Themes
-- Paper Light, Ops Dark, Premium Dark
+- 8 themes: Official, Classic, Slate, Mono — each with light and dark variants
 - Theme persists across sessions
 - Full mobile dark mode support
 
 ### 🔒 Security
 - Auth middleware on all API routes
-- Wildcard CORS locked to localhost
+- CSP headers via meta tags
 - Path traversal prevention on file/memory routes
-- Rate limiting on all endpoints
-- Skills security scanning before install
-- Exec approval workflow for sensitive commands
+- Rate limiting on endpoints
+- Optional password protection for web UI
 
 ---
 
