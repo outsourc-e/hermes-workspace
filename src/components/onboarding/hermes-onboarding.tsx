@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
+// Provider icons — simple colored letter badges (SSR-safe, no @lobehub/icons ESM issues)
 
 const ONBOARDING_KEY = 'hermes-onboarding-complete'
 

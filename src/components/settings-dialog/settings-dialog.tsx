@@ -41,6 +41,7 @@ import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 import { applyAccentColor } from '@/lib/accent-colors'
+// Provider icons — colored letter badges (SSR-safe)
 import {
   DialogClose,
   DialogContent,
@@ -233,7 +234,7 @@ function HermesContent() {
                 style={cardStyle}
               >
                 <div className="flex w-full items-center justify-between">
-                  <div className="flex size-8 items-center justify-center rounded-lg text-white text-xs font-bold" style={{ backgroundColor: p.color }}>
+                  <div className="flex size-8 items-center justify-center rounded-lg text-white text-xs font-bold shrink-0" style={{ backgroundColor: p.color }}>
                     {p.letter}
                   </div>
                   {isActive && <span className="size-2 rounded-full bg-green-500" />}
