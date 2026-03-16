@@ -87,9 +87,10 @@ export function WorkspaceShell() {
     if (path.startsWith('/chat') || path === '/new' || path === '/') return 0
     if (path.startsWith('/files')) return 1
     if (path.startsWith('/terminal')) return 2
-    if (path.startsWith('/memory')) return 3
-    if (path.startsWith('/skills')) return 4
-    if (path.startsWith('/settings')) return 5
+    if (path.startsWith('/jobs')) return 3
+    if (path.startsWith('/memory')) return 4
+    if (path.startsWith('/skills')) return 5
+    if (path.startsWith('/settings')) return 6
     return -1
   }, [])
 

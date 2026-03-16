@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
   Chat01Icon,
+  Clock01Icon,
   CommandLineIcon,
   File01Icon,
   PuzzleIcon,
@@ -54,6 +55,13 @@ const TABS: TabItem[] = [
     icon: CommandLineIcon,
     to: '/terminal',
     match: (p) => p.startsWith('/terminal'),
+  },
+  {
+    id: 'jobs',
+    label: 'Jobs',
+    icon: Clock01Icon,
+    to: '/jobs',
+    match: (p) => p.startsWith('/jobs'),
   },
   {
     id: 'memory',

@@ -13,6 +13,7 @@ import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MemoryRouteImport } from './routes/memory'
+import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
@@ -33,6 +34,7 @@ import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -44,6 +46,7 @@ import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
 import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
 import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
+import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 
 const TerminalRoute = TerminalRouteImport.update({
@@ -64,6 +67,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const MemoryRoute = MemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JobsRoute = JobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -166,6 +174,11 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
   path: '/api/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHermesJobsRoute = ApiHermesJobsRouteImport.update({
+  id: '/api/hermes-jobs',
+  path: '/api/hermes-jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
   id: '/api/hermes-config',
   path: '/api/hermes-config',
@@ -221,6 +234,11 @@ const ApiMemoryListRoute = ApiMemoryListRouteImport.update({
   path: '/api/memory/list',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => ApiHermesJobsRoute,
+} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -232,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
+  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -242,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
+  '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
@@ -259,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
@@ -270,6 +291,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
+  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
@@ -279,6 +301,7 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
+  '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
@@ -296,6 +319,7 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
@@ -308,6 +332,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
+  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -318,6 +343,7 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
+  '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
@@ -335,6 +361,7 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
@@ -348,6 +375,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/files'
+    | '/jobs'
     | '/memory'
     | '/settings'
     | '/skills'
@@ -358,6 +386,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/files'
     | '/api/hermes-config'
+    | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
     | '/api/paths'
@@ -375,6 +404,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/hermes-jobs/$jobId'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
@@ -386,6 +416,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/files'
+    | '/jobs'
     | '/memory'
     | '/skills'
     | '/terminal'
@@ -395,6 +426,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/files'
     | '/api/hermes-config'
+    | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
     | '/api/paths'
@@ -412,6 +444,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat'
     | '/settings'
+    | '/api/hermes-jobs/$jobId'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
@@ -423,6 +456,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/files'
+    | '/jobs'
     | '/memory'
     | '/settings'
     | '/skills'
@@ -433,6 +467,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/files'
     | '/api/hermes-config'
+    | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
     | '/api/paths'
@@ -450,6 +485,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/hermes-jobs/$jobId'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
@@ -462,6 +498,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   FilesRoute: typeof FilesRoute
+  JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -472,6 +509,7 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
+  ApiHermesJobsRoute: typeof ApiHermesJobsRouteWithChildren
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelsRoute: typeof ApiModelsRoute
   ApiPathsRoute: typeof ApiPathsRoute
@@ -521,6 +559,13 @@ declare module '@tanstack/react-router' {
       path: '/memory'
       fullPath: '/memory'
       preLoaderRoute: typeof MemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/jobs': {
+      id: '/jobs'
+      path: '/jobs'
+      fullPath: '/jobs'
+      preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/files': {
@@ -663,6 +708,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hermes-jobs': {
+      id: '/api/hermes-jobs'
+      path: '/api/hermes-jobs'
+      fullPath: '/api/hermes-jobs'
+      preLoaderRoute: typeof ApiHermesJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hermes-config': {
       id: '/api/hermes-config'
       path: '/api/hermes-config'
@@ -740,6 +792,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMemoryListRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hermes-jobs/$jobId': {
+      id: '/api/hermes-jobs/$jobId'
+      path: '/$jobId'
+      fullPath: '/api/hermes-jobs/$jobId'
+      preLoaderRoute: typeof ApiHermesJobsJobIdRouteImport
+      parentRoute: typeof ApiHermesJobsRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -764,6 +823,18 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
 
+interface ApiHermesJobsRouteChildren {
+  ApiHermesJobsJobIdRoute: typeof ApiHermesJobsJobIdRoute
+}
+
+const ApiHermesJobsRouteChildren: ApiHermesJobsRouteChildren = {
+  ApiHermesJobsJobIdRoute: ApiHermesJobsJobIdRoute,
+}
+
+const ApiHermesJobsRouteWithChildren = ApiHermesJobsRoute._addFileChildren(
+  ApiHermesJobsRouteChildren,
+)
+
 interface ApiSessionsRouteChildren {
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
   ApiSessionsSessionKeyStatusRoute: typeof ApiSessionsSessionKeyStatusRoute
@@ -782,6 +853,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   FilesRoute: FilesRoute,
+  JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
@@ -792,6 +864,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
+  ApiHermesJobsRoute: ApiHermesJobsRouteWithChildren,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelsRoute: ApiModelsRoute,
   ApiPathsRoute: ApiPathsRoute,
