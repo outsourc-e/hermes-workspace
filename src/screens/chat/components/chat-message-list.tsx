@@ -451,6 +451,8 @@ function ChatMessageListComponent({
   // Filter messages — toolResult handled by grouping into assistant bubble below
   const displayMessages = useMemo(() => {
     const filteredMessages = messages.filter((msg) => {
+      // Hide tool messages — rendered as pills on the assistant message instead
+      if (msg.role === 'tool') return false
 
       const cleanedText = textFromMessage(msg).trim()
 

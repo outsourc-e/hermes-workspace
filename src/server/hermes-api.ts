@@ -173,17 +173,18 @@ export function toGatewayMessage(msg: HermesMessage): Record<string, unknown> {
   // Build content array
   const content: Array<Record<string, unknown>> = []
 
+  // Build streamToolCalls array for separate pill rendering (outside bubble)
+  const streamToolCallsArr: Array<Record<string, unknown>> = []
   if (msg.role === 'assistant' && toolCalls && Array.isArray(toolCalls)) {
-    // Add tool call content blocks
     for (const tc of toolCalls) {
       const fn = (tc as Record<string, unknown>).function as
         | Record<string, unknown>
         | undefined
-      content.push({
-        type: 'tool_call',
-        toolCallId: (tc as Record<string, unknown>).id,
-        toolName: fn?.name,
+      streamToolCallsArr.push({
+        id: (tc as Record<string, unknown>).id || `tc-${Math.random().toString(36).slice(2, 8)}`,
+        name: fn?.name || 'tool',
         args: fn?.arguments,
+        phase: 'complete',
       })
     }
   }
@@ -209,6 +210,7 @@ export function toGatewayMessage(msg: HermesMessage): Record<string, unknown> {
     timestamp: msg.timestamp ? msg.timestamp * 1000 : Date.now(),
     createdAt: msg.timestamp ? new Date(msg.timestamp * 1000).toISOString() : undefined,
     sessionKey: msg.session_id,
+    ...(streamToolCallsArr.length > 0 ? { streamToolCalls: streamToolCallsArr } : {}),
   }
 }
 
