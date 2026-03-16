@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  ArrowDown01Icon,
+  ArrowUp01Icon,
   Clock01Icon,
   RefreshIcon,
   Add01Icon,
@@ -17,6 +19,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import {
   fetchJobs,
+  fetchJobOutput,
   createJob,
   deleteJob,
   pauseJob,
@@ -36,11 +39,54 @@ function formatNextRun(nextRun?: string | null): string {
     const diffMs = d.getTime() - now.getTime()
     if (diffMs < 0) return 'overdue'
     if (diffMs < 60_000) return 'in < 1m'
-    if (diffMs < 3600_000) return `in ${Math.round(diffMs / 60_000)}m`
-    if (diffMs < 86400_000) return `in ${Math.round(diffMs / 3600_000)}h`
+    if (diffMs < 3_600_000) return `in ${Math.round(diffMs / 60_000)}m`
+    if (diffMs < 86_400_000) return `in ${Math.round(diffMs / 3_600_000)}h`
     return d.toLocaleDateString()
   } catch {
     return nextRun
+  }
+}
+
+function formatRunTimestamp(value?: string | null): string {
+  if (!value) return 'Never run'
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return value
+  }
+}
+
+function getOutputPreview(content: string): string {
+  const normalized = content.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= 200) return normalized
+  return `${normalized.slice(0, 200).trimEnd()}…`
+}
+
+function getLastRunStatus(job: HermesJob): {
+  label: string
+  color: string
+} {
+  if (!job.last_run_at) {
+    return {
+      label: 'Never run',
+      color: 'var(--theme-muted)',
+    }
+  }
+  if (job.last_run_success === true) {
+    return {
+      label: 'Last run succeeded',
+      color: 'var(--theme-success)',
+    }
+  }
+  if (job.last_run_success === false) {
+    return {
+      label: 'Last run failed',
+      color: 'var(--theme-danger)',
+    }
+  }
+  return {
+    label: 'Last run unknown',
+    color: 'var(--theme-muted)',
   }
 }
 
@@ -57,8 +103,16 @@ function JobCard({
   onTrigger: (id: string) => void
   onDelete: (id: string) => void
 }) {
+  const [expanded, setExpanded] = useState(false)
   const isPaused = job.state === 'paused' || !job.enabled
   const isCompleted = job.state === 'completed'
+  const lastRunStatus = getLastRunStatus(job)
+  const outputQuery = useQuery({
+    queryKey: ['hermes', 'jobs', job.id, 'output'],
+    queryFn: () => fetchJobOutput(job.id),
+    enabled: expanded,
+    staleTime: 30_000,
+  })
 
   return (
     <motion.div
@@ -73,25 +127,31 @@ function JobCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
             <span
-              className={cn(
-                'inline-block w-2 h-2 rounded-full shrink-0',
-                isPaused ? 'bg-yellow-500' : isCompleted ? 'bg-blue-500' : 'bg-green-500',
-              )}
+              className="inline-block h-2 w-2 shrink-0 rounded-full"
+              style={{
+                background: isPaused
+                  ? 'var(--theme-muted)'
+                  : isCompleted
+                    ? 'var(--theme-accent)'
+                    : 'var(--theme-text)',
+              }}
             />
-            <h3 className="font-medium text-sm text-[var(--theme-text)] truncate">
+            <h3 className="truncate text-sm font-medium text-[var(--theme-text)]">
               {job.name || '(unnamed)'}
             </h3>
           </div>
-          <p className="text-xs text-[var(--theme-muted)] line-clamp-2 mb-2">
+          <p className="mb-2 line-clamp-2 text-xs text-[var(--theme-muted)]">
             {job.prompt}
           </p>
-          <div className="flex items-center gap-3 text-[10px] text-[var(--theme-muted)]">
+          <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--theme-muted)]">
             <span>{job.schedule_display || 'custom'}</span>
             <span>·</span>
             <span>Next: {formatNextRun(job.next_run_at)}</span>
+            <span>·</span>
+            <span>Last: {formatRunTimestamp(job.last_run_at)}</span>
             {job.skills && job.skills.length > 0 && (
               <>
                 <span>·</span>
@@ -99,18 +159,29 @@ function JobCard({
               </>
             )}
           </div>
+          <div className="flex items-center gap-2 text-[11px] text-[var(--theme-muted)]">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ background: lastRunStatus.color }}
+            />
+            <span>{lastRunStatus.label}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             onClick={() => onTrigger(job.id)}
-            className="p-1.5 rounded-lg hover:bg-[var(--theme-hover)] transition-colors"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title="Run now"
           >
-            <HugeiconsIcon icon={PlayIcon} size={14} className="text-green-500" />
+            <HugeiconsIcon
+              icon={PlayIcon}
+              size={14}
+              className="text-[var(--theme-accent)]"
+            />
           </button>
           <button
             onClick={() => (isPaused ? onResume(job.id) : onPause(job.id))}
-            className="p-1.5 rounded-lg hover:bg-[var(--theme-hover)] transition-colors"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title={isPaused ? 'Resume' : 'Pause'}
           >
             <HugeiconsIcon
@@ -120,14 +191,82 @@ function JobCard({
             />
           </button>
           <button
+            onClick={() => setExpanded((current) => !current)}
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+            title={expanded ? 'Hide run history' : 'Show run history'}
+          >
+            <HugeiconsIcon
+              icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
+              size={14}
+              className="text-[var(--theme-muted)]"
+            />
+          </button>
+          <button
             onClick={() => onDelete(job.id)}
-            className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title="Delete"
           >
-            <HugeiconsIcon icon={Delete01Icon} size={14} className="text-red-400" />
+            <HugeiconsIcon
+              icon={Delete01Icon}
+              size={14}
+              style={{ color: 'var(--theme-danger)' }}
+            />
           </button>
         </div>
       </div>
+
+      <AnimatePresence initial={false}>
+        {expanded ? (
+          <motion.div
+            layout
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 border-t border-[var(--theme-border)] pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-[var(--theme-text)]">
+                  Run history
+                </p>
+                <p className="text-[10px] text-[var(--theme-muted)]">
+                  Showing recent outputs
+                </p>
+              </div>
+              {outputQuery.isLoading ? (
+                <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">
+                  Loading outputs...
+                </div>
+              ) : outputQuery.isError ? (
+                <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">
+                  Failed to load outputs.
+                </div>
+              ) : outputQuery.data && outputQuery.data.length > 0 ? (
+                <div className="space-y-2">
+                  {outputQuery.data.map((output) => (
+                    <div
+                      key={`${output.filename}-${output.timestamp}`}
+                      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-[var(--theme-muted)]">
+                        <span>{formatRunTimestamp(output.timestamp)}</span>
+                        <span className="truncate">{output.filename}</span>
+                      </div>
+                      <p className="text-xs leading-5 text-[var(--theme-text)]">
+                        {getOutputPreview(output.content) || 'No output content'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">
+                  No run outputs yet.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   )
 }
@@ -145,19 +284,31 @@ export function JobsScreen() {
 
   const pauseMutation = useMutation({
     mutationFn: pauseJob,
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: QUERY_KEY }); toast('Job paused') },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      toast('Job paused')
+    },
   })
   const resumeMutation = useMutation({
     mutationFn: resumeJob,
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: QUERY_KEY }); toast('Job resumed') },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      toast('Job resumed')
+    },
   })
   const triggerMutation = useMutation({
     mutationFn: triggerJob,
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: QUERY_KEY }); toast('Job triggered') },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      toast('Job triggered')
+    },
   })
   const deleteMutation = useMutation({
     mutationFn: deleteJob,
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: QUERY_KEY }); toast('Job deleted') },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      toast('Job deleted')
+    },
   })
   const createMutation = useMutation({
     mutationFn: createJob,
@@ -178,9 +329,7 @@ export function JobsScreen() {
     if (!search.trim()) return jobs
     const q = search.toLowerCase()
     return jobs.filter(
-      (j) =>
-        j.name?.toLowerCase().includes(q) ||
-        j.prompt?.toLowerCase().includes(q),
+      (j) => j.name?.toLowerCase().includes(q) || j.prompt?.toLowerCase().includes(q),
     )
   }, [jobsQuery.data, search])
 
@@ -199,14 +348,17 @@ export function JobsScreen() {
   )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={Clock01Icon} size={18} className="text-[var(--theme-accent)]" />
+          <HugeiconsIcon
+            icon={Clock01Icon}
+            size={18}
+            className="text-[var(--theme-accent)]"
+          />
           <h1 className="text-base font-semibold text-[var(--theme-text)]">Jobs</h1>
           {jobsQuery.data && (
-            <span className="text-xs text-[var(--theme-muted)] ml-1">
+            <span className="ml-1 text-xs text-[var(--theme-muted)]">
               ({jobsQuery.data.length})
             </span>
           )}
@@ -214,14 +366,19 @@ export function JobsScreen() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => void queryClient.invalidateQueries({ queryKey: QUERY_KEY })}
-            className="p-1.5 rounded-lg hover:bg-[var(--theme-hover)] transition-colors"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title="Refresh"
           >
-            <HugeiconsIcon icon={RefreshIcon} size={16} className="text-[var(--theme-muted)]" />
+            <HugeiconsIcon
+              icon={RefreshIcon}
+              size={16}
+              className="text-[var(--theme-muted)]"
+            />
           </button>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--theme-accent)] text-white text-xs font-medium hover:opacity-90 transition-opacity"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+            style={{ background: 'var(--theme-accent)' }}
           >
             <HugeiconsIcon icon={Add01Icon} size={14} />
             New Job
@@ -229,8 +386,7 @@ export function JobsScreen() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="px-4 py-2 border-b border-[var(--theme-border)]">
+      <div className="border-b border-[var(--theme-border)] px-4 py-2">
         <div className="relative">
           <HugeiconsIcon
             icon={Search01Icon}
@@ -242,26 +398,29 @@ export function JobsScreen() {
             placeholder="Search jobs..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-[var(--theme-input)] text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] border border-[var(--theme-border)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
+            className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] py-1.5 pl-8 pr-3 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
           />
         </div>
       </div>
 
-      {/* Job List */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
         {jobsQuery.isLoading ? (
-          <div className="flex items-center justify-center py-12 text-[var(--theme-muted)] text-sm">
+          <div className="flex items-center justify-center py-12 text-sm text-[var(--theme-muted)]">
             Loading jobs...
           </div>
         ) : jobsQuery.isError ? (
-          <div className="flex items-center justify-center py-12 text-red-400 text-sm">
-            Failed to load jobs: {jobsQuery.error instanceof Error ? jobsQuery.error.message : 'Unknown error'}
+          <div
+            className="flex items-center justify-center py-12 text-sm"
+            style={{ color: 'var(--theme-danger)' }}
+          >
+            Failed to load jobs:{' '}
+            {jobsQuery.error instanceof Error ? jobsQuery.error.message : 'Unknown error'}
           </div>
         ) : filteredJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-[var(--theme-muted)]">
             <HugeiconsIcon icon={Clock01Icon} size={32} className="mb-3 opacity-40" />
             <p className="text-sm font-medium">No scheduled jobs</p>
-            <p className="text-xs mt-1">Create one to get started</p>
+            <p className="mt-1 text-xs">Create one to get started</p>
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
