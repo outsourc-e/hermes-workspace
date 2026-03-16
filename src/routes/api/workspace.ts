@@ -46,7 +46,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
   // Priority 2: Environment variable
   const envWorkspace =
     process.env.HERMES_WORKSPACE_DIR?.trim() ||
-    process.env.HERMES_WORKSPACE_DIR || process.env.OPENCLAW_WORKSPACE_DIR?.trim()
+    process.env.HERMES_WORKSPACE_DIR?.trim()
   if (envWorkspace) {
     const isValid = await isValidDirectory(envWorkspace)
     if (isValid) {

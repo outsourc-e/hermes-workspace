@@ -1,6 +1,6 @@
 {
   "name": "hermes-workspace",
-  "version": "1.0.0-hackathon",
+  "version": "0.1.0",
   "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",

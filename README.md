@@ -6,7 +6,7 @@
 
 **Your AI agent's command center — chat, files, memory, skills, and terminal in one place.**
 
-[![Version](https://img.shields.io/badge/version-4.0.0-6366F1.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.0-6366F1.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6366F1.svg)](CONTRIBUTING.md)
@@ -19,7 +19,7 @@
 
 ---
 
-## ✨ What's New in v4.0
+## ✨ Features
 
 - 🤖 **Hermes Agent Integration** — Direct FastAPI backend connection with real-time SSE streaming
 - 🎨 **8-Theme System** — Official, Classic, Slate, Mono — each with light and dark variants
@@ -213,12 +213,12 @@ Features pending cloud infrastructure:
 
 | Feature | Status |
 |---------|--------|
-| Chat + SSE Streaming | ✅ Shipped (v4.0) |
-| Files + Terminal | ✅ Shipped (v4.0) |
-| Memory Browser | ✅ Shipped (v4.0) |
-| Skills Browser | ✅ Shipped (v4.0) |
-| Mobile PWA + Tailscale | ✅ Shipped (v4.0) |
-| 8-Theme System | ✅ Shipped (v4.0) |
+| Chat + SSE Streaming | ✅ Shipped |
+| Files + Terminal | ✅ Shipped |
+| Memory Browser | ✅ Shipped |
+| Skills Browser | ✅ Shipped |
+| Mobile PWA + Tailscale | ✅ Shipped |
+| 8-Theme System | ✅ Shipped |
 | Native Desktop App (Electron) | 🔨 In Development |
 | Model Switching & Config | 🔨 In Development |
 | Chat Abort / Cancel | 🔨 In Development |

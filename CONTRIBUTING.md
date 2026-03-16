@@ -4,80 +4,49 @@ Thanks for your interest in contributing! Here's how to get started.
 
 ## Quick Start
 
-1. **Fork** the repo and clone your fork
-2. **Install dependencies:** `npm install`
-3. **Install Playwright:** `npx playwright install chromium` (required for Browser tab)
-4. **Set up environment:**
+1. Fork the repo and clone your fork
+2. Install dependencies: `pnpm install`
+3. Set up environment:
    ```bash
    cp .env.example .env
-   # Edit .env with your gateway URL and token
-   # Hermes Workspace still uses the gateway token from: hermes gateway token
+   # Edit .env — set HERMES_API_URL (default: http://127.0.0.1:8642)
    ```
-5. **Run dev server:** `npm run dev`
-6. **Make your changes** on a feature branch
-7. **Open a PR** against `main`
+4. Start [Hermes Agent](https://github.com/NousResearch/hermes-agent) API server
+5. Run dev server: `pnpm dev`
+6. Make your changes on a feature branch
+7. Open a PR against `main`
 
 ## Development
 
 ```bash
 # Install dependencies
-npm install
-
-# Install Playwright browser
-npx playwright install chromium
+pnpm install
 
 # Dev server (default: localhost:3000)
-npm run dev
+pnpm dev
 
 # Type check
-npm run typecheck
+npx tsc --noEmit
 
 # Lint
-npm run lint
+pnpm lint
 
 # Build for production
-npm run build
+pnpm build
 ```
 
-**First-time setup:**
-- Copy `.env.example` to `.env`
-- Set `CLAWDBOT_GATEWAY_URL` (default: `ws://127.0.0.1:18789`)
-- Set `HERMES_GATEWAY_TOKEN` (find with `hermes gateway token`)
-- See [README.md](README.md#environment-setup) for detailed environment variable documentation
+## Environment Variables
+
+See `.env.example` for all options. Key ones:
+
+- `HERMES_API_URL` — Hermes Agent FastAPI backend (default: `http://127.0.0.1:8642`)
+- `HERMES_PASSWORD` — Optional password protection for the web UI
+- `HERMES_ALLOWED_HOSTS` — Comma-separated hostnames for non-localhost access
 
 ## Guidelines
 
 - **One PR per feature/fix** — keep them focused
-- **Test your changes** — make sure the app builds and runs
+- **Test your changes** — make sure the app builds (`npx tsc --noEmit`) and runs
 - **Describe what you changed** — clear PR title + description
 - **No secrets** — never commit API keys, tokens, or passwords
 - **Follow existing patterns** — match the code style you see
-
-## Architecture
-
-- **Framework:** TanStack Start + React
-- **Styling:** Tailwind CSS
-- **State:** TanStack Query + React hooks
-- **Hermes communication:** WebSocket via Hermes Agent RPC
-
-Key directories:
-
-```
-src/
-├── components/     # Shared UI components
-├── hooks/          # Custom React hooks
-├── lib/            # Utilities and helpers
-├── routes/         # TanStack Router pages + API routes
-├── screens/        # Major screen layouts (chat, dashboard)
-└── server/         # Server-side Hermes communication
-```
-
-## Reporting Issues
-
-- Use [GitHub Issues](https://github.com/outsourc-e/hermes-workspace/issues)
-- Include: what you expected, what happened, steps to reproduce
-- Screenshots help!
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).

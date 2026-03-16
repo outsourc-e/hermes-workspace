@@ -2,12 +2,9 @@ services:
   hermes-workspace:
     build: .
     ports:
-      - '3000:3000'
+      - "${PORT:-3000}:3000"
     environment:
-      - CLAWDBOT_GATEWAY_URL=${CLAWDBOT_GATEWAY_URL:-ws://host.docker.internal:18789}
-      - CLAWDBOT_GATEWAY_TOKEN=${CLAWDBOT_GATEWAY_TOKEN:-}
-      - HERMES_ALLOWED_HOSTS=${HERMES_ALLOWED_HOSTS:-${HERMES_ALLOWED_HOSTS:-}}
-      - HERMES_PASSWORD=${HERMES_PASSWORD:-${HERMES_PASSWORD:-}}
+      - HERMES_API_URL=${HERMES_API_URL:-http://host.docker.internal:8642}
+      - HERMES_PASSWORD=${HERMES_PASSWORD:-}
+      - HERMES_ALLOWED_HOSTS=${HERMES_ALLOWED_HOSTS:-}
     restart: unless-stopped
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'

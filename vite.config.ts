@@ -15,7 +15,7 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const gatewayUrl = env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+  const gatewayUrl = env.HERMES_API_URL?.trim() || 'http://127.0.0.1:8642'
   let workspaceDaemonStarted = false
   let workspaceDaemonStarting = false
   let workspaceDaemonShuttingDown = false
@@ -399,8 +399,8 @@ const config = defineConfig(({ mode, command }) => {
 
           // Replace specific env vars first, then the generic fallback
           let result = code
-          result = result.replace(/process\.env\.CLAWDBOT_GATEWAY_URL/g, JSON.stringify(gatewayUrl))
-          result = result.replace(/process\.env\.CLAWDBOT_GATEWAY_TOKEN/g, JSON.stringify(env.CLAWDBOT_GATEWAY_TOKEN || ''))
+          result = result.replace(/process\.env\.HERMES_API_URL/g, JSON.stringify(gatewayUrl))
+          result = result.replace(/process\.env\.HERMES_API_TOKEN/g, JSON.stringify(env.HERMES_API_TOKEN || ''))
           result = result.replace(/process\.env\.NODE_ENV/g, JSON.stringify(mode))
           result = result.replace(/process\.env/g, '{}')
           result = result.replace(/process\.platform/g, '"browser"')
