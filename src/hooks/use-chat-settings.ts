@@ -5,7 +5,7 @@ import { persist } from 'zustand/middleware'
 export type ThemeMode = 'system' | 'light' | 'dark'
 export type LoaderStyle =
   | 'dots'
-  | 'braille-claw'
+  | 'braille-hermes'
   | 'braille-orbit'
   | 'braille-breathe'
   | 'braille-pulse'

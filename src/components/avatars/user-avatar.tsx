@@ -10,7 +10,7 @@ type AvatarProps = {
 
 /**
  * User avatar — same logo family as assistant.
- * Dark slate rounded square with orange person silhouette + subtle claw accent.
+ * Dark slate rounded square with orange person silhouette + accent.
  */
 function UserAvatarComponent({
   size = 28,

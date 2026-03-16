@@ -58,7 +58,6 @@ const FEATURED_SKILLS: Array<{ id: string; group: string }> = [
   { id: 'atomtanstudio/craft-do', group: 'Most Popular' },
   { id: 'bro3886/gtasks-cli', group: 'New This Week' },
   { id: 'vvardhan14/pokerpal', group: 'New This Week' },
-  { id: 'okoddcat/clawops', group: 'Developer Tools' },
   {
     id: 'veeramanikandanr48/docker-containerization',
     group: 'Developer Tools',

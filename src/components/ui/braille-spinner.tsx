@@ -58,14 +58,14 @@ const PRESETS: Record<string, string[]> = {
     braille(D2, D5),
   ],
 
-  // Claw grabbing motion 🦀
+  // Hermes caduceus motion 🦀
   // Open pincer → closing → gripped → releasing
-  claw: [
+  hermes: [
     // Open wide - two "arms" spread
     braille(D1, D4), // tips open
     braille(D1, D2, D4, D5), // arms extending down
     braille(D1, D2, D3, D4, D5, D6), // full arms open
-    braille(D1, D2, D3, D7, D4, D5, D6, D8), // arms + base (fully open claw)
+    braille(D1, D2, D3, D7, D4, D5, D6, D8), // arms + base (animation frame)
     // Closing inward
     braille(D2, D3, D7, D5, D6, D8), // tips retract, mid closes
     braille(D3, D7, D6, D8), // closing more
@@ -122,7 +122,7 @@ type BrailleSpinnerProps = {
 }
 
 function BrailleSpinnerComponent({
-  preset = 'claw',
+  preset = 'hermes',
   size,
   color,
   speed = 100,
@@ -132,7 +132,7 @@ function BrailleSpinnerComponent({
   const [frame, setFrame] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const frames = PRESETS[preset] ?? PRESETS.claw!
+  const frames = PRESETS[preset] ?? PRESETS.hermes!
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
@@ -168,7 +168,7 @@ export { BrailleSpinner, PRESETS as BRAILLE_PRESETS }
 export type { BrailleSpinnerPreset, BrailleSpinnerProps }
 
 // Usage:
-// <BrailleSpinner />                          — default claw animation
+// <BrailleSpinner />                          — default hermes animation
 // <BrailleSpinner preset="braille" />          — classic rotating
 // <BrailleSpinner preset="orbit" size={24} />  — orbiting dot, 24px
-// <BrailleSpinner preset="claw" color="var(--color-primary-500)" speed={120} />
+// <BrailleSpinner preset="hermes" color="var(--color-primary-500)" speed={120} />

@@ -780,7 +780,7 @@ type LoaderStyleOption = { value: LoaderStyle; label: string }
 
 const LOADER_STYLES: LoaderStyleOption[] = [
   { value: 'dots', label: 'Dots' },
-  { value: 'braille-claw', label: 'Claw' },
+  { value: 'braille-hermes', label: 'Hermes' },
   { value: 'braille-orbit', label: 'Orbit' },
   { value: 'braille-breathe', label: 'Breathe' },
   { value: 'braille-pulse', label: 'Pulse' },
@@ -791,7 +791,7 @@ const LOADER_STYLES: LoaderStyleOption[] = [
 
 function getPreset(style: LoaderStyle): BrailleSpinnerPreset | null {
   const map: Record<string, BrailleSpinnerPreset> = {
-    'braille-claw': 'claw',
+    'braille-hermes': 'hermes',
     'braille-orbit': 'orbit',
     'braille-breathe': 'breathe',
     'braille-pulse': 'pulse',

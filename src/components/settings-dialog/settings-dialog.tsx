@@ -723,7 +723,7 @@ function _LoaderContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const styles: Array<{ value: LoaderStyle; label: string }> = [
     { value: 'dots', label: 'Dots' },
-    { value: 'braille-claw', label: 'Hermes' },
+    { value: 'braille-hermes', label: 'Hermes' },
     { value: 'braille-orbit', label: 'Orbit' },
     { value: 'braille-breathe', label: 'Breathe' },
     { value: 'braille-pulse', label: 'Pulse' },
@@ -733,7 +733,7 @@ function _LoaderContent() {
   ]
   function getPreset(s: LoaderStyle): BrailleSpinnerPreset | null {
     const m: Record<string, BrailleSpinnerPreset> = {
-      'braille-claw': 'claw',
+      'braille-hermes': 'hermes',
       'braille-orbit': 'orbit',
       'braille-breathe': 'breathe',
       'braille-pulse': 'pulse',
