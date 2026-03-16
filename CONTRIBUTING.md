@@ -11,7 +11,7 @@ Thanks for your interest in contributing! Here's how to get started.
    ```bash
    cp .env.example .env
    # Edit .env with your gateway URL and token
-   # Hermes Workspace still uses the gateway token from: openclaw config get gateway.auth.token
+   # Hermes Workspace still uses the gateway token from: hermes gateway token
    ```
 5. **Run dev server:** `npm run dev`
 6. **Make your changes** on a feature branch
@@ -42,7 +42,7 @@ npm run build
 **First-time setup:**
 - Copy `.env.example` to `.env`
 - Set `CLAWDBOT_GATEWAY_URL` (default: `ws://127.0.0.1:18789`)
-- Set `CLAWDBOT_GATEWAY_TOKEN` (find with `openclaw config get gateway.auth.token`)
+- Set `HERMES_GATEWAY_TOKEN` (find with `hermes gateway token`)
 - See [README.md](README.md#environment-setup) for detailed environment variable documentation
 
 ## Guidelines

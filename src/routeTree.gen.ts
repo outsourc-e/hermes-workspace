@@ -13,7 +13,6 @@ import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MemoryRouteImport } from './routes/memory'
-import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
@@ -21,114 +20,31 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
-import { Route as ApiWorkspaceTasksRouteImport } from './routes/api/workspace-tasks'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
-import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
-import { Route as ApiUsageAnalyticsRouteImport } from './routes/api/usage-analytics'
-import { Route as ApiUsageRouteImport } from './routes/api/usage'
-import { Route as ApiUpdateCheckRouteImport } from './routes/api/update-check'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
-import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
-import { Route as ApiStreamRouteImport } from './routes/api/stream'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
-import { Route as ApiSessionTitleRouteImport } from './routes/api/session-title'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
-import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
-import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
-import { Route as ApiOllamaHealthRouteImport } from './routes/api/ollama-health'
-import { Route as ApiNetworkUrlRouteImport } from './routes/api/network-url'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
-import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
-import { Route as ApiLocalSetupRouteImport } from './routes/api/local-setup'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
-import { Route as ApiEventsRouteImport } from './routes/api/events'
-import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
-import { Route as ApiCronRouteImport } from './routes/api/cron'
-import { Route as ApiCostRouteImport } from './routes/api/cost'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
-import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
-import { Route as ApiConfigGetRouteImport } from './routes/api/config-get'
-import { Route as ApiCliAgentsRouteImport } from './routes/api/cli-agents'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
-import { Route as ApiChatAbortRouteImport } from './routes/api/chat-abort'
-import { Route as ApiBrowserRouteImport } from './routes/api/browser'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
-import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activity'
-import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
-import { Route as ApiWorkspaceTeamsRouteImport } from './routes/api/workspace/teams'
-import { Route as ApiWorkspaceTaskRunsRouteImport } from './routes/api/workspace/task-runs'
-import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/stats'
-import { Route as ApiWorkspaceSkillsRouteImport } from './routes/api/workspace/skills'
-import { Route as ApiWorkspaceProjectsRouteImport } from './routes/api/workspace/projects'
-import { Route as ApiWorkspacePhasesRouteImport } from './routes/api/workspace/phases'
-import { Route as ApiWorkspaceMissionsRouteImport } from './routes/api/workspace/missions'
-import { Route as ApiWorkspaceMemoryFilesRouteImport } from './routes/api/workspace/memory-files'
-import { Route as ApiWorkspaceEventsRouteImport } from './routes/api/workspace/events'
-import { Route as ApiWorkspaceDecomposeRouteImport } from './routes/api/workspace/decompose'
-import { Route as ApiWorkspaceConfigRouteImport } from './routes/api/workspace/config'
-import { Route as ApiWorkspaceCheckpointsRouteImport } from './routes/api/workspace/checkpoints'
-import { Route as ApiWorkspaceAgentsRouteImport } from './routes/api/workspace/agents'
-import { Route as ApiWorkspaceTasksIdRouteImport } from './routes/api/workspace-tasks.$id'
-import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
 import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
 import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
-import { Route as ApiGatewayUsageRouteImport } from './routes/api/gateway/usage'
-import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway/status'
-import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
-import { Route as ApiGatewayNodesRouteImport } from './routes/api/gateway/nodes'
-import { Route as ApiGatewayChannelsRouteImport } from './routes/api/gateway/channels'
-import { Route as ApiEventsRecentRouteImport } from './routes/api/events/recent'
-import { Route as ApiDebugStatusRouteImport } from './routes/api/debug/status'
-import { Route as ApiDebugReconnectRouteImport } from './routes/api/debug/reconnect'
-import { Route as ApiCronUpsertRouteImport } from './routes/api/cron/upsert'
-import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
-import { Route as ApiCronRunIfDueRouteImport } from './routes/api/cron/run-if-due'
-import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
-import { Route as ApiCronListRouteImport } from './routes/api/cron/list'
-import { Route as ApiCronDeleteRouteImport } from './routes/api/cron/delete'
-import { Route as ApiCloudWebhookRouteImport } from './routes/api/cloud/webhook'
-import { Route as ApiCloudStatusRouteImport } from './routes/api/cloud/status'
-import { Route as ApiCloudProvisionRouteImport } from './routes/api/cloud/provision'
-import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
-import { Route as ApiWorkspaceTaskRunsAdhocRouteImport } from './routes/api/workspace/task-runs.adhoc'
-import { Route as ApiWorkspaceProjectsIdRouteImport } from './routes/api/workspace/projects.$id'
-import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/workspace/checkpoints.$id'
-import { Route as ApiWorkspaceAgentsIdRouteImport } from './routes/api/workspace/agents.$id'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
-import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
-import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents.$pid.kill'
-import { Route as ApiWorkspaceTeamsIdApprovalConfigRouteImport } from './routes/api/workspace/teams.$id.approval-config'
-import { Route as ApiWorkspaceTaskRunsIdStopRouteImport } from './routes/api/workspace/task-runs.$id.stop'
-import { Route as ApiWorkspaceTaskRunsIdRetryRouteImport } from './routes/api/workspace/task-runs.$id.retry'
-import { Route as ApiWorkspaceTaskRunsIdPauseRouteImport } from './routes/api/workspace/task-runs.$id.pause'
-import { Route as ApiWorkspaceTaskRunsIdEventsRouteImport } from './routes/api/workspace/task-runs.$id.events'
-import { Route as ApiWorkspaceSkillsIdContentRouteImport } from './routes/api/workspace/skills.$id.content'
-import { Route as ApiWorkspaceMissionsIdStopRouteImport } from './routes/api/workspace/missions.$id.stop'
-import { Route as ApiWorkspaceMissionsIdStatusRouteImport } from './routes/api/workspace/missions.$id.status'
-import { Route as ApiWorkspaceMissionsIdStartRouteImport } from './routes/api/workspace/missions.$id.start'
-import { Route as ApiWorkspaceMissionsIdResumeRouteImport } from './routes/api/workspace/missions.$id.resume'
-import { Route as ApiWorkspaceMissionsIdPauseRouteImport } from './routes/api/workspace/missions.$id.pause'
-import { Route as ApiWorkspaceCheckpointsIdVerifyTscRouteImport } from './routes/api/workspace/checkpoints.$id.verify-tsc'
-import { Route as ApiWorkspaceCheckpointsIdReviseRouteImport } from './routes/api/workspace/checkpoints.$id.revise'
-import { Route as ApiWorkspaceCheckpointsIdRejectRouteImport } from './routes/api/workspace/checkpoints.$id.reject'
-import { Route as ApiWorkspaceCheckpointsIdDiffRouteImport } from './routes/api/workspace/checkpoints.$id.diff'
-import { Route as ApiWorkspaceCheckpointsIdApproveAndPrRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-pr'
-import { Route as ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-merge'
-import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-commit'
-import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
@@ -148,11 +64,6 @@ const SettingsRoute = SettingsRouteImport.update({
 const MemoryRoute = MemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const JobsRoute = JobsRouteImport.update({
-  id: '/jobs',
-  path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -190,34 +101,9 @@ const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   path: '/chat/$sessionKey',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkspaceTasksRoute = ApiWorkspaceTasksRouteImport.update({
-  id: '/api/workspace-tasks',
-  path: '/api/workspace-tasks',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   id: '/api/workspace',
   path: '/api/workspace',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
-  id: '/api/validate-provider',
-  path: '/api/validate-provider',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiUsageAnalyticsRoute = ApiUsageAnalyticsRouteImport.update({
-  id: '/api/usage-analytics',
-  path: '/api/usage-analytics',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiUsageRoute = ApiUsageRouteImport.update({
-  id: '/api/usage',
-  path: '/api/usage',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiUpdateCheckRoute = ApiUpdateCheckRouteImport.update({
-  id: '/api/update-check',
-  path: '/api/update-check',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -240,16 +126,6 @@ const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
   path: '/api/terminal-close',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
-  id: '/api/system-metrics',
-  path: '/api/system-metrics',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiStreamRoute = ApiStreamRouteImport.update({
-  id: '/api/stream',
-  path: '/api/stream',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiSkillsRoute = ApiSkillsRouteImport.update({
   id: '/api/skills',
   path: '/api/skills',
@@ -258,11 +134,6 @@ const ApiSkillsRoute = ApiSkillsRouteImport.update({
 const ApiSessionsRoute = ApiSessionsRouteImport.update({
   id: '/api/sessions',
   path: '/api/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSessionTitleRoute = ApiSessionTitleRouteImport.update({
-  id: '/api/session-title',
-  path: '/api/session-title',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionStatusRoute = ApiSessionStatusRouteImport.update({
@@ -280,44 +151,14 @@ const ApiSendRoute = ApiSendRouteImport.update({
   path: '/api/send',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
-  id: '/api/provider-usage',
-  path: '/api/provider-usage',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPingRoute = ApiPingRouteImport.update({
-  id: '/api/ping',
-  path: '/api/ping',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOllamaHealthRoute = ApiOllamaHealthRouteImport.update({
-  id: '/api/ollama-health',
-  path: '/api/ollama-health',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiNetworkUrlRoute = ApiNetworkUrlRouteImport.update({
-  id: '/api/network-url',
-  path: '/api/network-url',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
   id: '/api/models',
   path: '/api/models',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiModelSwitchRoute = ApiModelSwitchRouteImport.update({
-  id: '/api/model-switch',
-  path: '/api/model-switch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLocalSetupRoute = ApiLocalSetupRouteImport.update({
-  id: '/api/local-setup',
-  path: '/api/local-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHistoryRoute = ApiHistoryRouteImport.update({
@@ -335,59 +176,14 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiEventsRoute = ApiEventsRouteImport.update({
-  id: '/api/events',
-  path: '/api/events',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
-  id: '/api/debug-analyze',
-  path: '/api/debug-analyze',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCronRoute = ApiCronRouteImport.update({
-  id: '/api/cron',
-  path: '/api/cron',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCostRoute = ApiCostRouteImport.update({
-  id: '/api/cost',
-  path: '/api/cost',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiContextUsageRoute = ApiContextUsageRouteImport.update({
   id: '/api/context-usage',
   path: '/api/context-usage',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiConfigPatchRoute = ApiConfigPatchRouteImport.update({
-  id: '/api/config-patch',
-  path: '/api/config-patch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiConfigGetRoute = ApiConfigGetRouteImport.update({
-  id: '/api/config-get',
-  path: '/api/config-get',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCliAgentsRoute = ApiCliAgentsRouteImport.update({
-  id: '/api/cli-agents',
-  path: '/api/cli-agents',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiChatEventsRoute = ApiChatEventsRouteImport.update({
   id: '/api/chat-events',
   path: '/api/chat-events',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiChatAbortRoute = ApiChatAbortRouteImport.update({
-  id: '/api/chat-abort',
-  path: '/api/chat-abort',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBrowserRoute = ApiBrowserRouteImport.update({
-  id: '/api/browser',
-  path: '/api/browser',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
@@ -398,91 +194,6 @@ const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
 const ApiAuthRoute = ApiAuthRouteImport.update({
   id: '/api/auth',
   path: '/api/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAgentActivityRoute = ApiAgentActivityRouteImport.update({
-  id: '/api/agent-activity',
-  path: '/api/agent-activity',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTasksIndexRoute = ApiTasksIndexRouteImport.update({
-  id: '/api/tasks/',
-  path: '/api/tasks/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWorkspaceTeamsRoute = ApiWorkspaceTeamsRouteImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceTaskRunsRoute = ApiWorkspaceTaskRunsRouteImport.update({
-  id: '/task-runs',
-  path: '/task-runs',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceStatsRoute = ApiWorkspaceStatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceSkillsRoute = ApiWorkspaceSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceProjectsRoute = ApiWorkspaceProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspacePhasesRoute = ApiWorkspacePhasesRouteImport.update({
-  id: '/phases',
-  path: '/phases',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceMissionsRoute = ApiWorkspaceMissionsRouteImport.update({
-  id: '/missions',
-  path: '/missions',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceMemoryFilesRoute = ApiWorkspaceMemoryFilesRouteImport.update({
-  id: '/memory-files',
-  path: '/memory-files',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceEventsRoute = ApiWorkspaceEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceDecomposeRoute = ApiWorkspaceDecomposeRouteImport.update({
-  id: '/decompose',
-  path: '/decompose',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceConfigRoute = ApiWorkspaceConfigRouteImport.update({
-  id: '/config',
-  path: '/config',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceCheckpointsRoute = ApiWorkspaceCheckpointsRouteImport.update({
-  id: '/checkpoints',
-  path: '/checkpoints',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceAgentsRoute = ApiWorkspaceAgentsRouteImport.update({
-  id: '/agents',
-  path: '/agents',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceTasksIdRoute = ApiWorkspaceTasksIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ApiWorkspaceTasksRoute,
-} as any)
-const ApiTasksTaskIdRoute = ApiTasksTaskIdRouteImport.update({
-  id: '/api/tasks/$taskId',
-  path: '/api/tasks/$taskId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
@@ -510,614 +221,126 @@ const ApiMemoryListRoute = ApiMemoryListRouteImport.update({
   path: '/api/memory/list',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiGatewayUsageRoute = ApiGatewayUsageRouteImport.update({
-  id: '/api/gateway/usage',
-  path: '/api/gateway/usage',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
-  id: '/api/gateway/status',
-  path: '/api/gateway/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewaySessionsRoute = ApiGatewaySessionsRouteImport.update({
-  id: '/api/gateway/sessions',
-  path: '/api/gateway/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayNodesRoute = ApiGatewayNodesRouteImport.update({
-  id: '/api/gateway/nodes',
-  path: '/api/gateway/nodes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayChannelsRoute = ApiGatewayChannelsRouteImport.update({
-  id: '/api/gateway/channels',
-  path: '/api/gateway/channels',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiEventsRecentRoute = ApiEventsRecentRouteImport.update({
-  id: '/recent',
-  path: '/recent',
-  getParentRoute: () => ApiEventsRoute,
-} as any)
-const ApiDebugStatusRoute = ApiDebugStatusRouteImport.update({
-  id: '/api/debug/status',
-  path: '/api/debug/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDebugReconnectRoute = ApiDebugReconnectRouteImport.update({
-  id: '/api/debug/reconnect',
-  path: '/api/debug/reconnect',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCronUpsertRoute = ApiCronUpsertRouteImport.update({
-  id: '/upsert',
-  path: '/upsert',
-  getParentRoute: () => ApiCronRoute,
-} as any)
-const ApiCronToggleRoute = ApiCronToggleRouteImport.update({
-  id: '/toggle',
-  path: '/toggle',
-  getParentRoute: () => ApiCronRoute,
-} as any)
-const ApiCronRunIfDueRoute = ApiCronRunIfDueRouteImport.update({
-  id: '/run-if-due',
-  path: '/run-if-due',
-  getParentRoute: () => ApiCronRoute,
-} as any)
-const ApiCronRunRoute = ApiCronRunRouteImport.update({
-  id: '/run',
-  path: '/run',
-  getParentRoute: () => ApiCronRoute,
-} as any)
-const ApiCronListRoute = ApiCronListRouteImport.update({
-  id: '/list',
-  path: '/list',
-  getParentRoute: () => ApiCronRoute,
-} as any)
-const ApiCronDeleteRoute = ApiCronDeleteRouteImport.update({
-  id: '/delete',
-  path: '/delete',
-  getParentRoute: () => ApiCronRoute,
-} as any)
-const ApiCloudWebhookRoute = ApiCloudWebhookRouteImport.update({
-  id: '/api/cloud/webhook',
-  path: '/api/cloud/webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCloudStatusRoute = ApiCloudStatusRouteImport.update({
-  id: '/api/cloud/status',
-  path: '/api/cloud/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCloudProvisionRoute = ApiCloudProvisionRouteImport.update({
-  id: '/api/cloud/provision',
-  path: '/api/cloud/provision',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBrowserNavigateRoute = ApiBrowserNavigateRouteImport.update({
-  id: '/navigate',
-  path: '/navigate',
-  getParentRoute: () => ApiBrowserRoute,
-} as any)
-const ApiWorkspaceTaskRunsAdhocRoute =
-  ApiWorkspaceTaskRunsAdhocRouteImport.update({
-    id: '/adhoc',
-    path: '/adhoc',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceProjectsIdRoute = ApiWorkspaceProjectsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ApiWorkspaceProjectsRoute,
-} as any)
-const ApiWorkspaceCheckpointsIdRoute =
-  ApiWorkspaceCheckpointsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiWorkspaceCheckpointsRoute,
-  } as any)
-const ApiWorkspaceAgentsIdRoute = ApiWorkspaceAgentsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ApiWorkspaceAgentsRoute,
-} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
     path: '/$sessionKey/status',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
-const ApiCronRunsJobIdRoute = ApiCronRunsJobIdRouteImport.update({
-  id: '/runs/$jobId',
-  path: '/runs/$jobId',
-  getParentRoute: () => ApiCronRoute,
-} as any)
-const ApiCliAgentsPidKillRoute = ApiCliAgentsPidKillRouteImport.update({
-  id: '/$pid/kill',
-  path: '/$pid/kill',
-  getParentRoute: () => ApiCliAgentsRoute,
-} as any)
-const ApiWorkspaceTeamsIdApprovalConfigRoute =
-  ApiWorkspaceTeamsIdApprovalConfigRouteImport.update({
-    id: '/$id/approval-config',
-    path: '/$id/approval-config',
-    getParentRoute: () => ApiWorkspaceTeamsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdStopRoute =
-  ApiWorkspaceTaskRunsIdStopRouteImport.update({
-    id: '/$id/stop',
-    path: '/$id/stop',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdRetryRoute =
-  ApiWorkspaceTaskRunsIdRetryRouteImport.update({
-    id: '/$id/retry',
-    path: '/$id/retry',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdPauseRoute =
-  ApiWorkspaceTaskRunsIdPauseRouteImport.update({
-    id: '/$id/pause',
-    path: '/$id/pause',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdEventsRoute =
-  ApiWorkspaceTaskRunsIdEventsRouteImport.update({
-    id: '/$id/events',
-    path: '/$id/events',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceSkillsIdContentRoute =
-  ApiWorkspaceSkillsIdContentRouteImport.update({
-    id: '/$id/content',
-    path: '/$id/content',
-    getParentRoute: () => ApiWorkspaceSkillsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdStopRoute =
-  ApiWorkspaceMissionsIdStopRouteImport.update({
-    id: '/$id/stop',
-    path: '/$id/stop',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdStatusRoute =
-  ApiWorkspaceMissionsIdStatusRouteImport.update({
-    id: '/$id/status',
-    path: '/$id/status',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdStartRoute =
-  ApiWorkspaceMissionsIdStartRouteImport.update({
-    id: '/$id/start',
-    path: '/$id/start',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdResumeRoute =
-  ApiWorkspaceMissionsIdResumeRouteImport.update({
-    id: '/$id/resume',
-    path: '/$id/resume',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdPauseRoute =
-  ApiWorkspaceMissionsIdPauseRouteImport.update({
-    id: '/$id/pause',
-    path: '/$id/pause',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdVerifyTscRoute =
-  ApiWorkspaceCheckpointsIdVerifyTscRouteImport.update({
-    id: '/verify-tsc',
-    path: '/verify-tsc',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdReviseRoute =
-  ApiWorkspaceCheckpointsIdReviseRouteImport.update({
-    id: '/revise',
-    path: '/revise',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdRejectRoute =
-  ApiWorkspaceCheckpointsIdRejectRouteImport.update({
-    id: '/reject',
-    path: '/reject',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdDiffRoute =
-  ApiWorkspaceCheckpointsIdDiffRouteImport.update({
-    id: '/diff',
-    path: '/diff',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveAndPrRoute =
-  ApiWorkspaceCheckpointsIdApproveAndPrRouteImport.update({
-    id: '/approve-and-pr',
-    path: '/approve-and-pr',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveAndMergeRoute =
-  ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport.update({
-    id: '/approve-and-merge',
-    path: '/approve-and-merge',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveAndCommitRoute =
-  ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport.update({
-    id: '/approve-and-commit',
-    path: '/approve-and-commit',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveRoute =
-  ApiWorkspaceCheckpointsIdApproveRouteImport.update({
-    id: '/approve',
-    path: '/approve',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
-  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
-  '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
-  '/api/browser': typeof ApiBrowserRouteWithChildren
-  '/api/chat-abort': typeof ApiChatAbortRoute
   '/api/chat-events': typeof ApiChatEventsRoute
-  '/api/cli-agents': typeof ApiCliAgentsRouteWithChildren
-  '/api/config-get': typeof ApiConfigGetRoute
-  '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
-  '/api/cost': typeof ApiCostRoute
-  '/api/cron': typeof ApiCronRouteWithChildren
-  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
-  '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
-  '/api/local-setup': typeof ApiLocalSetupRoute
-  '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
-  '/api/network-url': typeof ApiNetworkUrlRoute
-  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/paths': typeof ApiPathsRoute
-  '/api/ping': typeof ApiPingRoute
-  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-status': typeof ApiSessionStatusRoute
-  '/api/session-title': typeof ApiSessionTitleRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
-  '/api/stream': typeof ApiStreamRoute
-  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
-  '/api/update-check': typeof ApiUpdateCheckRoute
-  '/api/usage': typeof ApiUsageRoute
-  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
-  '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
-  '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/cloud/provision': typeof ApiCloudProvisionRoute
-  '/api/cloud/status': typeof ApiCloudStatusRoute
-  '/api/cloud/webhook': typeof ApiCloudWebhookRoute
-  '/api/cron/delete': typeof ApiCronDeleteRoute
-  '/api/cron/list': typeof ApiCronListRoute
-  '/api/cron/run': typeof ApiCronRunRoute
-  '/api/cron/run-if-due': typeof ApiCronRunIfDueRoute
-  '/api/cron/toggle': typeof ApiCronToggleRoute
-  '/api/cron/upsert': typeof ApiCronUpsertRoute
-  '/api/debug/reconnect': typeof ApiDebugReconnectRoute
-  '/api/debug/status': typeof ApiDebugStatusRoute
-  '/api/events/recent': typeof ApiEventsRecentRoute
-  '/api/gateway/channels': typeof ApiGatewayChannelsRoute
-  '/api/gateway/nodes': typeof ApiGatewayNodesRoute
-  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
-  '/api/gateway/status': typeof ApiGatewayStatusRoute
-  '/api/gateway/usage': typeof ApiGatewayUsageRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
-  '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
-  '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
-  '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
-  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
-  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
-  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
-  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
-  '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
-  '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
-  '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
-  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
-  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
-  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
-  '/api/workspace/teams': typeof ApiWorkspaceTeamsRouteWithChildren
-  '/api/tasks/': typeof ApiTasksIndexRoute
-  '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
-  '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
-  '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
-  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
-  '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  '/api/workspace/checkpoints/$id/approve-and-pr': typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  '/api/workspace/checkpoints/$id/diff': typeof ApiWorkspaceCheckpointsIdDiffRoute
-  '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
-  '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
-  '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
-  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
-  '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
-  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
-  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
-  '/api/workspace/skills/$id/content': typeof ApiWorkspaceSkillsIdContentRoute
-  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
-  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
-  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
-  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
-  '/api/workspace/teams/$id/approval-config': typeof ApiWorkspaceTeamsIdApprovalConfigRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
-  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
-  '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
-  '/api/browser': typeof ApiBrowserRouteWithChildren
-  '/api/chat-abort': typeof ApiChatAbortRoute
   '/api/chat-events': typeof ApiChatEventsRoute
-  '/api/cli-agents': typeof ApiCliAgentsRouteWithChildren
-  '/api/config-get': typeof ApiConfigGetRoute
-  '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
-  '/api/cost': typeof ApiCostRoute
-  '/api/cron': typeof ApiCronRouteWithChildren
-  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
-  '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
-  '/api/local-setup': typeof ApiLocalSetupRoute
-  '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
-  '/api/network-url': typeof ApiNetworkUrlRoute
-  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/paths': typeof ApiPathsRoute
-  '/api/ping': typeof ApiPingRoute
-  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-status': typeof ApiSessionStatusRoute
-  '/api/session-title': typeof ApiSessionTitleRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
-  '/api/stream': typeof ApiStreamRoute
-  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
-  '/api/update-check': typeof ApiUpdateCheckRoute
-  '/api/usage': typeof ApiUsageRoute
-  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
-  '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
-  '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
-  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/cloud/provision': typeof ApiCloudProvisionRoute
-  '/api/cloud/status': typeof ApiCloudStatusRoute
-  '/api/cloud/webhook': typeof ApiCloudWebhookRoute
-  '/api/cron/delete': typeof ApiCronDeleteRoute
-  '/api/cron/list': typeof ApiCronListRoute
-  '/api/cron/run': typeof ApiCronRunRoute
-  '/api/cron/run-if-due': typeof ApiCronRunIfDueRoute
-  '/api/cron/toggle': typeof ApiCronToggleRoute
-  '/api/cron/upsert': typeof ApiCronUpsertRoute
-  '/api/debug/reconnect': typeof ApiDebugReconnectRoute
-  '/api/debug/status': typeof ApiDebugStatusRoute
-  '/api/events/recent': typeof ApiEventsRecentRoute
-  '/api/gateway/channels': typeof ApiGatewayChannelsRoute
-  '/api/gateway/nodes': typeof ApiGatewayNodesRoute
-  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
-  '/api/gateway/status': typeof ApiGatewayStatusRoute
-  '/api/gateway/usage': typeof ApiGatewayUsageRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
-  '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
-  '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
-  '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
-  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
-  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
-  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
-  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
-  '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
-  '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
-  '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
-  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
-  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
-  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
-  '/api/workspace/teams': typeof ApiWorkspaceTeamsRouteWithChildren
-  '/api/tasks': typeof ApiTasksIndexRoute
-  '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
-  '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
-  '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
-  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
-  '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  '/api/workspace/checkpoints/$id/approve-and-pr': typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  '/api/workspace/checkpoints/$id/diff': typeof ApiWorkspaceCheckpointsIdDiffRoute
-  '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
-  '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
-  '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
-  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
-  '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
-  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
-  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
-  '/api/workspace/skills/$id/content': typeof ApiWorkspaceSkillsIdContentRoute
-  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
-  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
-  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
-  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
-  '/api/workspace/teams/$id/approval-config': typeof ApiWorkspaceTeamsIdApprovalConfigRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
-  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
-  '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
-  '/api/browser': typeof ApiBrowserRouteWithChildren
-  '/api/chat-abort': typeof ApiChatAbortRoute
   '/api/chat-events': typeof ApiChatEventsRoute
-  '/api/cli-agents': typeof ApiCliAgentsRouteWithChildren
-  '/api/config-get': typeof ApiConfigGetRoute
-  '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
-  '/api/cost': typeof ApiCostRoute
-  '/api/cron': typeof ApiCronRouteWithChildren
-  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
-  '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
-  '/api/local-setup': typeof ApiLocalSetupRoute
-  '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
-  '/api/network-url': typeof ApiNetworkUrlRoute
-  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/paths': typeof ApiPathsRoute
-  '/api/ping': typeof ApiPingRoute
-  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-status': typeof ApiSessionStatusRoute
-  '/api/session-title': typeof ApiSessionTitleRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
-  '/api/stream': typeof ApiStreamRoute
-  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
-  '/api/update-check': typeof ApiUpdateCheckRoute
-  '/api/usage': typeof ApiUsageRoute
-  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
-  '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
-  '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/cloud/provision': typeof ApiCloudProvisionRoute
-  '/api/cloud/status': typeof ApiCloudStatusRoute
-  '/api/cloud/webhook': typeof ApiCloudWebhookRoute
-  '/api/cron/delete': typeof ApiCronDeleteRoute
-  '/api/cron/list': typeof ApiCronListRoute
-  '/api/cron/run': typeof ApiCronRunRoute
-  '/api/cron/run-if-due': typeof ApiCronRunIfDueRoute
-  '/api/cron/toggle': typeof ApiCronToggleRoute
-  '/api/cron/upsert': typeof ApiCronUpsertRoute
-  '/api/debug/reconnect': typeof ApiDebugReconnectRoute
-  '/api/debug/status': typeof ApiDebugStatusRoute
-  '/api/events/recent': typeof ApiEventsRecentRoute
-  '/api/gateway/channels': typeof ApiGatewayChannelsRoute
-  '/api/gateway/nodes': typeof ApiGatewayNodesRoute
-  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
-  '/api/gateway/status': typeof ApiGatewayStatusRoute
-  '/api/gateway/usage': typeof ApiGatewayUsageRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
-  '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
-  '/api/workspace-tasks/$id': typeof ApiWorkspaceTasksIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
-  '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
-  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
-  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
-  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
-  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
-  '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
-  '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
-  '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
-  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
-  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
-  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
-  '/api/workspace/teams': typeof ApiWorkspaceTeamsRouteWithChildren
-  '/api/tasks/': typeof ApiTasksIndexRoute
-  '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
-  '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
-  '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
-  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
-  '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  '/api/workspace/checkpoints/$id/approve-and-pr': typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  '/api/workspace/checkpoints/$id/diff': typeof ApiWorkspaceCheckpointsIdDiffRoute
-  '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
-  '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
-  '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
-  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
-  '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
-  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
-  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
-  '/api/workspace/skills/$id/content': typeof ApiWorkspaceSkillsIdContentRoute
-  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
-  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
-  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
-  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
-  '/api/workspace/teams/$id/approval-config': typeof ApiWorkspaceTeamsIdApprovalConfigRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1125,438 +348,149 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/files'
-    | '/jobs'
     | '/memory'
     | '/settings'
     | '/skills'
     | '/terminal'
-    | '/api/agent-activity'
     | '/api/auth'
     | '/api/auth-check'
-    | '/api/browser'
-    | '/api/chat-abort'
     | '/api/chat-events'
-    | '/api/cli-agents'
-    | '/api/config-get'
-    | '/api/config-patch'
     | '/api/context-usage'
-    | '/api/cost'
-    | '/api/cron'
-    | '/api/debug-analyze'
-    | '/api/events'
     | '/api/files'
     | '/api/hermes-config'
     | '/api/history'
-    | '/api/local-setup'
-    | '/api/model-switch'
     | '/api/models'
-    | '/api/network-url'
-    | '/api/ollama-health'
     | '/api/paths'
-    | '/api/ping'
-    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-status'
-    | '/api/session-title'
     | '/api/sessions'
     | '/api/skills'
-    | '/api/stream'
-    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
-    | '/api/update-check'
-    | '/api/usage'
-    | '/api/usage-analytics'
-    | '/api/validate-provider'
     | '/api/workspace'
-    | '/api/workspace-tasks'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
-    | '/api/browser/navigate'
-    | '/api/cloud/provision'
-    | '/api/cloud/status'
-    | '/api/cloud/webhook'
-    | '/api/cron/delete'
-    | '/api/cron/list'
-    | '/api/cron/run'
-    | '/api/cron/run-if-due'
-    | '/api/cron/toggle'
-    | '/api/cron/upsert'
-    | '/api/debug/reconnect'
-    | '/api/debug/status'
-    | '/api/events/recent'
-    | '/api/gateway/channels'
-    | '/api/gateway/nodes'
-    | '/api/gateway/sessions'
-    | '/api/gateway/status'
-    | '/api/gateway/usage'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
     | '/api/sessions/send'
-    | '/api/tasks/$taskId'
-    | '/api/workspace-tasks/$id'
-    | '/api/workspace/agents'
-    | '/api/workspace/checkpoints'
-    | '/api/workspace/config'
-    | '/api/workspace/decompose'
-    | '/api/workspace/events'
-    | '/api/workspace/memory-files'
-    | '/api/workspace/missions'
-    | '/api/workspace/phases'
-    | '/api/workspace/projects'
-    | '/api/workspace/skills'
-    | '/api/workspace/stats'
-    | '/api/workspace/task-runs'
-    | '/api/workspace/teams'
-    | '/api/tasks/'
-    | '/api/cli-agents/$pid/kill'
-    | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
-    | '/api/workspace/agents/$id'
-    | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/projects/$id'
-    | '/api/workspace/task-runs/adhoc'
-    | '/api/workspace/checkpoints/$id/approve'
-    | '/api/workspace/checkpoints/$id/approve-and-commit'
-    | '/api/workspace/checkpoints/$id/approve-and-merge'
-    | '/api/workspace/checkpoints/$id/approve-and-pr'
-    | '/api/workspace/checkpoints/$id/diff'
-    | '/api/workspace/checkpoints/$id/reject'
-    | '/api/workspace/checkpoints/$id/revise'
-    | '/api/workspace/checkpoints/$id/verify-tsc'
-    | '/api/workspace/missions/$id/pause'
-    | '/api/workspace/missions/$id/resume'
-    | '/api/workspace/missions/$id/start'
-    | '/api/workspace/missions/$id/status'
-    | '/api/workspace/missions/$id/stop'
-    | '/api/workspace/skills/$id/content'
-    | '/api/workspace/task-runs/$id/events'
-    | '/api/workspace/task-runs/$id/pause'
-    | '/api/workspace/task-runs/$id/retry'
-    | '/api/workspace/task-runs/$id/stop'
-    | '/api/workspace/teams/$id/approval-config'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$'
     | '/files'
-    | '/jobs'
     | '/memory'
     | '/skills'
     | '/terminal'
-    | '/api/agent-activity'
     | '/api/auth'
     | '/api/auth-check'
-    | '/api/browser'
-    | '/api/chat-abort'
     | '/api/chat-events'
-    | '/api/cli-agents'
-    | '/api/config-get'
-    | '/api/config-patch'
     | '/api/context-usage'
-    | '/api/cost'
-    | '/api/cron'
-    | '/api/debug-analyze'
-    | '/api/events'
     | '/api/files'
     | '/api/hermes-config'
     | '/api/history'
-    | '/api/local-setup'
-    | '/api/model-switch'
     | '/api/models'
-    | '/api/network-url'
-    | '/api/ollama-health'
     | '/api/paths'
-    | '/api/ping'
-    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-status'
-    | '/api/session-title'
     | '/api/sessions'
     | '/api/skills'
-    | '/api/stream'
-    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
-    | '/api/update-check'
-    | '/api/usage'
-    | '/api/usage-analytics'
-    | '/api/validate-provider'
     | '/api/workspace'
-    | '/api/workspace-tasks'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat'
     | '/settings'
-    | '/api/browser/navigate'
-    | '/api/cloud/provision'
-    | '/api/cloud/status'
-    | '/api/cloud/webhook'
-    | '/api/cron/delete'
-    | '/api/cron/list'
-    | '/api/cron/run'
-    | '/api/cron/run-if-due'
-    | '/api/cron/toggle'
-    | '/api/cron/upsert'
-    | '/api/debug/reconnect'
-    | '/api/debug/status'
-    | '/api/events/recent'
-    | '/api/gateway/channels'
-    | '/api/gateway/nodes'
-    | '/api/gateway/sessions'
-    | '/api/gateway/status'
-    | '/api/gateway/usage'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
     | '/api/sessions/send'
-    | '/api/tasks/$taskId'
-    | '/api/workspace-tasks/$id'
-    | '/api/workspace/agents'
-    | '/api/workspace/checkpoints'
-    | '/api/workspace/config'
-    | '/api/workspace/decompose'
-    | '/api/workspace/events'
-    | '/api/workspace/memory-files'
-    | '/api/workspace/missions'
-    | '/api/workspace/phases'
-    | '/api/workspace/projects'
-    | '/api/workspace/skills'
-    | '/api/workspace/stats'
-    | '/api/workspace/task-runs'
-    | '/api/workspace/teams'
-    | '/api/tasks'
-    | '/api/cli-agents/$pid/kill'
-    | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
-    | '/api/workspace/agents/$id'
-    | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/projects/$id'
-    | '/api/workspace/task-runs/adhoc'
-    | '/api/workspace/checkpoints/$id/approve'
-    | '/api/workspace/checkpoints/$id/approve-and-commit'
-    | '/api/workspace/checkpoints/$id/approve-and-merge'
-    | '/api/workspace/checkpoints/$id/approve-and-pr'
-    | '/api/workspace/checkpoints/$id/diff'
-    | '/api/workspace/checkpoints/$id/reject'
-    | '/api/workspace/checkpoints/$id/revise'
-    | '/api/workspace/checkpoints/$id/verify-tsc'
-    | '/api/workspace/missions/$id/pause'
-    | '/api/workspace/missions/$id/resume'
-    | '/api/workspace/missions/$id/start'
-    | '/api/workspace/missions/$id/status'
-    | '/api/workspace/missions/$id/stop'
-    | '/api/workspace/skills/$id/content'
-    | '/api/workspace/task-runs/$id/events'
-    | '/api/workspace/task-runs/$id/pause'
-    | '/api/workspace/task-runs/$id/retry'
-    | '/api/workspace/task-runs/$id/stop'
-    | '/api/workspace/teams/$id/approval-config'
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/files'
-    | '/jobs'
     | '/memory'
     | '/settings'
     | '/skills'
     | '/terminal'
-    | '/api/agent-activity'
     | '/api/auth'
     | '/api/auth-check'
-    | '/api/browser'
-    | '/api/chat-abort'
     | '/api/chat-events'
-    | '/api/cli-agents'
-    | '/api/config-get'
-    | '/api/config-patch'
     | '/api/context-usage'
-    | '/api/cost'
-    | '/api/cron'
-    | '/api/debug-analyze'
-    | '/api/events'
     | '/api/files'
     | '/api/hermes-config'
     | '/api/history'
-    | '/api/local-setup'
-    | '/api/model-switch'
     | '/api/models'
-    | '/api/network-url'
-    | '/api/ollama-health'
     | '/api/paths'
-    | '/api/ping'
-    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-status'
-    | '/api/session-title'
     | '/api/sessions'
     | '/api/skills'
-    | '/api/stream'
-    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
-    | '/api/update-check'
-    | '/api/usage'
-    | '/api/usage-analytics'
-    | '/api/validate-provider'
     | '/api/workspace'
-    | '/api/workspace-tasks'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
-    | '/api/browser/navigate'
-    | '/api/cloud/provision'
-    | '/api/cloud/status'
-    | '/api/cloud/webhook'
-    | '/api/cron/delete'
-    | '/api/cron/list'
-    | '/api/cron/run'
-    | '/api/cron/run-if-due'
-    | '/api/cron/toggle'
-    | '/api/cron/upsert'
-    | '/api/debug/reconnect'
-    | '/api/debug/status'
-    | '/api/events/recent'
-    | '/api/gateway/channels'
-    | '/api/gateway/nodes'
-    | '/api/gateway/sessions'
-    | '/api/gateway/status'
-    | '/api/gateway/usage'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
     | '/api/sessions/send'
-    | '/api/tasks/$taskId'
-    | '/api/workspace-tasks/$id'
-    | '/api/workspace/agents'
-    | '/api/workspace/checkpoints'
-    | '/api/workspace/config'
-    | '/api/workspace/decompose'
-    | '/api/workspace/events'
-    | '/api/workspace/memory-files'
-    | '/api/workspace/missions'
-    | '/api/workspace/phases'
-    | '/api/workspace/projects'
-    | '/api/workspace/skills'
-    | '/api/workspace/stats'
-    | '/api/workspace/task-runs'
-    | '/api/workspace/teams'
-    | '/api/tasks/'
-    | '/api/cli-agents/$pid/kill'
-    | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
-    | '/api/workspace/agents/$id'
-    | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/projects/$id'
-    | '/api/workspace/task-runs/adhoc'
-    | '/api/workspace/checkpoints/$id/approve'
-    | '/api/workspace/checkpoints/$id/approve-and-commit'
-    | '/api/workspace/checkpoints/$id/approve-and-merge'
-    | '/api/workspace/checkpoints/$id/approve-and-pr'
-    | '/api/workspace/checkpoints/$id/diff'
-    | '/api/workspace/checkpoints/$id/reject'
-    | '/api/workspace/checkpoints/$id/revise'
-    | '/api/workspace/checkpoints/$id/verify-tsc'
-    | '/api/workspace/missions/$id/pause'
-    | '/api/workspace/missions/$id/resume'
-    | '/api/workspace/missions/$id/start'
-    | '/api/workspace/missions/$id/status'
-    | '/api/workspace/missions/$id/stop'
-    | '/api/workspace/skills/$id/content'
-    | '/api/workspace/task-runs/$id/events'
-    | '/api/workspace/task-runs/$id/pause'
-    | '/api/workspace/task-runs/$id/retry'
-    | '/api/workspace/task-runs/$id/stop'
-    | '/api/workspace/teams/$id/approval-config'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   FilesRoute: typeof FilesRoute
-  JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
   TerminalRoute: typeof TerminalRoute
-  ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
-  ApiBrowserRoute: typeof ApiBrowserRouteWithChildren
-  ApiChatAbortRoute: typeof ApiChatAbortRoute
   ApiChatEventsRoute: typeof ApiChatEventsRoute
-  ApiCliAgentsRoute: typeof ApiCliAgentsRouteWithChildren
-  ApiConfigGetRoute: typeof ApiConfigGetRoute
-  ApiConfigPatchRoute: typeof ApiConfigPatchRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
-  ApiCostRoute: typeof ApiCostRoute
-  ApiCronRoute: typeof ApiCronRouteWithChildren
-  ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
-  ApiEventsRoute: typeof ApiEventsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
-  ApiLocalSetupRoute: typeof ApiLocalSetupRoute
-  ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
-  ApiNetworkUrlRoute: typeof ApiNetworkUrlRoute
-  ApiOllamaHealthRoute: typeof ApiOllamaHealthRoute
   ApiPathsRoute: typeof ApiPathsRoute
-  ApiPingRoute: typeof ApiPingRoute
-  ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
-  ApiSessionTitleRoute: typeof ApiSessionTitleRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRoute
-  ApiStreamRoute: typeof ApiStreamRoute
-  ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
-  ApiUpdateCheckRoute: typeof ApiUpdateCheckRoute
-  ApiUsageRoute: typeof ApiUsageRoute
-  ApiUsageAnalyticsRoute: typeof ApiUsageAnalyticsRoute
-  ApiValidateProviderRoute: typeof ApiValidateProviderRoute
-  ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
-  ApiWorkspaceTasksRoute: typeof ApiWorkspaceTasksRouteWithChildren
+  ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
-  ApiCloudProvisionRoute: typeof ApiCloudProvisionRoute
-  ApiCloudStatusRoute: typeof ApiCloudStatusRoute
-  ApiCloudWebhookRoute: typeof ApiCloudWebhookRoute
-  ApiDebugReconnectRoute: typeof ApiDebugReconnectRoute
-  ApiDebugStatusRoute: typeof ApiDebugStatusRoute
-  ApiGatewayChannelsRoute: typeof ApiGatewayChannelsRoute
-  ApiGatewayNodesRoute: typeof ApiGatewayNodesRoute
-  ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
-  ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
-  ApiGatewayUsageRoute: typeof ApiGatewayUsageRoute
   ApiMemoryListRoute: typeof ApiMemoryListRoute
   ApiMemoryReadRoute: typeof ApiMemoryReadRoute
   ApiMemorySearchRoute: typeof ApiMemorySearchRoute
   ApiMemoryWriteRoute: typeof ApiMemoryWriteRoute
-  ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
-  ApiTasksIndexRoute: typeof ApiTasksIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1587,13 +521,6 @@ declare module '@tanstack/react-router' {
       path: '/memory'
       fullPath: '/memory'
       preLoaderRoute: typeof MemoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/jobs': {
-      id: '/jobs'
-      path: '/jobs'
-      fullPath: '/jobs'
-      preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/files': {
@@ -1645,46 +572,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSessionKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/workspace-tasks': {
-      id: '/api/workspace-tasks'
-      path: '/api/workspace-tasks'
-      fullPath: '/api/workspace-tasks'
-      preLoaderRoute: typeof ApiWorkspaceTasksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/workspace': {
       id: '/api/workspace'
       path: '/api/workspace'
       fullPath: '/api/workspace'
       preLoaderRoute: typeof ApiWorkspaceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/validate-provider': {
-      id: '/api/validate-provider'
-      path: '/api/validate-provider'
-      fullPath: '/api/validate-provider'
-      preLoaderRoute: typeof ApiValidateProviderRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/usage-analytics': {
-      id: '/api/usage-analytics'
-      path: '/api/usage-analytics'
-      fullPath: '/api/usage-analytics'
-      preLoaderRoute: typeof ApiUsageAnalyticsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/usage': {
-      id: '/api/usage'
-      path: '/api/usage'
-      fullPath: '/api/usage'
-      preLoaderRoute: typeof ApiUsageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/update-check': {
-      id: '/api/update-check'
-      path: '/api/update-check'
-      fullPath: '/api/update-check'
-      preLoaderRoute: typeof ApiUpdateCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -1715,20 +607,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTerminalCloseRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/system-metrics': {
-      id: '/api/system-metrics'
-      path: '/api/system-metrics'
-      fullPath: '/api/system-metrics'
-      preLoaderRoute: typeof ApiSystemMetricsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/stream': {
-      id: '/api/stream'
-      path: '/api/stream'
-      fullPath: '/api/stream'
-      preLoaderRoute: typeof ApiStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/skills': {
       id: '/api/skills'
       path: '/api/skills'
@@ -1741,13 +619,6 @@ declare module '@tanstack/react-router' {
       path: '/api/sessions'
       fullPath: '/api/sessions'
       preLoaderRoute: typeof ApiSessionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/session-title': {
-      id: '/api/session-title'
-      path: '/api/session-title'
-      fullPath: '/api/session-title'
-      preLoaderRoute: typeof ApiSessionTitleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/session-status': {
@@ -1771,20 +642,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSendRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/provider-usage': {
-      id: '/api/provider-usage'
-      path: '/api/provider-usage'
-      fullPath: '/api/provider-usage'
-      preLoaderRoute: typeof ApiProviderUsageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ping': {
-      id: '/api/ping'
-      path: '/api/ping'
-      fullPath: '/api/ping'
-      preLoaderRoute: typeof ApiPingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/paths': {
       id: '/api/paths'
       path: '/api/paths'
@@ -1792,39 +649,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPathsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/ollama-health': {
-      id: '/api/ollama-health'
-      path: '/api/ollama-health'
-      fullPath: '/api/ollama-health'
-      preLoaderRoute: typeof ApiOllamaHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/network-url': {
-      id: '/api/network-url'
-      path: '/api/network-url'
-      fullPath: '/api/network-url'
-      preLoaderRoute: typeof ApiNetworkUrlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/models': {
       id: '/api/models'
       path: '/api/models'
       fullPath: '/api/models'
       preLoaderRoute: typeof ApiModelsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/model-switch': {
-      id: '/api/model-switch'
-      path: '/api/model-switch'
-      fullPath: '/api/model-switch'
-      preLoaderRoute: typeof ApiModelSwitchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/local-setup': {
-      id: '/api/local-setup'
-      path: '/api/local-setup'
-      fullPath: '/api/local-setup'
-      preLoaderRoute: typeof ApiLocalSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/history': {
@@ -1848,34 +677,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/events': {
-      id: '/api/events'
-      path: '/api/events'
-      fullPath: '/api/events'
-      preLoaderRoute: typeof ApiEventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/debug-analyze': {
-      id: '/api/debug-analyze'
-      path: '/api/debug-analyze'
-      fullPath: '/api/debug-analyze'
-      preLoaderRoute: typeof ApiDebugAnalyzeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cron': {
-      id: '/api/cron'
-      path: '/api/cron'
-      fullPath: '/api/cron'
-      preLoaderRoute: typeof ApiCronRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cost': {
-      id: '/api/cost'
-      path: '/api/cost'
-      fullPath: '/api/cost'
-      preLoaderRoute: typeof ApiCostRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/context-usage': {
       id: '/api/context-usage'
       path: '/api/context-usage'
@@ -1883,46 +684,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiContextUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/config-patch': {
-      id: '/api/config-patch'
-      path: '/api/config-patch'
-      fullPath: '/api/config-patch'
-      preLoaderRoute: typeof ApiConfigPatchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/config-get': {
-      id: '/api/config-get'
-      path: '/api/config-get'
-      fullPath: '/api/config-get'
-      preLoaderRoute: typeof ApiConfigGetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cli-agents': {
-      id: '/api/cli-agents'
-      path: '/api/cli-agents'
-      fullPath: '/api/cli-agents'
-      preLoaderRoute: typeof ApiCliAgentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/chat-events': {
       id: '/api/chat-events'
       path: '/api/chat-events'
       fullPath: '/api/chat-events'
       preLoaderRoute: typeof ApiChatEventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/chat-abort': {
-      id: '/api/chat-abort'
-      path: '/api/chat-abort'
-      fullPath: '/api/chat-abort'
-      preLoaderRoute: typeof ApiChatAbortRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/browser': {
-      id: '/api/browser'
-      path: '/api/browser'
-      fullPath: '/api/browser'
-      preLoaderRoute: typeof ApiBrowserRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth-check': {
@@ -1937,125 +703,6 @@ declare module '@tanstack/react-router' {
       path: '/api/auth'
       fullPath: '/api/auth'
       preLoaderRoute: typeof ApiAuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/agent-activity': {
-      id: '/api/agent-activity'
-      path: '/api/agent-activity'
-      fullPath: '/api/agent-activity'
-      preLoaderRoute: typeof ApiAgentActivityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks/': {
-      id: '/api/tasks/'
-      path: '/api/tasks'
-      fullPath: '/api/tasks/'
-      preLoaderRoute: typeof ApiTasksIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/workspace/teams': {
-      id: '/api/workspace/teams'
-      path: '/teams'
-      fullPath: '/api/workspace/teams'
-      preLoaderRoute: typeof ApiWorkspaceTeamsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/task-runs': {
-      id: '/api/workspace/task-runs'
-      path: '/task-runs'
-      fullPath: '/api/workspace/task-runs'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/stats': {
-      id: '/api/workspace/stats'
-      path: '/stats'
-      fullPath: '/api/workspace/stats'
-      preLoaderRoute: typeof ApiWorkspaceStatsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/skills': {
-      id: '/api/workspace/skills'
-      path: '/skills'
-      fullPath: '/api/workspace/skills'
-      preLoaderRoute: typeof ApiWorkspaceSkillsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/projects': {
-      id: '/api/workspace/projects'
-      path: '/projects'
-      fullPath: '/api/workspace/projects'
-      preLoaderRoute: typeof ApiWorkspaceProjectsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/phases': {
-      id: '/api/workspace/phases'
-      path: '/phases'
-      fullPath: '/api/workspace/phases'
-      preLoaderRoute: typeof ApiWorkspacePhasesRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/missions': {
-      id: '/api/workspace/missions'
-      path: '/missions'
-      fullPath: '/api/workspace/missions'
-      preLoaderRoute: typeof ApiWorkspaceMissionsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/memory-files': {
-      id: '/api/workspace/memory-files'
-      path: '/memory-files'
-      fullPath: '/api/workspace/memory-files'
-      preLoaderRoute: typeof ApiWorkspaceMemoryFilesRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/events': {
-      id: '/api/workspace/events'
-      path: '/events'
-      fullPath: '/api/workspace/events'
-      preLoaderRoute: typeof ApiWorkspaceEventsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/decompose': {
-      id: '/api/workspace/decompose'
-      path: '/decompose'
-      fullPath: '/api/workspace/decompose'
-      preLoaderRoute: typeof ApiWorkspaceDecomposeRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/config': {
-      id: '/api/workspace/config'
-      path: '/config'
-      fullPath: '/api/workspace/config'
-      preLoaderRoute: typeof ApiWorkspaceConfigRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/checkpoints': {
-      id: '/api/workspace/checkpoints'
-      path: '/checkpoints'
-      fullPath: '/api/workspace/checkpoints'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/agents': {
-      id: '/api/workspace/agents'
-      path: '/agents'
-      fullPath: '/api/workspace/agents'
-      preLoaderRoute: typeof ApiWorkspaceAgentsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace-tasks/$id': {
-      id: '/api/workspace-tasks/$id'
-      path: '/$id'
-      fullPath: '/api/workspace-tasks/$id'
-      preLoaderRoute: typeof ApiWorkspaceTasksIdRouteImport
-      parentRoute: typeof ApiWorkspaceTasksRoute
-    }
-    '/api/tasks/$taskId': {
-      id: '/api/tasks/$taskId'
-      path: '/api/tasks/$taskId'
-      fullPath: '/api/tasks/$taskId'
-      preLoaderRoute: typeof ApiTasksTaskIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sessions/send': {
@@ -2093,313 +740,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMemoryListRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/gateway/usage': {
-      id: '/api/gateway/usage'
-      path: '/api/gateway/usage'
-      fullPath: '/api/gateway/usage'
-      preLoaderRoute: typeof ApiGatewayUsageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway/status': {
-      id: '/api/gateway/status'
-      path: '/api/gateway/status'
-      fullPath: '/api/gateway/status'
-      preLoaderRoute: typeof ApiGatewayStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway/sessions': {
-      id: '/api/gateway/sessions'
-      path: '/api/gateway/sessions'
-      fullPath: '/api/gateway/sessions'
-      preLoaderRoute: typeof ApiGatewaySessionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway/nodes': {
-      id: '/api/gateway/nodes'
-      path: '/api/gateway/nodes'
-      fullPath: '/api/gateway/nodes'
-      preLoaderRoute: typeof ApiGatewayNodesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway/channels': {
-      id: '/api/gateway/channels'
-      path: '/api/gateway/channels'
-      fullPath: '/api/gateway/channels'
-      preLoaderRoute: typeof ApiGatewayChannelsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events/recent': {
-      id: '/api/events/recent'
-      path: '/recent'
-      fullPath: '/api/events/recent'
-      preLoaderRoute: typeof ApiEventsRecentRouteImport
-      parentRoute: typeof ApiEventsRoute
-    }
-    '/api/debug/status': {
-      id: '/api/debug/status'
-      path: '/api/debug/status'
-      fullPath: '/api/debug/status'
-      preLoaderRoute: typeof ApiDebugStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/debug/reconnect': {
-      id: '/api/debug/reconnect'
-      path: '/api/debug/reconnect'
-      fullPath: '/api/debug/reconnect'
-      preLoaderRoute: typeof ApiDebugReconnectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cron/upsert': {
-      id: '/api/cron/upsert'
-      path: '/upsert'
-      fullPath: '/api/cron/upsert'
-      preLoaderRoute: typeof ApiCronUpsertRouteImport
-      parentRoute: typeof ApiCronRoute
-    }
-    '/api/cron/toggle': {
-      id: '/api/cron/toggle'
-      path: '/toggle'
-      fullPath: '/api/cron/toggle'
-      preLoaderRoute: typeof ApiCronToggleRouteImport
-      parentRoute: typeof ApiCronRoute
-    }
-    '/api/cron/run-if-due': {
-      id: '/api/cron/run-if-due'
-      path: '/run-if-due'
-      fullPath: '/api/cron/run-if-due'
-      preLoaderRoute: typeof ApiCronRunIfDueRouteImport
-      parentRoute: typeof ApiCronRoute
-    }
-    '/api/cron/run': {
-      id: '/api/cron/run'
-      path: '/run'
-      fullPath: '/api/cron/run'
-      preLoaderRoute: typeof ApiCronRunRouteImport
-      parentRoute: typeof ApiCronRoute
-    }
-    '/api/cron/list': {
-      id: '/api/cron/list'
-      path: '/list'
-      fullPath: '/api/cron/list'
-      preLoaderRoute: typeof ApiCronListRouteImport
-      parentRoute: typeof ApiCronRoute
-    }
-    '/api/cron/delete': {
-      id: '/api/cron/delete'
-      path: '/delete'
-      fullPath: '/api/cron/delete'
-      preLoaderRoute: typeof ApiCronDeleteRouteImport
-      parentRoute: typeof ApiCronRoute
-    }
-    '/api/cloud/webhook': {
-      id: '/api/cloud/webhook'
-      path: '/api/cloud/webhook'
-      fullPath: '/api/cloud/webhook'
-      preLoaderRoute: typeof ApiCloudWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cloud/status': {
-      id: '/api/cloud/status'
-      path: '/api/cloud/status'
-      fullPath: '/api/cloud/status'
-      preLoaderRoute: typeof ApiCloudStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cloud/provision': {
-      id: '/api/cloud/provision'
-      path: '/api/cloud/provision'
-      fullPath: '/api/cloud/provision'
-      preLoaderRoute: typeof ApiCloudProvisionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/browser/navigate': {
-      id: '/api/browser/navigate'
-      path: '/navigate'
-      fullPath: '/api/browser/navigate'
-      preLoaderRoute: typeof ApiBrowserNavigateRouteImport
-      parentRoute: typeof ApiBrowserRoute
-    }
-    '/api/workspace/task-runs/adhoc': {
-      id: '/api/workspace/task-runs/adhoc'
-      path: '/adhoc'
-      fullPath: '/api/workspace/task-runs/adhoc'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsAdhocRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/projects/$id': {
-      id: '/api/workspace/projects/$id'
-      path: '/$id'
-      fullPath: '/api/workspace/projects/$id'
-      preLoaderRoute: typeof ApiWorkspaceProjectsIdRouteImport
-      parentRoute: typeof ApiWorkspaceProjectsRoute
-    }
-    '/api/workspace/checkpoints/$id': {
-      id: '/api/workspace/checkpoints/$id'
-      path: '/$id'
-      fullPath: '/api/workspace/checkpoints/$id'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsRoute
-    }
-    '/api/workspace/agents/$id': {
-      id: '/api/workspace/agents/$id'
-      path: '/$id'
-      fullPath: '/api/workspace/agents/$id'
-      preLoaderRoute: typeof ApiWorkspaceAgentsIdRouteImport
-      parentRoute: typeof ApiWorkspaceAgentsRoute
-    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
       fullPath: '/api/sessions/$sessionKey/status'
       preLoaderRoute: typeof ApiSessionsSessionKeyStatusRouteImport
       parentRoute: typeof ApiSessionsRoute
-    }
-    '/api/cron/runs/$jobId': {
-      id: '/api/cron/runs/$jobId'
-      path: '/runs/$jobId'
-      fullPath: '/api/cron/runs/$jobId'
-      preLoaderRoute: typeof ApiCronRunsJobIdRouteImport
-      parentRoute: typeof ApiCronRoute
-    }
-    '/api/cli-agents/$pid/kill': {
-      id: '/api/cli-agents/$pid/kill'
-      path: '/$pid/kill'
-      fullPath: '/api/cli-agents/$pid/kill'
-      preLoaderRoute: typeof ApiCliAgentsPidKillRouteImport
-      parentRoute: typeof ApiCliAgentsRoute
-    }
-    '/api/workspace/teams/$id/approval-config': {
-      id: '/api/workspace/teams/$id/approval-config'
-      path: '/$id/approval-config'
-      fullPath: '/api/workspace/teams/$id/approval-config'
-      preLoaderRoute: typeof ApiWorkspaceTeamsIdApprovalConfigRouteImport
-      parentRoute: typeof ApiWorkspaceTeamsRoute
-    }
-    '/api/workspace/task-runs/$id/stop': {
-      id: '/api/workspace/task-runs/$id/stop'
-      path: '/$id/stop'
-      fullPath: '/api/workspace/task-runs/$id/stop'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdStopRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/task-runs/$id/retry': {
-      id: '/api/workspace/task-runs/$id/retry'
-      path: '/$id/retry'
-      fullPath: '/api/workspace/task-runs/$id/retry'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdRetryRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/task-runs/$id/pause': {
-      id: '/api/workspace/task-runs/$id/pause'
-      path: '/$id/pause'
-      fullPath: '/api/workspace/task-runs/$id/pause'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdPauseRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/task-runs/$id/events': {
-      id: '/api/workspace/task-runs/$id/events'
-      path: '/$id/events'
-      fullPath: '/api/workspace/task-runs/$id/events'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdEventsRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/skills/$id/content': {
-      id: '/api/workspace/skills/$id/content'
-      path: '/$id/content'
-      fullPath: '/api/workspace/skills/$id/content'
-      preLoaderRoute: typeof ApiWorkspaceSkillsIdContentRouteImport
-      parentRoute: typeof ApiWorkspaceSkillsRoute
-    }
-    '/api/workspace/missions/$id/stop': {
-      id: '/api/workspace/missions/$id/stop'
-      path: '/$id/stop'
-      fullPath: '/api/workspace/missions/$id/stop'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdStopRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/status': {
-      id: '/api/workspace/missions/$id/status'
-      path: '/$id/status'
-      fullPath: '/api/workspace/missions/$id/status'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdStatusRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/start': {
-      id: '/api/workspace/missions/$id/start'
-      path: '/$id/start'
-      fullPath: '/api/workspace/missions/$id/start'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdStartRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/resume': {
-      id: '/api/workspace/missions/$id/resume'
-      path: '/$id/resume'
-      fullPath: '/api/workspace/missions/$id/resume'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdResumeRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/pause': {
-      id: '/api/workspace/missions/$id/pause'
-      path: '/$id/pause'
-      fullPath: '/api/workspace/missions/$id/pause'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdPauseRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/checkpoints/$id/verify-tsc': {
-      id: '/api/workspace/checkpoints/$id/verify-tsc'
-      path: '/verify-tsc'
-      fullPath: '/api/workspace/checkpoints/$id/verify-tsc'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdVerifyTscRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/revise': {
-      id: '/api/workspace/checkpoints/$id/revise'
-      path: '/revise'
-      fullPath: '/api/workspace/checkpoints/$id/revise'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdReviseRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/reject': {
-      id: '/api/workspace/checkpoints/$id/reject'
-      path: '/reject'
-      fullPath: '/api/workspace/checkpoints/$id/reject'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdRejectRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/diff': {
-      id: '/api/workspace/checkpoints/$id/diff'
-      path: '/diff'
-      fullPath: '/api/workspace/checkpoints/$id/diff'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdDiffRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve-and-pr': {
-      id: '/api/workspace/checkpoints/$id/approve-and-pr'
-      path: '/approve-and-pr'
-      fullPath: '/api/workspace/checkpoints/$id/approve-and-pr'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveAndPrRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve-and-merge': {
-      id: '/api/workspace/checkpoints/$id/approve-and-merge'
-      path: '/approve-and-merge'
-      fullPath: '/api/workspace/checkpoints/$id/approve-and-merge'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve-and-commit': {
-      id: '/api/workspace/checkpoints/$id/approve-and-commit'
-      path: '/approve-and-commit'
-      fullPath: '/api/workspace/checkpoints/$id/approve-and-commit'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve': {
-      id: '/api/workspace/checkpoints/$id/approve'
-      path: '/approve'
-      fullPath: '/api/workspace/checkpoints/$id/approve'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
     }
   }
 }
@@ -2418,65 +764,6 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
 
-interface ApiBrowserRouteChildren {
-  ApiBrowserNavigateRoute: typeof ApiBrowserNavigateRoute
-}
-
-const ApiBrowserRouteChildren: ApiBrowserRouteChildren = {
-  ApiBrowserNavigateRoute: ApiBrowserNavigateRoute,
-}
-
-const ApiBrowserRouteWithChildren = ApiBrowserRoute._addFileChildren(
-  ApiBrowserRouteChildren,
-)
-
-interface ApiCliAgentsRouteChildren {
-  ApiCliAgentsPidKillRoute: typeof ApiCliAgentsPidKillRoute
-}
-
-const ApiCliAgentsRouteChildren: ApiCliAgentsRouteChildren = {
-  ApiCliAgentsPidKillRoute: ApiCliAgentsPidKillRoute,
-}
-
-const ApiCliAgentsRouteWithChildren = ApiCliAgentsRoute._addFileChildren(
-  ApiCliAgentsRouteChildren,
-)
-
-interface ApiCronRouteChildren {
-  ApiCronDeleteRoute: typeof ApiCronDeleteRoute
-  ApiCronListRoute: typeof ApiCronListRoute
-  ApiCronRunRoute: typeof ApiCronRunRoute
-  ApiCronRunIfDueRoute: typeof ApiCronRunIfDueRoute
-  ApiCronToggleRoute: typeof ApiCronToggleRoute
-  ApiCronUpsertRoute: typeof ApiCronUpsertRoute
-  ApiCronRunsJobIdRoute: typeof ApiCronRunsJobIdRoute
-}
-
-const ApiCronRouteChildren: ApiCronRouteChildren = {
-  ApiCronDeleteRoute: ApiCronDeleteRoute,
-  ApiCronListRoute: ApiCronListRoute,
-  ApiCronRunRoute: ApiCronRunRoute,
-  ApiCronRunIfDueRoute: ApiCronRunIfDueRoute,
-  ApiCronToggleRoute: ApiCronToggleRoute,
-  ApiCronUpsertRoute: ApiCronUpsertRoute,
-  ApiCronRunsJobIdRoute: ApiCronRunsJobIdRoute,
-}
-
-const ApiCronRouteWithChildren =
-  ApiCronRoute._addFileChildren(ApiCronRouteChildren)
-
-interface ApiEventsRouteChildren {
-  ApiEventsRecentRoute: typeof ApiEventsRecentRoute
-}
-
-const ApiEventsRouteChildren: ApiEventsRouteChildren = {
-  ApiEventsRecentRoute: ApiEventsRecentRoute,
-}
-
-const ApiEventsRouteWithChildren = ApiEventsRoute._addFileChildren(
-  ApiEventsRouteChildren,
-)
-
 interface ApiSessionsRouteChildren {
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
   ApiSessionsSessionKeyStatusRoute: typeof ApiSessionsSessionKeyStatusRoute
@@ -2491,253 +778,39 @@ const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
   ApiSessionsRouteChildren,
 )
 
-interface ApiWorkspaceAgentsRouteChildren {
-  ApiWorkspaceAgentsIdRoute: typeof ApiWorkspaceAgentsIdRoute
-}
-
-const ApiWorkspaceAgentsRouteChildren: ApiWorkspaceAgentsRouteChildren = {
-  ApiWorkspaceAgentsIdRoute: ApiWorkspaceAgentsIdRoute,
-}
-
-const ApiWorkspaceAgentsRouteWithChildren =
-  ApiWorkspaceAgentsRoute._addFileChildren(ApiWorkspaceAgentsRouteChildren)
-
-interface ApiWorkspaceCheckpointsIdRouteChildren {
-  ApiWorkspaceCheckpointsIdApproveRoute: typeof ApiWorkspaceCheckpointsIdApproveRoute
-  ApiWorkspaceCheckpointsIdApproveAndCommitRoute: typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  ApiWorkspaceCheckpointsIdApproveAndMergeRoute: typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  ApiWorkspaceCheckpointsIdApproveAndPrRoute: typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  ApiWorkspaceCheckpointsIdDiffRoute: typeof ApiWorkspaceCheckpointsIdDiffRoute
-  ApiWorkspaceCheckpointsIdRejectRoute: typeof ApiWorkspaceCheckpointsIdRejectRoute
-  ApiWorkspaceCheckpointsIdReviseRoute: typeof ApiWorkspaceCheckpointsIdReviseRoute
-  ApiWorkspaceCheckpointsIdVerifyTscRoute: typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-}
-
-const ApiWorkspaceCheckpointsIdRouteChildren: ApiWorkspaceCheckpointsIdRouteChildren =
-  {
-    ApiWorkspaceCheckpointsIdApproveRoute:
-      ApiWorkspaceCheckpointsIdApproveRoute,
-    ApiWorkspaceCheckpointsIdApproveAndCommitRoute:
-      ApiWorkspaceCheckpointsIdApproveAndCommitRoute,
-    ApiWorkspaceCheckpointsIdApproveAndMergeRoute:
-      ApiWorkspaceCheckpointsIdApproveAndMergeRoute,
-    ApiWorkspaceCheckpointsIdApproveAndPrRoute:
-      ApiWorkspaceCheckpointsIdApproveAndPrRoute,
-    ApiWorkspaceCheckpointsIdDiffRoute: ApiWorkspaceCheckpointsIdDiffRoute,
-    ApiWorkspaceCheckpointsIdRejectRoute: ApiWorkspaceCheckpointsIdRejectRoute,
-    ApiWorkspaceCheckpointsIdReviseRoute: ApiWorkspaceCheckpointsIdReviseRoute,
-    ApiWorkspaceCheckpointsIdVerifyTscRoute:
-      ApiWorkspaceCheckpointsIdVerifyTscRoute,
-  }
-
-const ApiWorkspaceCheckpointsIdRouteWithChildren =
-  ApiWorkspaceCheckpointsIdRoute._addFileChildren(
-    ApiWorkspaceCheckpointsIdRouteChildren,
-  )
-
-interface ApiWorkspaceCheckpointsRouteChildren {
-  ApiWorkspaceCheckpointsIdRoute: typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-}
-
-const ApiWorkspaceCheckpointsRouteChildren: ApiWorkspaceCheckpointsRouteChildren =
-  {
-    ApiWorkspaceCheckpointsIdRoute: ApiWorkspaceCheckpointsIdRouteWithChildren,
-  }
-
-const ApiWorkspaceCheckpointsRouteWithChildren =
-  ApiWorkspaceCheckpointsRoute._addFileChildren(
-    ApiWorkspaceCheckpointsRouteChildren,
-  )
-
-interface ApiWorkspaceMissionsRouteChildren {
-  ApiWorkspaceMissionsIdPauseRoute: typeof ApiWorkspaceMissionsIdPauseRoute
-  ApiWorkspaceMissionsIdResumeRoute: typeof ApiWorkspaceMissionsIdResumeRoute
-  ApiWorkspaceMissionsIdStartRoute: typeof ApiWorkspaceMissionsIdStartRoute
-  ApiWorkspaceMissionsIdStatusRoute: typeof ApiWorkspaceMissionsIdStatusRoute
-  ApiWorkspaceMissionsIdStopRoute: typeof ApiWorkspaceMissionsIdStopRoute
-}
-
-const ApiWorkspaceMissionsRouteChildren: ApiWorkspaceMissionsRouteChildren = {
-  ApiWorkspaceMissionsIdPauseRoute: ApiWorkspaceMissionsIdPauseRoute,
-  ApiWorkspaceMissionsIdResumeRoute: ApiWorkspaceMissionsIdResumeRoute,
-  ApiWorkspaceMissionsIdStartRoute: ApiWorkspaceMissionsIdStartRoute,
-  ApiWorkspaceMissionsIdStatusRoute: ApiWorkspaceMissionsIdStatusRoute,
-  ApiWorkspaceMissionsIdStopRoute: ApiWorkspaceMissionsIdStopRoute,
-}
-
-const ApiWorkspaceMissionsRouteWithChildren =
-  ApiWorkspaceMissionsRoute._addFileChildren(ApiWorkspaceMissionsRouteChildren)
-
-interface ApiWorkspaceProjectsRouteChildren {
-  ApiWorkspaceProjectsIdRoute: typeof ApiWorkspaceProjectsIdRoute
-}
-
-const ApiWorkspaceProjectsRouteChildren: ApiWorkspaceProjectsRouteChildren = {
-  ApiWorkspaceProjectsIdRoute: ApiWorkspaceProjectsIdRoute,
-}
-
-const ApiWorkspaceProjectsRouteWithChildren =
-  ApiWorkspaceProjectsRoute._addFileChildren(ApiWorkspaceProjectsRouteChildren)
-
-interface ApiWorkspaceSkillsRouteChildren {
-  ApiWorkspaceSkillsIdContentRoute: typeof ApiWorkspaceSkillsIdContentRoute
-}
-
-const ApiWorkspaceSkillsRouteChildren: ApiWorkspaceSkillsRouteChildren = {
-  ApiWorkspaceSkillsIdContentRoute: ApiWorkspaceSkillsIdContentRoute,
-}
-
-const ApiWorkspaceSkillsRouteWithChildren =
-  ApiWorkspaceSkillsRoute._addFileChildren(ApiWorkspaceSkillsRouteChildren)
-
-interface ApiWorkspaceTaskRunsRouteChildren {
-  ApiWorkspaceTaskRunsAdhocRoute: typeof ApiWorkspaceTaskRunsAdhocRoute
-  ApiWorkspaceTaskRunsIdEventsRoute: typeof ApiWorkspaceTaskRunsIdEventsRoute
-  ApiWorkspaceTaskRunsIdPauseRoute: typeof ApiWorkspaceTaskRunsIdPauseRoute
-  ApiWorkspaceTaskRunsIdRetryRoute: typeof ApiWorkspaceTaskRunsIdRetryRoute
-  ApiWorkspaceTaskRunsIdStopRoute: typeof ApiWorkspaceTaskRunsIdStopRoute
-}
-
-const ApiWorkspaceTaskRunsRouteChildren: ApiWorkspaceTaskRunsRouteChildren = {
-  ApiWorkspaceTaskRunsAdhocRoute: ApiWorkspaceTaskRunsAdhocRoute,
-  ApiWorkspaceTaskRunsIdEventsRoute: ApiWorkspaceTaskRunsIdEventsRoute,
-  ApiWorkspaceTaskRunsIdPauseRoute: ApiWorkspaceTaskRunsIdPauseRoute,
-  ApiWorkspaceTaskRunsIdRetryRoute: ApiWorkspaceTaskRunsIdRetryRoute,
-  ApiWorkspaceTaskRunsIdStopRoute: ApiWorkspaceTaskRunsIdStopRoute,
-}
-
-const ApiWorkspaceTaskRunsRouteWithChildren =
-  ApiWorkspaceTaskRunsRoute._addFileChildren(ApiWorkspaceTaskRunsRouteChildren)
-
-interface ApiWorkspaceTeamsRouteChildren {
-  ApiWorkspaceTeamsIdApprovalConfigRoute: typeof ApiWorkspaceTeamsIdApprovalConfigRoute
-}
-
-const ApiWorkspaceTeamsRouteChildren: ApiWorkspaceTeamsRouteChildren = {
-  ApiWorkspaceTeamsIdApprovalConfigRoute:
-    ApiWorkspaceTeamsIdApprovalConfigRoute,
-}
-
-const ApiWorkspaceTeamsRouteWithChildren =
-  ApiWorkspaceTeamsRoute._addFileChildren(ApiWorkspaceTeamsRouteChildren)
-
-interface ApiWorkspaceRouteChildren {
-  ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRouteWithChildren
-  ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
-  ApiWorkspaceConfigRoute: typeof ApiWorkspaceConfigRoute
-  ApiWorkspaceDecomposeRoute: typeof ApiWorkspaceDecomposeRoute
-  ApiWorkspaceEventsRoute: typeof ApiWorkspaceEventsRoute
-  ApiWorkspaceMemoryFilesRoute: typeof ApiWorkspaceMemoryFilesRoute
-  ApiWorkspaceMissionsRoute: typeof ApiWorkspaceMissionsRouteWithChildren
-  ApiWorkspacePhasesRoute: typeof ApiWorkspacePhasesRoute
-  ApiWorkspaceProjectsRoute: typeof ApiWorkspaceProjectsRouteWithChildren
-  ApiWorkspaceSkillsRoute: typeof ApiWorkspaceSkillsRouteWithChildren
-  ApiWorkspaceStatsRoute: typeof ApiWorkspaceStatsRoute
-  ApiWorkspaceTaskRunsRoute: typeof ApiWorkspaceTaskRunsRouteWithChildren
-  ApiWorkspaceTeamsRoute: typeof ApiWorkspaceTeamsRouteWithChildren
-}
-
-const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
-  ApiWorkspaceAgentsRoute: ApiWorkspaceAgentsRouteWithChildren,
-  ApiWorkspaceCheckpointsRoute: ApiWorkspaceCheckpointsRouteWithChildren,
-  ApiWorkspaceConfigRoute: ApiWorkspaceConfigRoute,
-  ApiWorkspaceDecomposeRoute: ApiWorkspaceDecomposeRoute,
-  ApiWorkspaceEventsRoute: ApiWorkspaceEventsRoute,
-  ApiWorkspaceMemoryFilesRoute: ApiWorkspaceMemoryFilesRoute,
-  ApiWorkspaceMissionsRoute: ApiWorkspaceMissionsRouteWithChildren,
-  ApiWorkspacePhasesRoute: ApiWorkspacePhasesRoute,
-  ApiWorkspaceProjectsRoute: ApiWorkspaceProjectsRouteWithChildren,
-  ApiWorkspaceSkillsRoute: ApiWorkspaceSkillsRouteWithChildren,
-  ApiWorkspaceStatsRoute: ApiWorkspaceStatsRoute,
-  ApiWorkspaceTaskRunsRoute: ApiWorkspaceTaskRunsRouteWithChildren,
-  ApiWorkspaceTeamsRoute: ApiWorkspaceTeamsRouteWithChildren,
-}
-
-const ApiWorkspaceRouteWithChildren = ApiWorkspaceRoute._addFileChildren(
-  ApiWorkspaceRouteChildren,
-)
-
-interface ApiWorkspaceTasksRouteChildren {
-  ApiWorkspaceTasksIdRoute: typeof ApiWorkspaceTasksIdRoute
-}
-
-const ApiWorkspaceTasksRouteChildren: ApiWorkspaceTasksRouteChildren = {
-  ApiWorkspaceTasksIdRoute: ApiWorkspaceTasksIdRoute,
-}
-
-const ApiWorkspaceTasksRouteWithChildren =
-  ApiWorkspaceTasksRoute._addFileChildren(ApiWorkspaceTasksRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   FilesRoute: FilesRoute,
-  JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
   TerminalRoute: TerminalRoute,
-  ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
-  ApiBrowserRoute: ApiBrowserRouteWithChildren,
-  ApiChatAbortRoute: ApiChatAbortRoute,
   ApiChatEventsRoute: ApiChatEventsRoute,
-  ApiCliAgentsRoute: ApiCliAgentsRouteWithChildren,
-  ApiConfigGetRoute: ApiConfigGetRoute,
-  ApiConfigPatchRoute: ApiConfigPatchRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
-  ApiCostRoute: ApiCostRoute,
-  ApiCronRoute: ApiCronRouteWithChildren,
-  ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
-  ApiEventsRoute: ApiEventsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHistoryRoute: ApiHistoryRoute,
-  ApiLocalSetupRoute: ApiLocalSetupRoute,
-  ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
-  ApiNetworkUrlRoute: ApiNetworkUrlRoute,
-  ApiOllamaHealthRoute: ApiOllamaHealthRoute,
   ApiPathsRoute: ApiPathsRoute,
-  ApiPingRoute: ApiPingRoute,
-  ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionStatusRoute: ApiSessionStatusRoute,
-  ApiSessionTitleRoute: ApiSessionTitleRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRoute,
-  ApiStreamRoute: ApiStreamRoute,
-  ApiSystemMetricsRoute: ApiSystemMetricsRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
-  ApiUpdateCheckRoute: ApiUpdateCheckRoute,
-  ApiUsageRoute: ApiUsageRoute,
-  ApiUsageAnalyticsRoute: ApiUsageAnalyticsRoute,
-  ApiValidateProviderRoute: ApiValidateProviderRoute,
-  ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
-  ApiWorkspaceTasksRoute: ApiWorkspaceTasksRouteWithChildren,
+  ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
-  ApiCloudProvisionRoute: ApiCloudProvisionRoute,
-  ApiCloudStatusRoute: ApiCloudStatusRoute,
-  ApiCloudWebhookRoute: ApiCloudWebhookRoute,
-  ApiDebugReconnectRoute: ApiDebugReconnectRoute,
-  ApiDebugStatusRoute: ApiDebugStatusRoute,
-  ApiGatewayChannelsRoute: ApiGatewayChannelsRoute,
-  ApiGatewayNodesRoute: ApiGatewayNodesRoute,
-  ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
-  ApiGatewayStatusRoute: ApiGatewayStatusRoute,
-  ApiGatewayUsageRoute: ApiGatewayUsageRoute,
   ApiMemoryListRoute: ApiMemoryListRoute,
   ApiMemoryReadRoute: ApiMemoryReadRoute,
   ApiMemorySearchRoute: ApiMemorySearchRoute,
   ApiMemoryWriteRoute: ApiMemoryWriteRoute,
-  ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
-  ApiTasksIndexRoute: ApiTasksIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

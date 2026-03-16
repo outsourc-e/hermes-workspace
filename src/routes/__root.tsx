@@ -6,16 +6,10 @@ import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import { WorkspaceShell } from '@/components/workspace-shell'
-import { useTaskReminders } from '@/hooks/use-task-reminders'
-import { UpdateNotifier } from '@/components/update-notifier'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
-import { CompactionNotifier } from '@/components/compaction-notifier'
-import { FallbackBanner } from '@/components/fallback-banner'
-import { GatewayRestartProvider } from '@/components/gateway-restart-overlay'
-import { ExecApprovalToast } from '@/components/exec-approval-toast'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
 
@@ -199,11 +193,6 @@ export const Route = createRootRoute({
 
 const queryClient = new QueryClient()
 
-function TaskReminderRunner() {
-  useTaskReminders()
-  return null
-}
-
 function RootLayout() {
   // Unregister any existing service workers — they cause stale asset issues
   // after Docker image updates and behind reverse proxies (Pangolin, Cloudflare, etc.)
@@ -229,22 +218,15 @@ function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GatewayRestartProvider>
       <HermesOnboarding />
-      <CompactionNotifier />
-      <FallbackBanner />
       <GlobalShortcutListener />
       <TerminalShortcutListener />
-      <TaskReminderRunner />
-      <UpdateNotifier />
       <MobilePromptTrigger />
       <Toaster />
-      <ExecApprovalToast />
       <WorkspaceShell />
       <SearchModal />
       <OnboardingTour />
       <KeyboardShortcutsModal />
-      </GatewayRestartProvider>
     </QueryClientProvider>
   )
 }

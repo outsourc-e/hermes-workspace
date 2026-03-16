@@ -192,7 +192,7 @@ function ThinkingBubble({
             {canExpandResearch ? (
               <button
                 type="button"
-                onClick={() => expandedResearchCard?.setCollapsed((collapsed) => !collapsed)}
+                onClick={() => expandedResearchCard?.setCollapsed(!expandedResearchCard.collapsed)}
                 className="relative z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-primary-200/80 bg-primary-50/90 text-primary-500 transition-colors hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/80 dark:text-primary-300 dark:hover:bg-primary-800"
                 aria-label={expandedResearchCard?.collapsed ? 'Expand research timeline' : 'Collapse research timeline'}
                 title={expandedResearchCard?.collapsed ? 'Expand research timeline' : 'Collapse research timeline'}
@@ -227,11 +227,7 @@ function ThinkingBubble({
         </div>
 
         {expandedResearchCard && !expandedResearchCard.collapsed ? (
-          <ResearchCard
-            steps={expandedResearchCard.steps}
-            isActive={expandedResearchCard.isActive}
-            totalDurationMs={expandedResearchCard.totalDurationMs}
-          />
+          <ResearchCard researchCard={expandedResearchCard} />
         ) : null}
       </div>
     </div>

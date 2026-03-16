@@ -116,16 +116,6 @@ export function SearchModal() {
         },
       },
       {
-        id: 'qa-jobs',
-        emoji: '⏰',
-        label: 'Jobs',
-        description: 'Open scheduled jobs and run history',
-        onSelect: () => {
-          closeModal()
-          navigate({ to: '/jobs' })
-        },
-      },
-      {
         id: 'qa-files',
         emoji: '📁',
         label: 'Files',
@@ -265,9 +255,7 @@ export function SearchModal() {
             icon={
               entry.id === 'qa-logs'
                 ? ListViewIcon
-                : entry.id === 'qa-jobs'
-                  ? Clock01Icon
-                  : FlashIcon
+                : FlashIcon
             }
             size={20}
             strokeWidth={1.5}

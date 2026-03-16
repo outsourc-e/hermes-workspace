@@ -208,9 +208,8 @@ const config = defineConfig(({ mode, command }) => {
 
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. HERMES_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
-  // Keep CLAWSUITE_ALLOWED_HOSTS as a compatibility fallback for older deployments.
-  const _allowedHosts: string[] | true = (env.HERMES_ALLOWED_HOSTS || env.CLAWSUITE_ALLOWED_HOSTS)?.trim()
-    ? (env.HERMES_ALLOWED_HOSTS || env.CLAWSUITE_ALLOWED_HOSTS)!.split(',')
+  const _allowedHosts: string[] | true = (env.HERMES_ALLOWED_HOSTS)?.trim()
+    ? (env.HERMES_ALLOWED_HOSTS)!.split(',')
         .map((h) => h.trim())
         .filter(Boolean)
     : []

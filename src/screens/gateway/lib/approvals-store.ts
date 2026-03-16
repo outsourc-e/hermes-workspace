@@ -1,45 +1,29 @@
-export type ApprovalRequest = {
+// Stub — exec approvals are not used in Hermes Workspace.
+// Kept as a no-op to satisfy chat-screen imports without breaking chat.
+
+export interface ApprovalRequest {
   id: string
-  agentId: string
-  agentName: string
-  action: string
-  context: string
-  requestedAt: number
+  sessionKey: string
+  command: string
+  timestamp: number
   status: 'pending' | 'approved' | 'denied'
-  resolvedAt?: number
-  /** Where this approval came from — 'agent' (parsed from SSE) or 'gateway' (polled from gateway API) */
-  source?: 'agent' | 'gateway'
-  /** Raw gateway approval ID for resolving via the gateway API */
   gatewayApprovalId?: string
+  agentId?: string
+  agentName?: string
+  action?: string
+  context?: string
+  source?: string
+  resolvedAt?: number
 }
 
-const APPROVALS_KEY = 'hermes:approvals'
+export function addApproval(_approval: Record<string, unknown>): ApprovalRequest | null {
+  return null
+}
 
 export function loadApprovals(): ApprovalRequest[] {
-  try {
-    const raw = localStorage.getItem(APPROVALS_KEY)
-    if (!raw) return []
-    const all = JSON.parse(raw) as ApprovalRequest[]
-    // Auto-archive resolved items older than 24h
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000
-    return all.filter(a => a.status === 'pending' || (a.resolvedAt && a.resolvedAt > cutoff))
-  } catch { return [] }
+  return []
 }
 
-export function saveApprovals(approvals: ApprovalRequest[]): void {
-  try {
-    localStorage.setItem(APPROVALS_KEY, JSON.stringify(approvals))
-  } catch { /* ignore */ }
-}
+export function saveApprovals(_approvals?: ApprovalRequest[]): void {}
 
-export function addApproval(req: Omit<ApprovalRequest, 'id' | 'requestedAt' | 'status'>): ApprovalRequest {
-  const newReq: ApprovalRequest = {
-    ...req,
-    id: `apr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    requestedAt: Date.now(),
-    status: 'pending',
-  }
-  const current = loadApprovals()
-  saveApprovals([newReq, ...current])
-  return newReq
-}
+export function respondToApproval(_id: string, _status: 'approved' | 'denied'): void {}
