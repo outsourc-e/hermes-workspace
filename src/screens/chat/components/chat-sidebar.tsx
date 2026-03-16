@@ -1067,7 +1067,11 @@ function ChatSidebarComponent({
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        initialSection={settingsSection}
+      />
 
       <ProvidersDialog open={providersOpen} onOpenChange={setProvidersOpen} />
 

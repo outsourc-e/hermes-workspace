@@ -17,6 +17,7 @@ import { FallbackBanner } from '@/components/fallback-banner'
 import { GatewayRestartProvider } from '@/components/gateway-restart-overlay'
 import { ExecApprovalToast } from '@/components/exec-approval-toast'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
+import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
 
 const APP_CSP = [
   "default-src 'self'",
@@ -230,6 +231,7 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GatewayRestartProvider>
+      <HermesOnboarding />
       <CompactionNotifier />
       <FallbackBanner />
       <GlobalShortcutListener />

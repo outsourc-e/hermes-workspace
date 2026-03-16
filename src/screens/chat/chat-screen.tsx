@@ -1894,6 +1894,64 @@ export function ChatScreen({
     }
   }, [])
 
+  const handleUiSlashCommand = useCallback(
+    (command: string) => {
+      const trimmedCommand = command.trim()
+      if (!trimmedCommand.startsWith('/')) return false
+
+      if (trimmedCommand === '/new') {
+        navigate({ to: '/chat' })
+        return true
+      }
+
+      if (trimmedCommand === '/clear') {
+        const sessionKey =
+          forcedSessionKey || resolvedSessionKey || activeSessionKey || activeFriendlyId
+        clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
+        toast('Chat cleared', { type: 'success' })
+        return true
+      }
+
+      if (trimmedCommand === '/model' || trimmedCommand === '/skin') {
+        window.dispatchEvent(
+          new CustomEvent(CHAT_OPEN_SETTINGS_EVENT, {
+            detail: {
+              section: trimmedCommand === '/skin' ? 'appearance' : 'hermes',
+            },
+          }),
+        )
+        return true
+      }
+
+      if (trimmedCommand === '/skills') {
+        navigate({ to: '/skills' })
+        return true
+      }
+
+      if (trimmedCommand === '/save') {
+        const exported = exportConversationTranscript({
+          sessionLabel: activeFriendlyId || 'conversation',
+          messages: finalDisplayMessages,
+        })
+        if (exported) {
+          toast('Conversation exported', { type: 'success' })
+        }
+        return true
+      }
+
+      return false
+    },
+    [
+      activeFriendlyId,
+      activeSessionKey,
+      finalDisplayMessages,
+      forcedSessionKey,
+      navigate,
+      queryClient,
+      resolvedSessionKey,
+    ],
+  )
+
   const send = useCallback(
     (
       body: string,
@@ -1903,6 +1961,7 @@ export function ChatScreen({
     ) => {
       const trimmedBody = body.trim()
       if (trimmedBody.length === 0 && attachments.length === 0) return
+      if (attachments.length === 0 && handleUiSlashCommand(trimmedBody)) return
 
       // Deduplicate sends with identical content within a 500ms window.
       // This prevents double-fire from paste events that trigger multiple send paths.
@@ -1992,6 +2051,7 @@ export function ChatScreen({
       upsertSessionInCache,
       queryClient,
       resolvedSessionKey,
+      handleUiSlashCommand,
     ],
   )
 
@@ -1999,59 +2059,10 @@ export function ChatScreen({
     (command: string) => {
       const trimmedCommand = command.trim()
       if (!trimmedCommand.startsWith('/')) return
-
-      if (trimmedCommand === '/new') {
-        navigate({ to: '/chat' })
-        return
-      }
-
-      if (trimmedCommand === '/clear') {
-        const sessionKey =
-          forcedSessionKey || resolvedSessionKey || activeSessionKey || activeFriendlyId
-        clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
-        toast('Chat cleared')
-        return
-      }
-
-      if (trimmedCommand === '/model' || trimmedCommand === '/skin') {
-        window.dispatchEvent(
-          new CustomEvent(CHAT_OPEN_SETTINGS_EVENT, {
-            detail: {
-              section: trimmedCommand === '/skin' ? 'appearance' : 'hermes',
-            },
-          }),
-        )
-        return
-      }
-
-      if (trimmedCommand === '/skills') {
-        navigate({ to: '/skills' })
-        return
-      }
-
-      if (trimmedCommand === '/save') {
-        const exported = exportConversationTranscript({
-          sessionLabel: activeFriendlyId || 'conversation',
-          messages: finalDisplayMessages,
-        })
-        if (exported) {
-          toast('Conversation exported')
-        }
-        return
-      }
-
+      if (handleUiSlashCommand(trimmedCommand)) return
       send(trimmedCommand, [], false, commandHelpers)
     },
-    [
-      activeFriendlyId,
-      activeSessionKey,
-      finalDisplayMessages,
-      forcedSessionKey,
-      navigate,
-      queryClient,
-      resolvedSessionKey,
-      send,
-    ],
+    [commandHelpers, handleUiSlashCommand, send],
   )
 
   useEffect(() => {
