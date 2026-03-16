@@ -29,7 +29,7 @@ import { HermesHealthBanner } from '@/components/hermes-health-banner'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+// System metrics footer removed — not used in Hermes Workspace
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
@@ -423,7 +423,7 @@ export function WorkspaceShell() {
       </div>
 
       {isMobile ? <MobileTabBar /> : null}
-      {settings.showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
+      {/* System metrics footer removed */}
       <CommandPalette pathname={pathname} sessions={sessions} />
     </>
   )

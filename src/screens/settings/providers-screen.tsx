@@ -18,7 +18,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
-import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
+import type { GatewayModelCatalogEntry } from '@/lib/model-types'
 import {
   getProviderDisplayName,
   getProviderInfo,

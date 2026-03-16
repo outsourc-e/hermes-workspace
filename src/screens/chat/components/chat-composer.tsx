@@ -40,7 +40,7 @@ import { Button } from '@/components/ui/button'
 import type {
   GatewayModelCatalogEntry,
   GatewayModelSwitchResponse,
-} from '@/lib/gateway-api'
+} from '@/lib/model-types'
 import { usePinnedModels } from '@/hooks/use-pinned-models'
 // import { ModeSelector } from '@/components/mode-selector'
 import { cn } from '@/lib/utils'

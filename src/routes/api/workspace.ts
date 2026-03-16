@@ -71,12 +71,12 @@ async function detectWorkspace(savedPath?: string): Promise<{
     }
   }
 
-  // Priority 4: OpenClaw home directory for compatibility with existing gateway installs
-  const gatewayConfigDir = path.join(os.homedir(), '.openclaw')
-  const gatewayConfigDirValid = await isValidDirectory(gatewayConfigDir)
-  if (gatewayConfigDirValid) {
+  // Priority 4: Hermes home directory
+  const hermesDir = path.join(os.homedir(), '.hermes')
+  const hermesDirValid = await isValidDirectory(hermesDir)
+  if (hermesDirValid) {
     return {
-      path: gatewayConfigDir,
+      path: hermesDir,
       folderName: '.hermes',
       source: 'default',
       isValid: true,

@@ -29,7 +29,7 @@ import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
-import { GatewayStatusMessage } from './components/gateway-status-message'
+import { GatewayStatusMessage } from './components/connection-status-message'
 import {
   consumePendingSend,
   hasPendingGeneration,
@@ -75,7 +75,8 @@ import { InspectorPanel } from '@/components/inspector/inspector-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
-import { useChatActivityStore } from '@/stores/chat-activity-store'
+// Activity store removed — not used in Hermes Workspace
+const _noopSetActivity = (_s: string) => {}
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { useGatewayChatStore } from '@/stores/gateway-chat-store'
@@ -1221,7 +1222,7 @@ export function ChatScreen({
   }, [suggestion, resolvedSessionKey, dismiss])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity)
+  const setLocalActivity = _noopSetActivity
   useEffect(() => {
     if (liveToolActivity.length > 0) {
       setLocalActivity('tool-use')
@@ -1760,7 +1761,7 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (connectionState === 'error' || connectionState === 'disconnected') {
+    if (false) { // Gateway connection checks removed — Hermes uses direct API
       hasSeenGatewayDisconnectRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return
