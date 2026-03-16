@@ -316,62 +316,33 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
             var d = document.createElement('div');
             d.id = 'splash-screen';
-            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.8s ease;';
-            d.innerHTML = '<img src="/hermes-avatar.webp" alt="Hermes" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
-              + '<img src="'+(isDark ? '/hermes-banner.png' : '/hermes-banner-light.png')+'" alt="HERMES-AGENT" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
-              + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
-              + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
+            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
+            d.innerHTML = '<img src="/hermes-avatar.webp" alt="Hermes" style="width:72px;height:72px;margin-bottom:16px;border-radius:14px" />'
+              + '<div style="font:600 18px/1 system-ui,-apple-system,sans-serif;letter-spacing:-0.01em;color:'+text+'">Hermes Workspace</div>'
+              + '<div style="margin-top:16px;display:flex;gap:4px;align-items:center">'
+              + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
+              + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
+              + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
+              + '</div>';
             document.body.prepend(d);
 
-            var bar = document.getElementById('splash-bar');
-            if (bar) {
-              setTimeout(function(){ bar.style.width='15%' }, 300);
-              setTimeout(function(){ bar.style.width='40%' }, 800);
-              setTimeout(function(){ bar.style.width='65%' }, 1500);
-              setTimeout(function(){ bar.style.width='85%' }, 2500);
-              setTimeout(function(){ bar.style.width='92%' }, 3200);
-            }
-
-            // Logo entrance animation
-            var logo = d.querySelector('div');
-            if (logo) {
-              logo.style.cssText += ';opacity:0;transform:scale(0.85);transition:opacity 0.6s ease,transform 0.6s ease;';
-              setTimeout(function(){ logo.style.opacity='1'; logo.style.transform='scale(1)'; }, 100);
-            }
-
-            // Pulsing glow behind logo
-            var glow = document.createElement('div');
-            glow.style.cssText = 'position:absolute;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,'+accent+' 18%, transparent) 0%,transparent 70%);animation:splashPulse 2s ease-in-out infinite;pointer-events:none;';
-            d.insertBefore(glow, d.firstChild);
-            // Position glow behind logo
-            glow.style.cssText += 'top:50%;left:50%;transform:translate(-50%,-60%);';
-
-            // Shimmer on progress bar
-            var shimmer = document.createElement('div');
-            shimmer.style.cssText = 'position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:splashShimmer 1.5s ease-in-out infinite;';
-            var barWrap = bar ? bar.parentElement : null;
-            if (barWrap) { barWrap.style.position = 'relative'; barWrap.style.overflow = 'hidden'; barWrap.appendChild(shimmer); }
-
-            // Add keyframes
+            // Simple dot animation
             var style = document.createElement('style');
-            style.textContent = '@keyframes splashPulse{0%,100%{opacity:0.5;transform:translate(-50%,-60%) scale(1)}50%{opacity:1;transform:translate(-50%,-60%) scale(1.15)}} @keyframes splashShimmer{0%{left:-100%}100%{left:100%}}';
+            style.textContent = '@keyframes splashDot{0%,80%,100%{opacity:0.3}40%{opacity:1}}'+'.splash-dot:nth-child(1){animation:splashDot 1.2s ease-in-out infinite}'+'.splash-dot:nth-child(2){animation:splashDot 1.2s ease-in-out 0.2s infinite}'+'.splash-dot:nth-child(3){animation:splashDot 1.2s ease-in-out 0.4s infinite}';
             document.head.appendChild(style);
 
             window.__dismissSplash = function() {
               var el = document.getElementById('splash-screen');
               if (!el) return;
-              if (bar) bar.style.width = '100%';
-              setTimeout(function(){
-                el.style.opacity = '0';
-                setTimeout(function(){ el.remove(); }, 800);
-              }, 300);
+              el.style.opacity = '0';
+              setTimeout(function(){ el.remove(); }, 500);
             };
-            // Fallback: always dismiss after 8s
-            setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 8000);
-            // Fast dismiss: if returning user (has gateway config in localStorage), skip splash quickly
+            // Fallback: always dismiss after 5s
+            setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 5000);
+            // Fast dismiss: returning users skip quickly
             try {
               if (localStorage.getItem('hermes-gateway-url') || localStorage.getItem('gateway-url')) {
-                setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 800);
+                setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 600);
               }
             } catch(e) {}
           })()
