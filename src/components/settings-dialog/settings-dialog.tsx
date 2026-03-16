@@ -1018,18 +1018,24 @@ const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
 type SettingsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialSection?: SectionId
 }
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const [active, setActive] = useState<SectionId>('hermes')
+export function SettingsDialog({
+  open,
+  onOpenChange,
+  initialSection = 'hermes',
+}: SettingsDialogProps) {
+  const [active, setActive] = useState<SectionId>(initialSection)
   const [mobileView, setMobileView] = useState<'nav' | 'content'>('nav')
   const ActiveContent = CONTENT_MAP[active]
 
   useEffect(() => {
     if (open) {
+      setActive(initialSection)
       setMobileView('nav')
     }
-  }, [open])
+  }, [initialSection, open])
 
   function handleSectionSelect(sectionId: SectionId) {
     setActive(sectionId)

@@ -81,6 +81,7 @@ import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 import {
+  CHAT_OPEN_SETTINGS_EVENT,
   CHAT_PENDING_COMMAND_STORAGE_KEY,
   CHAT_RUN_COMMAND_EVENT,
   type ChatRunCommandDetail,
@@ -131,6 +132,58 @@ function normalizeMessageValue(value: unknown): string {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : ''
+}
+
+
+function sanitizeExportToken(value: string): string {
+  return value.trim().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '')
+}
+
+function exportConversationTranscript(payload: {
+  sessionLabel: string
+  messages: Array<GatewayMessage>
+}) {
+  if (typeof document === 'undefined') return false
+
+  const sessionToken = sanitizeExportToken(payload.sessionLabel) || 'conversation'
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const body = payload.messages
+    .map((message) => {
+      const role =
+        typeof message.role === 'string' && message.role.trim()
+          ? message.role.trim().toUpperCase()
+          : 'MESSAGE'
+      const text = textFromMessage(message).trim()
+      const attachments = Array.isArray(message.attachments)
+        ? message.attachments
+            .map((attachment) => attachment?.name?.trim())
+            .filter((value): value is string => Boolean(value))
+        : []
+
+      const lines = [`## ${role}`]
+      if (text) lines.push(text)
+      if (attachments.length > 0) {
+        lines.push('', 'Attachments:')
+        for (const attachment of attachments) {
+          lines.push(`- ${attachment}`)
+        }
+      }
+      return lines.join('\n')
+    })
+    .join('\n\n')
+    .trim()
+
+  const content = `# Hermes Conversation Export\n\nSession: ${payload.sessionLabel}\nExported: ${new Date().toISOString()}\n\n${body || '_No messages in this conversation._'}\n`
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${sessionToken}-${timestamp}.md`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  return true
 }
 
 function messageFallbackSignature(message: GatewayMessage): string {
@@ -1946,9 +1999,59 @@ export function ChatScreen({
     (command: string) => {
       const trimmedCommand = command.trim()
       if (!trimmedCommand.startsWith('/')) return
+
+      if (trimmedCommand === '/new') {
+        navigate({ to: '/chat' })
+        return
+      }
+
+      if (trimmedCommand === '/clear') {
+        const sessionKey =
+          forcedSessionKey || resolvedSessionKey || activeSessionKey || activeFriendlyId
+        clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
+        toast('Chat cleared')
+        return
+      }
+
+      if (trimmedCommand === '/model' || trimmedCommand === '/skin') {
+        window.dispatchEvent(
+          new CustomEvent(CHAT_OPEN_SETTINGS_EVENT, {
+            detail: {
+              section: trimmedCommand === '/skin' ? 'appearance' : 'hermes',
+            },
+          }),
+        )
+        return
+      }
+
+      if (trimmedCommand === '/skills') {
+        navigate({ to: '/skills' })
+        return
+      }
+
+      if (trimmedCommand === '/save') {
+        const exported = exportConversationTranscript({
+          sessionLabel: activeFriendlyId || 'conversation',
+          messages: finalDisplayMessages,
+        })
+        if (exported) {
+          toast('Conversation exported')
+        }
+        return
+      }
+
       send(trimmedCommand, [], false, commandHelpers)
     },
-    [send],
+    [
+      activeFriendlyId,
+      activeSessionKey,
+      finalDisplayMessages,
+      forcedSessionKey,
+      navigate,
+      queryClient,
+      resolvedSessionKey,
+      send,
+    ],
   )
 
   useEffect(() => {

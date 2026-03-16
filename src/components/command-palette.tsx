@@ -28,6 +28,7 @@ import {
   CommandSeparator,
 } from '@/components/ui/command'
 import {
+  CHAT_OPEN_SETTINGS_EVENT,
   CHAT_PENDING_COMMAND_STORAGE_KEY,
   CHAT_RUN_COMMAND_EVENT,
 } from '@/screens/chat/chat-events'
@@ -113,11 +114,28 @@ export function CommandPalette({
       return
     }
 
-    if (
-      pathname.startsWith('/chat') ||
-      pathname.startsWith('/chat') ||
-      pathname === '/'
-    ) {
+    if (command === '/skills') {
+      void navigate({ to: '/skills' })
+      return
+    }
+
+    if (command === '/model' || command === '/skin') {
+      const section = command === '/skin' ? 'appearance' : 'hermes'
+      if (pathname.startsWith('/chat') || pathname === '/') {
+        window.dispatchEvent(
+          new CustomEvent(CHAT_OPEN_SETTINGS_EVENT, {
+            detail: { section },
+          }),
+        )
+        return
+      }
+
+      window.sessionStorage.setItem(CHAT_PENDING_COMMAND_STORAGE_KEY, command)
+      void navigate({ to: '/chat' })
+      return
+    }
+
+    if (pathname.startsWith('/chat') || pathname === '/') {
       window.dispatchEvent(
         new CustomEvent(CHAT_RUN_COMMAND_EVENT, {
           detail: { command },
@@ -223,31 +241,49 @@ export function CommandPalette({
         onSelect: () => runSlashCommand('/new'),
       },
       {
-        id: 'slash-reset',
-        group: 'Slash Commands',
-        label: '/reset',
-        keywords: 'reset conversation context',
-        shortcut: 'Run',
-        icon: CommandLineIcon,
-        onSelect: () => runSlashCommand('/reset'),
-      },
-      {
         id: 'slash-clear',
         group: 'Slash Commands',
         label: '/clear',
-        keywords: 'clear conversation history',
+        keywords: 'clear current chat history conversation',
         shortcut: 'Run',
         icon: CommandLineIcon,
         onSelect: () => runSlashCommand('/clear'),
       },
       {
-        id: 'slash-status',
+        id: 'slash-model',
         group: 'Slash Commands',
-        label: '/status',
-        keywords: 'show session status health',
+        label: '/model',
+        keywords: 'open model picker settings hermes provider',
         shortcut: 'Run',
         icon: CommandLineIcon,
-        onSelect: () => runSlashCommand('/status'),
+        onSelect: () => runSlashCommand('/model'),
+      },
+      {
+        id: 'slash-skills',
+        group: 'Slash Commands',
+        label: '/skills',
+        keywords: 'browse manage skills page',
+        shortcut: 'Run',
+        icon: CommandLineIcon,
+        onSelect: () => runSlashCommand('/skills'),
+      },
+      {
+        id: 'slash-skin',
+        group: 'Slash Commands',
+        label: '/skin',
+        keywords: 'open appearance settings theme',
+        shortcut: 'Run',
+        icon: CommandLineIcon,
+        onSelect: () => runSlashCommand('/skin'),
+      },
+      {
+        id: 'slash-save',
+        group: 'Slash Commands',
+        label: '/save',
+        keywords: 'export current conversation transcript',
+        shortcut: 'Run',
+        icon: CommandLineIcon,
+        onSelect: () => runSlashCommand('/save'),
       },
     ],
     [pathname],

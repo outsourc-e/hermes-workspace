@@ -8,7 +8,6 @@ import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { useTaskReminders } from '@/hooks/use-task-reminders'
 import { UpdateNotifier } from '@/components/update-notifier'
-import { OpenClawUpdateNotifier } from '@/components/openclaw-update-notifier'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
@@ -51,13 +50,7 @@ const VALID_THEMES = [
 const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
-  
-  // Hermes Workspace — API is same-origin REST/SSE, no WebSocket needed.
-  // __GATEWAY_URL__ kept as stub for any legacy code that references it.
-  if (typeof window !== 'undefined') {
-    window.__GATEWAY_URL__ = ''
-  }
-  
+
   try {
     const root = document.documentElement
     const storedTheme = localStorage.getItem('${THEME_STORAGE_KEY}')
@@ -127,7 +120,7 @@ export const Route = createRootRoute({
       {
         name: 'description',
         content:
-          'Supercharged chat interface for Hermes AI agents with file explorer, terminal, and usage tracking',
+          'Hermes Agent workspace',
       },
       {
         property: 'og:image',

@@ -66,7 +66,7 @@ export const useSettingsStore = create<SettingsState>()(
       }
     },
     {
-      name: 'openclaw-settings',
+      name: 'hermes-settings',
       skipHydration: true,
     },
   ),

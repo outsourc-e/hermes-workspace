@@ -82,7 +82,7 @@ export function getConnectionErrorMessage(
         title: 'Pair this device first',
         description:
           'This device is not paired with Hermes yet.',
-        action: 'Run `openclaw pair` on the Hermes machine, then reconnect.',
+        action: 'Check Hermes connection on the Hermes machine, then reconnect.',
       }
     case 'gateway_unreachable':
       return {

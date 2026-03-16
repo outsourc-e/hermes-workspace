@@ -79,4 +79,4 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
 ]
 
-export const STORAGE_KEY = 'openclaw-onboarding-complete'
+export const STORAGE_KEY = 'hermes-onboarding-complete'

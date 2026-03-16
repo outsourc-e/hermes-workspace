@@ -16,6 +16,10 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
+import {
+  CHAT_OPEN_SETTINGS_EVENT,
+  type ChatOpenSettingsDetail,
+} from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
 import { useRenameSession } from '../hooks/use-rename-session'
@@ -493,6 +497,7 @@ function ChatSidebarComponent({
 }: ChatSidebarProps) {
   const {
     settingsOpen,
+    settingsSection,
     setSettingsOpen,
     handleOpenSettings,
   } = useSidebarSettings()
@@ -510,6 +515,20 @@ function ChatSidebarComponent({
     },
   })
 
+  useEffect(() => {
+    function handleOpenSettingsEvent(event: Event) {
+      const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
+      handleOpenSettings(detail?.section === 'appearance' ? 'appearance' : 'hermes')
+    }
+
+    window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
+    return () => {
+      window.removeEventListener(
+        CHAT_OPEN_SETTINGS_EVENT,
+        handleOpenSettingsEvent,
+      )
+    }
+  }, [handleOpenSettings])
 
   // Platform-aware modifier key
   const mod = useMemo(
@@ -1014,7 +1033,7 @@ function ChatSidebarComponent({
             <MenuContent side="top" align="start" className="min-w-[200px]">
               <MenuItem
                 onClick={function onOpenSettings() {
-                  setSettingsOpen(true)
+                  handleOpenSettings('hermes')
                 }}
                 className="justify-between"
               >
@@ -1035,7 +1054,7 @@ function ChatSidebarComponent({
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => handleOpenSettings('hermes')}
                 className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >

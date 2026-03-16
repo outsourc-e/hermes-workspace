@@ -8,7 +8,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  OPENCLAW_CONFIG_PATH,
+  HERMES_CONFIG_PATH,
   PROVIDER_CATALOG,
   buildConfigExample,
   getAuthTypeLabel,
@@ -466,7 +466,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                 <div className="mt-3 rounded-xl border border-primary-200 bg-primary-100/70 px-3 py-2">
                   <p className="text-xs text-primary-700 text-pretty">
                     Config file path:{' '}
-                    <code className="font-mono">{OPENCLAW_CONFIG_PATH}</code>
+                    <code className="font-mono">{HERMES_CONFIG_PATH}</code>
                   </p>
                 </div>
 
@@ -729,7 +729,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                       <p className="text-xs text-primary-700 text-pretty">
                         API keys are stored locally in{' '}
                         <code className="font-mono">
-                          {OPENCLAW_CONFIG_PATH}
+                          {HERMES_CONFIG_PATH}
                         </code>
                         , never sent to Studio.
                       </p>

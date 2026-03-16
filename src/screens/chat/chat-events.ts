@@ -9,3 +9,9 @@ export const CHAT_PENDING_COMMAND_STORAGE_KEY =
 export type ChatRunCommandDetail = {
   command: string
 }
+
+export const CHAT_OPEN_SETTINGS_EVENT = 'hermes:chat-open-settings'
+
+export type ChatOpenSettingsDetail = {
+  section: 'hermes' | 'appearance'
+}
