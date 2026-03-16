@@ -85,8 +85,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const processStoreEvent = useGatewayChatStore((s) => s.processEvent)
   const clearStreamingSession = useGatewayChatStore((s) => s.clearStreamingSession)
 
-  const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 30_000
-  const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = 45_000
+  // Hermes tool calls can take 60-120s (file reads, terminal commands, web searches)
+  const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 120_000
+  const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = 180_000
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {

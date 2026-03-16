@@ -9,7 +9,8 @@ import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
 import { createSession, streamChat } from '../../server/hermes-api'
 
-const SEND_STREAM_RUN_TIMEOUT_MS = 180_000
+// Hermes agent runs can take 5+ minutes with complex tool chains
+const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
 
 function readString(value: unknown): string {
