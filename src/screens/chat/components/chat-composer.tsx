@@ -762,7 +762,8 @@ function ChatComposerComponent({
     () => toDraftStorageKey(sessionKey),
     [sessionKey],
   )
-  const modelButtonLabel = '⚕ Hermes Agent'
+  const [currentSelectedModel, setCurrentSelectedModel] = useState<string | null>(null)
+  const modelButtonLabel = currentSelectedModel || currentModel || '⚕ Hermes Agent'
 
 
   // Measure composer height and set CSS variable for scroll padding
@@ -2061,15 +2062,35 @@ function ChatComposerComponent({
 
                   {!isModelSwitcherDisabled && isModelMenuOpen ? (
                     <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border shadow-lg" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
-                      <div className="p-1">
-                        <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium border-l-2 border-accent-500 rounded-lg" style={{ backgroundColor: 'var(--theme-panel)', color: 'var(--theme-text)' }}>
-                          <span className="flex-1 truncate">⚕ Hermes Agent</span>
-                          <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-label="Currently active" />
-                        </div>
-                      </div>
-                      {/* Model info footer */}
-                      <div className="px-3 py-2 text-[11px] font-medium" style={{ borderTop: '1px solid var(--theme-border)', color: 'var(--theme-muted)' }}>
-                        Runtime: gpt-5.3-codex · 90 skills loaded
+                      <div className="p-1 max-h-[300px] overflow-y-auto">
+                        {(modelsQuery.data?.models ?? []).map((model: ModelCatalogEntry) => {
+                          const modelId = typeof model === 'string' ? model : (model.id ?? model.name ?? '')
+                          const modelName = typeof model === 'string' ? model : (model.name ?? model.id ?? '')
+                          const isActive = modelId === (currentSelectedModel || currentModel)
+                          return (
+                            <button
+                              key={modelId}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setCurrentSelectedModel(modelId)
+                                setIsModelMenuOpen(false)
+                                modelSwitchMutation.mutate({ model: modelId, sessionKey })
+                              }}
+                              className={cn(
+                                'flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors',
+                                isActive ? 'border-l-2 border-accent-500' : 'hover:opacity-80',
+                              )}
+                              style={{
+                                backgroundColor: isActive ? 'var(--theme-panel)' : 'transparent',
+                                color: 'var(--theme-text)',
+                              }}
+                            >
+                              <span className="flex-1 truncate text-left">{modelName}</span>
+                              {isActive && <span className="h-1.5 w-1.5 rounded-full bg-accent-500 shrink-0" />}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   ) : null}
