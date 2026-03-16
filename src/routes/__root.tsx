@@ -317,9 +317,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             var d = document.createElement('div');
             d.id = 'splash-screen';
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
-            d.innerHTML = '<img src="/hermes-avatar.webp" alt="Hermes" style="width:72px;height:72px;margin-bottom:16px;border-radius:14px" />'
-              + '<div style="font:600 18px/1 system-ui,-apple-system,sans-serif;letter-spacing:-0.01em;color:'+text+'">Hermes Workspace</div>'
-              + '<div style="margin-top:16px;display:flex;gap:4px;align-items:center">'
+            d.innerHTML = '<img src="/hermes-avatar.webp" alt="Hermes" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
+              + '<img src="'+(isDark ? '/hermes-banner.png' : '/hermes-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
+              + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
+              + '<div style="margin-top:20px;display:flex;gap:4px;align-items:center">'
               + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
               + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
               + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
