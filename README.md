@@ -13,7 +13,7 @@
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
-![Hermes Workspace Chat](./docs/screenshots/chat.png)
+![Hermes Workspace](./docs/screenshots/splash.png)
 
 </div>
 
