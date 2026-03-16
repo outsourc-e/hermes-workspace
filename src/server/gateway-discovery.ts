@@ -225,7 +225,7 @@ async function scanLocalGatewayRange(): Promise<DiscoveryResult> {
     return {
       found: false,
       source: 'none',
-      error: 'No local Hermes gateway found on localhost ports 18789-18800.',
+      error: 'Hermes Agent not found on localhost ports 18789-18800.',
     }
   }
 
@@ -290,7 +290,7 @@ export async function discoverGateway(): Promise<DiscoveryResult> {
   return {
     found: false,
     source: 'none',
-    error: 'No local Hermes gateway found. Please start Hermes or enter connection details manually.',
+    error: 'Hermes Agent not found. Run hermes to start, or enter connection details manually.',
   }
 }
 

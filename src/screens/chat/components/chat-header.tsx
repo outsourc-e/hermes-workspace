@@ -236,7 +236,7 @@ function ChatHeaderComponent({
               className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95"
               aria-label="Open sessions"
             >
-              <OpenClawStudioIcon className="size-8 rounded-xl overflow-hidden" />
+              <img src="/hermes-avatar.webp" alt="Hermes" className="size-8 rounded-xl" />
             </button>
             <div className="min-w-0 max-w-[45vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold tracking-tight text-ink">
               {mobileTitle}

@@ -294,7 +294,7 @@ function NavItem({
 
 // ── Last-visited route tracking ─────────────────────────────────────────
 
-const LAST_ROUTE_KEY = 'openclaw-sidebar-last-route'
+const LAST_ROUTE_KEY = 'hermes-sidebar-last-route'
 
 function getLastRoute(section: string): string | null {
   try {
@@ -554,15 +554,15 @@ function ChatSidebarComponent({
 
   // Collapsible section states
   const [mainExpanded, toggleMain] = usePersistedBool(
-    'openclaw-sidebar-main-expanded',
+    'hermes-sidebar-main-expanded',
     true,
   )
   const [knowledgeExpanded, toggleKnowledge] = usePersistedBool(
-    'openclaw-sidebar-knowledge-expanded',
+    'hermes-sidebar-knowledge-expanded',
     true,
   )
   const [systemExpanded, toggleSystem] = usePersistedBool(
-    'openclaw-sidebar-system-expanded',
+    'hermes-sidebar-system-expanded',
     false,
   )
 

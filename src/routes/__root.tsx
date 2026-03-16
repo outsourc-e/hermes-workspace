@@ -243,7 +243,7 @@ function RootLayout() {
       <TerminalShortcutListener />
       <TaskReminderRunner />
       <UpdateNotifier />
-      <OpenClawUpdateNotifier />
+      {/* OpenClawUpdateNotifier removed — not relevant for Hermes */}
       <MobilePromptTrigger />
       <Toaster />
       <ExecApprovalToast />

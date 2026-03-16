@@ -279,7 +279,7 @@ export function WorkspaceShell() {
             <p className="mt-3 text-sm text-accent-400">
               Make sure Hermes is running:{' '}
               <code className="rounded bg-primary-900 px-1.5 py-0.5 text-xs text-primary-200">
-                openclaw gateway start
+                hermes gateway start
               </code>
             </p>
           ) : null}

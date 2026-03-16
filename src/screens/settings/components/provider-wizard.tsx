@@ -542,7 +542,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
                       This will run{' '}
                       <code className="font-mono text-primary-800">
-                        openclaw configure
+                        hermes setup
                       </code>{' '}
                       in the terminal to start the OAuth flow. A browser window
                       will open for you to sign in with Google.
@@ -554,7 +554,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         onClick={function onLaunchOAuth() {
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
-                            'Run "openclaw configure" in the terminal and select Google OAuth when prompted. ' +
+                            'Run "hermes setup" in the terminal and select Google OAuth when prompted. ' +
                               'A browser window will open for sign-in. Once complete, Hermes will restart automatically.',
                           )
                           setVerifyState('warning')
@@ -569,7 +569,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                           In the terminal, run:
                         </p>
                         <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">
-                          openclaw configure
+                          hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
                           Select <strong>Google Antigravity</strong> →{' '}
@@ -582,7 +582,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         <p className="text-xs text-primary-700 text-pretty">
                           No terminal access?{' '}
                           <a
-                            href="https://docs.openclaw.ai"
+                            href="https://github.com/NousResearch/hermes-agent"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
@@ -608,7 +608,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         onClick={function onLaunchCLI() {
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
-                            'Run "openclaw configure" in the terminal and select Anthropic → CLI Token. ' +
+                            'Run "hermes setup" in the terminal and select Anthropic → CLI Token. ' +
                               'It will detect your Claude CLI credentials and import them automatically.',
                           )
                           setVerifyState('warning')
@@ -623,7 +623,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                           In the terminal, run:
                         </p>
                         <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">
-                          openclaw configure
+                          hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
                           Select <strong>Anthropic</strong> →{' '}
@@ -646,7 +646,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         <p className="text-xs text-primary-700 text-pretty">
                           No terminal access?{' '}
                           <a
-                            href="https://docs.openclaw.ai"
+                            href="https://github.com/NousResearch/hermes-agent"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"

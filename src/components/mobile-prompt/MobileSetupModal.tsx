@@ -217,7 +217,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
         </button>
 
         <div className="mb-4 flex items-center gap-3 pr-10">
-          <OpenClawStudioIcon className="size-9 overflow-hidden rounded-xl" />
+          <img src="/hermes-avatar.webp" alt="Hermes" className="size-9 rounded-xl" />
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-white">Mobile Setup</h2>
             <div className="mt-1 flex items-center gap-1.5">

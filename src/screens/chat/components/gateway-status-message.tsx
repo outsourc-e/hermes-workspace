@@ -51,7 +51,7 @@ function classifyConnectionError(
     return {
       title: 'Pairing required',
       description: "This device isn't paired with Hermes yet.",
-      action: 'Run "openclaw pair" on the Hermes machine.',
+      action: 'Check Hermes Agent connection.',
     }
   }
 
