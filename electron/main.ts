@@ -37,8 +37,9 @@ function getGatewayUrl(): string | null {
   }
 }
 
-function isOpenClawInstalled(): boolean {
+function isGatewayCliInstalled(): boolean {
   try {
+    // Hermes Workspace still relies on the openclaw CLI to manage the local gateway.
     execSync('which openclaw || where openclaw', { timeout: 5000 })
     return true
   } catch {
@@ -171,12 +172,13 @@ function createTray() {
 
 // IPC handlers for onboarding wizard
 ipcMain.handle('gateway:check', () => {
-  return { url: getGatewayUrl(), installed: isOpenClawInstalled() }
+  return { url: getGatewayUrl(), installed: isGatewayCliInstalled() }
 })
 
 ipcMain.handle('gateway:install', async () => {
   return new Promise((resolve, reject) => {
     try {
+      // Hermes Workspace installs the openclaw CLI because it provides gateway management.
       const install = spawn('npm', ['install', '-g', 'openclaw'], {
         shell: true,
         stdio: 'pipe',

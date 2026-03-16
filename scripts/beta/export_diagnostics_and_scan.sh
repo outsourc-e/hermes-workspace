@@ -1,16 +1,16 @@
 #!/bin/bash
-# Export Diagnostics + Secret Scan Script for OpenClaw Studio Beta Testing
+# Export Diagnostics + Secret Scan Script for Hermes Workspace Beta Testing
 # Exports diagnostics bundle and scans for leaked secrets
 
 set -e  # Exit on error
 
-echo "🔍 OpenClaw Studio - Export Diagnostics + Secret Scan"
+echo "🔍 Hermes Workspace - Export Diagnostics + Secret Scan"
 echo "======================================================"
 echo ""
 
 # Check if running from project root
 if [ ! -f "package.json" ]; then
-  echo "❌ Error: Must run from project root (openclaw-studio/)"
+  echo "❌ Error: Must run from project root (hermes-workspace/)"
   echo "   Current directory: $(pwd)"
   exit 1
 fi
@@ -122,7 +122,7 @@ else
   echo "❌ Export complete with CRITICAL SECURITY ISSUE!"
   echo ""
   echo "IMMEDIATE ACTION REQUIRED:"
-  echo "  1. Report to security@openclaw.ai"
+  echo "  1. Report to security@hermesworkspace.app"
   echo "  2. Include scan result: ${SCAN_FILE}"
   echo "  3. Do NOT share diagnostics file publicly"
 fi

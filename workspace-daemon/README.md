@@ -1,4 +1,4 @@
-# Hermes Workspace Workspace Daemon
+# Hermes Workspace Daemon
 
 `@hermes-workspace/workspace-daemon` is a local orchestration service for running coding agents against tracked projects. It stores projects, missions, tasks, task runs, checkpoints, and activity in SQLite, prepares per-task workspaces, and exposes an HTTP API for the Hermes Workspace UI or other tooling.
 
@@ -18,7 +18,7 @@
 - One or more agent CLIs available locally if you want to execute tasks:
   - `codex` for the Codex adapter
   - `claude` for the Claude adapter and `/api/decompose`
-  - an OpenClaw server for the OpenClaw adapter
+  - an OpenClaw-compatible server for the OpenClaw adapter
 - `git` if you want workspace isolation through worktrees or checkpoint merge flows.
 - `gh` if you want `approve-and-pr` to open GitHub pull requests.
 
@@ -78,6 +78,7 @@ Notes:
 
 - `workspace_root` is resolved relative to the tracked project path when a project path exists.
 - `default_adapter` may be `codex`, `claude`, `openclaw`, or `ollama`.
+  `openclaw` remains the compatibility adapter name for Hermes gateway sessions.
 - The markdown body becomes the task prompt template.
 - Template variables: `{{project_name}}`, `{{task_name}}`, `{{task_description}}`, `{{workspace_path}}`.
 - If `auto_approve` is `true`, completed runs are checkpointed and marked complete without manual review. Git worktrees created for that task are cleaned up automatically after approval.
@@ -125,7 +126,7 @@ Built-in adapters:
 
 - `codex`: launches `codex app-server` by default and talks JSON-RPC over stdio.
 - `claude`: launches `claude --print --permission-mode bypassPermissions -p <prompt>`.
-- `openclaw`: calls `POST /sessions/spawn` on an OpenClaw server, default `http://127.0.0.1:3333`.
+- `openclaw`: calls `POST /sessions/spawn` on the Hermes-compatible session server, default `http://127.0.0.1:3333`.
 
 Agent records are created through `POST /api/agents`. `adapter_config` is stored as JSON and passed through to the adapter. Common fields include:
 
@@ -134,7 +135,7 @@ Agent records are created through `POST /api/agents`. `adapter_config` is stored
 - `timeoutMs`
 - `env`
 - `model`
-- `url` for OpenClaw
+- `url` for the Hermes-compatible session server
 
 ## API surface
 

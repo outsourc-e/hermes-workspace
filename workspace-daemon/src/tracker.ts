@@ -2069,7 +2069,7 @@ export class Tracker extends EventEmitter {
                 ? 'Anthropic'
                 : agent.adapter_type === 'ollama'
                   ? 'Ollama'
-                  : 'OpenClaw',
+                  : 'Hermes Gateway',
           status: normalizeDirectoryStatus(agent.status),
           avatar: agent.avatar ?? '🛰️',
           avatar_tone:

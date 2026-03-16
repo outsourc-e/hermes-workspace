@@ -21,7 +21,7 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 
 ## Out of Scope
 
-- Hermes Agent itself (report to [Hermes Agent](https://github.com/openclaw/openclaw))
+- Hermes Agent itself (report to the Hermes Agent project)
 - Third-party dependencies (report to the respective maintainer)
 - Social engineering attacks
 
@@ -65,7 +65,7 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
   - `/api/terminal-stream`
   - `/api/gateway-restart`
   - `/api/update-check` (POST)
-  - `/api/openclaw-update` (POST)
+  - `/api/update-check` (POST)
 
 ## Supported Versions
 

@@ -21,7 +21,7 @@ if (typeof window !== 'undefined' && import.meta.env.DEV) {
       { name: 'memory_search', args: '{"query":"test"}', delay: 0, duration: 800 },
       { name: 'Read', args: '{"path":"MEMORY.md"}', delay: 200, duration: 1200 },
       { name: 'exec', args: '{"command":"git log --oneline -5"}', delay: 500, duration: 2000 },
-      { name: 'web_search', args: '{"query":"openclaw latest"}', delay: 1000, duration: 1500 },
+      { name: 'web_search', args: '{"query":"hermes agent latest"}', delay: 1000, duration: 1500 },
       { name: 'Edit', args: '{"path":"src/app.tsx"}', delay: 1500, duration: 900 },
     ]
     tools.forEach((tool, i) => {

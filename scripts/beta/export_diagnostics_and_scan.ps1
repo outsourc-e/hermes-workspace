@@ -1,13 +1,13 @@
-# Export Diagnostics + Secret Scan Script for OpenClaw Studio Beta Testing (Windows)
+# Export Diagnostics + Secret Scan Script for Hermes Workspace Beta Testing (Windows)
 # Exports diagnostics bundle and scans for leaked secrets
 
-Write-Host "🔍 OpenClaw Studio - Export Diagnostics + Secret Scan" -ForegroundColor Cyan
+Write-Host "🔍 Hermes Workspace - Export Diagnostics + Secret Scan" -ForegroundColor Cyan
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if running from project root
 if (-Not (Test-Path "package.json")) {
-  Write-Host "❌ Error: Must run from project root (openclaw-studio/)" -ForegroundColor Red
+  Write-Host "❌ Error: Must run from project root (hermes-workspace/)" -ForegroundColor Red
   Write-Host "   Current directory: $(Get-Location)" -ForegroundColor Red
   exit 1
 }
@@ -129,7 +129,7 @@ if ($exitCode -eq 0) {
   Write-Host "❌ Export complete with CRITICAL SECURITY ISSUE!" -ForegroundColor Red
   Write-Host ""
   Write-Host "IMMEDIATE ACTION REQUIRED:"
-  Write-Host "  1. Report to security@openclaw.ai"
+  Write-Host "  1. Report to security@hermesworkspace.app"
   Write-Host "  2. Include scan result: $scanFile"
   Write-Host "  3. Do NOT share diagnostics file publicly"
 }

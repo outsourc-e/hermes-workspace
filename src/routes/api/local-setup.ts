@@ -113,6 +113,7 @@ async function installHermes() {
 }
 
 function startGatewayDetached() {
+  // Hermes Workspace still uses the openclaw CLI to boot the local gateway.
   const child = spawn('openclaw', ['gateway', 'start', '--bind', 'lan'], {
     detached: true,
     env: process.env,
@@ -137,6 +138,7 @@ async function isGatewayRunning(port: number) {
 }
 
 async function readGatewayConfig(): Promise<HermesConfig | null> {
+  // Hermes Workspace reads the OpenClaw config because the gateway still writes there.
   const configPath = join(homedir(), '.openclaw', 'openclaw.json')
 
   try {
@@ -183,7 +185,7 @@ async function waitForGatewayToken() {
     await wait(POLL_INTERVAL_MS)
   }
 
-  throw new Error('Gateway auth token was not written to ~/.hermes/config.yaml')
+  throw new Error('Gateway auth token was not written to ~/.openclaw/openclaw.json')
 }
 
 export const Route = createFileRoute('/api/local-setup')({

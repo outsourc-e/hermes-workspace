@@ -44,7 +44,9 @@ async function detectWorkspace(savedPath?: string): Promise<{
   }
 
   // Priority 2: Environment variable
-  const envWorkspace = process.env.OPENCLAW_WORKSPACE_DIR?.trim()
+  const envWorkspace =
+    process.env.HERMES_WORKSPACE_DIR?.trim() ||
+    process.env.OPENCLAW_WORKSPACE_DIR?.trim()
   if (envWorkspace) {
     const isValid = await isValidDirectory(envWorkspace)
     if (isValid) {
@@ -69,12 +71,12 @@ async function detectWorkspace(savedPath?: string): Promise<{
     }
   }
 
-  // Priority 4: Home directory .openclaw (even if workspace subfolder doesn't exist)
-  const openclawDir = path.join(os.homedir(), '.openclaw')
-  const openclawValid = await isValidDirectory(openclawDir)
-  if (openclawValid) {
+  // Priority 4: OpenClaw home directory for compatibility with existing gateway installs
+  const gatewayConfigDir = path.join(os.homedir(), '.openclaw')
+  const gatewayConfigDirValid = await isValidDirectory(gatewayConfigDir)
+  if (gatewayConfigDirValid) {
     return {
-      path: openclawDir,
+      path: gatewayConfigDir,
       folderName: '.hermes',
       source: 'default',
       isValid: true,

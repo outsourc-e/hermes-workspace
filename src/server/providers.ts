@@ -3,6 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse as parseYaml } from 'yaml'
 
+// Reads OpenClaw gateway config for Hermes Workspace provider/model discovery.
+
 type GatewayConfig = {
   auth?: {
     profiles?: Record<string, { provider?: string }>
@@ -160,7 +162,7 @@ function modelIdFromScopedKey(scoped: string): string | null {
 }
 
 /**
- * Read configured provider names from auth.profiles keys in ~/.openclaw/openclaw.json.
+ * Read configured provider names from auth.profiles keys in the OpenClaw config.
  * Returns only provider names (e.g., ["anthropic", "openrouter"]), never secrets.
  */
 export function getConfiguredProviderNames(): Array<string> {

@@ -35,7 +35,7 @@ export class OpenClawAdapter implements AgentAdapter {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenClaw steer request failed with ${response.status}`);
+      throw new Error(`Hermes gateway steer request failed with ${response.status}`);
     }
   }
 
@@ -77,7 +77,7 @@ export class OpenClawAdapter implements AgentAdapter {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenClaw request failed with ${response.status}`);
+      throw new Error(`Hermes gateway request failed with ${response.status}`);
     }
 
     const contentType = response.headers.get("content-type") ?? "";

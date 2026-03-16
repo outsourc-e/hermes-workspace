@@ -11,7 +11,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# --- Fetch built-in OpenClaw skills ---
+# --- Fetch built-in Hermes-compatible skills ---
 FROM node:22-alpine AS skills
 WORKDIR /tmp
 RUN apk add --no-cache git && \
@@ -28,7 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Create non-root user
-RUN addgroup -S clawsuite && adduser -S clawsuite -G clawsuite
+RUN addgroup -S hermes && adduser -S hermes -G hermes
 
 # Copy build output and package.json (for any runtime deps)
 COPY --from=builder /app/dist ./dist
@@ -36,12 +36,12 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/server-entry.js ./
 
-# Copy built-in OpenClaw skills
+# Copy built-in Hermes-compatible skills
 COPY --from=skills /openclaw-skills ./openclaw-skills
 
 # Expose default port
 EXPOSE 3000
 
-USER clawsuite
+USER hermes
 
 CMD ["node", "server-entry.js"]

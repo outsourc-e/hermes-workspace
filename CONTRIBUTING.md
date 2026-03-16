@@ -11,7 +11,7 @@ Thanks for your interest in contributing! Here's how to get started.
    ```bash
    cp .env.example .env
    # Edit .env with your gateway URL and token
-   # Find token: openclaw config get gateway.auth.token
+   # Hermes Workspace still uses the gateway token from: openclaw config get gateway.auth.token
    ```
 5. **Run dev server:** `npm run dev`
 6. **Make your changes** on a feature branch

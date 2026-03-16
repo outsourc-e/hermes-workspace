@@ -1,5 +1,5 @@
 /**
- * Test script for diagnostics bundle redaction
+ * Test script for Hermes Workspace diagnostics bundle redaction
  * Phase 2.4-001: Verify no sensitive patterns leak through
  *
  * Run: npx tsx scripts/qa/test-redaction.ts

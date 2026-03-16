@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { analyzeError, readOpenClawLogs } from '../../server/debug-analyzer'
+import { analyzeError, readGatewayLogs } from '../../server/debug-analyzer'
 import {
   getClientIp,
   rateLimit,
@@ -32,7 +32,7 @@ export const Route = createFileRoute('/api/debug-analyze')({
           const terminalOutput =
             typeof body.terminalOutput === 'string' ? body.terminalOutput : ''
 
-          const logContent = await readOpenClawLogs()
+          const logContent = await readGatewayLogs()
           const analysis = await analyzeError(terminalOutput, logContent)
           return json(analysis)
         } catch (error) {

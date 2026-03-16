@@ -27,7 +27,11 @@ type DateStampedFile = {
 }
 
 function getWorkspaceRoot(): string {
-  const configured = (process.env.OPENCLAW_WORKSPACE || '').trim()
+  const configured = (
+    process.env.HERMES_WORKSPACE ||
+    process.env.OPENCLAW_WORKSPACE ||
+    ''
+  ).trim()
   return path.resolve(
     configured || path.join(os.homedir(), '.hermes'),
   )

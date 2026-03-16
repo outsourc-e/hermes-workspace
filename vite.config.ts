@@ -208,6 +208,7 @@ const config = defineConfig(({ mode, command }) => {
 
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. HERMES_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
+  // Keep CLAWSUITE_ALLOWED_HOSTS as a compatibility fallback for older deployments.
   const _allowedHosts: string[] | true = (env.HERMES_ALLOWED_HOSTS || env.CLAWSUITE_ALLOWED_HOSTS)?.trim()
     ? (env.HERMES_ALLOWED_HOSTS || env.CLAWSUITE_ALLOWED_HOSTS)!.split(',')
         .map((h) => h.trim())
@@ -262,7 +263,7 @@ const config = defineConfig(({ mode, command }) => {
         ignored: ['**/routeTree.gen.ts'],
       },
       proxy: {
-        // WebSocket proxy: clients connect to /ws-gateway on the ClawSuite
+        // WebSocket proxy: clients connect to /ws-gateway on the Hermes Workspace
         // server (any IP/port), which internally forwards to the local gateway.
         // This means phone/LAN/Docker users never need to reach port 18789 directly.
         '/ws-gateway': {
@@ -271,7 +272,7 @@ const config = defineConfig(({ mode, command }) => {
           ws: true,
           rewrite: (path) => path.replace(/^\/ws-gateway/, ''),
         },
-        // REST API proxy: all /api/gateway/* calls proxied through ClawSuite server
+        // REST API proxy: all /api/gateway/* calls proxied through Hermes Workspace server
         '/api/gateway-proxy': {
           target: proxyTarget,
           changeOrigin: true,

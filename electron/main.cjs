@@ -45,8 +45,9 @@ function getGatewayUrl() {
     }
 }
 
-function isOpenClawInstalled() {
+function isGatewayCliInstalled() {
     try {
+        // Hermes Workspace still relies on the openclaw CLI to manage the local gateway.
         (0, child_process_1.execSync)('which openclaw || where openclaw', { timeout: 5000 });
         return true;
     } catch {
@@ -101,10 +102,10 @@ async function startWorkspaceDaemonIfNeeded() {
 // Checks common ports for a running Hermes Workspace dev/preview server.
 // If none found, starts `pnpm dev` from the repo directory.
 let appProcess = null;
-const CLAWSUITE_PORTS = [3000, 3003, 3001, 3002];
+const HERMES_WORKSPACE_PORTS = [3000, 3003, 3001, 3002];
 
 function findRunningServer() {
-    for (const port of CLAWSUITE_PORTS) {
+    for (const port of HERMES_WORKSPACE_PORTS) {
         try {
             const code = (0, child_process_1.execSync)(
                 `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/api/session-status`,
@@ -129,7 +130,7 @@ function findRepoDir() {
         if ((0, fs_1.existsSync)((0, path_1.join)(dir, 'package.json'))) {
             try {
                 const pkg = JSON.parse((0, fs_1.readFileSync)((0, path_1.join)(dir, 'package.json'), 'utf-8'));
-                if (pkg.name === 'hermesWorkspace' || pkg.name === '@clawsuite/app') return dir;
+                if (pkg.name === 'hermesWorkspace' || pkg.name === 'hermes-workspace') return dir;
             } catch { /* skip */ }
         }
     }
@@ -265,9 +266,10 @@ async function createWindow() {
     });
 
     const gatewayUrl = getGatewayUrl();
-    if (!gatewayUrl && isOpenClawInstalled()) {
+    if (!gatewayUrl && isGatewayCliInstalled()) {
         console.log('[Hermes Workspace] Hermes not running, auto-starting...');
         try {
+            // Hermes Workspace still relies on the openclaw CLI to manage the local gateway.
             gatewayProcess = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
                 shell: true,
                 stdio: 'ignore',
@@ -381,12 +383,13 @@ function createTray() {
 
 // IPC handlers for onboarding wizard
 electron_1.ipcMain.handle('gateway:check', () => {
-    return { url: getGatewayUrl(), installed: isOpenClawInstalled() };
+    return { url: getGatewayUrl(), installed: isGatewayCliInstalled() };
 });
 
 electron_1.ipcMain.handle('gateway:install', async () => {
     return new Promise((resolve, reject) => {
         try {
+            // Hermes Workspace installs the openclaw CLI because it provides gateway management.
             const install = (0, child_process_1.spawn)('npm', ['install', '-g', 'openclaw'], {
                 shell: true,
                 stdio: 'pipe',

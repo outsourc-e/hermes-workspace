@@ -1,16 +1,16 @@
 #!/bin/bash
-# Reset Local State Script for OpenClaw Studio Beta Testing
+# Reset Local State Script for Hermes Workspace Beta Testing
 # Safely clears localStorage, cache, and temporary files
 
 set -e  # Exit on error
 
-echo "🧹 OpenClaw Studio - Reset Local State"
+echo "🧹 Hermes Workspace - Reset Local State"
 echo "======================================="
 echo ""
 
 # Check if running from project root
 if [ ! -f "package.json" ]; then
-  echo "❌ Error: Must run from project root (openclaw-studio/)"
+  echo "❌ Error: Must run from project root (hermes-workspace/)"
   echo "   Current directory: $(pwd)"
   exit 1
 fi
@@ -23,7 +23,7 @@ echo ""
 echo "   This will NOT clear:"
 echo "   - node_modules"
 echo "   - Source code"
-echo "   - OpenClaw Gateway data"
+echo "   - Hermes gateway data"
 echo ""
 
 # Prompt for confirmation

@@ -40,26 +40,26 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          name: ClawSuite ${{ steps.version.outputs.version }}
+          name: Hermes Workspace ${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
           body: |
-            ## ClawSuite ${{ steps.version.outputs.version }}
+            ## Hermes Workspace ${{ steps.version.outputs.version }}
 
-            **VSCode for AI Agents** - Desktop interface for OpenClaw Gateway
+            **Hermes Workspace** - Desktop workspace for Hermes Agent
 
             ### Downloads
 
             | Platform | Architecture | Download |
             |----------|-------------|----------|
-            | macOS | Apple Silicon (M1/M2/M3) | `ClawSuite_*_aarch64.dmg` |
-            | macOS | Intel | `ClawSuite_*_x64.dmg` |
-            | Windows | 64-bit | `ClawSuite_*_x64-setup.exe` |
-            | Linux | 64-bit | `ClawSuite_*_amd64.AppImage` |
+            | macOS | Apple Silicon (M1/M2/M3) | `HermesWorkspace_*_aarch64.dmg` |
+            | macOS | Intel | `HermesWorkspace_*_x64.dmg` |
+            | Windows | 64-bit | `HermesWorkspace_*_x64-setup.exe` |
+            | Linux | 64-bit | `HermesWorkspace_*_amd64.AppImage` |
 
             ### Installation
 
-            **macOS:** Download the `.dmg`, open it, and drag ClawSuite to Applications.
+            **macOS:** Download the `.dmg`, open it, and drag Hermes Workspace to Applications.
 
             **Windows:** Download and run the installer.
 

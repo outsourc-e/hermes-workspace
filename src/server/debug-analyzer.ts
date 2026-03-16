@@ -422,7 +422,7 @@ export async function analyzeError(
   }
 }
 
-export async function readOpenClawLogs(): Promise<string> {
+export async function readGatewayLogs(): Promise<string> {
   const date = formatLogDate(new Date())
   const logPath = path.join('/tmp', 'openclaw', `openclaw-${date}.log`)
 

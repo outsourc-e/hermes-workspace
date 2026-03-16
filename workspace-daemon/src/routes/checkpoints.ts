@@ -649,7 +649,7 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
         resumed = true;
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Failed to steer OpenClaw session";
+          error instanceof Error ? error.message : "Failed to steer Hermes gateway session";
         res.status(500).json({ error: message });
         return;
       }

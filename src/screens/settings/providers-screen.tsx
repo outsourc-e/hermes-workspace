@@ -185,8 +185,6 @@ const TAB_ORDER: Array<{ id: SettingsTabId; label: string }> = [
   { id: 'memory', label: 'Memory' },
 ]
 
-// OpenClaw-specific option arrays removed (thinking, verbose, block streaming, compaction)
-
 const MEMORY_PROVIDER_OPTIONS: Array<SelectOption> = [
   { label: 'Local', value: 'local' },
   { label: 'OpenAI', value: 'openai' },
@@ -234,8 +232,8 @@ const SETTINGS: Array<SettingDefinition> = [
     step: 1000,
   },
   // Thinking/reasoning settings removed — not supported by Hermes Agent
-  // OpenClaw-specific settings removed: bootstrap, block streaming, compaction,
-  // thinking, verbose, fast mode — none apply to Hermes Agent
+  // Legacy gateway-specific settings removed: bootstrap, block streaming,
+  // compaction, thinking, verbose, and fast mode do not apply here.
   {
     id: 'context-tokens-session',
     tab: 'session',

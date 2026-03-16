@@ -13,9 +13,12 @@ import {
 } from '../../../server/rate-limit'
 
 // Use workspace-level tasks file so all Hermes agents share one source of truth
+const WORKSPACE_ROOT =
+  process.env.HERMES_WORKSPACE || process.env.OPENCLAW_WORKSPACE || ''
+
 const TASKS_FILE =
-  process.env.OPENCLAW_WORKSPACE
-    ? path.join(process.env.OPENCLAW_WORKSPACE, 'data', 'tasks.json')
+  WORKSPACE_ROOT
+    ? path.join(WORKSPACE_ROOT, 'data', 'tasks.json')
     : path.join(process.cwd(), '..', 'data', 'tasks.json')
 
 async function readTasks(): Promise<Record<string, unknown>[]> {

@@ -1,13 +1,13 @@
-# Reset Local State Script for OpenClaw Studio Beta Testing (Windows)
+# Reset Local State Script for Hermes Workspace Beta Testing (Windows)
 # Safely clears localStorage, cache, and temporary files
 
-Write-Host "🧹 OpenClaw Studio - Reset Local State" -ForegroundColor Cyan
+Write-Host "🧹 Hermes Workspace - Reset Local State" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if running from project root
 if (-Not (Test-Path "package.json")) {
-  Write-Host "❌ Error: Must run from project root (openclaw-studio/)" -ForegroundColor Red
+  Write-Host "❌ Error: Must run from project root (hermes-workspace/)" -ForegroundColor Red
   Write-Host "   Current directory: $(Get-Location)" -ForegroundColor Red
   exit 1
 }
@@ -20,7 +20,7 @@ Write-Host ""
 Write-Host "   This will NOT clear:"
 Write-Host "   - node_modules"
 Write-Host "   - Source code"
-Write-Host "   - OpenClaw Gateway data"
+Write-Host "   - Hermes gateway data"
 Write-Host ""
 
 # Prompt for confirmation
