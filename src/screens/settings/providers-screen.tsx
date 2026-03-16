@@ -185,36 +185,7 @@ const TAB_ORDER: Array<{ id: SettingsTabId; label: string }> = [
   { id: 'memory', label: 'Memory' },
 ]
 
-const THINKING_OPTIONS: Array<SelectOption> = [
-  { label: 'Off', value: 'off' },
-  { label: 'Minimal', value: 'minimal' },
-  { label: 'Low', value: 'low' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'High', value: 'high' },
-  { label: 'XHigh', value: 'xhigh' },
-  { label: 'Adaptive', value: 'adaptive' },
-]
-
-const VERBOSE_OPTIONS: Array<SelectOption> = [
-  { label: 'Off', value: 'off' },
-  { label: 'On', value: 'on' },
-  { label: 'Full', value: 'full' },
-]
-
-const BLOCK_STREAMING_OPTIONS: Array<SelectOption> = [
-  { label: 'Off', value: 'off' },
-  { label: 'On', value: 'on' },
-]
-
-const BLOCK_STREAMING_BREAK_OPTIONS: Array<SelectOption> = [
-  { label: 'After text ends', value: 'text_end' },
-  { label: 'After message ends', value: 'message_end' },
-]
-
-const COMPACTION_MODE_OPTIONS: Array<SelectOption> = [
-  { label: 'Default', value: 'default' },
-  { label: 'Safeguard', value: 'safeguard' },
-]
+// OpenClaw-specific option arrays removed (thinking, verbose, block streaming, compaction)
 
 const MEMORY_PROVIDER_OPTIONS: Array<SelectOption> = [
   { label: 'Local', value: 'local' },
@@ -262,98 +233,9 @@ const SETTINGS: Array<SettingDefinition> = [
     min: 1,
     step: 1000,
   },
-  {
-    id: 'thinking-default-models',
-    tab: 'models',
-    path: 'agents.defaults.thinkingDefault',
-    label: 'Thinking level default',
-    description: 'Default reasoning level used when sessions do not set their own thinking override.',
-    kind: 'select',
-    options: THINKING_OPTIONS,
-  },
-  {
-    id: 'bootstrap-max-chars',
-    tab: 'agents',
-    path: 'agents.defaults.bootstrapMaxChars',
-    label: 'Bootstrap prompt max chars',
-    description: 'Maximum prompt length for the bootstrap payload before truncation.',
-    kind: 'number',
-    min: 1,
-    step: 1000,
-  },
-  {
-    id: 'block-streaming-default',
-    tab: 'agents',
-    path: 'agents.defaults.blockStreamingDefault',
-    label: 'Block streaming default',
-    description: 'Default block streaming behavior for agents that support streamed replies.',
-    kind: 'select',
-    options: BLOCK_STREAMING_OPTIONS,
-  },
-  {
-    id: 'block-streaming-break',
-    tab: 'agents',
-    path: 'agents.defaults.blockStreamingBreak',
-    label: 'Block streaming break',
-    description: 'Choose whether block streaming flushes at text end or full message end.',
-    kind: 'select',
-    options: BLOCK_STREAMING_BREAK_OPTIONS,
-  },
-  {
-    id: 'compaction-mode',
-    tab: 'agents',
-    path: 'agents.defaults.compaction.mode',
-    label: 'Compaction mode',
-    description: 'Switch between the standard and safeguard compaction strategies.',
-    kind: 'select',
-    options: COMPACTION_MODE_OPTIONS,
-  },
-  {
-    id: 'compaction-threshold',
-    tab: 'agents',
-    path: 'agents.defaults.compaction.memoryFlush.softThresholdTokens',
-    label: 'Compaction threshold',
-    description: 'Soft memory flush threshold, in tokens, before compaction routines start helping.',
-    kind: 'number',
-    min: 0,
-    step: 500,
-  },
-  {
-    id: 'keep-recent-tokens',
-    tab: 'agents',
-    path: 'agents.defaults.compaction.keepRecentTokens',
-    label: 'Keep recent tokens',
-    description: 'Minimum recent context to preserve during compaction.',
-    kind: 'number',
-    min: 1,
-    step: 1000,
-  },
-  {
-    id: 'thinking-default-session',
-    tab: 'session',
-    path: 'agents.defaults.thinkingDefault',
-    label: 'Session thinking default',
-    description: 'Default reasoning level for newly created sessions.',
-    kind: 'select',
-    options: THINKING_OPTIONS,
-  },
-  {
-    id: 'verbose-default',
-    tab: 'session',
-    path: 'agents.defaults.verboseDefault',
-    label: 'Verbose default',
-    description: 'Default verbosity level used for new sessions.',
-    kind: 'select',
-    options: VERBOSE_OPTIONS,
-  },
-  {
-    id: 'fast-default',
-    tab: 'session',
-    label: 'Fast mode default',
-    description: 'Hermes does not currently expose a persisted fast-mode default in agent defaults.',
-    kind: 'boolean',
-    unsupported: true,
-  },
+  // Thinking/reasoning settings removed — not supported by Hermes Agent
+  // OpenClaw-specific settings removed: bootstrap, block streaming, compaction,
+  // thinking, verbose, fast mode — none apply to Hermes Agent
   {
     id: 'context-tokens-session',
     tab: 'session',
