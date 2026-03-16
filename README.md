@@ -51,7 +51,7 @@
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **OpenClaw Gateway** running locally — [Setup Guide](https://github.com/nichochar/openclaw)
+- **Hermes Agent** backend running on port 8642
 
 ### Install & Run
 
@@ -66,9 +66,8 @@ pnpm dev                   # Starts on http://localhost:3000
 ### Environment Variables
 
 ```env
-# Hermes Gateway connection (OpenClaw gateway)
-HERMES_GATEWAY_URL=ws://127.0.0.1:18789
-HERMES_GATEWAY_TOKEN=your_gateway_token
+# Hermes FastAPI backend URL
+HERMES_API_URL=http://127.0.0.1:8642
 
 # Optional: password-protect the web UI
 # HERMES_PASSWORD=your_password
