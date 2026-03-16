@@ -9,11 +9,11 @@ const ONBOARDING_KEY = 'hermes-onboarding-complete'
 type Step = 'welcome' | 'connect' | 'provider' | 'test' | 'done'
 
 const PROVIDERS = [
-  { id: 'nous', name: 'Nous Portal', icon: '⚕', desc: 'Free via OAuth' },
-  { id: 'openai-codex', name: 'OpenAI Codex', icon: '◎', desc: 'Free via ChatGPT Pro' },
-  { id: 'anthropic', name: 'Anthropic', icon: '◇', desc: 'API key required' },
-  { id: 'openrouter', name: 'OpenRouter', icon: '⚡', desc: 'API key required' },
-  { id: 'ollama', name: 'Ollama', icon: '🦙', desc: 'Local models' },
+  { id: 'nous', name: 'Nous Portal', letter: 'N', color: '#8B5CF6', desc: 'Free via OAuth' },
+  { id: 'openai-codex', name: 'OpenAI Codex', letter: 'O', color: '#10B981', desc: 'Free via ChatGPT Pro' },
+  { id: 'anthropic', name: 'Anthropic', letter: 'A', color: '#D97706', desc: 'API key required' },
+  { id: 'openrouter', name: 'OpenRouter', letter: 'R', color: '#6366F1', desc: 'API key required' },
+  { id: 'ollama', name: 'Ollama', letter: 'L', color: '#3B82F6', desc: 'Local models, no key needed' },
 ]
 
 export function HermesOnboarding() {
@@ -194,12 +194,14 @@ export function HermesOnboarding() {
                     )}
                     style={cardStyle}
                   >
-                    <span className="text-2xl">{p.icon}</span>
-                    <div>
+                    <div className="flex size-10 items-center justify-center rounded-xl text-white text-sm font-bold shrink-0" style={{ backgroundColor: p.color }}>
+                      {p.letter}
+                    </div>
+                    <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold">{p.name}</div>
                       <div className="text-xs" style={mutedStyle}>{p.desc}</div>
                     </div>
-                    {selectedProvider === p.id && <span className="ml-auto size-2 rounded-full bg-green-500" />}
+                    {selectedProvider === p.id && <span className="ml-auto size-2.5 rounded-full bg-green-500 shrink-0" />}
                   </button>
                 ))}
               </div>

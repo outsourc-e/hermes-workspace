@@ -132,16 +132,16 @@ const SETTINGS_CARD_CLASS =
 
 // ── Section components ──────────────────────────────────────────────────
 
-const PROVIDER_CARDS: Array<{ id: string; name: string; icon: string; models: string[]; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
-  { id: 'nous', name: 'Nous Portal', icon: '⚕', models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'], authType: 'oauth' },
-  { id: 'openai-codex', name: 'OpenAI Codex', icon: '◎', models: ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-4o'], authType: 'oauth' },
-  { id: 'anthropic', name: 'Anthropic', icon: '◇', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'], authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
-  { id: 'openrouter', name: 'OpenRouter', icon: '⚡', models: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'], authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
-  { id: 'zai', name: 'Z.AI / GLM', icon: '✦', models: ['glm-4-plus', 'glm-4-air'], authType: 'api_key', envKey: 'GLM_API_KEY' },
-  { id: 'kimi-coding', name: 'Kimi', icon: '☾', models: ['kimi-latest', 'moonshot-v1-128k'], authType: 'api_key', envKey: 'KIMI_API_KEY' },
-  { id: 'minimax', name: 'MiniMax', icon: '▲', models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'], authType: 'api_key', envKey: 'MINIMAX_API_KEY' },
-  { id: 'ollama', name: 'Ollama', icon: '🦙', models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'], authType: 'none' },
-  { id: 'custom', name: 'Custom', icon: '⚙', models: [], authType: 'api_key' },
+const PROVIDER_CARDS: Array<{ id: string; name: string; letter: string; color: string; models: string[]; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
+  { id: 'nous', name: 'Nous Portal', letter: 'N', color: '#8B5CF6', models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'], authType: 'oauth' },
+  { id: 'openai-codex', name: 'OpenAI Codex', letter: 'O', color: '#10B981', models: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'], authType: 'oauth' },
+  { id: 'anthropic', name: 'Anthropic', letter: 'A', color: '#D97706', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'], authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
+  { id: 'openrouter', name: 'OpenRouter', letter: 'R', color: '#6366F1', models: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'], authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
+  { id: 'zai', name: 'Z.AI / GLM', letter: 'Z', color: '#EC4899', models: ['glm-4-plus', 'glm-4-air'], authType: 'api_key', envKey: 'GLM_API_KEY' },
+  { id: 'kimi-coding', name: 'Kimi', letter: 'K', color: '#14B8A6', models: ['kimi-latest', 'moonshot-v1-128k'], authType: 'api_key', envKey: 'KIMI_API_KEY' },
+  { id: 'minimax', name: 'MiniMax', letter: 'M', color: '#F97316', models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'], authType: 'api_key', envKey: 'MINIMAX_API_KEY' },
+  { id: 'ollama', name: 'Ollama', letter: 'L', color: '#3B82F6', models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'], authType: 'none' },
+  { id: 'custom', name: 'Custom', letter: 'C', color: '#6B7280', models: [], authType: 'api_key' },
 ]
 
 function HermesContent() {
@@ -233,13 +233,15 @@ function HermesContent() {
                 style={cardStyle}
               >
                 <div className="flex w-full items-center justify-between">
-                  <span className="text-lg">{p.icon}</span>
+                  <div className="flex size-8 items-center justify-center rounded-lg text-white text-xs font-bold" style={{ backgroundColor: p.color }}>
+                    {p.letter}
+                  </div>
                   {isActive && <span className="size-2 rounded-full bg-green-500" />}
                   {!isActive && hasKey && <span className="size-2 rounded-full bg-green-500/40" />}
                   {!hasKey && p.authType === 'api_key' && <span className="size-2 rounded-full bg-red-500/60" />}
                 </div>
-                <span className="text-sm font-semibold">{p.name}</span>
-                <span className="text-[10px]" style={mutedStyle}>
+                <span className="text-xs font-semibold mt-1">{p.name}</span>
+                <span className="text-[9px]" style={mutedStyle}>
                   {p.authType === 'oauth' ? 'OAuth' : p.authType === 'none' ? 'Local' : hasKey ? 'Key set' : 'Key required'}
                 </span>
               </button>
@@ -281,7 +283,9 @@ function HermesContent() {
             const isEditing = editingKey === key
             return (
               <div key={p.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
-                <span className="text-base">{p.icon}</span>
+                <div className="flex size-7 items-center justify-center rounded-md text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: p.color }}>
+                  {p.letter}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{p.name}</div>
                   <div className="text-[11px] font-mono" style={mutedStyle}>
