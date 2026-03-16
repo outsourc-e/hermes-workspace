@@ -80,6 +80,7 @@ type ChatComposerProps = {
   thinkingLevel?: ThinkingLevel
   /** Called when user changes thinking level */
   onThinkingLevelChange?: (level: ThinkingLevel) => void
+  onAbort?: () => void
 }
 
 type ChatComposerHelpers = {
@@ -585,6 +586,7 @@ function ChatComposerComponent({
   webSearchEnabled,
   thinkingLevel: externalThinkingLevel,
   onThinkingLevelChange,
+  onAbort,
 }: ChatComposerProps) {
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
@@ -1306,18 +1308,10 @@ function ChatComposerComponent({
   }, [voiceRecorder])
 
   const handleAbort = useCallback(
-    async function handleAbort() {
-      try {
-        await fetch('/api/chat-abort', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionKey }),
-        })
-      } catch {
-        // Ignore abort errors
-      }
+    function handleAbort() {
+      onAbort?.()
     },
-    [sessionKey],
+    [onAbort],
   )
 
   const handleOpenAttachmentPicker = useCallback(

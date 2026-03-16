@@ -1104,7 +1104,7 @@ export function ChatScreen({
     availableModels: availableModelIds,
   })
 
-  const { startStreaming } = useStreamingMessage({
+  const { startStreaming, cancelStreaming } = useStreamingMessage({
     onSessionResolved: useCallback(
       ({ sessionKey, friendlyId }: { sessionKey: string; friendlyId: string }) => {
         const activeSend = activeSendRef.current
@@ -2057,6 +2057,25 @@ export function ChatScreen({
     ],
   )
 
+  const handleAbortStreaming = useCallback(() => {
+    const activeSend = activeSendRef.current
+    if (activeSend?.clientId) {
+      updateHistoryMessageByClientIdEverywhere(
+        queryClient,
+        activeSend.clientId,
+        (message) => ({
+          ...message,
+          status: 'sent',
+        }),
+      )
+    }
+    activeSendRef.current = null
+    cancelStreaming()
+    setSending(false)
+    setPendingGeneration(false)
+    setWaitingForResponse(false)
+  }, [cancelStreaming, queryClient])
+
   const runPaletteSlashCommand = useCallback(
     (command: string) => {
       const trimmedCommand = command.trim()
@@ -2357,6 +2376,7 @@ export function ChatScreen({
           {showComposer ? (
             <ChatComposer
               onSubmit={send}
+              onAbort={handleAbortStreaming}
               isLoading={sending || waitingForResponse}
               disabled={sending || hideUi}
               sessionKey={

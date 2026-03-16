@@ -686,6 +686,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     stopFrame()
     clearHandoffTimer()
     clearSendStreamRun()
+    clearStreamingSession(activeSessionKeyRef.current)
     fullTextRef.current = ''
     renderedTextRef.current = ''
     targetTextRef.current = ''
@@ -694,11 +695,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     lifecyclePhaseRef.current = 'idle'
     acceptedAtRef.current = null
     lastActivityAtRef.current = null
-    setState((prev) => ({
-      ...prev,
+    setState({
       isStreaming: false,
-    }))
-  }, [clearHandoffTimer, clearSendStreamRun, stopFrame])
+      streamingMessageId: null,
+      streamingText: '',
+      error: null,
+    })
+  }, [clearHandoffTimer, clearSendStreamRun, clearStreamingSession, stopFrame])
 
   const resetStreaming = useCallback(() => {
     cancelStreaming()
