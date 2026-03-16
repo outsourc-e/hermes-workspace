@@ -1587,13 +1587,7 @@ function MessageItemComponent({
                 <span className="text-[10px] text-white/60 self-end">Sent</span>
               )}
 
-              {effectiveIsStreaming && !hasRevealedText && (
-                <div className="flex items-center gap-1 px-1 py-0.5">
-                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:0ms]" />
-                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:150ms]" />
-                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:300ms]" />
-                </div>
-              )}
+              {/* Removed duplicate waiting dots — tool pill already shows status */}
             </div>
           </Message>
         )}

@@ -760,14 +760,7 @@ function ChatComposerComponent({
     () => toDraftStorageKey(sessionKey),
     [sessionKey],
   )
-  const modelButtonLabel = (() => {
-    const base = '⚕ Hermes Agent'
-    const suffix = [
-      thinkingLevel === 'low' ? '🧠 Low' : thinkingLevel === 'off' ? '🧠 Off' : null,
-      fastMode ? '⚡' : null,
-    ].filter(Boolean).join(' ')
-    return suffix ? `${base} · ${suffix}` : base
-  })()
+  const modelButtonLabel = '⚕ Hermes Agent'
 
 
   // Measure composer height and set CSS variable for scroll padding
