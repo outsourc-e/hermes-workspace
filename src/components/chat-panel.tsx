@@ -1,7 +1,7 @@
 /**
  * ChatPanel — collapsible right-panel chat overlay for non-chat routes.
  * Renders a full ChatScreen in a side panel so users can chat while
- * viewing dashboard, skills, gateway pages, etc.
+ * viewing dashboard, skills, other pages, etc.
  */
 import { useCallback, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'

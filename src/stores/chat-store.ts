@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type {
-  GatewayMessage,
+  ChatMessage,
   MessageContent,
   ToolCallContent,
   ThinkingContent,
@@ -10,7 +10,7 @@ import type {
 export type ChatStreamEvent =
   | {
       type: 'message'
-      message: GatewayMessage
+      message: ChatMessage
       sessionKey: string
       runId?: string
       transport?: 'chat-events' | 'send-stream'
@@ -46,12 +46,12 @@ export type ChatStreamEvent =
       errorMessage?: string
       runId?: string
       sessionKey: string
-      message?: GatewayMessage
+      message?: ChatMessage
       transport?: 'chat-events' | 'send-stream'
     }
   | {
       type: 'user_message'
-      message: GatewayMessage
+      message: ChatMessage
       sessionKey: string
       source?: string
       runId?: string
@@ -77,11 +77,11 @@ export type StreamingState = {
   }>
 }
 
-type GatewayChatState = {
+type ChatState = {
   connectionState: ConnectionState
   lastError: string | null
   /** Messages received via real-time stream, keyed by sessionKey */
-  realtimeMessages: Map<string, Array<GatewayMessage>>
+  realtimeMessages: Map<string, Array<ChatMessage>>
   /** Current streaming state per session */
   streamingState: Map<string, StreamingState>
   /** Timestamp of last received event */
@@ -96,7 +96,7 @@ type GatewayChatState = {
   // Actions
   setConnectionState: (state: ConnectionState, error?: string) => void
   processEvent: (event: ChatStreamEvent) => void
-  getRealtimeMessages: (sessionKey: string) => Array<GatewayMessage>
+  getRealtimeMessages: (sessionKey: string) => Array<ChatMessage>
   getStreamingState: (sessionKey: string) => StreamingState | null
   clearSession: (sessionKey: string) => void
   clearRealtimeBuffer: (sessionKey: string) => void
@@ -104,8 +104,8 @@ type GatewayChatState = {
   clearAllStreaming: () => void
   mergeHistoryMessages: (
     sessionKey: string,
-    historyMessages: Array<GatewayMessage>,
-  ) => Array<GatewayMessage>
+    historyMessages: Array<ChatMessage>,
+  ) => Array<ChatMessage>
   /** Register a runId as being handled by send-stream — chat-events will skip it */
   registerSendStreamRun: (runId: string) => void
   /** Unregister a runId when send-stream completes */
@@ -128,10 +128,10 @@ function normalizeString(value: unknown): string {
 }
 
 /**
- * Strip <final>...</final> wrapper tags that the Hermes gateway emits as a
+ * Strip <final>...</final> wrapper tags that the server emits as a
  * streaming-completion sentinel in agent chunk events.
  *
- * The gateway sometimes wraps the last streaming chunk (or a standalone
+ * The server sometimes wraps the last streaming chunk (or a standalone
  * assistant-message event that fires before the formal `state: 'final'` chat
  * event) in <final>…</final> tags.  When the subsequent clean `done` event
  * arrives, the dedup logic compares its text against the already-stored tagged
@@ -140,13 +140,13 @@ function normalizeString(value: unknown): string {
  *
  * Stripping these tags at the store boundary (before storing or comparing)
  * ensures the two copies are treated as the same message regardless of whether
- * the gateway included the sentinel tags or not.
+ * the server included the sentinel tags or not.
  */
 function stripFinalTags(text: string): string {
   // <final>…</final>  — strip outer wrapper (case-insensitive, allows whitespace)
   let result = text.replace(/^\s*<final>\s*([\s\S]*?)\s*<\/final>\s*$/i, '$1').trim()
   // P7: strip internal model tags that should never appear in rendered output.
-  // Matches gateway control UI's rg/ig/ag stripping functions.
+  // Matches chat UI's rg/ig/ag stripping functions.
   // Respects code blocks — only strip tags outside of ``` fences.
   result = stripInternalTags(result)
   return result
@@ -156,7 +156,7 @@ function stripFinalTags(text: string): string {
  * Strip internal model tags (<thinking>, <antThinking>, <thought>,
  * <parameter name="newText">, <relevant_memories>) that can leak into
  * displayed text. Only strips outside code blocks to avoid breaking code samples.
- * Mirrors the gateway control UI's tag-stripping pipeline.
+ * Mirrors the chat control UI's tag-stripping pipeline.
  */
 function stripInternalTags(text: string): string {
   // Split on code blocks to avoid stripping inside them
@@ -179,10 +179,10 @@ function stripInternalTags(text: string): string {
  * untouched.  If the message has no text content the original object is
  * returned as-is so we don't allocate unnecessarily.
  */
-function stripFinalTagsFromMessage(msg: GatewayMessage): GatewayMessage {
+function stripFinalTagsFromMessage(msg: ChatMessage): ChatMessage {
   let modified = false
   const rawMessage = msg as Record<string, unknown>
-  const nextMessage: GatewayMessage & Record<string, unknown> = { ...msg }
+  const nextMessage: ChatMessage & Record<string, unknown> = { ...msg }
 
   if (Array.isArray(msg.content)) {
     const nextContent = msg.content.map((part) => {
@@ -209,7 +209,7 @@ function stripFinalTagsFromMessage(msg: GatewayMessage): GatewayMessage {
   return nextMessage
 }
 
-function getMessageId(msg: GatewayMessage | null | undefined): string | undefined {
+function getMessageId(msg: ChatMessage | null | undefined): string | undefined {
   if (!msg) return undefined
   const id = (msg as { id?: string }).id
   if (typeof id === 'string' && id.trim().length > 0) return id
@@ -218,7 +218,7 @@ function getMessageId(msg: GatewayMessage | null | undefined): string | undefine
   return undefined
 }
 
-function getClientNonce(msg: GatewayMessage | null | undefined): string {
+function getClientNonce(msg: ChatMessage | null | undefined): string {
   if (!msg) return ''
   const raw = msg as Record<string, unknown>
   return (
@@ -229,7 +229,7 @@ function getClientNonce(msg: GatewayMessage | null | undefined): string {
   )
 }
 
-function getMessageEventTime(msg: GatewayMessage | null | undefined): number | undefined {
+function getMessageEventTime(msg: ChatMessage | null | undefined): number | undefined {
   if (!msg) return undefined
   const raw = msg as Record<string, unknown>
   for (const key of ['createdAt', 'timestamp'] as const) {
@@ -243,27 +243,27 @@ function getMessageEventTime(msg: GatewayMessage | null | undefined): number | u
   return undefined
 }
 
-function getMessageReceiveTime(msg: GatewayMessage | null | undefined): number | undefined {
+function getMessageReceiveTime(msg: ChatMessage | null | undefined): number | undefined {
   if (!msg) return undefined
   const value = (msg as Record<string, unknown>).__receiveTime
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-function getMessageHistoryIndex(msg: GatewayMessage | null | undefined): number | undefined {
+function getMessageHistoryIndex(msg: ChatMessage | null | undefined): number | undefined {
   if (!msg) return undefined
   const value = (msg as Record<string, unknown>).__historyIndex
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function getMessageRealtimeSequence(
-  msg: GatewayMessage | null | undefined,
+  msg: ChatMessage | null | undefined,
 ): number | undefined {
   if (!msg) return undefined
   const value = (msg as Record<string, unknown>).__realtimeSequence
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-function hasToolCalls(msg: GatewayMessage | null | undefined): boolean {
+function hasToolCalls(msg: ChatMessage | null | undefined): boolean {
   if (!msg) return false
   if (Array.isArray(msg.content)) {
     const contentHasToolCalls = msg.content.some((part) => part.type === 'toolCall')
@@ -277,7 +277,7 @@ function hasToolCalls(msg: GatewayMessage | null | undefined): boolean {
   )
 }
 
-function getMessageChronologyRank(msg: GatewayMessage): number {
+function getMessageChronologyRank(msg: ChatMessage): number {
   const role = normalizeString(msg.role).toLowerCase()
   if (role === 'user') return 0
   if (role === 'assistant' && hasToolCalls(msg)) return 1
@@ -286,7 +286,7 @@ function getMessageChronologyRank(msg: GatewayMessage): number {
   return 4
 }
 
-function compareMessagesByTime(left: GatewayMessage, right: GatewayMessage): number {
+function compareMessagesByTime(left: ChatMessage, right: ChatMessage): number {
   const leftTime = getMessageEventTime(left) ?? getMessageReceiveTime(left) ?? 0
   const rightTime = getMessageEventTime(right) ?? getMessageReceiveTime(right) ?? 0
   if (leftTime !== rightTime) return leftTime - rightTime
@@ -321,8 +321,8 @@ function compareMessagesByTime(left: GatewayMessage, right: GatewayMessage): num
 }
 
 function sortMessagesChronologically(
-  messages: Array<GatewayMessage>,
-): Array<GatewayMessage> {
+  messages: Array<ChatMessage>,
+): Array<ChatMessage> {
   return messages
     .map((message, index) => ({ message, index }))
     .sort((left, right) => {
@@ -338,7 +338,7 @@ function isExternalInboundUserSource(source: unknown): boolean {
   return normalized === 'webchat' || normalized === 'signal' || normalized === 'telegram'
 }
 
-function getAttachmentSignature(msg: GatewayMessage | null | undefined): string {
+function getAttachmentSignature(msg: ChatMessage | null | undefined): string {
   if (!msg) return ''
   const attachments = Array.isArray((msg as any).attachments)
     ? ((msg as any).attachments as Array<Record<string, unknown>>)
@@ -352,7 +352,7 @@ function getAttachmentSignature(msg: GatewayMessage | null | undefined): string 
     .join('|')
 }
 
-function isOptimisticUserCandidate(msg: GatewayMessage | null | undefined): boolean {
+function isOptimisticUserCandidate(msg: ChatMessage | null | undefined): boolean {
   if (!msg || msg.role !== 'user') return false
   const raw = msg as Record<string, unknown>
   return (
@@ -361,7 +361,7 @@ function isOptimisticUserCandidate(msg: GatewayMessage | null | undefined): bool
   )
 }
 
-function messageMultipartSignature(msg: GatewayMessage | null | undefined): string {
+function messageMultipartSignature(msg: ChatMessage | null | undefined): string {
   if (!msg) return ''
   let content = Array.isArray(msg.content)
     ? msg.content
@@ -393,7 +393,7 @@ function messageMultipartSignature(msg: GatewayMessage | null | undefined): stri
   return `${msg.role ?? 'unknown'}:${content}:${attachments}`
 }
 
-export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
+export const useChatStore = create<ChatState>((set, get) => ({
   connectionState: 'disconnected',
   lastError: null,
   realtimeMessages: new Map(),
@@ -445,7 +445,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
       case 'user_message': {
         // Filter internal system event messages that should never appear in chat.
         // These are pre-compaction flushes, heartbeat prompts, and similar
-        // gateway-injected control messages — mirror the filter in use-chat-history.ts.
+        // server-injected control messages — mirror the filter in use-chat-history.ts.
         if (event.message.role === 'user') {
           const rawText = extractMessageText(event.message)
           if (
@@ -466,7 +466,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const incomingReceiveTime = now
 
         // Strip <final>…</final> sentinel tags from assistant messages before
-        // storing or comparing.  The gateway can emit a bare assistant-message
+        // storing or comparing.  The server can emit a bare assistant-message
         // event (state=undefined) whose text is still wrapped in these tags,
         // and the subsequent clean `done` event then fails the dedup check
         // because the stored text differs from the final text.
@@ -557,7 +557,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         })
 
         // Mark user messages from external sources
-        const incomingMessage: GatewayMessage = {
+        const incomingMessage: ChatMessage = {
           ...normalizedMessage,
           __realtimeSource:
             event.type === 'user_message' ? (event as any).source : undefined,
@@ -607,7 +607,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
 
-        // Gateway sends full accumulated text with fullReplace=true
+        // Server sends full accumulated text with fullReplace=true
         // Replace entire text (default), or append if fullReplace is explicitly false
         const next: StreamingState = {
           ...prev,
@@ -684,12 +684,12 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const streaming = streamingMap.get(sessionKey)
 
         // Build the complete message — prefer authoritative final payload (bug #8 fix)
-        let completeMessage: GatewayMessage | null = null
+        let completeMessage: ChatMessage | null = null
 
         if (event.message) {
           // Prefer done event's message payload — it's the authoritative final response.
           // Strip <final>…</final> sentinel tags: the `done` message may still carry
-          // them if the gateway serialises the final state from its streaming buffer.
+          // them if the server serialises the final state from its streaming buffer.
           const cleanedMessage = stripFinalTagsFromMessage(event.message)
           // Preserve tool calls from streaming state on the final message so
           // ToolCallPill can render them even after streaming state is cleared.
@@ -883,7 +883,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           if (rtText) {
             const histText = extractMessageText(histMsg)
             if (histText === rtText) return true
-            // Prefix match: the gateway may enrich the body with inline
+            // Prefix match: the server may enrich the body with inline
             // <attachment> tags that weren't in the original optimistic message.
             // The enriched body starts with the original text.
             if (histText && rtText.startsWith(histText)) return true
@@ -949,15 +949,15 @@ function extractTextFromContent(
 }
 
 /**
- * Extract text from a GatewayMessage using multiple strategies:
+ * Extract text from a ChatMessage using multiple strategies:
  *   1. content array (canonical format)
- *   2. top-level text/body/message fields (legacy / some gateway adapters)
+ *   2. top-level text/body/message fields (legacy / some server adapters)
  *
- * Some gateways echo user messages with a top-level `text` field instead of
+ * Some servers echo user messages with a top-level `text` field instead of
  * the `content` array. Using only extractTextFromContent() would return ''
  * for those, causing dedup to fail in mergeHistoryMessages.
  */
-function extractMessageText(msg: GatewayMessage | null | undefined): string {
+function extractMessageText(msg: ChatMessage | null | undefined): string {
   if (!msg) return ''
   const fromContent = extractTextFromContent(msg.content)
   if (fromContent.length > 0) return fromContent

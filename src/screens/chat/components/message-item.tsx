@@ -11,8 +11,8 @@ import {
 } from '../utils'
 import { MessageActionsBar } from './message-actions-bar'
 import type {
-  GatewayAttachment,
-  GatewayMessage,
+  ChatAttachment,
+  ChatMessage,
   ToolCallContent,
 } from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
@@ -109,11 +109,11 @@ type ExecNotification = {
 }
 
 type MessageItemProps = {
-  message: GatewayMessage
-  attachedToolMessages?: Array<GatewayMessage>
-  toolResultsByCallId?: Map<string, GatewayMessage>
+  message: ChatMessage
+  attachedToolMessages?: Array<ChatMessage>
+  toolResultsByCallId?: Map<string, ChatMessage>
   toolCalls?: Array<StreamToolCall>
-  onRetryMessage?: (message: GatewayMessage) => void
+  onRetryMessage?: (message: ChatMessage) => void
   forceActionsVisible?: boolean
   wrapperRef?: React.RefObject<HTMLDivElement | null>
   wrapperClassName?: string
@@ -138,7 +138,7 @@ type InlineToolSection = {
   state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error'
 }
 
-function extractToolResultText(msg: GatewayMessage | undefined): string {
+function extractToolResultText(msg: ChatMessage | undefined): string {
   if (!msg) return ''
   // Prefer text from content blocks (exec stdout, Read output, etc.)
   if (Array.isArray(msg.content)) {
@@ -157,7 +157,7 @@ function extractToolResultText(msg: GatewayMessage | undefined): string {
 
 function mapToolCallToToolPart(
   toolCall: ToolCallContent,
-  resultMessage: GatewayMessage | undefined,
+  resultMessage: ChatMessage | undefined,
 ): ToolPart {
   const hasResult = resultMessage !== undefined
   const isError = resultMessage?.isError ?? false
@@ -196,7 +196,7 @@ function mapToolCallToToolPart(
   }
 }
 
-function toolCallsSignature(message: GatewayMessage): string {
+function toolCallsSignature(message: ChatMessage): string {
   const toolCalls = getToolCallsFromMessage(message)
   return toolCalls
     .map((toolCall) => {
@@ -209,7 +209,7 @@ function toolCallsSignature(message: GatewayMessage): string {
     .join('||')
 }
 
-function toolResultSignature(result: GatewayMessage | undefined): string {
+function toolResultSignature(result: ChatMessage | undefined): string {
   if (!result) return 'missing'
   const content = Array.isArray(result.content) ? result.content : []
   const text = content
@@ -221,8 +221,8 @@ function toolResultSignature(result: GatewayMessage | undefined): string {
 }
 
 function toolResultsSignature(
-  message: GatewayMessage,
-  toolResultsByCallId: Map<string, GatewayMessage> | undefined,
+  message: ChatMessage,
+  toolResultsByCallId: Map<string, ChatMessage> | undefined,
 ): string {
   if (!toolResultsByCallId) return ''
   const toolCalls = getToolCallsFromMessage(message)
@@ -247,7 +247,7 @@ function normalizeTimestamp(value: unknown): number | null {
   return null
 }
 
-function rawTimestamp(message: GatewayMessage): number | null {
+function rawTimestamp(message: ChatMessage): number | null {
   const candidates = [
     (message as any).createdAt,
     (message as any).created_at,
@@ -262,7 +262,7 @@ function rawTimestamp(message: GatewayMessage): number | null {
   return null
 }
 
-function thinkingFromMessage(msg: GatewayMessage): string | null {
+function thinkingFromMessage(msg: ChatMessage): string | null {
   const parts = Array.isArray(msg.content) ? msg.content : []
   const thinkingPart = parts.find((part) => part.type === 'thinking')
   if (thinkingPart && 'thinking' in thinkingPart) {
@@ -283,7 +283,7 @@ function normalizeStreamToolPhase(
   return 'running'
 }
 
-function readExecNotification(message: GatewayMessage): ExecNotification | null {
+function readExecNotification(message: ChatMessage): ExecNotification | null {
   const raw = (message as any).__execNotification as
     | Record<string, unknown>
     | undefined
@@ -456,7 +456,7 @@ function shortenModelName(raw: string): string {
     .replace(/\bGpt\b/g, 'GPT')
 }
 
-function messageMetadataSignature(message: GatewayMessage): string {
+function messageMetadataSignature(message: ChatMessage): string {
   const root = message as Record<string, unknown>
   return JSON.stringify({
     model: root.model ?? root.modelName ?? root.model_name ?? null,
@@ -486,7 +486,7 @@ function messageMetadataSignature(message: GatewayMessage): string {
   })
 }
 
-function getMessageUsageMetadata(message: GatewayMessage): {
+function getMessageUsageMetadata(message: ChatMessage): {
   inputTokens: number | null
   outputTokens: number | null
   cacheReadTokens: number | null
@@ -500,7 +500,7 @@ function getMessageUsageMetadata(message: GatewayMessage): {
       ? (root.usage as Record<string, unknown>)
       : null
 
-  // Gateway may store step/cost data in message.details (from chat.history)
+  // Server may store step/cost data in message.details (from chat.history)
   const details =
     root.details && typeof root.details === 'object'
       ? (root.details as Record<string, unknown>)
@@ -731,7 +731,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   return pill
 }
 
-function attachmentSource(attachment: GatewayAttachment | undefined): string {
+function attachmentSource(attachment: ChatAttachment | undefined): string {
   if (!attachment) return ''
   const candidates = [attachment.previewUrl, attachment.dataUrl, attachment.url]
   for (const candidate of candidates) {
@@ -742,7 +742,7 @@ function attachmentSource(attachment: GatewayAttachment | undefined): string {
   return ''
 }
 
-function attachmentExtension(attachment: GatewayAttachment): string {
+function attachmentExtension(attachment: ChatAttachment): string {
   const name = typeof attachment.name === 'string' ? attachment.name : ''
   const fromName = name.split('.').pop()?.trim().toLowerCase() || ''
   if (fromName) return fromName
@@ -752,7 +752,7 @@ function attachmentExtension(attachment: GatewayAttachment): string {
   return fileName.split('.').pop()?.trim().toLowerCase() || ''
 }
 
-function isImageAttachment(attachment: GatewayAttachment): boolean {
+function isImageAttachment(attachment: ChatAttachment): boolean {
   const contentType =
     typeof attachment.contentType === 'string'
       ? attachment.contentType.trim().toLowerCase()
@@ -1125,7 +1125,7 @@ function MessageItemComponent({
     : []
   const hasAttachments = attachments.length > 0
 
-  // Extract inline images from content array (gateway sends images as content blocks)
+  // Extract inline images from content array (server sends images as content blocks)
   const inlineImages = useMemo(() => {
     const parts = Array.isArray(message.content) ? message.content : []
     return parts
@@ -1263,9 +1263,9 @@ function MessageItemComponent({
   )
   const hasToolCalls = inlineToolSections.length > 0
 
-  // 'queued' = delivered to gateway, waiting for response (busy/backlogged)
-  // 'sending' = still in flight to the gateway API (should clear in <1s)
-  // 'error'   = gateway rejected or network failed → show retry
+  // 'queued' = delivered to server, waiting for response (busy/backlogged)
+  // 'sending' = still in flight to the server API (should clear in <1s)
+  // 'error'   = server rejected or network failed → show retry
   const isQueued = message.status === 'queued'
   const isFailed = message.status === 'error'
   const usageMetadata = useMemo(

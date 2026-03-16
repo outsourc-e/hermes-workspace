@@ -1,5 +1,5 @@
 /**
- * Convert raw gateway session keys to human-readable names.
+ * Convert raw Hermes session keys to human-readable names.
  *
  * Examples:
  *   "agent:main:main" → "Main"

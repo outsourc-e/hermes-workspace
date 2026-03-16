@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { chatQueryKeys } from '../screens/chat/chat-queries'
 import { getMessageTimestamp, textFromMessage } from '../screens/chat/utils'
-import type { GatewayMessage, HistoryResponse } from '../screens/chat/types'
+import type { ChatMessage, HistoryResponse } from '../screens/chat/types'
 
 type ExportFormat = 'markdown' | 'json' | 'text'
 
@@ -67,7 +67,7 @@ export function useExport({
   return { exportConversation }
 }
 
-function formatTimestamp(message: GatewayMessage): string {
+function formatTimestamp(message: ChatMessage): string {
   const ts = getMessageTimestamp(message)
   return new Date(ts).toLocaleString('en-GB', {
     year: 'numeric',
@@ -84,7 +84,7 @@ function roleLabel(role: string | undefined): string {
   return role || 'Unknown'
 }
 
-function toMarkdown(messages: Array<GatewayMessage>, title: string): string {
+function toMarkdown(messages: Array<ChatMessage>, title: string): string {
   const lines: Array<string> = []
   lines.push('# ' + title)
   lines.push('')
@@ -109,7 +109,7 @@ function toMarkdown(messages: Array<GatewayMessage>, title: string): string {
   return lines.join('\n')
 }
 
-function toJSON(messages: Array<GatewayMessage>, title: string): string {
+function toJSON(messages: Array<ChatMessage>, title: string): string {
   const entries = messages
     .map(function mapMessage(message) {
       const text = textFromMessage(message)
@@ -134,7 +134,7 @@ function toJSON(messages: Array<GatewayMessage>, title: string): string {
   )
 }
 
-function toPlainText(messages: Array<GatewayMessage>, title: string): string {
+function toPlainText(messages: Array<ChatMessage>, title: string): string {
   const lines: Array<string> = []
   lines.push(title)
   lines.push('Exported on ' + new Date().toLocaleString('en-GB'))

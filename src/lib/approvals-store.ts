@@ -7,7 +7,7 @@ export interface ApprovalRequest {
   command: string
   timestamp: number
   status: 'pending' | 'approved' | 'denied'
-  gatewayApprovalId?: string
+  approvalId?: string
   agentId?: string
   agentName?: string
   action?: string

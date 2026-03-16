@@ -38,8 +38,8 @@ import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
 import type {
-  GatewayModelCatalogEntry,
-  GatewayModelSwitchResponse,
+  ModelCatalogEntry,
+  ModelSwitchResponse,
 } from '@/lib/model-types'
 import { usePinnedModels } from '@/hooks/use-pinned-models'
 // import { ModeSelector } from '@/components/mode-selector'
@@ -144,7 +144,7 @@ function isHermesCatalogEntry(
 
 async function fetchModels(): Promise<{
   ok?: boolean
-  models?: Array<GatewayModelCatalogEntry>
+  models?: Array<ModelCatalogEntry>
   configuredProviders?: Array<string>
 }> {
   const response = await fetch(`${HERMES_API_URL}/v1/models`)
@@ -202,13 +202,13 @@ async function fetchModels(): Promise<{
     ),
   )
 
-  return { ok: true, models: models as Array<GatewayModelCatalogEntry>, configuredProviders }
+  return { ok: true, models: models as Array<ModelCatalogEntry>, configuredProviders }
 }
 
 async function switchModel(
   model: string,
   _sessionKey?: string,
-): Promise<GatewayModelSwitchResponse> {
+): Promise<ModelSwitchResponse> {
   return {
     ok: true,
     resolved: {
@@ -224,7 +224,7 @@ const MAX_ATTACHMENT_FILE_SIZE = 50 * 1024 * 1024
 const MAX_IMAGE_DIMENSION = 1920
 /** Initial JPEG compression quality (0-1). */
 const IMAGE_QUALITY = 0.85
-/** Gateway-safe image attachment limit after processing (1MB). */
+/** Safe image attachment limit after processing (1MB). */
 const MAX_TRANSPORT_IMAGE_SIZE = 1 * 1024 * 1024
 
 const IMAGE_EXTENSION_TO_MIME: Record<string, string> = {
@@ -546,7 +546,7 @@ async function fetchCurrentModelFromStatus(): Promise<string> {
 
     const payload = (await response.json()) as SessionStatusApiResponse
     if (payload.ok === false) {
-      throw new Error(readText(payload.error) || 'Gateway unavailable')
+      throw new Error(readText(payload.error) || 'Server unavailable')
     }
 
     return readModelFromStatusPayload(payload.payload ?? payload)
@@ -644,13 +644,13 @@ function ChatComposerComponent({
   const { pinned, isPinned } = usePinnedModels()
 
   const modelsQuery = useQuery({
-    queryKey: ['gateway', 'models'],
+    queryKey: ['hermes', 'models'],
     queryFn: fetchModels,
     refetchInterval: 60_000,
     retry: false,
   })
   const currentModelQuery = useQuery({
-    queryKey: ['gateway', 'session-status-model'],
+    queryKey: ['hermes', 'session-status-model'],
     queryFn: fetchCurrentModelFromStatus,
     refetchInterval: 30_000,
     retry: false,
@@ -662,14 +662,14 @@ function ChatComposerComponent({
   void modelsQuery.data
 
   const modelSwitchMutation = useMutation({
-    mutationFn: async function switchGatewayModel(payload: {
+    mutationFn: async function doSwitchModel(payload: {
       model: string
       sessionKey?: string
     }) {
       return await switchModel(payload.model, payload.sessionKey)
     },
     onSuccess: function onSuccess(
-      payload: GatewayModelSwitchResponse,
+      payload: ModelSwitchResponse,
       variables,
     ) {
       const provider = readText(payload.resolved?.modelProvider)

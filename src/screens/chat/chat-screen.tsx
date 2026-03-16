@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
   deriveFriendlyIdFromKey,
-  isMissingGatewayAuth,
+  isMissingAuth,
   readError,
   textFromMessage,
 } from './utils'
@@ -20,7 +20,7 @@ import {
   appendHistoryMessage,
   chatQueryKeys,
   clearHistoryMessages,
-  fetchGatewayStatus,
+  fetchStatus,
   updateHistoryMessageByClientId,
   updateHistoryMessageByClientIdEverywhere,
   updateSessionLastMessage,
@@ -29,7 +29,7 @@ import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
-import { GatewayStatusMessage } from './components/connection-status-message'
+import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
   consumePendingSend,
   hasPendingGeneration,
@@ -53,15 +53,15 @@ import {
   addApproval,
   loadApprovals,
   saveApprovals,
-} from '@/screens/gateway/lib/approvals-store'
+} from '@/lib/approvals-store'
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
   ChatComposerHelpers,
   ThinkingLevel,
 } from './components/chat-composer'
-import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
-import type { GatewayAttachment, GatewayMessage, SessionMeta } from './types'
+import type { ApprovalRequest } from '@/lib/approvals-store'
+import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import { stripQueuedWrapper } from '@/lib/strip-queued-wrapper'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
@@ -79,7 +79,7 @@ import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 const _noopSetActivity = (_s: string) => {}
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
-import { useGatewayChatStore } from '@/stores/gateway-chat-store'
+import { useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 import {
   CHAT_OPEN_SETTINGS_EVENT,
@@ -142,7 +142,7 @@ function sanitizeExportToken(value: string): string {
 
 function exportConversationTranscript(payload: {
   sessionLabel: string
-  messages: Array<GatewayMessage>
+  messages: Array<ChatMessage>
 }) {
   if (typeof document === 'undefined') return false
 
@@ -187,7 +187,7 @@ function exportConversationTranscript(payload: {
   return true
 }
 
-function messageFallbackSignature(message: GatewayMessage): string {
+function messageFallbackSignature(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   const timestamp = normalizeMessageValue(
     typeof raw.timestamp === 'number' ? String(raw.timestamp) : raw.timestamp,
@@ -228,7 +228,7 @@ function messageFallbackSignature(message: GatewayMessage): string {
   return `${message.role ?? 'unknown'}:${timestamp}:${contentParts}:${attachments}`
 }
 
-function getMessageClientId(message: GatewayMessage): string {
+function getMessageClientId(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   const directClientId = normalizeMessageValue(raw.clientId)
   if (directClientId) return directClientId
@@ -243,7 +243,7 @@ function getMessageClientId(message: GatewayMessage): string {
   return ''
 }
 
-function getRetryMessageKey(message: GatewayMessage): string {
+function getRetryMessageKey(message: ChatMessage): string {
   const clientId = getMessageClientId(message)
   if (clientId) return `client:${clientId}`
 
@@ -261,7 +261,7 @@ function getRetryMessageKey(message: GatewayMessage): string {
   return `fallback:${message.role ?? 'unknown'}:${timestamp}:${messageText}`
 }
 
-function isRetryableQueuedMessage(message: GatewayMessage): boolean {
+function isRetryableQueuedMessage(message: ChatMessage): boolean {
   if ((message.role || '') !== 'user') return false
   const raw = message as Record<string, unknown>
   const status = normalizeMessageValue(raw.status)
@@ -275,19 +275,19 @@ const commandHelpers: ChatComposerHelpers = {
 }
 
 function getMessageRetryAttachments(
-  message: GatewayMessage,
-): Array<GatewayAttachment> {
+  message: ChatMessage,
+): Array<ChatAttachment> {
   if (!Array.isArray(message.attachments)) return []
   return message.attachments.filter((attachment) => {
     return Boolean(attachment) && typeof attachment === 'object'
   })
 }
 
-function getMessageStatusValue(message: GatewayMessage): string {
+function getMessageStatusValue(message: ChatMessage): string {
   return normalizeMessageValue((message as Record<string, unknown>).status)
 }
 
-function getMessageTimestampValue(message: GatewayMessage): number | null {
+function getMessageTimestampValue(message: ChatMessage): number | null {
   const raw = message as Record<string, unknown>
   const candidates = [
     raw.timestamp,
@@ -309,7 +309,7 @@ function getMessageTimestampValue(message: GatewayMessage): number | null {
   return null
 }
 
-function getMessageAttachmentSignature(message: GatewayMessage): string {
+function getMessageAttachmentSignature(message: ChatMessage): string {
   if (!Array.isArray(message.attachments) || message.attachments.length === 0) {
     return ''
   }
@@ -328,7 +328,7 @@ function getMessageAttachmentSignature(message: GatewayMessage): string {
     .join('|')
 }
 
-function isOptimisticUserMessage(message: GatewayMessage): boolean {
+function isOptimisticUserMessage(message: ChatMessage): boolean {
   const raw = message as Record<string, unknown>
   return (
     normalizeMessageValue(raw.__optimisticId).length > 0 ||
@@ -337,8 +337,8 @@ function isOptimisticUserMessage(message: GatewayMessage): boolean {
 }
 
 function shouldCollapseTextDuplicate(
-  existing: GatewayMessage,
-  candidate: GatewayMessage,
+  existing: ChatMessage,
+  candidate: ChatMessage,
 ): boolean {
   if (existing.role !== candidate.role) return false
 
@@ -364,7 +364,7 @@ function shouldCollapseTextDuplicate(
   )
 }
 
-function stripQueuedWrapperFromUserMessage(message: GatewayMessage): GatewayMessage {
+function stripQueuedWrapperFromUserMessage(message: ChatMessage): ChatMessage {
   if (message.role !== 'user') return message
 
   const text = textFromMessage(message)
@@ -410,8 +410,8 @@ export function ChatScreen({
   const lastAssistantSignature = useRef('')
   const refreshHistoryRef = useRef<() => void>(() => {})
   const retriedQueuedMessageKeysRef = useRef(new Set<string>())
-  const hasSeenGatewayDisconnectRef = useRef(false)
-  const hadGatewayErrorRef = useRef(false)
+  const hasSeenDisconnectRef = useRef(false)
+  const hadErrorRef = useRef(false)
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
     [],
   )
@@ -455,7 +455,7 @@ export function ChatScreen({
     (state) => state.panelHeight,
   )
   const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
-  const sseConnectionState = useGatewayChatStore((s) => s.connectionState)
+  const sseConnectionState = useChatStore((s) => s.connectionState)
 
   const {
     sessionsQuery,
@@ -511,22 +511,22 @@ export function ChatScreen({
         setPendingGeneration(true)
       }, []),
       onApprovalRequest: useCallback((payload: Record<string, unknown>) => {
-        const gatewayApprovalId =
+        const approvalId =
           typeof payload.id === 'string'
             ? payload.id
             : typeof payload.approvalId === 'string'
               ? payload.approvalId
-              : typeof payload.gatewayApprovalId === 'string'
-                ? payload.gatewayApprovalId
+              : typeof payload.approvalId === 'string'
+                ? payload.approvalId
                 : ''
 
         const currentApprovals = loadApprovals()
         if (
-          gatewayApprovalId &&
+          approvalId &&
           currentApprovals.some((entry) => {
             return (
               entry.status === 'pending' &&
-              entry.gatewayApprovalId === gatewayApprovalId
+              entry.approvalId === approvalId
             )
           })
         ) {
@@ -559,15 +559,15 @@ export function ChatScreen({
         const agentId =
           typeof agentIdValue === 'string' && agentIdValue.trim().length > 0
             ? agentIdValue
-            : 'gateway'
+            : 'hermes'
 
         addApproval({
           agentId,
           agentName,
           action,
           context,
-          source: 'gateway',
-          gatewayApprovalId: gatewayApprovalId || undefined,
+          source: 'hermes',
+          approvalId: approvalId || undefined,
         })
         setPendingApprovals(loadApprovals().filter((entry) => entry.status === 'pending'))
       }, []),
@@ -653,12 +653,12 @@ export function ChatScreen({
       setPendingApprovals(
         nextApprovals.filter((entry) => entry.status === 'pending'),
       )
-      if (!approval.gatewayApprovalId) return
+      if (!approval.approvalId) return
 
       const endpoint =
         status === 'approved'
-          ? `/api/approvals/${approval.gatewayApprovalId}/approve`
-          : `/api/approvals/${approval.gatewayApprovalId}/deny`
+          ? `/api/approvals/${approval.approvalId}/approve`
+          : `/api/approvals/${approval.approvalId}/deny`
       try {
         await fetch(endpoint, { method: 'POST' })
       } catch {
@@ -721,8 +721,8 @@ export function ChatScreen({
       return 0
     })
     const seen = new Set<string>()
-    const seenByText = new Map<string, GatewayMessage>()
-    const dedupedSet = new Set<GatewayMessage>()
+    const seenByText = new Map<string, ChatMessage>()
+    const dedupedSet = new Set<ChatMessage>()
     for (const msg of sortedForDedup) {
       const raw = msg as Record<string, unknown>
       const rawOptimisticId = normalizeMessageValue(raw.__optimisticId)
@@ -829,7 +829,7 @@ export function ChatScreen({
       __streamingText: realtimeStreamingText,
       __streamingThinking: realtimeStreamingThinking,
       __streamToolCalls: streamToolCalls,
-    } as GatewayMessage
+    } as ChatMessage
 
     const existingStreamIdx = nextMessages.findIndex(
       (message) => message.__streamingStatus === 'streaming',
@@ -934,7 +934,7 @@ export function ChatScreen({
     // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
     // The refetch replaces the query cache with server data — if the server
     // hasn't processed the user's POST yet, the optimistic message vanishes.
-    const currentMessages = (historyQuery.data as any)?.messages as GatewayMessage[] | undefined
+    const currentMessages = (historyQuery.data as any)?.messages as ChatMessage[] | undefined
     const pendingOptimistic = (currentMessages ?? []).filter((msg) => {
       const raw = msg as Record<string, unknown>
       return (
@@ -1034,7 +1034,7 @@ export function ChatScreen({
   })
 
   const currentModelQuery = useQuery({
-    queryKey: ['gateway', 'session-status-model'],
+    queryKey: ['hermes', 'session-status-model'],
     queryFn: async () => {
       try {
         const res = await fetch('/api/session-status')
@@ -1153,7 +1153,7 @@ export function ChatScreen({
         const activeSend = activeSendRef.current
         if (
           activeSend?.clientId &&
-          !isMissingGatewayAuth(messageText)
+          !isMissingAuth(messageText)
         ) {
           updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
             ...message,
@@ -1162,7 +1162,7 @@ export function ChatScreen({
         }
         activeSendRef.current = null
         setSending(false)
-        if (isMissingGatewayAuth(messageText)) {
+        if (isMissingAuth(messageText)) {
           try {
             navigate({ to: '/', replace: true })
           } catch {
@@ -1180,9 +1180,9 @@ export function ChatScreen({
     ),
     onMessageAccepted: useCallback(
       (_sessionKey: string, friendlyId: string, clientId: string) => {
-        // HTTP 200 received — gateway accepted the message. Clear "sending"
+        // HTTP 200 received — server accepted the message. Clear "sending"
         // status immediately so the Retry timer never fires. This is the
-        // primary confirmation path since the gateway does NOT echo user
+        // primary confirmation path since the server does NOT echo user
         // messages back via SSE.
         updateHistoryMessageByClientId(queryClient, friendlyId, _sessionKey, clientId, (message) => ({
           ...message,
@@ -1235,9 +1235,9 @@ export function ChatScreen({
     }
   }, [waitingForResponse, isRealtimeStreaming, liveToolActivity, setLocalActivity])
 
-  const gatewayStatusQuery = useQuery({
-    queryKey: ['gateway', 'status'],
-    queryFn: fetchGatewayStatus,
+  const statusQuery = useQuery({
+    queryKey: ['hermes', 'status'],
+    queryFn: fetchStatus,
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: true,
@@ -1246,30 +1246,30 @@ export function ChatScreen({
     staleTime: 30_000,
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
-  // Don't show gateway errors for new chats or when SSE is connected (proves gateway works)
-  const gatewayStatusError =
+  // Don't show errors for new chats or when SSE is connected
+  const statusError =
     !isNewChat && connectionState !== 'connected'
-      ? gatewayStatusQuery.error instanceof Error
+      ? statusQuery.error instanceof Error
         ? {
-            message: gatewayStatusQuery.error.message,
-            status: (gatewayStatusQuery.error as Error & { status?: number })
+            message: statusQuery.error.message,
+            status: (statusQuery.error as Error & { status?: number })
               .status,
           }
-        : gatewayStatusQuery.data && !gatewayStatusQuery.data.ok
+        : statusQuery.data && !statusQuery.data.ok
           ? {
-              message: gatewayStatusQuery.data.error || 'Hermes unavailable',
-              status: gatewayStatusQuery.data.status,
+              message: statusQuery.data.error || 'Hermes unavailable',
+              status: statusQuery.data.status,
             }
           : null
       : null
-  const gatewayError = gatewayStatusError?.message ?? sessionsError ?? historyError
-  const gatewayErrorStatus = gatewayStatusError?.status
-  const showErrorNotice = Boolean(gatewayError) && !isNewChat
-  const handleGatewayRefetch = useCallback(() => {
-    void gatewayStatusQuery.refetch()
+  const serverError = statusError?.message ?? sessionsError ?? historyError
+  const serverErrorStatus = statusError?.status
+  const showErrorNotice = Boolean(serverError) && !isNewChat
+  const handleRefetch = useCallback(() => {
+    void statusQuery.refetch()
     void sessionsQuery.refetch()
     void historyQuery.refetch()
-  }, [gatewayStatusQuery, sessionsQuery, historyQuery])
+  }, [statusQuery, sessionsQuery, historyQuery])
 
   const handleRefreshHistory = useCallback(() => {
     void historyQuery.refetch()
@@ -1359,28 +1359,28 @@ export function ChatScreen({
       return
     }
     const messageText =
-      sessionsError ?? historyError ?? gatewayStatusError?.message
+      sessionsError ?? historyError ?? statusError?.message
     if (!messageText) {
       if (error?.startsWith('Failed to load')) {
         setError(null)
       }
       return
     }
-    if (isMissingGatewayAuth(messageText)) {
+    if (isMissingAuth(messageText)) {
       navigate({ to: '/', replace: true })
     }
     const message = sessionsError
       ? `Failed to load sessions. ${sessionsError}`
       : historyError
         ? `Failed to load history. ${historyError}`
-        : gatewayStatusError
-          ? `Hermes unavailable. ${gatewayStatusError.message}`
+        : statusError
+          ? `Hermes unavailable. ${statusError.message}`
           : null
     if (message) setError(message)
   }, [
     activeExists,
     error,
-    gatewayStatusError,
+    statusError,
     historyError,
     isRedirecting,
     navigate,
@@ -1494,7 +1494,7 @@ export function ChatScreen({
       sessionKey: string,
       friendlyId: string,
       body: string,
-      attachments: Array<GatewayAttachment> = [],
+      attachments: Array<ChatAttachment> = [],
       fastMode = false,
       skipOptimistic = false,
       existingClientId = '',
@@ -1508,7 +1508,7 @@ export function ChatScreen({
       }))
 
     // Inject text/file attachment content directly into the message body.
-    // Gateways reliably forward text in the message body; file attachments
+    // Servers reliably forward text in the message body; file attachments
     // may be silently dropped for non-image types.
       const textBlocks = normalizedAttachments
         .filter((a) => {
@@ -1567,8 +1567,8 @@ export function ChatScreen({
         streamFinish()
       }, 120_000)
 
-      // Send a compatibility shape for gateway attachment parsing.
-      // Different gateway/channel versions read different keys.
+      // Send a compatibility shape for attachment parsing.
+      // Different server/channel versions read different keys.
       const payloadAttachments = normalizedAttachments.map((attachment) => {
         const mimeType =
           normalizeMimeType(attachment.contentType) ||
@@ -1690,7 +1690,7 @@ export function ChatScreen({
   ])
 
   const retryQueuedMessage = useCallback(
-    function retryQueuedMessage(message: GatewayMessage, mode: 'manual' | 'auto') {
+    function retryQueuedMessage(message: ChatMessage, mode: 'manual' | 'auto') {
       if (!isRetryableQueuedMessage(message)) return false
 
       const body = textFromMessage(message).trim()
@@ -1752,7 +1752,7 @@ export function ChatScreen({
   )
 
   const handleRetryMessage = useCallback(
-    function handleRetryMessage(message: GatewayMessage) {
+    function handleRetryMessage(message: ChatMessage) {
       const retryKey = getRetryMessageKey(message)
       retriedQueuedMessageKeysRef.current.delete(retryKey)
       retryQueuedMessage(message, 'manual')
@@ -1761,48 +1761,48 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (false) { // Gateway connection checks removed — Hermes uses direct API
-      hasSeenGatewayDisconnectRef.current = true
+    if (false) { // Server connection checks removed — Hermes uses direct API
+      hasSeenDisconnectRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return
     }
 
-    if (connectionState === 'connected' && hasSeenGatewayDisconnectRef.current) {
-      hasSeenGatewayDisconnectRef.current = false
+    if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
+      hasSeenDisconnectRef.current = false
       flushRetryableMessages()
     }
   }, [connectionState, flushRetryableMessages])
 
   useEffect(() => {
-    if (gatewayStatusError) {
-      hadGatewayErrorRef.current = true
+    if (statusError) {
+      hadErrorRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return
     }
 
-    const isGatewayHealthy = gatewayStatusQuery.data?.ok === true
-    if (isGatewayHealthy && hadGatewayErrorRef.current) {
-      hadGatewayErrorRef.current = false
+    const isHealthy = statusQuery.data?.ok === true
+    if (isHealthy && hadErrorRef.current) {
+      hadErrorRef.current = false
       flushRetryableMessages()
     }
-  }, [flushRetryableMessages, gatewayStatusError, gatewayStatusQuery.data])
+  }, [flushRetryableMessages, statusError, statusQuery.data])
 
   useEffect(() => {
-    function handleGatewayHealthRestored() {
+    function handleHealthRestored() {
       retriedQueuedMessageKeysRef.current.clear()
-      hadGatewayErrorRef.current = false
+      hadErrorRef.current = false
       flushRetryableMessages()
-      handleGatewayRefetch()
+      handleRefetch()
     }
 
-    window.addEventListener('gateway:health-restored', handleGatewayHealthRestored)
+    window.addEventListener('hermes:health-restored', handleHealthRestored)
     return () => {
       window.removeEventListener(
-        'gateway:health-restored',
-        handleGatewayHealthRestored,
+        'hermes:health-restored',
+        handleHealthRestored,
       )
     }
-  }, [flushRetryableMessages, handleGatewayRefetch])
+  }, [flushRetryableMessages, handleRefetch])
 
   const createSessionForMessage = useCallback(
     async (preferredFriendlyId?: string) => {
@@ -1847,7 +1847,7 @@ export function ChatScreen({
   )
 
   const upsertSessionInCache = useCallback(
-    (friendlyId: string, lastMessage: GatewayMessage) => {
+    (friendlyId: string, lastMessage: ChatMessage) => {
       if (!friendlyId) return
       queryClient.setQueryData(
         chatQueryKeys.sessions,
@@ -1981,7 +1981,7 @@ export function ChatScreen({
       // Scroll to bottom immediately so user sees their message + incoming response
       requestAnimationFrame(() => scrollChatToBottom('smooth'))
 
-      const attachmentPayload: Array<GatewayAttachment> = attachments.map(
+      const attachmentPayload: Array<ChatAttachment> = attachments.map(
         (attachment) => ({
           ...attachment,
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
@@ -2008,7 +2008,7 @@ export function ChatScreen({
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.sessions })
         })
 
-        // Send using the new thread id — gateway can still resolve/reroute under the hood
+        // Send using the new thread id — server can still resolve/reroute under the hood
         // Fire send BEFORE navigate — navigating unmounts the component and can cancel the fetch
         sendMessage(
           threadId,
@@ -2136,23 +2136,23 @@ export function ChatScreen({
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     (historyQuery.isLoading && !historyQuery.data) || isRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
-  const gatewayNotice = useMemo(() => {
+  const errorNotice = useMemo(() => {
     if (!showErrorNotice) return null
-    if (!gatewayError) return null
+    if (!serverError) return null
     return (
-      <GatewayStatusMessage
+      <ConnectionStatusMessage
         state="error"
-        error={gatewayError}
-        status={gatewayErrorStatus}
-        onRetry={handleGatewayRefetch}
+        error={serverError}
+        status={serverErrorStatus}
+        onRetry={handleRefetch}
       />
     )
-  }, [gatewayError, gatewayErrorStatus, handleGatewayRefetch, showErrorNotice])
+  }, [serverError, serverErrorStatus, handleRefetch, showErrorNotice])
 
   const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
     connectionState === 'connected'
       ? 'connected'
-      : gatewayStatusQuery.data?.ok === false || gatewayStatusQuery.isError
+      : statusQuery.data?.ok === false || statusQuery.isError
         ? 'disconnected'
         : 'connecting'
 
@@ -2261,7 +2261,7 @@ export function ChatScreen({
 
           {!isFocusMode && <ContextBar compact={compact} />}
 
-          {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
+          {errorNotice && <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>}
           {pendingApprovals.length > 0 && (
             <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
               <div className="space-y-2">

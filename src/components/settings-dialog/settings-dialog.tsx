@@ -884,7 +884,7 @@ function _AdvancedContent() {
     } else {
       setUrlError(null)
     }
-    updateSettings({ gatewayUrl: value })
+    updateSettings({ hermesUrl: value })
   }
 
   async function testConnection() {
@@ -898,7 +898,7 @@ function _AdvancedContent() {
     }
   }
 
-  const urlErrorId = 'gateway-url-error'
+  const urlErrorId = 'hermes-url-error'
 
   return (
     <div className="space-y-4">
@@ -912,7 +912,7 @@ function _AdvancedContent() {
             <Input
               type="url"
               placeholder="https://api.hermesworkspace.app"
-              value={settings.gatewayUrl}
+              value={settings.hermesUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
               aria-label="Hermes URL"

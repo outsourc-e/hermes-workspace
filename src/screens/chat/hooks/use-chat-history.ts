@@ -5,7 +5,7 @@ import { chatQueryKeys, fetchHistory } from '../chat-queries'
 import { getMessageTimestamp, textFromMessage } from '../utils'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
 import type { QueryClient } from '@tanstack/react-query'
-import type { GatewayMessage, HistoryResponse } from '../types'
+import type { ChatMessage, HistoryResponse } from '../types'
 
 type UseChatHistoryInput = {
   activeFriendlyId: string
@@ -186,7 +186,7 @@ export function useChatHistory({
   })
 
   const stableHistorySignatureRef = useRef('')
-  const stableHistoryMessagesRef = useRef<Array<GatewayMessage>>([])
+  const stableHistoryMessagesRef = useRef<Array<ChatMessage>>([])
   const historyMessages = useMemo(() => {
     const messages = Array.isArray(historyQuery.data?.messages)
       ? historyQuery.data.messages
@@ -213,7 +213,7 @@ export function useChatHistory({
 
   // Filter messages for display - hide tool calls, system events, etc.
   const displayMessages = useMemo(() => {
-    const filtered = historyMessages.filter((msg: GatewayMessage) => {
+    const filtered = historyMessages.filter((msg: ChatMessage) => {
       // Always show user messages (unless system events)
       if (msg.role === 'user') {
         const text = textFromMessage(msg)
@@ -296,7 +296,7 @@ export function useChatHistory({
 
       const hasLater = filtered
         .slice(i + 1)
-        .some((m: GatewayMessage) => m.role === 'assistant')
+        .some((m: ChatMessage) => m.role === 'assistant')
       if (hasLater) {
         if (!showToolMessages) {
           // Hide intermediate narration entirely
@@ -353,9 +353,9 @@ export function useChatHistory({
 }
 
 function mergeOptimisticHistoryMessages(
-  serverMessages: Array<GatewayMessage>,
-  optimisticMessages: Array<GatewayMessage>,
-): Array<GatewayMessage> {
+  serverMessages: Array<ChatMessage>,
+  optimisticMessages: Array<ChatMessage>,
+): Array<ChatMessage> {
   if (!optimisticMessages.length) return serverMessages
 
   const merged = [...serverMessages]

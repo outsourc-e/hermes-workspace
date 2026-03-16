@@ -11,7 +11,7 @@ export function HermesHealthBanner() {
 
     async function check() {
       try {
-        // Check via same-origin gateway proxy (works from any device)
+        // Check via same-origin server proxy (works from any device)
         const res = await fetch('/api/auth-check', { signal: AbortSignal.timeout(5000) })
         if (!cancelled) {
           if (res.ok) {

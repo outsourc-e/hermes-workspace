@@ -1,5 +1,5 @@
-// Model types (extracted from gateway-api.ts)
-export type GatewayModelCatalogEntry =
+// Model types (Model catalog types)
+export type ModelCatalogEntry =
   | string
   | {
       alias?: string
@@ -12,7 +12,7 @@ export type GatewayModelCatalogEntry =
       [key: string]: unknown
     }
 
-export type GatewayModelSwitchResponse = {
+export type ModelSwitchResponse = {
   ok?: boolean
   error?: string
   resolved?: {

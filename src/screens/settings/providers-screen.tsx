@@ -18,7 +18,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
-import type { GatewayModelCatalogEntry } from '@/lib/model-types'
+import type { ModelCatalogEntry } from '@/lib/model-types'
 import {
   getProviderDisplayName,
   getProviderInfo,
@@ -45,11 +45,11 @@ type ProvidersScreenProps = {
   embedded?: boolean
 }
 
-type GatewayConfig = Record<string, unknown>
+type HermesConfig = Record<string, unknown>
 
 type ConfigQueryResponse = {
   ok?: boolean
-  payload?: GatewayConfig
+  payload?: HermesConfig
   error?: string
 }
 
@@ -105,7 +105,7 @@ function isHermesCatalogEntry(
 
 async function fetchModels(): Promise<{
   ok?: boolean
-  models?: Array<GatewayModelCatalogEntry>
+  models?: Array<ModelCatalogEntry>
   configuredProviders?: Array<string>
 }> {
   const response = await fetch(`${HERMES_API_URL}/v1/models`)
@@ -174,7 +174,7 @@ async function fetchModels(): Promise<{
     ),
   )
 
-  return { ok: true, models: models as Array<GatewayModelCatalogEntry>, configuredProviders }
+  return { ok: true, models: models as Array<ModelCatalogEntry>, configuredProviders }
 }
 
 const TAB_ORDER: Array<{ id: SettingsTabId; label: string }> = [
@@ -232,7 +232,7 @@ const SETTINGS: Array<SettingDefinition> = [
     step: 1000,
   },
   // Thinking/reasoning settings removed — not supported by Hermes Agent
-  // Legacy gateway-specific settings removed: bootstrap, block streaming,
+  // Legacy settings removed: bootstrap, block streaming,
   // compaction, thinking, verbose, and fast mode do not apply here.
   {
     id: 'context-tokens-session',
@@ -305,7 +305,7 @@ function parseStringList(value: string): Array<string> {
     .filter(Boolean)
 }
 
-function readProviderId(entry: GatewayModelCatalogEntry): string | null {
+function readProviderId(entry: ModelCatalogEntry): string | null {
   if (typeof entry === 'string') return null
   const provider = typeof entry.provider === 'string' ? entry.provider : ''
   const normalized = normalizeProviderId(provider)
@@ -313,7 +313,7 @@ function readProviderId(entry: GatewayModelCatalogEntry): string | null {
 }
 
 function buildProviderSummaries(payload: {
-  models?: Array<GatewayModelCatalogEntry>
+  models?: Array<ModelCatalogEntry>
   configuredProviders?: Array<string>
 }): Array<ProviderSummary> {
   const modelCounts = new Map<string, number>()
@@ -387,7 +387,7 @@ function defaultFormatValue(setting: SettingDefinition, value: unknown): string 
 
 function getDraftValue(
   setting: SettingDefinition,
-  config: GatewayConfig | undefined,
+  config: HermesConfig | undefined,
   draftValues: Record<string, string>,
 ): string {
   if (draftValues[setting.id] !== undefined) return draftValues[setting.id]
@@ -409,7 +409,7 @@ function parseNumberValue(rawValue: string): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function buildModelOptions(models: Array<GatewayModelCatalogEntry>): Array<SelectOption> {
+function buildModelOptions(models: Array<ModelCatalogEntry>): Array<SelectOption> {
   const seen = new Set<string>()
   const options: Array<SelectOption> = []
 
@@ -474,7 +474,7 @@ function ProviderStatusBadge({ status }: { status: ProviderStatus }) {
 
 function SettingCard(props: {
   setting: SettingDefinition
-  config: GatewayConfig | undefined
+  config: HermesConfig | undefined
   draftValues: Record<string, string>
   setDraftValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
   saveSetting: (payload: SaveSettingPayload) => Promise<void>
@@ -692,7 +692,7 @@ function SettingCard(props: {
 function ProviderManagementSection(props: {
   embedded: boolean
   providerSummaries: Array<ProviderSummary>
-  modelsQuery: ReturnType<typeof useQuery<{ ok?: boolean; models?: Array<GatewayModelCatalogEntry>; configuredProviders?: Array<string> }>>
+  modelsQuery: ReturnType<typeof useQuery<{ ok?: boolean; models?: Array<ModelCatalogEntry>; configuredProviders?: Array<string> }>>
   deletingId: string | null
   onAddProvider: () => void
   onEdit: (provider: ProviderSummary) => void
@@ -863,21 +863,21 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const modelsQuery = useQuery({
-    queryKey: ['gateway', 'providers', 'models'],
+    queryKey: ['hermes', 'providers', 'models'],
     queryFn: fetchModels,
     refetchInterval: 60_000,
     retry: false,
   })
 
   const configQuery = useQuery({
-    queryKey: ['gateway', 'config'],
+    queryKey: ['hermes', 'config'],
     queryFn: async () => {
       const response = await fetch('/api/config-get')
       const payload = (await response.json().catch(() => ({}))) as ConfigQueryResponse
       if (!response.ok || payload.ok === false) {
         throw new Error(payload.error || `HTTP ${response.status}`)
       }
-      return (payload.payload ?? {}) as GatewayConfig
+      return (payload.payload ?? {}) as HermesConfig
     },
     retry: 1,
   })
@@ -895,7 +895,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
       }
     },
     onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['gateway', 'config'] })
+      await queryClient.invalidateQueries({ queryKey: ['hermes', 'config'] })
       toast(`${variables.label} saved`, { type: 'success' })
     },
     onError: (error) => {
@@ -974,7 +974,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
 
     setDeletingId(provider.id)
     try {
-      const res = await fetch('/api/gateway-config', {
+      const res = await fetch('/api/hermes-config', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -989,7 +989,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
         })
       } else {
         await queryClient.invalidateQueries({
-          queryKey: ['gateway', 'providers', 'models'],
+          queryKey: ['hermes', 'providers', 'models'],
         })
         toast(`Provider "${provider.name}" removed`, { type: 'success' })
       }

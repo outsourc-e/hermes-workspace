@@ -1,11 +1,11 @@
-import type { GatewayAttachment, GatewayMessage } from './types'
+import type { ChatAttachment, ChatMessage } from './types'
 
 export type PendingSendPayload = {
   sessionKey: string
   friendlyId: string
   message: string
-  attachments: Array<GatewayAttachment>
-  optimisticMessage: GatewayMessage
+  attachments: Array<ChatAttachment>
+  optimisticMessage: ChatMessage
 }
 
 let pendingSend: PendingSendPayload | null = null

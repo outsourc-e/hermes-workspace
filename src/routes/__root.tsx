@@ -320,7 +320,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 5000);
             // Fast dismiss: returning users skip quickly
             try {
-              if (localStorage.getItem('hermes-gateway-url') || localStorage.getItem('gateway-url')) {
+              if (localStorage.getItem('hermes-hermes-url') || localStorage.getItem('hermes-url')) {
                 setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 600);
               }
             } catch(e) {}

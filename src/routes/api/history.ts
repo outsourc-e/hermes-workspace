@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '@/server/auth-middleware'
-import { getMessages, listSessions, toGatewayMessage } from '../../server/hermes-api'
+import { getMessages, listSessions, toChatMessage } from '../../server/hermes-api'
 import { resolveSessionKey } from '../../server/session-utils'
 
 export const Route = createFileRoute('/api/history')({
@@ -41,7 +41,7 @@ export const Route = createFileRoute('/api/history')({
             sessionKey,
             sessionId: sessionKey,
             messages: boundedMessages.map((message, index) =>
-              toGatewayMessage(message, { historyIndex: index }),
+              toChatMessage(message, { historyIndex: index }),
             ),
           })
         } catch (err) {

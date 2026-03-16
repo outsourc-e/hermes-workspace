@@ -59,7 +59,7 @@
 git clone https://github.com/outsourc-e/hermes-workspace.git
 cd hermes-workspace
 pnpm install
-cp .env.example .env       # Add your gateway URL + token
+cp .env.example .env       # Add your Hermes API URL
 pnpm dev                   # Starts on http://localhost:3000
 ```
 
@@ -161,7 +161,7 @@ A fully managed cloud version of Hermes Workspace is in development:
 Features pending cloud infrastructure:
 - Cross-device session sync
 - Team shared memory and workspaces
-- Cloud-hosted gateway with managed uptime
+- Cloud-hosted backend with managed uptime
 - Webhook integrations and external triggers
 
 ---

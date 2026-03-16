@@ -29,7 +29,7 @@ export type ThinkingContent = {
 
 export type MessageContent = TextContent | ToolCallContent | ThinkingContent
 
-export type GatewayAttachment = {
+export type ChatAttachment = {
   id?: string
   name?: string
   contentType?: string
@@ -43,10 +43,10 @@ export type GatewayAttachment = {
 
 export type StreamingStatus = 'idle' | 'streaming' | 'complete' | 'error'
 
-export type GatewayMessage = {
+export type ChatMessage = {
   role?: string
   content?: Array<MessageContent>
-  attachments?: Array<GatewayAttachment>
+  attachments?: Array<ChatAttachment>
   toolCallId?: string
   toolName?: string
   details?: Record<string, unknown>
@@ -68,7 +68,7 @@ export type SessionSummary = {
   title?: string
   derivedTitle?: string
   updatedAt?: number
-  lastMessage?: GatewayMessage | null
+  lastMessage?: ChatMessage | null
   friendlyId?: string
   titleStatus?: SessionTitleStatus
   titleSource?: SessionTitleSource
@@ -82,7 +82,7 @@ export type SessionListResponse = {
 export type HistoryResponse = {
   sessionKey: string
   sessionId?: string
-  messages: Array<GatewayMessage>
+  messages: Array<ChatMessage>
 }
 
 export type SessionMeta = {
@@ -92,7 +92,7 @@ export type SessionMeta = {
   derivedTitle?: string
   label?: string
   updatedAt?: number
-  lastMessage?: GatewayMessage | null
+  lastMessage?: ChatMessage | null
   titleStatus?: SessionTitleStatus
   titleSource?: SessionTitleSource
   titleError?: string | null

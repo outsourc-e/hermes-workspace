@@ -15,7 +15,7 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const gatewayUrl = env.HERMES_API_URL?.trim() || 'http://127.0.0.1:8642'
+  const hermesApiUrl = env.HERMES_API_URL?.trim() || 'http://127.0.0.1:8642'
   let workspaceDaemonStarted = false
   let workspaceDaemonStarting = false
   let workspaceDaemonShuttingDown = false
@@ -216,7 +216,7 @@ const config = defineConfig(({ mode, command }) => {
   let proxyTarget = 'http://127.0.0.1:18789'
 
   try {
-    const parsed = new URL(gatewayUrl)
+    const parsed = new URL(hermesApiUrl)
     parsed.protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:'
     parsed.pathname = ''
     proxyTarget = parsed.toString().replace(/\/$/, '')
@@ -253,7 +253,7 @@ const config = defineConfig(({ mode, command }) => {
       ],
     },
     server: {
-      // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking gateway connectivity
+      // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking connectivity
       host: '0.0.0.0',
       allowedHosts: true,
       watch: {
@@ -262,25 +262,25 @@ const config = defineConfig(({ mode, command }) => {
         ignored: ['**/routeTree.gen.ts'],
       },
       proxy: {
-        // WebSocket proxy: clients connect to /ws-gateway on the Hermes Workspace
-        // server (any IP/port), which internally forwards to the local gateway.
+        // WebSocket proxy: clients connect to /ws-hermes on the Hermes Workspace
+        // server (any IP/port), which internally forwards to the local server.
         // This means phone/LAN/Docker users never need to reach port 18789 directly.
-        '/ws-gateway': {
+        '/ws-hermes': {
           target: proxyTarget,
           changeOrigin: false,
           ws: true,
-          rewrite: (path) => path.replace(/^\/ws-gateway/, ''),
+          rewrite: (path) => path.replace(/^\/ws-hermes/, ''),
         },
-        // REST API proxy: all /api/gateway/* calls proxied through Hermes Workspace server
-        '/api/gateway-proxy': {
+        // REST API proxy: API proxy for Hermes backend
+        '/api/hermes-proxy': {
           target: proxyTarget,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/gateway-proxy/, ''),
+          rewrite: (path) => path.replace(/^\/api\/hermes-proxy/, ''),
         },
-        '/gateway-ui': {
+        '/hermes-ui': {
           target: proxyTarget,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/gateway-ui/, ''),
+          rewrite: (path) => path.replace(/^\/hermes-ui/, ''),
           ws: true,
           configure: (proxy) => {
             proxy.on('proxyRes', (_proxyRes) => {
@@ -399,7 +399,7 @@ const config = defineConfig(({ mode, command }) => {
 
           // Replace specific env vars first, then the generic fallback
           let result = code
-          result = result.replace(/process\.env\.HERMES_API_URL/g, JSON.stringify(gatewayUrl))
+          result = result.replace(/process\.env\.HERMES_API_URL/g, JSON.stringify(hermesApiUrl))
           result = result.replace(/process\.env\.HERMES_API_TOKEN/g, JSON.stringify(env.HERMES_API_TOKEN || ''))
           result = result.replace(/process\.env\.NODE_ENV/g, JSON.stringify(mode))
           result = result.replace(/process\.env/g, '{}')

@@ -1,6 +1,6 @@
 /**
  * Phase 2.6: Workspace detection API
- * Auto-detects workspace from Gateway config, env, or default paths
+ * Auto-detects workspace from Hermes config, env, or default paths
  */
 import os from 'node:os'
 import path from 'node:path'
@@ -53,7 +53,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
       return {
         path: envWorkspace,
         folderName: extractFolderName(envWorkspace),
-        source: 'gateway',
+        source: 'hermes',
         isValid: true,
       }
     }

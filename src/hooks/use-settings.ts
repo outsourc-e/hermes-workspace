@@ -6,8 +6,8 @@ export type SettingsThemeMode = 'system' | 'light' | 'dark'
 export type AccentColor = 'orange' | 'purple' | 'blue' | 'green'
 
 export type StudioSettings = {
-  gatewayUrl: string
-  gatewayToken: string
+  hermesUrl: string
+  hermesToken: string
   theme: SettingsThemeMode
   accentColor: AccentColor
   editorFontSize: number
@@ -30,8 +30,8 @@ type SettingsState = {
 }
 
 export const defaultStudioSettings: StudioSettings = {
-  gatewayUrl: '',
-  gatewayToken: '',
+  hermesUrl: '',
+  hermesToken: '',
   theme: 'system',
   accentColor: 'blue',
   editorFontSize: 13,

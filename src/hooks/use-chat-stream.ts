@@ -1,7 +1,7 @@
-// Stub — Hermes Workspace uses hermes-api.ts for chat streaming, not gateway SSE.
+// Stub — Hermes Workspace uses hermes-api.ts for chat streaming, not legacy SSE.
 // This hook is kept as a no-op to satisfy use-realtime-chat-history imports.
 
-export function useGatewayChatStream(_opts: {
+export function useChatStream(_opts: {
   sessionKey?: string
   enabled?: boolean
   onReconnect?: () => void

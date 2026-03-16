@@ -63,7 +63,7 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 - Tightened rate limiting to 10 requests/minute per IP (sliding window) on high-risk endpoints:
   - `/api/terminal-input`
   - `/api/terminal-stream`
-  - `/api/gateway-restart`
+  - `/api/restart`
   - `/api/update-check` (POST)
   - `/api/update-check` (POST)
 

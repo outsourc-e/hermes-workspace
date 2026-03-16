@@ -4,7 +4,7 @@ import { AgentChatHeader } from './AgentChatHeader'
 import { AgentChatInput } from './AgentChatInput'
 import { AgentChatMessages } from './AgentChatMessages'
 import type { AgentChatMessage } from './AgentChatMessages'
-import type { GatewayMessage } from '@/screens/chat/types'
+import type { ChatMessage } from '@/screens/chat/types'
 import { DialogContent, DialogRoot } from '@/components/ui/dialog'
 import {
   getMessageTimestamp,
@@ -21,7 +21,7 @@ type AgentChatModalProps = {
 }
 
 type HistoryPayload = {
-  messages?: Array<GatewayMessage>
+  messages?: Array<ChatMessage>
 }
 
 function mapRole(value: unknown): 'user' | 'agent' {
@@ -30,7 +30,7 @@ function mapRole(value: unknown): 'user' | 'agent' {
   return 'agent'
 }
 
-function readMessageText(message: GatewayMessage): string {
+function readMessageText(message: ChatMessage): string {
   const fromContent = textFromMessage(message)
   if (fromContent.length > 0) return fromContent
 
@@ -43,7 +43,7 @@ function readMessageText(message: GatewayMessage): string {
 }
 
 function toChatMessages(
-  messages: Array<GatewayMessage>,
+  messages: Array<ChatMessage>,
 ): Array<AgentChatMessage> {
   return messages
     .map(function mapMessage(message, index) {

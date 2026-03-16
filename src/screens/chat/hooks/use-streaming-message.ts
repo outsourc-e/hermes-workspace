@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useGatewayChatStore } from '@/stores/gateway-chat-store'
-import type { GatewayAttachment, GatewayMessage } from '../types'
+import { useChatStore } from '@/stores/chat-store'
+import type { ChatAttachment, ChatMessage } from '../types'
 import { pushActivity } from '@/components/inspector/activity-store'
 
 type StreamingState = {
@@ -38,7 +38,7 @@ type StepUsagePayload = {
 type UseStreamingMessageOptions = {
   onStarted?: (payload: { runId: string | null }) => void
   onChunk?: (text: string, fullText: string) => void
-  onComplete?: (message: GatewayMessage) => void
+  onComplete?: (message: ChatMessage) => void
   onError?: (error: string) => void
   onThinking?: (thinking: string) => void
   onTool?: (tool: unknown) => void
@@ -80,10 +80,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const handoffTimerRef = useRef<number | null>(null)
   const stepUsageRef = useRef<StepUsagePayload>({})
 
-  const registerSendStreamRun = useGatewayChatStore((s) => s.registerSendStreamRun)
-  const unregisterSendStreamRun = useGatewayChatStore((s) => s.unregisterSendStreamRun)
-  const processStoreEvent = useGatewayChatStore((s) => s.processEvent)
-  const clearStreamingSession = useGatewayChatStore((s) => s.clearStreamingSession)
+  const registerSendStreamRun = useChatStore((s) => s.registerSendStreamRun)
+  const unregisterSendStreamRun = useChatStore((s) => s.unregisterSendStreamRun)
+  const processStoreEvent = useChatStore((s) => s.processEvent)
+  const clearStreamingSession = useChatStore((s) => s.clearStreamingSession)
 
   // Hermes tool calls can take 60-120s (file reads, terminal commands, web searches)
   const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 120_000
@@ -164,13 +164,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           return
         }
         if (reason === 'handoff') {
-          const store = useGatewayChatStore.getState()
-          const gatewayStreamingState =
+          const store = useChatStore.getState()
+          const streamingState =
             store.streamingState.get(activeSessionKeyRef.current) ?? null
-          const gatewayLastEventAt = store.lastEventAt
+          const lastEventTimestamp = store.lastEventAt
           if (
-            gatewayStreamingState !== null ||
-            (gatewayLastEventAt > 0 && Date.now() - gatewayLastEventAt < timeoutMs)
+            streamingState !== null ||
+            (lastEventTimestamp > 0 && Date.now() - lastEventTimestamp < timeoutMs)
           ) {
             schedulePostAcceptanceTimeout(reason)
             return
@@ -288,7 +288,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         streamingText: finalText,
       }))
 
-      const message: GatewayMessage = {
+      const message: ChatMessage = {
         role: 'assistant',
         content: [
           ...(thinking ? [{ type: 'thinking' as const, thinking }] : []),
@@ -530,7 +530,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       message: string
       thinking?: string
       fastMode?: boolean
-      attachments?: Array<GatewayAttachment>
+      attachments?: Array<ChatAttachment>
       idempotencyKey?: string
     }) => {
       if (eventSourceRef.current) {

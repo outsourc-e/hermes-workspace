@@ -3,7 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert02Icon, WifiDisconnected01Icon } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 
-type GatewayStatusMessageProps = {
+type ConnectionStatusMessageProps = {
   state: 'checking' | 'error'
   error?: string | null
   status?: number | null
@@ -76,26 +76,26 @@ function classifyConnectionError(
   }
 }
 
-export function GatewayStatusMessage({
+export function ConnectionStatusMessage({
   state,
   error,
   status,
   onRetry,
   className,
-}: GatewayStatusMessageProps) {
+}: ConnectionStatusMessageProps) {
   const isChecking = state === 'checking'
   const [visible, setVisible] = useState(true)
   const [fadingOut, setFadingOut] = useState(false)
   const errorInfo = classifyConnectionError(error, status)
 
-  // Auto-dismiss when gateway comes back
+  // Auto-dismiss when server comes back
   useEffect(() => {
     function handleRestored() {
       setFadingOut(true)
       setTimeout(() => setVisible(false), 300)
     }
-    window.addEventListener('gateway:health-restored', handleRestored)
-    return () => window.removeEventListener('gateway:health-restored', handleRestored)
+    window.addEventListener('hermes:health-restored', handleRestored)
+    return () => window.removeEventListener('hermes:health-restored', handleRestored)
   }, [])
 
   if (!visible) return null

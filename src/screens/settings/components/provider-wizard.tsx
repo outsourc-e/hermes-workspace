@@ -22,7 +22,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useGatewayRestart } from '@/components/gateway-restart-overlay'
+import { useConnectionRestart } from '@/components/connection-overlay'
 import { cn } from '@/lib/utils'
 import { ProviderIcon } from './provider-icon'
 
@@ -140,7 +140,7 @@ async function pollForProvider(
 }
 
 export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWizardProps) {
-  const { triggerRestart } = useGatewayRestart()
+  const { triggerRestart } = useConnectionRestart()
 
   const [step, setStep] = useState<WizardStep>('provider')
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(

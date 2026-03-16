@@ -2,7 +2,7 @@
  * Hermes FastAPI Client
  *
  * HTTP client for the Hermes FastAPI backend (default: http://127.0.0.1:8642).
- * Replaces gateway.ts WebSocket connection for the Hermes Workspace fork.
+ * Replaces legacy WebSocket connection for the Hermes Workspace fork.
  */
 
 const HERMES_API = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
@@ -156,10 +156,10 @@ export async function forkSession(
   return hermesPost(`/api/sessions/${sessionId}/fork`)
 }
 
-// ── Conversion helpers (Hermes → Gateway format) ─────────────────
+// ── Conversion helpers (Hermes → Chat format) ─────────────────
 
-/** Convert a HermesMessage to the GatewayMessage format the frontend expects */
-export function toGatewayMessage(
+/** Convert a HermesMessage to the ChatMessage format the frontend expects */
+export function toChatMessage(
   msg: HermesMessage,
   options?: { historyIndex?: number },
 ): Record<string, unknown> {

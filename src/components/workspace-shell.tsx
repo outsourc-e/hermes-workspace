@@ -265,7 +265,7 @@ export function WorkspaceShell() {
       authQuery.error instanceof Error
         ? authQuery.error.message
         : 'Failed to connect to Hermes server'
-    const showBackendHint = /gateway|websocket|backend/i.test(errorMessage)
+    const showBackendHint = /server.websocket.backend/i.test(errorMessage)
 
     return (
       <div className="flex h-screen items-center justify-center bg-surface px-6">

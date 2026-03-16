@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-// Active run tracking (replaces gateway.ts imports)
+// Active run tracking (replaces legacy imports)
 const _activeSendRuns = new Set<string>()
 function registerActiveSendRun(runId: string): void { if (runId) _activeSendRuns.add(runId) }
 function unregisterActiveSendRun(runId: string): void { if (runId) _activeSendRuns.delete(runId) }
@@ -87,7 +87,7 @@ function normalizeAttachments(
   return normalized.length > 0 ? normalized : undefined
 }
 
-function getGatewayMessage(
+function getChatMessage(
   message: string,
   attachments?: Array<Record<string, unknown>>,
 ): string {
@@ -102,7 +102,7 @@ function normalizeHermesErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   const message = raw.trim()
   if (!message) return 'Hermes request failed'
-  return message.replace(/\bgateway\b/gi, 'Hermes')
+  return message.replace(/\bserver\b/gi, 'Hermes')
 }
 
 export const Route = createFileRoute('/api/send-stream')({
@@ -175,7 +175,7 @@ export const Route = createFileRoute('/api/send-stream')({
           })
         }
 
-        // Create streaming response using the SHARED gateway connection
+        // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
         let streamClosed = false
         let activeRunId: string | null = null
@@ -217,7 +217,7 @@ export const Route = createFileRoute('/api/send-stream')({
               await streamChat(
                 sessionKey,
                 {
-                  message: getGatewayMessage(message, attachments),
+                  message: getChatMessage(message, attachments),
                   model: typeof body.model === 'string' ? body.model : undefined,
                   system_message: thinking,
                 },

@@ -1,13 +1,13 @@
 import { normalizeSessions, readError } from './utils'
 import type { QueryClient } from '@tanstack/react-query'
 import type {
-  GatewayMessage,
+  ChatMessage,
   HistoryResponse,
   SessionListResponse,
   SessionMeta,
 } from './types'
 
-type GatewayStatusResponse = {
+type StatusResponse = {
   ok: boolean
   error?: string
   status?: number
@@ -19,7 +19,7 @@ function normalizeId(value: unknown): string {
   return trimmed.length > 0 ? trimmed : ''
 }
 
-function getMessageClientId(message: GatewayMessage): string {
+function getMessageClientId(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   const candidates = [raw.clientId, raw.client_id]
   for (const candidate of candidates) {
@@ -29,12 +29,12 @@ function getMessageClientId(message: GatewayMessage): string {
   return ''
 }
 
-function getMessageOptimisticId(message: GatewayMessage): string {
+function getMessageOptimisticId(message: ChatMessage): string {
   return normalizeId(message.__optimisticId)
 }
 
 function isMatchingClientMessage(
-  message: GatewayMessage,
+  message: ChatMessage,
   clientId: string,
   optimisticId: string,
 ): boolean {
@@ -74,7 +74,7 @@ export async function fetchHistory(payload: {
   return (await res.json()) as HistoryResponse
 }
 
-export async function fetchGatewayStatus(): Promise<GatewayStatusResponse> {
+export async function fetchStatus(): Promise<StatusResponse> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 5000)
 
@@ -87,14 +87,14 @@ export async function fetchGatewayStatus(): Promise<GatewayStatusResponse> {
       error.status = res.status
       throw error
     }
-    const payload = (await res.json()) as GatewayStatusResponse
+    const payload = (await res.json()) as StatusResponse
     return {
       ...payload,
       status: res.status,
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('Gateway check timed out')
+      throw new Error('Server check timed out')
     }
     throw err
   } finally {
@@ -106,7 +106,7 @@ export function updateHistoryMessages(
   queryClient: QueryClient,
   friendlyId: string,
   sessionKey: string,
-  updater: (messages: Array<GatewayMessage>) => Array<GatewayMessage>,
+  updater: (messages: Array<ChatMessage>) => Array<ChatMessage>,
 ) {
   const queryKey = chatQueryKeys.history(friendlyId, sessionKey)
   queryClient.setQueryData(queryKey, function update(data: unknown) {
@@ -122,10 +122,10 @@ export function updateHistoryMessages(
 }
 
 /**
- * Extract normalized plain text content from a GatewayMessage for dedup
+ * Extract normalized plain text content from a ChatMessage for dedup
  * comparison. Handles both content-array and legacy text/message fields.
  */
-function normalizeMessageText(message: GatewayMessage): string {
+function normalizeMessageText(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
 
   // Prefer structured content array (canonical format)
@@ -140,7 +140,7 @@ function normalizeMessageText(message: GatewayMessage): string {
     if (text.length > 0) return text
   }
 
-  // Fall back to legacy top-level text/message fields (some gateway / channel
+  // Fall back to legacy top-level text/message fields (some server / channel
   // adapters use these instead of the content-array format)
   for (const key of ['text', 'message', 'body']) {
     const val = raw[key]
@@ -152,10 +152,10 @@ function normalizeMessageText(message: GatewayMessage): string {
 
 /**
  * Build an attachment identity signature for image-only dedup.
- * Uses name + size because those survive the round-trip through the gateway;
+ * Uses name + size because those survive the round-trip through the server;
  * the base64 content is stripped before storage/history.
  */
-function normalizeAttachmentSignature(message: GatewayMessage): string {
+function normalizeAttachmentSignature(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   const attachments = Array.isArray(raw.attachments)
     ? (raw.attachments as Array<Record<string, unknown>>)
@@ -168,9 +168,9 @@ function normalizeAttachmentSignature(message: GatewayMessage): string {
 }
 
 function replaceMatchingOptimisticUserMessage(
-  messages: Array<GatewayMessage>,
-  incomingMessage: GatewayMessage,
-): Array<GatewayMessage> | null {
+  messages: Array<ChatMessage>,
+  incomingMessage: ChatMessage,
+): Array<ChatMessage> | null {
   if (incomingMessage.role !== 'user') return null
 
   const incomingClientId = getMessageClientId(incomingMessage)
@@ -227,7 +227,7 @@ function replaceMatchingOptimisticUserMessage(
   if (matchIndex === -1) return null
 
   const existing = messages[matchIndex]
-  const replacement: GatewayMessage = {
+  const replacement: ChatMessage = {
     ...existing,
     ...incomingMessage,
     clientId: incomingClientId || getMessageClientId(existing) || undefined,
@@ -245,7 +245,7 @@ export function appendHistoryMessage(
   queryClient: QueryClient,
   friendlyId: string,
   sessionKey: string,
-  message: GatewayMessage,
+  message: ChatMessage,
 ) {
   updateHistoryMessages(
     queryClient,
@@ -276,7 +276,7 @@ export function appendHistoryMessage(
       }
 
       // Fallback dedup for SSE-echoed user messages that arrive WITHOUT a
-      // clientId (gateway did not echo it back). Check if an existing optimistic
+      // clientId (server did not echo it back). Check if an existing optimistic
       // user message with the same text content (or attachment signature for
       // image-only sends) was added in the last 10 seconds. This prevents
       // duplicates without dropping legitimately repeated messages sent at
@@ -359,7 +359,7 @@ export function updateHistoryMessageByClientId(
   friendlyId: string,
   sessionKey: string,
   clientId: string,
-  updater: (message: GatewayMessage) => GatewayMessage,
+  updater: (message: ChatMessage) => ChatMessage,
 ) {
   const normalizedClientId = normalizeId(clientId)
   if (!normalizedClientId) return
@@ -384,7 +384,7 @@ export function updateHistoryMessageByClientId(
 export function updateHistoryMessageByClientIdEverywhere(
   queryClient: QueryClient,
   clientId: string,
-  updater: (message: GatewayMessage) => GatewayMessage,
+  updater: (message: ChatMessage) => ChatMessage,
 ) {
   const normalizedClientId = normalizeId(clientId)
   if (!normalizedClientId) return
@@ -479,7 +479,7 @@ export function updateSessionLastMessage(
   queryClient: QueryClient,
   sessionKey: string,
   friendlyId: string,
-  message: GatewayMessage,
+  message: ChatMessage,
 ) {
   queryClient.setQueryData(
     chatQueryKeys.sessions,

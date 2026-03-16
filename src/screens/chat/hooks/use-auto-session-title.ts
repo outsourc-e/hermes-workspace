@@ -7,7 +7,7 @@ import {
   useSessionTitleInfo,
 } from '../session-title-store'
 import { textFromMessage } from '../utils'
-import type { GatewayMessage, SessionMeta } from '../types'
+import type { ChatMessage, SessionMeta } from '../types'
 import { generateSessionTitle } from '@/utils/generate-session-title'
 
 const MIN_MESSAGES_FOR_TITLE = 2
@@ -34,7 +34,7 @@ function isGenericTitle(title: string): boolean {
 }
 const MAX_PER_MESSAGE_CHARS = 600
 
-function buildSnippet(messages: Array<GatewayMessage>) {
+function buildSnippet(messages: Array<ChatMessage>) {
   const snippet: Array<{ role: string; text: string }> = []
 
   for (const message of messages) {
@@ -61,7 +61,7 @@ function requiredMessagesForTitle(
   return MIN_MESSAGES_FOR_TITLE
 }
 
-function countRelevantMessages(messages: Array<GatewayMessage>) {
+function countRelevantMessages(messages: Array<ChatMessage>) {
   let count = 0
   for (const message of messages) {
     if (message.role !== 'user' && message.role !== 'assistant') continue
@@ -85,7 +85,7 @@ type UseAutoSessionTitleInput = {
   friendlyId: string
   sessionKey: string | undefined
   activeSession?: SessionMeta
-  messages: Array<GatewayMessage>
+  messages: Array<ChatMessage>
   messageCount?: number
   enabled: boolean
 }

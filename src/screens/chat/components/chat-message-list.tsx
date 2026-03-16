@@ -20,7 +20,7 @@ import {
 } from '../utils'
 import { MessageItem } from './message-item'
 import { ScrollToBottomButton } from './scroll-to-bottom-button'
-import type { GatewayMessage } from '../types'
+import type { ChatMessage } from '../types'
 import {
   ChatContainerContent,
   ChatContainerRoot,
@@ -269,7 +269,7 @@ function shouldHideSystemInjectedUserMessage(text: string): boolean {
   )
 }
 
-function getChronologyRank(message: GatewayMessage): number {
+function getChronologyRank(message: ChatMessage): number {
   const role = typeof message.role === 'string' ? message.role.toLowerCase() : ''
   const content = Array.isArray(message.content) ? message.content : []
   const hasToolCalls =
@@ -287,8 +287,8 @@ function getChronologyRank(message: GatewayMessage): number {
 }
 
 function sortMessagesChronologically(
-  messages: Array<GatewayMessage>,
-): Array<GatewayMessage> {
+  messages: Array<ChatMessage>,
+): Array<ChatMessage> {
   return messages
     .map((message, index) => ({ message, index }))
     .sort((left, right) => {
@@ -343,9 +343,9 @@ type MessageSearchMatch = {
 }
 
 type DisplayEntry = {
-  message: GatewayMessage
+  message: ChatMessage
   sourceIndex: number
-  attachedToolMessages: Array<GatewayMessage>
+  attachedToolMessages: Array<ChatMessage>
 }
 
 function escapeAttributeSelector(value: string): string {
@@ -357,8 +357,8 @@ function escapeAttributeSelector(value: string): string {
 }
 
 type ChatMessageListProps = {
-  messages: Array<GatewayMessage>
-  onRetryMessage?: (message: GatewayMessage) => void
+  messages: Array<ChatMessage>
+  onRetryMessage?: (message: ChatMessage) => void
   onRefresh?: () => void | Promise<unknown>
   loading: boolean
   empty: boolean
@@ -383,7 +383,7 @@ type ChatMessageListProps = {
   hideSystemMessages?: boolean
   isCompacting?: boolean
   /** True while the HTTP send request is in-flight (before waitingForResponse
-   *  can confirm the gateway received it). Keeps the thinking indicator visible
+   *  can confirm the server received it). Keeps the thinking indicator visible
    *  during the very first render after the user submits. */
   sending?: boolean
 }
@@ -548,7 +548,7 @@ function ChatMessageListComponent({
         const normalizedText = cleanedText.toLowerCase()
         const containsSystemFailure =
           normalizedText.includes('exec failed') ||
-          normalizedText.includes('gatewayrestart') ||
+          normalizedText.includes('serverrestart') ||
           normalizedText.includes('signal sigkill')
         const matchesHeartbeatPrompt =
           /read heartbeat\.md if it exists.*?reply heartbeat_ok\./is.test(
@@ -771,7 +771,7 @@ function ChatMessageListComponent({
   }, [])
 
   const toolResultsByCallId = useMemo(() => {
-    const map = new Map<string, GatewayMessage>()
+    const map = new Map<string, ChatMessage>()
     for (const message of messages) {
       if (message.role !== 'toolResult') continue
       const toolCallId = message.toolCallId
@@ -888,7 +888,7 @@ function ChatMessageListComponent({
   // the indicator stays alive even after tool calls finish and before text flows.
   const showTypingIndicator = (() => {
     // sending covers the instant the HTTP request fires before waitingForResponse
-    // is confirmed by the gateway (they're typically batched but this is belt+suspenders)
+    // is confirmed by the server (they're typically batched but this is belt+suspenders)
     const effectivelyWaiting = waitingForResponse || thinkingGrace || sending
     // Streaming-but-empty condition: the SSE stream is active (isRealtimeStreaming)
     // but no text chunk has arrived yet. Keep the indicator visible so there's
@@ -973,7 +973,7 @@ function ChatMessageListComponent({
     }
   }, [scrollMetrics, shouldVirtualize, visibleEntries.length])
 
-  function isMessageStreaming(message: GatewayMessage, index: number) {
+  function isMessageStreaming(message: ChatMessage, index: number) {
     if (!isStreaming || !streamingMessageId) return false
     const messageId = message.__optimisticId || (message as any).id
     return (
@@ -1578,7 +1578,7 @@ function ChatMessageListComponent({
 }
 
 function getMessageSpacingClass(
-  messages: Array<GatewayMessage>,
+  messages: Array<ChatMessage>,
   index: number,
 ): string {
   if (index === 0) return 'mt-0'
@@ -1594,7 +1594,7 @@ function getMessageSpacingClass(
 }
 
 function getToolGroupClass(
-  messages: Array<GatewayMessage>,
+  messages: Array<ChatMessage>,
   index: number,
 ): string {
   const message = messages[index]
@@ -1622,7 +1622,7 @@ function getToolGroupClass(
   return 'border-l border-primary-200/70 pl-3'
 }
 
-function getStableMessageId(message: GatewayMessage, index: number): string {
+function getStableMessageId(message: ChatMessage, index: number): string {
   if (message.__optimisticId) return message.__optimisticId
 
   const idCandidates = ['id', 'messageId', 'uuid', 'clientId'] as const
@@ -1641,7 +1641,7 @@ function getStableMessageId(message: GatewayMessage, index: number): string {
   return `${message.role ?? 'assistant'}-${index}`
 }
 
-function getRawMessageTimestamp(message: GatewayMessage): number | null {
+function getRawMessageTimestamp(message: ChatMessage): number | null {
   const candidates = [
     (message as any).createdAt,
     (message as any).created_at,

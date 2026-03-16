@@ -45,7 +45,7 @@ import {
   selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { GatewayStatusDot } from '@/components/gateway-status-indicator'
+import { StatusDot } from '@/components/status-indicator'
 import {
   MenuRoot,
   MenuTrigger,
@@ -1026,7 +1026,7 @@ function ChatSidebarComponent({
                     <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                       {profileDisplayName}
                     </span>
-                    <GatewayStatusDot />
+                    <StatusDot />
                   </motion.div>
                 )}
               </AnimatePresence>

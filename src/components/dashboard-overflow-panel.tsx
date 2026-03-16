@@ -29,7 +29,7 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
   { icon: BrainIcon, label: 'Memory', to: '/memory' },
 ]
 
-const GATEWAY_ITEMS: Array<OverflowItem> = [
+const HERMES_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: PuzzleIcon, label: 'Skills', to: '/skills' },
   { icon: Settings01Icon, label: 'Settings', to: '/settings' },
@@ -147,7 +147,7 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
             </button>
           </section>
           <OverflowGrid title="System" items={SYSTEM_ITEMS} onSelect={handleSelect} />
-          <OverflowGrid title="Hermes" items={GATEWAY_ITEMS} onSelect={handleSelect} />
+          <OverflowGrid title="Hermes" items={HERMES_ITEMS} onSelect={handleSelect} />
         </div>
       </div>
     </div>

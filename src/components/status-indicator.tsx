@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 
-async function pingGateway(): Promise<boolean> {
+async function pingServer(): Promise<boolean> {
   try {
     const response = await fetch('http://localhost:8642/health', {
       signal: AbortSignal.timeout(5000),
@@ -19,10 +19,10 @@ async function pingGateway(): Promise<boolean> {
  * Minimal dot-only status indicator (no text).
  * Shows green (connected), yellow (connecting), or red (offline).
  */
-export function GatewayStatusDot() {
+export function StatusDot() {
   const { data: isConnected, isLoading } = useQuery({
     queryKey: ['hermes', 'health'],
-    queryFn: pingGateway,
+    queryFn: pingServer,
     refetchInterval: 15_000,
     retry: false,
   })
@@ -49,7 +49,7 @@ export function GatewayStatusDot() {
   )
 }
 
-export function GatewayStatusIndicator({
+export function StatusIndicator({
   collapsed,
   inline,
 }: {
@@ -58,7 +58,7 @@ export function GatewayStatusIndicator({
 }) {
   const { data: isConnected, isLoading } = useQuery({
     queryKey: ['hermes', 'health'],
-    queryFn: pingGateway,
+    queryFn: pingServer,
     refetchInterval: 15_000,
     retry: false,
   })
