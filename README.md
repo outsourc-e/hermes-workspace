@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="./public/logo-icon.png" alt="ClawSuite" width="80" />
+<img src="./public/logo-icon.png" alt="Hermes Workspace" width="80" />
 
-# ClawSuite
+# Hermes Workspace
 
-**The full-stack mission control platform for OpenClaw AI agents.**
+**The full-stack mission control platform for Hermes Agent AI workflows.**
 
 [![Version](https://img.shields.io/badge/version-3.0.0-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -13,7 +13,7 @@
 
 > Not a chat wrapper. A complete command center — orchestrate agents, run missions, track costs, and control everything from one place.
 
-![ClawSuite Dashboard](./public/screenshots/dashboard-v3.png)
+![Hermes Workspace Dashboard](./public/screenshots/dashboard-v3.png)
 
 </div>
 
@@ -65,13 +65,13 @@
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **OpenClaw Gateway** running locally — [Setup Guide](https://openclaw.ai/docs/installation)
+- **Hermes Agent** running locally — [Setup Guide](https://openclaw.ai/docs/installation)
 
 ### Install & Run
 
 ```bash
-git clone https://github.com/outsourc-e/clawsuite.git
-cd clawsuite
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
 npm install
 cp .env.example .env       # Add your gateway URL + password
 npm run dev                # Starts on http://localhost:3000
@@ -89,36 +89,36 @@ STUDIO_PASSWORD=your_dashboard_password
 
 ## 📱 Install as App (Recommended)
 
-ClawSuite is a **Progressive Web App (PWA)** — install it for the full native app experience with no browser chrome, keyboard shortcuts, and offline support.
+Hermes Workspace is a **Progressive Web App (PWA)** — install it for the full native app experience with no browser chrome, keyboard shortcuts, and offline support.
 
 ### 🖥️ Desktop (macOS / Windows / Linux)
 
-1. Open ClawSuite in **Chrome** or **Edge** at `http://localhost:3000`
+1. Open Hermes Workspace in **Chrome** or **Edge** at `http://localhost:3000`
 2. Click the **install icon** (⊕) in the address bar
-3. Click **Install** — ClawSuite opens as a standalone desktop app
+3. Click **Install** — Hermes Workspace opens as a standalone desktop app
 4. Pin to Dock / Taskbar for quick access
 
 > **macOS users:** After installing, you can also add it to your Launchpad.
 
 ### 📱 iPhone / iPad (iOS Safari)
 
-1. Open ClawSuite in **Safari** on your iPhone
+1. Open Hermes Workspace in **Safari** on your iPhone
 2. Tap the **Share** button (□↑)
 3. Scroll down and tap **"Add to Home Screen"**
-4. Tap **Add** — the ClawSuite icon appears on your home screen
+4. Tap **Add** — the Hermes Workspace icon appears on your home screen
 5. Launch from home screen for the full native app experience
 
 ### 🤖 Android
 
-1. Open ClawSuite in **Chrome** on your Android device
+1. Open Hermes Workspace in **Chrome** on your Android device
 2. Tap the **three-dot menu** (⋮) → **"Add to Home screen"**
-3. Tap **Add** — ClawSuite is now a native-feeling app on your device
+3. Tap **Add** — Hermes Workspace is now a native-feeling app on your device
 
 ---
 
 ## 📡 Mobile Access via Tailscale
 
-Access ClawSuite from anywhere on your devices — no port forwarding, no VPN complexity.
+Access Hermes Workspace from anywhere on your devices — no port forwarding, no VPN complexity.
 
 ### Setup
 
@@ -134,7 +134,7 @@ Access ClawSuite from anywhere on your devices — no port forwarding, no VPN co
    # Example output: 100.x.x.x
    ```
 
-4. **Open ClawSuite on your phone:**
+4. **Open Hermes Workspace on your phone:**
    ```
    http://100.x.x.x:3000
    ```
@@ -155,7 +155,7 @@ The desktop app will offer:
 - Auto-launch on startup
 - Deep OS integration (macOS menu bar, Windows taskbar)
 
-**In the meantime:** Install ClawSuite as a PWA (see above) for a near-native desktop experience — it works great.
+**In the meantime:** Install Hermes Workspace as a PWA (see above) for a near-native desktop experience — it works great.
 
 ---
 
@@ -163,7 +163,7 @@ The desktop app will offer:
 
 > **Status: Coming Soon**
 
-A fully managed cloud version of ClawSuite is in development:
+A fully managed cloud version of Hermes Workspace is in development:
 
 - **One-click deploy** — No self-hosting required
 - **Multi-device sync** — Access your agents from any device
@@ -251,13 +251,13 @@ Features pending cloud infrastructure:
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/clawsuite&type=date&logscale&legend=top-left)](https://www.star-history.com/#outsourc-e/clawsuite&type=date&logscale&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)](https://www.star-history.com/#outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)
 
 ---
 
 ## 💛 Support the Project
 
-ClawSuite is free and open source. If it's saving you time and powering your workflow, consider supporting development:
+Hermes Workspace is free and open source. If it's saving you time and powering your workflow, consider supporting development:
 
 **ETH:** `0xB332D4C60f6FBd94913e3Fd40d77e3FE901FAe22`
 
@@ -284,5 +284,5 @@ MIT — see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-  <sub>Built with ⚡ by <a href="https://github.com/outsourc-e">@outsourc-e</a> and the ClawSuite community</sub>
+  <sub>Built with ⚡ by <a href="https://github.com/outsourc-e">@outsourc-e</a> and the Hermes Workspace community</sub>
 </div>

@@ -11,7 +11,7 @@ export interface Mode {
   preferredPremiumModel?: string
 }
 
-const STORAGE_KEY = 'openclaw-modes'
+const STORAGE_KEY = 'hermes-modes'
 
 function loadModes(): Mode[] {
   try {

@@ -1,5 +1,5 @@
 {
-  "projectName": "clawsuite",
+  "projectName": "hermes",
   "mode": "file-router",
   "typescript": true,
   "tailwind": true,

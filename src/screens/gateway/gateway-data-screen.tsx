@@ -137,7 +137,7 @@ export function GatewayDataScreen({
           <div className="flex items-center justify-center h-32">
             <div className="flex items-center gap-2 text-primary-500">
               <div className="size-4 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin" />
-              <span className="text-sm">Connecting to gateway…</span>
+              <span className="text-sm">Connecting to Hermes…</span>
             </div>
           </div>
         ) : query.isError ? (

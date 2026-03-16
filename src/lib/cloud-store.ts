@@ -13,10 +13,10 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
-const CLOUD_API_URL = process.env.CLAWSUITE_CLOUD_API || 'https://cloud.clawsuite.io'
+const CLOUD_API_URL = process.env.HERMES_CLOUD_API || 'https://cloud.hermesworkspace.app'
 
 function createGatewayUrl(instanceId: string): string {
-  return `https://${instanceId}.gateway.mock.clawsuite.local`
+  return `https://${instanceId}.hermes.mock.hermesworkspace.local`
 }
 
 function createGatewayToken(): string {
@@ -31,7 +31,7 @@ function getExpiryDate(plan: CloudPlan): string {
 }
 
 /**
- * Provision a cloud instance. When CLAWSUITE_CLOUD_API is set, proxies to the
+ * Provision a cloud instance. When HERMES_CLOUD_API is set, proxies to the
  * real cloud API (PC2 Docker containers). Otherwise falls back to local mock.
  */
 export async function provisionCloudInstance(params: {

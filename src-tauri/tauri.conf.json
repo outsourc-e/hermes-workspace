@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ClawSuite",
+  "productName": "Hermes Workspace",
   "version": "3.2.0",
   "identifier": "io.buildingthefuture.clawsuite",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ClawSuite",
+        "title": "Hermes Workspace",
         "width": 1440,
         "height": 900,
         "minWidth": 800,

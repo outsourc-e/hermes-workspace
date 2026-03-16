@@ -36,7 +36,7 @@ type UpdatePhase =
   | 'done'
   | 'error'
 
-const DISMISS_KEY = 'openclaw-update-dismissed'
+const DISMISS_KEY = 'hermes-update-dismissed'
 const CHECK_INTERVAL_MS = 15 * 60 * 1000
 
 const PHASE_LABELS: Record<UpdatePhase, string> = {

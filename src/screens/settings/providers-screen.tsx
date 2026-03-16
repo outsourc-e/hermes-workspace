@@ -864,14 +864,14 @@ function ProviderManagementSection(props: {
 
         {modelsQuery.isPending ? (
           <p className="rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-600">
-            Loading providers from Gateway...
+            Loading providers from Hermes...
           </p>
         ) : null}
 
         {modelsQuery.error ? (
           <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
             <p className="mb-2 text-sm text-primary-700">
-              Unable to load providers right now. Check your gateway connection.
+              Unable to load providers right now. Check your Hermes connection.
             </p>
             <Button variant="outline" size="sm" onClick={() => modelsQuery.refetch()}>
               Retry

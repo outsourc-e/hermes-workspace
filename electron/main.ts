@@ -217,7 +217,7 @@ ipcMain.handle('gateway:connect', async (_event, url: string) => {
     execSync(`curl -s -o /dev/null -w "%{http_code}" ${url}/api/health`, { timeout: 3000 })
     return { success: true, url }
   } catch {
-    return { success: false, error: 'Could not connect to gateway' }
+    return { success: false, error: 'Could not connect to Hermes' }
   }
 })
 

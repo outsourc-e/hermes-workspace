@@ -85,7 +85,7 @@ async function fetchGatewayLogs(): Promise<
       unavailable: true,
       message:
         payload.error ||
-        'Gateway logs not available via RPC — check gateway.logs config',
+        'Hermes logs are not available via RPC. Check the Hermes logs config.',
     }
   }
 
@@ -158,7 +158,7 @@ export function GatewayLogsScreen() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `gateway-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`
+    anchor.download = `hermes-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -182,7 +182,7 @@ export function GatewayLogsScreen() {
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-primary-900">
-                  Gateway Logs
+                  Hermes Logs
                 </h1>
                 <p className="text-sm text-primary-600">
                   Live log viewer with level filters, search, and export.
@@ -256,7 +256,7 @@ export function GatewayLogsScreen() {
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
                   placeholder="Search visible logs"
-                  aria-label="Search gateway logs"
+                  aria-label="Search Hermes logs"
                 />
               </div>
 
@@ -286,7 +286,7 @@ export function GatewayLogsScreen() {
         <section className="rounded-xl border border-primary-200 bg-white shadow-sm">
           {query.isPending ? (
             <div className="px-5 py-12 text-center text-sm text-primary-600">
-              Loading gateway logs…
+              Loading Hermes logs…
             </div>
           ) : unavailableMessage ? (
             <div className="px-5 py-12 text-center">
@@ -294,7 +294,7 @@ export function GatewayLogsScreen() {
                 {unavailableMessage}
               </p>
               <p className="mt-2 text-xs text-primary-600">
-                The gateway did not expose a supported logs RPC method.
+                Hermes did not expose a supported logs RPC method.
               </p>
             </div>
           ) : query.isError ? (
@@ -302,7 +302,7 @@ export function GatewayLogsScreen() {
               <p className="text-sm font-medium text-red-700">
                 {query.error instanceof Error
                   ? query.error.message
-                  : 'Failed to load gateway logs'}
+                  : 'Failed to load Hermes logs'}
               </p>
             </div>
           ) : filteredEntries.length === 0 ? (
@@ -334,7 +334,7 @@ export function GatewayLogsScreen() {
                       </span>
                     </div>
                     <div className="text-xs font-medium uppercase tracking-wide text-primary-600">
-                      {entry.source || 'gateway'}
+                      {entry.source || 'Hermes'}
                     </div>
                     <div className="min-w-0 break-words text-sm text-primary-900">
                       {entry.message}

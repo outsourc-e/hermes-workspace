@@ -134,7 +134,7 @@ export const DIAGNOSTICS_BUNDLE_VERSION = '1.0.0'
 export function generateBundleFilename(): string {
   const date = new Date().toISOString().slice(0, 10)
   const time = new Date().toISOString().slice(11, 19).replace(/:/g, '-')
-  return `openclaw-diagnostics-${date}-${time}.json`
+  return `hermes-diagnostics-${date}-${time}.json`
 }
 
 export function downloadBundle(bundle: DiagnosticsBundle): void {
@@ -151,7 +151,7 @@ export function downloadBundle(bundle: DiagnosticsBundle): void {
 }
 
 export function buildGitHubIssueUrl(bundle: DiagnosticsBundle): string {
-  const baseUrl = 'https://github.com/outsourc-e/clawsuite/issues/new'
+  const baseUrl = 'https://github.com/outsourc-e/hermes-workspace/issues/new'
 
   const title = encodeURIComponent('Bug: [Brief description]')
 
@@ -159,7 +159,7 @@ export function buildGitHubIssueUrl(bundle: DiagnosticsBundle): string {
 
 - **App Version:** ${bundle.environment.appVersion}
 - **OS:** ${bundle.environment.os}
-- **Gateway Status:** ${bundle.gateway.status}
+- **Hermes Status:** ${bundle.gateway.status}
 
 ## What I was doing
 

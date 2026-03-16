@@ -7,7 +7,7 @@ export function GatewayPlaceholder({ title }: { title: string }) {
       <HugeiconsIcon icon={AlertDiamondIcon} size={32} strokeWidth={1.5} />
       <h2 className="text-lg font-medium text-ink">{title}</h2>
       <p className="text-sm text-primary-600 max-w-md text-center">
-        This page is coming soon. The gateway endpoint exists but the UI has not
+        This page is coming soon. The Hermes endpoint exists but the UI has not
         been built yet.
       </p>
     </div>

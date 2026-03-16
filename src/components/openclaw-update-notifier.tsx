@@ -15,8 +15,8 @@ import { cn } from '@/lib/utils'
 
 type UpdatePhase = 'idle' | 'updating' | 'restarting' | 'done' | 'error'
 
-const DISMISS_KEY = 'openclaw-update-dismissed-version'
-const AUTO_UPDATE_KEY = 'openclaw-auto-update'
+const DISMISS_KEY = 'hermes-update-dismissed-version'
+const AUTO_UPDATE_KEY = 'hermes-auto-update'
 const CHECK_INTERVAL_MS = 30 * 60 * 1000
 
 function shouldShowUpdateBanner(

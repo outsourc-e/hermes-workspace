@@ -587,7 +587,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Hermes docs
+                            See the Hermes Agent docs
                           </a>{' '}
                           for setup instructions.
                         </p>
@@ -651,7 +651,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Hermes docs
+                            See the Hermes Agent docs
                           </a>{' '}
                           for CLI token setup instructions.
                         </p>

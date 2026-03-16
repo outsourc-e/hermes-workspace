@@ -361,7 +361,7 @@ function AppearanceContent() {
       <div className={SETTINGS_CARD_CLASS}>
         <Row
           label="System metrics footer"
-          description="Show a persistent footer with CPU, RAM, disk, and gateway status."
+          description="Show a persistent footer with CPU, RAM, disk, and Hermes status."
         >
           <Switch
             checked={settings.showSystemMetricsFooter}
@@ -721,7 +721,7 @@ function AdvancedContent() {
           <div className="w-full max-w-sm">
             <Input
               type="url"
-              placeholder="https://api.openclaw.ai"
+              placeholder="https://api.hermesworkspace.app"
               value={settings.gatewayUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"

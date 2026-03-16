@@ -218,7 +218,7 @@ export function ApprovalsPage({ approvals, onApprove, onDeny }: ApprovalsPagePro
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Approvals</h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">Live gateway queue with local approval history</p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">Live Hermes queue with local approval history</p>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">

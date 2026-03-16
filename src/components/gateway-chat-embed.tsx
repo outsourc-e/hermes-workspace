@@ -42,7 +42,7 @@ function GatewayChatEmbedComponent({ className }: { className?: string }) {
         <div className="absolute inset-0 flex items-center justify-center bg-surface">
           <div className="flex flex-col items-center gap-2">
             <div className="size-6 animate-spin rounded-full border-2 border-primary-300 border-t-accent-500" />
-            <p className="text-xs text-primary-600">Connecting to gateway...</p>
+            <p className="text-xs text-primary-600">Connecting to Hermes...</p>
           </div>
         </div>
       )}
@@ -50,7 +50,7 @@ function GatewayChatEmbedComponent({ className }: { className?: string }) {
         <div className="absolute inset-0 flex items-center justify-center bg-surface">
           <div className="flex flex-col items-center gap-2 text-center">
             <p className="text-sm text-primary-700">
-              Unable to connect to gateway
+              Unable to connect to Hermes
             </p>
             <p className="text-xs text-primary-500">
               Make sure Hermes is running on port 18789

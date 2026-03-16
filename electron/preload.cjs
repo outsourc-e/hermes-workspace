@@ -1,6 +1,6 @@
 "use strict";
 /**
- * ClawSuite Electron Preload Script
+ * Hermes Workspace Electron Preload Script
  * Exposes safe IPC bridge to renderer
  */
 Object.defineProperty(exports, "__esModule", { value: true });

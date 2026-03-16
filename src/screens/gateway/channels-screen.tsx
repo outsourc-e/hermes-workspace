@@ -428,7 +428,7 @@ export function ChannelsScreen() {
             <div>
               <h1 className="text-base font-semibold text-primary-900">Channels</h1>
               <p className="text-xs text-primary-500">
-                Live channel health, probe status, and per-channel gateway config
+                Live channel health, probe status, and per-channel Hermes config
               </p>
             </div>
             {statusQuery.isFetching && !statusQuery.isLoading ? (
@@ -441,7 +441,7 @@ export function ChannelsScreen() {
             {isRestarting ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white px-2.5 py-1 text-[11px] font-medium text-primary-600">
                 <HugeiconsIcon icon={RefreshIcon} size={12} className="animate-spin" />
-                Restarting gateway
+                Restarting Hermes
               </span>
             ) : null}
             {lastUpdated ? (
@@ -463,7 +463,7 @@ export function ChannelsScreen() {
           <div className="flex h-32 items-center justify-center rounded-xl border border-primary-200 bg-white">
             <div className="flex items-center gap-2 text-primary-500">
               <div className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
-              <span className="text-sm">Connecting to gateway…</span>
+              <span className="text-sm">Connecting to Hermes…</span>
             </div>
           </div>
         ) : statusQuery.isError ? (

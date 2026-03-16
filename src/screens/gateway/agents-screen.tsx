@@ -1332,7 +1332,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
               </h2>
               <ul className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
                 <li>Create an agent profile</li>
-                <li>Connect a gateway</li>
+                <li>Connect Hermes</li>
                 <li>Spawn your first session</li>
               </ul>
               <button

@@ -1,4 +1,4 @@
-# Contributing to ClawSuite
+# Contributing to Hermes Workspace
 
 Thanks for your interest in contributing! Here's how to get started.
 
@@ -58,7 +58,7 @@ npm run build
 - **Framework:** TanStack Start + React
 - **Styling:** Tailwind CSS
 - **State:** TanStack Query + React hooks
-- **Gateway communication:** WebSocket via OpenClaw RPC
+- **Hermes communication:** WebSocket via Hermes Agent RPC
 
 Key directories:
 
@@ -69,12 +69,12 @@ src/
 ├── lib/            # Utilities and helpers
 ├── routes/         # TanStack Router pages + API routes
 ├── screens/        # Major screen layouts (chat, dashboard)
-└── server/         # Server-side gateway communication
+└── server/         # Server-side Hermes communication
 ```
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/outsourc-e/clawsuite/issues)
+- Use [GitHub Issues](https://github.com/outsourc-e/hermes-workspace/issues)
 - Include: what you expected, what happened, steps to reproduce
 - Screenshots help!
 

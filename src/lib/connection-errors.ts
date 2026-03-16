@@ -74,46 +74,46 @@ export function getConnectionErrorMessage(
       return {
         title: 'Authentication required',
         description:
-          'The gateway rejected this connection.',
-        action: 'Update your gateway token in Settings and try again.',
+          'Hermes rejected this connection.',
+        action: 'Update your Hermes token in Settings and try again.',
       }
     case 'gateway_pairing_required':
       return {
         title: 'Pair this device first',
         description:
-          'This device is not paired with the gateway yet.',
-        action: 'Run `openclaw pair` on the gateway machine, then reconnect.',
+          'This device is not paired with Hermes yet.',
+        action: 'Run `openclaw pair` on the Hermes machine, then reconnect.',
       }
     case 'gateway_unreachable':
       return {
-        title: 'Gateway unreachable',
-        description: 'Hermes Workspace cannot reach the configured Hermes gateway.',
-        action: 'Check that Hermes is running and the gateway URL is correct.',
+        title: 'Hermes unreachable',
+        description: 'Hermes Workspace cannot reach the configured Hermes instance.',
+        action: 'Check that Hermes is running and the Hermes URL is correct.',
       }
     case 'handshake_failed':
       return {
         title: 'Connection could not be verified',
         description:
-          'The gateway responded, but the secure connection handshake did not complete.',
-        action: 'Try reconnecting. If it keeps failing, check gateway pairing and auth.',
+          'Hermes responded, but the secure connection handshake did not complete.',
+        action: 'Try reconnecting. If it keeps failing, check Hermes pairing and auth.',
       }
     case 'handshake_timeout':
       return {
         title: 'Connection timed out',
-        description: 'The gateway did not respond in time.',
+        description: 'Hermes did not respond in time.',
         action: 'Check your network and try again.',
       }
     case 'disconnected':
       return {
         title: 'Connection lost',
-        description: 'The connection to the gateway was interrupted.',
+        description: 'The connection to Hermes was interrupted.',
         action: 'Wait a moment, then retry if it does not reconnect.',
       }
     case 'unknown':
       return {
         title: 'Connection error',
-        description: 'Something went wrong while connecting to the gateway.',
-        action: 'Try again, or review the gateway settings.',
+        description: 'Something went wrong while connecting to Hermes.',
+        action: 'Try again, or review the Hermes settings.',
       }
   }
 }

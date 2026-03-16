@@ -4,11 +4,6 @@
   "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/outsourc-e/clawsuite.git"
-  },
-  "homepage": "https://clawsuite.io",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",

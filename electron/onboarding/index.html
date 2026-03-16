@@ -7,7 +7,7 @@
     http-equiv="Content-Security-Policy"
     content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:18789; media-src 'self';"
   >
-  <title>ClawSuite — Setup</title>
+  <title>Hermes Workspace — Setup</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -282,7 +282,7 @@
         <path d="M20 44V20h8l8 12 8-12h0v24" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="32" cy="32" r="4" fill="white" opacity="0.6"/>
       </svg>
-      <h1>Claw<span>Suite</span></h1>
+      <h1>Hermes <span>Workspace</span></h1>
       <p>Your AI command center</p>
     </div>
 
@@ -299,7 +299,7 @@
           <div class="option-icon">🔗</div>
           <div class="option-content">
             <h3>Connect Existing Gateway <span class="badge badge-recommended">Recommended</span></h3>
-            <p>Already have OpenClaw running? Connect to your local or remote gateway instantly.</p>
+            <p>Already have Hermes Agent running? Connect to your local or remote Hermes instance instantly.</p>
           </div>
         </div>
 
@@ -307,7 +307,7 @@
           <div class="option-icon">🖥️</div>
           <div class="option-content">
             <h3>Local — New Install <span class="badge badge-free">Free</span></h3>
-            <p>Install OpenClaw on this machine. Full control, self-hosted, runs locally.</p>
+            <p>Install Hermes Agent on this machine. Full control, self-hosted, runs locally.</p>
           </div>
         </div>
 
@@ -315,7 +315,7 @@
           <div class="option-icon">☁️</div>
           <div class="option-content">
             <h3>Cloud <span class="badge badge-pro">Pro</span></h3>
-            <p>Managed hosting. We run the gateway — you just build. Starting at $20/mo.</p>
+            <p>Managed hosting. We run Hermes for you while you focus on the work. Starting at $20/mo.</p>
           </div>
         </div>
       </div>
@@ -332,14 +332,14 @@
         <div style="font-size: 48px; margin-bottom: 16px;">🚀</div>
         <h2 style="font-size: 22px; margin-bottom: 8px;">You're all set!</h2>
         <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">
-          ClawSuite is connected and ready to go.
+          Hermes Workspace is connected and ready to go.
         </p>
         <div id="connection-info" style="background: var(--surface); border-radius: 8px; padding: 16px; text-align: left; font-size: 13px;">
           <!-- Filled by JS -->
         </div>
       </div>
       <div class="actions">
-        <button class="btn btn-primary" onclick="finishSetup()">Open ClawSuite →</button>
+        <button class="btn btn-primary" onclick="finishSetup()">Open Hermes Workspace →</button>
       </div>
     </div>
   </div>
@@ -374,8 +374,8 @@
 
       if (selectedMode === 'existing') {
         container.innerHTML = `
-          <h2 style="font-size: 18px; margin-bottom: 4px;">Connect to Gateway</h2>
-          <p style="color: var(--text-muted); font-size: 13px;">Enter your OpenClaw gateway URL</p>
+          <h2 style="font-size: 18px; margin-bottom: 4px;">Connect to Hermes</h2>
+          <p style="color: var(--text-muted); font-size: 13px;">Enter your Hermes Agent URL</p>
           <div class="input-group">
             <label>Gateway URL</label>
             <input type="text" id="gateway-url" placeholder="http://localhost:18789" value="http://localhost:18789" />
@@ -390,8 +390,8 @@
         detectGateway()
       } else if (selectedMode === 'local') {
         container.innerHTML = `
-          <h2 style="font-size: 18px; margin-bottom: 4px;">Install OpenClaw</h2>
-          <p style="color: var(--text-muted); font-size: 13px;">We'll install OpenClaw and start the gateway</p>
+          <h2 style="font-size: 18px; margin-bottom: 4px;">Install Hermes Agent</h2>
+          <p style="color: var(--text-muted); font-size: 13px;">We'll install Hermes Agent and start Hermes for you.</p>
           <div class="status" id="install-status"></div>
           <div class="terminal" id="install-terminal"></div>
           <div class="actions">
@@ -422,17 +422,17 @@
     async function detectGateway() {
       const status = document.getElementById('connect-status')
       status.className = 'status show status-loading'
-      status.innerHTML = '<div class="spinner"></div> Checking for gateway...'
+      status.innerHTML = '<div class="spinner"></div> Checking for Hermes...'
 
       try {
         const result = await window.clawsuite.gateway.check()
         if (result.url) {
           document.getElementById('gateway-url').value = result.url
           status.className = 'status show status-success'
-          status.innerHTML = '✓ Gateway detected at ' + result.url
+          status.innerHTML = '✓ Hermes detected at ' + result.url
         } else {
           status.className = 'status show status-loading'
-          status.innerHTML = '⚠️ No gateway detected. Enter URL manually or go back and choose "New Install".'
+          status.innerHTML = '⚠️ No Hermes instance detected. Enter the URL manually or go back and choose "New Install".'
         }
       } catch (e) {
         status.style.display = 'none'
@@ -454,7 +454,7 @@
           status.innerHTML = '✓ Connected!'
           setTimeout(() => {
             document.getElementById('connection-info').innerHTML = `
-              <div><strong>Mode:</strong> Local Gateway</div>
+              <div><strong>Mode:</strong> Local Hermes</div>
               <div style="margin-top: 8px;"><strong>URL:</strong> ${gatewayUrl}</div>
               <div style="margin-top: 8px;"><strong>Status:</strong> <span style="color: var(--success);">● Connected</span></div>
             `
@@ -478,7 +478,7 @@
       btn.disabled = true
       btn.textContent = 'Installing...'
       status.className = 'status show status-loading'
-      status.innerHTML = '<div class="spinner"></div> Installing OpenClaw...'
+      status.innerHTML = '<div class="spinner"></div> Installing Hermes Agent...'
       terminal.classList.add('show')
       terminal.textContent = '$ npm install -g openclaw\n'
 
@@ -486,15 +486,15 @@
         const result = await window.clawsuite.gateway.install()
         terminal.textContent += result.output + '\n✓ Installed!\n\n'
 
-        status.innerHTML = '<div class="spinner"></div> Starting gateway...'
+        status.innerHTML = '<div class="spinner"></div> Starting Hermes...'
         terminal.textContent += '$ openclaw gateway start\n'
 
         const startResult = await window.clawsuite.gateway.start()
         if (startResult.success) {
           gatewayUrl = startResult.url
           status.className = 'status show status-success'
-          status.innerHTML = '✓ Gateway running!'
-          terminal.textContent += '✓ Gateway started at ' + gatewayUrl + '\n'
+          status.innerHTML = '✓ Hermes is running!'
+          terminal.textContent += '✓ Hermes started at ' + gatewayUrl + '\n'
 
           setTimeout(() => {
             document.getElementById('connection-info').innerHTML = `

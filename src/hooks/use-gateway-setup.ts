@@ -104,7 +104,7 @@ async function saveConfig(url: string, token: string): Promise<{ ok: boolean; er
     })
     const data = (await response.json()) as { ok?: boolean; connected?: boolean; error?: string }
     if (data.ok && data.connected === false) {
-      return { ok: true, error: 'Config saved. Reconnecting to gateway...' }
+      return { ok: true, error: 'Config saved. Reconnecting to Hermes...' }
     }
     return { ok: Boolean(data.ok), error: data.error }
   } catch (err) {
@@ -135,7 +135,7 @@ export async function autoDetectGateway(): Promise<{
     if (!data.ok || !data.url) {
       return {
         ok: false,
-        error: data.error || 'No gateway found on localhost ports 18789-18800.',
+        error: data.error || 'No Hermes instance found on localhost ports 18789-18800.',
       }
     }
 
@@ -143,7 +143,7 @@ export async function autoDetectGateway(): Promise<{
   } catch {
     return {
       ok: false,
-      error: 'Auto-detect failed. Enter the gateway URL manually.',
+      error: 'Auto-detect failed. Enter the Hermes URL manually.',
     }
   }
 }
@@ -152,7 +152,9 @@ function readSavedGatewayConfig(): SavedGatewayConfig | null {
   if (typeof window === 'undefined') return null
 
   try {
-    const settingsRaw = localStorage.getItem('openclaw-settings')
+    const settingsRaw =
+      localStorage.getItem('hermes-settings') ??
+      localStorage.getItem('openclaw-settings')
     if (settingsRaw) {
       const parsed = JSON.parse(settingsRaw) as {
         state?: { settings?: { gatewayUrl?: string; gatewayToken?: string } }
@@ -354,7 +356,7 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
 
     set({
       testStatus: 'error',
-      testError: error || 'Gateway not reachable after saving config. You may need to restart Hermes Workspace.',
+        testError: error || 'Hermes is not reachable after saving config. You may need to restart Hermes Workspace.',
     })
     return false
   },
@@ -366,7 +368,7 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
       set({ testStatus: 'success', testError: null })
       return true
     }
-    set({ testStatus: 'error', testError: error || 'Gateway not reachable' })
+    set({ testStatus: 'error', testError: error || 'Hermes is not reachable' })
     return false
   },
 

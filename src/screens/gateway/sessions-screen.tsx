@@ -304,7 +304,7 @@ export function SessionsScreen() {
             <div className="flex h-32 items-center justify-center">
               <div className="flex items-center gap-2 text-primary-500">
                 <div className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
-                <span className="text-sm">Connecting to gateway…</span>
+                <span className="text-sm">Connecting to Hermes…</span>
               </div>
             </div>
           ) : query.isError ? (

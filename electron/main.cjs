@@ -1,10 +1,10 @@
 "use strict";
 /**
- * ClawSuite Electron Main Process
+ * Hermes Workspace Electron Main Process
  * Wraps the Vite-built web app in a native desktop window.
  *
  * Production mode starts a local HTTP server that serves the built client
- * files and proxies /api/* requests to the OpenClaw gateway.
+ * files and proxies /api/* requests to Hermes Agent.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
@@ -97,8 +97,8 @@ async function startWorkspaceDaemonIfNeeded() {
     }
 }
 
-// ── Find or start ClawSuite server ────────────────────────────────────────
-// Checks common ports for a running ClawSuite dev/preview server.
+// ── Find or start Hermes Workspace server ─────────────────────────────────
+// Checks common ports for a running Hermes Workspace dev/preview server.
 // If none found, starts `pnpm dev` from the repo directory.
 let appProcess = null;
 const CLAWSUITE_PORTS = [3000, 3003, 3001, 3002];
@@ -119,7 +119,7 @@ function findRunningServer() {
 }
 
 function findRepoDir() {
-    // Common locations for the ClawSuite repo
+    // Common locations for the Hermes Workspace repo
     const candidates = [
         (0, path_1.join)(process.env.HOME || '', '.openclaw', 'workspace', 'clawsuite'),
         (0, path_1.join)(process.env.HOME || '', 'clawsuite'),
@@ -142,18 +142,18 @@ function startLocalServer(_gatewayUrl) {
         const existingPort = findRunningServer();
         if (existingPort) {
             localServerPort = existingPort;
-            console.log(`[ClawSuite] Found running server on port ${existingPort}`);
+            console.log(`[Hermes Workspace] Found running server on port ${existingPort}`);
             return resolve(existingPort);
         }
 
         // Try to start one from the repo
         const repoDir = findRepoDir();
         if (!repoDir) {
-            console.error('[ClawSuite] Could not find ClawSuite repo directory');
-            return reject(new Error('ClawSuite repo not found'));
+            console.error('[Hermes Workspace] Could not find Hermes Workspace repo directory');
+            return reject(new Error('Hermes Workspace repo not found'));
         }
 
-        console.log(`[ClawSuite] Starting server from ${repoDir}...`);
+        console.log(`[Hermes Workspace] Starting server from ${repoDir}...`);
         const port = 3003;
 
         appProcess = (0, child_process_1.spawn)('pnpm', ['dev', '--port', String(port)], {
@@ -197,7 +197,7 @@ function startLocalServer(_gatewayUrl) {
                 // Extract actual port from output
                 const match = output.match(/:(\d{4})\//);
                 localServerPort = match ? parseInt(match[1], 10) : port;
-                console.log(`[ClawSuite] Dev server started on port ${localServerPort}`);
+                console.log(`[Hermes Workspace] Dev server started on port ${localServerPort}`);
                 resolve(localServerPort);
             }
         });
@@ -216,7 +216,7 @@ function startLocalServer(_gatewayUrl) {
         });
 
         appProcess.on('error', (err) => {
-            console.error('[ClawSuite] Dev server failed:', err);
+            console.error('[Hermes Workspace] Dev server failed:', err);
             if (!started) {
                 started = true;
                 clearTimeout(timeout);
@@ -245,7 +245,7 @@ async function createWindow() {
         height: 900,
         minWidth: 800,
         minHeight: 600,
-        title: 'ClawSuite',
+        title: 'Hermes Workspace',
         icon: (0, fs_1.existsSync)(iconPath) ? iconPath : undefined,
         titleBarStyle: 'hiddenInset',
         trafficLightPosition: { x: 16, y: 12 },
@@ -266,7 +266,7 @@ async function createWindow() {
 
     const gatewayUrl = getGatewayUrl();
     if (!gatewayUrl && isOpenClawInstalled()) {
-        console.log('[ClawSuite] Gateway not running, auto-starting...');
+        console.log('[Hermes Workspace] Hermes not running, auto-starting...');
         try {
             gatewayProcess = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
                 shell: true,
@@ -276,7 +276,7 @@ async function createWindow() {
             gatewayProcess.unref();
             await new Promise((resolve) => setTimeout(resolve, 3000));
         } catch (err) {
-            console.error('[ClawSuite] Failed to auto-start gateway:', err);
+            console.error('[Hermes Workspace] Failed to auto-start Hermes:', err);
         }
     }
 
@@ -284,12 +284,12 @@ async function createWindow() {
         try {
             await startLocalServer(getGatewayUrl());
         } catch (err) {
-            console.error('[ClawSuite] Failed to start local server:', err);
+            console.error('[Hermes Workspace] Failed to start local server:', err);
         }
     }
 
     const appUrl = getAppUrl();
-    console.log(`[ClawSuite] Loading: ${appUrl}`);
+    console.log(`[Hermes Workspace] Loading: ${appUrl}`);
     mainWindow.loadURL(appUrl);
 
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -312,7 +312,7 @@ function createTray() {
     // macOS tray icons should be 22px (template for dark/light auto-switch)
     trayIcon.setTemplateImage(true);
     tray = new electron_1.Tray(trayIcon.resize({ width: 22, height: 22 }));
-    tray.setToolTip('ClawSuite');
+    tray.setToolTip('Hermes Workspace');
 
     function buildTrayMenu() {
         const gatewayUrl = getGatewayUrl();
@@ -320,7 +320,7 @@ function createTray() {
 
         const contextMenu = electron_1.Menu.buildFromTemplate([
             {
-                label: 'Open ClawSuite',
+                label: 'Open Hermes Workspace',
                 click: () => { mainWindow?.show(); mainWindow?.focus(); },
                 accelerator: 'CommandOrControl+Shift+C',
             },
@@ -356,7 +356,7 @@ function createTray() {
                 enabled: false,
             },
             { type: 'separator' },
-            { label: 'Quit ClawSuite', click: () => electron_1.app.quit() },
+            { label: 'Quit Hermes Workspace', click: () => electron_1.app.quit() },
         ]);
 
         tray.setContextMenu(contextMenu);
@@ -444,7 +444,7 @@ electron_1.ipcMain.handle('gateway:connect', async (_event, url) => {
         if (code !== '200') throw new Error('not 200');
         return { success: true, url };
     } catch {
-        return { success: false, error: 'Could not connect to gateway' };
+        return { success: false, error: 'Could not connect to Hermes' };
     }
 });
 
@@ -466,7 +466,7 @@ electron_1.ipcMain.handle('onboarding:complete', async (_event, config) => {
             try {
                 await startLocalServer(config.gatewayUrl);
             } catch (err) {
-                console.error('[ClawSuite] Failed to start local server:', err);
+                console.error('[Hermes Workspace] Failed to start local server:', err);
             }
         }
         const appUrl = getAppUrl();
@@ -510,4 +510,4 @@ electron_1.app.on('before-quit', () => {
     }
 });
 
-electron_1.app.setName('ClawSuite');
+electron_1.app.setName('Hermes Workspace');

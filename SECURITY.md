@@ -2,18 +2,18 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in ClawSuite, please report it responsibly.
+If you discover a security vulnerability in Hermes Workspace, please report it responsibly.
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, email: **security@clawsuite.io**
+Instead, email: **security@hermesworkspace.app**
 
 We will acknowledge your report within 48 hours and aim to provide a fix within 7 days for critical issues.
 
 ## Scope
 
-- ClawSuite web application code
-- API routes and gateway communication
+- Hermes Workspace web application code
+- API routes and Hermes communication
 - Authentication and session management
 - Client-side data handling and rendering
 - Exec approval and human-in-the-loop controls
@@ -21,7 +21,7 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 
 ## Out of Scope
 
-- OpenClaw gateway itself (report to [OpenClaw](https://github.com/openclaw/openclaw))
+- Hermes Agent itself (report to [Hermes Agent](https://github.com/openclaw/openclaw))
 - Third-party dependencies (report to the respective maintainer)
 - Social engineering attacks
 
@@ -42,11 +42,11 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 - Path traversal prevention on all file and memory routes (`ensureWorkspacePath()`)
 - `.md`-only restriction on memory write routes
 - No API keys or secrets ever exposed to client-side code
-- Gateway tokens are server-side only
+- Hermes tokens are server-side only
 - Diagnostic output scrubbed of sensitive data
 
 **Agent Safety**
-- Exec approval workflow — sensitive gateway exec commands require explicit human approval via in-UI modal
+- Exec approval workflow — sensitive Hermes exec commands require explicit human approval via in-UI modal
 - Skills security scanning — every skill from the marketplace is scanned for suspicious patterns before install
 
 **Configuration**
