@@ -100,8 +100,13 @@ export function WorkspaceShell() {
     error?: string
   }
 
+  const isClient = typeof window !== 'undefined'
+
   const authQuery = useQuery<AuthStatus>({
     queryKey: ['auth-status'],
+    // Only run on client — relative fetch('/api/...') has no host during SSR,
+    // causing silent failures + infinite re-render loop on hydration.
+    enabled: isClient,
     queryFn: async () => {
       const controller = new AbortController()
       const timeout = globalThis.setTimeout(() => controller.abort(), 5_000)
@@ -131,9 +136,10 @@ export function WorkspaceShell() {
   })
 
   const authState = {
-    checked: !authQuery.isLoading,
-    authenticated: authQuery.data?.authenticated ?? false,
-    authRequired: authQuery.data?.authRequired ?? true,
+    // On SSR (query disabled) or after query resolves → checked = true
+    checked: !isClient || !authQuery.isLoading,
+    authenticated: authQuery.data?.authenticated ?? !isClient,
+    authRequired: authQuery.data?.authRequired ?? false,
   }
 
   // Derive active session from URL
