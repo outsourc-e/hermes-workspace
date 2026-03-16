@@ -145,7 +145,7 @@ function ChatContainerContent({
   ...props
 }: ChatContainerContentProps) {
   return (
-    <div className={cn('flex w-full flex-col min-h-full justify-end', className)} {...props}>
+    <div className={cn('flex w-full flex-col min-h-full', className)} {...props}>
       <div
         className="mx-auto w-full px-3 sm:px-5 flex flex-col"
         style={{ maxWidth: 'min(768px, 100%)' }}

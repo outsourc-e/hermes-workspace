@@ -1220,7 +1220,7 @@ function ChatMessageListComponent({
         : `calc(${bottomOffset} + ${overlayGap}px)`
     return (
       <div
-        className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
+        className={`pointer-events-none absolute z-40 ${isMobileViewport ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}
         style={{ bottom: overlayBottom }}
       >
         <ScrollToBottomButton
