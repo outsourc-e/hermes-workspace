@@ -13,6 +13,7 @@ import {
   PlayIcon,
   PauseIcon,
   Delete01Icon,
+  PencilEdit02Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
 import { toast } from '@/components/ui/toast'
@@ -25,9 +26,11 @@ import {
   pauseJob,
   resumeJob,
   triggerJob,
+  updateJob,
   type HermesJob,
 } from '@/lib/jobs-api'
 import { CreateJobDialog } from './create-job-dialog'
+import { EditJobDialog } from './edit-job-dialog'
 
 const QUERY_KEY = ['hermes', 'jobs'] as const
 
@@ -96,12 +99,14 @@ function JobCard({
   onResume,
   onTrigger,
   onDelete,
+  onEdit,
 }: {
   job: HermesJob
   onPause: (id: string) => void
   onResume: (id: string) => void
   onTrigger: (id: string) => void
   onDelete: (id: string) => void
+  onEdit: (job: HermesJob) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const isPaused = job.state === 'paused' || !job.enabled
@@ -191,6 +196,17 @@ function JobCard({
             />
           </button>
           <button
+            onClick={() => onEdit(job)}
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+            title="Edit"
+          >
+            <HugeiconsIcon
+              icon={PencilEdit02Icon}
+              size={14}
+              className="text-[var(--theme-muted)]"
+            />
+          </button>
+          <button
             onClick={() => setExpanded((current) => !current)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title={expanded ? 'Hide run history' : 'Show run history'}
@@ -275,6 +291,7 @@ export function JobsScreen() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [editingJob, setEditingJob] = useState<HermesJob | null>(null)
 
   const jobsQuery = useQuery({
     queryKey: QUERY_KEY,
@@ -319,6 +336,29 @@ export function JobsScreen() {
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to create job', {
+        type: 'error',
+      })
+    },
+  })
+  const updateMutation = useMutation({
+    mutationFn: async (payload: {
+      jobId: string
+      updates: {
+        name: string
+        schedule: string
+        prompt: string
+        deliver?: string[]
+        skills?: string[]
+        repeat?: number
+      }
+    }) => updateJob(payload.jobId, payload.updates),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      toast('Job updated')
+      setEditingJob(null)
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to update job', {
         type: 'error',
       })
     },
@@ -431,6 +471,7 @@ export function JobsScreen() {
                 onPause={(id) => pauseMutation.mutate(id)}
                 onResume={(id) => resumeMutation.mutate(id)}
                 onTrigger={(id) => triggerMutation.mutate(id)}
+                onEdit={(job) => setEditingJob(job)}
                 onDelete={(id) => {
                   if (confirm(`Delete job "${job.name}"?`)) {
                     deleteMutation.mutate(id)
@@ -447,6 +488,21 @@ export function JobsScreen() {
         onOpenChange={setShowCreate}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}
+      />
+      <EditJobDialog
+        job={editingJob}
+        open={editingJob !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingJob(null)
+        }}
+        onSubmit={async (updates) => {
+          if (!editingJob) return
+          await updateMutation.mutateAsync({
+            jobId: editingJob.id,
+            updates,
+          })
+        }}
+        isSubmitting={updateMutation.isPending}
       />
     </div>
   )
