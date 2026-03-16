@@ -5,6 +5,7 @@ import {
   ArrowDown01Icon,
   BrainIcon,
   Chat01Icon,
+  Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
   MessageMultiple01Icon,
@@ -550,6 +551,7 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isTerminalActive = pathname === '/terminal'
+  const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
@@ -762,6 +764,13 @@ function ChatSidebarComponent({
       icon: ComputerTerminal01Icon,
       label: 'Terminal',
       active: isTerminalActive,
+    },
+    {
+      kind: 'link',
+      to: '/jobs',
+      icon: Clock01Icon,
+      label: 'Jobs',
+      active: isJobsActive,
     },
   ]
 
