@@ -134,3 +134,4 @@ docs/PHASE_*
 docs/specs/
 docs/CLAWSUITE-ROADMAP.md
 release/
+__pycache__/

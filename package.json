@@ -6,7 +6,6 @@
   "license": "MIT",
   "private": true,
   "type": "module",
-  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
@@ -14,13 +13,7 @@
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix",
-    "electron:dev": "NODE_ENV=development electron .",
-    "electron:build": "npm run build && electron-builder --config electron-builder.config.cjs",
-    "electron:build:mac": "npm run build && electron-builder --mac --config electron-builder.config.cjs",
-    "electron:build:win": "npm run build && electron-builder --win --config electron-builder.config.cjs",
-    "beta:reset-state": "bash scripts/beta/reset_local_state.sh",
-    "beta:export-diagnostics": "bash scripts/beta/export_diagnostics_and_scan.sh"
+    "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
@@ -72,8 +65,6 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
-    "electron": "^40.8.0",
-    "electron-builder": "^26.8.1",
     "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
     "typescript": "^5.7.2",
