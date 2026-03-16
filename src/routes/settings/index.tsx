@@ -345,7 +345,7 @@ function SettingsRoute() {
     setAutoDetectingGateway(false)
   }
 
-  function getAccentBadgeClass(color: AccentColor): string {
+  function _getAccentBadgeClass(color: AccentColor): string {
     if (color === 'orange') return 'bg-orange-500'
     if (color === 'purple') return 'bg-purple-500'
     if (color === 'blue') return 'bg-blue-500'
@@ -819,7 +819,7 @@ function SettingsRoute() {
 const PROFILE_IMAGE_MAX_DIMENSION = 128
 const PROFILE_IMAGE_MAX_FILE_SIZE = 10 * 1024 * 1024
 
-function ProfileSection() {
+function _ProfileSection() {
   const { settings: chatSettings, updateSettings: updateChatSettings } =
     useChatSettingsStore()
   const [profileError, setProfileError] = useState<string | null>(null)
@@ -1046,7 +1046,7 @@ function LoaderPreview({ style }: { style: LoaderStyle }) {
   )
 }
 
-function LoaderStyleSection() {
+function _LoaderStyleSection() {
   const { settings: chatSettings, updateSettings: updateChatSettings } =
     useChatSettingsStore()
 

@@ -77,7 +77,7 @@ function NotFoundPage() {
               Files
             </Link>
             <Link
-              to="/cron"
+              to="/jobs"
               className="text-accent-500 hover:text-accent-600 hover:underline"
             >
               Jobs

@@ -1406,7 +1406,8 @@ export function ChatScreen({
     if (!shouldRedirectToNew) return
     resetPendingSend()
     clearHistoryMessages(queryClient, activeFriendlyId, sessionKeyForHistory)
-    navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' }, replace: true })
+    const latestSession = sessions[0]?.friendlyId ?? 'new'
+    navigate({ to: '/chat/$sessionKey', params: { sessionKey: latestSession }, replace: true })
   }, [
     activeFriendlyId,
     historyQuery.isFetching,

@@ -35,7 +35,7 @@ export const Route = createFileRoute('/chat/$sessionKey')({
             </button>
             <button
               onClick={() => {
-                if (typeof window !== 'undefined') window.location.href = '/chat/main'
+                if (typeof window !== 'undefined') window.location.href = '/chat'
               }}
               className="px-4 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors"
             >

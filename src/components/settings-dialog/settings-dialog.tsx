@@ -11,7 +11,6 @@ import {
   Notification03Icon,
   PaintBoardIcon,
   Sun01Icon,
-  UserIcon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
 import { useState, useEffect, Component } from 'react'
@@ -150,7 +149,7 @@ function HermesContent() {
   const [activeModel, setActiveModel] = useState('')
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [keyInput, setKeyInput] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [_saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [configuredKeys, setConfiguredKeys] = useState<Record<string, string>>({})
   const [memEnabled, setMemEnabled] = useState(true)
@@ -362,7 +361,7 @@ function HermesContent() {
   )
 }
 
-function ProfileContent() {
+function _ProfileContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const [profileError, setProfileError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
@@ -510,14 +509,14 @@ function AppearanceContent() {
     updateSettings({ theme })
   }
 
-  function badgeClass(color: AccentColor): string {
+  function _badgeClass(color: AccentColor): string {
     if (color === 'orange') return 'bg-orange-500'
     if (color === 'purple') return 'bg-purple-500'
     if (color === 'blue') return 'bg-blue-500'
     return 'bg-green-500'
   }
 
-  function handleAccentColorChange(selectedAccent: AccentColor) {
+  function _handleAccentColorChange(selectedAccent: AccentColor) {
     localStorage.setItem('hermes-accent', selectedAccent)
     document.documentElement.setAttribute('data-accent', selectedAccent)
     applyAccentColor(selectedAccent)
@@ -720,7 +719,7 @@ function EnterpriseThemePicker() {
   )
 }
 
-function LoaderContent() {
+function _LoaderContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const styles: Array<{ value: LoaderStyle; label: string }> = [
     { value: 'dots', label: 'Dots' },
@@ -867,7 +866,7 @@ function NotificationsContent() {
   )
 }
 
-function AdvancedContent() {
+function _AdvancedContent() {
   const { settings, updateSettings } = useSettings()
   const [connectionStatus, setConnectionStatus] = useState<
     'idle' | 'testing' | 'connected' | 'failed'

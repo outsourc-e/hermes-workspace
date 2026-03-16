@@ -14,6 +14,7 @@ import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as MemoryRouteImport } from './routes/memory'
+import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as CronRouteImport } from './routes/cron'
 import { Route as ActivityRouteImport } from './routes/activity'
@@ -171,6 +172,11 @@ const SessionsRoute = SessionsRouteImport.update({
 const MemoryRoute = MemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JobsRoute = JobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -869,6 +875,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/cron': typeof CronRoute
   '/files': typeof FilesRoute
+  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -1009,6 +1016,7 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/cron': typeof CronRoute
   '/files': typeof FilesRoute
+  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
@@ -1149,6 +1157,7 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/cron': typeof CronRoute
   '/files': typeof FilesRoute
+  '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -1291,6 +1300,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/cron'
     | '/files'
+    | '/jobs'
     | '/memory'
     | '/sessions'
     | '/settings'
@@ -1431,6 +1441,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/cron'
     | '/files'
+    | '/jobs'
     | '/memory'
     | '/sessions'
     | '/skills'
@@ -1570,6 +1581,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/cron'
     | '/files'
+    | '/jobs'
     | '/memory'
     | '/sessions'
     | '/settings'
@@ -1711,6 +1723,7 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   CronRoute: typeof CronRoute
   FilesRoute: typeof FilesRoute
+  JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
   SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -1827,6 +1840,13 @@ declare module '@tanstack/react-router' {
       path: '/memory'
       fullPath: '/memory'
       preLoaderRoute: typeof MemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/jobs': {
+      id: '/jobs'
+      path: '/jobs'
+      fullPath: '/jobs'
+      preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/files': {
@@ -3039,6 +3059,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   CronRoute: CronRoute,
   FilesRoute: FilesRoute,
+  JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
   SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,

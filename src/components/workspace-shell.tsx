@@ -259,7 +259,7 @@ export function WorkspaceShell() {
       authQuery.error instanceof Error
         ? authQuery.error.message
         : 'Failed to connect to Hermes server'
-    const showGatewayTip = /gateway|websocket/i.test(errorMessage)
+    const showBackendHint = /gateway|websocket|backend/i.test(errorMessage)
 
     return (
       <div className="flex h-screen items-center justify-center bg-surface px-6">
@@ -275,7 +275,7 @@ export function WorkspaceShell() {
           <p className="mt-3 text-sm text-primary-300">
             The server may still be starting up. Wait a moment and try again.
           </p>
-          {showGatewayTip ? (
+          {showBackendHint ? (
             <p className="mt-3 text-sm text-accent-400">
               Make sure the Hermes backend is running:{' '}
               <code className="rounded bg-primary-900 px-1.5 py-0.5 text-xs text-primary-200">

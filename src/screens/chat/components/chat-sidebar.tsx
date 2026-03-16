@@ -12,7 +12,7 @@ import {
   PencilEdit02Icon,
   PuzzleIcon,
   Search01Icon,
-  ApiIcon,
+
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
@@ -533,7 +533,7 @@ function ChatSidebarComponent({
   }, [handleOpenSettings])
 
   // Platform-aware modifier key
-  const mod = useMemo(
+  const _mod = useMemo(
     () =>
       typeof navigator !== 'undefined' &&
       /Mac|iPod|iPhone|iPad/.test(navigator.userAgent)
@@ -547,14 +547,14 @@ function ChatSidebarComponent({
     pathname === '/' || pathname === '/new' || pathname.startsWith('/chat')
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
-  const isSettingsActive = pathname === '/settings'
+  const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isSessionsActive = pathname === '/sessions'
-  const isJobsActive = pathname === '/cron'
+  const isJobsActive = pathname === '/jobs' || pathname === '/cron'
   const isTerminalActive = pathname === '/terminal'
   const isMemoryActive = pathname === '/memory'
-  const mainRoutes = ['/chat', '/new', '/sessions', '/files', '/cron', '/terminal']
+  const mainRoutes = ['/chat', '/new', '/sessions', '/files', '/jobs', '/cron', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
 
@@ -566,7 +566,7 @@ function ChatSidebarComponent({
 
   const mainNav = getLastRoute('main') || '/chat'
   const knowledgeNav = getLastRoute('knowledge') || '/memory'
-  const systemNav = getLastRoute('system') || '/settings'
+  const _systemNav = getLastRoute('system') || '/settings'
 
   const transition = {
     duration: 0.15,
@@ -584,7 +584,7 @@ function ChatSidebarComponent({
     'hermes-sidebar-knowledge-expanded',
     true,
   )
-  const [systemExpanded, toggleSystem] = usePersistedBool(
+  const [_systemExpanded, _toggleSystem] = usePersistedBool(
     'hermes-sidebar-system-expanded',
     false,
   )
@@ -768,7 +768,7 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/cron',
+      to: '/jobs',
       icon: Clock01Icon,
       label: 'Jobs',
       active: isJobsActive,
@@ -800,7 +800,7 @@ function ChatSidebarComponent({
     },
   ]
 
-  const systemItems: NavItemDef[] = [
+  const _systemItems: NavItemDef[] = [
     // Settings is now a popup dialog, not a nav route
   ]
 

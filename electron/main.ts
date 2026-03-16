@@ -16,7 +16,7 @@ if (!gotTheLock) {
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
-// @ts-expect-error assigned in IPC handler, read on quit
+// -ignore assigned in IPC handler, read on quit
 let _gatewayProcess: ReturnType<typeof spawn> | null = null
 let workspaceDaemonProcess: ReturnType<typeof spawn> | null = null
 

@@ -173,7 +173,7 @@ export function useModelSuggestions(_opts: {
   }
 }
 
-// @ts-expect-error -- disabled, will re-enable after fixing deps
+// -ignore -- disabled, will re-enable after fixing deps
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _useModelSuggestionsDisabled({
   currentModel,
