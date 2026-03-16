@@ -65,7 +65,7 @@
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **Hermes Agent** running locally — [Setup Guide](https://openclaw.ai/docs/installation)
+- **Hermes Agent** running locally — [Setup Guide](https://github.com/NousResearch/hermes-agent)
 
 ### Install & Run
 

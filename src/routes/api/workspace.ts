@@ -58,7 +58,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
   }
 
   // Priority 3: Default Hermes workspace path
-  const defaultPath = path.join(os.homedir(), '.openclaw', 'workspace')
+  const defaultPath = path.join(os.homedir(), '.hermes')
   const defaultValid = await isValidDirectory(defaultPath)
   if (defaultValid) {
     return {
@@ -75,7 +75,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
   if (openclawValid) {
     return {
       path: openclawDir,
-      folderName: '.openclaw',
+      folderName: '.hermes',
       source: 'default',
       isValid: true,
     }

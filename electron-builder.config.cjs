@@ -3,9 +3,9 @@
  * https://www.electron.build/configuration
  */
 module.exports = {
-  appId: 'com.clawsuite.app',
-  productName: 'ClawSuite',
-  copyright: 'Copyright © 2026 ClawSuite',
+  appId: 'com.hermes.workspace',
+  productName: 'Hermes Workspace',
+  copyright: 'Copyright © 2026 Hermes Workspace',
 
   directories: {
     output: 'release',
@@ -35,7 +35,7 @@ module.exports = {
   },
 
   dmg: {
-    title: 'ClawSuite',
+    title: 'Hermes Workspace',
     iconSize: 80,
     contents: [
       { x: 130, y: 220 },
@@ -68,7 +68,7 @@ module.exports = {
   publish: {
     provider: 'github',
     owner: 'outsourc-e',
-    repo: 'clawsuite',
+    repo: 'hermes-workspace',
     releaseType: 'release',
   },
 

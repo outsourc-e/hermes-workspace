@@ -154,7 +154,7 @@ function readSavedGatewayConfig(): SavedGatewayConfig | null {
   try {
     const settingsRaw =
       localStorage.getItem('hermes-settings') ??
-      localStorage.getItem('openclaw-settings')
+      localStorage.getItem('hermes-settings')
     if (settingsRaw) {
       const parsed = JSON.parse(settingsRaw) as {
         state?: { settings?: { gatewayUrl?: string; gatewayToken?: string } }

@@ -61,7 +61,7 @@ const OPENAI_MODEL = 'gpt-4o-mini'
 
 function getGatewayHttpUrl(path: string): string {
   const envUrl =
-    process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+    process.env.HERMES_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
   try {
     const parsed = new URL(envUrl)
     parsed.protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:'
@@ -143,7 +143,7 @@ async function readHermesConfig(): Promise<HermesConfig | null> {
 async function resolveProvider(): Promise<ResolvedProvider | null> {
   // Try gateway first — works with any configured provider, uses gateway token
   try {
-    const gwTokenEnv = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim()
+    const gwTokenEnv = process.env.HERMES_GATEWAY_TOKEN?.trim()
     if (gwTokenEnv) {
       // Quick probe to see if gateway is up
       const probe = await fetch(getGatewayHttpUrl('/health'), {

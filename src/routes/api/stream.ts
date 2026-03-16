@@ -40,13 +40,13 @@ type ConnectParams = {
 }
 
 function getGatewayConfig() {
-  const url = process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
-  const token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim() || ''
-  const password = process.env.CLAWDBOT_GATEWAY_PASSWORD?.trim() || ''
+  const url = process.env.HERMES_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+  const token = process.env.HERMES_GATEWAY_TOKEN?.trim() || ''
+  const password = process.env.HERMES_GATEWAY_PASSWORD?.trim() || ''
 
   if (!token && !password) {
     throw new Error(
-      'Missing gateway auth. Set CLAWDBOT_GATEWAY_TOKEN (recommended) or CLAWDBOT_GATEWAY_PASSWORD in the server environment.',
+      'Missing gateway auth. Set HERMES_GATEWAY_TOKEN (recommended) or HERMES_GATEWAY_PASSWORD in the server environment.',
     )
   }
 

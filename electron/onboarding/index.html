@@ -396,7 +396,7 @@
           <div class="terminal" id="install-terminal"></div>
           <div class="actions">
             <button class="btn btn-secondary" onclick="goToStep(1)">← Back</button>
-            <button class="btn btn-primary" id="install-btn" onclick="installOpenClaw()">Install & Start</button>
+            <button class="btn btn-primary" id="install-btn" onclick="installHermes()">Install & Start</button>
           </div>
         `
       } else if (selectedMode === 'cloud') {
@@ -425,7 +425,7 @@
       status.innerHTML = '<div class="spinner"></div> Checking for Hermes...'
 
       try {
-        const result = await window.clawsuite.gateway.check()
+        const result = await window.hermesWorkspace.gateway.check()
         if (result.url) {
           document.getElementById('gateway-url').value = result.url
           status.className = 'status show status-success'
@@ -447,7 +447,7 @@
       status.innerHTML = '<div class="spinner"></div> Connecting...'
 
       try {
-        const result = await window.clawsuite.gateway.connect(url)
+        const result = await window.hermesWorkspace.gateway.connect(url)
         if (result.success) {
           gatewayUrl = url
           status.className = 'status show status-success'
@@ -470,7 +470,7 @@
       }
     }
 
-    async function installOpenClaw() {
+    async function installHermes() {
       const status = document.getElementById('install-status')
       const terminal = document.getElementById('install-terminal')
       const btn = document.getElementById('install-btn')
@@ -480,16 +480,16 @@
       status.className = 'status show status-loading'
       status.innerHTML = '<div class="spinner"></div> Installing Hermes Agent...'
       terminal.classList.add('show')
-      terminal.textContent = '$ npm install -g openclaw\n'
+      terminal.textContent = '$ pip install hermes-agent\n'
 
       try {
-        const result = await window.clawsuite.gateway.install()
+        const result = await window.hermesWorkspace.gateway.install()
         terminal.textContent += result.output + '\n✓ Installed!\n\n'
 
         status.innerHTML = '<div class="spinner"></div> Starting Hermes...'
-        terminal.textContent += '$ openclaw gateway start\n'
+        terminal.textContent += '$ hermes --web\n'
 
-        const startResult = await window.clawsuite.gateway.start()
+        const startResult = await window.hermesWorkspace.gateway.start()
         if (startResult.success) {
           gatewayUrl = startResult.url
           status.className = 'status show status-success'
@@ -507,7 +507,7 @@
         }
       } catch (e) {
         status.className = 'status show status-error'
-        status.innerHTML = '✗ Installation failed. Try running manually: npm install -g openclaw'
+        status.innerHTML = '✗ Installation failed. Try running manually: pip install hermes-agent'
         terminal.textContent += '✗ Error: ' + e.message + '\n'
         btn.disabled = false
         btn.textContent = 'Retry'
@@ -525,7 +525,7 @@
 
     async function finishSetup() {
       if (gatewayUrl) {
-        await window.clawsuite.onboarding.complete({
+        await window.hermesWorkspace.onboarding.complete({
           mode: selectedMode,
           gatewayUrl: gatewayUrl,
         })

@@ -121,15 +121,15 @@ function findRunningServer() {
 function findRepoDir() {
     // Common locations for the Hermes Workspace repo
     const candidates = [
-        (0, path_1.join)(process.env.HOME || '', '.openclaw', 'workspace', 'clawsuite'),
-        (0, path_1.join)(process.env.HOME || '', 'clawsuite'),
+        (0, path_1.join)(process.env.HOME || '', '.openclaw', 'workspace', 'hermesWorkspace'),
+        (0, path_1.join)(process.env.HOME || '', 'hermesWorkspace'),
         (0, path_1.join)(__dirname, '..'),
     ];
     for (const dir of candidates) {
         if ((0, fs_1.existsSync)((0, path_1.join)(dir, 'package.json'))) {
             try {
                 const pkg = JSON.parse((0, fs_1.readFileSync)((0, path_1.join)(dir, 'package.json'), 'utf-8'));
-                if (pkg.name === 'clawsuite' || pkg.name === '@clawsuite/app') return dir;
+                if (pkg.name === 'hermesWorkspace' || pkg.name === '@clawsuite/app') return dir;
             } catch { /* skip */ }
         }
     }

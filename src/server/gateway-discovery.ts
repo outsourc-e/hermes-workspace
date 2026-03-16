@@ -105,9 +105,9 @@ async function discoverFromCli(): Promise<DiscoveryResult> {
  * Check if env vars are already set
  */
 function discoverFromEnv(): DiscoveryResult {
-  const url = process.env.CLAWDBOT_GATEWAY_URL?.trim()
-  const token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim()
-  const password = process.env.CLAWDBOT_GATEWAY_PASSWORD?.trim()
+  const url = process.env.HERMES_GATEWAY_URL?.trim()
+  const token = process.env.HERMES_GATEWAY_TOKEN?.trim()
+  const password = process.env.HERMES_GATEWAY_PASSWORD?.trim()
 
   if (token) {
     // Only short-circuit if we actually have a token.
@@ -253,16 +253,16 @@ export async function discoverGateway(): Promise<DiscoveryResult> {
   const fileResult = await discoverFromConfigFile()
   if (fileResult.found) {
     // Apply to process.env so gateway client uses it
-    if (fileResult.url) process.env.CLAWDBOT_GATEWAY_URL = fileResult.url
-    if (fileResult.token) process.env.CLAWDBOT_GATEWAY_TOKEN = fileResult.token
+    if (fileResult.url) process.env.HERMES_GATEWAY_URL = fileResult.url
+    if (fileResult.token) process.env.HERMES_GATEWAY_TOKEN = fileResult.token
     return fileResult
   }
 
   // 3. Try CLI (slower, but works if config file structure differs)
   const cliResult = await discoverFromCli()
   if (cliResult.found) {
-    if (cliResult.url) process.env.CLAWDBOT_GATEWAY_URL = cliResult.url
-    if (cliResult.token) process.env.CLAWDBOT_GATEWAY_TOKEN = cliResult.token
+    if (cliResult.url) process.env.HERMES_GATEWAY_URL = cliResult.url
+    if (cliResult.token) process.env.HERMES_GATEWAY_TOKEN = cliResult.token
     return cliResult
   }
 

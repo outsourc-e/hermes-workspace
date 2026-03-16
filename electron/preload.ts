@@ -5,7 +5,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron'
 
-contextBridge.exposeInMainWorld('clawsuite', {
+contextBridge.exposeInMainWorld('hermesWorkspace', {
   // Gateway management
   gateway: {
     check: () => ipcRenderer.invoke('gateway:check'),

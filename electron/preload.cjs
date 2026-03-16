@@ -5,7 +5,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
-electron_1.contextBridge.exposeInMainWorld('clawsuite', {
+electron_1.contextBridge.exposeInMainWorld('hermesWorkspace', {
     // Gateway management
     gateway: {
         check: () => electron_1.ipcRenderer.invoke('gateway:check'),

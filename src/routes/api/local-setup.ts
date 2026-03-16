@@ -22,7 +22,7 @@ type SetupEvent = {
   token?: string
 }
 
-type OpenClawConfig = {
+type HermesConfig = {
   gateway?: {
     port?: number
     auth?: {
@@ -87,9 +87,9 @@ async function runCommand(command: string, args: string[], timeoutMs: number) {
   )
 }
 
-async function isOpenClawInstalled() {
+async function isHermesInstalled() {
   try {
-    const whichResult = await runCommand('which', ['openclaw'], 5_000)
+    const whichResult = await runCommand('which', ['hermes'], 5_000)
     if (whichResult.code === 0 && whichResult.stdout.trim()) {
       return true
     }
@@ -98,15 +98,15 @@ async function isOpenClawInstalled() {
   }
 
   try {
-    const versionResult = await runCommand('openclaw', ['--version'], 5_000)
+    const versionResult = await runCommand('hermes', ['--version'], 5_000)
     return versionResult.code === 0 && Boolean(versionResult.stdout.trim())
   } catch {
     return false
   }
 }
 
-async function installOpenClaw() {
-  const result = await runCommand('npm', ['install', '-g', 'openclaw'], 10 * 60_000)
+async function installHermes() {
+  const result = await runCommand('pip', ['install', 'hermes-agent'], 10 * 60_000)
   if (result.code !== 0) {
     throw new Error(result.stderr.trim() || result.stdout.trim() || 'npm install failed')
   }
@@ -136,13 +136,13 @@ async function isGatewayRunning(port: number) {
   })
 }
 
-async function readGatewayConfig(): Promise<OpenClawConfig | null> {
+async function readGatewayConfig(): Promise<HermesConfig | null> {
   const configPath = join(homedir(), '.openclaw', 'openclaw.json')
 
   try {
     await access(configPath)
     const raw = await readFile(configPath, 'utf8')
-    return JSON.parse(raw) as OpenClawConfig
+    return JSON.parse(raw) as HermesConfig
   } catch {
     return null
   }
@@ -183,7 +183,7 @@ async function waitForGatewayToken() {
     await wait(POLL_INTERVAL_MS)
   }
 
-  throw new Error('Gateway auth token was not written to ~/.openclaw/openclaw.json')
+  throw new Error('Gateway auth token was not written to ~/.hermes/config.yaml')
 }
 
 export const Route = createFileRoute('/api/local-setup')({
@@ -243,14 +243,14 @@ export const Route = createFileRoute('/api/local-setup')({
                   message: 'Checking for Hermes...',
                 })
 
-                let installed = await isOpenClawInstalled()
+                let installed = await isHermesInstalled()
                 if (!installed) {
                   emit({
                     status: 'installing',
                     message: 'Installing Hermes...',
                   })
-                  await installOpenClaw()
-                  installed = await isOpenClawInstalled()
+                  await installHermes()
+                  installed = await isHermesInstalled()
                 }
 
                 if (!installed) {
@@ -271,7 +271,7 @@ export const Route = createFileRoute('/api/local-setup')({
                   } catch (error) {
                     throw new Error(
                       formatCommandError(
-                        'openclaw gateway start --bind lan',
+                        'hermes --web',
                         error,
                         'Failed to launch the Hermes gateway',
                       ),
