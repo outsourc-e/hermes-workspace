@@ -1563,34 +1563,33 @@ function MessageItemComponent({
                     )}
                   </div>
                 ) : null)}
-              {!isUser && hasStreamToolCalls ? (
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {effectiveStreamToolCalls.map((toolCall) => (
-                    <ToolCallPill key={toolCall.id} toolCall={toolCall} />
-                  ))}
-                </div>
-              ) : effectiveIsStreaming && !hasRevealedText ? (
-                <div className="mb-2 flex items-center gap-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
-                  <span className="size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
-                  <span>
-                    {effectiveStreamToolCalls.length > 0
-                      ? formatToolDisplayLabel(
-                          effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].name,
-                          effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].args as Record<string, unknown> | undefined,
-                        )
-                      : 'Working\u2026'}
-                  </span>
-                </div>
-              ) : null}
               {/* Sent indicator — message delivered, waiting for response */}
               {isUser && isQueued && (
                 <span className="text-[10px] text-white/60 self-end">Sent</span>
               )}
-
-              {/* Removed duplicate waiting dots — tool pill already shows status */}
             </div>
           </Message>
         )}
+        {/* Tool calls — rendered OUTSIDE the chat bubble as separate pills */}
+        {!isUser && hasStreamToolCalls ? (
+          <div className="flex flex-wrap gap-1.5 pl-1">
+            {effectiveStreamToolCalls.map((toolCall) => (
+              <ToolCallPill key={toolCall.id} toolCall={toolCall} />
+            ))}
+          </div>
+        ) : effectiveIsStreaming && !hasRevealedText ? (
+          <div className="flex items-center gap-2 pl-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+            <span className="size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
+            <span>
+              {effectiveStreamToolCalls.length > 0
+                ? formatToolDisplayLabel(
+                    effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].name,
+                    effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].args as Record<string, unknown> | undefined,
+                  )
+                : 'Working\u2026'}
+            </span>
+          </div>
+        ) : null}
         {hasAssistantMetadata ? (
           <div className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-primary-400 leading-relaxed">
             {usageMetadata.inputTokens !== null && (
