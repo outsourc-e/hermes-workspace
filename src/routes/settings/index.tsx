@@ -442,40 +442,7 @@ function SettingsRoute() {
                   </div>
                 </SettingsRow>
 
-                <SettingsRow
-                  label="Accent color"
-                  description="Select the primary accent for controls and highlights."
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {(['orange', 'purple', 'blue', 'green'] as const).map(
-                      function mapAccent(color) {
-                        const active = settings.accentColor === color
-                        return (
-                          <Button
-                            key={color}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              updateSettings({ accentColor: color })
-                            }
-                            className={cn(
-                              'border border-primary-200 bg-primary-100/70 text-primary-900 hover:bg-primary-200',
-                              active && 'border-primary-500 bg-primary-200',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'size-2.5 rounded-full',
-                                getAccentBadgeClass(color),
-                              )}
-                            />
-                            <span className="capitalize">{color}</span>
-                          </Button>
-                        )
-                      },
-                    )}
-                  </div>
-                </SettingsRow>
+                {/* Accent color removed — themes control accent */}
 
               </SettingsSection>
               {/* LoaderStyleSection removed — not relevant for Hermes */}
