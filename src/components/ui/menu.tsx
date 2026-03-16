@@ -40,7 +40,11 @@ function MenuContent({
             background: 'var(--theme-card)',
             color: 'var(--theme-text)',
             border: '1px solid var(--theme-border)',
-            boxShadow: 'var(--theme-shadow-2)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            opacity: 1,
+            zIndex: 9999,
           }}
         >
           {children}

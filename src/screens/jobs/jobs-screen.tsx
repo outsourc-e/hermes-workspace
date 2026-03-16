@@ -24,6 +24,7 @@ import {
   triggerJob,
   type HermesJob,
 } from '@/lib/jobs-api'
+import { CreateJobDialog } from './create-job-dialog'
 
 const QUERY_KEY = ['hermes', 'jobs'] as const
 
@@ -165,6 +166,11 @@ export function JobsScreen() {
       toast('Job created')
       setShowCreate(false)
     },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to create job', {
+        type: 'error',
+      })
+    },
   })
 
   const filteredJobs = useMemo(() => {
@@ -179,14 +185,15 @@ export function JobsScreen() {
   }, [jobsQuery.data, search])
 
   const handleCreate = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault()
-      const form = new FormData(e.currentTarget)
-      createMutation.mutate({
-        name: form.get('name') as string,
-        schedule: form.get('schedule') as string,
-        prompt: form.get('prompt') as string,
-      })
+    async (input: {
+      name: string
+      schedule: string
+      prompt: string
+      deliver?: string[]
+      skills?: string[]
+      repeat?: number
+    }) => {
+      await createMutation.mutateAsync(input)
     },
     [createMutation],
   )
@@ -213,7 +220,7 @@ export function JobsScreen() {
             <HugeiconsIcon icon={RefreshIcon} size={16} className="text-[var(--theme-muted)]" />
           </button>
           <button
-            onClick={() => setShowCreate(!showCreate)}
+            onClick={() => setShowCreate(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--theme-accent)] text-white text-xs font-medium hover:opacity-90 transition-opacity"
           >
             <HugeiconsIcon icon={Add01Icon} size={14} />
@@ -239,55 +246,6 @@ export function JobsScreen() {
           />
         </div>
       </div>
-
-      {/* Create Form */}
-      <AnimatePresence>
-        {showCreate && (
-          <motion.form
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            onSubmit={handleCreate}
-            className="px-4 py-3 border-b border-[var(--theme-border)] space-y-2 overflow-hidden"
-          >
-            <input
-              name="name"
-              placeholder="Job name"
-              required
-              className="w-full px-3 py-1.5 text-xs rounded-lg bg-[var(--theme-input)] text-[var(--theme-text)] border border-[var(--theme-border)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
-            />
-            <input
-              name="schedule"
-              placeholder="Schedule (e.g. 'every 30m', '0 9 * * *', 'in 2h')"
-              required
-              className="w-full px-3 py-1.5 text-xs rounded-lg bg-[var(--theme-input)] text-[var(--theme-text)] border border-[var(--theme-border)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
-            />
-            <textarea
-              name="prompt"
-              placeholder="What should Hermes do?"
-              required
-              rows={3}
-              className="w-full px-3 py-1.5 text-xs rounded-lg bg-[var(--theme-input)] text-[var(--theme-text)] border border-[var(--theme-border)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] resize-none"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCreate(false)}
-                className="px-3 py-1.5 text-xs rounded-lg hover:bg-[var(--theme-hover)] text-[var(--theme-muted)] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="px-3 py-1.5 text-xs rounded-lg bg-[var(--theme-accent)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {createMutation.isPending ? 'Creating...' : 'Create Job'}
-              </button>
-            </div>
-          </motion.form>
-        )}
-      </AnimatePresence>
 
       {/* Job List */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
@@ -324,6 +282,13 @@ export function JobsScreen() {
           </AnimatePresence>
         )}
       </div>
+
+      <CreateJobDialog
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        onSubmit={handleCreate}
+        isSubmitting={createMutation.isPending}
+      />
     </div>
   )
 }
