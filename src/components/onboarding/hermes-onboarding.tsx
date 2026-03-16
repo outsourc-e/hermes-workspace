@@ -97,27 +97,18 @@ export function HermesOnboarding() {
   const mutedStyle: React.CSSProperties = { color: 'var(--theme-muted)' }
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.2 }}
-          className="w-full max-w-lg rounded-2xl p-6"
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.97 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="w-full max-w-md rounded-2xl p-8"
           style={cardStyle}
         >
-          {/* Progress dots */}
-          <div className="flex justify-center gap-1.5 mb-6">
-            {(['welcome', 'connect', 'provider', 'test', 'done'] as Step[]).map((s, i) => (
-              <div
-                key={s}
-                className={cn('h-1.5 rounded-full transition-all', s === step ? 'w-6 bg-accent-500' : 'w-1.5')}
-                style={s !== step ? { backgroundColor: 'var(--theme-border)' } : undefined}
-              />
-            ))}
-          </div>
+          {/* Progress dots removed — cleaner */}
 
           {/* Step: Welcome */}
           {step === 'welcome' && (
