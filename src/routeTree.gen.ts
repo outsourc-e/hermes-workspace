@@ -52,6 +52,7 @@ import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiLocalSetupRouteImport } from './routes/api/local-setup'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGatewayRestartRouteImport } from './routes/api/gateway-restart'
 import { Route as ApiGatewayDiscoverRouteImport } from './routes/api/gateway-discover'
 import { Route as ApiGatewayConfigRouteImport } from './routes/api/gateway-config'
@@ -360,6 +361,11 @@ const ApiLocalSetupRoute = ApiLocalSetupRouteImport.update({
 const ApiHistoryRoute = ApiHistoryRouteImport.update({
   id: '/api/history',
   path: '/api/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
+  id: '/api/hermes-config',
+  path: '/api/hermes-config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGatewayRestartRoute = ApiGatewayRestartRouteImport.update({
@@ -890,6 +896,7 @@ export interface FileRoutesByFullPath {
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-restart': typeof ApiGatewayRestartRoute
+  '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/local-setup': typeof ApiLocalSetupRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -1028,6 +1035,7 @@ export interface FileRoutesByTo {
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-restart': typeof ApiGatewayRestartRoute
+  '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/local-setup': typeof ApiLocalSetupRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -1168,6 +1176,7 @@ export interface FileRoutesById {
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-restart': typeof ApiGatewayRestartRoute
+  '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/local-setup': typeof ApiLocalSetupRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -1309,6 +1318,7 @@ export interface FileRouteTypes {
     | '/api/gateway-config'
     | '/api/gateway-discover'
     | '/api/gateway-restart'
+    | '/api/hermes-config'
     | '/api/history'
     | '/api/local-setup'
     | '/api/model-switch'
@@ -1447,6 +1457,7 @@ export interface FileRouteTypes {
     | '/api/gateway-config'
     | '/api/gateway-discover'
     | '/api/gateway-restart'
+    | '/api/hermes-config'
     | '/api/history'
     | '/api/local-setup'
     | '/api/model-switch'
@@ -1586,6 +1597,7 @@ export interface FileRouteTypes {
     | '/api/gateway-config'
     | '/api/gateway-discover'
     | '/api/gateway-restart'
+    | '/api/hermes-config'
     | '/api/history'
     | '/api/local-setup'
     | '/api/model-switch'
@@ -1726,6 +1738,7 @@ export interface RootRouteChildren {
   ApiGatewayConfigRoute: typeof ApiGatewayConfigRoute
   ApiGatewayDiscoverRoute: typeof ApiGatewayDiscoverRoute
   ApiGatewayRestartRoute: typeof ApiGatewayRestartRoute
+  ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiLocalSetupRoute: typeof ApiLocalSetupRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
@@ -2080,6 +2093,13 @@ declare module '@tanstack/react-router' {
       path: '/api/history'
       fullPath: '/api/history'
       preLoaderRoute: typeof ApiHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hermes-config': {
+      id: '/api/hermes-config'
+      path: '/api/hermes-config'
+      fullPath: '/api/hermes-config'
+      preLoaderRoute: typeof ApiHermesConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/gateway-restart': {
@@ -3046,6 +3066,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewayConfigRoute: ApiGatewayConfigRoute,
   ApiGatewayDiscoverRoute: ApiGatewayDiscoverRoute,
   ApiGatewayRestartRoute: ApiGatewayRestartRoute,
+  ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiLocalSetupRoute: ApiLocalSetupRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
