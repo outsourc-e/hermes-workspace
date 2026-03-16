@@ -1213,14 +1213,14 @@ function ChatMessageListComponent({
   const scrollToBottomOverlay = useMemo(() => {
     const isVisible = !isNearBottom && displayEntries.length > 0
     const hasVisibleEntries = visibleEntries.length > 0
-    const overlayGap = isMobileViewport ? 32 : 24
+    const overlayGap = isMobileViewport ? 8 : 24
     const overlayBottom =
       typeof bottomOffset === 'number'
         ? `${bottomOffset + overlayGap}px`
         : `calc(${bottomOffset} + ${overlayGap}px)`
     return (
       <div
-        className={`pointer-events-none absolute z-40 ${isMobileViewport ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}
+        className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
         style={{ bottom: overlayBottom }}
       >
         <ScrollToBottomButton
