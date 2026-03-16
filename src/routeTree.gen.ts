@@ -14,7 +14,6 @@ import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as JobsRouteImport } from './routes/jobs'
-import { Route as HealthRouteImport } from './routes/health'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
@@ -36,7 +35,6 @@ import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
-import { Route as ApiHermesHealthRouteImport } from './routes/api/hermes-health'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -74,11 +72,6 @@ const MemoryRoute = MemoryRouteImport.update({
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HealthRoute = HealthRouteImport.update({
-  id: '/health',
-  path: '/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -186,11 +179,6 @@ const ApiHermesJobsRoute = ApiHermesJobsRouteImport.update({
   path: '/api/hermes-jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHermesHealthRoute = ApiHermesHealthRouteImport.update({
-  id: '/api/hermes-health',
-  path: '/api/hermes-health',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
   id: '/api/hermes-config',
   path: '/api/hermes-config',
@@ -262,7 +250,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
-  '/health': typeof HealthRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -274,7 +261,6 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
-  '/api/hermes-health': typeof ApiHermesHealthRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
@@ -305,7 +291,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
-  '/health': typeof HealthRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/skills': typeof SkillsRoute
@@ -316,7 +301,6 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
-  '/api/hermes-health': typeof ApiHermesHealthRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
@@ -348,7 +332,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/files': typeof FilesRoute
-  '/health': typeof HealthRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -360,7 +343,6 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
-  '/api/hermes-health': typeof ApiHermesHealthRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
@@ -393,7 +375,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/files'
-    | '/health'
     | '/jobs'
     | '/memory'
     | '/settings'
@@ -405,7 +386,6 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/files'
     | '/api/hermes-config'
-    | '/api/hermes-health'
     | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
@@ -436,7 +416,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/files'
-    | '/health'
     | '/jobs'
     | '/memory'
     | '/skills'
@@ -447,7 +426,6 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/files'
     | '/api/hermes-config'
-    | '/api/hermes-health'
     | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
@@ -478,7 +456,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/files'
-    | '/health'
     | '/jobs'
     | '/memory'
     | '/settings'
@@ -490,7 +467,6 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/files'
     | '/api/hermes-config'
-    | '/api/hermes-health'
     | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
@@ -522,7 +498,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   FilesRoute: typeof FilesRoute
-  HealthRoute: typeof HealthRoute
   JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -534,7 +509,6 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
-  ApiHermesHealthRoute: typeof ApiHermesHealthRoute
   ApiHermesJobsRoute: typeof ApiHermesJobsRouteWithChildren
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelsRoute: typeof ApiModelsRoute
@@ -592,13 +566,6 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/jobs'
       preLoaderRoute: typeof JobsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/health': {
-      id: '/health'
-      path: '/health'
-      fullPath: '/health'
-      preLoaderRoute: typeof HealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/files': {
@@ -748,13 +715,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesJobsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hermes-health': {
-      id: '/api/hermes-health'
-      path: '/api/hermes-health'
-      fullPath: '/api/hermes-health'
-      preLoaderRoute: typeof ApiHermesHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/hermes-config': {
       id: '/api/hermes-config'
       path: '/api/hermes-config'
@@ -893,7 +853,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   FilesRoute: FilesRoute,
-  HealthRoute: HealthRoute,
   JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
   SettingsRoute: SettingsRouteWithChildren,
@@ -905,7 +864,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
-  ApiHermesHealthRoute: ApiHermesHealthRoute,
   ApiHermesJobsRoute: ApiHermesJobsRouteWithChildren,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelsRoute: ApiModelsRoute,

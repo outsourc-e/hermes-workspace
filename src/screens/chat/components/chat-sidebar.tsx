@@ -6,7 +6,6 @@ import {
   BrainIcon,
   Chat01Icon,
   Clock01Icon,
-  Activity01Icon,
   ComputerTerminal01Icon,
   File01Icon,
   MessageMultiple01Icon,
@@ -552,7 +551,6 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isTerminalActive = pathname === '/terminal'
-  const isHealthActive = pathname === '/health'
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
@@ -794,15 +792,7 @@ function ChatSidebarComponent({
     },
   ]
 
-  const systemItems: NavItemDef[] = [
-    {
-      kind: 'link',
-      to: '/health',
-      icon: Activity01Icon,
-      label: 'Health',
-      active: isHealthActive,
-    },
-  ]
+  const systemItems: NavItemDef[] = []
 
   return (
     <motion.aside
