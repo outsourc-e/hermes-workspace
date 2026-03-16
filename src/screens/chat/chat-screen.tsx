@@ -2201,6 +2201,7 @@ export function ChatScreen({
         'relative min-w-0 flex flex-col overflow-hidden',
         compact ? 'h-full flex-1 min-h-0' : 'h-full',
       )}
+      style={{ background: 'var(--theme-bg)' }}
     >
       <div
         className={cn(
