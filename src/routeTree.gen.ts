@@ -12,18 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
-import { Route as CronRouteImport } from './routes/cron'
-import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
-import { Route as GatewayLogsRouteImport } from './routes/gateway/logs'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceTasksRouteImport } from './routes/api/workspace-tasks'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
@@ -46,7 +42,6 @@ import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
-import { Route as ApiOpenclawUpdateRouteImport } from './routes/api/openclaw-update'
 import { Route as ApiOllamaHealthRouteImport } from './routes/api/ollama-health'
 import { Route as ApiNetworkUrlRouteImport } from './routes/api/network-url'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
@@ -54,9 +49,6 @@ import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiLocalSetupRouteImport } from './routes/api/local-setup'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
-import { Route as ApiGatewayRestartRouteImport } from './routes/api/gateway-restart'
-import { Route as ApiGatewayDiscoverRouteImport } from './routes/api/gateway-discover'
-import { Route as ApiGatewayConfigRouteImport } from './routes/api/gateway-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
@@ -71,10 +63,6 @@ import { Route as ApiChatAbortRouteImport } from './routes/api/chat-abort'
 import { Route as ApiBrowserRouteImport } from './routes/api/browser'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
-import { Route as ApiAgentSteerRouteImport } from './routes/api/agent-steer'
-import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
-import { Route as ApiAgentKillRouteImport } from './routes/api/agent-kill'
-import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activity'
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
 import { Route as ApiWorkspaceTeamsRouteImport } from './routes/api/workspace/teams'
@@ -101,9 +89,7 @@ import { Route as ApiGatewayUsageRouteImport } from './routes/api/gateway/usage'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway/status'
 import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
 import { Route as ApiGatewayNodesRouteImport } from './routes/api/gateway/nodes'
-import { Route as ApiGatewayLogsRouteImport } from './routes/api/gateway/logs'
 import { Route as ApiGatewayChannelsRouteImport } from './routes/api/gateway/channels'
-import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agents'
 import { Route as ApiEventsRecentRouteImport } from './routes/api/events/recent'
 import { Route as ApiDebugStatusRouteImport } from './routes/api/debug/status'
 import { Route as ApiDebugReconnectRouteImport } from './routes/api/debug/reconnect'
@@ -116,11 +102,7 @@ import { Route as ApiCronDeleteRouteImport } from './routes/api/cron/delete'
 import { Route as ApiCloudWebhookRouteImport } from './routes/api/cloud/webhook'
 import { Route as ApiCloudStatusRouteImport } from './routes/api/cloud/status'
 import { Route as ApiCloudProvisionRouteImport } from './routes/api/cloud/provision'
-import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
-import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/status'
-import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
 import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
-import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gateway/approvals/index'
 import { Route as ApiWorkspaceTaskRunsAdhocRouteImport } from './routes/api/workspace/task-runs.adhoc'
 import { Route as ApiWorkspaceProjectsIdRouteImport } from './routes/api/workspace/projects.$id'
 import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/workspace/checkpoints.$id'
@@ -147,7 +129,6 @@ import { Route as ApiWorkspaceCheckpointsIdApproveAndPrRouteImport } from './rou
 import { Route as ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-merge'
 import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-commit'
 import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
-import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
@@ -164,11 +145,6 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SessionsRoute = SessionsRouteImport.update({
-  id: '/sessions',
-  path: '/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MemoryRoute = MemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
@@ -182,16 +158,6 @@ const JobsRoute = JobsRouteImport.update({
 const FilesRoute = FilesRouteImport.update({
   id: '/files',
   path: '/files',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CronRoute = CronRouteImport.update({
-  id: '/cron',
-  path: '/cron',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ActivityRoute = ActivityRouteImport.update({
-  id: '/activity',
-  path: '/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -218,11 +184,6 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
   id: '/providers',
   path: '/providers',
   getParentRoute: () => SettingsRoute,
-} as any)
-const GatewayLogsRoute = GatewayLogsRouteImport.update({
-  id: '/gateway/logs',
-  path: '/gateway/logs',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
@@ -334,11 +295,6 @@ const ApiPathsRoute = ApiPathsRouteImport.update({
   path: '/api/paths',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOpenclawUpdateRoute = ApiOpenclawUpdateRouteImport.update({
-  id: '/api/openclaw-update',
-  path: '/api/openclaw-update',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiOllamaHealthRoute = ApiOllamaHealthRouteImport.update({
   id: '/api/ollama-health',
   path: '/api/ollama-health',
@@ -372,21 +328,6 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
 const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
   id: '/api/hermes-config',
   path: '/api/hermes-config',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayRestartRoute = ApiGatewayRestartRouteImport.update({
-  id: '/api/gateway-restart',
-  path: '/api/gateway-restart',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayDiscoverRoute = ApiGatewayDiscoverRouteImport.update({
-  id: '/api/gateway-discover',
-  path: '/api/gateway-discover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayConfigRoute = ApiGatewayConfigRouteImport.update({
-  id: '/api/gateway-config',
-  path: '/api/gateway-config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
@@ -457,26 +398,6 @@ const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
 const ApiAuthRoute = ApiAuthRouteImport.update({
   id: '/api/auth',
   path: '/api/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAgentSteerRoute = ApiAgentSteerRouteImport.update({
-  id: '/api/agent-steer',
-  path: '/api/agent-steer',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAgentPauseRoute = ApiAgentPauseRouteImport.update({
-  id: '/api/agent-pause',
-  path: '/api/agent-pause',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAgentKillRoute = ApiAgentKillRouteImport.update({
-  id: '/api/agent-kill',
-  path: '/api/agent-kill',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAgentDispatchRoute = ApiAgentDispatchRouteImport.update({
-  id: '/api/agent-dispatch',
-  path: '/api/agent-dispatch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAgentActivityRoute = ApiAgentActivityRouteImport.update({
@@ -609,19 +530,9 @@ const ApiGatewayNodesRoute = ApiGatewayNodesRouteImport.update({
   path: '/api/gateway/nodes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiGatewayLogsRoute = ApiGatewayLogsRouteImport.update({
-  id: '/api/gateway/logs',
-  path: '/api/gateway/logs',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiGatewayChannelsRoute = ApiGatewayChannelsRouteImport.update({
   id: '/api/gateway/channels',
   path: '/api/gateway/channels',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayAgentsRoute = ApiGatewayAgentsRouteImport.update({
-  id: '/api/gateway/agents',
-  path: '/api/gateway/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEventsRecentRoute = ApiEventsRecentRouteImport.update({
@@ -684,32 +595,11 @@ const ApiCloudProvisionRoute = ApiCloudProvisionRouteImport.update({
   path: '/api/cloud/provision',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiBrowserTabsRoute = ApiBrowserTabsRouteImport.update({
-  id: '/tabs',
-  path: '/tabs',
-  getParentRoute: () => ApiBrowserRoute,
-} as any)
-const ApiBrowserStatusRoute = ApiBrowserStatusRouteImport.update({
-  id: '/status',
-  path: '/status',
-  getParentRoute: () => ApiBrowserRoute,
-} as any)
-const ApiBrowserScreenshotRoute = ApiBrowserScreenshotRouteImport.update({
-  id: '/screenshot',
-  path: '/screenshot',
-  getParentRoute: () => ApiBrowserRoute,
-} as any)
 const ApiBrowserNavigateRoute = ApiBrowserNavigateRouteImport.update({
   id: '/navigate',
   path: '/navigate',
   getParentRoute: () => ApiBrowserRoute,
 } as any)
-const ApiGatewayApprovalsIndexRoute =
-  ApiGatewayApprovalsIndexRouteImport.update({
-    id: '/api/gateway/approvals/',
-    path: '/api/gateway/approvals/',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiWorkspaceTaskRunsAdhocRoute =
   ApiWorkspaceTaskRunsAdhocRouteImport.update({
     id: '/adhoc',
@@ -862,30 +752,17 @@ const ApiWorkspaceCheckpointsIdApproveRoute =
     path: '/approve',
     getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
   } as any)
-const ApiGatewayApprovalsApprovalIdActionRoute =
-  ApiGatewayApprovalsApprovalIdActionRouteImport.update({
-    id: '/api/gateway/approvals/$approvalId/$action',
-    path: '/api/gateway/approvals/$approvalId/$action',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/activity': typeof ActivityRoute
-  '/cron': typeof CronRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
-  '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
-  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
-  '/api/agent-kill': typeof ApiAgentKillRoute
-  '/api/agent-pause': typeof ApiAgentPauseRoute
-  '/api/agent-steer': typeof ApiAgentSteerRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/browser': typeof ApiBrowserRouteWithChildren
@@ -900,9 +777,6 @@ export interface FileRoutesByFullPath {
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
-  '/api/gateway-config': typeof ApiGatewayConfigRoute
-  '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
-  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/local-setup': typeof ApiLocalSetupRoute
@@ -910,7 +784,6 @@ export interface FileRoutesByFullPath {
   '/api/models': typeof ApiModelsRoute
   '/api/network-url': typeof ApiNetworkUrlRoute
   '/api/ollama-health': typeof ApiOllamaHealthRoute
-  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
@@ -933,14 +806,10 @@ export interface FileRoutesByFullPath {
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
-  '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
-  '/api/browser/status': typeof ApiBrowserStatusRoute
-  '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/cloud/provision': typeof ApiCloudProvisionRoute
   '/api/cloud/status': typeof ApiCloudStatusRoute
   '/api/cloud/webhook': typeof ApiCloudWebhookRoute
@@ -953,9 +822,7 @@ export interface FileRoutesByFullPath {
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
-  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/channels': typeof ApiGatewayChannelsRoute
-  '/api/gateway/logs': typeof ApiGatewayLogsRoute
   '/api/gateway/nodes': typeof ApiGatewayNodesRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
@@ -988,8 +855,6 @@ export interface FileRoutesByFullPath {
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
   '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
-  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
   '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
   '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
@@ -1013,19 +878,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/activity': typeof ActivityRoute
-  '/cron': typeof CronRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
-  '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
-  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
-  '/api/agent-kill': typeof ApiAgentKillRoute
-  '/api/agent-pause': typeof ApiAgentPauseRoute
-  '/api/agent-steer': typeof ApiAgentSteerRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/browser': typeof ApiBrowserRouteWithChildren
@@ -1040,9 +898,6 @@ export interface FileRoutesByTo {
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
-  '/api/gateway-config': typeof ApiGatewayConfigRoute
-  '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
-  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/local-setup': typeof ApiLocalSetupRoute
@@ -1050,7 +905,6 @@ export interface FileRoutesByTo {
   '/api/models': typeof ApiModelsRoute
   '/api/network-url': typeof ApiNetworkUrlRoute
   '/api/ollama-health': typeof ApiOllamaHealthRoute
-  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
@@ -1073,14 +927,10 @@ export interface FileRoutesByTo {
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
-  '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
-  '/api/browser/status': typeof ApiBrowserStatusRoute
-  '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/cloud/provision': typeof ApiCloudProvisionRoute
   '/api/cloud/status': typeof ApiCloudStatusRoute
   '/api/cloud/webhook': typeof ApiCloudWebhookRoute
@@ -1093,9 +943,7 @@ export interface FileRoutesByTo {
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
-  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/channels': typeof ApiGatewayChannelsRoute
-  '/api/gateway/logs': typeof ApiGatewayLogsRoute
   '/api/gateway/nodes': typeof ApiGatewayNodesRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
@@ -1128,8 +976,6 @@ export interface FileRoutesByTo {
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
   '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
-  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
   '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
   '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
@@ -1154,20 +1000,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/activity': typeof ActivityRoute
-  '/cron': typeof CronRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
-  '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
-  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
-  '/api/agent-kill': typeof ApiAgentKillRoute
-  '/api/agent-pause': typeof ApiAgentPauseRoute
-  '/api/agent-steer': typeof ApiAgentSteerRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/browser': typeof ApiBrowserRouteWithChildren
@@ -1182,9 +1021,6 @@ export interface FileRoutesById {
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
-  '/api/gateway-config': typeof ApiGatewayConfigRoute
-  '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
-  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/local-setup': typeof ApiLocalSetupRoute
@@ -1192,7 +1028,6 @@ export interface FileRoutesById {
   '/api/models': typeof ApiModelsRoute
   '/api/network-url': typeof ApiNetworkUrlRoute
   '/api/ollama-health': typeof ApiOllamaHealthRoute
-  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
@@ -1215,14 +1050,10 @@ export interface FileRoutesById {
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-tasks': typeof ApiWorkspaceTasksRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
-  '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
-  '/api/browser/status': typeof ApiBrowserStatusRoute
-  '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/cloud/provision': typeof ApiCloudProvisionRoute
   '/api/cloud/status': typeof ApiCloudStatusRoute
   '/api/cloud/webhook': typeof ApiCloudWebhookRoute
@@ -1235,9 +1066,7 @@ export interface FileRoutesById {
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
-  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/channels': typeof ApiGatewayChannelsRoute
-  '/api/gateway/logs': typeof ApiGatewayLogsRoute
   '/api/gateway/nodes': typeof ApiGatewayNodesRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
@@ -1270,8 +1099,6 @@ export interface FileRoutesById {
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRoute
   '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
-  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
   '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
   '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
   '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
@@ -1297,20 +1124,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
-    | '/activity'
-    | '/cron'
     | '/files'
     | '/jobs'
     | '/memory'
-    | '/sessions'
     | '/settings'
     | '/skills'
     | '/terminal'
     | '/api/agent-activity'
-    | '/api/agent-dispatch'
-    | '/api/agent-kill'
-    | '/api/agent-pause'
-    | '/api/agent-steer'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/browser'
@@ -1325,9 +1145,6 @@ export interface FileRouteTypes {
     | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
-    | '/api/gateway-config'
-    | '/api/gateway-discover'
-    | '/api/gateway-restart'
     | '/api/hermes-config'
     | '/api/history'
     | '/api/local-setup'
@@ -1335,7 +1152,6 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/network-url'
     | '/api/ollama-health'
-    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
     | '/api/provider-usage'
@@ -1358,14 +1174,10 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
-    | '/gateway/logs'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
     | '/api/browser/navigate'
-    | '/api/browser/screenshot'
-    | '/api/browser/status'
-    | '/api/browser/tabs'
     | '/api/cloud/provision'
     | '/api/cloud/status'
     | '/api/cloud/webhook'
@@ -1378,9 +1190,7 @@ export interface FileRouteTypes {
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
-    | '/api/gateway/agents'
     | '/api/gateway/channels'
-    | '/api/gateway/logs'
     | '/api/gateway/nodes'
     | '/api/gateway/sessions'
     | '/api/gateway/status'
@@ -1413,8 +1223,6 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
     | '/api/workspace/task-runs/adhoc'
-    | '/api/gateway/approvals/'
-    | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
     | '/api/workspace/checkpoints/$id/approve-and-commit'
     | '/api/workspace/checkpoints/$id/approve-and-merge'
@@ -1438,19 +1246,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
-    | '/activity'
-    | '/cron'
     | '/files'
     | '/jobs'
     | '/memory'
-    | '/sessions'
     | '/skills'
     | '/terminal'
     | '/api/agent-activity'
-    | '/api/agent-dispatch'
-    | '/api/agent-kill'
-    | '/api/agent-pause'
-    | '/api/agent-steer'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/browser'
@@ -1465,9 +1266,6 @@ export interface FileRouteTypes {
     | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
-    | '/api/gateway-config'
-    | '/api/gateway-discover'
-    | '/api/gateway-restart'
     | '/api/hermes-config'
     | '/api/history'
     | '/api/local-setup'
@@ -1475,7 +1273,6 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/network-url'
     | '/api/ollama-health'
-    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
     | '/api/provider-usage'
@@ -1498,14 +1295,10 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
-    | '/gateway/logs'
     | '/settings/providers'
     | '/chat'
     | '/settings'
     | '/api/browser/navigate'
-    | '/api/browser/screenshot'
-    | '/api/browser/status'
-    | '/api/browser/tabs'
     | '/api/cloud/provision'
     | '/api/cloud/status'
     | '/api/cloud/webhook'
@@ -1518,9 +1311,7 @@ export interface FileRouteTypes {
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
-    | '/api/gateway/agents'
     | '/api/gateway/channels'
-    | '/api/gateway/logs'
     | '/api/gateway/nodes'
     | '/api/gateway/sessions'
     | '/api/gateway/status'
@@ -1553,8 +1344,6 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
     | '/api/workspace/task-runs/adhoc'
-    | '/api/gateway/approvals'
-    | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
     | '/api/workspace/checkpoints/$id/approve-and-commit'
     | '/api/workspace/checkpoints/$id/approve-and-merge'
@@ -1578,20 +1367,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$'
-    | '/activity'
-    | '/cron'
     | '/files'
     | '/jobs'
     | '/memory'
-    | '/sessions'
     | '/settings'
     | '/skills'
     | '/terminal'
     | '/api/agent-activity'
-    | '/api/agent-dispatch'
-    | '/api/agent-kill'
-    | '/api/agent-pause'
-    | '/api/agent-steer'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/browser'
@@ -1606,9 +1388,6 @@ export interface FileRouteTypes {
     | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
-    | '/api/gateway-config'
-    | '/api/gateway-discover'
-    | '/api/gateway-restart'
     | '/api/hermes-config'
     | '/api/history'
     | '/api/local-setup'
@@ -1616,7 +1395,6 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/network-url'
     | '/api/ollama-health'
-    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
     | '/api/provider-usage'
@@ -1639,14 +1417,10 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspace-tasks'
     | '/chat/$sessionKey'
-    | '/gateway/logs'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
     | '/api/browser/navigate'
-    | '/api/browser/screenshot'
-    | '/api/browser/status'
-    | '/api/browser/tabs'
     | '/api/cloud/provision'
     | '/api/cloud/status'
     | '/api/cloud/webhook'
@@ -1659,9 +1433,7 @@ export interface FileRouteTypes {
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
-    | '/api/gateway/agents'
     | '/api/gateway/channels'
-    | '/api/gateway/logs'
     | '/api/gateway/nodes'
     | '/api/gateway/sessions'
     | '/api/gateway/status'
@@ -1694,8 +1466,6 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id'
     | '/api/workspace/projects/$id'
     | '/api/workspace/task-runs/adhoc'
-    | '/api/gateway/approvals/'
-    | '/api/gateway/approvals/$approvalId/$action'
     | '/api/workspace/checkpoints/$id/approve'
     | '/api/workspace/checkpoints/$id/approve-and-commit'
     | '/api/workspace/checkpoints/$id/approve-and-merge'
@@ -1720,20 +1490,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
-  ActivityRoute: typeof ActivityRoute
-  CronRoute: typeof CronRoute
   FilesRoute: typeof FilesRoute
   JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
-  SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
   TerminalRoute: typeof TerminalRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
-  ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
-  ApiAgentKillRoute: typeof ApiAgentKillRoute
-  ApiAgentPauseRoute: typeof ApiAgentPauseRoute
-  ApiAgentSteerRoute: typeof ApiAgentSteerRoute
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
   ApiBrowserRoute: typeof ApiBrowserRouteWithChildren
@@ -1748,9 +1511,6 @@ export interface RootRouteChildren {
   ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
   ApiEventsRoute: typeof ApiEventsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
-  ApiGatewayConfigRoute: typeof ApiGatewayConfigRoute
-  ApiGatewayDiscoverRoute: typeof ApiGatewayDiscoverRoute
-  ApiGatewayRestartRoute: typeof ApiGatewayRestartRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiLocalSetupRoute: typeof ApiLocalSetupRoute
@@ -1758,7 +1518,6 @@ export interface RootRouteChildren {
   ApiModelsRoute: typeof ApiModelsRoute
   ApiNetworkUrlRoute: typeof ApiNetworkUrlRoute
   ApiOllamaHealthRoute: typeof ApiOllamaHealthRoute
-  ApiOpenclawUpdateRoute: typeof ApiOpenclawUpdateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
@@ -1781,16 +1540,13 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
   ApiWorkspaceTasksRoute: typeof ApiWorkspaceTasksRouteWithChildren
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
-  GatewayLogsRoute: typeof GatewayLogsRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiCloudProvisionRoute: typeof ApiCloudProvisionRoute
   ApiCloudStatusRoute: typeof ApiCloudStatusRoute
   ApiCloudWebhookRoute: typeof ApiCloudWebhookRoute
   ApiDebugReconnectRoute: typeof ApiDebugReconnectRoute
   ApiDebugStatusRoute: typeof ApiDebugStatusRoute
-  ApiGatewayAgentsRoute: typeof ApiGatewayAgentsRoute
   ApiGatewayChannelsRoute: typeof ApiGatewayChannelsRoute
-  ApiGatewayLogsRoute: typeof ApiGatewayLogsRoute
   ApiGatewayNodesRoute: typeof ApiGatewayNodesRoute
   ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
@@ -1801,8 +1557,6 @@ export interface RootRouteChildren {
   ApiMemoryWriteRoute: typeof ApiMemoryWriteRoute
   ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
   ApiTasksIndexRoute: typeof ApiTasksIndexRoute
-  ApiGatewayApprovalsIndexRoute: typeof ApiGatewayApprovalsIndexRoute
-  ApiGatewayApprovalsApprovalIdActionRoute: typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1828,13 +1582,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sessions': {
-      id: '/sessions'
-      path: '/sessions'
-      fullPath: '/sessions'
-      preLoaderRoute: typeof SessionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/memory': {
       id: '/memory'
       path: '/memory'
@@ -1854,20 +1601,6 @@ declare module '@tanstack/react-router' {
       path: '/files'
       fullPath: '/files'
       preLoaderRoute: typeof FilesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cron': {
-      id: '/cron'
-      path: '/cron'
-      fullPath: '/cron'
-      preLoaderRoute: typeof CronRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/activity': {
-      id: '/activity'
-      path: '/activity'
-      fullPath: '/activity'
-      preLoaderRoute: typeof ActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -1904,13 +1637,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/providers'
       preLoaderRoute: typeof SettingsProvidersRouteImport
       parentRoute: typeof SettingsRoute
-    }
-    '/gateway/logs': {
-      id: '/gateway/logs'
-      path: '/gateway/logs'
-      fullPath: '/gateway/logs'
-      preLoaderRoute: typeof GatewayLogsRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
@@ -2066,13 +1792,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPathsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/openclaw-update': {
-      id: '/api/openclaw-update'
-      path: '/api/openclaw-update'
-      fullPath: '/api/openclaw-update'
-      preLoaderRoute: typeof ApiOpenclawUpdateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/ollama-health': {
       id: '/api/ollama-health'
       path: '/api/ollama-health'
@@ -2120,27 +1839,6 @@ declare module '@tanstack/react-router' {
       path: '/api/hermes-config'
       fullPath: '/api/hermes-config'
       preLoaderRoute: typeof ApiHermesConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway-restart': {
-      id: '/api/gateway-restart'
-      path: '/api/gateway-restart'
-      fullPath: '/api/gateway-restart'
-      preLoaderRoute: typeof ApiGatewayRestartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway-discover': {
-      id: '/api/gateway-discover'
-      path: '/api/gateway-discover'
-      fullPath: '/api/gateway-discover'
-      preLoaderRoute: typeof ApiGatewayDiscoverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway-config': {
-      id: '/api/gateway-config'
-      path: '/api/gateway-config'
-      fullPath: '/api/gateway-config'
-      preLoaderRoute: typeof ApiGatewayConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -2239,34 +1937,6 @@ declare module '@tanstack/react-router' {
       path: '/api/auth'
       fullPath: '/api/auth'
       preLoaderRoute: typeof ApiAuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/agent-steer': {
-      id: '/api/agent-steer'
-      path: '/api/agent-steer'
-      fullPath: '/api/agent-steer'
-      preLoaderRoute: typeof ApiAgentSteerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/agent-pause': {
-      id: '/api/agent-pause'
-      path: '/api/agent-pause'
-      fullPath: '/api/agent-pause'
-      preLoaderRoute: typeof ApiAgentPauseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/agent-kill': {
-      id: '/api/agent-kill'
-      path: '/api/agent-kill'
-      fullPath: '/api/agent-kill'
-      preLoaderRoute: typeof ApiAgentKillRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/agent-dispatch': {
-      id: '/api/agent-dispatch'
-      path: '/api/agent-dispatch'
-      fullPath: '/api/agent-dispatch'
-      preLoaderRoute: typeof ApiAgentDispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/agent-activity': {
@@ -2451,25 +2121,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGatewayNodesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/gateway/logs': {
-      id: '/api/gateway/logs'
-      path: '/api/gateway/logs'
-      fullPath: '/api/gateway/logs'
-      preLoaderRoute: typeof ApiGatewayLogsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/gateway/channels': {
       id: '/api/gateway/channels'
       path: '/api/gateway/channels'
       fullPath: '/api/gateway/channels'
       preLoaderRoute: typeof ApiGatewayChannelsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway/agents': {
-      id: '/api/gateway/agents'
-      path: '/api/gateway/agents'
-      fullPath: '/api/gateway/agents'
-      preLoaderRoute: typeof ApiGatewayAgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/events/recent': {
@@ -2556,40 +2212,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCloudProvisionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/browser/tabs': {
-      id: '/api/browser/tabs'
-      path: '/tabs'
-      fullPath: '/api/browser/tabs'
-      preLoaderRoute: typeof ApiBrowserTabsRouteImport
-      parentRoute: typeof ApiBrowserRoute
-    }
-    '/api/browser/status': {
-      id: '/api/browser/status'
-      path: '/status'
-      fullPath: '/api/browser/status'
-      preLoaderRoute: typeof ApiBrowserStatusRouteImport
-      parentRoute: typeof ApiBrowserRoute
-    }
-    '/api/browser/screenshot': {
-      id: '/api/browser/screenshot'
-      path: '/screenshot'
-      fullPath: '/api/browser/screenshot'
-      preLoaderRoute: typeof ApiBrowserScreenshotRouteImport
-      parentRoute: typeof ApiBrowserRoute
-    }
     '/api/browser/navigate': {
       id: '/api/browser/navigate'
       path: '/navigate'
       fullPath: '/api/browser/navigate'
       preLoaderRoute: typeof ApiBrowserNavigateRouteImport
       parentRoute: typeof ApiBrowserRoute
-    }
-    '/api/gateway/approvals/': {
-      id: '/api/gateway/approvals/'
-      path: '/api/gateway/approvals'
-      fullPath: '/api/gateway/approvals/'
-      preLoaderRoute: typeof ApiGatewayApprovalsIndexRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/api/workspace/task-runs/adhoc': {
       id: '/api/workspace/task-runs/adhoc'
@@ -2773,13 +2401,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveRouteImport
       parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
     }
-    '/api/gateway/approvals/$approvalId/$action': {
-      id: '/api/gateway/approvals/$approvalId/$action'
-      path: '/api/gateway/approvals/$approvalId/$action'
-      fullPath: '/api/gateway/approvals/$approvalId/$action'
-      preLoaderRoute: typeof ApiGatewayApprovalsApprovalIdActionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -2799,16 +2420,10 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 interface ApiBrowserRouteChildren {
   ApiBrowserNavigateRoute: typeof ApiBrowserNavigateRoute
-  ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
-  ApiBrowserStatusRoute: typeof ApiBrowserStatusRoute
-  ApiBrowserTabsRoute: typeof ApiBrowserTabsRoute
 }
 
 const ApiBrowserRouteChildren: ApiBrowserRouteChildren = {
   ApiBrowserNavigateRoute: ApiBrowserNavigateRoute,
-  ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,
-  ApiBrowserStatusRoute: ApiBrowserStatusRoute,
-  ApiBrowserTabsRoute: ApiBrowserTabsRoute,
 }
 
 const ApiBrowserRouteWithChildren = ApiBrowserRoute._addFileChildren(
@@ -3056,20 +2671,13 @@ const ApiWorkspaceTasksRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
-  ActivityRoute: ActivityRoute,
-  CronRoute: CronRoute,
   FilesRoute: FilesRoute,
   JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
-  SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
   TerminalRoute: TerminalRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
-  ApiAgentDispatchRoute: ApiAgentDispatchRoute,
-  ApiAgentKillRoute: ApiAgentKillRoute,
-  ApiAgentPauseRoute: ApiAgentPauseRoute,
-  ApiAgentSteerRoute: ApiAgentSteerRoute,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
   ApiBrowserRoute: ApiBrowserRouteWithChildren,
@@ -3084,9 +2692,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
   ApiEventsRoute: ApiEventsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
-  ApiGatewayConfigRoute: ApiGatewayConfigRoute,
-  ApiGatewayDiscoverRoute: ApiGatewayDiscoverRoute,
-  ApiGatewayRestartRoute: ApiGatewayRestartRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiLocalSetupRoute: ApiLocalSetupRoute,
@@ -3094,7 +2699,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelsRoute: ApiModelsRoute,
   ApiNetworkUrlRoute: ApiNetworkUrlRoute,
   ApiOllamaHealthRoute: ApiOllamaHealthRoute,
-  ApiOpenclawUpdateRoute: ApiOpenclawUpdateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
@@ -3117,16 +2721,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
   ApiWorkspaceTasksRoute: ApiWorkspaceTasksRouteWithChildren,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
-  GatewayLogsRoute: GatewayLogsRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiCloudProvisionRoute: ApiCloudProvisionRoute,
   ApiCloudStatusRoute: ApiCloudStatusRoute,
   ApiCloudWebhookRoute: ApiCloudWebhookRoute,
   ApiDebugReconnectRoute: ApiDebugReconnectRoute,
   ApiDebugStatusRoute: ApiDebugStatusRoute,
-  ApiGatewayAgentsRoute: ApiGatewayAgentsRoute,
   ApiGatewayChannelsRoute: ApiGatewayChannelsRoute,
-  ApiGatewayLogsRoute: ApiGatewayLogsRoute,
   ApiGatewayNodesRoute: ApiGatewayNodesRoute,
   ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
@@ -3137,9 +2738,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMemoryWriteRoute: ApiMemoryWriteRoute,
   ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
   ApiTasksIndexRoute: ApiTasksIndexRoute,
-  ApiGatewayApprovalsIndexRoute: ApiGatewayApprovalsIndexRoute,
-  ApiGatewayApprovalsApprovalIdActionRoute:
-    ApiGatewayApprovalsApprovalIdActionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

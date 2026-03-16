@@ -1791,7 +1791,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => void navigate({ to: '/cron' })}
+                        onClick={() => void navigate({ to: '/jobs' })}
                       >
                         Open Cron Screen
                       </Button>

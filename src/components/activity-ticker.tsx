@@ -67,12 +67,12 @@ export function ActivityTicker() {
   return (
     <div
       className="mb-4 flex h-8 cursor-pointer items-center overflow-hidden rounded-xl border border-primary-200 bg-primary-50/80 px-3 shadow-sm transition-colors hover:bg-primary-100/80 dark:border-primary-800 dark:bg-primary-900/60 dark:hover:bg-primary-800/60 md:h-9 md:px-4"
-      onClick={() => void navigate({ to: '/activity' })}
+      onClick={() => void navigate({ to: '/chat' })}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ')
-          void navigate({ to: '/activity' })
+          void navigate({ to: '/chat' })
       }}
     >
       <span

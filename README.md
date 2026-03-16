@@ -1,62 +1,48 @@
 <div align="center">
 
-<img src="./public/logo-icon.png" alt="Hermes Workspace" width="80" />
+<img src="./public/hermes-avatar.webp" alt="Hermes Workspace" width="80" style="border-radius: 16px" />
 
 # Hermes Workspace
 
-**The full-stack mission control platform for Hermes Agent AI workflows.**
+**Your AI agent's command center — chat, files, memory, skills, and terminal in one place.**
 
-[![Version](https://img.shields.io/badge/version-3.0.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-4.0.0-6366F1.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6366F1.svg)](CONTRIBUTING.md)
 
-> Not a chat wrapper. A complete command center — orchestrate agents, run missions, track costs, and control everything from one place.
+> Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
-![Hermes Workspace Dashboard](./public/screenshots/dashboard-v3.png)
+![Hermes Workspace Chat](./docs/screenshots/chat.png)
 
 </div>
 
 ---
 
-## ✨ What's New in v3.0
+## ✨ What's New in v4.0
 
-- 🤖 **Mission Control** — Full multi-agent orchestration with an isometric office view, live agent status, and mission lifecycle management (spawn → pause → resume → abort)
-- 📊 **Cost Analytics** — Per-agent spend, daily trends, MTD totals, and projected EOM cost backed by real gateway data
-- 🎨 **3-Theme System** — Paper Light, Ops Dark, Premium Dark — deep dark mode wiring across 66+ components
-- 🔒 **Security Hardened** — Auth middleware on all API routes, wildcard CORS removed, exec approval prompts
-- 📱 **Mobile-First PWA** — Full feature parity on any device, installable as a native app on iOS and Android
-- ⚡ **Live SSE Streaming** — Real-time agent output streams to Mission Control and chat — no polling
-- 🧠 **Memory Browser** — Browse, search, and edit agent memory files directly from the UI
+- 🤖 **Hermes Agent Integration** — Direct FastAPI backend connection with real-time SSE streaming
+- 🎨 **8-Theme System** — Official, Classic, Slate, Mono — each with light and dark variants
+- 🔒 **Security Hardened** — Auth middleware on all API routes, CSP headers, exec approval prompts
+- 📱 **Mobile-First PWA** — Full feature parity on any device via Tailscale
+- ⚡ **Live SSE Streaming** — Real-time agent output with tool call rendering
+- 🧠 **Memory & Skills** — Browse, search, and edit agent memory; explore 2,000+ skills
 
 ---
 
 ## 📸 Screenshots
 
-| Agent Hub — Mission Control | Chat — Live Streaming |
+| Chat | Files |
 |:---:|:---:|
-| ![Agent Hub](./public/screenshots/agent-hub-v3.png) | ![Chat](./public/screenshots/chat-v3.png) |
+| ![Chat](./docs/screenshots/chat.png) | ![Files](./docs/screenshots/files.png) |
 
-| Mobile Dashboard | Mission Control |
+| Terminal | Memory |
 |:---:|:---:|
-| ![Mobile](./public/screenshots/mobile-dashboard-v3.png) | ![Missions](./public/screenshots/mission-control-v3.png) |
+| ![Terminal](./docs/screenshots/terminal.png) | ![Memory](./docs/screenshots/memory.png) |
 
-<details>
-<summary>📸 More Screenshots</summary>
-
-| Mission Wizard | Tasks Board |
+| Skills | Settings |
 |:---:|:---:|
-| ![Mission Wizard](./public/screenshots/gallery/mission-wizard.png) | ![Tasks](./public/screenshots/gallery/tasks-board.png) |
-
-| Skills Marketplace | Cron Manager |
-|:---:|:---:|
-| ![Skills](./public/screenshots/gallery/skills-browser.png) | ![Cron](./public/screenshots/gallery/cron-manager.png) |
-
-| Agents Configuration | Mobile Agent Hub |
-|:---:|:---:|
-| ![Agents](./public/screenshots/gallery/agents-config.png) | ![Mobile Hub](./public/screenshots/gallery/mobile-agent-hub.png) |
-
-</details>
+| ![Skills](./docs/screenshots/skills.png) | ![Settings](./docs/screenshots/settings.png) |
 
 ---
 
@@ -236,16 +222,17 @@ Features pending cloud infrastructure:
 
 | Feature | Status |
 |---------|--------|
-| Mission Control + Agent Hub | ✅ Shipped (v3.0) |
-| Live SSE Streaming | ✅ Shipped (v3.0) |
-| Cost Analytics | ✅ Shipped (v3.0) |
-| Mobile PWA + Tailscale | ✅ Shipped (v3.0) |
+| Chat + SSE Streaming | ✅ Shipped (v4.0) |
+| Files + Terminal | ✅ Shipped (v4.0) |
+| Memory Browser | ✅ Shipped (v4.0) |
+| Skills Browser | ✅ Shipped (v4.0) |
+| Mobile PWA + Tailscale | ✅ Shipped (v4.0) |
+| 8-Theme System | ✅ Shipped (v4.0) |
 | Native Desktop App (Electron) | 🔨 In Development |
+| Model Switching & Config | 🔨 In Development |
+| Chat Abort / Cancel | 🔨 In Development |
 | Cloud / Hosted Version | 🔜 Coming Soon |
 | Team Collaboration | 🔜 Coming Soon |
-| Multi-device Session Sync | 🔜 Coming Soon |
-| Provider Approval Workflow | 🔨 In Development |
-| Board Groups / Project Hierarchy | 📋 Planned |
 
 ---
 

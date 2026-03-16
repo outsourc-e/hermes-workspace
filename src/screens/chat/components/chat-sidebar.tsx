@@ -5,7 +5,6 @@ import {
   ArrowDown01Icon,
   BrainIcon,
   Chat01Icon,
-  Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
   MessageMultiple01Icon,
@@ -550,11 +549,9 @@ function ChatSidebarComponent({
   const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
-  const isSessionsActive = pathname === '/sessions'
-  const isJobsActive = pathname === '/jobs' || pathname === '/cron'
   const isTerminalActive = pathname === '/terminal'
   const isMemoryActive = pathname === '/memory'
-  const mainRoutes = ['/chat', '/new', '/sessions', '/files', '/jobs', '/cron', '/terminal']
+  const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
 
@@ -754,24 +751,10 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/sessions',
-      icon: Chat01Icon,
-      label: 'Sessions',
-      active: isSessionsActive,
-    },
-    {
-      kind: 'link',
       to: '/files',
       icon: File01Icon,
       label: 'Files',
       active: isFilesActive,
-    },
-    {
-      kind: 'link',
-      to: '/jobs',
-      icon: Clock01Icon,
-      label: 'Jobs',
-      active: isJobsActive,
     },
     {
       kind: 'link',

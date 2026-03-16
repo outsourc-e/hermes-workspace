@@ -65,22 +65,22 @@ function NotFoundPage() {
               Chat
             </Link>
             <Link
-              to="/sessions"
-              className="text-accent-500 hover:text-accent-600 hover:underline"
-            >
-              Sessions
-            </Link>
-            <Link
               to="/files"
               className="text-accent-500 hover:text-accent-600 hover:underline"
             >
               Files
             </Link>
             <Link
-              to="/jobs"
+              to="/memory"
               className="text-accent-500 hover:text-accent-600 hover:underline"
             >
-              Jobs
+              Memory
+            </Link>
+            <Link
+              to="/skills"
+              className="text-accent-500 hover:text-accent-600 hover:underline"
+            >
+              Skills
             </Link>
           </div>
         </div>

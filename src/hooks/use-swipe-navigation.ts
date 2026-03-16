@@ -5,9 +5,8 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const TAB_ORDER = [
   '/chat/main',
-  '/sessions',
   '/files',
-  '/cron',
+  '/jobs',
   '/settings',
 ] as const
 
@@ -29,10 +28,9 @@ function findCurrentTabIndex(pathname: string): number {
   if (pathname.startsWith('/chat') || pathname === '/new' || pathname === '/') {
     return 0
   }
-  if (pathname.startsWith('/sessions')) return 1
-  if (pathname.startsWith('/files')) return 2
-  if (pathname.startsWith('/cron')) return 3
-  if (pathname.startsWith('/settings')) return 4
+  if (pathname.startsWith('/files')) return 1
+  if (pathname.startsWith('/jobs')) return 2
+  if (pathname.startsWith('/settings')) return 3
   return -1
 }
 

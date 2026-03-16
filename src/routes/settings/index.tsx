@@ -12,7 +12,6 @@ import {
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import type * as React from 'react'
-import type { AccentColor } from '@/hooks/use-settings'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -23,7 +22,6 @@ import {
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import { UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
@@ -31,7 +29,6 @@ import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
-import { getConnectionErrorInfo } from '@/lib/connection-errors'
 // useWorkspaceStore removed — hamburger eliminated on mobile
 
 export const Route = createFileRoute('/settings/')({
@@ -265,28 +262,6 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 function SettingsRoute() {
   usePageTitle('Settings')
   const { settings, updateSettings } = useSettings()
-  const gatewayUrl = useGatewaySetupStore((state) => state.gatewayUrl)
-  const gatewayToken = useGatewaySetupStore((state) => state.gatewayToken)
-  const gatewayTestStatus = useGatewaySetupStore((state) => state.testStatus)
-  const gatewayTestError = useGatewaySetupStore((state) => state.testError)
-  const gatewaySaving = useGatewaySetupStore((state) => state.saving)
-  const gatewayErrorInfo = getConnectionErrorInfo(gatewayTestError)
-  const loadCurrentGatewayConfig = useGatewaySetupStore(
-    (state) => state.loadCurrentConfig,
-  )
-  const setGatewayUrl = useGatewaySetupStore((state) => state.setGatewayUrl)
-  const setGatewayToken = useGatewaySetupStore((state) => state.setGatewayToken)
-  const saveAndTestGateway = useGatewaySetupStore((state) => state.saveAndTest)
-  const testGatewayConnection = useGatewaySetupStore(
-    (state) => state.testConnection,
-  )
-  const autoDetectGateway = useGatewaySetupStore(
-    (state) => state.autoDetectGateway,
-  )
-  const openGatewayWizard = useGatewaySetupStore((state) => state.open)
-  const [autoDetectingGateway, setAutoDetectingGateway] = useState(false)
-  const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null)
-  const [autoDetectError, setAutoDetectError] = useState<string | null>(null)
 
   // Phase 4.2: Fetch models for preferred model dropdowns
   const [availableModels, setAvailableModels] = useState<
@@ -317,47 +292,6 @@ function SettingsRoute() {
     }
     void fetchModels()
   }, [])
-
-  useEffect(() => {
-    async function initializeGatewayConnectionSettings() {
-      await loadCurrentGatewayConfig()
-      await testGatewayConnection()
-    }
-
-    void initializeGatewayConnectionSettings()
-  }, [loadCurrentGatewayConfig, testGatewayConnection])
-
-  async function handleAutoDetectGateway() {
-    setAutoDetectingGateway(true)
-    setAutoDetectMessage(null)
-    setAutoDetectError(null)
-
-    const result = await autoDetectGateway()
-    if (!result.ok || !result.url) {
-      setAutoDetectError(
-        result.error || 'No Hermes endpoint found on localhost ports 18789-18800.',
-      )
-      setAutoDetectingGateway(false)
-      return
-    }
-
-    setAutoDetectMessage(`Detected Hermes at ${result.url}`)
-    setAutoDetectingGateway(false)
-  }
-
-  function _getAccentBadgeClass(color: AccentColor): string {
-    if (color === 'orange') return 'bg-orange-500'
-    if (color === 'purple') return 'bg-purple-500'
-    if (color === 'blue') return 'bg-blue-500'
-    return 'bg-green-500'
-  }
-
-  function getConnectionDotClass(): string {
-    if (gatewayTestStatus === 'success') return 'bg-green-500'
-    if (gatewayTestStatus === 'error') return 'bg-red-500'
-    if (gatewayTestStatus === 'testing') return 'bg-accent-500'
-    return 'bg-primary-500'
-  }
 
   const [activeSection, setActiveSection] =
     useState<SettingsSectionId>('hermes')
@@ -510,210 +444,48 @@ function SettingsRoute() {
 
           {/* ── Notifications ───────────────────────────────────── */}
           {activeSection === 'notifications' && (
-            <SettingsSection
-              title="Notifications"
-              description="Control alert delivery and usage warning threshold."
-              icon={Notification03Icon}
-            >
-              <SettingsRow
-                label="Enable alerts"
-                description="Show usage and system alert notifications."
-              >
-                <Switch
-                  checked={settings.notificationsEnabled}
-                  onCheckedChange={(checked) =>
-                    updateSettings({ notificationsEnabled: checked })
-                  }
-                  aria-label="Enable alerts"
-                />
-              </SettingsRow>
-              <SettingsRow
-                label="Usage threshold"
-                description="Set usage warning trigger between 50% and 100%."
-              >
-                <div className="flex w-full items-center gap-2 md:max-w-xs">
-                  <input
-                    type="range"
-                    min={50}
-                    max={100}
-                    value={settings.usageThreshold}
-                    onChange={(e) =>
-                      updateSettings({ usageThreshold: Number(e.target.value) })
-                    }
-                    className="w-full accent-primary-900 dark:accent-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!settings.notificationsEnabled}
-                    aria-label={`Usage threshold: ${settings.usageThreshold} percent`}
-                    aria-valuemin={50}
-                    aria-valuemax={100}
-                    aria-valuenow={settings.usageThreshold}
-                  />
-                  <span className="w-12 text-right text-sm tabular-nums text-primary-700">
-                    {settings.usageThreshold}%
-                  </span>
-                </div>
-              </SettingsRow>
-            </SettingsSection>
-          )}
-
-          {/* ── Advanced ────────────────────────────────────────── */}
-          {activeSection === 'advanced' && (
             <>
               <SettingsSection
-                title="Hermes Connection"
-                description="Edit the saved Hermes connection, reconnect, and rerun setup if needed."
-                icon={CloudIcon}
+                title="Notifications"
+                description="Control alert delivery and usage warning threshold."
+                icon={Notification03Icon}
               >
                 <SettingsRow
-                  label="Hermes URL"
-                  description="Saved Hermes WebSocket endpoint."
+                  label="Enable alerts"
+                  description="Show usage and system alert notifications."
                 >
-                  <div className="w-full md:max-w-md">
-                    <Input
-                      type="url"
-                      placeholder="ws://127.0.0.1:18789"
-                      value={gatewayUrl}
-                      onChange={(e) => setGatewayUrl(e.target.value)}
-                      className="h-9 w-full"
-                      aria-label="Hermes URL"
-                    />
-                  </div>
+                  <Switch
+                    checked={settings.notificationsEnabled}
+                    onCheckedChange={(checked) =>
+                      updateSettings({ notificationsEnabled: checked })
+                    }
+                    aria-label="Enable alerts"
+                  />
                 </SettingsRow>
                 <SettingsRow
-                  label="Hermes Token"
-                  description="Saved token for the Hermes connection."
+                  label="Usage threshold"
+                  description="Set usage warning trigger between 50% and 100%."
                 >
-                  <div className="w-full md:max-w-md">
-                    <Input
-                      type="password"
-                      placeholder="Leave empty if no token is set"
-                      value={gatewayToken}
-                      onChange={(e) => setGatewayToken(e.target.value)}
-                      className="h-9 w-full"
-                      aria-label="Hermes Token"
-                    />
-                  </div>
-                </SettingsRow>
-                <SettingsRow
-                  label="Connection status"
-                  description="Current Hermes reachability."
-                >
-                  <div className="flex w-full flex-col items-start gap-2 md:w-auto">
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium',
-                        gatewayTestStatus === 'success' &&
-                          'border-green-500/35 bg-green-500/10 text-green-600',
-                        gatewayTestStatus === 'error' &&
-                          'border-red-500/35 bg-red-500/10 text-red-600',
-                        gatewayTestStatus === 'testing' &&
-                          'border-accent-500/35 bg-accent-500/10 text-accent-600',
-                        gatewayTestStatus === 'idle' &&
-                          'border-primary-300 bg-primary-100 text-primary-700',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'size-2 rounded-full',
-                          getConnectionDotClass(),
-                        )}
-                      />
-                      {gatewayTestStatus === 'idle' ? 'Disconnected' : null}
-                      {gatewayTestStatus === 'testing' ? 'Reconnecting...' : null}
-                      {gatewayTestStatus === 'success' ? 'Connected' : null}
-                      {gatewayTestStatus === 'error' ? 'Disconnected' : null}
-                    </span>
-                    {gatewayTestError ? (
-                      <div className="text-xs text-red-600">
-                        <p className="font-medium">{gatewayErrorInfo.title}</p>
-                        <p className="mt-0.5">{gatewayErrorInfo.description}</p>
-                        {gatewayErrorInfo.action ? (
-                          <p className="mt-1 font-medium text-red-700">
-                            {gatewayErrorInfo.action}
-                          </p>
-                        ) : null}
-                        {gatewayErrorInfo.details ? (
-                          <p className="mt-1 text-[11px] text-red-500">
-                            {gatewayErrorInfo.details}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </SettingsRow>
-                <SettingsRow
-                  label="Actions"
-                  description="Save changes, reconnect, or scan localhost ports 18789-18800."
-                >
-                  <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void saveAndTestGateway()}
-                      disabled={
-                        gatewaySaving ||
-                        gatewayTestStatus === 'testing' ||
-                        !gatewayUrl.trim()
+                  <div className="flex w-full items-center gap-2 md:max-w-xs">
+                    <input
+                      type="range"
+                      min={50}
+                      max={100}
+                      value={settings.usageThreshold}
+                      onChange={(e) =>
+                        updateSettings({ usageThreshold: Number(e.target.value) })
                       }
-                    >
-                      <HugeiconsIcon
-                        icon={CheckmarkCircle02Icon}
-                        size={20}
-                        strokeWidth={1.5}
-                      />
-                      {gatewaySaving
-                        ? 'Saving...'
-                        : gatewayTestStatus === 'testing'
-                          ? 'Reconnecting...'
-                          : 'Save & Reconnect'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleAutoDetectGateway()}
-                      disabled={autoDetectingGateway || gatewaySaving}
-                    >
-                      {autoDetectingGateway
-                        ? 'Scanning localhost...'
-                        : 'Auto-detect'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        // Clear stale connection state and reload
-                        try {
-                          const keys = Object.keys(localStorage)
-                          for (const key of keys) {
-                            if (key.startsWith('hermes-') || key.startsWith('gateway-')) {
-                              localStorage.removeItem(key)
-                            }
-                          }
-                        } catch { /* ignore */ }
-                        window.location.reload()
-                      }}
-                      className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
-                    >
-                      Reset Connection
-                    </Button>
+                      className="w-full accent-primary-900 dark:accent-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!settings.notificationsEnabled}
+                      aria-label={`Usage threshold: ${settings.usageThreshold} percent`}
+                      aria-valuemin={50}
+                      aria-valuemax={100}
+                      aria-valuenow={settings.usageThreshold}
+                    />
+                    <span className="w-12 text-right text-sm tabular-nums text-primary-700">
+                      {settings.usageThreshold}%
+                    </span>
                   </div>
-                </SettingsRow>
-                {autoDetectError ? (
-                  <p className="text-sm text-red-600">{autoDetectError}</p>
-                ) : null}
-                {autoDetectMessage ? (
-                  <p className="text-sm text-green-600">{autoDetectMessage}</p>
-                ) : null}
-                <SettingsRow
-                  label="Setup wizard"
-                  description="Open the full setup wizard again."
-                >
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void openGatewayWizard()}
-                  >
-                    Run Setup Wizard
-                  </Button>
                 </SettingsRow>
               </SettingsSection>
 

@@ -96,16 +96,6 @@ export function SearchModal() {
         },
       },
       {
-        id: 'qa-sessions',
-        emoji: '🗂️',
-        label: 'Sessions',
-        description: 'Open the session archive',
-        onSelect: () => {
-          closeModal()
-          navigate({ to: '/sessions' })
-        },
-      },
-      {
         id: 'qa-skills',
         emoji: '🛠️',
         label: 'Skills',
@@ -132,7 +122,7 @@ export function SearchModal() {
         description: 'Open scheduled jobs and run history',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/cron' })
+          navigate({ to: '/jobs' })
         },
       },
       {
@@ -275,7 +265,7 @@ export function SearchModal() {
             icon={
               entry.id === 'qa-logs'
                 ? ListViewIcon
-                : entry.id === 'qa-cron'
+                : entry.id === 'qa-jobs'
                   ? Clock01Icon
                   : FlashIcon
             }
