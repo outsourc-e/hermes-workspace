@@ -68,3 +68,4 @@ jobs:
           fi
 
           echo "✅ No obvious secret patterns found"
+

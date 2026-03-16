@@ -28,3 +28,4 @@ EXPOSE 3000
 USER hermes
 
 CMD ["node", "server-entry.js"]
+

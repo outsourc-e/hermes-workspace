@@ -74,3 +74,4 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 | v3.x (main) | ✅ Active |
 | v2.x | ⚠️ Security fixes only |
 | < v2.0 | ❌ Unsupported |
+

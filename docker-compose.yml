@@ -8,3 +8,4 @@ services:
       - HERMES_PASSWORD=${HERMES_PASSWORD:-}
       - HERMES_ALLOWED_HOSTS=${HERMES_ALLOWED_HOSTS:-}
     restart: unless-stopped
+
