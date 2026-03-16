@@ -478,7 +478,7 @@ function SettingsRoute() {
                 </SettingsRow>
 
               </SettingsSection>
-              <LoaderStyleSection />
+              {/* LoaderStyleSection removed — not relevant for Hermes */}
             </>
           )}
 
