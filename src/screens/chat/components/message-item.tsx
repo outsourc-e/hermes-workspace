@@ -322,12 +322,49 @@ function fileNameFromPath(value: string): string {
   return parts[parts.length - 1] || normalized
 }
 
+const TOOL_DISPLAY_LABELS: Record<string, string> = {
+  browser_click: '🖱 Click Element',
+  browser_type: '⌨ Type Text',
+  browser_press: '⏎ Press Key',
+  browser_scroll: '↕ Scroll',
+  browser_back: '← Back',
+  browser_get_images: '🖼 Get Images',
+  browser_vision: '👁 Vision Capture',
+  browser_close: '✕ Close Browser',
+  execute_code: '🐍 Execute Code',
+  process: '⚙ Process',
+  'multi_tool_use.parallel': '⚡ Parallel Tools',
+  todo: '☑ Todo',
+  cronjob: '⏰ Cron Job',
+  delegate_task: '👥 Delegate Task',
+  mixture_of_agents: '🧠 Mixture of Agents',
+  session_search: '🔍 Search Sessions',
+  clarify: '❓ Clarify',
+  skill_manage: '📦 Manage Skill',
+  vision_analyze: '👁 Analyze Image',
+  image_generate: '🎨 Generate Image',
+  send_message: '💬 Send Message',
+  text_to_speech: '🔊 Text to Speech',
+  honcho_profile: '👤 Honcho Profile',
+  honcho_search: '🔎 Honcho Search',
+  honcho_context: '📋 Honcho Context',
+  ha_list_entities: '🏠 HA Entities',
+  ha_get_state: '🏠 HA State',
+  ha_list_services: '🏠 HA Services',
+  web_search: '🌐 Web Search',
+  web_extract: '📄 Web Extract',
+  browser_navigate: '🌐 Open Page',
+  browser_snapshot: '📸 Snapshot',
+}
+
 function formatToolDisplayLabel(
   name: string,
   args?: Record<string, unknown>,
 ): string {
   const normalizedName = name.trim()
   const lowerName = normalizedName.toLowerCase()
+  const mappedLabel = TOOL_DISPLAY_LABELS[lowerName]
+  if (mappedLabel) return mappedLabel
 
   if (lowerName === 'read' || lowerName === 'read_file') {
     const filePath = readStringArg(args, 'file_path', 'path', 'target_file')
@@ -359,14 +396,11 @@ function formatToolDisplayLabel(
     return cmd ? `exec ${cmd.length > 30 ? cmd.slice(0, 27) + '…' : cmd}` : 'exec'
   }
 
-  if (lowerName === 'memory_search' || lowerName === 'session_search') return 'memory search'
+  if (lowerName === 'memory_search') return 'memory search'
   if (lowerName === 'save_memory') return 'save memory'
   if (lowerName === 'memory_get') return 'memory get'
-  if (lowerName === 'web_search') return 'web search'
-  if (lowerName === 'web_fetch' || lowerName === 'web_extract') return 'web fetch'
+  if (lowerName === 'web_fetch') return 'web fetch'
   if (lowerName === 'skill_view') return 'view skill'
-  if (lowerName === 'skill_manage') return 'manage skill'
-  if (lowerName === 'delegate_task') return 'delegate'
 
   return lowerName.replace(/_/g, ' ')
 }

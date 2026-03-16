@@ -247,6 +247,16 @@ function getMessageReceiveTime(msg: GatewayMessage | null | undefined): number |
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
+function compareMessagesByTime(left: GatewayMessage, right: GatewayMessage): number {
+  const leftTime = getMessageEventTime(left) ?? getMessageReceiveTime(left) ?? 0
+  const rightTime = getMessageEventTime(right) ?? getMessageReceiveTime(right) ?? 0
+  if (leftTime !== rightTime) return leftTime - rightTime
+
+  const leftId = getMessageId(left) ?? ''
+  const rightId = getMessageId(right) ?? ''
+  return leftId.localeCompare(rightId)
+}
+
 function isExternalInboundUserSource(source: unknown): boolean {
   const normalized = normalizeString(source).toLowerCase()
   return normalized === 'webchat' || normalized === 'signal' || normalized === 'telegram'
@@ -837,8 +847,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
       return historyMessages
     }
 
-    // Append new realtime messages to history
-    return [...historyMessages, ...newRealtimeMessages]
+    return [...historyMessages, ...newRealtimeMessages].sort(compareMessagesByTime)
   },
 }))
 

@@ -1051,6 +1051,23 @@ export function ChatScreen({
   })
 
   const { startStreaming } = useStreamingMessage({
+    onSessionResolved: useCallback(
+      ({ sessionKey, friendlyId }: { sessionKey: string; friendlyId: string }) => {
+        const activeSend = activeSendRef.current
+        if (activeSend) {
+          activeSendRef.current = {
+            ...activeSend,
+            sessionKey,
+            friendlyId,
+          }
+        }
+        if (sessionKey === activeFriendlyId && friendlyId === activeFriendlyId) {
+          return
+        }
+        onSessionResolved?.({ sessionKey, friendlyId })
+      },
+      [activeFriendlyId, onSessionResolved],
+    ),
     onStarted: useCallback(
       ({ runId }: { runId: string | null }) => {
         const activeSend = activeSendRef.current

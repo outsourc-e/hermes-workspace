@@ -43,10 +43,20 @@ type UseStreamingMessageOptions = {
   onThinking?: (thinking: string) => void
   onTool?: (tool: unknown) => void
   onMessageAccepted?: (sessionKey: string, friendlyId: string, clientId: string) => void
+  onSessionResolved?: (payload: { sessionKey: string; friendlyId: string }) => void
 }
 
 export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
-  const { onStarted, onChunk, onComplete, onError, onThinking, onTool, onMessageAccepted } = options
+  const {
+    onStarted,
+    onChunk,
+    onComplete,
+    onError,
+    onThinking,
+    onTool,
+    onMessageAccepted,
+    onSessionResolved,
+  } = options
 
   const [state, setState] = useState<StreamingState>({
     isStreaming: false,
@@ -119,6 +129,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
   const markFailed = useCallback(
     (message: string) => {
+      if (finishedRef.current) return
       finishedRef.current = true
       eventSourceRef.current = null
       stopFrame()
@@ -299,6 +310,21 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       switch (event) {
         case 'started': {
+          const resolvedSessionKey =
+            typeof payload.sessionKey === 'string' && payload.sessionKey.trim()
+              ? payload.sessionKey.trim()
+              : activeSessionKeyRef.current
+          const resolvedFriendlyId =
+            typeof payload.friendlyId === 'string' && payload.friendlyId.trim()
+              ? payload.friendlyId.trim()
+              : resolvedSessionKey
+          if (resolvedSessionKey !== activeSessionKeyRef.current) {
+            activeSessionKeyRef.current = resolvedSessionKey
+            onSessionResolved?.({
+              sessionKey: resolvedSessionKey,
+              friendlyId: resolvedFriendlyId,
+            })
+          }
           // Register runId so chat-events skips duplicate chunks for this run
           const runId = payload.runId as string | undefined
           if (runId) {
@@ -475,7 +501,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Gateway connection closed')
+            markFailed('Hermes connection closed')
           }
           break
         }
@@ -485,6 +511,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       finishStream,
       markFailed,
       onStarted,
+      onSessionResolved,
       onThinking,
       onTool,
       markActivity,
@@ -555,14 +582,31 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           throw new Error(errorText || 'Stream request failed')
         }
 
+        const resolvedSessionKey =
+          response.headers.get('x-hermes-session-key')?.trim() || params.sessionKey
+        const resolvedFriendlyId =
+          response.headers.get('x-hermes-friendly-id')?.trim() ||
+          resolvedSessionKey
+        if (resolvedSessionKey !== activeSessionKeyRef.current) {
+          activeSessionKeyRef.current = resolvedSessionKey
+          onSessionResolved?.({
+            sessionKey: resolvedSessionKey,
+            friendlyId: resolvedFriendlyId,
+          })
+        }
+
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
-        // HTTP 200 — message accepted by gateway. Clear optimistic "sending"
-        // status so the Retry timer never fires. The gateway does NOT echo
+        // HTTP 200 — message accepted by Hermes. Clear optimistic "sending"
+        // status so the Retry timer never fires. Hermes does NOT echo
         // user messages via SSE, so this is the only confirmation we get.
         if (params.idempotencyKey && onMessageAccepted) {
-          onMessageAccepted(params.sessionKey, params.friendlyId, params.idempotencyKey)
+          onMessageAccepted(
+            activeSessionKeyRef.current,
+            activeSessionKeyRef.current,
+            params.idempotencyKey,
+          )
         }
 
         const reader = response.body?.getReader()
@@ -625,6 +669,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       markAccepted,
       markFailed,
       onMessageAccepted,
+      onSessionResolved,
       processEvent,
       schedulePostAcceptanceTimeout,
       stopFrame,

@@ -7,9 +7,10 @@ import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
-import { streamChat } from '../../server/hermes-api'
+import { createSession, streamChat } from '../../server/hermes-api'
 
 const SEND_STREAM_RUN_TIMEOUT_MS = 180_000
+const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -96,6 +97,13 @@ function getGatewayMessage(
   return message
 }
 
+function normalizeHermesErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const message = raw.trim()
+  if (!message) return 'Hermes request failed'
+  return message.replace(/\bgateway\b/gi, 'Hermes')
+}
+
 export const Route = createFileRoute('/api/send-stream')({
   server: {
     handlers: {
@@ -117,7 +125,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
         const rawSessionKey =
           typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
-        const friendlyId =
+        const requestedFriendlyId =
           typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
         const message = String(body.message ?? '')
         const thinking =
@@ -135,15 +143,22 @@ export const Route = createFileRoute('/api/send-stream')({
 
         // Resolve session key
         let sessionKey: string
+        let resolvedFriendlyId: string
         try {
           const resolved = await resolveSessionKey({
             rawSessionKey,
-            friendlyId,
+            friendlyId: requestedFriendlyId,
             defaultKey: 'main',
           })
           sessionKey = resolved.sessionKey
+          resolvedFriendlyId = resolved.sessionKey
+          if (SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
+            const session = await createSession()
+            sessionKey = session.id
+            resolvedFriendlyId = session.id
+          }
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err)
+          const errorMsg = normalizeHermesErrorMessage(err)
           if (errorMsg === 'session not found') {
             return new Response(
               JSON.stringify({ ok: false, error: 'session not found' }),
@@ -230,7 +245,11 @@ export const Route = createFileRoute('/api/send-stream')({
 
                     if (!startedSent && runId) {
                       startedSent = true
-                      sendEvent('started', { runId, sessionKey: sessionKeyFromEvent })
+                      sendEvent('started', {
+                        runId,
+                        sessionKey: sessionKeyFromEvent,
+                        friendlyId: sessionKeyFromEvent,
+                      })
                     }
 
                     if (event === 'run.started') {
@@ -364,14 +383,11 @@ export const Route = createFileRoute('/api/send-stream')({
                         readString(
                           (data.error as Record<string, unknown> | undefined)?.message,
                         ) || 'Hermes stream error'
-                      const translated = {
-                        state: 'error',
-                        errorMessage,
+                      sendEvent('error', {
+                        message: errorMessage,
                         sessionKey: sessionKeyFromEvent,
                         runId,
-                      }
-                      sendEvent('done', translated)
-                      publishChatEvent('done', translated)
+                      })
                       closeStream()
                       return
                     }
@@ -400,8 +416,11 @@ export const Route = createFileRoute('/api/send-stream')({
             } catch (err) {
               // Only send error if stream hasn't already completed successfully
               if (!streamClosed) {
-                const errorMsg = err instanceof Error ? err.message : String(err)
-                sendEvent('error', { message: errorMsg })
+                const errorMsg = normalizeHermesErrorMessage(err)
+                sendEvent('error', {
+                  message: errorMsg,
+                  sessionKey,
+                })
                 closeStream()
               }
             }
@@ -416,6 +435,8 @@ export const Route = createFileRoute('/api/send-stream')({
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             Connection: 'keep-alive',
+            'X-Hermes-Session-Key': sessionKey,
+            'X-Hermes-Friendly-Id': resolvedFriendlyId,
           },
         })
       },

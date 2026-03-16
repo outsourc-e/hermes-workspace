@@ -1,10 +1,11 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  BrainIcon,
   Chat01Icon,
-  Clock01Icon,
+  CommandLineIcon,
   File01Icon,
-  ListViewIcon,
+  PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -41,13 +42,6 @@ const TABS: TabItem[] = [
     match: (p) => p.startsWith('/chat') || p === '/new' || p === '/',
   },
   {
-    id: 'sessions',
-    label: 'Sessions',
-    icon: ListViewIcon,
-    to: '/sessions',
-    match: (p) => p.startsWith('/sessions'),
-  },
-  {
     id: 'files',
     label: 'Files',
     icon: File01Icon,
@@ -55,11 +49,25 @@ const TABS: TabItem[] = [
     match: (p) => p.startsWith('/files'),
   },
   {
-    id: 'jobs',
-    label: 'Jobs',
-    icon: Clock01Icon,
-    to: '/cron',
-    match: (p) => p.startsWith('/cron'),
+    id: 'terminal',
+    label: 'Terminal',
+    icon: CommandLineIcon,
+    to: '/terminal',
+    match: (p) => p.startsWith('/terminal'),
+  },
+  {
+    id: 'memory',
+    label: 'Memory',
+    icon: BrainIcon,
+    to: '/memory',
+    match: (p) => p.startsWith('/memory'),
+  },
+  {
+    id: 'skills',
+    label: 'Skills',
+    icon: PuzzleIcon,
+    to: '/skills',
+    match: (p) => p.startsWith('/skills'),
   },
   {
     id: 'settings',

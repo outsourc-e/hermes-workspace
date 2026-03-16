@@ -82,13 +82,16 @@ function ChatRoute() {
       friendlyId: string
       sessionKey: string
     }) {
+      const sourceFriendlyId = activeFriendlyId
+      const sourceSessionKey = forcedSessionKey ?? activeFriendlyId
       moveHistoryMessages(
         queryClient,
-        'new',
-        'new',
+        sourceFriendlyId,
+        sourceSessionKey,
         payload.friendlyId,
         payload.sessionKey,
       )
+      queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] })
       setForcedSession({
         friendlyId: payload.friendlyId,
         sessionKey: payload.sessionKey,
@@ -99,7 +102,7 @@ function ChatRoute() {
         replace: true,
       })
     },
-    [navigate, queryClient],
+    [activeFriendlyId, forcedSessionKey, navigate, queryClient],
   )
 
   if (!mounted) {
@@ -123,7 +126,11 @@ function ChatRoute() {
           activeFriendlyId={activeFriendlyId}
           isNewChat={isNewChat}
           forcedSessionKey={forcedSessionKey}
-          onSessionResolved={isNewChat ? handleSessionResolved : undefined}
+          onSessionResolved={
+            isNewChat || activeFriendlyId === 'main'
+              ? handleSessionResolved
+              : undefined
+          }
         />
       </Suspense>
     </ErrorBoundary>
