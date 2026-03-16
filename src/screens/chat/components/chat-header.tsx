@@ -3,7 +3,6 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
 } from '@hugeicons/core-free-icons'
-import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -243,14 +242,7 @@ function ChatHeaderComponent({
           </div>
 
           <div className="ml-2 flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={handleOpenAgentDetails}
-              className="relative min-h-11 min-w-11 rounded-full transition-transform active:scale-90"
-              aria-label="Open agent details"
-            >
-              <OrchestratorAvatar size={28} compact />
-            </button>
+            <InspectorToggleButton />
           </div>
         </div>
       </div>
