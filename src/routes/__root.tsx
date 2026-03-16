@@ -320,23 +320,26 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             d.innerHTML = '<img src="/hermes-avatar.webp" alt="Hermes" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
               + '<img src="'+(isDark ? '/hermes-banner.png' : '/hermes-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
               + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
-              + '<div style="margin-top:20px;display:flex;gap:4px;align-items:center">'
-              + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
-              + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
-              + '<span class="splash-dot" style="width:5px;height:5px;border-radius:50%;background:'+accent+';opacity:0.3"></span>'
-              + '</div>';
+              + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
             document.body.prepend(d);
 
-            // Simple dot animation
-            var style = document.createElement('style');
-            style.textContent = '@keyframes splashDot{0%,80%,100%{opacity:0.3}40%{opacity:1}}'+'.splash-dot:nth-child(1){animation:splashDot 1.2s ease-in-out infinite}'+'.splash-dot:nth-child(2){animation:splashDot 1.2s ease-in-out 0.2s infinite}'+'.splash-dot:nth-child(3){animation:splashDot 1.2s ease-in-out 0.4s infinite}';
-            document.head.appendChild(style);
+            var bar = document.getElementById('splash-bar');
+            if (bar) {
+              setTimeout(function(){ bar.style.width='15%' }, 300);
+              setTimeout(function(){ bar.style.width='40%' }, 800);
+              setTimeout(function(){ bar.style.width='65%' }, 1500);
+              setTimeout(function(){ bar.style.width='85%' }, 2500);
+              setTimeout(function(){ bar.style.width='92%' }, 3200);
+            }
 
             window.__dismissSplash = function() {
               var el = document.getElementById('splash-screen');
               if (!el) return;
-              el.style.opacity = '0';
-              setTimeout(function(){ el.remove(); }, 500);
+              if (bar) bar.style.width = '100%';
+              setTimeout(function(){
+                el.style.opacity = '0';
+                setTimeout(function(){ el.remove(); }, 500);
+              }, 300);
             };
             // Fallback: always dismiss after 5s
             setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 5000);
