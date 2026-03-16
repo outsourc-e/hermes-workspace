@@ -619,7 +619,8 @@ function ChatComposerComponent({
   // Falls back to internal state if no external controller provided
   const [internalThinkingLevel, setInternalThinkingLevel] = useState<ThinkingLevel>('low')
   const thinkingLevel = externalThinkingLevel ?? internalThinkingLevel
-  const handleThinkingToggle = useCallback(() => {
+  // Thinking toggle removed for Hermes (not supported) — keeping state for type compat
+  const _handleThinkingToggle = useCallback(() => {
     const next = nextThinkingLevel(thinkingLevel)
     if (onThinkingLevelChange) {
       onThinkingLevelChange(next)
@@ -627,6 +628,7 @@ function ChatComposerComponent({
       setInternalThinkingLevel(next)
     }
   }, [thinkingLevel, onThinkingLevelChange])
+  void _handleThinkingToggle
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
   const slashMenuRef = useRef<SlashCommandMenuHandle | null>(null)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
@@ -2071,44 +2073,16 @@ function ChatComposerComponent({
                   ) : null}
 
                   {!isModelSwitcherDisabled && isModelMenuOpen ? (
-                    <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border border-primary-200 bg-surface shadow-lg">
+                    <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border shadow-lg" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
                       <div className="p-1">
-                        <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-neutral-700 border-l-2 border-accent-500 bg-neutral-100 rounded-lg">
+                        <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium border-l-2 border-accent-500 rounded-lg" style={{ backgroundColor: 'var(--theme-panel)', color: 'var(--theme-text)' }}>
                           <span className="flex-1 truncate">⚕ Hermes Agent</span>
                           <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-label="Currently active" />
                         </div>
                       </div>
-                      {/* Settings footer — thinking + fast mode */}
-                      <div className="border-t border-neutral-100 dark:border-neutral-800 px-3 py-2 flex items-center gap-2">
-                        {fastMode && thinkingLevel !== 'off' && (
-                          <span className="text-[10px] text-amber-500 mr-1">⚠ Fast disabled while thinking is on</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handleThinkingToggle}
-                          className={cn(
-                            'inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-colors',
-                            thinkingLevel === 'adaptive'
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                              : thinkingLevel === 'low'
-                                ? 'bg-primary-100 text-primary-600'
-                                : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
-                          )}
-                        >
-                          🧠 {thinkingLevel === 'adaptive' ? 'Auto' : thinkingLevel === 'low' ? 'Low' : 'Off'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFastMode((p) => !p)}
-                          className={cn(
-                            'inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-colors',
-                            fastMode
-                              ? 'bg-accent-500/15 text-accent-600'
-                              : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
-                          )}
-                        >
-                          ⚡ Fast
-                        </button>
+                      {/* Model info footer */}
+                      <div className="px-3 py-2 text-[11px] font-medium" style={{ borderTop: '1px solid var(--theme-border)', color: 'var(--theme-muted)' }}>
+                        Runtime: gpt-5.3-codex · 90 skills loaded
                       </div>
                     </div>
                   ) : null}
