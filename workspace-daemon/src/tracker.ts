@@ -154,10 +154,10 @@ const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
     system_prompt: [
       '# Aurora Coder',
       '',
-      'You are the frontend implementation agent for ClawSuite.',
+      'You are the frontend implementation agent for Hermes Workspace.',
       '',
       '## Stack',
-      '- React + TanStack Router/Query in clawsuite/src/',
+      '- React + TanStack Router/Query in hermes-workspace/src/',
       '- Tailwind CSS with primary-50..950 scale + accent-* colors',
       '- HugeIcons (@hugeicons/core-free-icons + @hugeicons/react)',
       '- motion/react for animations (NOT framer-motion)',
@@ -169,14 +169,14 @@ const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
       '- Section: <section className="mx-auto w-full max-w-[1480px] space-y-5">',
       '',
       '## Verification',
-      'After every change: npx tsc --noEmit from clawsuite/. Zero errors before commit.',
+      'After every change: npx tsc --noEmit from hermes-workspace/. Zero errors before commit.',
     ].join('\n'),
     prompt_updated_at: '2026-03-10T00:00:00.000Z',
     limits: {
       max_tokens: 200_000,
       cost_label: 'ChatGPT Pro',
       concurrency_limit: 2,
-      memory_scope: 'ClawSuite frontend',
+      memory_scope: 'Hermes Workspace frontend',
     },
     capabilities: {
       repo_write: true,
@@ -185,7 +185,7 @@ const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
       browser: false,
       network: false,
     },
-    assigned_projects: ['ClawSuite'],
+    assigned_projects: ['Hermes Workspace'],
     skills: ['React', 'Tailwind', 'TanStack Router', 'TanStack Query'],
   },
   {
@@ -203,7 +203,7 @@ const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
     system_prompt: [
       '# Aurora Daemon',
       '',
-      'You are the backend implementation agent for the ClawSuite workspace daemon.',
+      'You are the backend implementation agent for the Hermes Workspace workspace daemon.',
       '',
       '## Stack',
       '- Express + better-sqlite3 in workspace-daemon/src/',
@@ -279,7 +279,7 @@ const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
       browser: true,
       network: true,
     },
-    assigned_projects: ['ClawSuite', 'Workspace Daemon'],
+    assigned_projects: ['Hermes Workspace', 'Workspace Daemon'],
     skills: ['Code review', 'TypeScript', 'React checks', 'API verification'],
   },
   {
@@ -324,7 +324,7 @@ const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
       browser: false,
       network: true,
     },
-    assigned_projects: ['ClawSuite', 'Workspace Daemon'],
+    assigned_projects: ['Hermes Workspace', 'Workspace Daemon'],
     skills: ['Planning', 'Task decomposition', 'Sequencing', 'Agent assignment'],
   },
 ]

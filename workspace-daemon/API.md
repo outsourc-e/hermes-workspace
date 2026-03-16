@@ -134,5 +134,5 @@ cd workspace-daemon && npm run dev
 npm run build && node dist/server.js
 
 # CLI
-npx @clawsuite/workspace-daemon start --port 3099
+npx @hermes-workspace/workspace-daemon start --port 3099
 ```

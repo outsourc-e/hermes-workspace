@@ -1,6 +1,6 @@
-# ClawSuite Workspace Daemon
+# Hermes Workspace Workspace Daemon
 
-`@clawsuite/workspace-daemon` is a local orchestration service for running coding agents against tracked projects. It stores projects, missions, tasks, task runs, checkpoints, and activity in SQLite, prepares per-task workspaces, and exposes an HTTP API for the ClawSuite UI or other tooling.
+`@hermes-workspace/workspace-daemon` is a local orchestration service for running coding agents against tracked projects. It stores projects, missions, tasks, task runs, checkpoints, and activity in SQLite, prepares per-task workspaces, and exposes an HTTP API for the Hermes Workspace UI or other tooling.
 
 ## What it does
 
@@ -203,7 +203,7 @@ Create a project:
 curl -X POST http://127.0.0.1:3002/api/projects \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "ClawSuite",
+    "name": "Hermes Workspace",
     "path": "/absolute/path/to/repo",
     "spec": "Ship the workspace daemon MVP."
   }'

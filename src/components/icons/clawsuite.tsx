@@ -1,6 +1,6 @@
 import { useId } from 'react'
 
-export type OpenClawStudioIconProps = {
+export type HermesIconProps = {
   className?: string
   animateDots?: boolean
   dotClassName?: string
@@ -10,11 +10,11 @@ export type OpenClawStudioIconProps = {
  * Hermes Agent icon — Nous Research blue gradient with gold caduceus.
  * Replaces the original Hermes Workspace orange terminal icon.
  */
-export function OpenClawStudioIcon({
+export function HermesIcon({
   className,
   animateDots = false,
   dotClassName: _dotClassName,
-}: OpenClawStudioIconProps) {
+}: HermesIconProps) {
   const uid = useId().replace(/:/g, '')
   const gradId = `hermesBg-${uid}`
 

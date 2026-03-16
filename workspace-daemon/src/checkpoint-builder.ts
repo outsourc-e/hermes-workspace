@@ -35,7 +35,7 @@ function notifyCheckpointReady(taskName: string, projectName: string, taskRunId:
         "system",
         "event",
         "--text",
-        `Checkpoint ready for review: ${taskName} (${projectName}). Run ID: ${taskRunId}. Open ClawSuite → Review Queue.`,
+        `Checkpoint ready for review: ${taskName} (${projectName}). Run ID: ${taskRunId}. Open Hermes Workspace → Review Queue.`,
         "--mode",
         "now",
       ],

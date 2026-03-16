@@ -6,7 +6,7 @@ const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const FORCE_KILL_DELAY_MS = 5_000;
 const EXIT_SETTLE_GRACE_MS = 10_000;
 const JSON_RPC_VERSION = "2.0";
-const CLIENT_NAME = "clawsuite-workspace";
+const CLIENT_NAME = "hermes-workspace-workspace";
 const CLIENT_VERSION = "0.1.0";
 
 type JsonRpcId = number | string;

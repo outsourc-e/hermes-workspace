@@ -313,7 +313,12 @@ export const Route = createFileRoute('/api/send-stream')({
                       return
                     }
 
-                    if (event === 'tool.pending' || event === 'tool.started') {
+                    if (event === 'tool.pending') {
+                      // Skip pending — tool.started fires right after with same data
+                      return
+                    }
+
+                    if (event === 'tool.started') {
                       const translated = {
                         phase: 'start',
                         name:
@@ -353,10 +358,12 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
 
                     if (event === 'tool.completed') {
+                      const resultPreview = readString(data.result_preview) || readString(data.result) || ''
                       const translated = {
                         phase: 'complete',
                         name: readString(data.tool_name) || 'tool',
                         toolCallId: readString(data.tool_call_id) || undefined,
+                        result: resultPreview.slice(0, 200),
                         sessionKey: sessionKeyFromEvent,
                         runId,
                       }

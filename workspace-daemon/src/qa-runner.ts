@@ -71,7 +71,7 @@ export class QARunner {
   private buildPrompt(diff: string, projectPath: string): string {
     return [
       'IDENTITY: aurora-qa',
-      'ROLE: Code reviewer for ClawSuite',
+      'ROLE: Code reviewer for Hermes Workspace',
       '',
       'REVIEW CHECKLIST:',
       '1. TypeScript errors',
