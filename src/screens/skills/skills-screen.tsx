@@ -277,7 +277,7 @@ export function SkillsScreen() {
               </h1>
               <p className="text-sm text-primary-500 text-pretty sm:text-base">
                 Discover, install, and manage skills across your local workspace
-                and ClawdHub registry.
+                and Skills Hub.
               </p>
             </div>
           </div>
@@ -742,17 +742,17 @@ function SkillsGrid({
             <>
               Run{' '}
               <code className="rounded bg-primary-200 px-1.5 py-0.5 font-mono text-[11px]">
-                clawdhub sync
+                hermes skills sync
               </code>{' '}
               in your terminal to download the skills registry, or browse skills
               at{' '}
               <a
-                href="https://clawdhub.com"
+                href="https://github.com/NousResearch/hermes-agent"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-accent-500 hover:underline"
               >
-                clawdhub.com
+                Skills Hub
               </a>
             </>
           ) : (

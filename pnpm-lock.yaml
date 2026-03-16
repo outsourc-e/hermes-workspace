@@ -20,6 +20,9 @@ importers:
       '@lobehub/icons':
         specifier: ^5.0.1
         version: 5.0.1(@lobehub/ui@5.5.1)(@types/react@19.2.14)(antd@6.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@lobehub/icons-static-png':
+        specifier: ^1.83.0
+        version: 1.83.0
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -868,6 +871,9 @@ packages:
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
+
+  '@lobehub/icons-static-png@1.83.0':
+    resolution: {integrity: sha512-64CQr1ojUMPDZOCIyVz3L9JzR1lwQ6wINslKB9tq8+fr+5WKhlVTHHkyRY8gkftV4QWTxApuJB5+HT8XAmsddA==}
 
   '@lobehub/icons@5.0.1':
     resolution: {integrity: sha512-Wp9KINavihoWtTOHqHFj80GaKOrIRnOT0S7q5JxMRjijv4CEzbyEkJ2ILJlTz8zstRUfx+HvCVAKUv/Mbdp00Q==}
@@ -6822,6 +6828,8 @@ snapshots:
       - '@types/react'
       - antd
       - supports-color
+
+  '@lobehub/icons-static-png@1.83.0': {}
 
   '@lobehub/icons@5.0.1(@lobehub/ui@5.5.1)(@types/react@19.2.14)(antd@6.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:

@@ -250,7 +250,7 @@ function fallbackForNoApiKey(): DebugAnalysis {
   return {
     summary: 'No LLM API key is configured for debug analysis.',
     rootCause:
-      'Neither ANTHROPIC_API_KEY nor OPENAI_API_KEY was found, and no provider API key was found in ~/.openclaw/openclaw.json.',
+      'No API key found. Run hermes setup to configure a provider.',
     suggestedCommands: [
       {
         command: 'export ANTHROPIC_API_KEY=your_key_here',

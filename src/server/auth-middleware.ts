@@ -39,7 +39,7 @@ export function revokeSessionToken(token: string): void {
  */
 export function isPasswordProtectionEnabled(): boolean {
   return Boolean(
-    process.env.CLAWSUITE_PASSWORD && process.env.CLAWSUITE_PASSWORD.length > 0,
+    process.env.HERMES_PASSWORD && process.env.HERMES_PASSWORD.length > 0,
   )
 }
 
@@ -47,7 +47,7 @@ export function isPasswordProtectionEnabled(): boolean {
  * Verify password using timing-safe comparison.
  */
 export function verifyPassword(password: string): boolean {
-  const configured = process.env.CLAWSUITE_PASSWORD
+  const configured = process.env.HERMES_PASSWORD
   if (!configured || configured.length === 0) {
     return false
   }

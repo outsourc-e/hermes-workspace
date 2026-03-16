@@ -166,43 +166,43 @@ function MemoryTab() {
   if (error) return <ErrorState text={`Memory: ${error}`} />
   if (!data) return <EmptyState text="No memory entries" />
 
-  // Render memory data
-  const entries = Array.isArray(data) ? data : Object.entries(data)
+  // Parse Hermes memory format: { targets: [{ target, entries, usage }] }
+  const targets = (data as any)?.targets || (Array.isArray(data) ? data : [])
+  const allEntries: Array<{ target: string; text: string; usage: string }> = []
+  for (const t of targets) {
+    const target = t.target || 'memory'
+    const usage = t.usage || ''
+    for (const entry of (t.entries || [])) {
+      allEntries.push({ target, text: typeof entry === 'string' ? entry : JSON.stringify(entry), usage })
+    }
+  }
 
-  if (entries.length === 0) return <EmptyState text="No memory entries" />
+  if (allEntries.length === 0) return <EmptyState text="No memory entries" />
 
   return (
-    <div className="space-y-1 p-3 overflow-auto max-h-[calc(100vh-140px)]">
-      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
-        Memory entries ({entries.length})
+    <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      <p className="mb-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {allEntries.length} memories across {targets.length} targets
       </p>
-      {Array.isArray(data)
-        ? data.map((item: unknown, i: number) => {
-            const label = typeof item === 'string' ? item : typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)
-            return (
-              <div
-                key={i}
-                className="flex items-center gap-2 rounded px-2 py-1 text-xs"
-                style={{ background: 'var(--theme-card2)' }}
-              >
-                <span className="shrink-0 h-1.5 w-1.5 rounded-full" style={{ background: 'var(--theme-accent)' }} />
-                <span className="truncate" style={{ color: 'var(--theme-text)' }}>{label}</span>
-              </div>
-            )
-          })
-        : Object.entries(data).map(([key, value]) => (
+      {targets.map((t: any) => (
+        <div key={t.target} className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-accent)' }}>
+              {t.target}
+            </span>
+            <span className="text-[10px]" style={{ color: 'var(--theme-muted)' }}>{t.usage}</span>
+          </div>
+          {(t.entries || []).map((entry: string, i: number) => (
             <div
-              key={key}
-              className="rounded px-2 py-1.5 text-xs"
-              style={{ background: 'var(--theme-card2)' }}
+              key={i}
+              className="rounded-lg px-3 py-2 text-xs leading-relaxed"
+              style={{ backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }}
             >
-              <span className="font-semibold" style={{ color: 'var(--theme-accent)' }}>{key}</span>
-              <span style={{ color: 'var(--theme-muted)' }}> → </span>
-              <span className="truncate" style={{ color: 'var(--theme-text)' }}>
-                {typeof value === 'string' ? value : JSON.stringify(value)}
-              </span>
+              {typeof entry === 'string' ? entry : JSON.stringify(entry, null, 2)}
             </div>
           ))}
+        </div>
+      ))}
     </div>
   )
 }

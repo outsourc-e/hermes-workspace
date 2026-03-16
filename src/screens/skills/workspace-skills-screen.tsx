@@ -261,7 +261,7 @@ export function WorkspaceSkillsScreen() {
                     size="sm"
                     onClick={handleComingSoon}
                   >
-                    Browse ClawHub
+                    Browse Skills Hub
                   </Button>
                 </div>
               </div>

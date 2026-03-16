@@ -242,7 +242,7 @@ export function OpenClawUpdateNotifier() {
                     : isUpdating
                       ? 'Please wait...'
                       : data.installType === 'npm'
-                        ? `v${data.currentVersion} → v${data.latestVersion} · Run: npm i -g openclaw@latest`
+                        ? `v${data.currentVersion} → v${data.latestVersion} · Run: pip install --upgrade hermes-agent`
                         : `v${data.currentVersion} → v${data.latestVersion}`}
               </p>
             </div>

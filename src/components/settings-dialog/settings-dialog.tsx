@@ -133,16 +133,16 @@ const SETTINGS_CARD_CLASS =
 
 // ── Section components ──────────────────────────────────────────────────
 
-const PROVIDER_CARDS: Array<{ id: string; name: string; letter: string; color: string; models: string[]; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
-  { id: 'nous', name: 'Nous Portal', letter: 'N', color: '#8B5CF6', models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'], authType: 'oauth' },
-  { id: 'openai-codex', name: 'OpenAI Codex', letter: 'O', color: '#10B981', models: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'], authType: 'oauth' },
-  { id: 'anthropic', name: 'Anthropic', letter: 'A', color: '#D97706', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'], authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
-  { id: 'openrouter', name: 'OpenRouter', letter: 'R', color: '#6366F1', models: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'], authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
-  { id: 'zai', name: 'Z.AI / GLM', letter: 'Z', color: '#EC4899', models: ['glm-4-plus', 'glm-4-air'], authType: 'api_key', envKey: 'GLM_API_KEY' },
-  { id: 'kimi-coding', name: 'Kimi', letter: 'K', color: '#14B8A6', models: ['kimi-latest', 'moonshot-v1-128k'], authType: 'api_key', envKey: 'KIMI_API_KEY' },
-  { id: 'minimax', name: 'MiniMax', letter: 'M', color: '#F97316', models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'], authType: 'api_key', envKey: 'MINIMAX_API_KEY' },
-  { id: 'ollama', name: 'Ollama', letter: 'L', color: '#3B82F6', models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'], authType: 'none' },
-  { id: 'custom', name: 'Custom', letter: 'C', color: '#6B7280', models: [], authType: 'api_key' },
+const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: string[]; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
+  { id: 'nous', name: 'Nous Portal', logo: '/providers/nous.png', models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'], authType: 'oauth' },
+  { id: 'openai-codex', name: 'OpenAI Codex', logo: '/providers/openai.png', models: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'], authType: 'oauth' },
+  { id: 'anthropic', name: 'Anthropic', logo: '/providers/anthropic.png', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'], authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
+  { id: 'openrouter', name: 'OpenRouter', logo: '/providers/openrouter.png', models: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'], authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
+  { id: 'zai', name: 'Z.AI / GLM', logo: '/providers/zhipu.png', models: ['glm-4-plus', 'glm-4-air'], authType: 'api_key', envKey: 'GLM_API_KEY' },
+  { id: 'kimi-coding', name: 'Kimi', logo: '/providers/kimi.png', models: ['kimi-latest', 'moonshot-v1-128k'], authType: 'api_key', envKey: 'KIMI_API_KEY' },
+  { id: 'minimax', name: 'MiniMax', logo: '/providers/minimax.png', models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'], authType: 'api_key', envKey: 'MINIMAX_API_KEY' },
+  { id: 'ollama', name: 'Ollama', logo: '/providers/ollama.png', models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'], authType: 'none' },
+  { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
 ]
 
 function HermesContent() {
@@ -234,9 +234,11 @@ function HermesContent() {
                 style={cardStyle}
               >
                 <div className="flex w-full items-center justify-between">
-                  <div className="flex size-8 items-center justify-center rounded-lg text-white text-xs font-bold shrink-0" style={{ backgroundColor: p.color }}>
-                    {p.letter}
-                  </div>
+                  {p.logo ? (
+                    <img src={p.logo} alt={p.name} className="size-8 rounded-lg shrink-0 object-cover" />
+                  ) : (
+                    <div className="size-8 rounded-lg bg-neutral-600 flex items-center justify-center text-white text-xs font-bold shrink-0">C</div>
+                  )}
                   {isActive && <span className="size-2 rounded-full bg-green-500" />}
                   {!isActive && hasKey && <span className="size-2 rounded-full bg-green-500/40" />}
                   {!hasKey && p.authType === 'api_key' && <span className="size-2 rounded-full bg-red-500/60" />}
@@ -284,9 +286,11 @@ function HermesContent() {
             const isEditing = editingKey === key
             return (
               <div key={p.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
-                <div className="flex size-7 items-center justify-center rounded-md text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: p.color }}>
-                  {p.letter}
-                </div>
+                {p.logo ? (
+                  <img src={p.logo} alt={p.name} className="size-7 rounded-md shrink-0 object-cover" />
+                ) : (
+                  <div className="size-7 rounded-md bg-neutral-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">C</div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{p.name}</div>
                   <div className="text-[11px] font-mono" style={mutedStyle}>
@@ -538,7 +542,7 @@ function AppearanceContent() {
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
           Theme Mode
         </p>
-        <div className="inline-flex rounded-lg border border-primary-200 bg-white p-1">
+        <div className="inline-flex rounded-lg border border-primary-200 p-1">
           {[
             { value: 'light', label: 'Light', icon: Sun01Icon },
             { value: 'dark', label: 'Dark', icon: Moon01Icon },
@@ -665,7 +669,7 @@ function EnterpriseThemePicker() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-lg border border-primary-200 bg-white px-3 py-2">
+      <div className="flex items-center justify-between rounded-lg border border-primary-200 px-3 py-2">
         <div>
           <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
             {currentMode === 'dark' ? 'Dark mode' : 'Light mode'}
@@ -728,7 +732,7 @@ function LoaderContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const styles: Array<{ value: LoaderStyle; label: string }> = [
     { value: 'dots', label: 'Dots' },
-    { value: 'braille-claw', label: 'Claw' },
+    { value: 'braille-claw', label: 'Hermes' },
     { value: 'braille-orbit', label: 'Orbit' },
     { value: 'braille-breathe', label: 'Breathe' },
     { value: 'braille-pulse', label: 'Pulse' },
@@ -1049,7 +1053,7 @@ export function SettingsDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="inset-0 h-full w-full max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-white p-0 shadow-xl md:inset-auto md:left-1/2 md:top-1/2 md:h-[min(88dvh,740px)] md:min-h-[520px] md:w-full md:max-w-3xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-primary-200">
+      <DialogContent className="inset-0 h-full w-full max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 p-0 shadow-xl md:inset-auto md:left-1/2 md:top-1/2 md:h-[min(88dvh,740px)] md:min-h-[520px] md:w-full md:max-w-3xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-primary-200 bg-[var(--theme-bg)]">
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex items-center justify-between border-b border-primary-200 bg-primary-50/80 px-4 py-4 md:rounded-t-2xl md:px-5">
             <div>

@@ -1573,7 +1573,9 @@ function MessageItemComponent({
         {/* Tool calls — rendered OUTSIDE the chat bubble as separate pills */}
         {!isUser && hasStreamToolCalls ? (
           <div className="flex flex-wrap gap-1.5 pl-1">
-            {effectiveStreamToolCalls.map((toolCall) => (
+            {effectiveStreamToolCalls
+              .filter((tc, i, arr) => arr.findIndex((t) => t.name === tc.name && JSON.stringify(t.args) === JSON.stringify(tc.args)) === i)
+              .map((toolCall) => (
               <ToolCallPill key={toolCall.id} toolCall={toolCall} />
             ))}
           </div>

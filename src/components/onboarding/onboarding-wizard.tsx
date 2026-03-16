@@ -12,7 +12,6 @@ import { useOnboardingStore } from '@/hooks/use-onboarding'
 import { ONBOARDING_STEPS } from './onboarding-steps'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 
 export function OnboardingWizard() {
   const {
@@ -118,7 +117,7 @@ export function OnboardingWizard() {
                     )}
                   >
                     {step.id === 'welcome' ? (
-                      <OpenClawStudioIcon className="size-16 rounded-2xl overflow-hidden" />
+                      <img src="/hermes-avatar.webp" alt="Hermes" className="size-16 rounded-2xl" />
                     ) : (
                       <HugeiconsIcon
                         icon={step.icon}

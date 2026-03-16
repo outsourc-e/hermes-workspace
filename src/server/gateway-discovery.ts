@@ -2,8 +2,8 @@
  * Gateway Auto-Discovery
  *
  * Automatically finds a local Hermes gateway by:
- * 1. Reading ~/.openclaw/openclaw.json for port + auth token
- * 2. Falling back to `openclaw config get` CLI commands
+ * 1. Reading ~/.hermes/config.yaml for port + auth token
+ * 2. Falling back to `hermes config get` CLI commands
  * 3. Probing default port 18789
  *
  * This lets Hermes Workspace connect seamlessly without manual config.
@@ -239,8 +239,8 @@ async function scanLocalGatewayRange(): Promise<DiscoveryResult> {
 /**
  * Main discovery function. Tries all methods in order:
  * 1. Existing env vars (already configured)
- * 2. Hermes config file (~/.openclaw/openclaw.json)
- * 3. Hermes CLI (`openclaw config get`)
+ * 2. Hermes config file (~/.hermes/config.yaml)
+ * 3. Hermes CLI (`hermes config get`)
  *
  * If token is found, also writes it to process.env so the gateway client picks it up.
  */

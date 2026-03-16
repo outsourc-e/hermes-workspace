@@ -3,7 +3,6 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
 } from '@hugeicons/core-free-icons'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { Button } from '@/components/ui/button'
 import {

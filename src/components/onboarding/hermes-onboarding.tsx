@@ -10,11 +10,11 @@ const ONBOARDING_KEY = 'hermes-onboarding-complete'
 type Step = 'welcome' | 'connect' | 'provider' | 'test' | 'done'
 
 const PROVIDERS = [
-  { id: 'nous', name: 'Nous Portal', letter: 'N', color: '#8B5CF6', desc: 'Free via OAuth' },
-  { id: 'openai-codex', name: 'OpenAI Codex', letter: 'O', color: '#10B981', desc: 'Free via ChatGPT Pro' },
-  { id: 'anthropic', name: 'Anthropic', letter: 'A', color: '#D97706', desc: 'API key required' },
-  { id: 'openrouter', name: 'OpenRouter', letter: 'R', color: '#6366F1', desc: 'API key required' },
-  { id: 'ollama', name: 'Ollama', letter: 'L', color: '#3B82F6', desc: 'Local models, no key needed' },
+  { id: 'nous', name: 'Nous Portal', logo: '/providers/nous.png', desc: 'Free via OAuth' },
+  { id: 'openai-codex', name: 'OpenAI Codex', logo: '/providers/openai.png', desc: 'Free via ChatGPT Pro' },
+  { id: 'anthropic', name: 'Anthropic', logo: '/providers/anthropic.png', desc: 'API key required' },
+  { id: 'openrouter', name: 'OpenRouter', logo: '/providers/openrouter.png', desc: 'API key required' },
+  { id: 'ollama', name: 'Ollama', logo: '/providers/ollama.png', desc: 'Local models, no key needed' },
 ]
 
 export function HermesOnboarding() {
@@ -186,9 +186,7 @@ export function HermesOnboarding() {
                     )}
                     style={cardStyle}
                   >
-                    <div className="flex size-10 items-center justify-center rounded-xl text-white text-sm font-bold shrink-0" style={{ backgroundColor: p.color }}>
-                      {p.letter}
-                    </div>
+                    <img src={p.logo} alt={p.name} className="size-10 rounded-xl shrink-0 object-cover" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold">{p.name}</div>
                       <div className="text-xs" style={mutedStyle}>{p.desc}</div>

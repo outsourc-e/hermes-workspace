@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon, Tick01Icon, Sent02Icon } from '@hugeicons/core-free-icons';
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite';
 
 const STORAGE_KEY_SEEN = 'hermes-mobile-setup-seen';
 

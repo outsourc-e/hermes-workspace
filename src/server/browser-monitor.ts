@@ -98,19 +98,19 @@ function getDemoTabs(): Array<BrowserTab> {
     {
       id: 'demo-tab-1',
       title: 'Hermes Workspace',
-      url: 'https://openclaw.local/studio',
+      url: 'https://hermes-agent.local/workspace',
       isActive: true,
     },
     {
       id: 'demo-tab-2',
       title: 'Gateway Status',
-      url: 'https://openclaw.local/gateway/status',
+      url: 'https://hermes-agent.local/status',
       isActive: false,
     },
     {
       id: 'demo-tab-3',
       title: 'Agent Documentation',
-      url: 'https://docs.openclaw.local/agents',
+      url: 'https://github.com/NousResearch/hermes-agent',
       isActive: false,
     },
   ]

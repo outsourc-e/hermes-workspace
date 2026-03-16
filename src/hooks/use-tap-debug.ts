@@ -47,14 +47,14 @@ function collectAncestorStyles(value: Element | null, maxDepth = 4) {
 }
 
 type TapDebugWindow = Window & {
-  __CLAWSUITE_TAP_DEBUG__?: boolean
+  __HERMES_TAP_DEBUG__?: boolean
   setChatTapDebug?: (enabled: boolean) => boolean
   toggleChatTapDebug?: () => boolean
 }
 
 function readEnabled(win: TapDebugWindow): boolean {
-  if (typeof win.__CLAWSUITE_TAP_DEBUG__ === 'boolean') {
-    return win.__CLAWSUITE_TAP_DEBUG__
+  if (typeof win.__HERMES_TAP_DEBUG__ === 'boolean') {
+    return win.__HERMES_TAP_DEBUG__
   }
   try {
     return window.localStorage.getItem(TAP_DEBUG_STORAGE_KEY) === '1'
@@ -82,7 +82,7 @@ export function useTapDebug(
 
     const applyEnabled = (next: boolean) => {
       enabled = next
-      debugWindow.__CLAWSUITE_TAP_DEBUG__ = next
+      debugWindow.__HERMES_TAP_DEBUG__ = next
       try {
         window.localStorage.setItem(TAP_DEBUG_STORAGE_KEY, next ? '1' : '0')
       } catch {
