@@ -24,12 +24,12 @@ type SlashCommandMenuHandle = {
 }
 
 const SLASH_COMMANDS: Array<SlashCommandDefinition> = [
-  { command: '/model', description: 'Switch AI model' },
-  { command: '/status', description: 'Show session status' },
-  { command: '/reasoning', description: 'Toggle reasoning mode' },
-  { command: '/fast', description: 'Toggle fast mode (priority processing)' },
   { command: '/new', description: 'Start new session' },
-  { command: '/clear', description: 'Clear conversation' },
+  { command: '/clear', description: 'Clear screen and start fresh' },
+  { command: '/model', description: 'Show or change the current model' },
+  { command: '/save', description: 'Save the current conversation' },
+  { command: '/skills', description: 'Browse and manage skills' },
+  { command: '/skin', description: 'Change the display theme' },
   { command: '/help', description: 'Show available commands' },
 ]
 

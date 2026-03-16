@@ -273,7 +273,7 @@ export async function readError(res: Response): Promise<string> {
 }
 
 export const missingGatewayAuthMessage =
-  'Missing gateway auth. Set CLAWDBOT_GATEWAY_TOKEN (recommended) or CLAWDBOT_GATEWAY_PASSWORD in the server environment.'
+  'Hermes Agent connection failed. Make sure Hermes is running on localhost:8642.'
 
 export function isMissingGatewayAuth(message: string): boolean {
   return message.includes(missingGatewayAuthMessage)
