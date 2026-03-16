@@ -132,28 +132,44 @@ const SETTINGS_CARD_CLASS =
 
 // ── Section components ──────────────────────────────────────────────────
 
+const PROVIDER_CARDS: Array<{ id: string; name: string; icon: string; models: string[]; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
+  { id: 'nous', name: 'Nous Portal', icon: '⚕', models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'], authType: 'oauth' },
+  { id: 'openai-codex', name: 'OpenAI Codex', icon: '◎', models: ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-4o'], authType: 'oauth' },
+  { id: 'anthropic', name: 'Anthropic', icon: '◇', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'], authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
+  { id: 'openrouter', name: 'OpenRouter', icon: '⚡', models: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'], authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
+  { id: 'zai', name: 'Z.AI / GLM', icon: '✦', models: ['glm-4-plus', 'glm-4-air'], authType: 'api_key', envKey: 'GLM_API_KEY' },
+  { id: 'kimi-coding', name: 'Kimi', icon: '☾', models: ['kimi-latest', 'moonshot-v1-128k'], authType: 'api_key', envKey: 'KIMI_API_KEY' },
+  { id: 'minimax', name: 'MiniMax', icon: '▲', models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'], authType: 'api_key', envKey: 'MINIMAX_API_KEY' },
+  { id: 'ollama', name: 'Ollama', icon: '🦙', models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'], authType: 'none' },
+  { id: 'custom', name: 'Custom', icon: '⚙', models: [], authType: 'api_key' },
+]
+
 function HermesContent() {
-  const [config, setConfig] = useState<Record<string, unknown> | null>(null)
-  const [providers, setProviders] = useState<Array<{id:string; name:string; envKeys:string[]; configured:boolean; maskedKeys:Record<string,string>}>>([])
-  const [activeModel, setActiveModel] = useState('')
   const [activeProvider, setActiveProvider] = useState('')
-  const [modelInput, setModelInput] = useState('')
-  const [providerInput, setProviderInput] = useState('')
+  const [activeModel, setActiveModel] = useState('')
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [keyInput, setKeyInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [configuredKeys, setConfiguredKeys] = useState<Record<string, string>>({})
+  const [memEnabled, setMemEnabled] = useState(true)
+  const [userProfileEnabled, setUserProfileEnabled] = useState(true)
 
   useEffect(() => {
     fetch('/api/hermes-config')
       .then((r) => r.json())
       .then((d: any) => {
-        setConfig(d.config)
-        setProviders(d.providers || [])
-        setActiveModel(d.activeModel || '')
         setActiveProvider(d.activeProvider || '')
-        setModelInput(d.activeModel || '')
-        setProviderInput(d.activeProvider || '')
+        setActiveModel(d.activeModel || '')
+        const mem = (d.config?.memory as Record<string, unknown>) || {}
+        setMemEnabled(mem.memory_enabled !== false)
+        setUserProfileEnabled(mem.user_profile_enabled !== false)
+        // Build configured keys map
+        const keys: Record<string, string> = {}
+        for (const p of (d.providers || [])) {
+          if (p.configured && p.envKeys?.[0]) keys[p.envKeys[0]] = p.maskedKeys?.[p.envKeys[0]] || '••••'
+        }
+        setConfiguredKeys(keys)
       })
       .catch(() => {})
   }, [])
@@ -164,142 +180,181 @@ function HermesContent() {
       const res = await fetch('/api/hermes-config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) })
       const r = await res.json() as { message?: string }
       setMsg(r.message || 'Saved')
-      // Refresh
       const ref = await fetch('/api/hermes-config')
       const d = await ref.json() as any
-      setConfig(d.config); setProviders(d.providers || []); setActiveModel(d.activeModel || ''); setActiveProvider(d.activeProvider || '')
+      setActiveProvider(d.activeProvider || ''); setActiveModel(d.activeModel || '')
+      const keys: Record<string, string> = {}
+      for (const p of (d.providers || [])) {
+        if (p.configured && p.envKeys?.[0]) keys[p.envKeys[0]] = p.maskedKeys?.[p.envKeys[0]] || '••••'
+      }
+      setConfiguredKeys(keys)
       setTimeout(() => setMsg(null), 3000)
     } catch { setMsg('Failed to save') }
     setSaving(false)
   }
 
-  const memConfig = (config?.memory as Record<string, unknown>) || {}
+  const selectProvider = (providerId: string, model: string) => {
+    setActiveProvider(providerId)
+    setActiveModel(model)
+    save({ config: { model: { default: model, provider: providerId } } })
+  }
+
+  const cardStyle: React.CSSProperties = { backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }
+  const mutedStyle: React.CSSProperties = { color: 'var(--theme-muted)' }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {msg && (
         <div className={cn('rounded-lg px-3 py-2 text-sm font-medium', msg.includes('Failed') ? 'bg-red-500/15 text-red-400' : 'bg-green-500/15 text-green-400')}>
           {msg}
         </div>
       )}
 
-      {/* Model */}
-      <div className={SETTINGS_CARD_CLASS}>
-        <h3 className="text-sm font-semibold text-primary-900 mb-2">Model & Provider</h3>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-500 w-16 shrink-0">Model</label>
-            <input
-              value={modelInput}
-              onChange={(e) => setModelInput(e.target.value)}
-              className="flex-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none focus:border-accent-500"
-              placeholder="e.g. gpt-5.3-codex"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-500 w-16 shrink-0">Provider</label>
-            <input
-              value={providerInput}
-              onChange={(e) => setProviderInput(e.target.value)}
-              className="flex-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none focus:border-accent-500"
-              placeholder="e.g. openai-codex"
-            />
-          </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => save({ config: { model: { default: modelInput, provider: providerInput } } })}
-              className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-600 disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
+      {/* Provider Selection */}
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Provider</p>
+        <p className="mb-3 text-[11px]" style={mutedStyle}>Select your AI provider. OAuth providers authenticate via browser.</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {PROVIDER_CARDS.map((p) => {
+            const isActive = activeProvider === p.id
+            const hasKey = p.authType === 'none' || p.authType === 'oauth' || (p.envKey ? !!configuredKeys[p.envKey] : false)
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  if (hasKey && p.models[0]) selectProvider(p.id, p.models[0])
+                }}
+                className={cn(
+                  'flex flex-col items-start gap-1 rounded-xl px-3 py-2.5 text-left transition-all',
+                  isActive ? 'ring-2 ring-accent-500 shadow-md' : 'hover:brightness-110',
+                  !hasKey && p.authType === 'api_key' && 'opacity-60',
+                )}
+                style={cardStyle}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="text-lg">{p.icon}</span>
+                  {isActive && <span className="size-2 rounded-full bg-green-500" />}
+                  {!isActive && hasKey && <span className="size-2 rounded-full bg-green-500/40" />}
+                  {!hasKey && p.authType === 'api_key' && <span className="size-2 rounded-full bg-red-500/60" />}
+                </div>
+                <span className="text-sm font-semibold">{p.name}</span>
+                <span className="text-[10px]" style={mutedStyle}>
+                  {p.authType === 'oauth' ? 'OAuth' : p.authType === 'none' ? 'Local' : hasKey ? 'Key set' : 'Key required'}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
+      {/* Model Selection for active provider */}
+      {activeProvider && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Model</p>
+          <div className="flex flex-wrap gap-2">
+            {(PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models || []).map((model) => (
+              <button
+                key={model}
+                type="button"
+                onClick={() => selectProvider(activeProvider, model)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-all',
+                  activeModel === model ? 'ring-2 ring-accent-500' : 'hover:brightness-110',
+                )}
+                style={cardStyle}
+              >
+                {model}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* API Keys */}
-      <div className={SETTINGS_CARD_CLASS}>
-        <h3 className="text-sm font-semibold text-primary-900 mb-2">API Keys</h3>
-        <p className="text-xs text-primary-500 mb-3">Stored in ~/.hermes/.env</p>
-        <div className="space-y-2">
-          {providers.filter((p) => p.envKeys.length > 0).map((provider) => (
-            <div key={provider.id} className="flex items-center justify-between gap-2 py-1">
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-primary-900">{provider.name}</div>
-                <div className="text-xs text-primary-500">
-                  {provider.configured ? '✅ Configured' : '❌ Not set'}
-                  {provider.configured && provider.maskedKeys[provider.envKeys[0]] && (
-                    <span className="ml-1 font-mono">{provider.maskedKeys[provider.envKeys[0]]}</span>
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>API Keys</p>
+        <div className="space-y-1.5">
+          {PROVIDER_CARDS.filter((p) => p.envKey).map((p) => {
+            const key = p.envKey!
+            const hasKey = !!configuredKeys[key]
+            const isEditing = editingKey === key
+            return (
+              <div key={p.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
+                <span className="text-base">{p.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{p.name}</div>
+                  <div className="text-[11px] font-mono" style={mutedStyle}>
+                    {isEditing ? (
+                      <input
+                        type="password"
+                        value={keyInput}
+                        onChange={(e) => setKeyInput(e.target.value)}
+                        placeholder={`Paste ${key}`}
+                        className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
+                        style={{ color: 'var(--theme-text)' }}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && keyInput) { save({ env: { [key]: keyInput } }); setEditingKey(null); setKeyInput('') }
+                          if (e.key === 'Escape') { setEditingKey(null); setKeyInput('') }
+                        }}
+                      />
+                    ) : hasKey ? configuredKeys[key] : 'Not configured'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn('size-2 rounded-full', hasKey ? 'bg-green-500' : 'bg-neutral-500')} />
+                  {isEditing ? (
+                    <>
+                      <button type="button" onClick={() => { if (keyInput) { save({ env: { [key]: keyInput } }) }; setEditingKey(null); setKeyInput('') }}
+                        className="rounded-lg px-2 py-1 text-[11px] font-medium bg-accent-500 text-white">Save</button>
+                      <button type="button" onClick={() => { setEditingKey(null); setKeyInput('') }}
+                        className="rounded-lg px-2 py-1 text-[11px] font-medium" style={{ color: 'var(--theme-muted)' }}>Cancel</button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => { setEditingKey(key); setKeyInput('') }}
+                      className="rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-accent-500/10" style={{ color: 'var(--theme-accent, var(--theme-text))' }}>
+                      {hasKey ? 'Update' : 'Add'}
+                    </button>
                   )}
                 </div>
               </div>
-              {editingKey === provider.envKeys[0] ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="password"
-                    value={keyInput}
-                    onChange={(e) => setKeyInput(e.target.value)}
-                    className="w-48 rounded-lg border border-primary-200 bg-primary-50 px-2 py-1 text-xs outline-none focus:border-accent-500"
-                    placeholder={`Enter ${provider.envKeys[0]}`}
-                  />
-                  <button type="button" onClick={() => { save({ env: { [provider.envKeys[0]]: keyInput } }); setEditingKey(null); setKeyInput('') }} className="rounded bg-accent-500 px-2 py-1 text-xs text-white">Save</button>
-                  <button type="button" onClick={() => { setEditingKey(null); setKeyInput('') }} className="rounded px-2 py-1 text-xs text-primary-500 hover:text-primary-900">✕</button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setEditingKey(provider.envKeys[0]); setKeyInput('') }}
-                  className="rounded-lg border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
-                >
-                  {provider.configured ? 'Change' : 'Add Key'}
-                </button>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
       {/* Memory */}
-      <div className={SETTINGS_CARD_CLASS}>
-        <h3 className="text-sm font-semibold text-primary-900 mb-2">Memory</h3>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Memory</p>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={cardStyle}>
             <div>
-              <div className="text-sm text-primary-900">Memory enabled</div>
-              <div className="text-xs text-primary-500">Store memories across sessions</div>
+              <div className="text-sm font-medium">Memory</div>
+              <div className="text-[11px]" style={mutedStyle}>Store & recall memories across sessions</div>
             </div>
-            <button
-              type="button"
-              onClick={() => save({ config: { memory: { memory_enabled: !(memConfig.memory_enabled !== false) } } })}
-              className={cn('rounded-full px-3 py-1 text-xs font-medium', memConfig.memory_enabled !== false ? 'bg-green-500/15 text-green-500' : 'bg-primary-200 text-primary-500')}
-            >
-              {memConfig.memory_enabled !== false ? 'On' : 'Off'}
-            </button>
+            <Switch checked={memEnabled} onCheckedChange={(c) => { setMemEnabled(c); save({ config: { memory: { memory_enabled: c } } }) }} />
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={cardStyle}>
             <div>
-              <div className="text-sm text-primary-900">User profile</div>
-              <div className="text-xs text-primary-500">Remember preferences</div>
+              <div className="text-sm font-medium">User Profile</div>
+              <div className="text-[11px]" style={mutedStyle}>Remember preferences & context</div>
             </div>
-            <button
-              type="button"
-              onClick={() => save({ config: { memory: { user_profile_enabled: !(memConfig.user_profile_enabled !== false) } } })}
-              className={cn('rounded-full px-3 py-1 text-xs font-medium', memConfig.user_profile_enabled !== false ? 'bg-green-500/15 text-green-500' : 'bg-primary-200 text-primary-500')}
-            >
-              {memConfig.user_profile_enabled !== false ? 'On' : 'Off'}
-            </button>
+            <Switch checked={userProfileEnabled} onCheckedChange={(c) => { setUserProfileEnabled(c); save({ config: { memory: { user_profile_enabled: c } } }) }} />
           </div>
         </div>
       </div>
 
-      {/* Info */}
-      <div className={SETTINGS_CARD_CLASS}>
-        <h3 className="text-sm font-semibold text-primary-900 mb-2">Runtime</h3>
-        <div className="space-y-1 text-xs">
-          <div className="flex justify-between"><span className="text-primary-500">Model</span><span className="font-mono text-primary-900">{activeModel}</span></div>
-          <div className="flex justify-between"><span className="text-primary-500">Provider</span><span className="font-mono text-primary-900">{activeProvider}</span></div>
-          <div className="flex justify-between"><span className="text-primary-500">Config</span><span className="font-mono text-primary-900">~/.hermes/config.yaml</span></div>
+      {/* Runtime Info */}
+      <div className="rounded-xl px-3 py-2.5" style={cardStyle}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="size-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Runtime</span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+          <span style={mutedStyle}>Model</span><span className="font-mono font-medium">{activeModel || '—'}</span>
+          <span style={mutedStyle}>Provider</span><span className="font-mono font-medium">{PROVIDER_CARDS.find((p) => p.id === activeProvider)?.name || activeProvider || '—'}</span>
+          <span style={mutedStyle}>Config</span><span className="font-mono font-medium">~/.hermes/config.yaml</span>
         </div>
       </div>
     </div>
