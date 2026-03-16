@@ -41,7 +41,7 @@ import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 import { applyAccentColor } from '@/lib/accent-colors'
-// Provider icons — colored letter badges (SSR-safe)
+import { ProviderLogo } from '@/components/provider-logo'
 import {
   DialogClose,
   DialogContent,
@@ -234,11 +234,7 @@ function HermesContent() {
                 style={cardStyle}
               >
                 <div className="flex w-full items-center justify-between">
-                  {p.logo ? (
-                    <img src={p.logo} alt={p.name} className="size-8 rounded-lg shrink-0 object-cover" />
-                  ) : (
-                    <div className="size-8 rounded-lg bg-neutral-600 flex items-center justify-center text-white text-xs font-bold shrink-0">C</div>
-                  )}
+                  <ProviderLogo provider={p.id} size={32} />
                   {isActive && <span className="size-2 rounded-full bg-green-500" />}
                   {!isActive && hasKey && <span className="size-2 rounded-full bg-green-500/40" />}
                   {!hasKey && p.authType === 'api_key' && <span className="size-2 rounded-full bg-red-500/60" />}
@@ -286,11 +282,7 @@ function HermesContent() {
             const isEditing = editingKey === key
             return (
               <div key={p.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
-                {p.logo ? (
-                  <img src={p.logo} alt={p.name} className="size-7 rounded-md shrink-0 object-cover" />
-                ) : (
-                  <div className="size-7 rounded-md bg-neutral-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">C</div>
-                )}
+                <ProviderLogo provider={p.id} size={28} className="rounded-md" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{p.name}</div>
                   <div className="text-[11px] font-mono" style={mutedStyle}>

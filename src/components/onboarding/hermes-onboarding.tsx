@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
-// Provider icons — simple colored letter badges (SSR-safe, no @lobehub/icons ESM issues)
+import { ProviderLogo } from '@/components/provider-logo'
 
 const ONBOARDING_KEY = 'hermes-onboarding-complete'
 
@@ -186,7 +186,7 @@ export function HermesOnboarding() {
                     )}
                     style={cardStyle}
                   >
-                    <img src={p.logo} alt={p.name} className="size-10 rounded-xl shrink-0 object-cover" />
+                    <ProviderLogo provider={p.id} size={40} className="rounded-xl shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold">{p.name}</div>
                       <div className="text-xs" style={mutedStyle}>{p.desc}</div>
