@@ -764,13 +764,7 @@ function ChatSidebarComponent({
   ]
 
   const systemItems: NavItemDef[] = [
-    {
-      kind: 'link',
-      to: '/settings',
-      icon: Settings01Icon,
-      label: 'Settings',
-      active: isSettingsActive,
-    },
+    // Settings is now a popup dialog, not a nav route
   ]
 
   return (
@@ -1035,7 +1029,7 @@ function ChatSidebarComponent({
             <MenuContent side="top" align="start" className="min-w-[200px]">
               <MenuItem
                 onClick={function onOpenSettings() {
-                  window.location.href = '/settings'
+                  setSettingsOpen(true)
                 }}
                 className="justify-between"
               >
@@ -1051,9 +1045,17 @@ function ChatSidebarComponent({
             </MenuContent>
           </MenuRoot>
 
-          {/* Theme toggle */}
+          {/* Settings + Theme toggle */}
           {!isVisuallyCollapsed && (
             <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
+                aria-label="Settings"
+              >
+                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
+              </button>
               <ThemeToggleMini />
             </div>
           )}
