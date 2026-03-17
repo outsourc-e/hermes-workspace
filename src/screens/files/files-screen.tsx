@@ -958,7 +958,7 @@ export function FilesScreen() {
     setTreeLoading(true)
     setTreeError(null)
     try {
-      const res = await fetch('/api/files?action=list&maxDepth=2')
+      const res = await fetch('/api/files?action=list&maxDepth=0')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as FilesListResponse
       setEntries(Array.isArray(data.entries) ? data.entries : [])
