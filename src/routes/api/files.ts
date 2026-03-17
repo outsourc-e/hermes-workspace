@@ -98,7 +98,7 @@ const IGNORED_DIRS = new Set([
   '.DS_Store',
 ])
 
-const MAX_DIRECTORY_DEPTH = 8
+const MAX_DIRECTORY_DEPTH = 3
 const MAX_DIRECTORY_ENTRIES = 20_000
 
 type ReadDirectoryOptions = {

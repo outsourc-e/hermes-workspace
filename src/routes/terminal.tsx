@@ -34,31 +34,6 @@ export const Route = createFileRoute('/terminal')({
 
 function TerminalRoute() {
   usePageTitle('Terminal')
-  const navigate = useNavigate()
-
-  function handleBack() {
-    if (window.history.length > 1) {
-      window.history.back()
-      return
-    }
-    navigate({
-      to: '/chat/$sessionKey',
-      params: { sessionKey: 'main' },
-      replace: true,
-    })
-  }
-
-  return (
-    <div className="box-border h-full min-h-0 overflow-hidden bg-surface pb-24 text-primary-900 md:pb-0">
-      <Suspense
-        fallback={
-          <div className="flex h-full min-h-0 items-center justify-center text-xs text-primary-500">
-            Loading terminal…
-          </div>
-        }
-      >
-        <TerminalWorkspace mode="fullscreen" onBack={handleBack} />
-      </Suspense>
-    </div>
-  )
+  // Terminal is rendered persistently in WorkspaceShell — return null here to avoid double mount
+  return null
 }

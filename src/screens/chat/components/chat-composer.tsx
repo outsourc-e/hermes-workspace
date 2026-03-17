@@ -1492,7 +1492,7 @@ function ChatComposerComponent({
     () => {
       if (!isMobileViewport) return { maxWidth: 'min(768px, 100%)' } as CSSProperties
       const safeArea = 'env(safe-area-inset-bottom, 0px)'
-      const tabBarH = 'var(--tabbar-h, 5rem)'
+      const tabBarH = 'var(--tabbar-h, 0px)'
       const tf = effectiveScrollHidden ? 'translateY(110%)' : 'translateY(0)'
 
       if (keyboardOrFocusActive) {

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { InspectorToggleButton } from '@/components/inspector/inspector-panel'
+import { HamburgerTrigger } from '@/components/mobile-hamburger-menu'
 
 function toTitleCase(value: string): string {
   return value
@@ -228,6 +229,7 @@ function ChatHeaderComponent({
       >
         <div className="px-4 h-12 flex items-center justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-2">
+            <HamburgerTrigger className="-ml-1 shrink-0" />
             <button
               type="button"
               onClick={onOpenSessions}

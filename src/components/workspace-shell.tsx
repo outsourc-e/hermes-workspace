@@ -26,6 +26,16 @@ import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
+import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { MobilePageHeader } from '@/components/mobile-page-header'
+import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
+import { lazy, Suspense } from 'react'
+
+const TerminalWorkspace = lazy(() =>
+  import('@/components/terminal/terminal-workspace').then((m) => ({
+    default: m.TerminalWorkspace,
+  })),
+)
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
 // System metrics footer removed — not used in Hermes Workspace
@@ -143,9 +153,22 @@ export function WorkspaceShell() {
   }
 
   // Derive active session from URL
+  const mobilePageTitle = (() => {
+    if (pathname.startsWith('/terminal')) return 'Terminal'
+    if (pathname.startsWith('/files')) return 'Files'
+    if (pathname.startsWith('/jobs')) return 'Jobs'
+    if (pathname.startsWith('/memory')) return 'Memory'
+    if (pathname.startsWith('/skills')) return 'Skills'
+    if (pathname.startsWith('/settings')) return 'Settings'
+    if (pathname.startsWith('/debug')) return 'Debug'
+    if (pathname.startsWith('/activity')) return 'Activity'
+    return null
+  })()
+
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const isOnTerminalRoute = pathname.startsWith('/terminal')
   const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
@@ -381,10 +404,10 @@ export function WorkspaceShell() {
             onTouchMove={isMobile ? onTouchMove : undefined}
             onTouchEnd={isMobile ? onTouchEnd : undefined}
             className={[
-              'h-full min-h-0 min-w-0 overflow-x-hidden bg-[var(--theme-bg)]',
+              'h-full min-h-0 min-w-0 overflow-x-hidden bg-[var(--theme-bg)] relative',
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
-                ? 'pb-[calc(var(--tabbar-h,120px)+0.5rem)]'
+                ? 'pb-[calc(var(--tabbar-h,0px)+0.5rem)]'
                 : !isMobile &&
                     !isOnChatRoute &&
                     settings.showSystemMetricsFooter
@@ -393,9 +416,35 @@ export function WorkspaceShell() {
             ].join(' ')}
             data-tour="chat-area"
           >
-            <div className={['page-transition h-full', slideClass].filter(Boolean).join(' ')}>
+            {/* Persistent terminal — stays mounted to preserve session across navigation */}
+            <div
+              className="flex flex-col"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                visibility: isOnTerminalRoute ? 'visible' : 'hidden',
+                pointerEvents: isOnTerminalRoute ? 'auto' : 'none',
+                zIndex: isOnTerminalRoute ? 1 : -1,
+              }}
+            >
+              {isMobile && isOnTerminalRoute && (
+                <MobilePageHeader title="Terminal" />
+              )}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <Suspense fallback={null}>
+                  <TerminalWorkspace mode="fullscreen" panelVisible={isOnTerminalRoute} />
+                </Suspense>
+              </div>
+              {/* Mobile input bar — sibling to terminal, NOT a child, so SSE re-renders don't freeze it */}
+              {isMobile && <MobileTerminalInput />}
+            </div>
+
+            <div className={['page-transition h-full flex flex-col', slideClass, isOnTerminalRoute ? 'hidden' : ''].filter(Boolean).join(' ')}>
+              {isMobile && !isOnChatRoute && !isOnTerminalRoute && mobilePageTitle && (
+                <MobilePageHeader title={mobilePageTitle} />
+              )}
               <ErrorBoundary
-                className="h-full"
+                className="h-full min-h-0 flex-1"
                 title="Something went wrong"
                 description="This page failed to render. Reload to try again."
               >
@@ -421,7 +470,7 @@ export function WorkspaceShell() {
         ) : null}
       </div>
 
-      {isMobile ? <MobileTabBar /> : null}
+      <MobileHamburgerMenu />
       {/* System metrics footer removed */}
       <CommandPalette pathname={pathname} sessions={sessions} />
     </>

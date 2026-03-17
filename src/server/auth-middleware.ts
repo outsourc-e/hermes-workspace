@@ -89,7 +89,12 @@ function isLocalRequest(request: Request): boolean {
   const forwarded = request.headers.get('x-forwarded-for')
   const ip = forwarded?.split(',')[0]?.trim() || '127.0.0.1'
   const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1']
-  return localIPs.includes(ip)
+  if (localIPs.includes(ip)) return true
+  // Allow Tailscale (100.x.x.x) and private LAN ranges
+  if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return true
+  if (/^192\.168\./.test(ip)) return true
+  if (/^10\./.test(ip)) return true
+  return false
 }
 
 /**

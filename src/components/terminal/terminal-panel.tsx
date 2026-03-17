@@ -193,6 +193,8 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
         cursorBlink: true,
         fontSize: 13,
         fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+        scrollback: 500,
+        convertEol: true,
       })
       const fitAddon = new FitAddon()
       const webLinks = new WebLinksAddon()
