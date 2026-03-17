@@ -51,17 +51,41 @@
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **Hermes Agent** backend running on port 8642
+- **Python 3.11+** — [python.org](https://www.python.org/)
+- **Hermes Agent** — [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
 
-### Install & Run
+### Step 1: Set up Hermes Agent (backend)
 
 ```bash
+# Clone and install Hermes Agent
+git clone https://github.com/NousResearch/hermes-agent.git
+cd hermes-agent
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e .
+
+# Run the interactive setup (configures your API keys)
+hermes setup
+
+# Start the API server on port 8642
+hermes webapi
+# Or manually: uvicorn webapi.app:app --host 0.0.0.0 --port 8642
+```
+
+> **API keys:** Hermes supports Anthropic (Claude), OpenAI, OpenRouter, and local models via Ollama. Run `hermes setup` to configure your provider, or set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in `~/.hermes/.env`.
+
+### Step 2: Install & Run Hermes Workspace (frontend)
+
+```bash
+# In a new terminal
 git clone https://github.com/outsourc-e/hermes-workspace.git
 cd hermes-workspace
 pnpm install
 cp .env.example .env       # Add your Hermes API URL
 pnpm dev                   # Starts on http://localhost:3000
 ```
+
+> **Verify:** Open `http://localhost:3000` — you should see the chat interface. If you get connection errors, make sure Hermes Agent is running on port 8642 (`curl http://localhost:8642/health` should return `{"status": "ok"}`).
 
 ### Environment Variables
 
