@@ -1,11 +1,31 @@
 services:
-  hermes-workspace:
-    build: .
-    ports:
-      - "${PORT:-3000}:3000"
+  hermes-agent:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    env_file:
+      - .env
     environment:
-      - HERMES_API_URL=${HERMES_API_URL:-http://host.docker.internal:8642}
-      - HERMES_PASSWORD=${HERMES_PASSWORD:-}
-      - HERMES_ALLOWED_HOSTS=${HERMES_ALLOWED_HOSTS:-}
-    restart: unless-stopped
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8642/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    ports:
+      - "8642:8642"
 
+  hermes-workspace:
+    build:
+      context: .
+      dockerfile: docker/workspace/Dockerfile
+    depends_on:
+      hermes-agent:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      HERMES_API_URL: http://hermes-agent:8642
+    ports:
+      - "3000:3000"

@@ -85,7 +85,8 @@ hermes webapi
 git clone https://github.com/outsourc-e/hermes-workspace.git
 cd hermes-workspace
 pnpm install
-cp .env.example .env       # Add your Hermes API URL
+cp .env.example .env
+printf '\nHERMES_API_URL=http://127.0.0.1:8642\n' >> .env
 pnpm dev                   # Starts on http://localhost:3000
 ```
 
@@ -94,12 +95,37 @@ pnpm dev                   # Starts on http://localhost:3000
 ### Environment Variables
 
 ```env
+# Anthropic key for Hermes Agent (optional for demo mode, required for chat)
+ANTHROPIC_API_KEY=your-key-here
+
 # Hermes FastAPI backend URL
 HERMES_API_URL=http://127.0.0.1:8642
 
 # Optional: password-protect the web UI
 # HERMES_PASSWORD=your_password
 ```
+
+---
+
+## 🐳 Docker Quickstart
+
+[![Open in GitHub Codespaces](https://img.shields.io/badge/GitHub%20Codespaces-Open-181717?logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=outsourc-e/hermes-workspace)
+
+### Prerequisites
+
+- **Docker**
+- **Docker Compose**
+
+```bash
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
+echo 'ANTHROPIC_API_KEY=sk-ant-xxx' > .env
+docker compose up
+```
+
+Open `http://localhost:3000`.
+
+> **Note:** Set your API key in `.env` — workspace works in demo mode without one but chat requires a valid key.
 
 ---
 
@@ -326,4 +352,3 @@ MIT — see [LICENSE](LICENSE) for details.
 <div align="center">
   <sub>Built with ⚡ by <a href="https://github.com/outsourc-e">@outsourc-e</a> and the Hermes Workspace community</sub>
 </div>
-
