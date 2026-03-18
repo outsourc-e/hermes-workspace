@@ -134,3 +134,5 @@ docs/specs/
 release/
 __pycache__/
 
+.env.docker
+.env.bak
