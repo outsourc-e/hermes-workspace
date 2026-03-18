@@ -119,13 +119,13 @@ HERMES_API_URL=http://127.0.0.1:8642
 ```bash
 git clone https://github.com/outsourc-e/hermes-workspace.git
 cd hermes-workspace
-echo 'ANTHROPIC_API_KEY=sk-ant-xxx' > .env
+cp .env.example .env   # Edit with your API key
 docker compose up
 ```
 
 Open `http://localhost:3000`.
 
-> **Note:** Set your API key in `.env` — workspace works in demo mode without one but chat requires a valid key.
+> **Supports any provider:** Anthropic, OpenAI, OpenRouter, or local models via Ollama (no key needed). Just set the right env var in `.env` — see `.env.example` for options.
 
 ---
 
