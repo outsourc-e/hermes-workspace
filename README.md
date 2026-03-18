@@ -52,13 +52,15 @@
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
 - **Python 3.11+** — [python.org](https://www.python.org/)
-- **Hermes Agent** — [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
+- **Hermes Agent (with WebAPI)** — see below
 
 ### Step 1: Set up Hermes Agent (backend)
 
+> **⚠️ Important:** Hermes Workspace requires the **WebAPI backend** (`hermes webapi`), which provides the FastAPI server with session management, chat streaming, skills, and memory endpoints. The upstream NousResearch/hermes-agent does not include this yet — use our fork which adds the WebAPI layer.
+
 ```bash
-# Clone and install Hermes Agent
-git clone https://github.com/NousResearch/hermes-agent.git
+# Clone the fork with WebAPI support
+git clone https://github.com/outsourc-e/hermes-agent.git
 cd hermes-agent
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
@@ -67,10 +69,12 @@ pip install -e .
 # Run the interactive setup (configures your API keys)
 hermes setup
 
-# Start the API server on port 8642
+# Start the WebAPI server on port 8642
 hermes webapi
 # Or manually: uvicorn webapi.app:app --host 0.0.0.0 --port 8642
 ```
+
+> **Using upstream hermes-agent?** The workspace will still load — it auto-detects which API endpoints your gateway supports and gracefully disables features that aren't available. You'll see a log message listing which APIs are missing. For full functionality (chat, sessions, skills, memory), use our fork.
 
 > **API keys:** Hermes supports Anthropic (Claude), OpenAI, OpenRouter, and local models via Ollama. Run `hermes setup` to configure your provider, or set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in `~/.hermes/.env`.
 
@@ -230,6 +234,40 @@ Features pending cloud infrastructure:
 - Path traversal prevention on file/memory routes
 - Rate limiting on endpoints
 - Optional password protection for web UI
+
+---
+
+## 🔧 Troubleshooting
+
+### "Workspace loads but chat doesn't work"
+
+The workspace auto-detects your gateway's capabilities on startup. Check your terminal for a line like:
+
+```
+[gateway] http://127.0.0.1:8642 available: health, models; missing: sessions, skills, memory, config, jobs
+[gateway] Missing Hermes APIs detected. Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes gateway
+```
+
+**Fix:** You need the WebAPI backend. Use our fork:
+```bash
+git clone https://github.com/outsourc-e/hermes-agent.git
+cd hermes-agent && pip install -e . && hermes webapi
+```
+
+### "Connection refused" or workspace hangs on load
+
+Your Hermes gateway isn't running. Start it:
+```bash
+cd hermes-agent
+source .venv/bin/activate
+hermes webapi
+```
+
+Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
+
+### "Using upstream NousResearch/hermes-agent"
+
+The upstream hermes-agent doesn't include the WebAPI server yet. The workspace will load but with limited functionality. For full features, switch to our fork (`outsourc-e/hermes-agent`).
 
 ---
 
