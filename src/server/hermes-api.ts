@@ -5,7 +5,13 @@
  * Replaces legacy WebSocket connection for the Hermes Workspace fork.
  */
 
-const HERMES_API = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+import {
+  ensureGatewayProbed,
+  getCapabilities,
+  HERMES_API,
+  probeGateway,
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
+} from './gateway-capabilities'
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -364,10 +370,17 @@ export async function isHermesAvailable(): Promise<boolean> {
     const res = await fetch(`${HERMES_API}/health`, {
       signal: AbortSignal.timeout(3000),
     })
-    return res.ok
+    if (!res.ok) return false
+    await probeGateway({ force: true })
+    return true
   } catch {
     return false
   }
 }
 
-export { HERMES_API }
+export {
+  ensureGatewayProbed,
+  getCapabilities as getGatewayCapabilities,
+  HERMES_API,
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
+}

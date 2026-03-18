@@ -1,7 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '@/server/auth-middleware'
-import { getConfig, getSession, listSessions } from '../../server/hermes-api'
+import {
+  ensureGatewayProbed,
+  getConfig,
+  getGatewayCapabilities,
+  getSession,
+  listSessions,
+} from '../../server/hermes-api'
 import { isSyntheticSessionKey } from '../../server/session-utils'
 
 export const Route = createFileRoute('/api/session-status')({
@@ -11,7 +17,25 @@ export const Route = createFileRoute('/api/session-status')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        await ensureGatewayProbed()
         try {
+          const capabilities = getGatewayCapabilities()
+          if (!capabilities.sessions) {
+            return json({
+              ok: true,
+              payload: {
+                status: 'idle',
+                sessionKey: 'new',
+                sessionLabel: '',
+                model: '',
+                modelProvider: '',
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                sessions: [],
+              },
+            })
+          }
           const url = new URL(request.url)
           const requestedKey = url.searchParams.get('sessionKey')?.trim() || ''
           let sessionKey = requestedKey || 'new'
@@ -37,10 +61,10 @@ export const Route = createFileRoute('/api/session-status')({
             sessionKey = sessions[0]!.id
           }
 
-          const [session, config] = await Promise.all([
-            getSession(sessionKey),
-            getConfig(),
-          ])
+          const session = await getSession(sessionKey)
+          const config = capabilities.config
+            ? await getConfig()
+            : ({ model: '', provider: '' } as const)
 
           const inputTokens = session.input_tokens ?? 0
           const outputTokens = session.output_tokens ?? 0

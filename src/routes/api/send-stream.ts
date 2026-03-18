@@ -7,7 +7,13 @@ import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
-import { createSession, streamChat } from '../../server/hermes-api'
+import {
+  createSession,
+  ensureGatewayProbed,
+  getGatewayCapabilities,
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
+  streamChat,
+} from '../../server/hermes-api'
 
 // Hermes agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
@@ -118,6 +124,13 @@ export const Route = createFileRoute('/api/send-stream')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().sessions) {
+          return new Response(
+            JSON.stringify({ ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
 
         const body = (await request.json().catch(() => ({}))) as Record<
           string,

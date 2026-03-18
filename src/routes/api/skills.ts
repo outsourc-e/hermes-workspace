@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  ensureGatewayProbed,
+  getCapabilities,
+  HERMES_UPGRADE_INSTRUCTIONS,
+} from '../../server/gateway-capabilities'
 import { requireJsonContentType } from '../../server/rate-limit'
 
 type SkillsTab = 'installed' | 'marketplace' | 'featured'
@@ -238,6 +243,18 @@ export const Route = createFileRoute('/api/skills')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        await ensureGatewayProbed()
+        if (!getCapabilities().skills) {
+          return json({
+            items: [],
+            skills: [],
+            total: 0,
+            page: 1,
+            categories: KNOWN_CATEGORIES,
+            source: 'unavailable',
+            message: `Gateway does not support /api/skills. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+          })
+        }
 
         try {
           const url = new URL(request.url)
@@ -314,6 +331,16 @@ export const Route = createFileRoute('/api/skills')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        await ensureGatewayProbed()
+        if (!getCapabilities().skills) {
+          return json(
+            {
+              ok: false,
+              error: `Gateway does not support /api/skills. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+            },
+            { status: 503 },
+          )
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck

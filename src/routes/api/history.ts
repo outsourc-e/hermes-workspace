@@ -1,7 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '@/server/auth-middleware'
-import { getMessages, listSessions, toChatMessage } from '../../server/hermes-api'
+import {
+  ensureGatewayProbed,
+  getGatewayCapabilities,
+  getMessages,
+  listSessions,
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
+  toChatMessage,
+} from '../../server/hermes-api'
 import { resolveSessionKey } from '../../server/session-utils'
 
 export const Route = createFileRoute('/api/history')({
@@ -10,6 +17,16 @@ export const Route = createFileRoute('/api/history')({
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().sessions) {
+          return json({
+            sessionKey: 'new',
+            sessionId: 'new',
+            messages: [],
+            source: 'unavailable',
+            message: SESSIONS_API_UNAVAILABLE_MESSAGE,
+          })
         }
         try {
           const url = new URL(request.url)

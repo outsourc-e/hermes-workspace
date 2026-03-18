@@ -3,7 +3,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { requireJsonContentType } from '../../../server/rate-limit'
-import { sendChat } from '../../../server/hermes-api'
+import {
+  ensureGatewayProbed,
+  getGatewayCapabilities,
+  sendChat,
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
+} from '../../../server/hermes-api'
 import { resolveSessionKey } from '../../../server/session-utils'
 
 export const Route = createFileRoute('/api/sessions/send')({
@@ -15,6 +20,13 @@ export const Route = createFileRoute('/api/sessions/send')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().sessions) {
+          return json(
+            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
+            { status: 503 },
+          )
+        }
 
         try {
           const body = (await request.json().catch(() => ({}))) as Record<

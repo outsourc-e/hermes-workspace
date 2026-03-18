@@ -3,8 +3,12 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-
-const HERMES_API = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+import {
+  ensureGatewayProbed,
+  getCapabilities,
+  HERMES_API,
+  HERMES_UPGRADE_INSTRUCTIONS,
+} from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/hermes-jobs')({
   server: {
@@ -12,6 +16,17 @@ export const Route = createFileRoute('/api/hermes-jobs')({
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+        }
+        await ensureGatewayProbed()
+        if (!getCapabilities().jobs) {
+          return new Response(
+            JSON.stringify({
+              items: [],
+              source: 'unavailable',
+              message: `Gateway does not support /api/jobs. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
         }
         const url = new URL(request.url)
         const params = url.searchParams.toString()
@@ -22,6 +37,15 @@ export const Route = createFileRoute('/api/hermes-jobs')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+        }
+        await ensureGatewayProbed()
+        if (!getCapabilities().jobs) {
+          return new Response(
+            JSON.stringify({
+              error: `Gateway does not support /api/jobs. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+            }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } },
+          )
         }
         const body = await request.text()
         const res = await fetch(`${HERMES_API}/api/jobs`, {

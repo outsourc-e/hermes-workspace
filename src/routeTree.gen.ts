@@ -36,6 +36,7 @@ import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
+import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
@@ -184,6 +185,11 @@ const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
   path: '/api/hermes-config',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
+  id: '/api/gateway-status',
+  path: '/api/gateway-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
   id: '/api/files',
   path: '/api/files',
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
@@ -300,6 +307,7 @@ export interface FileRoutesByTo {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
@@ -342,6 +350,7 @@ export interface FileRoutesById {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
@@ -385,6 +394,7 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/context-usage'
     | '/api/files'
+    | '/api/gateway-status'
     | '/api/hermes-config'
     | '/api/hermes-jobs'
     | '/api/history'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/context-usage'
     | '/api/files'
+    | '/api/gateway-status'
     | '/api/hermes-config'
     | '/api/hermes-jobs'
     | '/api/history'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/context-usage'
     | '/api/files'
+    | '/api/gateway-status'
     | '/api/hermes-config'
     | '/api/hermes-jobs'
     | '/api/history'
@@ -508,6 +520,7 @@ export interface RootRouteChildren {
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiFilesRoute: typeof ApiFilesRoute
+  ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHermesJobsRoute: typeof ApiHermesJobsRouteWithChildren
   ApiHistoryRoute: typeof ApiHistoryRoute
@@ -722,6 +735,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gateway-status': {
+      id: '/api/gateway-status'
+      path: '/api/gateway-status'
+      fullPath: '/api/gateway-status'
+      preLoaderRoute: typeof ApiGatewayStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/files': {
       id: '/api/files'
       path: '/api/files'
@@ -863,6 +883,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiFilesRoute: ApiFilesRoute,
+  ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHermesJobsRoute: ApiHermesJobsRouteWithChildren,
   ApiHistoryRoute: ApiHistoryRoute,

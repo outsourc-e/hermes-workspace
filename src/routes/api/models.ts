@@ -4,6 +4,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  ensureGatewayProbed,
+  getGatewayCapabilities,
+} from '../../server/hermes-api'
 
 const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
@@ -96,6 +100,18 @@ export const Route = createFileRoute('/api/models')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().models) {
+          return json({
+            ok: true,
+            object: 'list',
+            data: [],
+            models: [],
+            configuredProviders: [],
+            source: 'unavailable',
+            message: 'Gateway does not support /v1/models',
+          })
+        }
         try {
           const models = await fetchHermesModels()
           // Add models from auth store providers (Anthropic, OpenAI, etc.)
@@ -106,7 +122,22 @@ export const Route = createFileRoute('/api/models')({
               models.push(m)
             }
           }
-          return json({ ok: true, models })
+          const configuredProviders = Array.from(
+            new Set(
+              models
+                .map((model) =>
+                  typeof model.provider === 'string' ? model.provider : '',
+                )
+                .filter(Boolean),
+            ),
+          )
+          return json({
+            ok: true,
+            object: 'list',
+            data: models,
+            models,
+            configuredProviders,
+          })
         } catch (err) {
           return json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 503 })
         }

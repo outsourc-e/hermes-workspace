@@ -6,7 +6,10 @@ import { requireJsonContentType } from '../../server/rate-limit'
 import {
   createSession,
   deleteSession,
+  ensureGatewayProbed,
+  getGatewayCapabilities,
   listSessions,
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
   toSessionSummary,
   updateSession,
 } from '../../server/hermes-api'
@@ -18,6 +21,15 @@ export const Route = createFileRoute('/api/sessions')({
         // Auth check
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().sessions) {
+          return json({
+            ok: true,
+            sessions: [],
+            source: 'unavailable',
+            message: SESSIONS_API_UNAVAILABLE_MESSAGE,
+          })
         }
 
         try {
@@ -38,6 +50,13 @@ export const Route = createFileRoute('/api/sessions')({
         }
         const csrfCheckPost = requireJsonContentType(request)
         if (csrfCheckPost) return csrfCheckPost
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().sessions) {
+          return json(
+            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
+            { status: 503 },
+          )
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
@@ -84,6 +103,13 @@ export const Route = createFileRoute('/api/sessions')({
         }
         const csrfCheckPatch = requireJsonContentType(request)
         if (csrfCheckPatch) return csrfCheckPatch
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().sessions) {
+          return json(
+            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
+            { status: 503 },
+          )
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
@@ -127,6 +153,13 @@ export const Route = createFileRoute('/api/sessions')({
       DELETE: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        await ensureGatewayProbed()
+        if (!getGatewayCapabilities().sessions) {
+          return json(
+            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
+            { status: 503 },
+          )
         }
         try {
           const url = new URL(request.url)
