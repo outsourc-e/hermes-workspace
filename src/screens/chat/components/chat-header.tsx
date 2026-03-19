@@ -240,10 +240,13 @@ function ChatHeaderComponent({
             <button
               type="button"
               onClick={onOpenSessions}
-              className="min-w-0 max-w-[45vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold tracking-tight text-ink active:opacity-70 transition-opacity"
+              className="min-w-0 max-w-[45vw] flex items-center gap-1 overflow-hidden text-sm font-semibold tracking-tight text-ink active:opacity-70 transition-opacity"
               aria-label="Switch session"
             >
-              {mobileTitle}
+              <span className="truncate">{mobileTitle}</span>
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="shrink-0 opacity-50">
+                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
           </div>
 
