@@ -105,18 +105,20 @@ export function WorkspaceShell() {
   }, [])
 
   const isClient = typeof window !== 'undefined'
-  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(() =>
-    isClient ? null : { authenticated: true, authRequired: false },
-  )
+  // Both SSR and client start with the same value to avoid hydration mismatch.
+  // The ConnectionStartupScreen overlay verifies the real status on mount.
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+  const [connectionVerified, setConnectionVerified] = useState(false)
 
   const authState = {
-    checked: !isClient || authStatus !== null,
-    authenticated: authStatus?.authenticated ?? !isClient,
+    checked: !isClient || connectionVerified,
+    authenticated: authStatus?.authenticated ?? true,
     authRequired: authStatus?.authRequired ?? false,
   }
 
   const handleStartupConnected = useCallback((status: AuthStatus) => {
     setAuthStatus(status)
+    setConnectionVerified(true)
   }, [])
 
   // Derive active session from URL
