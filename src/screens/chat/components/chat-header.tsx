@@ -227,30 +227,31 @@ function ChatHeaderComponent({
         className="shrink-0 border-b border-primary-200 bg-surface transition-transform"
         style={pullOffset > 0 ? { transform: `translateY(${pullOffset}px)` } : undefined}
       >
-        <div className="px-4 h-12 flex items-center justify-between">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <button
-              type="button"
-              onClick={openHamburgerMenu}
-              className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95 -ml-1"
-              aria-label="Open navigation menu"
-            >
-              <img src="/hermes-avatar.webp" alt="Hermes" className="size-8 rounded-xl" />
-            </button>
+        <div className="px-3 h-14 flex items-center">
+          <button
+            type="button"
+            onClick={openHamburgerMenu}
+            className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95"
+            aria-label="Open navigation menu"
+          >
+            <img src="/hermes-avatar.webp" alt="Hermes" className="size-9 rounded-xl" />
+          </button>
+
+          <div className="flex-1 flex justify-center min-w-0 -ml-11">
             <button
               type="button"
               onClick={onOpenSessions}
-              className="min-w-0 max-w-[45vw] flex items-center gap-1 overflow-hidden text-sm font-semibold tracking-tight text-ink active:opacity-70 transition-opacity"
+              className="max-w-[60vw] flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-primary-100 active:bg-primary-150 transition-colors"
               aria-label="Switch session"
             >
-              <span className="truncate">{mobileTitle}</span>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="shrink-0 opacity-50">
+              <span className="truncate text-[15px] font-semibold tracking-tight text-ink">{mobileTitle}</span>
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="shrink-0 opacity-40">
                 <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           </div>
 
-          <div className="ml-2 flex shrink-0 items-center gap-1">
+          <div className="shrink-0 flex items-center min-w-11 justify-end">
             <InspectorToggleButton />
           </div>
         </div>
