@@ -13,6 +13,8 @@ import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
 } from './gateway-capabilities'
 
+console.log(`[hermes-api] Configured API: ${HERMES_API}`)
+
 // ── Types ─────────────────────────────────────────────────────────
 
 export type HermesSession = {

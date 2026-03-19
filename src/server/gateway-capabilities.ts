@@ -4,7 +4,7 @@
  * degrade cleanly against older Hermes gateways.
  */
 
-export const HERMES_API =
+export let HERMES_API =
   process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
 export const HERMES_UPGRADE_INSTRUCTIONS =
@@ -94,6 +94,25 @@ export async function probeGateway(options?: {
   }
 
   probePromise = (async () => {
+    // Auto-detect port if no explicit env var set
+    if (!process.env.HERMES_API_URL) {
+      const healthOn8642 = await probe('/health')
+      if (!healthOn8642) {
+        const fallback = 'http://127.0.0.1:8643'
+        const healthOn8643 = await fetch(`${fallback}/health`, {
+          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        }).then(r => r.ok).catch(() => false)
+        if (healthOn8643) {
+          HERMES_API = fallback
+          console.log(`[gateway] Connected to Hermes at ${HERMES_API}`)
+        } else {
+          console.warn('[gateway] Could not reach Hermes on 8642 or 8643')
+        }
+      } else {
+        console.log(`[gateway] Connected to Hermes at ${HERMES_API}`)
+      }
+    }
+
     const [health, models, sessions, skills, memory, config, jobs] =
       await Promise.all([
         probe('/health'),
