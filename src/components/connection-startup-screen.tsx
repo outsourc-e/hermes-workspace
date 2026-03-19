@@ -180,51 +180,19 @@ export function ConnectionStartupScreen({
                   disabled={serverStarting}
                   onClick={async () => {
                     setServerStarting(true)
-                    setServerLog([])
+                    setServerLog(['Launching Hermes Agent...'])
                     try {
-                      const res = await fetch('/api/terminal-stream', {
+                      const res = await fetch('/api/start-hermes', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          command: ['bash', '-lc', START_COMMAND],
-                          cwd: undefined,
-                          cols: 120,
-                          rows: 10,
-                        }),
                       })
-                      if (!res.ok || !res.body) {
-                        const errText = await res.text().catch(() => '')
-                        setServerLog(prev => [...prev, `Error: HTTP ${res.status} ${errText}`])
+                      const data = (await res.json()) as Record<string, unknown>
+                      if (res.ok && data.ok) {
+                        setServerLog(prev => [...prev, 'Process launched. Waiting for health check...'])
+                      } else {
+                        setServerLog(prev => [...prev, `Error: ${String(data.error || 'Unknown error')}`])
                         setServerStarting(false)
-                        return
                       }
-                      const reader = res.body.getReader()
-                      const decoder = new TextDecoder()
-                      let buffer = ''
-                      const read = async () => {
-                        while (true) {
-                          const { done, value } = await reader.read()
-                          if (done) break
-                          buffer += decoder.decode(value, { stream: true })
-                          const lines = buffer.split('\n')
-                          buffer = lines.pop() || ''
-                          for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                              try {
-                                const parsed = JSON.parse(line.slice(6)) as unknown
-                                if (typeof parsed === 'string') {
-                                  const clean = parsed.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim()
-                                  if (clean) setServerLog(prev => [...prev, clean])
-                                } else if (parsed && typeof parsed === 'object' && parsed !== null && 'data' in parsed) {
-                                  const clean = String((parsed as Record<string, unknown>).data).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim()
-                                  if (clean) setServerLog(prev => [...prev, clean])
-                                }
-                              } catch { /* skip */ }
-                            }
-                          }
-                        }
-                      }
-                      void read()
                     } catch (err) {
                       setServerLog(prev => [...prev, `Failed: ${err instanceof Error ? err.message : String(err)}`])
                       setServerStarting(false)

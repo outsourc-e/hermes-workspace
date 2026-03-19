@@ -26,6 +26,7 @@ import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-str
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
+import { Route as ApiStartHermesRouteImport } from './routes/api/start-hermes'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
@@ -135,6 +136,11 @@ const ApiTerminalInputRoute = ApiTerminalInputRouteImport.update({
 const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
   id: '/api/terminal-close',
   path: '/api/terminal-close',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStartHermesRoute = ApiStartHermesRouteImport.update({
+  id: '/api/start-hermes',
+  path: '/api/start-hermes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSkillsRoute = ApiSkillsRouteImport.update({
@@ -289,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -332,6 +339,7 @@ export interface FileRoutesByTo {
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -377,6 +385,7 @@ export interface FileRoutesById {
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -423,6 +432,7 @@ export interface FileRouteTypes {
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/start-hermes'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -466,6 +476,7 @@ export interface FileRouteTypes {
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/start-hermes'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -510,6 +521,7 @@ export interface FileRouteTypes {
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/start-hermes'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -555,6 +567,7 @@ export interface RootRouteChildren {
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRoute
+  ApiStartHermesRoute: typeof ApiStartHermesRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
@@ -689,6 +702,13 @@ declare module '@tanstack/react-router' {
       path: '/api/terminal-close'
       fullPath: '/api/terminal-close'
       preLoaderRoute: typeof ApiTerminalCloseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/start-hermes': {
+      id: '/api/start-hermes'
+      path: '/api/start-hermes'
+      fullPath: '/api/start-hermes'
+      preLoaderRoute: typeof ApiStartHermesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/skills': {
@@ -934,6 +954,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionStatusRoute: ApiSessionStatusRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRoute,
+  ApiStartHermesRoute: ApiStartHermesRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
