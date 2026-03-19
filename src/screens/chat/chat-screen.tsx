@@ -79,6 +79,7 @@ import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 const _noopSetActivity = (_s: string) => {}
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
+import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 import { useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 import {
@@ -1173,6 +1174,7 @@ export function ChatScreen({
         const errorMessage = `Failed to send message. ${messageText}`
         setError(errorMessage)
         toast('Failed to send message', { type: 'error' })
+        showErrorToast(messageText)
         setPendingGeneration(false)
         setWaitingForResponse(false)
       },
@@ -2432,6 +2434,8 @@ export function ChatScreen({
         threshold={alertThreshold}
         contextPercent={alertPercent}
       />
+
+      <ErrorToastContainer />
     </div>
   )
 }

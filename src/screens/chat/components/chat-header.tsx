@@ -240,16 +240,16 @@ function ChatHeaderComponent({
             </svg>
           </button>
 
-          {/* Session name — left aligned like ChatGPT */}
+          {/* Session name — centered pill, tappable */}
           <button
             type="button"
             onClick={onOpenSessions}
-            className="flex items-center gap-1 min-w-0 max-w-[55vw] active:opacity-60 transition-opacity"
+            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-white/5 hover:bg-primary-100 active:bg-primary-150 transition-colors"
             aria-label="Switch session"
           >
-            <span className="truncate text-[16px] font-semibold text-ink">{mobileTitle === 'new' ? 'Hermes' : mobileTitle}</span>
-            <svg width="8" height="14" viewBox="0 0 8 14" fill="none" className="shrink-0 opacity-40 mt-px">
-              <path d="M1.5 1L6.5 7L1.5 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <span className="truncate text-[13px] font-medium text-ink">{mobileTitle === 'new' ? 'New Chat' : mobileTitle}</span>
+            <svg width="8" height="5" viewBox="0 0 8 5" fill="none" className="shrink-0 opacity-40">
+              <path d="M1 1L4 4L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
 
