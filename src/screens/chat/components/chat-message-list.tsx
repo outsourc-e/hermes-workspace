@@ -1322,7 +1322,7 @@ function ChatMessageListComponent({
               value={messageSearchValue}
               onChange={(e) => setMessageSearchValue(e.target.value)}
               placeholder="Search messages..."
-              className="min-w-0 flex-1 rounded-md border border-primary-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1.5 text-sm text-primary-900 dark:text-neutral-100 outline-none placeholder:text-primary-400 dark:placeholder:text-neutral-500 focus:border-primary-400 dark:focus:border-primary-500 focus:ring-1 focus:ring-primary-400 dark:focus:ring-primary-500"
+              className="min-w-0 flex-1 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none placeholder:text-primary-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
             />
             {isMessageSearchActive && (
               <span className="shrink-0 text-xs text-primary-500 dark:text-neutral-400">
