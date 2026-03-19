@@ -1000,7 +1000,7 @@ function HermesConfigSection() {
                   setModelInput('')
                   void fetchModelsForProvider(newProvider)
                 }}
-                className="flex-1 rounded-md border border-primary-300 bg-white px-3 py-2 text-sm text-primary-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="flex-1 rounded-md border border-primary-300 bg-white dark:bg-primary-800 px-3 py-2 text-sm text-primary-900 dark:text-primary-100 dark:border-primary-600 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               >
                 {availableProviders.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -1024,7 +1024,7 @@ function HermesConfigSection() {
               <select
                 value={modelInput}
                 onChange={(e) => setModelInput(e.target.value)}
-                className="flex-1 rounded-md border border-primary-300 bg-white px-3 py-2 text-sm font-mono text-primary-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="flex-1 rounded-md border border-primary-300 bg-white dark:bg-primary-800 px-3 py-2 text-sm font-mono text-primary-900 dark:text-primary-100 dark:border-primary-600 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               >
                 {!availableModels.some(m => m.id === modelInput) && modelInput && (
                   <option value={modelInput}>{modelInput} (current)</option>
