@@ -185,10 +185,15 @@ export const Route = createFileRoute('/api/send-stream')({
           )
         }
 
-        const body = (await request.json().catch(() => ({}))) as Record<
-          string,
-          unknown
-        >
+        // Read body manually to handle large payloads (image attachments
+        // can push the JSON body above the default ~1MB parse limit).
+        let body: Record<string, unknown> = {}
+        try {
+          const rawBody = await request.text()
+          body = JSON.parse(rawBody) as Record<string, unknown>
+        } catch {
+          // Fall through — body stays empty, will hit 'message required' below
+        }
 
         const rawSessionKey =
           typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
