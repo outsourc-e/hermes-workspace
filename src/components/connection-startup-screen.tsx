@@ -102,6 +102,10 @@ export function ConnectionStartupScreen({
   }, [clearRetryTimeout, handleConnected, scheduleSetupReveal])
 
   useEffect(() => {
+    // Start the setup reveal timer immediately — don't wait for the first
+    // failed attempt. If the connection succeeds before the timer fires,
+    // handleConnected() clears it.
+    scheduleSetupReveal()
     void attemptConnection()
 
     return () => {
@@ -110,7 +114,7 @@ export function ConnectionStartupScreen({
       clearSetupTimeout()
       clearExitTimeout()
     }
-  }, [attemptConnection, clearExitTimeout, clearRetryTimeout, clearSetupTimeout])
+  }, [attemptConnection, clearExitTimeout, clearRetryTimeout, clearSetupTimeout, scheduleSetupReveal])
 
   useEffect(() => {
     if (copyState === 'idle') return
