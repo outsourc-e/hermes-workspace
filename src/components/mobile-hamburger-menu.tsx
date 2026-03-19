@@ -14,6 +14,7 @@ import {
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
+import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
 
 const NAV_ITEMS = [
   { id: 'chat',     label: 'Chat',     icon: Chat01Icon,      to: '/chat/main',  match: (p: string) => p.startsWith('/chat') || p === '/new' || p === '/' },
@@ -158,7 +159,12 @@ export function MobileHamburgerMenu() {
         <div className="px-3 pb-2 pt-3" style={{ borderTop: '1px solid var(--color-border, #e5e7eb)' }}>
           <div className="flex items-center gap-3 px-2">
             {/* User avatar + name + status dot */}
-            <img src="/hermes-avatar.webp" alt="User" className="size-9 rounded-xl shrink-0" />
+            <div className="size-9 rounded-xl shrink-0 flex items-center justify-center" style={{ background: 'var(--color-accent-muted, rgba(99,102,241,0.15))' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-accent, #6366f1)' }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
             <span className="text-[15px] font-semibold truncate" style={{ color: 'var(--color-ink, #111)' }}>Eric</span>
             <span className="size-2.5 rounded-full bg-green-500 shrink-0" />
 
@@ -175,14 +181,14 @@ export function MobileHamburgerMenu() {
               <HugeiconsIcon icon={Settings01Icon} size={20} strokeWidth={1.5} />
             </button>
 
-            {/* Theme toggle (moon) */}
+            {/* Theme toggle — sun/moon */}
             <button
               type="button"
               onClick={() => {
-                const html = document.documentElement
-                const current = html.getAttribute('data-theme')
-                html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark')
-                localStorage.setItem('theme', current === 'dark' ? 'light' : 'dark')
+                const current = getTheme()
+                const dark = isDarkTheme(current)
+                const next = getThemeVariant(current, dark ? 'light' : 'dark')
+                setTheme(next)
               }}
               className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
               aria-label="Toggle theme"
