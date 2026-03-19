@@ -272,7 +272,7 @@ type StreamChatOptions = {
  */
 export async function streamChat(
   sessionId: string,
-  body: { message: string; model?: string; system_message?: string },
+  body: { message: string; model?: string; system_message?: string; attachments?: Array<Record<string, unknown>> },
   opts: StreamChatOptions,
 ): Promise<void> {
   const res = await fetch(`${HERMES_API}/api/sessions/${sessionId}/chat/stream`, {

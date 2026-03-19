@@ -233,6 +233,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   message: getChatMessage(message, attachments),
                   model: typeof body.model === 'string' ? body.model : undefined,
                   system_message: thinking,
+                  attachments: attachments || undefined,
                 },
                 {
                   signal: abortController.signal,

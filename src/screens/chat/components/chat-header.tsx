@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { InspectorToggleButton } from '@/components/inspector/inspector-panel'
-import { HamburgerTrigger } from '@/components/mobile-hamburger-menu'
+import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 
 function toTitleCase(value: string): string {
   return value
@@ -229,18 +229,22 @@ function ChatHeaderComponent({
       >
         <div className="px-4 h-12 flex items-center justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <HamburgerTrigger className="-ml-1 shrink-0" />
             <button
               type="button"
-              onClick={onOpenSessions}
-              className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95"
-              aria-label="Open sessions"
+              onClick={openHamburgerMenu}
+              className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95 -ml-1"
+              aria-label="Open navigation menu"
             >
               <img src="/hermes-avatar.webp" alt="Hermes" className="size-8 rounded-xl" />
             </button>
-            <div className="min-w-0 max-w-[45vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold tracking-tight text-ink">
+            <button
+              type="button"
+              onClick={onOpenSessions}
+              className="min-w-0 max-w-[45vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold tracking-tight text-ink active:opacity-70 transition-opacity"
+              aria-label="Switch session"
+            >
               {mobileTitle}
-            </div>
+            </button>
           </div>
 
           <div className="ml-2 flex shrink-0 items-center gap-1">
