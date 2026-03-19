@@ -60,8 +60,8 @@ function ToastItem({ entry, onDismiss }: ToastItemProps) {
     <div
       className={cn(
         'flex items-start gap-3 max-w-sm w-full',
-        'rounded-xl border border-red-200 dark:border-red-800/60',
-        'bg-white dark:bg-zinc-900 shadow-lg px-4 py-3',
+        'rounded-xl border border-red-200',
+        'shadow-lg px-4 py-3 bg-surface',
         'animate-in slide-in-from-top-2 fade-in duration-200',
       )}
       role="alert"

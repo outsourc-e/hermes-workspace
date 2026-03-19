@@ -89,7 +89,7 @@ export function MobileSessionsPanel({
 
       <aside className="no-swipe absolute inset-y-0 left-0 w-[80vw] max-w-sm border-r shadow-2xl animate-in slide-in-from-left-8 duration-200" style={{ background: 'var(--color-surface, #fff)', borderColor: 'var(--color-border, #e5e7eb)' }}>
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3 dark:border-gray-700">
+          <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
             <h2 className="text-sm font-semibold text-ink">Sessions</h2>
             <button
               type="button"

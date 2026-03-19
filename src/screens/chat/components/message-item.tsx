@@ -861,17 +861,17 @@ function InlineToolSectionItem({
 
       {/* ── Expanded section ── */}
       <CollapsiblePanel>
-        <div className="mt-0.5 ml-3 flex flex-col gap-1.5 pb-1.5 border-l border-neutral-800/60 pl-2">
+        <div className="mt-0.5 ml-3 flex flex-col gap-1.5 pb-1.5 border-l border-primary-200/60 pl-2">
           {/* Args */}
           {toolSection.input && Object.keys(toolSection.input).length > 0 && !showRawJson ? (
             <div>
-              <div className="text-[9px] uppercase tracking-widest text-neutral-500 mb-0.5 font-sans">Arguments</div>
+              <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Arguments</div>
               {toolSection.type === 'exec' && headerArg ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-800 px-2 py-1 text-[11px] font-mono text-amber-300 dark:bg-neutral-950">
+                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[11px] font-mono text-amber-600" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
                   $ {headerArg}
                 </pre>
               ) : (
-                <pre className="max-h-32 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-[11px] font-mono text-neutral-300 dark:bg-neutral-950">
+                <pre className="max-h-32 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[11px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
                   {JSON.stringify(toolSection.input, null, 2)}
                 </pre>
               )}
@@ -883,26 +883,26 @@ function InlineToolSectionItem({
             isError && toolSection.errorText ? (
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">Error</div>
-                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded bg-red-950/40 p-2 text-xs font-mono text-red-300">
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-xs font-mono text-red-500" style={{ background: 'var(--code-bg, var(--theme-card))' }}>
                   {toolSection.errorText}
                 </pre>
               </div>
             ) : toolSection.outputText ? (
               <div>
-                <div className="text-[9px] uppercase tracking-widest text-neutral-500 mb-0.5 font-sans">Result</div>
-                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-xs font-mono text-neutral-200 dark:bg-neutral-950">
+                <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Result</div>
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-xs font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
                   {toolSection.outputText.length > 800
                     ? `${toolSection.outputText.slice(0, 800)}…`
                     : toolSection.outputText}
                 </pre>
               </div>
             ) : isRunning ? (
-              <span className="text-xs italic text-neutral-400">running…</span>
+              <span className="text-xs italic text-primary-500">running…</span>
             ) : (
-              <span className="text-xs italic text-neutral-400">no output</span>
+              <span className="text-xs italic text-primary-500">no output</span>
             )
           ) : (
-            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded bg-neutral-900 p-2 text-[11px] font-mono text-neutral-400 dark:bg-neutral-950">
+            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[11px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
               {rawJsonPayload}
             </pre>
           )}
@@ -911,7 +911,7 @@ function InlineToolSectionItem({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowRawJson((v) => !v) }}
-            className="self-start text-[9px] font-sans text-neutral-500 hover:text-neutral-300 transition-colors"
+            className="self-start text-[9px] font-sans text-primary-500 hover:text-primary-700 transition-colors"
           >
             {showRawJson ? '← formatted' : 'raw JSON →'}
           </button>

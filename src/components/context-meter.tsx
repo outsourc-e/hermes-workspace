@@ -73,16 +73,19 @@ export function ContextMeter({ variant = 'mobile', className }: ContextMeterProp
     return (
       <div className={cn('w-full flex flex-col', className)}>
         {/* Thin progress bar */}
-        <div className="w-full h-[3px] bg-primary-100 dark:bg-white/10">
+        <div className="w-full h-[3px]" style={{ background: 'var(--color-border, rgba(0,0,0,0.1))' }}>
           <div
             className={cn('h-full transition-all duration-700', getBarColor(pct))}
             style={{ width: `${Math.min(pct, 100)}%` }}
           />
         </div>
-        {/* Warning banner at 90%+ */}
-        {warning && pct >= 90 && (
-          <div className="w-full bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] px-3 py-0.5 text-center">
-            {warning}
+        {/* Warning banner at 75%+ */}
+        {warning && pct >= 75 && (
+          <div className={cn(
+            'w-full text-[11px] px-3 py-0.5 text-center',
+            pct >= 90 ? 'bg-red-500/10 text-red-600' : 'bg-orange-500/10 text-orange-600'
+          )}>
+            ⚠ {warning}
           </div>
         )}
       </div>
@@ -93,17 +96,17 @@ export function ContextMeter({ variant = 'mobile', className }: ContextMeterProp
   return (
     <div className={cn('flex items-center gap-2', className)}>
       {pct >= 75 && (
-        <span className="text-[10px] font-medium text-orange-500 dark:text-orange-400 shrink-0">
+        <span className="text-[10px] font-medium text-orange-500 shrink-0">
           {pct >= 90 ? '⚠ Context full' : '⚠ Context high'}
         </span>
       )}
-      <div className="w-20 h-1.5 rounded-full bg-primary-100 dark:bg-white/10 overflow-hidden shrink-0">
+      <div className="w-20 h-1.5 rounded-full overflow-hidden shrink-0" style={{ background: 'var(--color-border, rgba(0,0,0,0.1))' }}>
         <div
           className={cn('h-full rounded-full transition-all duration-700', getBarColor(pct))}
           style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </div>
-      <span className="text-[10px] text-primary-500 dark:text-primary-400 shrink-0 tabular-nums">
+      <span className="text-[10px] shrink-0 tabular-nums" style={{ color: 'var(--color-muted, #888)' }}>
         {Math.round(pct)}%
       </span>
     </div>

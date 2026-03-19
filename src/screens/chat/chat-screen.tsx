@@ -2284,7 +2284,8 @@ export function ChatScreen({
 
           {!isFocusMode && <ContextBar compact={compact} />}
 
-          <ContextMeter variant="mobile" />
+          <div className="md:hidden"><ContextMeter variant="mobile" /></div>
+          <div className="hidden md:block px-4 py-1"><ContextMeter variant="desktop" /></div>
 
           {errorNotice && <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>}
           {pendingApprovals.length > 0 && (
