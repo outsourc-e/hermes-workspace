@@ -119,8 +119,6 @@ export function ConnectionStartupScreen({
     return () => globalThis.clearTimeout(timer)
   }, [copyState])
 
-  if (!visible) return null
-
   return (
     <div
       className={[
