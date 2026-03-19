@@ -80,6 +80,7 @@ const _noopSetActivity = (_s: string) => {}
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
+import { ContextMeter } from '@/components/context-meter'
 import { useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 import {
@@ -2282,6 +2283,8 @@ export function ChatScreen({
           )}
 
           {!isFocusMode && <ContextBar compact={compact} />}
+
+          <ContextMeter variant="mobile" />
 
           {errorNotice && <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>}
           {pendingApprovals.length > 0 && (

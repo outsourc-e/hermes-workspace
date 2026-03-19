@@ -22,6 +22,9 @@ const NAV_ITEMS = [
   { id: 'jobs',     label: 'Jobs',     icon: Clock01Icon,      to: '/jobs',       match: (p: string) => p.startsWith('/jobs') },
   { id: 'memory',   label: 'Memory',   icon: BrainIcon,        to: '/memory',     match: (p: string) => p.startsWith('/memory') },
   { id: 'skills',   label: 'Skills',   icon: PuzzleIcon,       to: '/skills',     match: (p: string) => p.startsWith('/skills') },
+]
+
+const BOTTOM_ITEMS = [
   { id: 'settings', label: 'Settings', icon: Settings01Icon,   to: '/settings',   match: (p: string) => p.startsWith('/settings') },
 ]
 
@@ -152,6 +155,38 @@ export function MobileHamburgerMenu() {
             )
           })}
         </nav>
+
+        {/* Bottom — settings + connection indicator */}
+        <div className="px-3 pb-2 flex flex-col gap-1" style={{ borderTop: '1px solid var(--color-border, #e5e7eb)' }}>
+          <div className="flex items-center gap-3 px-3 py-3">
+            <div className="relative shrink-0">
+              <img src="/hermes-avatar.webp" alt="Hermes" className="size-8 rounded-full" />
+              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900" />
+            </div>
+            <span className="flex-1 text-[13px] font-medium truncate" style={{ color: 'var(--color-ink-muted, #555)' }}>Connected</span>
+          </div>
+          {BOTTOM_ITEMS.map((item) => {
+            const isActive = item.match(pathname)
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNav(item.to)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full',
+                  'transition-all duration-150 active:scale-[0.98]',
+                )}
+                style={isActive
+                  ? { background: 'var(--color-accent-muted, rgba(99,102,241,0.12))', color: 'var(--color-accent, #6366f1)' }
+                  : { color: 'var(--color-ink-muted, #555)' }
+                }
+              >
+                <HugeiconsIcon icon={item.icon} size={20} strokeWidth={isActive ? 2 : 1.6} />
+                <span className="text-[15px] font-medium">{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
     </>
   )
