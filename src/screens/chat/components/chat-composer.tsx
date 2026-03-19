@@ -242,10 +242,15 @@ async function fetchModels(): Promise<{
 
 async function switchModel(
   model: string,
+  provider?: string,
   _sessionKey?: string,
 ): Promise<ModelSwitchResponse> {
-  const modelProvider = model.includes('/') ? model.split('/')[0] : undefined
-  const modelId = model.includes('/') ? model.split('/').slice(1).join('/') : model
+  const modelId = model.trim()
+  const modelProvider = typeof provider === 'string' && provider.trim()
+    ? provider.trim()
+    : modelId.includes('/')
+      ? modelId.split('/')[0]
+      : undefined
 
   // Write the model change to ~/.hermes/config.yaml via the webapi
   try {
@@ -419,6 +424,17 @@ async function readFileAsText(file: File): Promise<string | null> {
 
 function readText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function getResolvedModelKey(model: string, provider?: string): string {
+  const normalizedModel = model.trim()
+  const normalizedProvider =
+    typeof provider === 'string' ? provider.trim() : ''
+
+  if (!normalizedModel) return ''
+  if (!normalizedProvider) return normalizedModel
+  if (normalizedModel.startsWith(`${normalizedProvider}/`)) return normalizedModel
+  return `${normalizedProvider}/${normalizedModel}`
 }
 
 function isCanvasSupported(): boolean {
@@ -716,9 +732,10 @@ function ChatComposerComponent({
   const modelSwitchMutation = useMutation({
     mutationFn: async function doSwitchModel(payload: {
       model: string
+      provider?: string
       sessionKey?: string
     }) {
-      return await switchModel(payload.model, payload.sessionKey)
+      return await switchModel(payload.model, payload.provider, payload.sessionKey)
     },
     onSuccess: function onSuccess(
       payload: ModelSwitchResponse,
@@ -755,7 +772,7 @@ function ChatComposerComponent({
 
 
   const handleModelSelect = useCallback(
-    function handleModelSelect(nextModel: string) {
+    function handleModelSelect(nextModel: string, provider?: string) {
       const model = nextModel.trim()
       if (!model) return
       const normalizedSessionKey =
@@ -763,8 +780,10 @@ function ChatComposerComponent({
           ? sessionKey.trim()
           : undefined
       setModelNotice(null)
+      setCurrentSelectedModel(getResolvedModelKey(model, provider))
       modelSwitchMutation.mutate({
         model,
+        provider,
         sessionKey: normalizedSessionKey,
       })
     },
@@ -789,7 +808,7 @@ function ChatComposerComponent({
     if (!currentModel) return
     if (currentModel.includes('hermes-agent')) return // already on hermes
     hermesAutoSwitched.current = true
-    handleModelSelect('hermes-agent/hermes-agent')
+    handleModelSelect('hermes-agent', 'hermes-agent')
   }, [currentModel, handleModelSelect])
 
   // When model switches to Claude 4.6 and thinking is 'off', auto-upgrade to 'adaptive'
@@ -2122,9 +2141,10 @@ function ChatComposerComponent({
                             if (!grouped.has(provider)) grouped.set(provider, [])
                             grouped.get(provider)!.push(model)
                           }
+                          const activeModelKey = currentSelectedModel || currentModel || ''
+                          const activeProvider = activeModelKey.split('/')[0]
                           // Sort: current provider first
                           const sortedProviders = [...grouped.keys()].sort((a, b) => {
-                            const activeProvider = (currentSelectedModel || currentModel || '').split('/')[0]
                             if (a === activeProvider) return -1
                             if (b === activeProvider) return 1
                             return a.localeCompare(b)
@@ -2133,20 +2153,21 @@ function ChatComposerComponent({
                             <div key={provider}>
                               <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-muted)' }}>
                                 {provider}
+                                {provider === activeProvider ? ' (active)' : ''}
                               </div>
                               {grouped.get(provider)!.map((model) => {
                                 const modelId = typeof model === 'string' ? model : (model.id ?? model.name ?? '')
                                 const modelName = typeof model === 'string' ? model : (model.name ?? model.id ?? '')
-                                const isActive = modelId === (currentSelectedModel || currentModel)
+                                const resolvedModelKey = getResolvedModelKey(modelId, provider)
+                                const isActive = resolvedModelKey === activeModelKey
                                 return (
                                   <button
                                     key={`${provider}/${modelId}`}
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      setCurrentSelectedModel(modelId)
                                       setIsModelMenuOpen(false)
-                                      modelSwitchMutation.mutate({ model: modelId, sessionKey })
+                                      handleModelSelect(modelId, provider)
                                     }}
                                     className={cn(
                                       'flex w-full items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
