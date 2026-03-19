@@ -120,6 +120,7 @@ type ModelSwitchNotice = {
   tone: 'success' | 'error'
   message: string
   retryModel?: string
+  retryProvider?: string
 }
 
 const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
@@ -143,48 +144,54 @@ function isHermesCatalogEntry(
   return entry !== null
 }
 
+type HermesProviderOption = {
+  id: string
+  label: string
+  authenticated: boolean
+}
+
+type HermesAvailableModelsResponse = {
+  provider: string
+  models: Array<{ id: string; description: string }>
+  providers: Array<HermesProviderOption>
+}
+
 async function fetchModels(): Promise<{
   ok?: boolean
   models?: Array<ModelCatalogEntry>
   configuredProviders?: Array<string>
+  currentProvider?: string
+  providerLabels?: Record<string, string>
+  providers?: Array<HermesProviderOption>
 }> {
-  // Try the rich available-models endpoint — fetch models from ALL authenticated providers
+  // Prefer Hermes' current provider models; fetch other providers lazily if needed.
   try {
     const richRes = await fetch('/api/hermes-proxy/api/available-models')
     if (richRes.ok) {
-      const richData = (await richRes.json()) as {
-        provider: string
-        models: Array<{ id: string; description: string }>
-        providers: Array<{ id: string; label: string; authenticated: boolean }>
-      }
+      const richData = (await richRes.json()) as HermesAvailableModelsResponse
       const authenticatedProviders = (richData.providers || []).filter((p) => p.authenticated)
       const configuredProviders = authenticatedProviders.map((p) => p.id)
+      const providerLabels = authenticatedProviders.reduce<Record<string, string>>(
+        (acc, provider) => {
+          acc[provider.id] = provider.label || provider.id
+          return acc
+        },
+        {},
+      )
+      const currentProvider = readModelText(richData.provider)
+      const models = (richData.models || []).map((model) => ({
+        id: model.id,
+        name: model.id,
+        provider: currentProvider || undefined,
+      }))
 
-      // Fetch models for each authenticated provider in parallel
-      const allModels: Array<ModelCatalogEntry> = []
-      // Store provider labels for display
-      const providerLabels: Record<string, string> = {}
-      for (const p of authenticatedProviders) {
-        providerLabels[p.id] = p.label || p.id
-      }
-      // Stash labels on window for the model menu to read
-      if (typeof window !== 'undefined') {
-        (window as unknown as Record<string, unknown>).__hermesProviderLabels = providerLabels
-      }
-      const providerFetches = authenticatedProviders.map(async (p) => {
-        try {
-          const res = await fetch(`/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(p.id)}`)
-          if (!res.ok) return
-          const data = (await res.json()) as { models: Array<{ id: string; description: string }> }
-          for (const m of data.models || []) {
-            allModels.push({ id: m.id, name: m.id, provider: p.id })
-          }
-        } catch { /* skip this provider */ }
-      })
-      await Promise.all(providerFetches)
-
-      if (allModels.length) {
-        return { ok: true, models: allModels, configuredProviders }
+      return {
+        ok: true,
+        models,
+        configuredProviders,
+        currentProvider,
+        providerLabels,
+        providers: authenticatedProviders,
       }
     }
   } catch {
@@ -249,6 +256,27 @@ async function fetchModels(): Promise<{
   return { ok: true, models: models as Array<ModelCatalogEntry>, configuredProviders }
 }
 
+async function fetchModelsForProvider(
+  provider: string,
+): Promise<Array<ModelCatalogEntry>> {
+  const normalizedProvider = provider.trim()
+  if (!normalizedProvider) return []
+
+  const response = await fetch(
+    `/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(normalizedProvider)}`,
+  )
+  if (!response.ok) {
+    throw new Error(`Hermes models request failed (${response.status})`)
+  }
+
+  const payload = (await response.json()) as HermesAvailableModelsResponse
+  return (payload.models || []).map((model) => ({
+    id: model.id,
+    name: model.id,
+    provider: normalizedProvider,
+  }))
+}
+
 async function switchModel(
   model: string,
   provider?: string,
@@ -262,16 +290,17 @@ async function switchModel(
       : undefined
 
   // Write the model change to ~/.hermes/config.yaml via the webapi
-  try {
-    const patch: Record<string, string> = { model: modelId }
-    if (modelProvider) patch.provider = modelProvider
-    await fetch('/api/hermes-proxy/api/config', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    })
-  } catch {
-    // Best-effort — config write failure shouldn't block model switch
+  const patch: Record<string, string> = { model: modelId }
+  if (modelProvider) patch.provider = modelProvider
+
+  const response = await fetch('/api/hermes-proxy/api/config', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
   }
 
   return {
@@ -687,6 +716,7 @@ function ChatComposerComponent({
     return window.matchMedia('(max-width: 767px)').matches
   })
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const [isProviderSwitcherExpanded, setIsProviderSwitcherExpanded] = useState(false)
   const [isMobileActionsMenuOpen, setIsMobileActionsMenuOpen] = useState(false)
   const [isWebSearchMode, _setIsWebSearchMode] = useState(false)
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
@@ -725,6 +755,35 @@ function ChatComposerComponent({
     queryFn: fetchModels,
     refetchInterval: 60_000,
     retry: false,
+  })
+  const currentProvider = modelsQuery.data?.currentProvider ?? ''
+  const otherProviders = useMemo(
+    () =>
+      (modelsQuery.data?.providers ?? []).filter(
+        (provider) => provider.id !== currentProvider,
+      ),
+    [currentProvider, modelsQuery.data?.providers],
+  )
+  const otherProviderModelsQuery = useQuery({
+    queryKey: ['hermes', 'models', 'other-providers', otherProviders.map((provider) => provider.id).sort().join('|')],
+    enabled: isProviderSwitcherExpanded && otherProviders.length > 0,
+    retry: false,
+    queryFn: async () => {
+      const modelEntries = await Promise.all(
+        otherProviders.map(async (provider) => ({
+          providerId: provider.id,
+          models: await fetchModelsForProvider(provider.id),
+        })),
+      )
+
+      return modelEntries.reduce<Record<string, Array<ModelCatalogEntry>>>(
+        (acc, entry) => {
+          acc[entry.providerId] = entry.models
+          return acc
+        },
+        {},
+      )
+    },
   })
   const currentModelQuery = useQuery({
     queryKey: ['hermes', 'session-status-model'],
@@ -768,12 +827,15 @@ function ChatComposerComponent({
           tone: 'error',
           message: 'Request timed out',
           retryModel: variables.model,
+          retryProvider: variables.provider,
         })
         return
       }
       setModelNotice({
         tone: 'error',
         message: message || 'Failed to switch model',
+        retryModel: variables.model,
+        retryProvider: variables.provider,
       })
     },
   })
@@ -800,12 +862,13 @@ function ChatComposerComponent({
   )
 
   const retryModel = modelNotice?.retryModel ?? ''
+  const retryProvider = modelNotice?.retryProvider
   const handleRetryModelSwitch = useCallback(
     function handleRetryModelSwitch() {
       if (!retryModel) return
-      handleModelSelect(retryModel)
+      handleModelSelect(retryModel, retryProvider)
     },
-    [handleModelSelect, retryModel],
+    [handleModelSelect, retryModel, retryProvider],
   )
 
   const currentModel = currentModelQuery.data ?? ''
@@ -962,6 +1025,7 @@ function ChatComposerComponent({
       if (!modelSelectorRef.current) return
       if (modelSelectorRef.current.contains(event.target as Node)) return
       setIsModelMenuOpen(false)
+      setIsProviderSwitcherExpanded(false)
     }
 
     document.addEventListener('mousedown', handleOutsideClick)
@@ -2084,7 +2148,11 @@ function ChatComposerComponent({
                     onClick={(event) => {
                       event.stopPropagation()
                       if (isModelSwitcherDisabled) return
-                      setIsModelMenuOpen((prev) => !prev)
+                      setIsModelMenuOpen((prev) => {
+                        const next = !prev
+                        if (!next) setIsProviderSwitcherExpanded(false)
+                        return next
+                      })
                     }}
                     className={cn(
                       'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-800',
@@ -2145,51 +2213,37 @@ function ChatComposerComponent({
                     <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border shadow-lg" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
                       <div className="p-1 max-h-[300px] overflow-y-auto">
                         {(() => {
-                          const allModels = modelsQuery.data?.models ?? []
-                          const providerLabels: Record<string, string> = (typeof window !== 'undefined'
-                            ? (window as unknown as Record<string, unknown>).__hermesProviderLabels as Record<string, string>
-                            : null) || {}
-                          // Group models by provider
-                          const grouped = new Map<string, Array<ModelCatalogEntry>>()
-                          for (const model of allModels) {
-                            const provider = (typeof model === 'string' ? 'other' : model.provider) || 'other'
-                            if (!grouped.has(provider)) grouped.set(provider, [])
-                            grouped.get(provider)!.push(model)
-                          }
-                          // Determine active provider from the selected model key or configured providers
+                          const currentProviderModels = modelsQuery.data?.models ?? []
+                          const providerLabels = modelsQuery.data?.providerLabels ?? {}
                           const activeModelKey = currentSelectedModel || currentModel || ''
-                          // If the key has provider/ prefix, extract it; otherwise check which group contains the model
                           let activeProvider = ''
                           if (activeModelKey.includes('/')) {
                             activeProvider = activeModelKey.split('/')[0]
+                          } else if (currentProviderModels.some((model) => {
+                            const modelId = typeof model === 'string' ? model : model.id
+                            return modelId === activeModelKey
+                          })) {
+                            activeProvider = currentProvider
                           } else {
-                            // Find which provider group contains this model
-                            for (const [pid, models] of grouped) {
-                              if (models.some((m) => {
-                                const mid = typeof m === 'string' ? m : m.id
-                                return mid === activeModelKey
+                            for (const provider of otherProviders) {
+                              const providerModels =
+                                otherProviderModelsQuery.data?.[provider.id] ?? []
+                              if (providerModels.some((model) => {
+                                const modelId = typeof model === 'string' ? model : model.id
+                                return modelId === activeModelKey
                               })) {
-                                activeProvider = pid
+                                activeProvider = provider.id
                                 break
                               }
                             }
                           }
-                          const configuredProviders = modelsQuery.data?.configuredProviders ?? []
-                          // Sort: active provider first, then alphabetical
-                          const sortedProviders = [...grouped.keys()].sort((a, b) => {
-                            if (a === activeProvider) return -1
-                            if (b === activeProvider) return 1
-                            return a.localeCompare(b)
-                          })
-                          return sortedProviders.map((provider) => (
-                            <div key={provider}>
-                              <div className="px-3 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: provider === activeProvider ? 'var(--theme-accent, #6366f1)' : 'var(--theme-muted)' }}>
-                                {providerLabels[provider] || provider}
-                                {provider === activeProvider && (
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
-                                )}
-                              </div>
-                              {grouped.get(provider)!.map((model) => {
+
+                          const renderModelList = (
+                            provider: string,
+                            models: Array<ModelCatalogEntry>,
+                          ) => (
+                            <>
+                              {models.map((model) => {
                                 const modelId = typeof model === 'string' ? model : (model.id ?? model.name ?? '')
                                 const modelName = typeof model === 'string' ? model : (model.name ?? model.id ?? '')
                                 const resolvedModelKey = getResolvedModelKey(modelId, provider)
@@ -2201,6 +2255,7 @@ function ChatComposerComponent({
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setIsModelMenuOpen(false)
+                                      setIsProviderSwitcherExpanded(false)
                                       handleModelSelect(modelId, provider)
                                     }}
                                     className={cn(
@@ -2217,8 +2272,71 @@ function ChatComposerComponent({
                                   </button>
                                 )
                               })}
-                            </div>
-                          ))
+                            </>
+                          )
+
+                          return (
+                            <>
+                              <div>
+                                <div className="px-3 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: currentProvider === activeProvider ? 'var(--theme-accent, #6366f1)' : 'var(--theme-muted)' }}>
+                                  {providerLabels[currentProvider] || currentProvider || 'Current provider'}
+                                  {currentProvider && currentProvider === activeProvider ? (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                  ) : null}
+                                </div>
+                                {renderModelList(currentProvider, currentProviderModels)}
+                              </div>
+
+                              {otherProviders.length > 0 ? (
+                                <div className="border-t mt-1 pt-1" style={{ borderColor: 'var(--theme-border)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setIsProviderSwitcherExpanded((prev) => !prev)
+                                    }}
+                                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:opacity-80"
+                                    style={{ color: 'var(--theme-muted)' }}
+                                  >
+                                    <span>Switch Provider</span>
+                                    <HugeiconsIcon
+                                      icon={isProviderSwitcherExpanded ? ArrowUp02Icon : ArrowDown01Icon}
+                                      size={12}
+                                      strokeWidth={2}
+                                      className="opacity-70"
+                                    />
+                                  </button>
+                                  {isProviderSwitcherExpanded ? (
+                                    <div className="pb-1">
+                                      {otherProviders.map((provider) => {
+                                        const providerModels =
+                                          otherProviderModelsQuery.data?.[provider.id] ?? []
+                                        return (
+                                          <div key={provider.id}>
+                                            <div className="px-3 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: provider.id === activeProvider ? 'var(--theme-accent, #6366f1)' : 'var(--theme-muted)' }}>
+                                              {providerLabels[provider.id] || provider.label || provider.id}
+                                              {provider.id === activeProvider ? (
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                              ) : null}
+                                            </div>
+                                            {providerModels.length > 0
+                                              ? renderModelList(provider.id, providerModels)
+                                              : (
+                                                <div className="px-3 py-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
+                                                  {otherProviderModelsQuery.isPending
+                                                    ? 'Loading models…'
+                                                    : 'No models available'}
+                                                </div>
+                                              )}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </>
+                          )
                         })()}
                       </div>
                     </div>
