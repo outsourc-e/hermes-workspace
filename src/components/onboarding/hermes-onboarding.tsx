@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { ProviderLogo } from '@/components/provider-logo'
@@ -32,6 +32,14 @@ export function HermesOnboarding() {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
   const [configuredModel, setConfiguredModel] = useState('')
+
+  // OAuth device flow state
+  const [oauthStep, setOauthStep] = useState<'idle' | 'loading' | 'waiting' | 'success' | 'error'>('idle')
+  const [oauthUserCode, setOauthUserCode] = useState('')
+  const [oauthVerificationUrl, setOauthVerificationUrl] = useState('')
+  const [oauthDeviceCode, setOauthDeviceCode] = useState('')
+  const [oauthError, setOauthError] = useState('')
+  const oauthPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const checkConfig = useCallback(async () => {
     try {
@@ -179,6 +187,86 @@ export function HermesOnboarding() {
     }
   }, [])
 
+  const startNousOAuth = useCallback(async () => {
+    setOauthStep('loading')
+    setOauthError('')
+    try {
+      const res = await fetch('/api/oauth/device-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'nous' }),
+      })
+      const data = await res.json() as { device_code?: string; user_code?: string; verification_uri_complete?: string; interval?: number; error?: string }
+      if (!res.ok || data.error) {
+        setOauthError(data.error || 'Failed to start OAuth')
+        setOauthStep('error')
+        return
+      }
+      setOauthDeviceCode(data.device_code || '')
+      setOauthUserCode(data.user_code || '')
+      setOauthVerificationUrl(data.verification_uri_complete || '')
+      setOauthStep('waiting')
+
+      // Open the verification URL in a new tab automatically
+      if (data.verification_uri_complete) {
+        window.open(data.verification_uri_complete, '_blank')
+      }
+
+      // Start polling
+      const intervalMs = Math.max((data.interval || 5) * 1000, 3000)
+      oauthPollRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch('/api/oauth/poll-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: 'nous', deviceCode: data.device_code }),
+          })
+          const pollData = await pollRes.json() as { status: string; message?: string }
+          if (pollData.status === 'success') {
+            if (oauthPollRef.current) clearInterval(oauthPollRef.current)
+            setOauthStep('success')
+            // Save provider config and fetch models
+            await saveProviderConfig()
+            try {
+              const modelsRes = await fetch('/v1/models')
+              if (modelsRes.ok) {
+                const modelsData = await modelsRes.json() as { data?: Array<{ id: string }> }
+                const models = (modelsData.data || []).map((m: { id: string }) => m.id).slice(0, 20)
+                setAvailableModels(models)
+                if (models.length > 0) setSelectedModel(models[0])
+              }
+            } catch { /* ignore */ }
+          } else if (pollData.status === 'error') {
+            if (oauthPollRef.current) clearInterval(oauthPollRef.current)
+            setOauthError(pollData.message || 'Authentication failed')
+            setOauthStep('error')
+          }
+          // 'pending' — keep polling
+        } catch { /* network error — keep polling */ }
+      }, intervalMs)
+    } catch (err) {
+      setOauthError(err instanceof Error ? err.message : 'Failed to start OAuth')
+      setOauthStep('error')
+    }
+  }, [saveProviderConfig])
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (oauthPollRef.current) clearInterval(oauthPollRef.current)
+    }
+  }, [])
+
+  // Reset OAuth state when provider changes
+  useEffect(() => {
+    if (oauthPollRef.current) clearInterval(oauthPollRef.current)
+    setOauthStep('idle')
+    setOauthUserCode('')
+    setOauthVerificationUrl('')
+    setOauthDeviceCode('')
+    setOauthError('')
+  }, [selectedProvider])
+
   if (!show) return null
 
   const cardStyle: React.CSSProperties = { backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }
@@ -282,20 +370,77 @@ export function HermesOnboarding() {
                 ))}
               </div>
 
-              {/* OAuth provider instructions */}
-              {selectedProvider && isOAuth && (
+              {/* OAuth provider — in-browser device flow (Nous) or terminal fallback (Codex) */}
+              {selectedProvider && isOAuth && selectedProvider === 'nous' && (
+                <div className="rounded-xl p-4 text-left space-y-3" style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}>
+                  {oauthStep === 'idle' && (
+                    <button
+                      onClick={startNousOAuth}
+                      className="w-full rounded-lg py-2.5 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 transition-colors"
+                    >
+                      Connect with Nous Portal
+                    </button>
+                  )}
+                  {oauthStep === 'loading' && (
+                    <div className="flex items-center justify-center gap-2 text-sm py-2" style={mutedStyle}>
+                      <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
+                      Starting OAuth flow...
+                    </div>
+                  )}
+                  {oauthStep === 'waiting' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm" style={mutedStyle}>
+                        <span className="size-2 rounded-full bg-yellow-400 animate-pulse" />
+                        Waiting for approval...
+                      </div>
+                      {oauthUserCode && (
+                        <div className="text-center space-y-1">
+                          <p className="text-xs" style={mutedStyle}>Your code:</p>
+                          <p className="text-2xl font-mono font-bold tracking-widest">{oauthUserCode}</p>
+                        </div>
+                      )}
+                      {oauthVerificationUrl && (
+                        <button
+                          onClick={() => window.open(oauthVerificationUrl, '_blank')}
+                          className="w-full rounded-lg py-2 text-xs font-medium border"
+                          style={{ borderColor: 'var(--theme-border)' }}
+                        >
+                          Open Nous Portal ↗
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {oauthStep === 'success' && (
+                    <div className="flex items-center gap-2 text-sm text-green-500">
+                      <span>✓</span>
+                      <span>Authenticated with Nous Portal!</span>
+                    </div>
+                  )}
+                  {oauthStep === 'error' && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-red-400">{oauthError || 'Authentication failed'}</p>
+                      <button
+                        onClick={startNousOAuth}
+                        className="w-full rounded-lg py-2 text-xs font-medium bg-accent-500 text-white"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {selectedProvider && isOAuth && selectedProvider === 'openai-codex' && (
                 <div className="rounded-xl p-4 text-left space-y-2" style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}>
                   <p className="text-sm font-medium">Run in your terminal:</p>
                   <div className="rounded-lg px-3 py-2 font-mono text-xs" style={{ background: 'rgba(0,0,0,0.2)' }}>
-                    hermes auth login {selectedProvider === 'nous' ? 'nous' : 'openai-codex'}
+                    hermes auth login openai-codex
                   </div>
                   <p className="text-xs" style={mutedStyle}>
-                    This opens a browser for {provider?.name} OAuth. Once authenticated, Hermes will save the token automatically and the workspace will detect it.
+                    This opens a browser for OpenAI Codex OAuth. Once authenticated, Hermes saves the token automatically.
                   </p>
                   <button
                     onClick={async () => {
                       await saveProviderConfig()
-                      // Check if auth already exists
                       try {
                         const modelsRes = await fetch('/v1/models')
                         if (modelsRes.ok) {

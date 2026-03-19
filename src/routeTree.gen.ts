@@ -43,6 +43,8 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
+import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
 import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
 import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
@@ -220,6 +222,16 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
 } as any)
+const ApiOauthPollTokenRoute = ApiOauthPollTokenRouteImport.update({
+  id: '/api/oauth/poll-token',
+  path: '/api/oauth/poll-token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOauthDeviceCodeRoute = ApiOauthDeviceCodeRouteImport.update({
+  id: '/api/oauth/device-code',
+  path: '/api/oauth/device-code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMemoryWriteRoute = ApiMemoryWriteRouteImport.update({
   id: '/api/memory/write',
   path: '/api/memory/write',
@@ -291,6 +303,8 @@ export interface FileRoutesByFullPath {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
+  '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -332,6 +346,8 @@ export interface FileRoutesByTo {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
+  '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -375,6 +391,8 @@ export interface FileRoutesById {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
+  '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -419,6 +437,8 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/oauth/device-code'
+    | '/api/oauth/poll-token'
     | '/api/sessions/send'
     | '/api/sessions/$sessionKey/status'
   fileRoutesByTo: FileRoutesByTo
@@ -460,6 +480,8 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/oauth/device-code'
+    | '/api/oauth/poll-token'
     | '/api/sessions/send'
     | '/api/sessions/$sessionKey/status'
   id:
@@ -502,6 +524,8 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/oauth/device-code'
+    | '/api/oauth/poll-token'
     | '/api/sessions/send'
     | '/api/sessions/$sessionKey/status'
   fileRoutesById: FileRoutesById
@@ -542,6 +566,8 @@ export interface RootRouteChildren {
   ApiMemoryReadRoute: typeof ApiMemoryReadRoute
   ApiMemorySearchRoute: typeof ApiMemorySearchRoute
   ApiMemoryWriteRoute: typeof ApiMemoryWriteRoute
+  ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
+  ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -784,6 +810,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/oauth/poll-token': {
+      id: '/api/oauth/poll-token'
+      path: '/api/oauth/poll-token'
+      fullPath: '/api/oauth/poll-token'
+      preLoaderRoute: typeof ApiOauthPollTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/oauth/device-code': {
+      id: '/api/oauth/device-code'
+      path: '/api/oauth/device-code'
+      fullPath: '/api/oauth/device-code'
+      preLoaderRoute: typeof ApiOauthDeviceCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/memory/write': {
       id: '/api/memory/write'
       path: '/api/memory/write'
@@ -905,6 +945,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMemoryReadRoute: ApiMemoryReadRoute,
   ApiMemorySearchRoute: ApiMemorySearchRoute,
   ApiMemoryWriteRoute: ApiMemoryWriteRoute,
+  ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
+  ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
