@@ -3,7 +3,8 @@ import { execSync, spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
-import { resolve } from 'node:path'
+import { resolve, dirname } from 'node:path'
+import os from 'node:os'
 
 // devtools removed
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -13,9 +14,134 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 
+// ---------------------------------------------------------------------------
+// Hermes Agent auto-start helpers
+// ---------------------------------------------------------------------------
+
+/** Resolve the hermes-agent directory using a priority-ordered fallback chain:
+ *  1. HERMES_AGENT_PATH env var (explicit override)
+ *  2. ../hermes-agent  — sibling clone (standard README setup)
+ *  3. ../../hermes-agent — one level up (monorepo / nested workspace)
+ *  Returns null if none found.
+ */
+function resolveHermesAgentDir(env: Record<string, string>): string | null {
+  const candidates: string[] = []
+
+  if (env.HERMES_AGENT_PATH?.trim()) {
+    candidates.push(env.HERMES_AGENT_PATH.trim())
+  }
+
+  // Resolve relative to the workspace root (parent of clawsuite/)
+  const workspaceRoot = dirname(resolve('.'))  // clawsuite/ → parent
+  candidates.push(
+    resolve(workspaceRoot, 'hermes-agent'),    // sibling of clawsuite/
+    resolve(workspaceRoot, '..', 'hermes-agent'), // one level up
+  )
+
+  for (const candidate of candidates) {
+    if (existsSync(resolve(candidate, 'webapi'))) return candidate
+  }
+  return null
+}
+
+/** Resolve the Python executable to use for uvicorn.
+ *  Prefers .venv/bin/python inside agentDir, falls back to system python3.
+ */
+function resolveHermesPython(agentDir: string): string {
+  const venvPython = resolve(agentDir, '.venv', 'bin', 'python')
+  if (existsSync(venvPython)) return venvPython
+  // uv creates 'venv' not '.venv' sometimes
+  const uvVenv = resolve(agentDir, 'venv', 'bin', 'python')
+  if (existsSync(uvVenv)) return uvVenv
+  return 'python3'
+}
+
+/** Check if hermes-agent health endpoint is responding */
+async function isHermesAgentHealthy(port = 8642): Promise<boolean> {
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/health`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const hermesApiUrl = env.HERMES_API_URL?.trim() || 'http://127.0.0.1:8642'
+
+  // Hermes Agent auto-start state
+  let hermesAgentChild: ChildProcess | null = null
+  let hermesAgentStarted = false
+
+  const startHermesAgent = async () => {
+    if (hermesAgentStarted) return
+    if (await isHermesAgentHealthy()) {
+      console.log('[hermes-agent] Already running — reusing existing process')
+      hermesAgentStarted = true
+      return
+    }
+
+    const agentDir = resolveHermesAgentDir(env)
+    if (!agentDir) {
+      console.warn(
+        '[hermes-agent] Could not find hermes-agent directory.\n' +
+        '  Set HERMES_AGENT_PATH in .env or clone hermes-agent as a sibling:\n' +
+        '    git clone https://github.com/outsourc-e/hermes-agent.git ../hermes-agent',
+      )
+      return
+    }
+
+    const python = resolveHermesPython(agentDir)
+    console.log(`[hermes-agent] Starting from ${agentDir} using ${python}`)
+
+    const child = spawn(
+      python,
+      ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', '8642'],
+      {
+        cwd: agentDir,
+        detached: false,   // keep tied to vite process — stops when dev server stops
+        stdio: 'pipe',
+        env: {
+          ...process.env,
+          PATH: `${resolve(agentDir, '.venv', 'bin')}:${resolve(agentDir, 'venv', 'bin')}:${process.env.PATH || ''}`,
+        },
+      },
+    )
+
+    hermesAgentChild = child
+    hermesAgentStarted = true
+
+    child.stdout?.on('data', (d: Buffer) => {
+      const line = d.toString().trim()
+      if (line) console.log(`[hermes-agent] ${line}`)
+    })
+    child.stderr?.on('data', (d: Buffer) => {
+      const line = d.toString().trim()
+      if (line) console.log(`[hermes-agent] ${line}`)
+    })
+
+    child.on('exit', (code) => {
+      hermesAgentChild = null
+      hermesAgentStarted = false
+      if (code !== 0 && code !== null) {
+        console.warn(`[hermes-agent] Exited with code ${code}`)
+      }
+    })
+
+    // Wait for healthy
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 1000))
+      if (await isHermesAgentHealthy()) {
+        console.log('[hermes-agent] ✓ Ready on http://127.0.0.1:8642')
+        return
+      }
+    }
+    console.warn('[hermes-agent] Started but health check timed out — may still be loading')
+  }
+
   let workspaceDaemonStarted = false
   let workspaceDaemonStarting = false
   let workspaceDaemonShuttingDown = false
@@ -255,6 +381,8 @@ const config = defineConfig(({ mode, command }) => {
     server: {
       // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking connectivity
       host: '0.0.0.0',
+      port: 3000,
+      strictPort: false, // allow fallback if 3000 is taken, but log clearly
       allowedHosts: true,
       watch: {
         // Exclude generated route tree — TanStack Router's file watcher
@@ -353,6 +481,21 @@ const config = defineConfig(({ mode, command }) => {
             if (workspaceDaemonChild) {
               workspaceDaemonChild.kill()
               workspaceDaemonChild = null
+            }
+          })
+
+          // Auto-start hermes-agent when dev server launches
+          if (command === 'serve') {
+            void startHermesAgent()
+          }
+
+          // Shutdown hermes-agent when dev server stops
+          server.httpServer?.on('close', () => {
+            if (hermesAgentChild) {
+              console.log('[hermes-agent] Stopping...')
+              hermesAgentChild.kill('SIGTERM')
+              hermesAgentChild = null
+              hermesAgentStarted = false
             }
           })
 
