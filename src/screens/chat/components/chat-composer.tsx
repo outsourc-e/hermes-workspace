@@ -2139,92 +2139,15 @@ function ChatComposerComponent({
                   </span>
                 )}
 
-                <div className="relative ml-0.5 md:ml-1 flex min-w-0 items-center gap-1 md:gap-2" ref={modelSelectorRef}>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setIsModelMenuOpen((prev) => !prev)
-                    }}
-                    className="inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-800"
-                    title={`${modelButtonLabel} — click to change model`}
+                <div className="ml-0.5 md:ml-1 flex min-w-0 items-center">
+                  <span
+                    className="inline-flex h-7 max-w-[8rem] items-center rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 text-[11px] font-medium text-primary-600"
+                    title={modelButtonLabel}
                   >
                     <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
                       {modelButtonLabel}
                     </span>
-                    <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="opacity-60" />
-                  </button>
-                  {isModelMenuOpen && (
-                    <div
-                      className="absolute bottom-[calc(100%+0.5rem)] left-0 z-40 w-[18rem] overflow-hidden rounded-xl border shadow-lg"
-                      style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}
-                    >
-                      <div className="p-3 space-y-3">
-                        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-muted)' }}>
-                          Model & Provider
-                        </div>
-                        {/* Provider */}
-                        <div>
-                          <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--theme-muted)' }}>Provider</label>
-                          {(modelsQuery.data?.providers ?? []).length > 0 ? (
-                            <select
-                              value={currentProvider}
-                              onChange={(e) => {
-                                const newProvider = e.target.value
-                                void switchModel(
-                                  (modelsQuery.data?.models ?? [])[0]
-                                    ? (typeof (modelsQuery.data?.models ?? [])[0] === 'string'
-                                      ? (modelsQuery.data?.models ?? [])[0] as string
-                                      : ((modelsQuery.data?.models ?? [])[0] as Record<string, unknown>).id as string)
-                                    : modelButtonLabel,
-                                  newProvider,
-                                ).then(() => {
-                                  void modelsQuery.refetch()
-                                  setIsModelMenuOpen(false)
-                                })
-                              }}
-                              className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium dark:bg-primary-800 dark:text-primary-100 dark:border-primary-600 bg-white text-primary-900 border-primary-300"
-                            >
-                              {(modelsQuery.data?.providers ?? []).map((p) => (
-                                <option key={p.id} value={p.id}>{p.label}{p.authenticated ? ' ✓' : ''}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="text-xs" style={{ color: 'var(--theme-muted)' }}>{currentProvider || 'Loading...'}</div>
-                          )}
-                        </div>
-                        {/* Model */}
-                        <div>
-                          <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--theme-muted)' }}>Model</label>
-                          {(modelsQuery.data?.models ?? []).length > 0 ? (
-                            <select
-                              value={modelButtonLabel}
-                              onChange={(e) => {
-                                const newModel = e.target.value
-                                void switchModel(newModel, currentProvider).then(() => {
-                                  setCurrentSelectedModel(newModel)
-                                  setIsModelMenuOpen(false)
-                                })
-                              }}
-                              className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-mono font-medium dark:bg-primary-800 dark:text-primary-100 dark:border-primary-600 bg-white text-primary-900 border-primary-300"
-                            >
-                              {(modelsQuery.data?.models ?? []).map((m) => {
-                                const mid = typeof m === 'string' ? m : (m.id ?? '')
-                                return <option key={mid} value={mid}>{mid}</option>
-                              })}
-                            </select>
-                          ) : (
-                            <div className="text-xs font-mono" style={{ color: 'var(--theme-muted)' }}>{modelButtonLabel}</div>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: 'var(--theme-border)' }}>
-                          <a href="/settings" className="text-[10px] font-medium hover:underline" style={{ color: 'var(--theme-muted)' }}>
-                            Full settings →
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  </span>
                 </div>
 
               </div>
