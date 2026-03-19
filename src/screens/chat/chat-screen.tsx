@@ -2282,8 +2282,6 @@ export function ChatScreen({
             />
           )}
 
-          {!isFocusMode && <ContextBar compact={compact} />}
-
           <div className="md:hidden"><ContextMeter variant="mobile" /></div>
           <div className="hidden md:block px-4 py-1"><ContextMeter variant="desktop" /></div>
 
