@@ -13,7 +13,7 @@ import {
   Sun01Icon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
-import { useState, useEffect, Component } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
 import type * as React from 'react'
 import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
@@ -147,6 +147,7 @@ const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: st
 function HermesContent() {
   const [activeProvider, setActiveProvider] = useState('')
   const [activeModel, setActiveModel] = useState('')
+  const [availableModels, setAvailableModels] = useState<string[]>([])
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [keyInput, setKeyInput] = useState('')
   const [_saving, setSaving] = useState(false)
@@ -155,12 +156,26 @@ function HermesContent() {
   const [memEnabled, setMemEnabled] = useState(true)
   const [userProfileEnabled, setUserProfileEnabled] = useState(true)
 
+  const fetchModelsForProvider = useCallback((providerId: string) => {
+    fetch(`/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`)
+      .then((r) => r.json())
+      .then((d: { models?: Array<{ id: string }> }) => {
+        setAvailableModels((d.models || []).map((m) => m.id))
+      })
+      .catch(() => {
+        // Fall back to hardcoded
+        const card = PROVIDER_CARDS.find((p) => p.id === providerId)
+        setAvailableModels(card?.models || [])
+      })
+  }, [])
+
   useEffect(() => {
     fetch('/api/hermes-config')
       .then((r) => r.json())
       .then((d: any) => {
         setActiveProvider(d.activeProvider || '')
         setActiveModel(d.activeModel || '')
+        if (d.activeProvider) fetchModelsForProvider(d.activeProvider)
         const mem = (d.config?.memory as Record<string, unknown>) || {}
         setMemEnabled(mem.memory_enabled !== false)
         setUserProfileEnabled(mem.user_profile_enabled !== false)
@@ -193,10 +208,16 @@ function HermesContent() {
     setSaving(false)
   }
 
-  const selectProvider = (providerId: string, model: string) => {
+  const selectProvider = (providerId: string, model?: string) => {
     setActiveProvider(providerId)
-    setActiveModel(model)
-    save({ config: { model: { default: model, provider: providerId } } })
+    if (model) {
+      setActiveModel(model)
+      save({ config: { model, provider: providerId } })
+    } else {
+      // Switching provider without a model — fetch models and pick the first one
+      fetchModelsForProvider(providerId)
+      save({ config: { provider: providerId } })
+    }
   }
 
   const cardStyle: React.CSSProperties = { backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }
@@ -223,7 +244,7 @@ function HermesContent() {
                 key={p.id}
                 type="button"
                 onClick={() => {
-                  if (hasKey && p.models[0]) selectProvider(p.id, p.models[0])
+                  if (hasKey) selectProvider(p.id)
                 }}
                 className={cn(
                   'flex flex-col items-start gap-1 rounded-xl px-3 py-2.5 text-left transition-all',
@@ -253,7 +274,7 @@ function HermesContent() {
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Model</p>
           <div className="flex flex-wrap gap-2">
-            {(PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models || []).map((model) => (
+            {(availableModels.length > 0 ? availableModels : PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models || []).map((model) => (
               <button
                 key={model}
                 type="button"
