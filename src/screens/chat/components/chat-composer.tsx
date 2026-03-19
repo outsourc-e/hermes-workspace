@@ -1543,13 +1543,13 @@ function ChatComposerComponent({
                 ? [
                     // iMessage-style: edge-to-edge, docked to bottom
                     'left-0 right-0',
-                    'backdrop-blur-xl',
-                    'border-t border-primary-200/60',
+                    'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl',
+                    'border-t border-primary-200/60 dark:border-neutral-800',
                   ].join(' ')
                 : [
                     // scroll-hide / integrated: floating pill above tab bar
                     'left-4 right-4',
-                    'backdrop-blur-2xl',
+                    'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl',
                     'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
                     'rounded-[22px]',
                   ].join(' '),
@@ -1561,7 +1561,7 @@ function ChatComposerComponent({
           : '',
         'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
       )}
-      style={{ ...composerWrapperStyle, backgroundColor: 'var(--composer-bg, var(--color-surface))' }}
+      style={composerWrapperStyle}
       ref={setWrapperRefs}
     >
       <input
@@ -1690,7 +1690,7 @@ function ChatComposerComponent({
                   setIsModelMenuOpen(false)
                   setIsMobileActionsMenuOpen((prev) => !prev)
                 }}
-                className="size-8 shrink-0 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 active:bg-primary-200 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="size-8 shrink-0 rounded-full bg-neutral-100 dark:bg-white/10 flex items-center justify-center text-primary-600 active:bg-neutral-200 dark:active:bg-white/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={1.5} />
               </button>
@@ -1770,7 +1770,7 @@ function ChatComposerComponent({
                         ? 'text-red-600 bg-red-100 animate-pulse'
                         : voiceInput.isListening
                           ? 'text-red-500 bg-red-50 animate-pulse'
-                          : 'text-primary-500 bg-primary-100',
+                          : 'text-primary-500 bg-neutral-100 dark:bg-white/10',
                     )}
                   >
                     <HugeiconsIcon icon={Mic01Icon} size={20} strokeWidth={1.5} />
@@ -1808,14 +1808,13 @@ function ChatComposerComponent({
                       }}
                     />
                     <div
-                      className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl shadow-2xl pb-safe animate-in slide-in-from-bottom-10 duration-200"
-                      style={{ background: 'var(--color-surface)' }}
+                      className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
                       role="dialog"
                       aria-label="Actions"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-primary-200" />
-                      <div className="px-4 pb-2 text-sm font-semibold text-primary-500">
+                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300" />
+                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
                         Actions
                       </div>
                       <div className="grid grid-cols-2 gap-2 px-4 pb-4">
@@ -1827,12 +1826,12 @@ function ChatComposerComponent({
                             handleOpenAttachmentPicker(event)
                             // sheet stays open; closes naturally after file selected or on backdrop tap
                           }}
-                          className="rounded-xl border border-primary-200 bg-primary-50 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="rounded-lg bg-orange-100 p-1.5 text-orange-600">
                             <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />
                           </span>
-                          <span className="text-sm font-medium text-primary-900">
+                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
                             Attach File
                           </span>
                         </button>
@@ -1848,12 +1847,12 @@ function ChatComposerComponent({
                               setIsModelMenuOpen(true)
                             }
                           }}
-                          className="rounded-xl border border-primary-200 bg-primary-50 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="rounded-lg bg-indigo-100 p-1.5 text-indigo-600">
                             <HugeiconsIcon icon={ArrowDown01Icon} size={24} strokeWidth={1.5} />
                           </span>
-                          <span className="text-sm font-medium text-primary-900 truncate max-w-full">
+                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100 truncate max-w-full">
                             {modelButtonLabel}
                           </span>
                         </button>
@@ -1865,12 +1864,12 @@ function ChatComposerComponent({
                               handleClearDraft()
                               setIsMobileActionsMenuOpen(false)
                             }}
-                            className="rounded-xl border border-primary-200 bg-primary-50 p-3 flex flex-col items-start gap-2 text-left"
+                            className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
                           >
                             <span className="rounded-lg bg-red-100 p-1.5 text-red-600">
                               <HugeiconsIcon icon={Delete01Icon} size={24} strokeWidth={1.5} />
                             </span>
-                            <span className="text-sm font-medium text-primary-900">
+                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
                               Clear Draft
                             </span>
                           </button>
@@ -1883,12 +1882,12 @@ function ChatComposerComponent({
                               onNewSession()
                               setIsMobileActionsMenuOpen(false)
                             }}
-                            className="rounded-xl border border-primary-200 bg-primary-50 p-3 flex flex-col items-start gap-2 text-left"
+                            className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
                           >
                             <span className="rounded-lg bg-green-100 p-1.5 text-green-600">
                               <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />
                             </span>
-                            <span className="text-sm font-medium text-primary-900">
+                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
                               New Session
                             </span>
                           </button>
@@ -1911,14 +1910,13 @@ function ChatComposerComponent({
                       onClick={() => setIsModelMenuOpen(false)}
                     />
                     <div
-                      className="fixed bottom-0 left-0 right-0 z-[210] rounded-t-2xl shadow-2xl pb-safe animate-in slide-in-from-bottom-10 duration-200"
-                      style={{ background: 'var(--color-surface)' }}
+                      className="fixed bottom-0 left-0 right-0 z-[210] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
                       role="dialog"
                       aria-label="Select model"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-primary-200" />
-                      <div className="px-4 pb-2 text-sm font-semibold text-primary-500">
+                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300" />
+                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
                         Model
                       </div>
                       <div className="pb-4">
