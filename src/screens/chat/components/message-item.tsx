@@ -1512,17 +1512,6 @@ function MessageItemComponent({
       )}
     >
 
-      {/* Tool call pills — primary display for active/completed stream tool calls */}
-      {!isUser && hasStreamToolCalls && (
-        <div className="flex flex-col gap-1.5 pl-1 max-w-sm">
-          {effectiveStreamToolCalls
-            .filter((tc, i, arr) => arr.findIndex((t) => t.name === tc.name && JSON.stringify(t.args) === JSON.stringify(tc.args)) === i)
-            .map((toolCall) => (
-            <ToolCallPill key={toolCall.id} toolCall={toolCall} />
-          ))}
-        </div>
-      )}
-
       {/* Bridge gap: thinking done but first text token not yet arrived (no tool calls active) */}
       {effectiveIsStreaming && !thinking && !hasText && !hasStreamToolCalls && (
         <div className="flex items-center gap-1.5 px-1 py-1">
@@ -1751,7 +1740,8 @@ function MessageItemComponent({
         ) : null}
 
       {/* Render tool calls — one collapsible card per tool with independent open state */}
-      {hasToolCalls && (
+      {/* Suppress inline sections when streaming pills are active to avoid double rendering */}
+      {hasToolCalls && !hasStreamToolCalls && (
         <div className="w-full max-w-[900px] mt-1 flex flex-col gap-1">
           {inlineToolSections.map((toolSection, index) => (
             <InlineToolSectionItem
@@ -1763,6 +1753,8 @@ function MessageItemComponent({
           ))}
         </div>
       )}
+
+      {/* Tool call pills removed — rendering handled by ThinkingBubble/ToolCallCard in chat-message-list.tsx */}
 
       {(!hasToolCalls || hasText) && (
         <MessageActionsBar

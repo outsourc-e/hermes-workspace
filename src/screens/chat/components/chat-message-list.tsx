@@ -64,6 +64,94 @@ function getToolStatusLabel(toolName: string): string {
   return TOOL_STATUS_MAP[toolName] ?? 'Working…'
 }
 
+const TOOL_EMOJIS: Record<string, string> = {
+  web_search: '🔍', search: '🔍', search_files: '🔍', session_search: '🔍',
+  terminal: '💻', exec: '💻', shell: '💻', bash: '💻',
+  Read: '📖', read: '📖', read_file: '📖', file_read: '📖',
+  Write: '✏️', write: '✏️', write_file: '✏️', edit: '✏️', Edit: '✏️',
+  memory: '🧠', memory_search: '🧠', memory_get: '🧠', save_memory: '🧠',
+  browser: '🌐', browser_navigate: '🌐', navigate: '🌐',
+  image: '🖼️', vision: '🖼️',
+  skill: '📦', skill_view: '📦', skill_load: '📦',
+  delegate: '🤖', spawn: '🤖',
+  tts: '🗣️',
+}
+
+function getToolEmoji(name: string): string {
+  if (TOOL_EMOJIS[name]) return TOOL_EMOJIS[name]
+  if (name.includes('search')) return '🔍'
+  if (name.includes('read') || name.includes('Read')) return '📖'
+  if (name.includes('write') || name.includes('Write') || name.includes('edit')) return '✏️'
+  if (name.includes('exec') || name.includes('terminal')) return '💻'
+  if (name.includes('memory')) return '🧠'
+  if (name.includes('browser')) return '🌐'
+  if (name.includes('skill')) return '📦'
+  return '⚡'
+}
+
+function getToolVerb(name: string): string {
+  if (name.includes('search')) return 'Searching'
+  if (name.includes('read') || name.includes('Read')) return 'Reading'
+  if (name.includes('write') || name.includes('Write') || name.includes('edit')) return 'Writing'
+  if (name.includes('exec') || name.includes('terminal')) return 'Executing'
+  if (name.includes('memory')) return 'Remembering'
+  if (name.includes('browser')) return 'Browsing'
+  if (name.includes('skill')) return 'Loading skill'
+  return 'Working'
+}
+
+function ToolCallCard({ name, phase }: { name: string; phase: string }) {
+  const isDone = phase === 'done' || phase === 'complete' || phase === 'completed'
+  const isError = phase === 'error' || phase === 'failed'
+  const isRunning = !isDone && !isError
+
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!isRunning) return
+    setElapsed(0)
+    const id = window.setInterval(() => setElapsed((s) => s + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [isRunning])
+
+  const [dots, setDots] = useState(0)
+  useEffect(() => {
+    if (!isRunning) return
+    const id = window.setInterval(() => setDots((d) => (d + 1) % 4), 400)
+    return () => window.clearInterval(id)
+  }, [isRunning])
+
+  const elapsedLabel = elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`
+  const emoji = getToolEmoji(name)
+  const verb = getToolVerb(name)
+  const displayName = name.replace(/_/g, ' ')
+
+  return (
+    <div
+      className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] overflow-hidden"
+      style={{
+        borderLeftWidth: '3px',
+        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
+        boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.12)' : 'none',
+      }}
+    >
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+        <span className="text-sm leading-none">{emoji}</span>
+        <span className="font-mono font-semibold text-ink">{displayName}</span>
+        <span className="flex-1" />
+        {isRunning && <span className="text-[10px] tabular-nums text-primary-400">{elapsedLabel}</span>}
+        {isDone && <span className="text-xs text-green-500">✅</span>}
+        {isError && <span className="text-xs text-red-500">❌</span>}
+        {isRunning && <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />}
+      </div>
+      {isRunning && (
+        <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
+          {verb}{'.'.repeat(dots)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type ThinkingBubbleProps = {
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   liveToolActivity?: Array<{ name: string; timestamp: number }>
@@ -137,6 +225,21 @@ function ThinkingBubble({
     }, 150)
     return () => window.clearTimeout(swapTimer)
   }, [statusLabel])
+
+  // When a tool is active, render tool pill cards instead of shimmer bubble
+  if (activeToolName && !isCompacting) {
+    const allTools = liveToolActivity.length > 0
+      ? liveToolActivity.map((t) => ({ name: t.name, phase: 'calling' as const }))
+      : activeToolCalls.map((t) => ({ name: t.name, phase: t.phase }))
+
+    return (
+      <div className="flex flex-col gap-1.5 max-w-sm animate-in fade-in duration-200">
+        {allTools.map((tc, i) => (
+          <ToolCallCard key={`${tc.name}-${i}`} name={tc.name} phase={tc.phase} />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-end gap-2">

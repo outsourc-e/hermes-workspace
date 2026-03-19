@@ -658,7 +658,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             args: event.args,
             result: (event as any).result ?? nextToolCalls[existingToolIndex].result,
           }
-        } else if (event.phase === 'calling' || event.phase === 'start') {
+        } else {
+          // Create entry for ANY phase (complete, error, skill.loaded, artifact.created, etc.)
+          // Events like skill.loaded arrive with phase 'complete' and no prior 'start' — create them too
           nextToolCalls.push({
             id: toolCallId,
             name: event.name,

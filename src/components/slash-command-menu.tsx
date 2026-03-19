@@ -95,7 +95,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
 
   return (
     <div className="pointer-events-none absolute inset-x-2 bottom-[calc(100%+0.5rem)] z-[70]">
-      <div className="pointer-events-auto overflow-hidden rounded-xl border border-primary-200 bg-surface shadow-lg">
+      <div className="pointer-events-auto overflow-hidden rounded-xl border border-primary-200 shadow-lg" style={{ background: 'var(--color-surface, var(--theme-card, #1a1f2e))' }}>
         <Command
           items={filteredCommands}
           value={query}

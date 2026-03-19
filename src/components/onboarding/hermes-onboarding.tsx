@@ -57,15 +57,8 @@ export function HermesOnboarding() {
     const done = localStorage.getItem(ONBOARDING_KEY)
     if (!done) {
       setShow(true)
-      return
     }
-    // Even if previously completed, re-show if no model/provider configured
-    checkConfig().then(({ activeModel, activeProvider }) => {
-      if (!activeModel && !activeProvider) {
-        setShow(true)
-      }
-    })
-  }, [checkConfig])
+  }, [])
 
   const complete = useCallback(() => {
     localStorage.setItem(ONBOARDING_KEY, 'true')
