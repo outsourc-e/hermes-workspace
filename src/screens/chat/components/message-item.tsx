@@ -660,6 +660,7 @@ const TOOL_EMOJI_ICONS: Record<string, string> = {
   web_search: '🔍',
   search: '🔍',
   search_files: '🔍',
+  session_search: '🔍',
   terminal: '💻',
   exec: '💻',
   shell: '💻',
@@ -763,8 +764,25 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   const [expanded, setExpanded] = useState(false)
   const [showMore, setShowMore] = useState(false)
 
-  const emoji = TOOL_EMOJI_ICONS[toolCall.name] ?? '⚡'
-  const verb = TOOL_VERBS[toolCall.name] ?? 'Working'
+  const emoji = TOOL_EMOJI_ICONS[toolCall.name]
+    ?? (toolCall.name.includes('search') ? '🔍'
+      : toolCall.name.includes('read') || toolCall.name.includes('Read') ? '📖'
+      : toolCall.name.includes('write') || toolCall.name.includes('Write') || toolCall.name.includes('edit') || toolCall.name.includes('Edit') ? '✏️'
+      : toolCall.name.includes('exec') || toolCall.name.includes('terminal') || toolCall.name.includes('shell') ? '💻'
+      : toolCall.name.includes('memory') ? '🧠'
+      : toolCall.name.includes('browser') || toolCall.name.includes('navigate') ? '🌐'
+      : toolCall.name.includes('image') || toolCall.name.includes('vision') ? '🖼️'
+      : toolCall.name.includes('skill') ? '📦'
+      : toolCall.name.includes('delegate') || toolCall.name.includes('spawn') ? '🤖'
+      : '⚡')
+  const verb = TOOL_VERBS[toolCall.name]
+    ?? (toolCall.name.includes('search') ? 'Searching'
+      : toolCall.name.includes('read') || toolCall.name.includes('Read') ? 'Reading'
+      : toolCall.name.includes('write') || toolCall.name.includes('Write') || toolCall.name.includes('edit') || toolCall.name.includes('Edit') ? 'Writing'
+      : toolCall.name.includes('exec') || toolCall.name.includes('terminal') ? 'Executing'
+      : toolCall.name.includes('memory') ? 'Remembering'
+      : toolCall.name.includes('browser') ? 'Browsing'
+      : 'Working')
   const displayName = formatToolDisplayLabel(
     toolCall.name,
     toolCall.args as Record<string, unknown> | undefined,
