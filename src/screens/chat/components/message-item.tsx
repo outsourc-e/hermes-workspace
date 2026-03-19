@@ -654,81 +654,225 @@ function keyArgLabel(name: string, args?: Record<string, unknown>): string | nul
   }
 }
 
-function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
-  const icons: Record<string, string> = {
-    web_search: '\u25ce',
-    search_files: '\u25ce',
-    Read: '\u25c7',
-    read_file: '\u25c7',
-    exec: '\u2699',
-    terminal: '\u2699',
-    memory_search: '\u2726',
-    memory_get: '\u2726',
-    save_memory: '\u2726',
-    Write: '\u270e',
-    write_file: '\u270e',
-    Edit: '\u270e',
-    browser: '\u25a3',
-    image: '\u25ce',
-    skill_view: '\u26a1',
-  }
+// --- Anime-style Tool Call Card ---
 
-  const icon = icons[toolCall.name] ?? '\u2694'
+const TOOL_EMOJI_ICONS: Record<string, string> = {
+  web_search: '🔍',
+  search: '🔍',
+  search_files: '🔍',
+  terminal: '💻',
+  exec: '💻',
+  shell: '💻',
+  bash: '💻',
+  Read: '📖',
+  read: '📖',
+  read_file: '📖',
+  file_read: '📖',
+  Write: '✏️',
+  write: '✏️',
+  write_file: '✏️',
+  file_write: '✏️',
+  Edit: '✏️',
+  edit: '✏️',
+  memory: '🧠',
+  memory_search: '🧠',
+  memory_get: '🧠',
+  save_memory: '🧠',
+  browser: '🌐',
+  browser_navigate: '🌐',
+  navigate: '🌐',
+  image: '🖼️',
+  vision: '🖼️',
+  skill: '📦',
+  skill_view: '📦',
+  skill_load: '📦',
+  delegate: '🤖',
+  spawn: '🤖',
+  tts: '🗣️',
+  speak: '🗣️',
+}
+
+const TOOL_VERBS: Record<string, string> = {
+  web_search: 'Searching',
+  search: 'Searching',
+  search_files: 'Searching',
+  terminal: 'Executing',
+  exec: 'Executing',
+  shell: 'Executing',
+  bash: 'Executing',
+  Read: 'Reading',
+  read: 'Reading',
+  read_file: 'Reading',
+  file_read: 'Reading',
+  Write: 'Writing',
+  write: 'Writing',
+  write_file: 'Writing',
+  file_write: 'Writing',
+  Edit: 'Writing',
+  edit: 'Writing',
+  memory: 'Remembering',
+  memory_search: 'Remembering',
+  memory_get: 'Remembering',
+  save_memory: 'Remembering',
+  browser: 'Browsing',
+  browser_navigate: 'Browsing',
+  navigate: 'Browsing',
+  image: 'Analyzing',
+  vision: 'Analyzing',
+  delegate: 'Delegating',
+  spawn: 'Delegating',
+  tts: 'Speaking',
+  speak: 'Speaking',
+}
+
+function useElapsedTime(active: boolean): string {
+  const [elapsed, setElapsed] = useState(0)
+  const startRef = useRef<number>(Date.now())
+
+  useEffect(() => {
+    if (!active) return
+    startRef.current = Date.now()
+    setElapsed(0)
+    const interval = setInterval(() => {
+      const secs = Math.floor((Date.now() - startRef.current) / 1000)
+      setElapsed(secs)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [active])
+
+  if (!active && elapsed === 0) return ''
+  if (elapsed < 60) return `${elapsed}s`
+  const m = Math.floor(elapsed / 60)
+  const s = elapsed % 60
+  return `${m}m ${s}s`
+}
+
+function useAnimatedDots(): string {
+  const [dots, setDots] = useState(0)
+  useEffect(() => {
+    const interval = setInterval(() => setDots((d) => (d + 1) % 4), 500)
+    return () => clearInterval(interval)
+  }, [])
+  return '.'.repeat(dots)
+}
+
+function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   const isDone = toolCall.phase === 'done'
   const isError = toolCall.phase === 'error'
   const isRunning = !isDone && !isError
-  const label = keyArgLabel(toolCall.name, toolCall.args as Record<string, unknown> | undefined)
+  const [expanded, setExpanded] = useState(false)
+  const [showMore, setShowMore] = useState(false)
+
+  const emoji = TOOL_EMOJI_ICONS[toolCall.name] ?? '⚡'
+  const verb = TOOL_VERBS[toolCall.name] ?? 'Working'
   const displayName = formatToolDisplayLabel(
     toolCall.name,
     toolCall.args as Record<string, unknown> | undefined,
   )
-  const truncated = label && label.length > 60 ? `${label.slice(0, 57)}\u2026` : label
+  const label = keyArgLabel(toolCall.name, toolCall.args as Record<string, unknown> | undefined)
+  const truncated = label && label.length > 50 ? `${label.slice(0, 47)}…` : label
 
-  const statusColor = isDone
-    ? 'var(--theme-success)'
+  const elapsed = useElapsedTime(isRunning)
+  const dots = useAnimatedDots()
+
+  const result = toolCall.result ?? ''
+  const preview = result.slice(0, 100)
+  const detail = result.slice(0, 500)
+  const hasMore = result.length > 500
+
+  const borderColor = isDone
+    ? 'color-mix(in srgb, var(--theme-success) 35%, var(--theme-border))'
     : isError
-      ? 'var(--theme-danger)'
-      : 'var(--theme-accent)'
+      ? 'color-mix(in srgb, var(--theme-danger) 35%, var(--theme-border))'
+      : 'color-mix(in srgb, var(--theme-accent) 50%, var(--theme-border))'
 
-  const pill = (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium max-w-full"
+  const leftAccent = isRunning ? 'var(--theme-accent)' : isDone ? 'var(--theme-success)' : 'var(--theme-danger)'
+
+  return (
+    <div
+      className="rounded-lg border text-[11px] max-w-full overflow-hidden"
       style={{
         background: 'var(--theme-card2)',
-        borderColor: isDone ? 'color-mix(in srgb, var(--theme-success) 30%, var(--theme-border))' : isError ? 'color-mix(in srgb, var(--theme-danger) 30%, var(--theme-border))' : 'var(--theme-border)',
-        color: 'var(--theme-text)',
+        borderColor,
+        borderLeftWidth: '3px',
+        borderLeftColor: leftAccent,
+        transition: 'border-color 0.3s',
+        boxShadow: isRunning ? `0 0 8px color-mix(in srgb, var(--theme-accent) 15%, transparent)` : 'none',
       }}
     >
-      <span className="shrink-0" style={{ color: statusColor }}>{icon}</span>
-      <span className="shrink-0">{displayName}</span>
-      {truncated && truncated !== displayName && (
-        <span className="opacity-50 truncate font-mono text-[10px]">{truncated}</span>
-      )}
+      {/* Header row */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+        {/* Icon */}
+        <span className="shrink-0 text-sm leading-none">{emoji}</span>
+        {/* Tool name */}
+        <span className="shrink-0 font-mono font-semibold" style={{ color: 'var(--theme-text)' }}>{displayName}</span>
+        {/* Key arg */}
+        {truncated && truncated !== displayName && (
+          <span className="truncate opacity-40 text-[10px] font-mono min-w-0">{truncated}</span>
+        )}
+        {/* Spacer */}
+        <span className="flex-1" />
+        {/* Elapsed */}
+        {elapsed && (
+          <span className="shrink-0 text-[10px] tabular-nums" style={{ color: 'var(--theme-muted)' }}>{elapsed}</span>
+        )}
+        {/* Status icon */}
+        {isDone && (
+          <span className="shrink-0 text-xs" style={{ color: 'var(--theme-success)' }}>✅</span>
+        )}
+        {isError && (
+          <span className="shrink-0 text-xs" style={{ color: 'var(--theme-danger)' }}>❌</span>
+        )}
+        {isRunning && (
+          <span className="shrink-0 size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
+        )}
+      </div>
+      {/* Status line while running */}
       {isRunning && (
-        <span className="shrink-0 size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
+        <div className="px-2.5 pb-1.5 text-[10px]" style={{ color: 'var(--theme-muted)' }}>
+          <span>{verb}{dots}</span>
+        </div>
       )}
-      {isDone && <span className="shrink-0" style={{ color: 'var(--theme-success)' }}>{'\u2714'}</span>}
-      {isError && <span className="shrink-0" style={{ color: 'var(--theme-danger)' }}>{'\u2718'}</span>}
-    </span>
+      {/* Error status */}
+      {isError && result && (
+        <div className="px-2.5 pb-1.5 text-[10px] font-mono truncate" style={{ color: 'var(--theme-danger)' }}>
+          {result.slice(0, 80)}
+        </div>
+      )}
+      {/* Result preview when done */}
+      {isDone && result && (
+        <div className="border-t" style={{ borderColor: 'var(--theme-border)' }}>
+          <button
+            type="button"
+            className="w-full flex items-center gap-1 px-2.5 py-1 text-[10px] hover:opacity-80 text-left"
+            style={{ color: 'var(--theme-muted)' }}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            <span>{expanded ? '▾' : '▸'}</span>
+            <span className="truncate">{preview}{result.length > 100 ? '…' : ''}</span>
+          </button>
+          {expanded && (
+            <pre
+              className="px-2.5 pb-2 text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto"
+              style={{ color: 'var(--theme-text)', opacity: 0.8 }}
+            >
+              {showMore ? result : detail}
+              {hasMore && !showMore && (
+                <button
+                  type="button"
+                  className="block mt-1 text-[10px] underline"
+                  style={{ color: 'var(--theme-accent)' }}
+                  onClick={(e) => { e.stopPropagation(); setShowMore(true) }}
+                >
+                  Show more
+                </button>
+              )}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
   )
-
-  if (isDone && toolCall.result) {
-    return (
-      <details className="inline-block max-w-full">
-        <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-          {pill}
-        </summary>
-        <pre
-          className="mt-1 max-h-40 overflow-y-auto rounded-lg px-2.5 py-1.5 text-xs font-mono whitespace-pre-wrap break-words"
-          style={{ background: 'var(--code-bg)', color: 'var(--code-foreground)', border: '1px solid var(--code-border)' }}
-        >
-          {toolCall.result}
-        </pre>
-      </details>
-    )
-  }
-
-  return pill
 }
 
 function attachmentSource(attachment: ChatAttachment | undefined): string {
@@ -1572,7 +1716,7 @@ function MessageItemComponent({
         )}
         {/* Tool calls — rendered OUTSIDE the chat bubble as separate pills */}
         {!isUser && hasStreamToolCalls ? (
-          <div className="flex flex-wrap gap-1.5 pl-1">
+          <div className="flex flex-col gap-1.5 pl-1 max-w-sm">
             {effectiveStreamToolCalls
               .filter((tc, i, arr) => arr.findIndex((t) => t.name === tc.name && JSON.stringify(t.args) === JSON.stringify(tc.args)) === i)
               .map((toolCall) => (
