@@ -227,31 +227,35 @@ function ChatHeaderComponent({
         className="shrink-0 border-b border-primary-200 bg-surface transition-transform"
         style={pullOffset > 0 ? { transform: `translateY(${pullOffset}px)` } : undefined}
       >
-        <div className="px-3 h-14 flex items-center">
+        <div className="px-3 h-12 flex items-center gap-0">
+          {/* Hamburger lines — ChatGPT style, large tap target */}
           <button
             type="button"
             onClick={openHamburgerMenu}
-            className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95"
+            className="shrink-0 flex items-center justify-center w-11 h-11 -ml-1 rounded-xl active:bg-white/10 transition-colors z-10"
             aria-label="Open navigation menu"
           >
-            <img src="/hermes-avatar.webp" alt="Hermes" className="size-9 rounded-xl" />
+            <svg width="20" height="16" viewBox="0 0 20 16" fill="none" className="text-ink opacity-70">
+              <path d="M1 1.5H19M1 8H19M1 14.5H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
           </button>
 
-          <div className="flex-1 flex justify-center min-w-0 -ml-11">
-            <button
-              type="button"
-              onClick={onOpenSessions}
-              className="max-w-[60vw] flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-primary-100 active:bg-primary-150 transition-colors"
-              aria-label="Switch session"
-            >
-              <span className="truncate text-[15px] font-semibold tracking-tight text-ink">{mobileTitle}</span>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="shrink-0 opacity-40">
-                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
+          {/* Session name — left aligned like ChatGPT */}
+          <button
+            type="button"
+            onClick={onOpenSessions}
+            className="flex items-center gap-1 min-w-0 max-w-[55vw] active:opacity-60 transition-opacity"
+            aria-label="Switch session"
+          >
+            <span className="truncate text-[16px] font-semibold text-ink">{mobileTitle === 'new' ? 'Hermes' : mobileTitle}</span>
+            <svg width="8" height="14" viewBox="0 0 8 14" fill="none" className="shrink-0 opacity-40 mt-px">
+              <path d="M1.5 1L6.5 7L1.5 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
 
-          <div className="shrink-0 flex items-center min-w-11 justify-end">
+          <div className="flex-1" />
+
+          <div className="shrink-0 flex items-center gap-1">
             <InspectorToggleButton />
           </div>
         </div>
