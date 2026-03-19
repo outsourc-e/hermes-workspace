@@ -1,16 +1,21 @@
 import type { HugeiconsIcon } from '@hugeicons/react'
 import {
+  CheckmarkCircle02Icon,
   Home01Icon,
-  Message01Icon,
-  DashboardSquare01Icon,
-  BrowserIcon,
-  Rocket01Icon,
-  Folder01Icon,
+  Plug01Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import type * as React from 'react'
+import {
+  ConnectionCheckStep,
+  ModelConfigurationStep,
+} from './setup-step-content'
 
 type IconType = React.ComponentProps<typeof HugeiconsIcon>['icon']
+
+export type OnboardingStepComponentProps = {
+  setCanProceed: (canProceed: boolean) => void
+}
 
 export type OnboardingStep = {
   id: string
@@ -18,64 +23,46 @@ export type OnboardingStep = {
   description: string
   icon: IconType
   iconBg: string
+  component?: React.ComponentType<OnboardingStepComponentProps>
+  nextLabel?: string
+  completeLabel?: string
+  canProceedByDefault?: boolean
 }
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
     title: 'Welcome to Hermes Workspace',
-    description:
-      "Your intelligent workspace for AI-powered automation. Let's take a quick tour of what you can do.",
+    description: 'Your AI workspace powered by Hermes Agent',
     icon: Home01Icon,
     iconBg: 'bg-orange-500',
+    nextLabel: 'Get Started',
   },
   {
-    id: 'chat',
-    title: 'AI Chat Interface',
-    description:
-      'Have natural conversations with powerful AI models. Create multiple sessions, search with ⌘K, and let AI handle complex tasks.',
-    icon: Message01Icon,
-    iconBg: 'bg-blue-500',
-  },
-  {
-    id: 'dashboard',
-    title: 'Dashboard & Widgets',
-    description:
-      'Track your usage, monitor active tasks, and customize your workspace with interactive widgets.',
-    icon: DashboardSquare01Icon,
+    id: 'connection-check',
+    title: 'Connection Check',
+    description: 'Verify that Hermes Agent is running before you begin.',
+    icon: Plug01Icon,
     iconBg: 'bg-emerald-500',
+    component: ConnectionCheckStep,
+    canProceedByDefault: false,
   },
   {
-    id: 'browser-terminal',
-    title: 'Browser & Terminal',
-    description:
-      'Built-in browser automation and terminal access. Let AI browse the web and execute commands on your behalf.',
-    icon: BrowserIcon,
-    iconBg: 'bg-purple-500',
-  },
-  {
-    id: 'agent-swarm',
-    title: 'Agent Swarm',
-    description:
-      'Multi-agent orchestration for complex workflows. Spawn specialized agents that work together. Coming soon.',
-    icon: Rocket01Icon,
-    iconBg: 'bg-pink-500',
-  },
-  {
-    id: 'files-memory',
-    title: 'Files & Memory',
-    description:
-      'Browse workspace files and access agent memory. Your AI assistant remembers context across sessions.',
-    icon: Folder01Icon,
-    iconBg: 'bg-amber-500',
-  },
-  {
-    id: 'providers',
-    title: 'Models & Providers',
-    description:
-      'Configure AI providers like OpenAI, Anthropic, and more. Choose the perfect model for each task.',
+    id: 'model-configuration',
+    title: 'Model Configuration',
+    description: 'Review your current provider and model setup.',
     icon: Settings01Icon,
     iconBg: 'bg-cyan-500',
+    component: ModelConfigurationStep,
+  },
+  {
+    id: 'ready',
+    title: 'You are all set!',
+    description:
+      'Start chatting with Hermes. Try asking it to help with code, research, or anything else.',
+    icon: CheckmarkCircle02Icon,
+    iconBg: 'bg-emerald-500',
+    completeLabel: 'Start Chatting',
   },
 ]
 

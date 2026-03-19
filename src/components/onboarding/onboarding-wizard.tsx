@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -8,12 +8,14 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
 } from '@hugeicons/core-free-icons'
+import { useNavigate } from '@tanstack/react-router'
 import { useOnboardingStore } from '@/hooks/use-onboarding'
 import { ONBOARDING_STEPS } from './onboarding-steps'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export function OnboardingWizard() {
+  const navigate = useNavigate()
   const {
     isOpen,
     currentStep,
@@ -25,14 +27,25 @@ export function OnboardingWizard() {
     complete,
     skip,
   } = useOnboardingStore()
+  const [canProceed, setCanProceed] = useState(true)
 
   // Run once on client mount — checks localStorage and opens if not completed
   useEffect(() => {
     initialize()
   }, [initialize])
 
+  const step = ONBOARDING_STEPS[currentStep]
   const isFirstStep = currentStep === 0
   const isLastStep = currentStep === totalSteps - 1
+
+  useEffect(() => {
+    setCanProceed(step.canProceedByDefault ?? true)
+  }, [step])
+
+  const handleComplete = useCallback(() => {
+    complete()
+    void navigate({ to: '/chat' })
+  }, [complete, navigate])
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -41,8 +54,9 @@ export function OnboardingWizard() {
       if (event.key === 'Escape') {
         skip()
       } else if (event.key === 'Enter') {
+        if (!canProceed) return
         if (isLastStep) {
-          complete()
+          handleComplete()
         } else {
           nextStep()
         }
@@ -51,7 +65,7 @@ export function OnboardingWizard() {
         prevStep()
       }
     },
-    [isOpen, isLastStep, isFirstStep, skip, complete, nextStep, prevStep],
+    [canProceed, isOpen, isLastStep, isFirstStep, skip, handleComplete, nextStep, prevStep],
   )
 
   useEffect(() => {
@@ -60,8 +74,6 @@ export function OnboardingWizard() {
   }, [handleKeyDown])
 
   if (!isOpen) return null
-
-  const step = ONBOARDING_STEPS[currentStep]
 
   return (
     <AnimatePresence>
@@ -103,39 +115,42 @@ export function OnboardingWizard() {
                   transition={{ duration: 0.2 }}
                   className="flex flex-col items-center text-center"
                 >
-                  {/* Icon or Logo */}
-                  <motion.div
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', damping: 15, stiffness: 300 }}
-                    className={cn(
-                      'mb-6 flex items-center justify-center shadow-lg',
-                      step.id === 'welcome'
-                        ? 'size-16'
-                        : 'size-20 rounded-2xl text-white',
-                      step.id !== 'welcome' && step.iconBg,
-                    )}
-                  >
-                    {step.id === 'welcome' ? (
-                      <img src="/hermes-avatar.webp" alt="Hermes" className="size-16 rounded-2xl" />
-                    ) : (
-                      <HugeiconsIcon
-                        icon={step.icon}
-                        className="size-10"
-                        strokeWidth={1.5}
-                      />
-                    )}
-                  </motion.div>
+                  {step.component ? (
+                    <step.component setCanProceed={setCanProceed} />
+                  ) : (
+                    <>
+                      <motion.div
+                        initial={{ scale: 0.8 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', damping: 15, stiffness: 300 }}
+                        className={cn(
+                          'mb-6 flex items-center justify-center shadow-lg',
+                          step.id === 'welcome'
+                            ? 'size-16'
+                            : 'size-20 rounded-2xl text-white',
+                          step.id !== 'welcome' && step.iconBg,
+                        )}
+                      >
+                        {step.id === 'welcome' ? (
+                          <img src="/hermes-avatar.webp" alt="Hermes" className="size-16 rounded-2xl" />
+                        ) : (
+                          <HugeiconsIcon
+                            icon={step.icon}
+                            className="size-10"
+                            strokeWidth={1.5}
+                          />
+                        )}
+                      </motion.div>
 
-                  {/* Title */}
-                  <h2 className="mb-3 text-2xl font-semibold text-primary-900">
-                    {step.title}
-                  </h2>
+                      <h2 className="mb-3 text-2xl font-semibold text-primary-900">
+                        {step.title}
+                      </h2>
 
-                  {/* Description */}
-                  <p className="mb-8 max-w-md text-base leading-relaxed text-primary-600">
-                    {step.description}
-                  </p>
+                      <p className="mb-8 max-w-md text-base leading-relaxed text-primary-600">
+                        {step.description}
+                      </p>
+                    </>
+                  )}
                 </motion.div>
               </AnimatePresence>
 
@@ -144,12 +159,19 @@ export function OnboardingWizard() {
                 {ONBOARDING_STEPS.map((_, index) => (
                   <button
                     key={index}
-                    onClick={() => goToStep(index)}
+                    onClick={() => {
+                      if (index <= currentStep) {
+                        goToStep(index)
+                      }
+                    }}
+                    disabled={index > currentStep}
                     className={cn(
                       'size-2.5 rounded-full transition-all duration-200',
                       index === currentStep
                         ? 'w-6 bg-accent-500'
-                        : 'bg-primary-300 hover:bg-primary-400',
+                        : 'bg-primary-300',
+                      index < currentStep && 'hover:bg-primary-400',
+                      index > currentStep && 'cursor-not-allowed opacity-50',
                     )}
                     aria-label={`Go to step ${index + 1}`}
                   />
@@ -175,19 +197,20 @@ export function OnboardingWizard() {
                 {isLastStep ? (
                   <Button
                     variant="default"
-                    onClick={complete}
+                    onClick={handleComplete}
                     className="gap-2 bg-accent-500 px-6 py-2.5 text-base font-medium shadow-lg shadow-accent-500/25 ring-1 ring-accent-400/20 transition-all hover:bg-accent-600 hover:shadow-xl hover:shadow-accent-500/30"
                   >
-                    Get Started
+                    {step.completeLabel ?? 'Get Started'}
                     <HugeiconsIcon icon={ArrowRight01Icon} className="size-5" />
                   </Button>
                 ) : (
                   <Button
                     variant="default"
                     onClick={nextStep}
+                    disabled={!canProceed}
                     className="gap-2"
                   >
-                    Next
+                    {step.nextLabel ?? 'Next'}
                     <HugeiconsIcon icon={ArrowRight01Icon} className="size-4" />
                   </Button>
                 )}

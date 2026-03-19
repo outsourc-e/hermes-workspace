@@ -1,8 +1,5 @@
 import { create } from 'zustand'
-import {
-  STORAGE_KEY,
-  ONBOARDING_STEPS,
-} from '@/components/onboarding/onboarding-steps'
+import { STORAGE_KEY } from '@/components/onboarding/onboarding-steps'
 
 type OnboardingState = {
   isOpen: boolean
@@ -29,7 +26,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   // Start closed — initialize() opens it on client if not completed
   isOpen: false,
   currentStep: 0,
-  totalSteps: ONBOARDING_STEPS.length,
+  totalSteps: 4,
   _initialized: false,
 
   initialize: () => {
