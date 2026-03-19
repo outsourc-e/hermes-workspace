@@ -24,9 +24,7 @@ const NAV_ITEMS = [
   { id: 'skills',   label: 'Skills',   icon: PuzzleIcon,       to: '/skills',     match: (p: string) => p.startsWith('/skills') },
 ]
 
-const BOTTOM_ITEMS = [
-  { id: 'settings', label: 'Settings', icon: Settings01Icon,   to: '/settings',   match: (p: string) => p.startsWith('/settings') },
-]
+
 
 /** Shared drawer state — used by both the trigger button and the drawer itself */
 let _setOpen: ((v: boolean) => void) | null = null
@@ -156,36 +154,45 @@ export function MobileHamburgerMenu() {
           })}
         </nav>
 
-        {/* Bottom — settings + connection indicator */}
-        <div className="px-3 pb-2 flex flex-col gap-1" style={{ borderTop: '1px solid var(--color-border, #e5e7eb)' }}>
-          <div className="flex items-center gap-3 px-3 py-3">
-            <div className="relative shrink-0">
-              <img src="/hermes-avatar.webp" alt="Hermes" className="size-8 rounded-full" />
-              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900" />
-            </div>
-            <span className="flex-1 text-[13px] font-medium truncate" style={{ color: 'var(--color-ink-muted, #555)' }}>Connected</span>
+        {/* Bottom — user profile + settings + theme toggle */}
+        <div className="px-3 pb-2 pt-3" style={{ borderTop: '1px solid var(--color-border, #e5e7eb)' }}>
+          <div className="flex items-center gap-3 px-2">
+            {/* User avatar + name + status dot */}
+            <img src="/hermes-avatar.webp" alt="User" className="size-9 rounded-xl shrink-0" />
+            <span className="text-[15px] font-semibold truncate" style={{ color: 'var(--color-ink, #111)' }}>Eric</span>
+            <span className="size-2.5 rounded-full bg-green-500 shrink-0" />
+
+            <div className="flex-1" />
+
+            {/* Settings cog */}
+            <button
+              type="button"
+              onClick={() => handleNav('/settings')}
+              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
+              aria-label="Settings"
+              style={{ color: 'var(--color-ink-muted, #888)' }}
+            >
+              <HugeiconsIcon icon={Settings01Icon} size={20} strokeWidth={1.5} />
+            </button>
+
+            {/* Theme toggle (moon) */}
+            <button
+              type="button"
+              onClick={() => {
+                const html = document.documentElement
+                const current = html.getAttribute('data-theme')
+                html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark')
+                localStorage.setItem('theme', current === 'dark' ? 'light' : 'dark')
+              }}
+              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
+              aria-label="Toggle theme"
+              style={{ color: 'var(--color-ink-muted, #888)' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            </button>
           </div>
-          {BOTTOM_ITEMS.map((item) => {
-            const isActive = item.match(pathname)
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleNav(item.to)}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full',
-                  'transition-all duration-150 active:scale-[0.98]',
-                )}
-                style={isActive
-                  ? { background: 'var(--color-accent-muted, rgba(99,102,241,0.12))', color: 'var(--color-accent, #6366f1)' }
-                  : { color: 'var(--color-ink-muted, #555)' }
-                }
-              >
-                <HugeiconsIcon icon={item.icon} size={20} strokeWidth={isActive ? 2 : 1.6} />
-                <span className="text-[15px] font-medium">{item.label}</span>
-              </button>
-            )
-          })}
         </div>
       </div>
     </>
