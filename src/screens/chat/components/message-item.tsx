@@ -808,52 +808,36 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
 
   return (
     <div
-      className="rounded-lg border text-[11px] max-w-full overflow-hidden"
+      className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] max-w-full overflow-hidden"
       style={{
-        background: 'var(--theme-card2)',
-        borderColor,
         borderLeftWidth: '3px',
-        borderLeftColor: leftAccent,
+        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
         transition: 'border-color 0.3s',
-        boxShadow: isRunning ? `0 0 8px color-mix(in srgb, var(--theme-accent) 15%, transparent)` : 'none',
+        boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.15)' : 'none',
       }}
     >
       {/* Header row */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5">
-        {/* Icon */}
         <span className="shrink-0 text-sm leading-none">{emoji}</span>
-        {/* Tool name */}
-        <span className="shrink-0 font-mono font-semibold" style={{ color: 'var(--theme-text)' }}>{displayName}</span>
-        {/* Key arg */}
+        <span className="shrink-0 font-mono font-semibold text-ink">{displayName}</span>
         {truncated && truncated !== displayName && (
           <span className="truncate opacity-40 text-[10px] font-mono min-w-0">{truncated}</span>
         )}
-        {/* Spacer */}
         <span className="flex-1" />
-        {/* Elapsed */}
         {elapsed && (
-          <span className="shrink-0 text-[10px] tabular-nums" style={{ color: 'var(--theme-muted)' }}>{elapsed}</span>
+          <span className="shrink-0 text-[10px] tabular-nums text-primary-400">{elapsed}</span>
         )}
-        {/* Status icon */}
-        {isDone && (
-          <span className="shrink-0 text-xs" style={{ color: 'var(--theme-success)' }}>✅</span>
-        )}
-        {isError && (
-          <span className="shrink-0 text-xs" style={{ color: 'var(--theme-danger)' }}>❌</span>
-        )}
-        {isRunning && (
-          <span className="shrink-0 size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
-        )}
+        {isDone && <span className="shrink-0 text-xs text-green-500">✅</span>}
+        {isError && <span className="shrink-0 text-xs text-red-500">❌</span>}
+        {isRunning && <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-indigo-500" />}
       </div>
-      {/* Status line while running */}
       {isRunning && (
-        <div className="px-2.5 pb-1.5 text-[10px]" style={{ color: 'var(--theme-muted)' }}>
+        <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
           <span>{verb}{dots}</span>
         </div>
       )}
-      {/* Error status */}
       {isError && result && (
-        <div className="px-2.5 pb-1.5 text-[10px] font-mono truncate" style={{ color: 'var(--theme-danger)' }}>
+        <div className="px-2.5 pb-1.5 text-[10px] font-mono truncate text-red-500">
           {result.slice(0, 80)}
         </div>
       )}
@@ -870,16 +854,12 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
             <span className="truncate">{preview}{result.length > 100 ? '…' : ''}</span>
           </button>
           {expanded && (
-            <pre
-              className="px-2.5 pb-2 text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto"
-              style={{ color: 'var(--theme-text)', opacity: 0.8 }}
-            >
+            <pre className="px-2.5 pb-2 text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-ink opacity-80">
               {showMore ? result : detail}
               {hasMore && !showMore && (
                 <button
                   type="button"
-                  className="block mt-1 text-[10px] underline"
-                  style={{ color: 'var(--theme-accent)' }}
+                  className="block mt-1 text-[10px] underline text-accent-500"
                   onClick={(e) => { e.stopPropagation(); setShowMore(true) }}
                 >
                   Show more
