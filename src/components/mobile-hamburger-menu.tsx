@@ -11,7 +11,7 @@ import {
   Settings01Icon,
   Cancel01Icon,
 } from '@hugeicons/core-free-icons'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 
@@ -58,6 +58,12 @@ export function MobileHamburgerMenu() {
   const [open, setOpen] = useState(false)
   _setOpen = setOpen
 
+  // Add/remove body class to push main content
+  useEffect(() => {
+    document.body.classList.toggle('nav-drawer-open', open)
+    return () => { document.body.classList.remove('nav-drawer-open') }
+  }, [open])
+
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const isChatRoute = pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
@@ -72,19 +78,30 @@ export function MobileHamburgerMenu() {
     <>
       {/* No floating button — each page has MobilePageHeader with HamburgerTrigger inline */}
 
-      {/* Backdrop */}
-      {open && (
+      {/* Push-style layout wrapper — sidebar pushes content right */}
+      <div
+        className={cn(
+          'fixed inset-0 z-[95] md:hidden',
+          'transition-transform duration-300 ease-in-out',
+          open ? 'translate-x-0' : 'pointer-events-none',
+        )}
+      >
+        {/* Main content overlay — dims and shifts right when sidebar is open */}
         <div
-          className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-sm md:hidden"
-          onClick={() => setOpen(false)}
+          className={cn(
+            'absolute inset-0 transition-all duration-300 ease-in-out',
+            open ? 'translate-x-72 opacity-40 scale-[0.92] rounded-2xl overflow-hidden' : 'translate-x-0 opacity-100 scale-100',
+          )}
+          onClick={() => open && setOpen(false)}
+          style={open ? { transformOrigin: 'left center' } : undefined}
         />
-      )}
+      </div>
 
       {/* Slide-over drawer */}
       <div
         className={cn(
           'fixed top-0 left-0 bottom-0 z-[96] w-72 md:hidden',
-          'border-r shadow-2xl',
+          'shadow-2xl',
           'flex flex-col pt-[max(env(safe-area-inset-top,20px),20px)] pb-[max(env(safe-area-inset-bottom,20px),20px)]',
           'transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : '-translate-x-full',

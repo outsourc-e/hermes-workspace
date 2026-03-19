@@ -1147,3 +1147,21 @@ code {
 [data-demo="true"] * {
   transition-duration: 0.05s !important;
 }
+
+/* Mobile nav drawer — push content right + dim when open */
+@media (max-width: 767px) {
+  body.nav-drawer-open > #root {
+    transform: translateX(288px) scale(0.92);
+    opacity: 0.4;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: transform 0.3s ease, opacity 0.3s ease, border-radius 0.3s ease;
+    pointer-events: none;
+  }
+  body:not(.nav-drawer-open) > #root {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+    border-radius: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease, border-radius 0.3s ease;
+  }
+}
