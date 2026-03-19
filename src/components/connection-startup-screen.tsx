@@ -21,6 +21,8 @@ export function ConnectionStartupScreen({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
     'idle',
   )
+  const [serverStarting, setServerStarting] = useState(false)
+  const [serverLog, setServerLog] = useState<string[]>([])
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const setupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -157,10 +159,82 @@ export function ConnectionStartupScreen({
               <p className="text-sm text-white/90">
                 Hermes Agent is not running. Start it with:
               </p>
-              <pre className="mt-3 overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4 text-xs leading-6 text-white/95 sm:text-sm">
-                <code className="font-mono">{START_COMMAND}</code>
-              </pre>
+              {serverStarting ? (
+                <div className="mt-3 w-full rounded-2xl border border-white/10 bg-black/60 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
+                    <span className="text-xs font-medium text-emerald-400">Starting Hermes Agent...</span>
+                  </div>
+                  <pre className="max-h-32 overflow-y-auto text-xs leading-5 text-white/70 font-mono">
+                    {serverLog.length > 0 ? serverLog.slice(-8).join('\n') : 'Launching server...'}
+                  </pre>
+                </div>
+              ) : (
+                <pre className="mt-3 overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4 text-xs leading-6 text-white/95 sm:text-sm">
+                  <code className="font-mono">{START_COMMAND}</code>
+                </pre>
+              )}
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
+                  type="button"
+                  disabled={serverStarting}
+                  onClick={async () => {
+                    setServerStarting(true)
+                    setServerLog([])
+                    try {
+                      const res = await fetch('/api/terminal-stream?' + new URLSearchParams({
+                        command: START_COMMAND,
+                        cwd: '/Users/aurora/.openclaw/workspace/hermes-agent',
+                        cols: '120',
+                        rows: '10',
+                      }).toString())
+                      if (!res.ok || !res.body) {
+                        setServerLog(prev => [...prev, `Error: HTTP ${res.status}`])
+                        setServerStarting(false)
+                        return
+                      }
+                      const reader = res.body.getReader()
+                      const decoder = new TextDecoder()
+                      let buffer = ''
+                      const read = async () => {
+                        while (true) {
+                          const { done, value } = await reader.read()
+                          if (done) break
+                          buffer += decoder.decode(value, { stream: true })
+                          const lines = buffer.split('\n')
+                          buffer = lines.pop() || ''
+                          for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                              try {
+                                const parsed = JSON.parse(line.slice(6))
+                                if (typeof parsed === 'string') {
+                                  // Strip ANSI codes for clean display
+                                  const clean = parsed.replace(/\x1b\[[0-9;]*m/g, '').trim()
+                                  if (clean) setServerLog(prev => [...prev, clean])
+                                } else if (parsed && typeof parsed === 'object' && 'data' in parsed) {
+                                  const clean = String(parsed.data).replace(/\x1b\[[0-9;]*m/g, '').trim()
+                                  if (clean) setServerLog(prev => [...prev, clean])
+                                }
+                              } catch { /* skip */ }
+                            }
+                          }
+                        }
+                      }
+                      void read()
+                    } catch (err) {
+                      setServerLog(prev => [...prev, `Failed: ${err instanceof Error ? err.message : String(err)}`])
+                      setServerStarting(false)
+                    }
+                  }}
+                  className={[
+                    'rounded-xl px-5 py-2.5 text-sm font-semibold transition',
+                    serverStarting
+                      ? 'bg-emerald-800 text-emerald-200 cursor-not-allowed'
+                      : 'bg-emerald-500 text-white hover:bg-emerald-400',
+                  ].join(' ')}
+                >
+                  {serverStarting ? 'Starting...' : '▶ Start Server'}
+                </button>
                 <button
                   type="button"
                   onClick={async () => {
@@ -183,6 +257,7 @@ export function ConnectionStartupScreen({
                   type="button"
                   onClick={() => {
                     setShowSetup(false)
+                    setServerStarting(false)
                     void attemptConnection()
                   }}
                   className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90"
