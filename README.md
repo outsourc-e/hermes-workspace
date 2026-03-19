@@ -51,63 +51,58 @@
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **pnpm** — `npm install -g pnpm`
 - **Python 3.11+** — [python.org](https://www.python.org/)
+- **Hermes Agent (with WebAPI)** — see below
 
-### Step 1: Clone both repos as siblings
+### Step 1: Set up Hermes Agent (backend)
+
+> **⚠️ Important:** Hermes Workspace requires the **WebAPI backend** (`hermes webapi`), which provides the FastAPI server with session management, chat streaming, skills, and memory endpoints. The upstream NousResearch/hermes-agent does not include this yet — use our fork which adds the WebAPI layer.
 
 ```bash
+# Clone the fork with WebAPI support
 git clone https://github.com/outsourc-e/hermes-agent.git
-git clone https://github.com/outsourc-e/hermes-workspace.git
-```
-
-> They must be in the **same parent directory** — Hermes Workspace auto-detects and starts Hermes Agent from `../hermes-agent`.
-
-### Step 2: Install Hermes Agent dependencies (one-time)
-
-```bash
 cd hermes-agent
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
+
+# Run the interactive setup (configures your API keys)
+hermes setup
+
+# Start the WebAPI server on port 8642
+hermes webapi
+# Or manually: uvicorn webapi.app:app --host 0.0.0.0 --port 8642
 ```
 
-### Step 3: Configure your API keys (one-time)
+> **Using upstream hermes-agent?** The workspace will still load — it auto-detects which API endpoints your gateway supports and gracefully disables features that aren't available. You'll see a log message listing which APIs are missing. For full functionality (chat, sessions, skills, memory), use our fork.
+
+> **API keys:** Hermes supports Anthropic (Claude), OpenAI, OpenRouter, and local models via Ollama. Run `hermes setup` to configure your provider, or set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in `~/.hermes/.env`.
+
+### Step 2: Install & Run Hermes Workspace (frontend)
 
 ```bash
-hermes setup   # interactive wizard — picks your provider + API key
-```
-
-Or set manually in `~/.hermes/.env`:
-```env
-ANTHROPIC_API_KEY=your-key-here   # for Claude
-# OPENAI_API_KEY=...              # for GPT
-# OPENROUTER_API_KEY=...          # for OpenRouter
-```
-
-### Step 4: Start the workspace
-
-```bash
-cd ../hermes-workspace
+# In a new terminal
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
 pnpm install
-pnpm dev
+cp .env.example .env
+printf '\nHERMES_API_URL=http://127.0.0.1:8642\n' >> .env
+pnpm dev                   # Starts on http://localhost:3000
 ```
 
-Open **http://localhost:3000** — Hermes Agent starts automatically in the background. No second terminal needed.
-
-> **Custom install location?** If you cloned the repos to different directories, set `HERMES_AGENT_PATH=/path/to/hermes-agent` in a `.env` file inside `hermes-workspace/`.
+> **Verify:** Open `http://localhost:3000` — you should see the chat interface. If you get connection errors, make sure Hermes Agent is running on port 8642 (`curl http://localhost:8642/health` should return `{"status": "ok"}`).
 
 ### Environment Variables
 
 ```env
-# Optional: explicit path to hermes-agent (only needed if not cloned as sibling)
-HERMES_AGENT_PATH=/path/to/hermes-agent
+# Anthropic key for Hermes Agent (optional for demo mode, required for chat)
+ANTHROPIC_API_KEY=your-key-here
+
+# Hermes FastAPI backend URL
+HERMES_API_URL=http://127.0.0.1:8642
 
 # Optional: password-protect the web UI
 # HERMES_PASSWORD=your_password
-
-# Optional: override allowed CORS origins (comma-separated)
-# HERMES_CORS_ORIGINS=http://localhost:3000,http://myserver.local:3000
 ```
 
 ---
