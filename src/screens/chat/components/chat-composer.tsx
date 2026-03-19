@@ -162,6 +162,15 @@ async function fetchModels(): Promise<{
 
       // Fetch models for each authenticated provider in parallel
       const allModels: Array<ModelCatalogEntry> = []
+      // Store provider labels for display
+      const providerLabels: Record<string, string> = {}
+      for (const p of authenticatedProviders) {
+        providerLabels[p.id] = p.label || p.id
+      }
+      // Stash labels on window for the model menu to read
+      if (typeof window !== 'undefined') {
+        (window as unknown as Record<string, unknown>).__hermesProviderLabels = providerLabels
+      }
       const providerFetches = authenticatedProviders.map(async (p) => {
         try {
           const res = await fetch(`/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(p.id)}`)
@@ -802,14 +811,9 @@ function ChatComposerComponent({
   const currentModel = currentModelQuery.data ?? ''
 
   // Auto-switch to hermes-agent model on mount (Hermes Workspace always uses Hermes)
-  const hermesAutoSwitched = useRef(false)
-  useEffect(() => {
-    if (hermesAutoSwitched.current) return
-    if (!currentModel) return
-    if (currentModel.includes('hermes-agent')) return // already on hermes
-    hermesAutoSwitched.current = true
-    handleModelSelect('hermes-agent', 'hermes-agent')
-  }, [currentModel, handleModelSelect])
+    // Removed: auto-switch to hermes-agent. The workspace respects the
+  // model/provider configured in ~/.hermes/config.yaml. Users switch
+  // via the model selector or Settings page.
 
   // When model switches to Claude 4.6 and thinking is 'off', auto-upgrade to 'adaptive'
   const prevModelRef = useRef('')
@@ -832,7 +836,15 @@ function ChatComposerComponent({
     [sessionKey],
   )
   const [currentSelectedModel, setCurrentSelectedModel] = useState<string | null>(null)
-  const modelButtonLabel = currentSelectedModel || currentModel || '⚕ Hermes Agent'
+  // On new chat, currentModel is empty until a session is created.
+  // Read the runtime model from the models query (first item is from the current provider).
+  const configuredModel = useMemo(() => {
+    const models = modelsQuery.data?.models ?? []
+    if (!models.length) return ''
+    const first = models[0]
+    return typeof first === 'string' ? first : (first.id || first.name || '')
+  }, [modelsQuery.data])
+  const modelButtonLabel = currentSelectedModel || currentModel || configuredModel || '⚕ Hermes Agent'
 
 
   // Measure composer height and set CSS variable for scroll padding
@@ -2134,6 +2146,9 @@ function ChatComposerComponent({
                       <div className="p-1 max-h-[300px] overflow-y-auto">
                         {(() => {
                           const allModels = modelsQuery.data?.models ?? []
+                          const providerLabels: Record<string, string> = (typeof window !== 'undefined'
+                            ? (window as unknown as Record<string, unknown>).__hermesProviderLabels as Record<string, string>
+                            : null) || {}
                           // Group models by provider
                           const grouped = new Map<string, Array<ModelCatalogEntry>>()
                           for (const model of allModels) {
@@ -2141,9 +2156,26 @@ function ChatComposerComponent({
                             if (!grouped.has(provider)) grouped.set(provider, [])
                             grouped.get(provider)!.push(model)
                           }
+                          // Determine active provider from the selected model key or configured providers
                           const activeModelKey = currentSelectedModel || currentModel || ''
-                          const activeProvider = activeModelKey.split('/')[0]
-                          // Sort: current provider first
+                          // If the key has provider/ prefix, extract it; otherwise check which group contains the model
+                          let activeProvider = ''
+                          if (activeModelKey.includes('/')) {
+                            activeProvider = activeModelKey.split('/')[0]
+                          } else {
+                            // Find which provider group contains this model
+                            for (const [pid, models] of grouped) {
+                              if (models.some((m) => {
+                                const mid = typeof m === 'string' ? m : m.id
+                                return mid === activeModelKey
+                              })) {
+                                activeProvider = pid
+                                break
+                              }
+                            }
+                          }
+                          const configuredProviders = modelsQuery.data?.configuredProviders ?? []
+                          // Sort: active provider first, then alphabetical
                           const sortedProviders = [...grouped.keys()].sort((a, b) => {
                             if (a === activeProvider) return -1
                             if (b === activeProvider) return 1
@@ -2151,15 +2183,17 @@ function ChatComposerComponent({
                           })
                           return sortedProviders.map((provider) => (
                             <div key={provider}>
-                              <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-muted)' }}>
-                                {provider}
-                                {provider === activeProvider ? ' (active)' : ''}
+                              <div className="px-3 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: provider === activeProvider ? 'var(--theme-accent, #6366f1)' : 'var(--theme-muted)' }}>
+                                {providerLabels[provider] || provider}
+                                {provider === activeProvider && (
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                )}
                               </div>
                               {grouped.get(provider)!.map((model) => {
                                 const modelId = typeof model === 'string' ? model : (model.id ?? model.name ?? '')
                                 const modelName = typeof model === 'string' ? model : (model.name ?? model.id ?? '')
                                 const resolvedModelKey = getResolvedModelKey(modelId, provider)
-                                const isActive = resolvedModelKey === activeModelKey
+                                const isActive = resolvedModelKey === activeModelKey || modelId === activeModelKey
                                 return (
                                   <button
                                     key={`${provider}/${modelId}`}
@@ -2170,15 +2204,15 @@ function ChatComposerComponent({
                                       handleModelSelect(modelId, provider)
                                     }}
                                     className={cn(
-                                      'flex w-full items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                                      isActive ? 'border-l-2 border-accent-500' : 'hover:opacity-80',
+                                      'flex w-full items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors',
+                                      isActive ? 'font-semibold border-l-2 border-accent-500' : 'font-medium hover:opacity-80',
                                     )}
                                     style={{
                                       backgroundColor: isActive ? 'var(--theme-panel)' : 'transparent',
                                       color: 'var(--theme-text)',
                                     }}
                                   >
-                                    <span className="flex-1 truncate text-left">{modelName}</span>
+                                    <span className="flex-1 truncate text-left font-mono text-xs">{modelName}</span>
                                     {isActive && <span className="h-1.5 w-1.5 rounded-full bg-accent-500 shrink-0" />}
                                   </button>
                                 )
