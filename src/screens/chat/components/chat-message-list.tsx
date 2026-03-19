@@ -35,9 +35,9 @@ import { CHAT_OPEN_MESSAGE_SEARCH_EVENT } from '@/screens/chat/chat-events'
 /** Duration (ms) the thinking indicator stays visible after waitingForResponse
  *  clears, giving the first response message time to render before the
  *  indicator disappears — prevents a flash of blank space (Bug 2 fix).
- *  Set high (5s) as a hard ceiling — early-cancel via streamingText arriving
- *  is the primary exit path, not the timer. */
-const THINKING_GRACE_PERIOD_MS = 5_000
+ *  Keep this short so tool pills appear immediately and the shimmer only
+ *  bridges the gap until the first tool/text event arrives. */
+const THINKING_GRACE_PERIOD_MS = 300
 
 /** Map tool names to human-readable status strings */
 const TOOL_STATUS_MAP: Record<string, string> = {
@@ -45,6 +45,13 @@ const TOOL_STATUS_MAP: Record<string, string> = {
   memory_get: 'Searching memory…',
   web_search: 'Searching the web…',
   web_fetch: 'Reading page…',
+  cron: 'Managing schedules…',
+  message: 'Sending message…',
+  gateway: 'Managing gateway…',
+  canvas: 'Rendering canvas…',
+  voice_call: 'Making call…',
+  pdf: 'Reading PDF…',
+  todo: 'Managing tasks…',
   Read: 'Reading file…',
   read: 'Reading file…',
   Write: 'Writing file…',
@@ -66,14 +73,20 @@ function getToolStatusLabel(toolName: string): string {
 
 const TOOL_EMOJIS: Record<string, string> = {
   web_search: '🔍', search: '🔍', search_files: '🔍', session_search: '🔍',
+  web_fetch: '🌐',
   terminal: '💻', exec: '💻', shell: '💻', bash: '💻',
   Read: '📖', read: '📖', read_file: '📖', file_read: '📖',
+  pdf: '📄',
   Write: '✏️', write: '✏️', write_file: '✏️', edit: '✏️', Edit: '✏️',
   memory: '🧠', memory_search: '🧠', memory_get: '🧠', save_memory: '🧠',
   browser: '🌐', browser_navigate: '🌐', navigate: '🌐',
   image: '🖼️', vision: '🖼️',
   skill: '📦', skill_view: '📦', skill_load: '📦',
-  delegate: '🤖', spawn: '🤖',
+  delegate: '🤖', spawn: '🤖', subagents: '🤖', agents_list: '🤖',
+  todo: '✅', cron: '⏰', message: '💬',
+  voice_call: '📞', canvas: '🎨', nodes: '📱', gateway: '⚙️',
+  lcm_grep: '🔍', lcm_expand: '🔍', lcm_describe: '🔍', lcm_expand_query: '🔍',
+  sessions_send: '📤', session_status: '📊', sessions_yield: '⏸️',
   tts: '🗣️',
 }
 
@@ -170,6 +183,14 @@ function ThinkingBubble({
   researchCard,
   isCompacting = false,
 }: ThinkingBubbleProps) {
+  const allTools = useMemo(
+    () =>
+      liveToolActivity.length > 0
+        ? liveToolActivity.map((t) => ({ name: t.name, phase: 'calling' as const }))
+        : activeToolCalls.map((t) => ({ name: t.name, phase: t.phase })),
+    [activeToolCalls, liveToolActivity],
+  )
+
   // Derive the most recent active tool name
   const activeToolName = useMemo(() => {
     // liveToolActivity is ordered newest-first
@@ -227,11 +248,7 @@ function ThinkingBubble({
   }, [statusLabel])
 
   // When a tool is active, render tool pill cards instead of shimmer bubble
-  if (activeToolName && !isCompacting) {
-    const allTools = liveToolActivity.length > 0
-      ? liveToolActivity.map((t) => ({ name: t.name, phase: 'calling' as const }))
-      : activeToolCalls.map((t) => ({ name: t.name, phase: t.phase }))
-
+  if (allTools.length > 0 && !isCompacting) {
     return (
       <div className="flex flex-col gap-1.5 max-w-sm animate-in fade-in duration-200">
         {allTools.map((tc, i) => (

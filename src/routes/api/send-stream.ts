@@ -111,6 +111,59 @@ function normalizeHermesErrorMessage(error: unknown): string {
   return message.replace(/\bserver\b/gi, 'Hermes')
 }
 
+function readRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : undefined
+}
+
+function getToolName(data: Record<string, unknown>): string {
+  const toolCall = readRecord(data.tool_call)
+  const tool = readRecord(data.tool)
+  const toolFunction = readRecord(toolCall?.function)
+  return (
+    readString(toolCall?.tool_name) ||
+    readString(toolCall?.name) ||
+    readString(toolFunction?.name) ||
+    readString(tool?.name) ||
+    readString(data.tool_name) ||
+    readString(data.name) ||
+    'tool'
+  )
+}
+
+function getToolCallId(
+  data: Record<string, unknown>,
+  runId: string | undefined,
+  toolName: string,
+): string {
+  const toolCall = readRecord(data.tool_call)
+  const tool = readRecord(data.tool)
+  return (
+    readString(toolCall?.id) ||
+    readString(tool?.id) ||
+    readString(data.tool_call_id) ||
+    readString(data.call_id) ||
+    readString(data.id) ||
+    `${runId || 'run'}:${toolName}`
+  )
+}
+
+function getToolArgs(data: Record<string, unknown>): unknown {
+  const toolCall = readRecord(data.tool_call)
+  const toolFunction = readRecord(toolCall?.function)
+  return toolCall?.arguments ?? toolFunction?.arguments ?? data.args
+}
+
+function getToolResultPreview(data: Record<string, unknown>): string {
+  return (
+    readString(data.result_preview) ||
+    readString(data.result) ||
+    readString(data.output) ||
+    readString(data.message)
+  )
+}
+
 export const Route = createFileRoute('/api/send-stream')({
   server: {
     handlers: {
@@ -327,25 +380,20 @@ export const Route = createFileRoute('/api/send-stream')({
                       return
                     }
 
-                    if (event === 'tool.pending') {
-                      // Skip pending — tool.started fires right after with same data
-                      return
-                    }
-
-                    if (event === 'tool.started') {
+                    if (
+                      event === 'tool.pending' ||
+                      event === 'tool.started' ||
+                      event === 'tool.calling' ||
+                      event === 'tool.running'
+                    ) {
+                      const toolName = getToolName(data)
                       const translated = {
-                        phase: 'start',
-                        name:
-                          readString((data.tool_call as Record<string, unknown> | undefined)?.tool_name) ||
-                          readString(data.tool_name) ||
-                          'tool',
-                        toolCallId:
-                          readString((data.tool_call as Record<string, unknown> | undefined)?.id) ||
-                          readString(data.tool_call_id) ||
-                          undefined,
-                        args:
-                          ((data.tool_call as Record<string, unknown> | undefined)?.arguments as unknown) ??
-                          data.args,
+                        phase: event === 'tool.pending' || event === 'tool.started'
+                          ? 'start'
+                          : 'calling',
+                        name: toolName,
+                        toolCallId: getToolCallId(data, runId, toolName),
+                        args: getToolArgs(data),
                         sessionKey: sessionKeyFromEvent,
                         runId,
                       }
@@ -356,9 +404,9 @@ export const Route = createFileRoute('/api/send-stream')({
 
                     if (event === 'tool.progress') {
                       const delta = readString(data.delta)
-                      if (!delta) return
-                      const toolName = readString(data.tool_name)
-                      if (toolName === '_thinking' || !toolName) {
+                      const toolName = getToolName(data)
+                      if (toolName === '_thinking' || toolName === 'tool') {
+                        if (!delta) return
                         const translated = {
                           text: delta,
                           sessionKey: sessionKeyFromEvent,
@@ -368,15 +416,27 @@ export const Route = createFileRoute('/api/send-stream')({
                         publishChatEvent('thinking', translated)
                         return
                       }
+                      const translated = {
+                        phase: 'calling',
+                        name: toolName,
+                        toolCallId: getToolCallId(data, runId, toolName),
+                        args: getToolArgs(data),
+                        result: delta || undefined,
+                        sessionKey: sessionKeyFromEvent,
+                        runId,
+                      }
+                      sendEvent('tool', translated)
+                      publishChatEvent('tool', translated)
                       return
                     }
 
                     if (event === 'tool.completed') {
-                      const resultPreview = readString(data.result_preview) || readString(data.result) || ''
+                      const toolName = getToolName(data)
+                      const resultPreview = getToolResultPreview(data)
                       const translated = {
                         phase: 'complete',
-                        name: readString(data.tool_name) || 'tool',
-                        toolCallId: readString(data.tool_call_id) || undefined,
+                        name: toolName,
+                        toolCallId: getToolCallId(data, runId, toolName),
                         result: resultPreview.slice(0, 200),
                         sessionKey: sessionKeyFromEvent,
                         runId,
@@ -450,10 +510,11 @@ export const Route = createFileRoute('/api/send-stream')({
                         readString(
                           (data.error as Record<string, unknown> | undefined)?.message,
                         ) || readString(data.message)
+                      const toolName = getToolName(data)
                       const translated = {
                         phase: 'error',
-                        name: readString(data.tool_name) || 'tool',
-                        toolCallId: readString(data.tool_call_id) || undefined,
+                        name: toolName,
+                        toolCallId: getToolCallId(data, runId, toolName),
                         result: errorMessage,
                         sessionKey: sessionKeyFromEvent,
                         runId,
