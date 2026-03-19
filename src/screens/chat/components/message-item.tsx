@@ -274,9 +274,9 @@ function thinkingFromMessage(msg: ChatMessage): string | null {
 function normalizeStreamToolPhase(
   phase: unknown,
 ): 'calling' | 'running' | 'done' | 'error' {
-  if (phase === 'calling') return 'calling'
+  if (phase === 'calling' || phase === 'start' || phase === 'started') return 'calling'
   if (phase === 'running') return 'running'
-  if (phase === 'done' || phase === 'result') return 'done'
+  if (phase === 'done' || phase === 'result' || phase === 'complete' || phase === 'completed') return 'done'
   if (phase === 'error' || phase === 'failed' || phase === 'failure') {
     return 'error'
   }
@@ -1532,8 +1532,19 @@ function MessageItemComponent({
       )}
     >
 
-      {/* Bridge gap: thinking done but first text token not yet arrived */}
-      {effectiveIsStreaming && !thinking && !hasText && (
+      {/* Tool call pills — primary display for active/completed stream tool calls */}
+      {!isUser && hasStreamToolCalls && (
+        <div className="flex flex-col gap-1.5 pl-1 max-w-sm">
+          {effectiveStreamToolCalls
+            .filter((tc, i, arr) => arr.findIndex((t) => t.name === tc.name && JSON.stringify(t.args) === JSON.stringify(tc.args)) === i)
+            .map((toolCall) => (
+            <ToolCallPill key={toolCall.id} toolCall={toolCall} />
+          ))}
+        </div>
+      )}
+
+      {/* Bridge gap: thinking done but first text token not yet arrived (no tool calls active) */}
+      {effectiveIsStreaming && !thinking && !hasText && !hasStreamToolCalls && (
         <div className="flex items-center gap-1.5 px-1 py-1">
           <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
           <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:150ms]" />
@@ -1541,7 +1552,7 @@ function MessageItemComponent({
         </div>
       )}
 
-      {thinking && !hasText && (
+      {thinking && !hasText && !hasStreamToolCalls && (
         <div className="w-full max-w-[900px]">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-fit">
@@ -1732,26 +1743,11 @@ function MessageItemComponent({
             </div>
           </Message>
         )}
-        {/* Tool calls — rendered OUTSIDE the chat bubble as separate pills */}
-        {!isUser && hasStreamToolCalls ? (
-          <div className="flex flex-col gap-1.5 pl-1 max-w-sm">
-            {effectiveStreamToolCalls
-              .filter((tc, i, arr) => arr.findIndex((t) => t.name === tc.name && JSON.stringify(t.args) === JSON.stringify(tc.args)) === i)
-              .map((toolCall) => (
-              <ToolCallPill key={toolCall.id} toolCall={toolCall} />
-            ))}
-          </div>
-        ) : effectiveIsStreaming && !hasRevealedText ? (
+        {/* Fallback working indicator when streaming with no text and no tool calls */}
+        {effectiveIsStreaming && !hasRevealedText && !hasStreamToolCalls ? (
           <div className="flex items-center gap-2 pl-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
             <span className="size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
-            <span>
-              {effectiveStreamToolCalls.length > 0
-                ? formatToolDisplayLabel(
-                    effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].name,
-                    effectiveStreamToolCalls[effectiveStreamToolCalls.length - 1].args as Record<string, unknown> | undefined,
-                  )
-                : 'Working\u2026'}
-            </span>
+            <span>Working&hellip;</span>
           </div>
         ) : null}
         {hasAssistantMetadata ? (
