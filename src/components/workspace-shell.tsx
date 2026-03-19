@@ -14,9 +14,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { RefreshIcon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { cn } from '@/lib/utils'
+import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -30,6 +29,7 @@ import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
 import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
+import { HermesHealthBanner } from '@/components/hermes-health-banner'
 import { lazy, Suspense } from 'react'
 
 const TerminalWorkspace = lazy(() =>
@@ -42,9 +42,9 @@ import { ErrorBoundary } from '@/components/error-boundary'
 // System metrics footer removed — not used in Hermes Workspace
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
-import { Button } from '@/components/ui/button'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
+import type { AuthStatus } from '@/lib/hermes-auth'
 
 type SessionsListResponse = Array<SessionMeta>
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
@@ -104,54 +104,20 @@ export function WorkspaceShell() {
     return -1
   }, [])
 
-  // Fetch actual auth status from server instead of hardcoding
-  interface AuthStatus {
-    authenticated: boolean
-    authRequired: boolean
-    error?: string
-  }
-
   const isClient = typeof window !== 'undefined'
-
-  const authQuery = useQuery<AuthStatus>({
-    queryKey: ['auth-status'],
-    // Only run on client — relative fetch('/api/...') has no host during SSR,
-    // causing silent failures + infinite re-render loop on hydration.
-    enabled: isClient,
-    queryFn: async () => {
-      const controller = new AbortController()
-      const timeout = globalThis.setTimeout(() => controller.abort(), 5_000)
-
-      let res: Response
-      try {
-        res = await fetch('/api/auth-check', { signal: controller.signal })
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Request timed out after 5 seconds')
-        }
-        throw error instanceof Error
-          ? error
-          : new Error('Failed to connect to Hermes server')
-      } finally {
-        globalThis.clearTimeout(timeout)
-      }
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as AuthStatus
-      if (data.error) throw new Error(data.error)
-      return data
-    },
-    staleTime: 60_000,
-    retry: 2,
-    retryDelay: 1_000,
-  })
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(() =>
+    isClient ? null : { authenticated: true, authRequired: false },
+  )
 
   const authState = {
-    // On SSR (query disabled) or after query resolves → checked = true
-    checked: !isClient || !authQuery.isLoading,
-    authenticated: authQuery.data?.authenticated ?? !isClient,
-    authRequired: authQuery.data?.authRequired ?? false,
+    checked: !isClient || authStatus !== null,
+    authenticated: authStatus?.authenticated ?? !isClient,
+    authRequired: authStatus?.authRequired ?? false,
   }
+
+  const handleStartupConnected = useCallback((status: AuthStatus) => {
+    setAuthStatus(status)
+  }, [])
 
   // Derive active session from URL
   const mobilePageTitle = (() => {
@@ -275,66 +241,11 @@ export function WorkspaceShell() {
   // Show loading indicator while checking auth
   if (!authState.checked) {
     return (
-      <div className="flex items-center justify-center h-screen bg-surface">
-        <div className="text-center">
-          <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-4" />
-          <p className="text-sm text-primary-500">Initializing Hermes...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authQuery.isError) {
-    const errorMessage =
-      authQuery.error instanceof Error
-        ? authQuery.error.message
-        : 'Failed to connect to Hermes server'
-    const showBackendHint = /server.websocket.backend/i.test(errorMessage)
-
-    return (
-      <div className="flex h-screen items-center justify-center bg-surface px-6">
-        <div className="w-full max-w-lg text-center">
-          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl border border-primary-800 bg-primary-900/80 text-2xl">
-            <span role="img" aria-label="Warning">
-              ⚠️
-            </span>
-          </div>
-          <h1 className="text-2xl font-semibold text-primary-100">
-            Could not connect to Hermes server
-          </h1>
-          <p className="mt-3 text-sm text-primary-300">
-            The server may still be starting up. Wait a moment and try again.
-          </p>
-          {showBackendHint ? (
-            <p className="mt-3 text-sm text-accent-400">
-              Make sure the Hermes backend is running:{' '}
-              <code className="rounded bg-primary-900 px-1.5 py-0.5 text-xs text-primary-200">
-                python -m webapi
-              </code>
-            </p>
-          ) : null}
-          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={() => void authQuery.refetch()}
-            >
-              <HugeiconsIcon icon={RefreshIcon} size={18} strokeWidth={1.8} />
-              Retry
-            </Button>
-            <Button size="lg" onClick={() => window.location.reload()}>
-              Reload Page
-            </Button>
-          </div>
-          <details className="mt-5 text-left">
-            <summary className="cursor-pointer text-xs text-primary-400">
-              Details
-            </summary>
-            <p className="mt-2 rounded-lg border border-primary-800 bg-primary-900/80 px-3 py-2 text-xs text-primary-300">
-              {errorMessage}
-            </p>
-          </details>
-        </div>
+      <div
+        className="relative h-screen overflow-hidden theme-bg theme-text"
+        style={{ height: 'var(--vvh, 100dvh)' }}
+      >
+        <ConnectionStartupScreen onConnected={handleStartupConnected} />
       </div>
     )
   }
@@ -356,6 +267,7 @@ export function WorkspaceShell() {
         className="relative overflow-hidden theme-bg theme-text"
         style={shellStyle}
       >
+        <HermesHealthBanner enabled={authState.checked} />
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div

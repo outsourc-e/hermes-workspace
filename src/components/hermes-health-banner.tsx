@@ -1,26 +1,33 @@
 import { useEffect, useState } from 'react'
+import { fetchHermesAuthStatus } from '@/lib/hermes-auth'
 
 const POLL_INTERVAL = 30_000
 
-export function HermesHealthBanner() {
+type HermesHealthBannerProps = {
+  enabled?: boolean
+}
+
+export function HermesHealthBanner({
+  enabled = false,
+}: HermesHealthBannerProps) {
   const [status, setStatus] = useState<'ok' | 'error' | 'checking'>('checking')
   const [lastError, setLastError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!enabled) {
+      setStatus('checking')
+      setLastError(null)
+      return
+    }
+
     let cancelled = false
 
     async function check() {
       try {
-        // Check via same-origin server proxy (works from any device)
-        const res = await fetch('/api/auth-check', { signal: AbortSignal.timeout(5000) })
+        await fetchHermesAuthStatus()
         if (!cancelled) {
-          if (res.ok) {
-            setStatus('ok')
-            setLastError(null)
-          } else {
-            setStatus('error')
-            setLastError(`HTTP ${res.status}`)
-          }
+          setStatus('ok')
+          setLastError(null)
         }
       } catch (err) {
         if (!cancelled) {
@@ -36,9 +43,9 @@ export function HermesHealthBanner() {
       cancelled = true
       clearInterval(interval)
     }
-  }, [])
+  }, [enabled])
 
-  if (status === 'ok' || status === 'checking') return null
+  if (!enabled || status === 'ok' || status === 'checking') return null
 
   return (
     <div
@@ -56,10 +63,10 @@ export function HermesHealthBanner() {
         type="button"
         onClick={() => {
           setStatus('checking')
-          fetch('/api/auth-check', { signal: AbortSignal.timeout(5000) })
-            .then((res) => {
-              setStatus(res.ok ? 'ok' : 'error')
-              if (!res.ok) setLastError(`HTTP ${res.status}`)
+          fetchHermesAuthStatus()
+            .then(() => {
+              setStatus('ok')
+              setLastError(null)
             })
             .catch((err) => {
               setStatus('error')
