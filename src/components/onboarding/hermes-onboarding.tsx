@@ -84,6 +84,7 @@ export function HermesOnboarding() {
   const provider = PROVIDERS.find((p) => p.id === selectedProvider)
   const needsApiKey = provider?.authType === 'api_key' || provider?.authType === 'custom'
   const needsBaseUrl = provider?.id === 'ollama' || provider?.authType === 'custom'
+  const isOAuth = provider?.authType === 'oauth'
 
   const saveProviderConfig = useCallback(async () => {
     if (!selectedProvider) return
@@ -280,6 +281,37 @@ export function HermesOnboarding() {
                   </button>
                 ))}
               </div>
+
+              {/* OAuth provider instructions */}
+              {selectedProvider && isOAuth && (
+                <div className="rounded-xl p-4 text-left space-y-2" style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}>
+                  <p className="text-sm font-medium">Run in your terminal:</p>
+                  <div className="rounded-lg px-3 py-2 font-mono text-xs" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    hermes auth login {selectedProvider === 'nous' ? 'nous' : 'openai-codex'}
+                  </div>
+                  <p className="text-xs" style={mutedStyle}>
+                    This opens a browser for {provider?.name} OAuth. Once authenticated, Hermes will save the token automatically and the workspace will detect it.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      await saveProviderConfig()
+                      // Check if auth already exists
+                      try {
+                        const modelsRes = await fetch('/v1/models')
+                        if (modelsRes.ok) {
+                          const modelsData = await modelsRes.json() as { data?: Array<{ id: string }> }
+                          const models = (modelsData.data || []).map((m: { id: string }) => m.id).slice(0, 20)
+                          setAvailableModels(models)
+                          if (models.length > 0) setSelectedModel(models[0])
+                        }
+                      } catch { /* ignore */ }
+                    }}
+                    className="w-full rounded-lg py-2 text-xs font-medium bg-accent-500 text-white"
+                  >
+                    I&apos;ve authenticated — check connection
+                  </button>
+                </div>
+              )}
 
               {/* API key / base URL inputs */}
               {selectedProvider && (needsApiKey || needsBaseUrl) && (
