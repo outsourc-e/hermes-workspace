@@ -125,16 +125,42 @@ export function useChatHistory({
     if (normalizedFriendlyId === 'main') return ''
     return normalizedFriendlyId
   }, [activeFriendlyId])
+  const normalizedForcedSessionKey = useMemo(
+    () => normalizeSessionCandidate(forcedSessionKey),
+    [forcedSessionKey],
+  )
+  const normalizedActiveSessionKey = useMemo(
+    () => normalizeSessionCandidate(activeSessionKey),
+    [activeSessionKey],
+  )
 
   const sessionKeyForHistory = useMemo(() => {
     const candidates = [
-      normalizeSessionCandidate(forcedSessionKey),
-      normalizeSessionCandidate(activeSessionKey),
+      normalizedForcedSessionKey,
+      normalizedActiveSessionKey,
       explicitRouteSessionKey,
     ]
     const match = candidates.find((candidate) => candidate.length > 0)
     return match || 'main'
-  }, [activeSessionKey, explicitRouteSessionKey, forcedSessionKey])
+  }, [
+    explicitRouteSessionKey,
+    normalizedActiveSessionKey,
+    normalizedForcedSessionKey,
+  ])
+  const hasDirectSessionKey = Boolean(
+    normalizedForcedSessionKey ||
+      normalizedActiveSessionKey ||
+      explicitRouteSessionKey,
+  )
+  const canFetchWithoutSessions = Boolean(
+    normalizedForcedSessionKey || explicitRouteSessionKey,
+  )
+  const shouldFetchHistory =
+    !isNewChat &&
+    Boolean(sessionKeyForHistory) &&
+    (canFetchWithoutSessions ||
+      (!isRedirecting &&
+        (hasDirectSessionKey || !sessionsReady || activeExists)))
 
   const historyKey = chatQueryKeys.history(
     activeFriendlyId,
@@ -170,14 +196,11 @@ export function useChatHistory({
         messages: merged,
       }
     },
-    enabled:
-      !isNewChat && // Don't fetch history for new chats
-      Boolean(sessionKeyForHistory) &&
-      !isRedirecting &&
-      (!sessionsReady || activeExists || Boolean(explicitRouteSessionKey)),
+    enabled: shouldFetchHistory,
     placeholderData: function useCachedHistory(): HistoryResponse | undefined {
       return queryClient.getQueryData(historyKey)
     },
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval: historyRefetchInterval,
     gcTime: 1000 * 60 * 10,
@@ -321,21 +344,19 @@ export function useChatHistory({
   const historyError =
     historyQuery.error instanceof Error ? historyQuery.error.message : null
   const resolvedSessionKey = useMemo(() => {
-    const normalizedForced = normalizeSessionCandidate(forcedSessionKey)
-    if (normalizedForced) return normalizedForced
+    if (normalizedForcedSessionKey) return normalizedForcedSessionKey
     const key = historyQuery.data?.sessionKey
     if (typeof key === 'string' && key.trim().length > 0) {
       return key.trim()
     }
-    const normalizedActive = normalizeSessionCandidate(activeSessionKey)
-    if (normalizedActive) return normalizedActive
+    if (normalizedActiveSessionKey) return normalizedActiveSessionKey
     if (explicitRouteSessionKey) return explicitRouteSessionKey
     return 'main'
   }, [
-    activeSessionKey,
     explicitRouteSessionKey,
-    forcedSessionKey,
     historyQuery.data?.sessionKey,
+    normalizedActiveSessionKey,
+    normalizedForcedSessionKey,
   ])
   const activeCanonicalKey =
     resolvedSessionKey || sessionKeyForHistory || 'main'

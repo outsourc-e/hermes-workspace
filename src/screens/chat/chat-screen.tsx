@@ -503,10 +503,13 @@ export function ChatScreen({
     completedStreamingThinking,
     activeToolCalls,
   } = useRealtimeChatHistory({
-      sessionKey: resolvedSessionKey || activeCanonicalKey,
+      sessionKey: resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey,
       friendlyId: activeFriendlyId,
       historyMessages,
-      enabled: !isNewChat && !isRedirecting,
+      enabled:
+        !isNewChat &&
+        Boolean(resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey) &&
+        !isRedirecting,
       onUserMessage: useCallback(() => {
         // External message arrived (e.g. from Telegram) — show thinking indicator
         setWaitingForResponse(true)

@@ -119,6 +119,12 @@ export function useRealtimeChatHistory({
     }
   }, [friendlyId, queryClient, sessionKey])
 
+  useEffect(() => {
+    if (!enabled) return
+    if (!sessionKey || sessionKey === 'new') return
+    void backfillHistory()
+  }, [backfillHistory, enabled, sessionKey])
+
   const { connectionState, lastError, reconnect } = useChatStream({
     sessionKey: sessionKey === 'new' ? undefined : sessionKey,
     enabled: enabled && sessionKey !== 'new',
