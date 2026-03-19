@@ -328,10 +328,7 @@ function SettingsRoute() {
           </div>
         </nav>
 
-        {/* Mobile header */}
-        <div className="flex items-center gap-2 md:hidden">
-          <h1 className="text-lg font-semibold text-primary-900">Settings</h1>
-        </div>
+        {/* Mobile header — intentionally omitted; MobilePageHeader above shows "Settings" */}
 
         {/* Mobile section pills */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none md:hidden">

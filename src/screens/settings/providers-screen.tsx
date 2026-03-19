@@ -1024,7 +1024,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
         <section className="mx-auto w-full max-w-[1480px] space-y-5">
           <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm">
             <div className="space-y-1">
-              <h1 className="text-lg font-semibold text-primary-900">
+              <h1 className="hidden md:block text-lg font-semibold text-primary-900">
                 Settings
               </h1>
               <p className="text-sm text-primary-600">
@@ -1059,7 +1059,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTabId)}>
             <TabsList
               variant="underline"
-              className="w-full flex-wrap justify-start gap-2 rounded-xl border border-primary-200 bg-white px-3 py-2"
+              className="w-full flex-nowrap overflow-x-auto justify-start gap-2 rounded-xl border border-primary-200 bg-white px-3 py-2"
             >
               {TAB_ORDER.map((tab) => {
                 const count =

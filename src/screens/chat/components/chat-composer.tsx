@@ -1826,7 +1826,7 @@ function ChatComposerComponent({
                             handleOpenAttachmentPicker(event)
                             // sheet stays open; closes naturally after file selected or on backdrop tap
                           }}
-                          className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="rounded-lg bg-orange-100 p-1.5 text-orange-600">
                             <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />
@@ -1847,7 +1847,7 @@ function ChatComposerComponent({
                               setIsModelMenuOpen(true)
                             }
                           }}
-                          className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="rounded-lg bg-indigo-100 p-1.5 text-indigo-600">
                             <HugeiconsIcon icon={ArrowDown01Icon} size={24} strokeWidth={1.5} />
@@ -1864,7 +1864,7 @@ function ChatComposerComponent({
                               handleClearDraft()
                               setIsMobileActionsMenuOpen(false)
                             }}
-                            className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left"
+                            className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
                           >
                             <span className="rounded-lg bg-red-100 p-1.5 text-red-600">
                               <HugeiconsIcon icon={Delete01Icon} size={24} strokeWidth={1.5} />
@@ -1882,7 +1882,7 @@ function ChatComposerComponent({
                               onNewSession()
                               setIsMobileActionsMenuOpen(false)
                             }}
-                            className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left"
+                            className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
                           >
                             <span className="rounded-lg bg-green-100 p-1.5 text-green-600">
                               <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />

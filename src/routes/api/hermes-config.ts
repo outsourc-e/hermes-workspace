@@ -139,8 +139,8 @@ export const Route = createFileRoute('/api/hermes-config')({
         return Response.json({
           config,
           providers: providerStatus,
-          activeProvider: model.provider || 'unknown',
-          activeModel: model.default || 'unknown',
+          activeProvider: model.provider || '',
+          activeModel: model.default || '',
           hermesHome: HERMES_HOME,
         })
       },

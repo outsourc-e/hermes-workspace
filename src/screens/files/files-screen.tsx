@@ -957,14 +957,21 @@ export function FilesScreen() {
   const loadTree = useCallback(async () => {
     setTreeLoading(true)
     setTreeError(null)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
     try {
-      const res = await fetch('/api/files?action=list&maxDepth=0')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const res = await fetch('/api/files?action=list&maxDepth=0', { signal: controller.signal })
+      if (!res.ok) throw new Error(`HTTP ${res.status} — check that HERMES_WORKSPACE_DIR is set`)
       const data = (await res.json()) as FilesListResponse
       setEntries(Array.isArray(data.entries) ? data.entries : [])
     } catch (err) {
-      setTreeError(err instanceof Error ? err.message : String(err))
+      if (err instanceof Error && err.name === 'AbortError') {
+        setTreeError('Could not load files — request timed out. Check that HERMES_WORKSPACE_DIR is set.')
+      } else {
+        setTreeError(err instanceof Error ? err.message : String(err))
+      }
     } finally {
+      clearTimeout(timeoutId)
       setTreeLoading(false)
     }
   }, [])
