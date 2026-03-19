@@ -689,6 +689,170 @@ function SettingCard(props: {
   )
 }
 
+const HERMES_API_URL_LOCAL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+
+const LOCAL_PROVIDERS = [
+  { id: 'ollama', label: 'Ollama', defaultUrl: 'http://localhost:11434/v1' },
+  { id: 'lmstudio', label: 'LM Studio', defaultUrl: 'http://localhost:1234/v1' },
+  { id: 'mlx', label: 'MLX (apple-mlx)', defaultUrl: 'http://localhost:8080/v1' },
+  { id: 'custom', label: 'Custom OpenAI-compatible', defaultUrl: '' },
+]
+const CLOUD_PROVIDERS = ['anthropic', 'openai', 'openai-codex', 'nous', 'openrouter']
+
+function ActiveModelCard() {
+  const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [model, setModel] = useState('')
+  const [provider, setProvider] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const configQuery = useQuery({
+    queryKey: ['hermes', 'active-config'],
+    queryFn: async () => {
+      const res = await fetch(`${HERMES_API_URL_LOCAL}/api/config`)
+      if (!res.ok) throw new Error('Failed to load config')
+      return res.json() as Promise<{ model: string; provider?: string; base_url?: string }>
+    },
+  })
+
+  const cfg = configQuery.data
+  const isLocal = LOCAL_PROVIDERS.some(p => p.id === (cfg?.provider ?? provider))
+
+  function startEdit() {
+    setModel(cfg?.model ?? '')
+    setProvider(cfg?.provider ?? '')
+    setBaseUrl(cfg?.base_url ?? '')
+    setEditing(true)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const res = await fetch(`${HERMES_API_URL_LOCAL}/api/config`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model.trim() || undefined,
+          provider: provider.trim() || undefined,
+          base_url: baseUrl.trim() || '',
+        }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      await queryClient.invalidateQueries({ queryKey: ['hermes', 'active-config'] })
+      toast('Model config saved — takes effect on next message', { type: 'success' })
+      setEditing(false)
+    } catch (e) {
+      toast(`Failed to save: ${e instanceof Error ? e.message : String(e)}`, { type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selectedLocal = LOCAL_PROVIDERS.find(p => p.id === provider)
+
+  return (
+    <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 shadow-sm md:p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-medium text-primary-900">Active Model</h3>
+          <p className="mt-0.5 text-xs text-primary-600">
+            Reads and writes directly to <code className="font-mono">~/.hermes/config.yaml</code>
+          </p>
+        </div>
+        {!editing && (
+          <Button size="sm" variant="outline" onClick={startEdit}>Edit</Button>
+        )}
+      </div>
+
+      {configQuery.isPending ? (
+        <p className="text-sm text-primary-500">Loading...</p>
+      ) : configQuery.error ? (
+        <p className="text-sm text-red-500">Could not load config — is Hermes Agent running?</p>
+      ) : !editing ? (
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div>
+            <span className="text-primary-500">Model</span>
+            <p className="font-mono font-medium text-primary-900">{cfg?.model || '—'}</p>
+          </div>
+          <div>
+            <span className="text-primary-500">Provider</span>
+            <p className="font-medium text-primary-900">{cfg?.provider || '—'}</p>
+          </div>
+          {cfg?.base_url && (
+            <div>
+              <span className="text-primary-500">Base URL</span>
+              <p className="font-mono text-primary-700">{cfg.base_url}</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Provider selector */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-primary-700">Provider</label>
+            <div className="flex flex-wrap gap-2">
+              {[...CLOUD_PROVIDERS, ...LOCAL_PROVIDERS.map(p => p.id)].map(pid => (
+                <button
+                  key={pid}
+                  type="button"
+                  onClick={() => {
+                    setProvider(pid)
+                    const lp = LOCAL_PROVIDERS.find(p => p.id === pid)
+                    if (lp && !baseUrl) setBaseUrl(lp.defaultUrl)
+                    if (!lp) setBaseUrl('')
+                  }}
+                  className={cn(
+                    'rounded-lg border px-3 py-1.5 text-xs font-medium transition',
+                    provider === pid
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                      : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300',
+                  )}
+                >
+                  {LOCAL_PROVIDERS.find(p => p.id === pid)?.label ?? pid}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Base URL — only for local providers */}
+          {isLocal && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-primary-700">
+                Base URL <span className="text-primary-400">(OpenAI-compatible endpoint)</span>
+              </label>
+              <Input
+                value={baseUrl}
+                onChange={e => setBaseUrl(e.target.value)}
+                placeholder={selectedLocal?.defaultUrl ?? 'http://localhost:11434/v1'}
+                className="font-mono text-sm"
+              />
+            </div>
+          )}
+
+          {/* Model name */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-primary-700">Model name</label>
+            <Input
+              value={model}
+              onChange={e => setModel(e.target.value)}
+              placeholder={isLocal ? 'qwen2.5:35b, llama3.2, etc.' : 'claude-sonnet-4-5'}
+              className="font-mono text-sm"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" onClick={() => void handleSave()} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function ProviderManagementSection(props: {
   embedded: boolean
   providerSummaries: Array<ProviderSummary>
@@ -1082,6 +1246,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
             </TabsList>
 
             <TabsContent value="providers" className="space-y-5">
+              <ActiveModelCard />
               <ProviderManagementSection
                 embedded={embedded}
                 providerSummaries={providerSummaries}
