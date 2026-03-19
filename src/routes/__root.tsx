@@ -109,7 +109,7 @@ export const Route = createRootRoute({
           'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual',
       },
       {
-        title: 'Hermes Agent Workspace',
+        title: 'Hermes Workspace',
       },
       {
         name: 'description',
@@ -154,7 +154,7 @@ export const Route = createRootRoute({
       {
         rel: 'icon',
         type: 'image/png',
-        href: '/hermes-caduceus.png',
+        href: '/hermes-avatar.png',
       },
       // PWA manifest and icons
       {

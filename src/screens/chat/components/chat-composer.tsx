@@ -148,6 +148,40 @@ async function fetchModels(): Promise<{
   models?: Array<ModelCatalogEntry>
   configuredProviders?: Array<string>
 }> {
+  // Try the rich available-models endpoint — fetch models from ALL authenticated providers
+  try {
+    const richRes = await fetch('/api/hermes-proxy/api/available-models')
+    if (richRes.ok) {
+      const richData = (await richRes.json()) as {
+        provider: string
+        models: Array<{ id: string; description: string }>
+        providers: Array<{ id: string; label: string; authenticated: boolean }>
+      }
+      const authenticatedProviders = (richData.providers || []).filter((p) => p.authenticated)
+      const configuredProviders = authenticatedProviders.map((p) => p.id)
+
+      // Fetch models for each authenticated provider in parallel
+      const allModels: Array<ModelCatalogEntry> = []
+      const providerFetches = authenticatedProviders.map(async (p) => {
+        try {
+          const res = await fetch(`/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(p.id)}`)
+          if (!res.ok) return
+          const data = (await res.json()) as { models: Array<{ id: string; description: string }> }
+          for (const m of data.models || []) {
+            allModels.push({ id: m.id, name: m.id, provider: p.id })
+          }
+        } catch { /* skip this provider */ }
+      })
+      await Promise.all(providerFetches)
+
+      if (allModels.length) {
+        return { ok: true, models: allModels, configuredProviders }
+      }
+    }
+  } catch {
+    // Fall back to /v1/models
+  }
+
   const response = await fetch(`${HERMES_API_URL}/v1/models`)
   if (!response.ok) {
     throw new Error(`Hermes models request failed (${response.status})`)
@@ -210,11 +244,27 @@ async function switchModel(
   model: string,
   _sessionKey?: string,
 ): Promise<ModelSwitchResponse> {
+  const modelProvider = model.includes('/') ? model.split('/')[0] : undefined
+  const modelId = model.includes('/') ? model.split('/').slice(1).join('/') : model
+
+  // Write the model change to ~/.hermes/config.yaml via the webapi
+  try {
+    const patch: Record<string, string> = { model: modelId }
+    if (modelProvider) patch.provider = modelProvider
+    await fetch('/api/hermes-proxy/api/config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+  } catch {
+    // Best-effort — config write failure shouldn't block model switch
+  }
+
   return {
     ok: true,
     resolved: {
-      modelProvider: model.includes('/') ? model.split('/')[0] : 'hermes-agent',
-      model: model.includes('/') ? model.split('/').slice(1).join('/') : model,
+      modelProvider: modelProvider || 'hermes-agent',
+      model: modelId,
     },
   }
 }
@@ -2063,34 +2113,58 @@ function ChatComposerComponent({
                   {!isModelSwitcherDisabled && isModelMenuOpen ? (
                     <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border shadow-lg" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
                       <div className="p-1 max-h-[300px] overflow-y-auto">
-                        {(modelsQuery.data?.models ?? []).map((model: ModelCatalogEntry) => {
-                          const modelId = typeof model === 'string' ? model : (model.id ?? model.name ?? '')
-                          const modelName = typeof model === 'string' ? model : (model.name ?? model.id ?? '')
-                          const isActive = modelId === (currentSelectedModel || currentModel)
-                          return (
-                            <button
-                              key={modelId}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setCurrentSelectedModel(modelId)
-                                setIsModelMenuOpen(false)
-                                modelSwitchMutation.mutate({ model: modelId, sessionKey })
-                              }}
-                              className={cn(
-                                'flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors',
-                                isActive ? 'border-l-2 border-accent-500' : 'hover:opacity-80',
-                              )}
-                              style={{
-                                backgroundColor: isActive ? 'var(--theme-panel)' : 'transparent',
-                                color: 'var(--theme-text)',
-                              }}
-                            >
-                              <span className="flex-1 truncate text-left">{modelName}</span>
-                              {isActive && <span className="h-1.5 w-1.5 rounded-full bg-accent-500 shrink-0" />}
-                            </button>
-                          )
-                        })}
+                        {(() => {
+                          const allModels = modelsQuery.data?.models ?? []
+                          // Group models by provider
+                          const grouped = new Map<string, Array<ModelCatalogEntry>>()
+                          for (const model of allModels) {
+                            const provider = (typeof model === 'string' ? 'other' : model.provider) || 'other'
+                            if (!grouped.has(provider)) grouped.set(provider, [])
+                            grouped.get(provider)!.push(model)
+                          }
+                          // Sort: current provider first
+                          const sortedProviders = [...grouped.keys()].sort((a, b) => {
+                            const activeProvider = (currentSelectedModel || currentModel || '').split('/')[0]
+                            if (a === activeProvider) return -1
+                            if (b === activeProvider) return 1
+                            return a.localeCompare(b)
+                          })
+                          return sortedProviders.map((provider) => (
+                            <div key={provider}>
+                              <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-muted)' }}>
+                                {provider}
+                              </div>
+                              {grouped.get(provider)!.map((model) => {
+                                const modelId = typeof model === 'string' ? model : (model.id ?? model.name ?? '')
+                                const modelName = typeof model === 'string' ? model : (model.name ?? model.id ?? '')
+                                const isActive = modelId === (currentSelectedModel || currentModel)
+                                return (
+                                  <button
+                                    key={`${provider}/${modelId}`}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setCurrentSelectedModel(modelId)
+                                      setIsModelMenuOpen(false)
+                                      modelSwitchMutation.mutate({ model: modelId, sessionKey })
+                                    }}
+                                    className={cn(
+                                      'flex w-full items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                                      isActive ? 'border-l-2 border-accent-500' : 'hover:opacity-80',
+                                    )}
+                                    style={{
+                                      backgroundColor: isActive ? 'var(--theme-panel)' : 'transparent',
+                                      color: 'var(--theme-text)',
+                                    }}
+                                  >
+                                    <span className="flex-1 truncate text-left">{modelName}</span>
+                                    {isActive && <span className="h-1.5 w-1.5 rounded-full bg-accent-500 shrink-0" />}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          ))
+                        })()}
                       </div>
                     </div>
                   ) : null}

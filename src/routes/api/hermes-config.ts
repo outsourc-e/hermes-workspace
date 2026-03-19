@@ -134,13 +134,25 @@ export const Route = createFileRoute('/api/hermes-config')({
         })
 
         // Get active provider/model from config
-        const model = (config.model as Record<string, unknown>) || {}
+        // Support both flat keys (model: "gpt-5.4", provider: "openai-codex")
+        // and legacy nested format (model: { default: "...", provider: "..." })
+        const modelField = config.model
+        let activeModel = ''
+        let activeProvider = ''
+        if (typeof modelField === 'string') {
+          activeModel = modelField
+          activeProvider = (config.provider as string) || ''
+        } else if (modelField && typeof modelField === 'object') {
+          const modelObj = modelField as Record<string, unknown>
+          activeModel = (modelObj.default as string) || ''
+          activeProvider = (modelObj.provider as string) || (config.provider as string) || ''
+        }
 
         return Response.json({
           config,
           providers: providerStatus,
-          activeProvider: model.provider || '',
-          activeModel: model.default || '',
+          activeProvider,
+          activeModel,
           hermesHome: HERMES_HOME,
         })
       },
@@ -167,6 +179,13 @@ export const Route = createFileRoute('/api/hermes-config')({
             }
           }
 
+          // Handle null values as explicit removals
+          for (const [key, value] of Object.entries(updates)) {
+            if (value === null) {
+              delete current[key]
+              delete updates[key]
+            }
+          }
           deepMerge(current, updates)
           writeConfig(current)
         }
