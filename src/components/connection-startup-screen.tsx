@@ -182,14 +182,19 @@ export function ConnectionStartupScreen({
                     setServerStarting(true)
                     setServerLog([])
                     try {
-                      const res = await fetch('/api/terminal-stream?' + new URLSearchParams({
-                        command: START_COMMAND,
-                        cwd: '/Users/aurora/.openclaw/workspace/hermes-agent',
-                        cols: '120',
-                        rows: '10',
-                      }).toString())
+                      const res = await fetch('/api/terminal-stream', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          command: ['bash', '-lc', START_COMMAND],
+                          cwd: undefined,
+                          cols: 120,
+                          rows: 10,
+                        }),
+                      })
                       if (!res.ok || !res.body) {
-                        setServerLog(prev => [...prev, `Error: HTTP ${res.status}`])
+                        const errText = await res.text().catch(() => '')
+                        setServerLog(prev => [...prev, `Error: HTTP ${res.status} ${errText}`])
                         setServerStarting(false)
                         return
                       }
@@ -206,13 +211,12 @@ export function ConnectionStartupScreen({
                           for (const line of lines) {
                             if (line.startsWith('data: ')) {
                               try {
-                                const parsed = JSON.parse(line.slice(6))
+                                const parsed = JSON.parse(line.slice(6)) as unknown
                                 if (typeof parsed === 'string') {
-                                  // Strip ANSI codes for clean display
-                                  const clean = parsed.replace(/\x1b\[[0-9;]*m/g, '').trim()
+                                  const clean = parsed.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim()
                                   if (clean) setServerLog(prev => [...prev, clean])
-                                } else if (parsed && typeof parsed === 'object' && 'data' in parsed) {
-                                  const clean = String(parsed.data).replace(/\x1b\[[0-9;]*m/g, '').trim()
+                                } else if (parsed && typeof parsed === 'object' && parsed !== null && 'data' in parsed) {
+                                  const clean = String((parsed as Record<string, unknown>).data).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim()
                                   if (clean) setServerLog(prev => [...prev, clean])
                                 }
                               } catch { /* skip */ }
