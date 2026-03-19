@@ -28,6 +28,7 @@ import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
+import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
 import { lazy, Suspense } from 'react'
 
@@ -473,6 +474,7 @@ export function WorkspaceShell() {
       <MobileHamburgerMenu />
       {/* System metrics footer removed */}
       <CommandPalette pathname={pathname} sessions={sessions} />
+      <HermesOnboarding />
     </>
   )
 }
