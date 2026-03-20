@@ -55,7 +55,7 @@ function formatModified(value: string): string {
 }
 
 function isDailyMemoryPath(pathValue: string): boolean {
-  return /^memory\/\d{4}-\d{2}-\d{2}\.md$/.test(pathValue)
+  return /^memories?\/\d{4}-\d{2}-\d{2}\.md$/.test(pathValue)
 }
 
 function splitFiles(files: Array<MemoryFileMeta>) {
@@ -330,11 +330,11 @@ export function MemoryBrowserScreen() {
                 ) : null}
 
                 <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                  memories/
+                  memory/ or memories/
                 </div>
                 {memoryFiles.length === 0 ? (
                   <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500">
-                    No files in memories/
+                    No files in memory/ or memories/
                   </div>
                 ) : (
                   memoryFiles.map((file) => (

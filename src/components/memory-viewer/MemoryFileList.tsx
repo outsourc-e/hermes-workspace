@@ -107,7 +107,7 @@ function MemoryFileList({
         <p className="text-xs text-primary-600 text-pretty">
           {isDemo
             ? 'Demo mode enabled because memory API data is unavailable.'
-            : 'Browse MEMORY.md and daily notes in memory/.'}
+            : 'Browse MEMORY.md and daily notes in memory/ or memories/.'}
         </p>
       </div>
 
@@ -140,7 +140,7 @@ function MemoryFileList({
                     size={20}
                     strokeWidth={1.5}
                   />
-                  <span className="truncate">memory/</span>
+                  <span className="truncate">memory/ or memories/</span>
                 </div>
                 {groups.length === 0 ? (
                   <div className="px-2 py-1.5 text-xs text-primary-500 text-pretty">
