@@ -648,7 +648,7 @@ function keyArgLabel(name: string, args?: Record<string, unknown>): string | nul
       return str(args.prompt)
     default: {
       // generic: first string value
-      const first = Object.values(args).find((v) => typeof v === 'string' && (v as string).trim())
+      const first = Object.values(args).find((v) => typeof v === 'string' && (v).trim())
       return str(first)
     }
   }
@@ -1306,7 +1306,7 @@ function MessageItemComponent({
     streamToolCalls.length > 0 ? streamToolCalls : embeddedStreamToolCalls
   const hasStreamToolCalls = effectiveStreamToolCalls.length > 0
   const activeStreamToolLabels = useMemo(() => {
-    const labels: string[] = []
+    const labels: Array<string> = []
     const seen = new Set<string>()
 
     for (const toolCall of effectiveStreamToolCalls) {
@@ -1393,7 +1393,7 @@ function MessageItemComponent({
         return {
           key: toolPart.toolCallId || `${toolPart.type}-${index}`,
           type: toolPart.type,
-          input: toolPart.input as Record<string, unknown> | undefined,
+          input: toolPart.input,
           outputText,
           errorText: toolPart.errorText,
           state: toolPart.state,

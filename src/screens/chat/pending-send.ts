@@ -58,7 +58,7 @@ function removePendingSendFromStorageByFriendlyId(friendlyId: string) {
   if (!canUseLocalStorage() || !friendlyId) return
 
   try {
-    const keysToDelete: string[] = []
+    const keysToDelete: Array<string> = []
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index)
       if (!key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)) continue
@@ -85,7 +85,7 @@ export function cleanupExpiredPendingSends() {
   if (!canUseLocalStorage()) return
 
   try {
-    const keysToDelete: string[] = []
+    const keysToDelete: Array<string> = []
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index)
       if (!key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)) continue

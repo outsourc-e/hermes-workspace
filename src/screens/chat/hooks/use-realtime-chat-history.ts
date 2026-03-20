@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useChatStream } from '../../../hooks/use-chat-stream'
 import { useChatStore } from '../../../stores/chat-store'
-import type { StreamingState } from '../../../stores/chat-store'
 import { appendHistoryMessage, chatQueryKeys } from '../chat-queries'
 import { toast } from '../../../components/ui/toast'
-import type { ChatMessage } from '../types'
 import { textFromMessage } from '../utils'
+import type { ChatMessage } from '../types'
+import type { StreamingState } from '../../../stores/chat-store'
 
 /** Read clientId from a message using either camelCase or snake_case field. */
 function readClientId(message: ChatMessage): string {
@@ -61,7 +61,7 @@ function attachmentSignature(message: ChatMessage): string {
     .join('|')
 }
 
-const EMPTY_MESSAGES: ChatMessage[] = []
+const EMPTY_MESSAGES: Array<ChatMessage> = []
 const EMPTY_TOOL_CALLS: Array<{ id: string; name: string; phase: string; args?: unknown }> = []
 
 type UseRealtimeChatHistoryOptions = {
@@ -183,11 +183,9 @@ export function useRealtimeChatHistory({
             const hasContent = echoText.length > 0 || echoAttachSig.length > 0
             if (hasContent) {
               const key = chatQueryKeys.history(friendlyId, sessionKey)
-              const cached = queryClient.getQueryData(key) as
-                | { messages?: ChatMessage[] }
-                | undefined
-              const existing = cached?.messages ?? []
-              const hasOptimistic = existing.some((m) => {
+              const cached = queryClient.getQueryData(key) as Record<string, unknown> | undefined
+              const existing = (cached?.messages ?? []) as Array<any>
+              const hasOptimistic = existing.some((m: any) => {
                 if (m.role !== 'user') return false
                 const isOptimistic =
                   typeof m.__optimisticId === 'string' &&
@@ -245,10 +243,8 @@ export function useRealtimeChatHistory({
           // Refetch history after generation completes — keeps chat in sync
           if (sessionKey && sessionKey !== 'new') {
             const key = chatQueryKeys.history(friendlyId, sessionKey)
-            const prevData = queryClient.getQueryData(key) as
-              | { messages?: ChatMessage[] }
-              | undefined
-            const prevCount = prevData?.messages?.length ?? 0
+            const prevData = queryClient.getQueryData(key) as Record<string, unknown> | undefined
+            const prevCount = (prevData?.messages as Array<unknown> | undefined)?.length ?? 0
 
             // Refetch immediately — done event message is already in realtime store
             queryClient.invalidateQueries({ queryKey: key }).then(() => {
@@ -256,10 +252,8 @@ export function useRealtimeChatHistory({
               completedStreamingThinkingRef.current = ''
 
               // Check for compaction — significant message count drop
-              const newData = queryClient.getQueryData(key) as
-                | { messages?: ChatMessage[] }
-                | undefined
-              const newCount = newData?.messages?.length ?? 0
+              const newData = queryClient.getQueryData(key) as Record<string, unknown> | undefined
+              const newCount = (newData?.messages as Array<unknown> | undefined)?.length ?? 0
               if (
                 prevCount > 10 &&
                 newCount > 0 &&

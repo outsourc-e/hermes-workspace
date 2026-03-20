@@ -11,10 +11,11 @@ import {
   Settings01Icon,
   Sun02Icon,
 } from '@hugeicons/core-free-icons'
+import type {SettingsThemeMode} from '@/hooks/use-settings';
 import { cn } from '@/lib/utils'
 import {
-  type SettingsThemeMode,
-  useSettingsStore,
+  
+  useSettingsStore
 } from '@/hooks/use-settings'
 
 type OverflowItem = {

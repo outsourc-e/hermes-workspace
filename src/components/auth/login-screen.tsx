@@ -1,4 +1,5 @@
-import { useState, FormEvent } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react';
 
 export function LoginScreen() {
   const [password, setPassword] = useState('')

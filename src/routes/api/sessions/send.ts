@@ -4,10 +4,10 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { requireJsonContentType } from '../../../server/rate-limit'
 import {
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
   getGatewayCapabilities,
   sendChat,
-  SESSIONS_API_UNAVAILABLE_MESSAGE,
 } from '../../../server/hermes-api'
 import { resolveSessionKey } from '../../../server/session-utils'
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Cancel01Icon, Tick01Icon, Sent02Icon } from '@hugeicons/core-free-icons';
+import { Cancel01Icon, Sent02Icon, Tick01Icon } from '@hugeicons/core-free-icons';
 
 const STORAGE_KEY_SEEN = 'hermes-mobile-setup-seen';
 

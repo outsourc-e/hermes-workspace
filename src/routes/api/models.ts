@@ -1,8 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   ensureGatewayProbed,
@@ -12,7 +12,7 @@ import {
 const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
 // Well-known models for providers available via auth store
-const AUTH_STORE_MODELS: Record<string, ModelEntry[]> = {
+const AUTH_STORE_MODELS: Record<string, Array<ModelEntry>> = {
   anthropic: [
     { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
     { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
@@ -25,8 +25,8 @@ const AUTH_STORE_MODELS: Record<string, ModelEntry[]> = {
   ],
 }
 
-function getAuthStoreModels(): ModelEntry[] {
-  const extra: ModelEntry[] = []
+function getAuthStoreModels(): Array<ModelEntry> {
+  const extra: Array<ModelEntry> = []
   for (const storePath of [
     path.join(os.homedir(), '.hermes', 'auth-profiles.json'),
     path.join(os.homedir(), '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json'),

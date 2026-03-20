@@ -17,8 +17,8 @@ export type HermesJob = {
   last_run_success?: boolean | null
   created_at?: string
   updated_at?: string
-  deliver?: string[]
-  skills?: string[]
+  deliver?: Array<string>
+  skills?: Array<string>
   repeat?: { times?: number; completed?: number }
   run_count?: number
 }
@@ -30,7 +30,7 @@ export type JobOutput = {
   size: number
 }
 
-export async function fetchJobs(): Promise<HermesJob[]> {
+export async function fetchJobs(): Promise<Array<HermesJob>> {
   const res = await fetch(`${HERMES_API}?include_disabled=true`)
   if (!res.ok) throw new Error(`Failed to fetch jobs: ${res.status}`)
   const data = await res.json()
@@ -41,8 +41,8 @@ export async function createJob(input: {
   schedule: string
   prompt: string
   name?: string
-  deliver?: string[]
-  skills?: string[]
+  deliver?: Array<string>
+  skills?: Array<string>
   repeat?: number
 }): Promise<HermesJob> {
   const res = await fetch(HERMES_API, {
@@ -96,7 +96,7 @@ export async function triggerJob(jobId: string): Promise<HermesJob> {
 export async function fetchJobOutput(
   jobId: string,
   limit = 10,
-): Promise<JobOutput[]> {
+): Promise<Array<JobOutput>> {
   const res = await fetch(`${HERMES_API}/${jobId}?action=output&limit=${limit}`)
   if (!res.ok) throw new Error(`Failed to fetch output: ${res.status}`)
   return (await res.json()).outputs ?? []

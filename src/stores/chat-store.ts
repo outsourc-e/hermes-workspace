@@ -2,9 +2,9 @@ import { create } from 'zustand'
 import type {
   ChatMessage,
   MessageContent,
-  ToolCallContent,
-  ThinkingContent,
   TextContent,
+  ThinkingContent,
+  ToolCallContent,
 } from '../screens/chat/types'
 
 export type ChatStreamEvent =
@@ -649,7 +649,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           (tc) => tc.id === toolCallId,
         )
 
-        let nextToolCalls = [...prev.toolCalls]
+        const nextToolCalls = [...prev.toolCalls]
 
         if (existingToolIndex >= 0) {
           nextToolCalls[existingToolIndex] = {

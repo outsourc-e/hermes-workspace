@@ -10,8 +10,8 @@ export function useChatStream(_opts: {
   onApprovalRequest?: (approval: Record<string, unknown>) => void
   onCompactionStart?: () => void
   onCompactionEnd?: () => void
-  onCompaction?: (...args: any[]) => void
-  onDone?: (...args: any[]) => void
+  onCompaction?: (...args: Array<any>) => void
+  onDone?: (...args: Array<any>) => void
 }) {
   return {
     connectionState: 'connected' as const,

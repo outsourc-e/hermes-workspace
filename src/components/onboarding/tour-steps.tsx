@@ -1,6 +1,6 @@
-import { Step } from 'react-joyride'
+import type { Step } from 'react-joyride'
 
-export const tourSteps: Step[] = [
+export const tourSteps: Array<Step> = [
   // Step 1: Welcome
   {
     target: 'body',

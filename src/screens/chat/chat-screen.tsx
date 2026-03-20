@@ -50,10 +50,11 @@ import { useRenameSession } from './hooks/use-rename-session'
 import { useContextAlert } from './hooks/use-context-alert'
 import { ContextBar } from './components/context-bar'
 import {
-  addApproval,
-  loadApprovals,
-  saveApprovals,
-} from '@/lib/approvals-store'
+  CHAT_OPEN_SETTINGS_EVENT,
+  CHAT_PENDING_COMMAND_STORAGE_KEY,
+  CHAT_RUN_COMMAND_EVENT
+  
+} from './chat-events'
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
@@ -62,6 +63,12 @@ import type {
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
+import type {ChatRunCommandDetail} from './chat-events';
+import {
+  addApproval,
+  loadApprovals,
+  saveApprovals,
+} from '@/lib/approvals-store'
 import { stripQueuedWrapper } from '@/lib/strip-queued-wrapper'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
@@ -75,22 +82,16 @@ import { InspectorPanel } from '@/components/inspector/inspector-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
-// Activity store removed — not used in Hermes Workspace
-const _noopSetActivity = (_s: string) => {}
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 import { ContextMeter } from '@/components/context-meter'
 import { useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
-import {
-  CHAT_OPEN_SETTINGS_EVENT,
-  CHAT_PENDING_COMMAND_STORAGE_KEY,
-  CHAT_RUN_COMMAND_EVENT,
-  type ChatRunCommandDetail,
-} from './chat-events'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
+// Activity store removed — not used in Hermes Workspace
+const _noopSetActivity = (_s: string) => {}
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -202,13 +203,13 @@ function messageFallbackSignature(message: ChatMessage): string {
             return `t:${typeof part.text === 'string' ? part.text.trim() : ''}`
           }
           if (part.type === 'thinking') {
-            return `th:${typeof (part as any).thinking === 'string' ? (part as any).thinking : ''}`
+            return `th:${typeof (part).thinking === 'string' ? (part).thinking : ''}`
           }
           if (part.type === 'toolCall') {
-            const toolPart = part as any
+            const toolPart = part
             return `tc:${toolPart.id ?? ''}:${toolPart.name ?? ''}`
           }
-          return `p:${(part as any).type ?? ''}`
+          return `p:${(part).type ?? ''}`
         })
         .join('|')
     : ''
@@ -414,7 +415,7 @@ export function ChatScreen({
   const retriedQueuedMessageKeysRef = useRef(new Set<string>())
   const hasSeenDisconnectRef = useRef(false)
   const hadErrorRef = useRef(false)
-  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
+  const [pendingApprovals, setPendingApprovals] = useState<Array<ApprovalRequest>>(
     [],
   )
   const [isCompacting, setIsCompacting] = useState(false)
@@ -939,7 +940,7 @@ export function ChatScreen({
     // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
     // The refetch replaces the query cache with server data — if the server
     // hasn't processed the user's POST yet, the optimistic message vanishes.
-    const currentMessages = (historyQuery.data as any)?.messages as ChatMessage[] | undefined
+    const currentMessages = (historyQuery.data as any)?.messages as Array<ChatMessage> | undefined
     const pendingOptimistic = (currentMessages ?? []).filter((msg) => {
       const raw = msg as Record<string, unknown>
       return (
@@ -1896,7 +1897,7 @@ export function ChatScreen({
   )
 
   const scrollChatToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    const viewport = document.querySelector('[data-chat-scroll-viewport]') as HTMLElement | null
+    const viewport = document.querySelector('[data-chat-scroll-viewport]')
     if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior })
     }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { Mode } from '@/hooks/use-modes'
 
 type ApplyModeDialogProps = {

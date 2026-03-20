@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ErrorBoundary } from '@/components/error-boundary'
 import { moveHistoryMessages } from '../../screens/chat/chat-queries'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 const ChatScreen = lazy(async () => {
   const module = await import('../../screens/chat/chat-screen')

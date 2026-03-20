@@ -3,11 +3,12 @@
  * Gives us real PTY (echo, colors, resize) without node-pty native addon.
  */
 import { randomUUID } from 'node:crypto'
-import { spawn, type ChildProcess } from 'node:child_process'
-import { resolve, dirname } from 'node:path'
+import {  spawn } from 'node:child_process'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 import EventEmitter from 'node:events'
+import type {ChildProcess} from 'node:child_process';
 
 export type TerminalSessionEvent = {
   event: string
@@ -33,7 +34,7 @@ const __dirname_resolved =
 const PTY_HELPER = resolve(__dirname_resolved, 'pty-helper.py')
 
 export function createTerminalSession(params: {
-  command?: string[]
+  command?: Array<string>
   cwd?: string
   env?: Record<string, string>
   cols?: number
@@ -59,7 +60,7 @@ export function createTerminalSession(params: {
   const rows = params.rows ?? 24
 
   // Buffer early output before any listener registers
-  const earlyBuffer: TerminalSessionEvent[] = []
+  const earlyBuffer: Array<TerminalSessionEvent> = []
   let hasListeners = false
 
   emitter.on('newListener', (eventName) => {

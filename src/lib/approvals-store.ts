@@ -20,10 +20,10 @@ export function addApproval(_approval: Record<string, unknown>): ApprovalRequest
   return null
 }
 
-export function loadApprovals(): ApprovalRequest[] {
+export function loadApprovals(): Array<ApprovalRequest> {
   return []
 }
 
-export function saveApprovals(_approvals?: ApprovalRequest[]): void {}
+export function saveApprovals(_approvals?: Array<ApprovalRequest>): void {}
 
 export function respondToApproval(_id: string, _status: 'approved' | 'denied'): void {}

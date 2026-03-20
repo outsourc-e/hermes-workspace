@@ -26,8 +26,8 @@ type EditJobDialogProps = {
     name: string
     schedule: string
     prompt: string
-    deliver?: string[]
-    skills?: string[]
+    deliver?: Array<string>
+    skills?: Array<string>
     repeat?: number
   }) => void | Promise<void>
 }
@@ -38,7 +38,7 @@ function readScheduleValue(job: HermesJob): string {
   }
   const schedule = job.schedule
   if (schedule && typeof schedule === 'object') {
-    const record = schedule as Record<string, unknown>
+    const record = schedule
     const candidates = [
       record.expression,
       record.cron,

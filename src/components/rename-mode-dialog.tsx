@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { Mode } from '@/hooks/use-modes'
 import { cn } from '@/lib/utils'
 import { useModes } from '@/hooks/use-modes'
-import type { Mode } from '@/hooks/use-modes'
 
 type RenameDialogProps = {
   mode: Mode

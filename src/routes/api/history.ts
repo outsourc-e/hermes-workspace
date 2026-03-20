@@ -1,15 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '@/server/auth-middleware'
 import {
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
   getGatewayCapabilities,
   getMessages,
   listSessions,
-  SESSIONS_API_UNAVAILABLE_MESSAGE,
   toChatMessage,
 } from '../../server/hermes-api'
 import { resolveSessionKey } from '../../server/session-utils'
+import { isAuthenticated } from '@/server/auth-middleware'
 
 export const Route = createFileRoute('/api/history')({
   server: {

@@ -3,7 +3,7 @@
  * Uses a sliding window approach per key.
  */
 
-const store = new Map<string, { timestamps: number[] }>()
+const store = new Map<string, { timestamps: Array<number> }>()
 
 // Cleanup old entries every 5 minutes
 setInterval(() => {

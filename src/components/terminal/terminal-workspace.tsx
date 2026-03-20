@@ -4,11 +4,11 @@ import {
   Add01Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
+  ArrowUp02Icon,
   Cancel01Icon,
   ComputerTerminal01Icon,
-  SidebarLeft01Icon,
   Copy01Icon,
-  ArrowUp02Icon,
+  SidebarLeft01Icon,
 } from '@hugeicons/core-free-icons'
 import type { FitAddon } from 'xterm-addon-fit'
 import type * as FitAddonModule from 'xterm-addon-fit'
@@ -401,7 +401,7 @@ export function TerminalWorkspace({
         for (let _bi = 0; _bi < blocks.length; _bi++) {
           // Yield every 10 blocks to let input events through
           if (_bi > 0 && _bi % 10 === 0) await new Promise((r) => setTimeout(r, 0))
-          const block = blocks[_bi]!
+          const block = blocks[_bi]
           if (!block.trim()) continue
           const lines = block.split('\n')
           let eventName = ''

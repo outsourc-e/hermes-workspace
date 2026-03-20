@@ -26,8 +26,8 @@ export type WorkspaceAgentDirectory = {
     browser: boolean
     network: boolean
   }
-  assigned_projects: string[]
-  skills: string[]
+  assigned_projects: Array<string>
+  skills: Array<string>
 }
 
 export type WorkspaceAgentStats = {
@@ -56,7 +56,7 @@ function asBoolean(value: unknown): boolean {
   return value === true
 }
 
-function asStringArray(value: unknown): string[] {
+function asStringArray(value: unknown): Array<string> {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : []
@@ -116,7 +116,7 @@ function normalizeAgent(value: unknown): WorkspaceAgentDirectory | null {
   }
 }
 
-export function extractWorkspaceAgents(payload: unknown): WorkspaceAgentDirectory[] {
+export function extractWorkspaceAgents(payload: unknown): Array<WorkspaceAgentDirectory> {
   if (Array.isArray(payload)) {
     return payload.map(normalizeAgent).filter((value): value is WorkspaceAgentDirectory => Boolean(value))
   }
@@ -149,7 +149,7 @@ export function normalizeWorkspaceAgentStats(payload: unknown): WorkspaceAgentSt
   }
 }
 
-export async function listWorkspaceAgents(): Promise<WorkspaceAgentDirectory[]> {
+export async function listWorkspaceAgents(): Promise<Array<WorkspaceAgentDirectory>> {
   const payload = await workspaceRequestJson('/api/workspace/agents')
   return extractWorkspaceAgents(payload)
 }

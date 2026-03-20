@@ -1,9 +1,10 @@
 import { ComputerIcon, Moon01Icon, Sun01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import type {SettingsThemeMode} from '@/hooks/use-settings';
 import {
+  
   applyTheme,
-  type SettingsThemeMode,
-  useSettingsStore,
+  useSettingsStore
 } from '@/hooks/use-settings'
 import { cn } from '@/lib/utils'
 

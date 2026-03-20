@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
-import type { TouchEvent } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
+import type { TouchEvent } from 'react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const TAB_ORDER = [

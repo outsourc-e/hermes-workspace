@@ -1,16 +1,17 @@
-import { lazy, Suspense, useCallback, useEffect, useRef } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from '@tanstack/react-router'
-const TerminalWorkspace = lazy(() =>
-  import('@/components/terminal/terminal-workspace').then((m) => ({
-    default: m.TerminalWorkspace,
-  })),
-)
 import {
   DEFAULT_PANEL_HEIGHT,
   MIN_PANEL_HEIGHT,
   useTerminalPanelStore,
 } from '@/stores/terminal-panel-store'
+
+const TerminalWorkspace = lazy(() =>
+  import('@/components/terminal/terminal-workspace').then((m) => ({
+    default: m.TerminalWorkspace,
+  })),
+)
 
 const MAX_VIEWPORT_RATIO = 0.6
 

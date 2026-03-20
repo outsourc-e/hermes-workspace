@@ -4,10 +4,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
-  ensureGatewayProbed,
-  getCapabilities,
   HERMES_API,
   HERMES_UPGRADE_INSTRUCTIONS,
+  ensureGatewayProbed,
+  getCapabilities,
 } from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/hermes-jobs/$jobId')({

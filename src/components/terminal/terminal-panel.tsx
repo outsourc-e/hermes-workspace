@@ -163,7 +163,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
 
       window.addEventListener('mousemove', handleMove)
       window.addEventListener('mouseup', handleUp)
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+       
     },
     [activeTab?.id, height],
   )
@@ -425,7 +425,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
                   placeholder="Search output"
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
-                      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+                       
                       handleSearch(
                         activeTab?.id ?? '',
                         event.currentTarget.value,

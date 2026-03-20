@@ -49,7 +49,7 @@ const defaultIcons: Record<ToastType, string> = {
 }
 
 export function Toaster() {
-  const [toasts, setToasts] = useState<ToastItem[]>([])
+  const [toasts, setToasts] = useState<Array<ToastItem>>([])
 
   const addToast = useCallback((item: ToastItem) => {
     setToasts((prev) => {

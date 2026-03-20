@@ -1,19 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
-// Active run tracking (replaces legacy imports)
-const _activeSendRuns = new Set<string>()
-function registerActiveSendRun(runId: string): void { if (runId) _activeSendRuns.add(runId) }
-function unregisterActiveSendRun(runId: string): void { if (runId) _activeSendRuns.delete(runId) }
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
 import {
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
   createSession,
   ensureGatewayProbed,
   getGatewayCapabilities,
-  SESSIONS_API_UNAVAILABLE_MESSAGE,
   streamChat,
 } from '../../server/hermes-api'
+// Active run tracking (replaces legacy imports)
+const _activeSendRuns = new Set<string>()
+function registerActiveSendRun(runId: string): void { if (runId) _activeSendRuns.add(runId) }
+function unregisterActiveSendRun(runId: string): void { if (runId) _activeSendRuns.delete(runId) }
 
 // Hermes agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000

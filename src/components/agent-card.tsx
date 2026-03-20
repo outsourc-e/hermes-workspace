@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
-import { CheckmarkCircle01Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Cancel01Icon, CheckmarkCircle01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export type AgentCardStatus = 'running' | 'completed' | 'failed'

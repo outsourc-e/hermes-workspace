@@ -3,11 +3,11 @@
  *
  * Persist user's favorite models for quick access in model switcher
  */
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 const STORAGE_KEY = 'pinnedModels'
 
-function getPinnedFromStorage(): string[] {
+function getPinnedFromStorage(): Array<string> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (!stored) return []
@@ -18,7 +18,7 @@ function getPinnedFromStorage(): string[] {
   }
 }
 
-function savePinnedToStorage(pinned: string[]) {
+function savePinnedToStorage(pinned: Array<string>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pinned))
   } catch {
@@ -27,7 +27,7 @@ function savePinnedToStorage(pinned: string[]) {
 }
 
 export function usePinnedModels() {
-  const [pinned, setPinned] = useState<string[]>(getPinnedFromStorage)
+  const [pinned, setPinned] = useState<Array<string>>(getPinnedFromStorage)
 
   const togglePin = (modelId: string) => {
     setPinned((prev) => {

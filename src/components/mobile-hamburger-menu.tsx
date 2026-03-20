@@ -2,6 +2,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
+  Cancel01Icon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
@@ -9,9 +10,8 @@ import {
   Menu01Icon,
   PuzzleIcon,
   Settings01Icon,
-  Cancel01Icon,
 } from '@hugeicons/core-free-icons'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useChatStore } from '@/stores/chat-store'
 import type { ChatAttachment, ChatMessage } from '../types'
+import { useChatStore } from '@/stores/chat-store'
 import { pushActivity } from '@/components/inspector/activity-store'
 
 type StreamingState = {

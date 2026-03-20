@@ -7,7 +7,7 @@ export type ActivityEvent = {
 }
 
 type ActivityState = {
-  events: ActivityEvent[]
+  events: Array<ActivityEvent>
   push: (event: ActivityEvent) => void
   clear: () => void
 }

@@ -34,7 +34,7 @@ type TabItem = {
   match: (path: string) => boolean
 }
 
-const TABS: TabItem[] = [
+const TABS: Array<TabItem> = [
   {
     id: 'chat',
     label: 'Chat',
@@ -146,7 +146,7 @@ export function MobileTabBar() {
 
       if (nextIdx !== currentIdx && nextIdx >= 0 && nextIdx < TABS.length) {
         hapticTap()
-        void navigate({ to: TABS[nextIdx]!.to })
+        void navigate({ to: TABS[nextIdx].to })
       }
     },
     [navigate, pathname],

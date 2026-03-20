@@ -7,6 +7,8 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useEffect, useRef, useState } from 'react'
+import { ProviderIcon } from './provider-icon'
+import type { ProviderAuthType } from '@/lib/provider-catalog'
 import {
   HERMES_CONFIG_PATH,
   PROVIDER_CATALOG,
@@ -14,7 +16,6 @@ import {
   getAuthTypeLabel,
   getProviderInfo,
 } from '@/lib/provider-catalog'
-import type { ProviderAuthType } from '@/lib/provider-catalog'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -24,7 +25,6 @@ import {
 } from '@/components/ui/dialog'
 import { useConnectionRestart } from '@/components/connection-overlay'
 import { cn } from '@/lib/utils'
-import { ProviderIcon } from './provider-icon'
 
 type WizardStep = 'provider' | 'auth' | 'instructions' | 'verify'
 type CopyState = 'idle' | 'copied' | 'failed'

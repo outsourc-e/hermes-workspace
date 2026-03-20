@@ -6,7 +6,7 @@
  * Uses @lobehub/icons for real provider logos.
  */
 
-import { type CSSProperties } from 'react'
+import type {CSSProperties} from 'react';
 import { cn } from '@/lib/utils'
 
 type ProviderModelIconProps = {

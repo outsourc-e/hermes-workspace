@@ -8,6 +8,10 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { ProviderIcon } from './components/provider-icon'
+import { ProviderWizard } from './components/provider-wizard'
+import type { ModelCatalogEntry } from '@/lib/model-types'
+import type { ProviderSummaryForEdit } from './components/provider-wizard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -18,16 +22,12 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
-import type { ModelCatalogEntry } from '@/lib/model-types'
 import {
   getProviderDisplayName,
   getProviderInfo,
   normalizeProviderId,
 } from '@/lib/provider-catalog'
 import { cn } from '@/lib/utils'
-import { ProviderIcon } from './components/provider-icon'
-import { ProviderWizard } from './components/provider-wizard'
-import type { ProviderSummaryForEdit } from './components/provider-wizard'
 
 type ProviderStatus = 'active' | 'configured'
 type SettingsTabId = 'providers' | 'models' | 'agents' | 'session' | 'memory'
@@ -70,7 +70,7 @@ type SettingDefinition = {
   description: string
   path?: string
   kind: SettingKind
-  options?: SelectOption[]
+  options?: Array<SelectOption>
   placeholder?: string
   min?: number
   step?: number
@@ -1041,7 +1041,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
       if (!response.ok || payload.ok === false) {
         throw new Error(payload.error || `HTTP ${response.status}`)
       }
-      return (payload.payload ?? {}) as HermesConfig
+      return (payload.payload ?? {})
     },
     retry: 1,
   })

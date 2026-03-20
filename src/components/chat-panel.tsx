@@ -12,7 +12,8 @@ import {
   Cancel01Icon,
   PencilEdit02Icon,
 } from '@hugeicons/core-free-icons'
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
+import type { SessionMeta } from '@/screens/chat/types'
 import { ChatScreen } from '@/screens/chat/chat-screen'
 import { chatQueryKeys, moveHistoryMessages } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -23,7 +24,6 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import type { SessionMeta } from '@/screens/chat/types'
 
 export function ChatPanel() {
   const isOpen = useWorkspaceStore((s) => s.chatPanelOpen)
@@ -62,7 +62,7 @@ export function ChatPanel() {
     },
     staleTime: 10_000,
   })
-  const sessions: SessionMeta[] = sessionsQuery.data ?? []
+  const sessions: Array<SessionMeta> = sessionsQuery.data ?? []
 
   // Current session title
   const activeSession = sessions.find((s) => s.friendlyId === activeFriendlyId)

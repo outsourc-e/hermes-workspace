@@ -2,42 +2,43 @@
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  ArrowLeft01Icon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
   CloudIcon,
   ComputerIcon,
-  ArrowLeft01Icon,
+  MessageMultiple01Icon,
   Moon01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Sun01Icon,
-  MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
-import { useState, useEffect, useCallback, Component } from 'react'
+import { Component, useCallback, useEffect, useState } from 'react'
 import type * as React from 'react'
 import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
+import type { LoaderStyle } from '@/hooks/use-chat-settings'
+import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
+import type {ThemeId} from '@/lib/theme';
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
 import {
   THEMES,
+  
   getTheme,
   getThemeVariant,
   isDarkTheme,
-  setTheme,
-  type ThemeId,
+  setTheme
 } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import { UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
-import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 import { applyAccentColor } from '@/lib/accent-colors'
 import { ProviderLogo } from '@/components/provider-logo'
@@ -132,7 +133,7 @@ const SETTINGS_CARD_CLASS =
 
 // ── Section components ──────────────────────────────────────────────────
 
-const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: string[]; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
+const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: Array<string>; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
   { id: 'nous', name: 'Nous Portal', logo: '/providers/nous.png', models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'], authType: 'oauth' },
   { id: 'openai-codex', name: 'OpenAI Codex', logo: '/providers/openai.png', models: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'], authType: 'oauth' },
   { id: 'anthropic', name: 'Anthropic', logo: '/providers/anthropic.png', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'], authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
@@ -147,7 +148,7 @@ const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: st
 function HermesContent() {
   const [activeProvider, setActiveProvider] = useState('')
   const [activeModel, setActiveModel] = useState('')
-  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [availableModels, setAvailableModels] = useState<Array<string>>([])
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [keyInput, setKeyInput] = useState('')
   const [_saving, setSaving] = useState(false)
@@ -196,7 +197,7 @@ function HermesContent() {
       const r = await res.json() as { message?: string }
       setMsg(r.message || 'Saved')
       const ref = await fetch('/api/hermes-config')
-      const d = await ref.json() as any
+      const d = await ref.json()
       setActiveProvider(d.activeProvider || ''); setActiveModel(d.activeModel || '')
       const keys: Record<string, string> = {}
       for (const p of (d.providers || [])) {
@@ -602,7 +603,7 @@ function AppearanceContent() {
   )
 }
 
-const ENTERPRISE_THEME_FAMILIES: ThemeId[] = [
+const ENTERPRISE_THEME_FAMILIES: Array<ThemeId> = [
   'hermes-official',
   'hermes-classic',
   'hermes-slate',

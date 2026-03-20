@@ -112,7 +112,7 @@ export function useContextAlert(): {
       stored.sent[String(candidate) as keyof StoredState['sent']] = true
       saveStoredState(stored)
 
-      setAlertThreshold(candidate as Threshold)
+      setAlertThreshold(candidate)
       setAlertOpen(true)
     } catch {
       /* ignore */

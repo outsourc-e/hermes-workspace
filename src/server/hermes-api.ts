@@ -6,11 +6,11 @@
  */
 
 import {
+  HERMES_API,
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
   getCapabilities,
-  HERMES_API,
   probeGateway,
-  SESSIONS_API_UNAVAILABLE_MESSAGE,
 } from './gateway-capabilities'
 
 console.log(`[hermes-api] Configured API: ${HERMES_API}`)
@@ -40,7 +40,7 @@ export type HermesMessage = {
   role: string
   content: string | null
   tool_call_id?: string | null
-  tool_calls?: unknown[] | string | null
+  tool_calls?: Array<unknown> | string | null
   tool_name?: string | null
   timestamp: number
   token_count?: number | null
@@ -106,8 +106,8 @@ export async function checkHealth(): Promise<{ status: string }> {
 
 // ── Sessions ─────────────────────────────────────────────────────
 
-export async function listSessions(limit = 50, offset = 0): Promise<HermesSession[]> {
-  const resp = await hermesGet<{ items: HermesSession[]; total: number }>(
+export async function listSessions(limit = 50, offset = 0): Promise<Array<HermesSession>> {
+  const resp = await hermesGet<{ items: Array<HermesSession>; total: number }>(
     `/api/sessions?limit=${limit}&offset=${offset}`,
   )
   return resp.items
@@ -142,8 +142,8 @@ export async function deleteSession(sessionId: string): Promise<void> {
   return hermesDeleteReq(`/api/sessions/${sessionId}`)
 }
 
-export async function getMessages(sessionId: string): Promise<HermesMessage[]> {
-  const resp = await hermesGet<{ items: HermesMessage[]; total: number }>(
+export async function getMessages(sessionId: string): Promise<Array<HermesMessage>> {
+  const resp = await hermesGet<{ items: Array<HermesMessage>; total: number }>(
     `/api/sessions/${sessionId}/messages`,
   )
   return resp.items
@@ -152,7 +152,7 @@ export async function getMessages(sessionId: string): Promise<HermesMessage[]> {
 export async function searchSessions(
   query: string,
   limit = 20,
-): Promise<{ query: string; count: number; results: unknown[] }> {
+): Promise<{ query: string; count: number; results: Array<unknown> }> {
   return hermesGet(
     `/api/sessions/search?q=${encodeURIComponent(query)}&limit=${limit}`,
   )
@@ -172,7 +172,7 @@ export function toChatMessage(
   options?: { historyIndex?: number },
 ): Record<string, unknown> {
   // Accept either parsed arrays from FastAPI or legacy JSON strings.
-  let toolCalls: unknown[] | undefined
+  let toolCalls: Array<unknown> | undefined
   if (Array.isArray(msg.tool_calls)) {
     toolCalls = msg.tool_calls
   } else if (msg.tool_calls && typeof msg.tool_calls === 'string') {

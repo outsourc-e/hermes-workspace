@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { Suspense, lazy } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
 

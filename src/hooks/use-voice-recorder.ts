@@ -28,7 +28,7 @@ export function useVoiceRecorder(
   const [state, setState] = useState<RecorderState>('idle')
   const [durationMs, setDurationMs] = useState(0)
   const recorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
+  const chunksRef = useRef<Array<Blob>>([])
   const startTimeRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)

@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
+  SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
   getGatewayCapabilities,
   getSession,
-  SESSIONS_API_UNAVAILABLE_MESSAGE,
   toSessionSummary,
 } from '../../../server/hermes-api'
 

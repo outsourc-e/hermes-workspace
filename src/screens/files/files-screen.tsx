@@ -194,7 +194,7 @@ function markdownToHtml(md: string): string {
 
   // Paragraphs
   const lines = html.split('\n')
-  const result: string[] = []
+  const result: Array<string> = []
   for (const line of lines) {
     if (
       line.trim() === '' ||
@@ -238,7 +238,7 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
   const n = bLines.length
 
   // Build LCS table
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  const dp: Array<Array<number>> = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       if (aLines[i - 1] === bLines[j - 1]) {

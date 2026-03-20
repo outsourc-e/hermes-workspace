@@ -81,7 +81,7 @@ function ToastItem({ entry, onDismiss }: ToastItemProps) {
 }
 
 export function ErrorToastContainer() {
-  const [toasts, setToasts] = useState<ErrorEntry[]>([])
+  const [toasts, setToasts] = useState<Array<ErrorEntry>>([])
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))

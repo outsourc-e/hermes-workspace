@@ -10,24 +10,25 @@ import {
   UserIcon,
 } from '@hugeicons/core-free-icons'
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type * as React from 'react'
+import type { LoaderStyle } from '@/hooks/use-chat-settings'
+import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
+import type {ThemeId} from '@/lib/theme';
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useSettings } from '@/hooks/use-settings'
-import { THEMES, getTheme, isDarkTheme, setTheme, type ThemeId } from '@/lib/theme'
+import { THEMES,  getTheme, isDarkTheme, setTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import { UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
-import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 // useWorkspaceStore removed — hamburger eliminated on mobile
 
@@ -252,7 +253,7 @@ type SettingsNavItem = {
   label: string
 }
 
-const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
+const SETTINGS_NAV_ITEMS: Array<SettingsNavItem> = [
   { id: 'hermes', label: 'Hermes Agent' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'chat', label: 'Chat' },
@@ -775,7 +776,7 @@ function ChatDisplaySection() {
 
 type LoaderStyleOption = { value: LoaderStyle; label: string }
 
-const LOADER_STYLES: LoaderStyleOption[] = [
+const LOADER_STYLES: Array<LoaderStyleOption> = [
   { value: 'dots', label: 'Dots' },
   { value: 'braille-hermes', label: 'Hermes' },
   { value: 'braille-orbit', label: 'Orbit' },
@@ -861,14 +862,14 @@ type HermesProvider = {
   id: string
   name: string
   authType: string
-  envKeys: string[]
+  envKeys: Array<string>
   configured: boolean
   maskedKeys: Record<string, string>
 }
 
 type HermesConfigData = {
   config: Record<string, unknown>
-  providers: HermesProvider[]
+  providers: Array<HermesProvider>
   activeProvider: string
   activeModel: string
   hermesHome: string
@@ -916,8 +917,8 @@ function HermesConfigSection() {
       .then((r) => r.json())
       .then((d: HermesConfigData) => {
         setData(d)
-        setModelInput((d.activeModel as string) || '')
-        setProviderInput((d.activeProvider as string) || '')
+        setModelInput((d.activeModel) || '')
+        setProviderInput((d.activeProvider) || '')
         setBaseUrlInput((d.config?.base_url as string) || '')
         setLoading(false)
         // Fetch available models for current provider

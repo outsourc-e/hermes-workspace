@@ -1,7 +1,6 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import type React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -14,6 +13,8 @@ import {
   PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
+import type React from 'react'
+import type { SessionMeta } from '@/screens/chat/types'
 import {
   Command,
   CommandDialog,
@@ -32,7 +33,6 @@ import {
   CHAT_PENDING_COMMAND_STORAGE_KEY,
   CHAT_RUN_COMMAND_EVENT,
 } from '@/screens/chat/chat-events'
-import type { SessionMeta } from '@/screens/chat/types'
 import { cn } from '@/lib/utils'
 
 type CommandPaletteProps = {

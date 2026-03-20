@@ -3,9 +3,9 @@
  * Rendered as a sibling in WorkspaceShell so SSE stream re-renders
  * in the terminal component never freeze this input.
  */
-import { useRef, useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Copy01Icon, ArrowUp02Icon } from '@hugeicons/core-free-icons'
+import { ArrowUp02Icon, Copy01Icon } from '@hugeicons/core-free-icons'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 
 async function sendToActiveTab(data: string) {

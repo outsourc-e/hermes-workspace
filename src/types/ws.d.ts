@@ -2,7 +2,7 @@ declare module 'ws' {
   import { EventEmitter } from 'node:events'
   import type { Server as HttpServer } from 'node:http'
 
-  export type RawData = string | Buffer | Array<Buffer> | ArrayBuffer | Buffer[]
+  export type RawData = string | Buffer | Array<Buffer> | ArrayBuffer | Array<Buffer>
 
   type ErrorCallback = (err?: Error) => void
 

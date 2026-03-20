@@ -78,9 +78,9 @@ function parseContextPercent(payload: unknown): number {
     (root.totals as Record<string, unknown> | undefined) ??
     root
   return readPercent(
-    (usage as Record<string, unknown>)?.contextPercent ??
-      (usage as Record<string, unknown>)?.context_percent ??
-      (usage as Record<string, unknown>)?.context ??
+    (usage)?.contextPercent ??
+      (usage)?.context_percent ??
+      (usage)?.context ??
       root?.contextPercent ??
       root?.context_percent,
   )
@@ -123,10 +123,10 @@ type UsageRow = {
 
 export function UsageMeterCompact() {
   const [contextPct, setContextPct] = useState<number | null>(null)
-  const [progressRows, setProgressRows] = useState<UsageRow[]>([])
+  const [progressRows, setProgressRows] = useState<Array<UsageRow>>([])
   const [providerLabel, setProviderLabel] = useState<string | null>(null)
   const [preferredProvider, setPreferredProvider] = useState<string | null>(getStoredPreferredProvider)
-  const [allProviders, setAllProviders] = useState<ProviderUsageEntry[]>([])
+  const [allProviders, setAllProviders] = useState<Array<ProviderUsageEntry>>([])
   const [expanded, setExpanded] = useState(true)
   // Flash state: animate provider name on change
   const [providerFlash, setProviderFlash] = useState(false)
@@ -135,7 +135,7 @@ export function UsageMeterCompact() {
   // ── Derived primary provider ─────────────────────────────────────────────
 
   const getPrimary = useCallback(
-    (providers: ProviderUsageEntry[], preferred: string | null) => {
+    (providers: Array<ProviderUsageEntry>, preferred: string | null) => {
       if (preferred) {
         const match = providers.find(
           (p) => p.provider === preferred && p.status === 'ok' && p.lines.length > 0,
@@ -168,11 +168,11 @@ export function UsageMeterCompact() {
   // ── Update display rows when provider changes ────────────────────────────
 
   const updateDisplayFromProviders = useCallback(
-    (providers: ProviderUsageEntry[], preferred: string | null) => {
+    (providers: Array<ProviderUsageEntry>, preferred: string | null) => {
       const primary = getPrimary(providers, preferred)
       if (!primary) return
 
-      const rows: UsageRow[] = primary.lines
+      const rows: Array<UsageRow> = primary.lines
         .filter((l) => l.type === 'progress' && l.used !== undefined)
         .slice(0, 2)
         .map((l) => ({
@@ -261,7 +261,7 @@ export function UsageMeterCompact() {
 
   // Build the rows to display: session context row + all provider progress rows
   const ctxRow: UsageRow = { label: 'Ctx', pct: contextPct, resetHint: null }
-  const allRows: UsageRow[] =
+  const allRows: Array<UsageRow> =
     progressRows.length > 0
       ? progressRows
       : [ctxRow]

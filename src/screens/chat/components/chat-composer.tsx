@@ -22,6 +22,11 @@ import {
 } from 'react'
 import type { CSSProperties, Ref } from 'react'
 
+import type {
+  ModelCatalogEntry,
+  ModelSwitchResponse,
+} from '@/lib/model-types'
+import type {SlashCommandDefinition, SlashCommandMenuHandle} from '@/components/slash-command-menu';
 import {
   PromptInput,
   PromptInputAction,
@@ -29,18 +34,14 @@ import {
   PromptInputTextarea,
 } from '@/components/prompt-kit/prompt-input'
 import {
-  SlashCommandMenu,
-  type SlashCommandDefinition,
-  type SlashCommandMenuHandle,
+  
+  SlashCommandMenu
+  
 } from '@/components/slash-command-menu'
 import { useSettings } from '@/hooks/use-settings'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
-import type {
-  ModelCatalogEntry,
-  ModelSwitchResponse,
-} from '@/lib/model-types'
 import { usePinnedModels } from '@/hooks/use-pinned-models'
 // import { ModeSelector } from '@/components/mode-selector'
 import { cn } from '@/lib/utils'

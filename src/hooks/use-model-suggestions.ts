@@ -17,7 +17,7 @@ type Suggestion = {
 }
 
 // Provider-specific model tiers (fallback when cost metadata unavailable)
-const MODEL_TIERS: Record<string, Record<ModelTier, string[]>> = {
+const MODEL_TIERS: Record<string, Record<ModelTier, Array<string>>> = {
   anthropic: {
     budget: ['claude-3-5-haiku', 'claude-haiku'],
     balanced: ['claude-3-5-sonnet', 'claude-sonnet-4-5'],
@@ -75,7 +75,7 @@ function getProvider(modelId: string): string | null {
 function findModelInTier(
   provider: string,
   tier: ModelTier,
-  availableModels: string[],
+  availableModels: Array<string>,
 ): string | null {
   const providerTiers = MODEL_TIERS[provider]
   if (!providerTiers) return null
@@ -91,7 +91,7 @@ function findModelInTier(
   return null
 }
 
-function isSimpleTask(messages: Message[]): boolean {
+function isSimpleTask(messages: Array<Message>): boolean {
   const recent = messages.slice(-3)
   if (recent.length < 3) return false
 
@@ -131,7 +131,7 @@ function setLastShownTimestamp() {
   }
 }
 
-function getSessionDismissals(): SessionDismissal[] {
+function getSessionDismissals(): Array<SessionDismissal> {
   try {
     const stored = localStorage.getItem('modelSuggestionSessionDismissals')
     return stored ? JSON.parse(stored) : []
@@ -161,8 +161,8 @@ function isSessionDismissed(sessionKey: string): boolean {
 export function useModelSuggestions(_opts: {
   currentModel: string
   sessionKey: string
-  messages: Message[]
-  availableModels: string[]
+  messages: Array<Message>
+  availableModels: Array<string>
 }) {
   // DISABLED: was causing infinite re-render loop (Maximum update depth exceeded)
   // TODO: fix the dependency array / memoization and re-enable
@@ -174,7 +174,7 @@ export function useModelSuggestions(_opts: {
 }
 
 // -ignore -- disabled, will re-enable after fixing deps
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function _useModelSuggestionsDisabled({
   currentModel,
   sessionKey,
@@ -183,8 +183,8 @@ function _useModelSuggestionsDisabled({
 }: {
   currentModel: string
   sessionKey: string
-  messages: Message[]
-  availableModels: string[]
+  messages: Array<Message>
+  availableModels: Array<string>
 }) {
   const { settings } = useSettings()
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
-import { cn } from '@/lib/utils'
+import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
-import { useActivityStore, type ActivityEvent } from './activity-store'
+import {  useActivityStore } from './activity-store'
+import type {ActivityEvent} from './activity-store';
+import { cn } from '@/lib/utils'
 
 const HERMES_API = 'http://localhost:8642'
 
@@ -23,7 +24,7 @@ export const useInspectorStore = create<InspectorStore>((set) => ({
 
 type TabId = 'activity' | 'files' | 'memory' | 'skills' | 'logs'
 
-const TABS: { id: TabId; label: string }[] = [
+const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'activity', label: 'Activity' },
   { id: 'files', label: 'Files' },
   { id: 'memory', label: 'Memory' },
@@ -136,7 +137,7 @@ function FilesTab() {
 // ── Memory Tab ────────────────────────────────────────────────────────────────
 
 function MemoryTab() {
-  const [data, setData] = useState<Record<string, unknown> | unknown[] | null>(null)
+  const [data, setData] = useState<Record<string, unknown> | Array<unknown> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -216,7 +217,7 @@ type SkillItem = {
 }
 
 function SkillsTab() {
-  const [skills, setSkills] = useState<SkillItem[]>([])
+  const [skills, setSkills] = useState<Array<SkillItem>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -250,7 +251,7 @@ function SkillsTab() {
   if (skills.length === 0) return <EmptyState text="No skills found" />
 
   // Group by category
-  const grouped: Record<string, SkillItem[]> = {}
+  const grouped: Record<string, Array<SkillItem>> = {}
   for (const skill of skills) {
     const cat = skill.category || 'Uncategorized'
     if (!grouped[cat]) grouped[cat] = []

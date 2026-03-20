@@ -9,8 +9,8 @@ import {
   Cancel01Icon,
 } from '@hugeicons/core-free-icons'
 import { useNavigate } from '@tanstack/react-router'
-import { useOnboardingStore } from '@/hooks/use-onboarding'
 import { ONBOARDING_STEPS } from './onboarding-steps'
+import { useOnboardingStore } from '@/hooks/use-onboarding'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 

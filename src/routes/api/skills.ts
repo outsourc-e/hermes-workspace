@@ -2,9 +2,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  HERMES_UPGRADE_INSTRUCTIONS,
   ensureGatewayProbed,
   getCapabilities,
-  HERMES_UPGRADE_INSTRUCTIONS,
 } from '../../server/gateway-capabilities'
 import { requireJsonContentType } from '../../server/rate-limit'
 

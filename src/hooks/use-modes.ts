@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSettings } from './use-settings'
 
 export interface Mode {
@@ -13,7 +13,7 @@ export interface Mode {
 
 const STORAGE_KEY = 'hermes-modes'
 
-function loadModes(): Mode[] {
+function loadModes(): Array<Mode> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     return stored ? JSON.parse(stored) : []
@@ -22,7 +22,7 @@ function loadModes(): Mode[] {
   }
 }
 
-function saveModes(modes: Mode[]): void {
+function saveModes(modes: Array<Mode>): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(modes))
   } catch {
@@ -31,7 +31,7 @@ function saveModes(modes: Mode[]): void {
 }
 
 export function useModes() {
-  const [modes, setModes] = useState<Mode[]>(loadModes)
+  const [modes, setModes] = useState<Array<Mode>>(loadModes)
   const [appliedModeId, setAppliedModeId] = useState<string | null>(null)
   const { settings, updateSettings } = useSettings()
 

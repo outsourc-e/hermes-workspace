@@ -4,13 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { chatQueryKeys, fetchHistory } from '../chat-queries'
 import { getMessageTimestamp, textFromMessage } from '../utils'
 import {
+  
   cleanupExpiredPendingSends,
   clearPendingMessage,
   persistPendingMessage,
-  readPendingMessage,
-  type PendingSendPayload,
+  readPendingMessage
 } from '../pending-send'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
+import type {PendingSendPayload} from '../pending-send';
 import type { QueryClient } from '@tanstack/react-query'
 import type { ChatMessage, HistoryResponse } from '../types'
 
@@ -250,9 +251,7 @@ export function useChatHistory({
   const historyQuery = useQuery({
     queryKey: historyKey,
     queryFn: async function fetchHistoryForSession() {
-      const cached = queryClient.getQueryData(historyKey) as
-        | Record<string, unknown>
-        | undefined
+      const cached = queryClient.getQueryData(historyKey)
       const optimisticMessages = Array.isArray((cached as any)?.messages)
         ? (cached as any).messages.filter((message: any) => {
             if (message.status === 'sending') return true

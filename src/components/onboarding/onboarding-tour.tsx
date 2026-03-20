@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Joyride, { ACTIONS, CallBackProps, STATUS, Styles } from 'react-joyride'
+import { useEffect, useState } from 'react'
+import Joyride, { ACTIONS, STATUS } from 'react-joyride'
 import { tourSteps } from './tour-steps'
+import type { CallBackProps, Styles } from 'react-joyride';
 import { useSettingsStore } from '@/hooks/use-settings'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
 
@@ -20,7 +21,7 @@ export function shouldCompleteOnboardingTour(
   action: string,
   status: string,
 ): boolean {
-  const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED]
+  const finishedStatuses: Array<string> = [STATUS.FINISHED, STATUS.SKIPPED]
   return finishedStatuses.includes(status) || action === ACTIONS.CLOSE
 }
 

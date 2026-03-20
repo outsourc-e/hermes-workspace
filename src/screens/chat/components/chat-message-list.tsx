@@ -12,7 +12,6 @@ import {
   Robot01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { hapticTap } from '@/lib/haptics'
 import {
   getMessageTimestamp,
   getToolCallsFromMessage,
@@ -20,7 +19,9 @@ import {
 } from '../utils'
 import { MessageItem } from './message-item'
 import { ScrollToBottomButton } from './scroll-to-bottom-button'
+import { ResearchCard } from './research-card'
 import type { ChatMessage } from '../types'
+import type { UseResearchCardResult } from '@/hooks/use-research-card'
 import {
   ChatContainerContent,
   ChatContainerRoot,
@@ -28,8 +29,7 @@ import {
 } from '@/components/prompt-kit/chat-container'
 import { AssistantAvatar } from '@/components/avatars'
 import { cn } from '@/lib/utils'
-import { ResearchCard } from './research-card'
-import type { UseResearchCardResult } from '@/hooks/use-research-card'
+import { hapticTap } from '@/lib/haptics'
 import { CHAT_OPEN_MESSAGE_SEARCH_EVENT } from '@/screens/chat/chat-events'
 
 /** Duration (ms) the thinking indicator stays visible after waitingForResponse
@@ -626,7 +626,7 @@ function ChatMessageListComponent({
     if (!anchor) return
     const viewport = anchor.closest(
       '[data-chat-scroll-viewport]',
-    ) as HTMLElement | null
+    )
     if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior })
     }
@@ -876,12 +876,12 @@ function ChatMessageListComponent({
 
     const viewport = anchor.closest(
       '[data-chat-scroll-viewport]',
-    ) as HTMLElement | null
+    )
     if (!viewport) return
 
     const escapedMessageId = escapeAttributeSelector(messageId)
     const selector = `[data-chat-message-id="${escapedMessageId}"]`
-    const target = viewport.querySelector(selector) as HTMLElement | null
+    const target = viewport.querySelector(selector)
     if (!target) return
 
     stickToBottomRef.current = false

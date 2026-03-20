@@ -15,7 +15,7 @@ export interface UseResearchCardResult {
   isVisible: boolean
   isActive: boolean
   currentStep: number
-  steps: ResearchStep[]
+  steps: Array<ResearchStep>
   collapsed: boolean
   setCollapsed: (collapsed: boolean) => void
   totalDurationMs: number

@@ -1,4 +1,3 @@
-import { createFileRoute } from '@tanstack/react-router'
 /**
  * Hermes Config API — read/write ~/.hermes/config.yaml and ~/.hermes/.env
  * Gives the web UI the same config power as `hermes setup`
@@ -6,6 +5,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { createFileRoute } from '@tanstack/react-router'
 import YAML from 'yaml'
 import { isAuthenticated } from '../../server/auth-middleware'
 

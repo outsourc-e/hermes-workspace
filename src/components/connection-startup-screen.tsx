@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchHermesAuthStatus, type AuthStatus } from '@/lib/hermes-auth'
+import type {AuthStatus} from '@/lib/hermes-auth';
+import {  fetchHermesAuthStatus } from '@/lib/hermes-auth'
 
 const POLL_INTERVAL_MS = 2_000
 const FAILURE_REVEAL_MS = 5_000
@@ -18,7 +19,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
   const [showFailureState, setShowFailureState] = useState(false)
   const [serverStarting, setServerStarting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
-  const [serverLog, setServerLog] = useState<string[]>([])
+  const [serverLog, setServerLog] = useState<Array<string>>([])
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
 
   const onConnectedRef = useRef(onConnected)

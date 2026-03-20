@@ -14,6 +14,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { Suspense, lazy } from 'react'
+import type { SessionMeta } from '@/screens/chat/types'
+import type { AuthStatus } from '@/lib/hermes-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -30,21 +33,18 @@ import { MobilePageHeader } from '@/components/mobile-page-header'
 import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
 import { HermesHealthBanner } from '@/components/hermes-health-banner'
-import { lazy, Suspense } from 'react'
-
-const TerminalWorkspace = lazy(() =>
-  import('@/components/terminal/terminal-workspace').then((m) => ({
-    default: m.TerminalWorkspace,
-  })),
-)
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
 // System metrics footer removed — not used in Hermes Workspace
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
-import type { SessionMeta } from '@/screens/chat/types'
-import type { AuthStatus } from '@/lib/hermes-auth'
+
+const TerminalWorkspace = lazy(() =>
+  import('@/components/terminal/terminal-workspace').then((m) => ({
+    default: m.TerminalWorkspace,
+  })),
+)
 
 type SessionsListResponse = Array<SessionMeta>
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =

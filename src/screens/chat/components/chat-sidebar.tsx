@@ -1,36 +1,37 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  ArrowDown01Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
-  ArrowDown01Icon,
   BrainIcon,
   Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
   MessageMultiple01Icon,
+  Moon02Icon,
   PencilEdit02Icon,
   PuzzleIcon,
-  Search01Icon,
 
-  Settings01Icon,
+  Search01Icon, Settings01Icon, Sun02Icon 
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
-  CHAT_OPEN_SETTINGS_EVENT,
-  type ChatOpenSettingsDetail,
+  CHAT_OPEN_SETTINGS_EVENT
+  
 } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
 import { useRenameSession } from '../hooks/use-rename-session'
-import { SettingsDialog } from '@/components/settings-dialog'
 import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
+import type {ChatOpenSettingsDetail} from '../chat-events';
 import type { SessionMeta } from '../types'
+import { SettingsDialog } from '@/components/settings-dialog'
 import {
   TooltipContent,
   TooltipProvider,
@@ -48,13 +49,13 @@ import {
 } from '@/hooks/use-chat-settings'
 import { StatusDot } from '@/components/status-indicator'
 import {
-  MenuRoot,
-  MenuTrigger,
   MenuContent,
   MenuItem,
+  MenuRoot,
+  MenuTrigger,
 } from '@/components/ui/menu'
-import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+
 type WorkspaceStats = Record<string, unknown>
 
 function ThemeToggleMini() {
@@ -145,7 +146,7 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   }
 }
 
-export async function fetchWorkspaceProjectShortcuts(): Promise<never[]> {
+export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
   return []
 }
 
@@ -418,7 +419,7 @@ function CollapsibleSection({
   onSelectSession,
 }: {
   expanded: boolean
-  items: NavItemDef[]
+  items: Array<NavItemDef>
   isCollapsed: boolean
   transition: Record<string, unknown>
   onSelectSession?: () => void
@@ -743,7 +744,7 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
-  const mainItems: NavItemDef[] = [
+  const mainItems: Array<NavItemDef> = [
     {
       kind: 'link',
       to: '/chat',
@@ -774,7 +775,7 @@ function ChatSidebarComponent({
     },
   ]
 
-  const knowledgeItems: NavItemDef[] = [
+  const knowledgeItems: Array<NavItemDef> = [
     {
       kind: 'link',
       to: '/memory',
@@ -792,7 +793,7 @@ function ChatSidebarComponent({
     },
   ]
 
-  const systemItems: NavItemDef[] = []
+  const systemItems: Array<NavItemDef> = []
 
   return (
     <motion.aside

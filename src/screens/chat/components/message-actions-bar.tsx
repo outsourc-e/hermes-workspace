@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Copy01Icon,
-  Tick02Icon,
   RefreshIcon,
+  Tick02Icon,
 } from '@hugeicons/core-free-icons'
 import { MessageTimestamp } from './message-timestamp'
 import {

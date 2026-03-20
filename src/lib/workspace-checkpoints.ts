@@ -87,8 +87,8 @@ export type WorkspaceCheckpointDetail = WorkspaceCheckpoint & {
   task_run_input_tokens: number | null
   task_run_output_tokens: number | null
   task_run_cost_cents: number | null
-  run_events: WorkspaceCheckpointRunEvent[]
-  diff_files: WorkspaceCheckpointDiffFile[]
+  run_events: Array<WorkspaceCheckpointRunEvent>
+  diff_files: Array<WorkspaceCheckpointDiffFile>
   verification: WorkspaceCheckpointVerificationMap
 }
 
@@ -546,7 +546,7 @@ export function getCheckpointFullSummary(checkpoint: WorkspaceCheckpoint): strin
 
 export interface ParsedDiffStat {
   raw: string
-  changedFiles: string[]
+  changedFiles: Array<string>
   filesChanged: number
 }
 
@@ -556,7 +556,7 @@ export function getCheckpointDiffStatParsed(checkpoint: WorkspaceCheckpoint): Pa
     const parsed = JSON.parse(checkpoint.diff_stat) as Record<string, unknown>
     return {
       raw: typeof parsed.raw === 'string' ? parsed.raw : '',
-      changedFiles: Array.isArray(parsed.changed_files) ? (parsed.changed_files as string[]) : [],
+      changedFiles: Array.isArray(parsed.changed_files) ? (parsed.changed_files as Array<string>) : [],
       filesChanged: typeof parsed.files_changed === 'number' ? parsed.files_changed : 0,
     }
   } catch {

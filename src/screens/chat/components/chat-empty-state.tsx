@@ -13,7 +13,7 @@ type SuggestionChip = {
   icon: unknown
 }
 
-const SUGGESTIONS: SuggestionChip[] = [
+const SUGGESTIONS: Array<SuggestionChip> = [
   {
     label: 'Analyze workspace',
     prompt: 'Analyze this workspace structure and give me 3 engineering risks. Use tools and keep it concise.',

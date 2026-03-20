@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Home01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, Home01Icon } from '@hugeicons/core-free-icons'
+import { usePageTitle } from '@/hooks/use-page-title'
 import { buttonVariants } from '@/components/ui/button'
 
 export const Route = createFileRoute('/$')({

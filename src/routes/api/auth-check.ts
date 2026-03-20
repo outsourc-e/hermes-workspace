@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import {
-  isPasswordProtectionEnabled,
   isAuthenticated,
+  isPasswordProtectionEnabled,
 } from '../../server/auth-middleware'
 
 export const Route = createFileRoute('/api/auth-check')({

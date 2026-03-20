@@ -125,7 +125,7 @@ export function useTapDebug(
         eventTarget instanceof Element
           ? eventTarget
           : eventTarget instanceof Node
-            ? (eventTarget as Node).parentElement
+            ? (eventTarget).parentElement
             : null
 
       console.debug(`[tap-debug:${label}]`, {

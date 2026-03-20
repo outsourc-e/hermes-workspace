@@ -1,18 +1,18 @@
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { cn } from '@/lib/utils'
-import { useModes } from '@/hooks/use-modes'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveModeDialog } from './save-mode-dialog'
 import { ManageModesModal } from './manage-modes-modal'
 import { ApplyModeDialog } from './apply-mode-dialog'
 import type { Mode } from '@/hooks/use-modes'
+import { useModes } from '@/hooks/use-modes'
+import { cn } from '@/lib/utils'
 
 type ModeSelectorProps = {
   currentModel: string
   onModelSwitch: (modelId: string) => void
   disabled?: boolean
-  availableModels: string[]
+  availableModels: Array<string>
   isStreaming?: boolean
 }
 

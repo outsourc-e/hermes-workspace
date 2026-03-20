@@ -1,15 +1,15 @@
-import type { HugeiconsIcon } from '@hugeicons/react'
 import {
   CheckmarkCircle02Icon,
   Home01Icon,
   Plug01Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import type * as React from 'react'
 import {
   ConnectionCheckStep,
   ModelConfigurationStep,
 } from './setup-step-content'
+import type { HugeiconsIcon } from '@hugeicons/react'
+import type * as React from 'react'
 
 type IconType = React.ComponentProps<typeof HugeiconsIcon>['icon']
 
@@ -29,7 +29,7 @@ export type OnboardingStep = {
   canProceedByDefault?: boolean
 }
 
-export const ONBOARDING_STEPS: OnboardingStep[] = [
+export const ONBOARDING_STEPS: Array<OnboardingStep> = [
   {
     id: 'welcome',
     title: 'Welcome to Hermes Workspace',

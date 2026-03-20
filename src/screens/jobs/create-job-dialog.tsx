@@ -24,8 +24,8 @@ type CreateJobDialogProps = {
     name: string
     schedule: string
     prompt: string
-    deliver?: string[]
-    skills?: string[]
+    deliver?: Array<string>
+    skills?: Array<string>
     repeat?: number
   }) => void | Promise<void>
 }
@@ -36,7 +36,7 @@ function getInitialState() {
     schedule: 'every 30m',
     prompt: '',
     skillsInput: '',
-    deliver: ['local'] as string[],
+    deliver: ['local'] as Array<string>,
     repeatMode: 'unlimited' as 'unlimited' | 'limited',
     repeatCount: '1',
   }

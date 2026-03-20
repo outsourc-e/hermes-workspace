@@ -1,12 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 
 /** Same resolution logic as vite.config.ts — must stay in sync */
 function resolveHermesAgentDir(): string | null {
-  const candidates: string[] = []
+  const candidates: Array<string> = []
 
   // 1. Explicit env override
   if (process.env.HERMES_AGENT_PATH?.trim()) {

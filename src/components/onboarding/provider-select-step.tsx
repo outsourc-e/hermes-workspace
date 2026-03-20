@@ -1,17 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import {
+  Alert02Icon,
+  CheckmarkCircle02Icon,
+  Copy01Icon,
+  ViewIcon,
+  ViewOffIcon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  CheckmarkCircle02Icon,
-  Alert02Icon,
-  ViewIcon,
-  ViewOffIcon,
-  Copy01Icon,
-} from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 
 /* ── Provider Definitions ── */
 
@@ -62,7 +62,7 @@ function OpenAILogo({ className }: { className?: string }) {
   )
 }
 
-const PROVIDERS: Provider[] = [
+const PROVIDERS: Array<Provider> = [
   {
     id: 'anthropic',
     name: 'Anthropic (Claude)',

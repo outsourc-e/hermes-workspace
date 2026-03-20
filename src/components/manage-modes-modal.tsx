@@ -1,12 +1,12 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { cn } from '@/lib/utils'
-import { useModes } from '@/hooks/use-modes'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { RenameDialog } from './rename-mode-dialog'
 import type { Mode } from '@/hooks/use-modes'
+import { cn } from '@/lib/utils'
+import { useModes } from '@/hooks/use-modes'
 
 type ManageModesModalProps = {
   onClose: () => void
-  availableModels: string[]
+  availableModels: Array<string>
 }
 
 export function ManageModesModal({

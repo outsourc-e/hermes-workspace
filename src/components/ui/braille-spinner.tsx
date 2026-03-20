@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 //   7 8
 // Bit mapping: d1=0x01, d2=0x02, d3=0x04, d4=0x08, d5=0x10, d6=0x20, d7=0x40, d8=0x80
 
-function braille(...dots: number[]): string {
+function braille(...dots: Array<number>): string {
   let bits = 0
   for (const d of dots) bits |= d
   return String.fromCharCode(0x2800 + bits)
@@ -27,7 +27,7 @@ const D5 = 0x10,
   D7 = 0x40,
   D8 = 0x80
 
-const PRESETS: Record<string, string[]> = {
+const PRESETS: Record<string, Array<string>> = {
   // Classic rotating braille spinner
   braille: '⠿⠧⠇⠏⠟⠻⠹⠸⠼⠾'.split(''),
 
@@ -132,7 +132,7 @@ function BrailleSpinnerComponent({
   const [frame, setFrame] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const frames = PRESETS[preset] ?? PRESETS.hermes!
+  const frames = PRESETS[preset] ?? PRESETS.hermes
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
