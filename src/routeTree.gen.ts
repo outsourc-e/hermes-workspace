@@ -33,14 +33,11 @@ import { Route as ApiSessionStatusRouteImport } from './routes/api/session-statu
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
-import { Route as ApiOpenclawUpdateRouteImport } from './routes/api/openclaw-update'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
-import { Route as ApiGatewayDiscoverRouteImport } from './routes/api/gateway-discover'
-import { Route as ApiGatewayConfigRouteImport } from './routes/api/gateway-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
@@ -54,10 +51,6 @@ import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
 import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
-import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
-import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/status'
-import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
-import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 
 const TerminalRoute = TerminalRouteImport.update({
@@ -180,11 +173,6 @@ const ApiPathsRoute = ApiPathsRouteImport.update({
   path: '/api/paths',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOpenclawUpdateRoute = ApiOpenclawUpdateRouteImport.update({
-  id: '/api/openclaw-update',
-  path: '/api/openclaw-update',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
   id: '/api/models',
   path: '/api/models',
@@ -208,16 +196,6 @@ const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
 const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   id: '/api/gateway-status',
   path: '/api/gateway-status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayDiscoverRoute = ApiGatewayDiscoverRouteImport.update({
-  id: '/api/gateway-discover',
-  path: '/api/gateway-discover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayConfigRoute = ApiGatewayConfigRouteImport.update({
-  id: '/api/gateway-config',
-  path: '/api/gateway-config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
@@ -285,26 +263,6 @@ const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiHermesJobsRoute,
 } as any)
-const ApiBrowserTabsRoute = ApiBrowserTabsRouteImport.update({
-  id: '/api/browser/tabs',
-  path: '/api/browser/tabs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBrowserStatusRoute = ApiBrowserStatusRouteImport.update({
-  id: '/api/browser/status',
-  path: '/api/browser/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBrowserScreenshotRoute = ApiBrowserScreenshotRouteImport.update({
-  id: '/api/browser/screenshot',
-  path: '/api/browser/screenshot',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBrowserNavigateRoute = ApiBrowserNavigateRouteImport.update({
-  id: '/api/browser/navigate',
-  path: '/api/browser/navigate',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -326,14 +284,11 @@ export interface FileRoutesByFullPath {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
-  '/api/gateway-config': typeof ApiGatewayConfigRoute
-  '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
-  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -350,10 +305,6 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
-  '/api/browser/status': typeof ApiBrowserStatusRoute
-  '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
@@ -377,14 +328,11 @@ export interface FileRoutesByTo {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
-  '/api/gateway-config': typeof ApiGatewayConfigRoute
-  '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
-  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -401,10 +349,6 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
-  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
-  '/api/browser/status': typeof ApiBrowserStatusRoute
-  '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
@@ -430,14 +374,11 @@ export interface FileRoutesById {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/files': typeof ApiFilesRoute
-  '/api/gateway-config': typeof ApiGatewayConfigRoute
-  '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
-  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -454,10 +395,6 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
-  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
-  '/api/browser/status': typeof ApiBrowserStatusRoute
-  '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
@@ -484,14 +421,11 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/context-usage'
     | '/api/files'
-    | '/api/gateway-config'
-    | '/api/gateway-discover'
     | '/api/gateway-status'
     | '/api/hermes-config'
     | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
-    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/send'
     | '/api/send-stream'
@@ -508,10 +442,6 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
-    | '/api/browser/navigate'
-    | '/api/browser/screenshot'
-    | '/api/browser/status'
-    | '/api/browser/tabs'
     | '/api/hermes-jobs/$jobId'
     | '/api/memory/list'
     | '/api/memory/read'
@@ -535,14 +465,11 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/context-usage'
     | '/api/files'
-    | '/api/gateway-config'
-    | '/api/gateway-discover'
     | '/api/gateway-status'
     | '/api/hermes-config'
     | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
-    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/send'
     | '/api/send-stream'
@@ -559,10 +486,6 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat'
     | '/settings'
-    | '/api/browser/navigate'
-    | '/api/browser/screenshot'
-    | '/api/browser/status'
-    | '/api/browser/tabs'
     | '/api/hermes-jobs/$jobId'
     | '/api/memory/list'
     | '/api/memory/read'
@@ -587,14 +510,11 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/context-usage'
     | '/api/files'
-    | '/api/gateway-config'
-    | '/api/gateway-discover'
     | '/api/gateway-status'
     | '/api/hermes-config'
     | '/api/hermes-jobs'
     | '/api/history'
     | '/api/models'
-    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/send'
     | '/api/send-stream'
@@ -611,10 +531,6 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
-    | '/api/browser/navigate'
-    | '/api/browser/screenshot'
-    | '/api/browser/status'
-    | '/api/browser/tabs'
     | '/api/hermes-jobs/$jobId'
     | '/api/memory/list'
     | '/api/memory/read'
@@ -640,14 +556,11 @@ export interface RootRouteChildren {
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiFilesRoute: typeof ApiFilesRoute
-  ApiGatewayConfigRoute: typeof ApiGatewayConfigRoute
-  ApiGatewayDiscoverRoute: typeof ApiGatewayDiscoverRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHermesJobsRoute: typeof ApiHermesJobsRouteWithChildren
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelsRoute: typeof ApiModelsRoute
-  ApiOpenclawUpdateRoute: typeof ApiOpenclawUpdateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
@@ -662,10 +575,6 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
-  ApiBrowserNavigateRoute: typeof ApiBrowserNavigateRoute
-  ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
-  ApiBrowserStatusRoute: typeof ApiBrowserStatusRoute
-  ApiBrowserTabsRoute: typeof ApiBrowserTabsRoute
   ApiMemoryListRoute: typeof ApiMemoryListRoute
   ApiMemoryReadRoute: typeof ApiMemoryReadRoute
   ApiMemorySearchRoute: typeof ApiMemorySearchRoute
@@ -844,13 +753,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPathsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/openclaw-update': {
-      id: '/api/openclaw-update'
-      path: '/api/openclaw-update'
-      fullPath: '/api/openclaw-update'
-      preLoaderRoute: typeof ApiOpenclawUpdateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/models': {
       id: '/api/models'
       path: '/api/models'
@@ -884,20 +786,6 @@ declare module '@tanstack/react-router' {
       path: '/api/gateway-status'
       fullPath: '/api/gateway-status'
       preLoaderRoute: typeof ApiGatewayStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway-discover': {
-      id: '/api/gateway-discover'
-      path: '/api/gateway-discover'
-      fullPath: '/api/gateway-discover'
-      preLoaderRoute: typeof ApiGatewayDiscoverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway-config': {
-      id: '/api/gateway-config'
-      path: '/api/gateway-config'
-      fullPath: '/api/gateway-config'
-      preLoaderRoute: typeof ApiGatewayConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -991,34 +879,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesJobsJobIdRouteImport
       parentRoute: typeof ApiHermesJobsRoute
     }
-    '/api/browser/tabs': {
-      id: '/api/browser/tabs'
-      path: '/api/browser/tabs'
-      fullPath: '/api/browser/tabs'
-      preLoaderRoute: typeof ApiBrowserTabsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/browser/status': {
-      id: '/api/browser/status'
-      path: '/api/browser/status'
-      fullPath: '/api/browser/status'
-      preLoaderRoute: typeof ApiBrowserStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/browser/screenshot': {
-      id: '/api/browser/screenshot'
-      path: '/api/browser/screenshot'
-      fullPath: '/api/browser/screenshot'
-      preLoaderRoute: typeof ApiBrowserScreenshotRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/browser/navigate': {
-      id: '/api/browser/navigate'
-      path: '/api/browser/navigate'
-      fullPath: '/api/browser/navigate'
-      preLoaderRoute: typeof ApiBrowserNavigateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -1083,14 +943,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiFilesRoute: ApiFilesRoute,
-  ApiGatewayConfigRoute: ApiGatewayConfigRoute,
-  ApiGatewayDiscoverRoute: ApiGatewayDiscoverRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHermesJobsRoute: ApiHermesJobsRouteWithChildren,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelsRoute: ApiModelsRoute,
-  ApiOpenclawUpdateRoute: ApiOpenclawUpdateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
@@ -1105,10 +962,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
-  ApiBrowserNavigateRoute: ApiBrowserNavigateRoute,
-  ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,
-  ApiBrowserStatusRoute: ApiBrowserStatusRoute,
-  ApiBrowserTabsRoute: ApiBrowserTabsRoute,
   ApiMemoryListRoute: ApiMemoryListRoute,
   ApiMemoryReadRoute: ApiMemoryReadRoute,
   ApiMemorySearchRoute: ApiMemorySearchRoute,
