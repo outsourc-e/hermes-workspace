@@ -1,11 +1,42 @@
 import { useEffect, useRef, useState } from 'react'
-import type {AuthStatus} from '@/lib/hermes-auth';
-import {  fetchHermesAuthStatus } from '@/lib/hermes-auth'
+import type { AuthStatus } from '@/lib/hermes-auth'
+import { fetchHermesAuthStatus } from '@/lib/hermes-auth'
 
 const POLL_INTERVAL_MS = 2_000
 const FAILURE_REVEAL_MS = 5_000
-const START_COMMAND =
-  'cd ~/.openclaw/workspace/hermes-agent && .venv/bin/python -m uvicorn webapi.app:app --host 0.0.0.0 --port 8642'
+
+type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
+
+function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'unknown'
+  const ua = navigator.userAgent.toLowerCase()
+  if (ua.includes('win')) return 'windows'
+  if (ua.includes('mac')) return 'macos'
+  if (ua.includes('linux')) return 'linux'
+  return 'unknown'
+}
+
+function getSetupSteps(platform: Platform): Array<{ title: string; command: string; note?: string }> {
+  const pip = platform === 'windows' ? 'pip' : 'pip3'
+  const python = platform === 'windows' ? 'python' : 'python3'
+
+  return [
+    {
+      title: 'Clone Hermes Agent (with WebAPI)',
+      command: 'git clone https://github.com/outsourc-e/hermes-agent.git',
+      note: 'Clone as a sibling to hermes-workspace for auto-discovery',
+    },
+    {
+      title: 'Install dependencies',
+      command: `cd hermes-agent && ${python} -m venv .venv && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${pip} install -e ".[webapi]"`,
+    },
+    {
+      title: 'Start the WebAPI server',
+      command: `cd hermes-agent && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${python} -m uvicorn webapi.app:app --host 0.0.0.0 --port 8642`,
+      note: 'Or click "Start Server" below if hermes-agent is already installed',
+    },
+  ]
+}
 
 type Props = { onConnected: (status: AuthStatus) => void }
 
@@ -20,7 +51,11 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
   const [serverStarting, setServerStarting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [serverLog, setServerLog] = useState<Array<string>>([])
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const [showManual, setShowManual] = useState(false)
+
+  const platform = useRef<Platform>(detectPlatform())
+  const steps = getSetupSteps(platform.current)
 
   const onConnectedRef = useRef(onConnected)
   useEffect(() => {
@@ -71,17 +106,68 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
   }, [])
 
   useEffect(() => {
-    if (copyState === 'idle') return
-    const timer = setTimeout(() => setCopyState('idle'), 2_000)
+    if (copiedIdx === null) return
+    const timer = setTimeout(() => setCopiedIdx(null), 2_000)
     return () => clearTimeout(timer)
-  }, [copyState])
+  }, [copiedIdx])
+
+  const handleCopy = async (text: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedIdx(idx)
+    } catch {
+      /* clipboard not available */
+    }
+  }
+
+  const handleAutoStart = async () => {
+    setServerStarting(true)
+    setServerError(null)
+    setServerLog(['Looking for hermes-agent...'])
+    try {
+      const res = await fetch('/api/start-hermes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('application/json')) {
+        const msg = `Unexpected response (${res.status})`
+        setServerLog([`Error: ${msg}`])
+        setServerError(msg)
+        setServerStarting(false)
+        return
+      }
+
+      const data = (await res.json()) as Record<string, unknown>
+      if (res.ok && data.ok) {
+        setServerLog([String(data.message || 'Started — waiting for connection...')])
+        setServerStarting(false)
+        return
+      }
+
+      const msg = String(data.error || 'Could not find hermes-agent')
+      const hint = data.hint ? String(data.hint) : ''
+      setServerLog([`Error: ${msg}`])
+      if (hint) setServerLog((prev) => [...prev, `Hint: ${hint}`])
+      setServerError(msg)
+      setServerStarting(false)
+      // Show manual steps when auto-start fails
+      setShowManual(true)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setServerLog([`Failed: ${msg}`])
+      setServerError(msg)
+      setServerStarting(false)
+      setShowManual(true)
+    }
+  }
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center px-6 text-white"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-white"
       style={{ backgroundColor: '#0A0E1A', fontFamily: 'Inter, system-ui, sans-serif' }}
     >
-      <div className="flex w-full max-w-md flex-col items-center text-center">
+      <div className="flex w-full max-w-lg flex-col items-center text-center">
         <img
           src="/hermes-avatar.webp"
           alt="Hermes"
@@ -92,10 +178,11 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           Hermes Workspace
         </h1>
 
+        {/* Connecting spinner */}
         <div
           className={[
             'mt-4 flex items-center gap-3 text-sm text-white/72 transition-opacity duration-300',
-            showFailureState ? 'opacity-0' : 'opacity-100',
+            showFailureState ? 'opacity-0 h-0' : 'opacity-100',
           ].join(' ')}
           aria-hidden={showFailureState}
         >
@@ -103,139 +190,127 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           <span>Connecting to Hermes Agent...</span>
         </div>
 
+        {/* Failure state — setup guide */}
         <div
           className={[
             'w-full overflow-hidden transition-all duration-500 ease-out',
             showFailureState
-              ? 'mt-6 max-h-[28rem] translate-y-0 opacity-100'
+              ? 'mt-6 max-h-[60rem] translate-y-0 opacity-100'
               : 'max-h-0 translate-y-2 opacity-0',
           ].join(' ')}
         >
           <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-sm">
             <p className="text-base font-medium text-white">
-              Hermes Agent is not running
+              Welcome! Let's connect to Hermes Agent
             </p>
-            <p className="mt-2 text-sm leading-6 text-white/70">
-              This screen will dismiss automatically when Hermes Agent is detected.
+            <p className="mt-2 text-sm leading-6 text-white/60">
+              Hermes Workspace needs a running Hermes Agent backend.
+              {' '}This page will auto-refresh when a connection is detected.
             </p>
 
-            {(serverStarting || serverLog.length > 0) ? (
-              <div
-                className={[
-                  'mt-4 w-full rounded-2xl border p-4',
-                  serverError ? 'border-red-500/30 bg-red-950/40' : 'border-white/10 bg-black/30',
-                ].join(' ')}
-              >
-                <div className="mb-2 flex items-center gap-2">
-                  {serverStarting ? (
-                    <div className="h-3 w-3 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
-                  ) : serverError ? (
-                    <span className="text-red-300">x</span>
-                  ) : (
-                    <span className="text-emerald-300">+</span>
-                  )}
-                  <span
-                    className={[
-                      'text-xs font-medium',
-                      serverError ? 'text-red-300' : 'text-emerald-300',
-                    ].join(' ')}
-                  >
-                    {serverStarting
-                      ? 'Starting Hermes Agent...'
-                      : serverError
-                        ? 'Failed to start Hermes Agent'
-                        : 'Launch requested. Waiting for health check...'}
-                  </span>
-                </div>
-
-                <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-5 text-white/72">
-                  {serverLog.slice(-8).join('\n')}
-                </pre>
-              </div>
-            ) : null}
-
-            <pre className="mt-4 overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-xs leading-6 text-white/92 sm:text-sm">
-              <code>{START_COMMAND}</code>
-            </pre>
-
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            {/* Auto-start section */}
+            <div className="mt-5">
               <button
                 type="button"
                 disabled={serverStarting}
-                onClick={async () => {
-                  setServerStarting(true)
-                  setServerError(null)
-                  setServerLog(['Launching Hermes Agent...'])
-                  try {
-                    const res = await fetch('/api/start-hermes', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                    })
-                    const contentType = res.headers.get('content-type') || ''
-                    if (!contentType.includes('application/json')) {
-                      const msg = `Unexpected response (${res.status}) - is pnpm dev on the right port?`
-                      setServerLog([`Error: ${msg}`])
-                      setServerError(msg)
-                      setServerStarting(false)
-                      return
-                    }
-
-                    const data = (await res.json()) as Record<string, unknown>
-                    if (res.ok && data.ok) {
-                      setServerLog([
-                        String(data.message || 'Process launched - waiting for health check...'),
-                      ])
-                      setServerStarting(false)
-                      return
-                    }
-
-                    const msg = String(data.error || 'Unknown error')
-                    const hint = data.hint ? `\nHint: ${String(data.hint)}` : ''
-                    setServerLog([`Error: ${msg}${hint}`])
-                    setServerError(msg)
-                    setServerStarting(false)
-                  } catch (err) {
-                    const msg = err instanceof Error ? err.message : String(err)
-                    setServerLog([`Failed: ${msg}`])
-                    setServerError(msg)
-                    setServerStarting(false)
-                  }
-                }}
+                onClick={handleAutoStart}
                 className={[
-                  'rounded-xl px-5 py-2.5 text-sm font-semibold transition',
+                  'w-full rounded-xl px-5 py-3 text-sm font-semibold transition',
                   serverStarting
-                    ? 'cursor-not-allowed bg-emerald-900/70 text-emerald-200'
-                    : 'bg-emerald-500 text-white hover:bg-emerald-400',
+                    ? 'cursor-not-allowed bg-indigo-900/70 text-indigo-200'
+                    : 'bg-indigo-500 text-white hover:bg-indigo-400',
                 ].join(' ')}
               >
-                {serverStarting ? 'Starting...' : 'Start Server'}
+                {serverStarting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white/90" />
+                    Detecting...
+                  </span>
+                ) : (
+                  '⚡ Auto-Start (detect & launch)'
+                )}
               </button>
 
+              {/* Server log */}
+              {serverLog.length > 0 ? (
+                <div
+                  className={[
+                    'mt-3 rounded-xl border p-3',
+                    serverError ? 'border-red-500/20 bg-red-950/30' : 'border-emerald-500/20 bg-emerald-950/30',
+                  ].join(' ')}
+                >
+                  <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-white/70">
+                    {serverLog.join('\n')}
+                  </pre>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Divider */}
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
               <button
                 type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(START_COMMAND)
-                    setCopyState('copied')
-                  } catch {
-                    setCopyState('failed')
-                  }
-                }}
-                className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+                onClick={() => setShowManual(!showManual)}
+                className="text-xs font-medium text-white/50 transition hover:text-white/70"
               >
-                {copyState === 'copied'
-                  ? 'Copied'
-                  : copyState === 'failed'
-                    ? 'Copy Failed'
-                    : 'Copy Command'}
+                {showManual ? 'Hide' : 'Show'} manual setup
               </button>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            {/* Manual setup steps */}
+            <div
+              className={[
+                'overflow-hidden transition-all duration-300',
+                showManual ? 'max-h-[40rem] opacity-100' : 'max-h-0 opacity-0',
+              ].join(' ')}
+            >
+              <div className="space-y-4">
+                {steps.map((step, idx) => (
+                  <div key={idx} className="rounded-xl border border-white/8 bg-black/20 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-300">
+                          {idx + 1}
+                        </span>
+                        <span className="text-sm font-medium text-white/90">{step.title}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(step.command, idx)}
+                        className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white/80"
+                      >
+                        {copiedIdx === idx ? '✓ Copied' : 'Copy'}
+                      </button>
+                    </div>
+                    <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-3 font-mono text-xs leading-5 text-white/80">
+                      <code>{step.command}</code>
+                    </pre>
+                    {step.note ? (
+                      <p className="mt-2 text-xs text-white/40">{step.note}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+
+              {/* Env var hint */}
+              <div className="mt-4 rounded-xl border border-white/6 bg-white/3 p-3">
+                <p className="text-xs font-medium text-white/50">
+                  Custom setup? Set <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">HERMES_API_URL</code> to
+                  point to your Hermes Agent:
+                </p>
+                <pre className="mt-2 overflow-x-auto font-mono text-xs text-white/60">
+                  HERMES_API_URL=http://your-server:8642 pnpm dev
+                </pre>
+              </div>
             </div>
           </div>
         </div>
 
         {!showFailureState ? (
           <p className="mt-6 text-xs text-white/45">
-            This screen will dismiss automatically when Hermes Agent is detected
+            This page auto-refreshes when Hermes Agent is detected
           </p>
         ) : null}
       </div>
