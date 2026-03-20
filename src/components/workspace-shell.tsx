@@ -240,18 +240,6 @@ export function WorkspaceShell() {
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
   }, [isMobile, setSidebarCollapsed, toggleSidebar])
 
-  // Show loading indicator while checking auth
-  if (!authState.checked) {
-    return (
-      <div
-        className="relative h-screen overflow-hidden theme-bg theme-text"
-        style={{ height: 'var(--vvh, 100dvh)' }}
-      >
-        <ConnectionStartupScreen onConnected={handleStartupConnected} />
-      </div>
-    )
-  }
-
   // Show login screen if auth is required and not authenticated
   if (authState.authRequired && !authState.authenticated) {
     return <LoginScreen />
@@ -382,6 +370,10 @@ export function WorkspaceShell() {
             onClick={() => setSidebarCollapsed(true)}
             className={DESKTOP_SIDEBAR_BACKDROP_CLASS}
           />
+        ) : null}
+
+        {!authState.checked ? (
+          <ConnectionStartupScreen onConnected={handleStartupConnected} />
         ) : null}
       </div>
 
