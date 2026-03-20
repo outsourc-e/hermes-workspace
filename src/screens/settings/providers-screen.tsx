@@ -5,6 +5,28 @@ import {
   Edit01Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
+
+/**
+ * Strip the provider prefix that hermes-agent adds internally via litellm.
+ * e.g. "openrouter/nvidia/nemotron-..." → "nvidia/nemotron-..."
+ *      "anthropic/claude-3-5-sonnet"    → "claude-3-5-sonnet"
+ * Only strips the first path segment if it matches a known provider ID.
+ */
+const KNOWN_PROVIDER_PREFIXES = [
+  'openrouter', 'anthropic', 'openai', 'openai-codex', 'nous',
+  'ollama', 'zai', 'kimi-coding', 'minimax', 'minimax-cn',
+]
+
+function stripProviderPrefix(model: string): string {
+  if (!model) return model
+  const slash = model.indexOf('/')
+  if (slash === -1) return model
+  const prefix = model.slice(0, slash)
+  if (KNOWN_PROVIDER_PREFIXES.includes(prefix)) {
+    return model.slice(slash + 1)
+  }
+  return model
+}
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
@@ -729,11 +751,12 @@ function ActiveModelCard() {
   async function handleSave() {
     setSaving(true)
     try {
+      const normalizedModel = stripProviderPrefix(model.trim())
       const res = await fetch(`${HERMES_API_URL_LOCAL}/api/config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: model.trim() || undefined,
+          model: normalizedModel || undefined,
           provider: provider.trim() || undefined,
           base_url: baseUrl.trim() || '',
         }),

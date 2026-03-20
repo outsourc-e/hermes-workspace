@@ -5,6 +5,28 @@ import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { ProviderLogo } from '@/components/provider-logo'
 
+/**
+ * Strip the provider prefix that hermes-agent adds internally via litellm.
+ * e.g. "openrouter/nvidia/nemotron-..." → "nvidia/nemotron-..."
+ *      "anthropic/claude-3-5-sonnet"    → "claude-3-5-sonnet"
+ * Only strips the first path segment if it matches a known provider ID.
+ */
+const KNOWN_PROVIDER_PREFIXES = [
+  'openrouter', 'anthropic', 'openai', 'openai-codex', 'nous',
+  'ollama', 'zai', 'kimi-coding', 'minimax', 'minimax-cn',
+]
+
+function stripProviderPrefix(model: string): string {
+  if (!model) return model
+  const slash = model.indexOf('/')
+  if (slash === -1) return model
+  const prefix = model.slice(0, slash)
+  if (KNOWN_PROVIDER_PREFIXES.includes(prefix)) {
+    return model.slice(slash + 1)
+  }
+  return model
+}
+
 const ONBOARDING_KEY = 'hermes-onboarding-complete'
 
 type Step = 'welcome' | 'connect' | 'provider' | 'test' | 'done'
@@ -133,12 +155,13 @@ export function HermesOnboarding() {
   const saveModelSelection = useCallback(async () => {
     if (!selectedModel) return
     try {
+      const normalizedModel = stripProviderPrefix(selectedModel)
       await fetch('/api/hermes-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: { model: { provider: selectedProvider, default: selectedModel } } }),
+        body: JSON.stringify({ config: { model: { provider: selectedProvider, default: normalizedModel } } }),
       })
-      setConfiguredModel(selectedModel)
+      setConfiguredModel(normalizedModel)
     } catch {}
   }, [selectedModel, selectedProvider])
 

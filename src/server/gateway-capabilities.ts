@@ -68,6 +68,11 @@ function summarizeCapabilities(next: GatewayCapabilities): {
   return { available, missing }
 }
 
+// APIs that are optional and do not warrant an upgrade warning when absent.
+// The jobs endpoint is not implemented in all Hermes versions; the UI already
+// handles its absence gracefully (returns an empty list instead of 404).
+const OPTIONAL_APIS = new Set(['jobs'])
+
 function logCapabilities(next: GatewayCapabilities): void {
   const { available, missing } = summarizeCapabilities(next)
   const summary =
@@ -75,7 +80,8 @@ function logCapabilities(next: GatewayCapabilities): void {
   if (summary === lastLoggedSummary) return
   lastLoggedSummary = summary
   console.log(summary)
-  if (missing.length > 0) {
+  const criticalMissing = missing.filter((key) => !OPTIONAL_APIS.has(key))
+  if (criticalMissing.length > 0) {
     console.warn(
       `[gateway] Missing Hermes APIs detected. ${HERMES_UPGRADE_INSTRUCTIONS}`,
     )

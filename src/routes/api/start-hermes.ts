@@ -1,8 +1,39 @@
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, resolve, join } from 'node:path'
+import { homedir } from 'node:os'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
+
+/**
+ * Read ~/.hermes/.env and return key=value pairs as an object.
+ * Silently returns {} if the file doesn't exist or can't be parsed.
+ */
+function readHermesEnv(): Record<string, string> {
+  const envPath = join(homedir(), '.hermes', '.env')
+  try {
+    const raw = readFileSync(envPath, 'utf-8')
+    const result: Record<string, string> = {}
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eqIdx = trimmed.indexOf('=')
+      if (eqIdx <= 0) continue
+      const key = trimmed.slice(0, eqIdx).trim()
+      let value = trimmed.slice(eqIdx + 1).trim()
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1)
+      }
+      if (key) result[key] = value
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
 
 /** Same resolution logic as vite.config.ts — must stay in sync */
 function resolveHermesAgentDir(): string | null {
@@ -68,6 +99,9 @@ export const Route = createFileRoute('/api/start-hermes')({
 
           const python = resolveHermesPython(agentDir)
 
+          // Source ~/.hermes/.env so API keys set via the UI are available
+          const hermesEnv = readHermesEnv()
+
           // Spawn detached so it survives if the dev server restarts
           const child = spawn(
             python,
@@ -78,6 +112,7 @@ export const Route = createFileRoute('/api/start-hermes')({
               stdio: 'ignore',
               env: {
                 ...process.env,
+                ...hermesEnv,
                 PATH: `${resolve(agentDir, '.venv', 'bin')}:${resolve(agentDir, 'venv', 'bin')}:${process.env.PATH || ''}`,
               },
             },
