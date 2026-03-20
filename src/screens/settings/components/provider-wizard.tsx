@@ -8,7 +8,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  OPENCLAW_CONFIG_PATH,
+  HERMES_CONFIG_PATH,
   PROVIDER_CATALOG,
   buildConfigExample,
   getAuthTypeLabel,
@@ -22,7 +22,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useGatewayRestart } from '@/components/gateway-restart-overlay'
+import { useConnectionRestart } from '@/components/connection-overlay'
 import { cn } from '@/lib/utils'
 import { ProviderIcon } from './provider-icon'
 
@@ -140,7 +140,7 @@ async function pollForProvider(
 }
 
 export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWizardProps) {
-  const { triggerRestart } = useGatewayRestart()
+  const { triggerRestart } = useConnectionRestart()
 
   const [step, setStep] = useState<WizardStep>('provider')
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
@@ -267,7 +267,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
       // Move to verify step, then trigger the restart flow
       setSaveState('saved')
       setVerifyState('checking')
-      setVerificationMessage(`${providerName} API key saved. Gateway is restarting…`)
+      setVerificationMessage(`${providerName} API key saved. Hermes is restarting…`)
       setStep('verify')
 
       // Shows confirm dialog: user can click "Restart & Apply" or "Cancel"
@@ -286,7 +286,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
         } else {
           setVerifyState('warning')
           setVerificationMessage(
-            `Gateway restarted, but ${providerName} models haven't appeared yet. ` +
+            `Hermes restarted, but ${providerName} models haven't appeared yet. ` +
               `Check your API key or wait a moment and refresh.`,
           )
         }
@@ -336,7 +336,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                 </DialogTitle>
                 <DialogDescription className="text-pretty">
                   Add provider credentials safely. API keys stay local in your
-                  OpenClaw config file and are never sent to Studio.
+                  Hermes config file and are never sent to Studio.
                 </DialogDescription>
               </div>
               <Button
@@ -466,7 +466,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                 <div className="mt-3 rounded-xl border border-primary-200 bg-primary-100/70 px-3 py-2">
                   <p className="text-xs text-primary-700 text-pretty">
                     Config file path:{' '}
-                    <code className="font-mono">{OPENCLAW_CONFIG_PATH}</code>
+                    <code className="font-mono">{HERMES_CONFIG_PATH}</code>
                   </p>
                 </div>
 
@@ -542,7 +542,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
                       This will run{' '}
                       <code className="font-mono text-primary-800">
-                        openclaw configure
+                        hermes setup
                       </code>{' '}
                       in the terminal to start the OAuth flow. A browser window
                       will open for you to sign in with Google.
@@ -554,8 +554,8 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         onClick={function onLaunchOAuth() {
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
-                            'Run "openclaw configure" in the terminal and select Google OAuth when prompted. ' +
-                              'A browser window will open for sign-in. Once complete, the gateway will restart automatically.',
+                            'Run "hermes setup" in the terminal and select Google OAuth when prompted. ' +
+                              'A browser window will open for sign-in. Once complete, Hermes will restart automatically.',
                           )
                           setVerifyState('warning')
                           setStep('verify')
@@ -569,7 +569,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                           In the terminal, run:
                         </p>
                         <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">
-                          openclaw configure
+                          hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
                           Select <strong>Google Antigravity</strong> →{' '}
@@ -582,12 +582,12 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         <p className="text-xs text-primary-700 text-pretty">
                           No terminal access?{' '}
                           <a
-                            href="https://docs.openclaw.ai"
+                            href="https://github.com/NousResearch/hermes-agent"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the OpenClaw docs
+                            See the Hermes Agent docs
                           </a>{' '}
                           for setup instructions.
                         </p>
@@ -598,7 +598,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                   <>
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
                       If you have Claude Code or the Claude CLI installed,
-                      OpenClaw can use the same auth token. Run the configure
+                      Hermes can use the same auth token. Run the configure
                       command to detect and import it automatically.
                     </p>
 
@@ -608,7 +608,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         onClick={function onLaunchCLI() {
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
-                            'Run "openclaw configure" in the terminal and select Anthropic → CLI Token. ' +
+                            'Run "hermes setup" in the terminal and select Anthropic → CLI Token. ' +
                               'It will detect your Claude CLI credentials and import them automatically.',
                           )
                           setVerifyState('warning')
@@ -623,7 +623,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                           In the terminal, run:
                         </p>
                         <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">
-                          openclaw configure
+                          hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
                           Select <strong>Anthropic</strong> →{' '}
@@ -646,12 +646,12 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                         <p className="text-xs text-primary-700 text-pretty">
                           No terminal access?{' '}
                           <a
-                            href="https://docs.openclaw.ai"
+                            href="https://github.com/NousResearch/hermes-agent"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the OpenClaw docs
+                            See the Hermes Agent docs
                           </a>{' '}
                           for CLI token setup instructions.
                         </p>
@@ -706,7 +706,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                             strokeWidth={1.5}
                             className="inline mr-1"
                           />
-                          Key saved! Gateway is restarting to apply changes.
+                          Key saved! Hermes is restarting to apply changes.
                         </p>
                       ) : null}
                     </div>
@@ -729,7 +729,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                       <p className="text-xs text-primary-700 text-pretty">
                         API keys are stored locally in{' '}
                         <code className="font-mono">
-                          {OPENCLAW_CONFIG_PATH}
+                          {HERMES_CONFIG_PATH}
                         </code>
                         , never sent to Studio.
                       </p>
@@ -832,7 +832,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                   </p>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
                     {verificationMessage ||
-                      'Waiting for gateway to respond…'}
+                      'Waiting for Hermes to respond…'}
                   </p>
                 </div>
 

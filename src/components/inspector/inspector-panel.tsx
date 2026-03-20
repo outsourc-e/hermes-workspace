@@ -1,0 +1,439 @@
+import { useState, useEffect, useRef } from 'react'
+import { cn } from '@/lib/utils'
+import { create } from 'zustand'
+import { useActivityStore, type ActivityEvent } from './activity-store'
+
+const HERMES_API = 'http://localhost:8642'
+
+// ── Store ─────────────────────────────────────────────────────────────────────
+
+type InspectorStore = {
+  isOpen: boolean
+  setOpen: (open: boolean) => void
+  toggle: () => void
+}
+
+export const useInspectorStore = create<InspectorStore>((set) => ({
+  isOpen: false,
+  setOpen: (open) => set({ isOpen: open }),
+  toggle: () => set((state) => ({ isOpen: !state.isOpen })),
+}))
+
+// ── Tab types ─────────────────────────────────────────────────────────────────
+
+type TabId = 'activity' | 'files' | 'memory' | 'skills' | 'logs'
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'activity', label: 'Activity' },
+  { id: 'files', label: 'Files' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'logs', label: 'Logs' },
+]
+
+// ── Shared loading / error ────────────────────────────────────────────────────
+
+function LoadingState({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 p-4">
+      <div
+        className="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
+        style={{ borderColor: 'var(--theme-accent)', borderTopColor: 'transparent' }}
+      />
+      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>{text}</span>
+    </div>
+  )
+}
+
+function ErrorState({ text }: { text: string }) {
+  return (
+    <div className="p-4">
+      <span className="text-xs" style={{ color: 'var(--theme-danger)' }}>{text}</span>
+    </div>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="p-4">
+      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>{text}</span>
+    </div>
+  )
+}
+
+// ── Activity Tab ──────────────────────────────────────────────────────────────
+
+function ActivityTab() {
+  const events = useActivityStore((s) => s.events)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [events.length])
+
+  if (events.length === 0) {
+    return <EmptyState text="No activity yet — start a conversation" />
+  }
+
+  return (
+    <div ref={scrollRef} className="space-y-1 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      {events.map((event: ActivityEvent, i: number) => (
+        <div
+          key={i}
+          className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs"
+          style={{ background: 'var(--theme-card2)' }}
+        >
+          <span style={{ color: 'var(--theme-accent)', fontFamily: 'monospace' }}>
+            {event.time}
+          </span>
+          <span style={{ color: 'var(--theme-muted)' }}>{event.type}</span>
+          <span className="ml-auto truncate" style={{ color: 'var(--theme-text)' }}>
+            {event.text}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Files Tab ─────────────────────────────────────────────────────────────────
+
+function FilesTab() {
+  const events = useActivityStore((s) => s.events)
+
+  // Extract file paths from activity events
+  const files = Array.from(
+    new Set(
+      events
+        .filter((e: ActivityEvent) => e.type === 'tool_call' || e.type === 'file_read' || e.type === 'file_write')
+        .map((e: ActivityEvent) => e.text)
+        .filter(Boolean)
+    )
+  )
+
+  if (files.length === 0) {
+    return <EmptyState text="No files touched yet — activity will appear during chat" />
+  }
+
+  return (
+    <div className="space-y-1 p-3">
+      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
+        Files touched in session ({files.length})
+      </p>
+      {files.map((file: string, i: number) => (
+        <div
+          key={i}
+          className="rounded px-2 py-1 text-xs font-mono truncate"
+          style={{ color: 'var(--theme-text)', background: 'var(--theme-card2)' }}
+        >
+          {file}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Memory Tab ────────────────────────────────────────────────────────────────
+
+function MemoryTab() {
+  const [data, setData] = useState<Record<string, unknown> | unknown[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${HERMES_API}/api/memory`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        if (!cancelled) {
+          setData(json)
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || 'Failed to load memory')
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) return <LoadingState text="Loading memory…" />
+  if (error) return <ErrorState text={`Memory: ${error}`} />
+  if (!data) return <EmptyState text="No memory entries" />
+
+  // Parse Hermes memory format: { targets: [{ target, entries, usage }] }
+  const targets = (data as any)?.targets || (Array.isArray(data) ? data : [])
+  const allEntries: Array<{ target: string; text: string; usage: string }> = []
+  for (const t of targets) {
+    const target = t.target || 'memory'
+    const usage = t.usage || ''
+    for (const entry of (t.entries || [])) {
+      allEntries.push({ target, text: typeof entry === 'string' ? entry : JSON.stringify(entry), usage })
+    }
+  }
+
+  if (allEntries.length === 0) return <EmptyState text="No memory entries" />
+
+  return (
+    <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      <p className="mb-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {allEntries.length} memories across {targets.length} targets
+      </p>
+      {targets.map((t: any) => (
+        <div key={t.target} className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-accent)' }}>
+              {t.target}
+            </span>
+            <span className="text-[10px]" style={{ color: 'var(--theme-muted)' }}>{t.usage}</span>
+          </div>
+          {(t.entries || []).map((entry: string, i: number) => (
+            <div
+              key={i}
+              className="rounded-lg px-3 py-2 text-xs leading-relaxed"
+              style={{ backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }}
+            >
+              {typeof entry === 'string' ? entry : JSON.stringify(entry, null, 2)}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Skills Tab ────────────────────────────────────────────────────────────────
+
+type SkillItem = {
+  name: string
+  category?: string
+  description?: string
+}
+
+function SkillsTab() {
+  const [skills, setSkills] = useState<SkillItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${HERMES_API}/api/skills`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        if (!cancelled) {
+          // Handle array of skills or object with skills property
+          const list = Array.isArray(json) ? json : (json.skills || json.data || [])
+          setSkills(list)
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || 'Failed to load skills')
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) return <LoadingState text="Loading skills…" />
+  if (error) return <ErrorState text={`Skills: ${error}`} />
+  if (skills.length === 0) return <EmptyState text="No skills found" />
+
+  // Group by category
+  const grouped: Record<string, SkillItem[]> = {}
+  for (const skill of skills) {
+    const cat = skill.category || 'Uncategorized'
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push(skill)
+  }
+
+  return (
+    <div className="space-y-3 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {skills.length} skills loaded
+      </p>
+      {Object.entries(grouped).map(([category, items]) => (
+        <div key={category}>
+          <p className="text-[10px] uppercase tracking-wider mb-1 font-semibold" style={{ color: 'var(--theme-accent)' }}>
+            {category}
+          </p>
+          {items.map((skill) => (
+            <button
+              key={skill.name}
+              type="button"
+              onClick={() => setExpanded(expanded === skill.name ? null : skill.name)}
+              className="w-full text-left rounded px-2 py-1.5 text-xs mb-0.5 transition-colors"
+              style={{
+                background: expanded === skill.name ? 'var(--theme-card2)' : 'transparent',
+                color: 'var(--theme-text)',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span style={{ color: 'var(--theme-accent)' }}>⚡</span>
+                <span>{skill.name}</span>
+              </div>
+              {expanded === skill.name && skill.description && (
+                <p className="mt-1 pl-5 text-[11px]" style={{ color: 'var(--theme-muted)' }}>
+                  {skill.description}
+                </p>
+              )}
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Logs Tab ──────────────────────────────────────────────────────────────────
+
+function LogsTab() {
+  const events = useActivityStore((s) => s.events)
+  const scrollRef = useRef<HTMLPreElement>(null)
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [events.length])
+
+  if (events.length === 0) {
+    return (
+      <div className="p-3">
+        <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+          Raw event stream — waiting for activity…
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-3">
+      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
+        Raw events ({events.length})
+      </p>
+      <pre
+        ref={scrollRef}
+        className="text-xs rounded p-2 overflow-auto max-h-[400px] font-mono"
+        style={{ background: 'var(--theme-card2)', color: 'var(--theme-muted)' }}
+      >
+        {events.map((e: ActivityEvent) => JSON.stringify(e)).join('\n')}
+      </pre>
+    </div>
+  )
+}
+
+// ── Panel ─────────────────────────────────────────────────────────────────────
+
+export function InspectorPanel() {
+  const isOpen = useInspectorStore((s) => s.isOpen)
+  const [activeTab, setActiveTab] = useState<TabId>('activity')
+
+  return (
+    <div
+      className={cn(
+        'fixed right-0 top-0 h-full z-40 flex flex-col overflow-hidden transition-[width] duration-200',
+        isOpen ? 'w-[350px]' : 'w-0',
+      )}
+      style={{
+        background: 'var(--theme-panel)',
+        borderLeft: '2px solid var(--theme-border)',
+        boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.2)',
+      }}
+    >
+      {isOpen && (
+        <>
+          {/* Header */}
+          <div
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ borderBottom: '1px solid var(--theme-border)' }}
+          >
+            <span className="text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
+              Inspector
+            </span>
+            <button
+              type="button"
+              onClick={() => useInspectorStore.getState().setOpen(false)}
+              className="rounded p-1 text-xs hover:opacity-70 transition-opacity"
+              style={{ color: 'var(--theme-muted)' }}
+              aria-label="Close inspector"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Tab bar */}
+          <div
+            className="flex shrink-0 overflow-x-auto"
+            style={{ borderBottom: '1px solid var(--theme-border)' }}
+          >
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'px-3 py-2 text-xs font-medium shrink-0 transition-colors',
+                  activeTab === tab.id
+                    ? 'border-b-2'
+                    : 'hover:opacity-80',
+                )}
+                style={{
+                  color: activeTab === tab.id ? 'var(--theme-accent)' : 'var(--theme-muted)',
+                  borderBottomColor: activeTab === tab.id ? 'var(--theme-accent)' : 'transparent',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-auto">
+            {activeTab === 'activity' && <ActivityTab />}
+            {activeTab === 'files' && <FilesTab />}
+            {activeTab === 'memory' && <MemoryTab />}
+            {activeTab === 'skills' && <SkillsTab />}
+            {activeTab === 'logs' && <LogsTab />}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Toggle Button ─────────────────────────────────────────────────────────────
+
+export function InspectorToggleButton({ className }: { className?: string }) {
+  const toggle = useInspectorStore((s) => s.toggle)
+  const isOpen = useInspectorStore((s) => s.isOpen)
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      title={isOpen ? 'Close inspector' : 'Open inspector'}
+      className={cn(
+        'flex items-center justify-center rounded-lg px-2 py-1.5 text-xs transition-colors',
+        isOpen ? 'opacity-100' : 'opacity-60 hover:opacity-90',
+        className,
+      )}
+      style={{
+        background: isOpen ? 'var(--theme-card2)' : undefined,
+        color: 'var(--theme-text)',
+        border: '1px solid var(--theme-border)',
+      }}
+      aria-label="Toggle inspector panel"
+    >
+      <span className="font-mono text-[11px]">{'{ }'}</span>
+    </button>
+  )
+}

@@ -9,7 +9,7 @@ export type ProviderInfo = {
   configExample: string
 }
 
-export const OPENCLAW_CONFIG_PATH = '~/.openclaw/openclaw.json'
+export const HERMES_CONFIG_PATH = '~/.hermes/config.yaml'
 
 export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {

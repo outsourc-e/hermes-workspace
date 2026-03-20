@@ -6,18 +6,12 @@ import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import { WorkspaceShell } from '@/components/workspace-shell'
-import { useTaskReminders } from '@/hooks/use-task-reminders'
-import { UpdateNotifier } from '@/components/update-notifier'
-import { OpenClawUpdateNotifier } from '@/components/openclaw-update-notifier'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
-import { CompactionNotifier } from '@/components/compaction-notifier'
-import { FallbackBanner } from '@/components/fallback-banner'
-import { GatewayRestartProvider } from '@/components/gateway-restart-overlay'
-import { ExecApprovalToast } from '@/components/exec-approval-toast'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
+import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
 
 const APP_CSP = [
   "default-src 'self'",
@@ -35,90 +29,40 @@ const APP_CSP = [
   "frame-src 'self' http: https:",
 ].join('; ')
 
+const THEME_STORAGE_KEY = 'hermes-theme'
+const DEFAULT_THEME = 'hermes-official'
+const VALID_THEMES = [
+  'hermes-official',
+  'hermes-official-light',
+  'hermes-classic',
+  'hermes-classic-light',
+  'hermes-slate',
+  'hermes-slate-light',
+  'hermes-mono',
+  'hermes-mono-light',
+]
+
 const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
-  
-  // Gateway connection via ClawSuite server proxy.
-  // Clients connect to /ws-gateway on the ClawSuite server (same host:port as the page).
-  // The server proxies internally to ws://127.0.0.1:18789 — so phone/LAN/Docker
-  // users never need direct access to port 18789.
-  // Manual override: set gatewayUrl in settings to skip proxy (e.g. wss:// remote).
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('openclaw-settings')
-      const parsed = stored ? JSON.parse(stored) : null
-      const manualUrl = parsed?.state?.settings?.gatewayUrl
-      if (manualUrl && typeof manualUrl === 'string' && manualUrl.startsWith('ws')) {
-        window.__GATEWAY_URL__ = manualUrl
-      } else {
-        // Use proxy path — works from any device that can reach ClawSuite
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        window.__GATEWAY_URL__ = proto + '//' + window.location.host + '/ws-gateway'
-      }
-    } catch {
-      window.__GATEWAY_URL__ = 'ws://127.0.0.1:18789'
-    }
-  }
-  
+
   try {
-    const stored = localStorage.getItem('openclaw-settings')
-    const fallback = localStorage.getItem('chat-settings')
-    let theme = 'light'
-    let accent = 'orange'
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      const storedTheme = parsed?.state?.settings?.theme
-      const storedAccent = parsed?.state?.settings?.accentColor
-      if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
-        theme = storedTheme
-      }
-      if (storedAccent === 'orange' || storedAccent === 'purple' || storedAccent === 'blue' || storedAccent === 'green') {
-        accent = storedAccent
-      }
-    } else if (fallback) {
-      const parsed = JSON.parse(fallback)
-      const storedTheme = parsed?.state?.settings?.theme
-      const storedAccent = parsed?.state?.settings?.accentColor
-      if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
-        theme = storedTheme
-      }
-      if (storedAccent === 'orange' || storedAccent === 'purple' || storedAccent === 'blue' || storedAccent === 'green') {
-        accent = storedAccent
-      }
-    }
     const root = document.documentElement
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    // ClawSuite theme class + data-theme attribute
-    const enterpriseTheme = localStorage.getItem('clawsuite-theme')
-    const isValidEnterpriseTheme =
-      enterpriseTheme === 'ops-dark' ||
-      enterpriseTheme === 'premium-dark' ||
-      enterpriseTheme === 'paper-light'
-    root.classList.remove('paper-light', 'ops-dark', 'premium-dark')
-    if (isValidEnterpriseTheme) {
-      root.setAttribute('data-theme', enterpriseTheme)
-      root.classList.add(enterpriseTheme)
-      if (enterpriseTheme === 'ops-dark' || enterpriseTheme === 'premium-dark') {
-        theme = 'dark'
-      } else {
-        theme = 'light'
+    const storedTheme = localStorage.getItem('${THEME_STORAGE_KEY}')
+    const theme = ${JSON.stringify(VALID_THEMES)}.includes(storedTheme) ? storedTheme : '${DEFAULT_THEME}'
+    const lightThemes = ['hermes-official-light', 'hermes-classic-light', 'hermes-slate-light', 'hermes-mono-light']
+    const isDark = !lightThemes.includes(theme)
+    root.classList.remove('light', 'dark', 'system')
+    root.classList.add(isDark ? 'dark' : 'light')
+    root.setAttribute('data-theme', theme)
+    root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
+
+    // Demo mode
+    try {
+      if (new URLSearchParams(window.location.search).get('demo') === '1') {
+        document.documentElement.setAttribute('data-demo', 'true');
       }
-    } else {
-      root.removeAttribute('data-theme')
-    }
-    const apply = () => {
-      root.classList.remove('light', 'dark', 'system')
-      root.classList.add(theme)
-      root.setAttribute('data-accent', accent)
-      if (theme === 'system' && media.matches) {
-        root.classList.add('dark')
-      }
-    }
-    apply()
-    media.addEventListener('change', () => {
-      if (theme === 'system') apply()
-    })
+    } catch {}
   } catch {}
 })()
 `
@@ -127,23 +71,19 @@ const themeColorScript = `
 (() => {
   try {
     const root = document.documentElement
-    const enterpriseTheme = localStorage.getItem('clawsuite-theme')
-    const settingsRaw = localStorage.getItem('openclaw-settings')
-    let appTheme = 'light'
-    if (settingsRaw) {
-      const parsed = JSON.parse(settingsRaw)
-      const saved = parsed?.state?.settings?.theme
-      if (saved === 'light' || saved === 'dark' || saved === 'system') {
-        appTheme = saved
-      }
+    const theme = root.getAttribute('data-theme') || '${DEFAULT_THEME}'
+    const colors = {
+      'hermes-official': '#0A0E1A',
+      'hermes-official-light': '#F6F8FC',
+      'hermes-classic': '#0d0f12',
+      'hermes-classic-light': '#F5F2ED',
+      'hermes-slate': '#0d1117',
+      'hermes-slate-light': '#F6F8FA',
+      'hermes-mono': '#111111',
+      'hermes-mono-light': '#FAFAFA',
     }
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const isDark = enterpriseTheme === 'ops-dark' || enterpriseTheme === 'premium-dark'
-      ? true
-      : enterpriseTheme === 'paper-light'
-        ? false
-        : appTheme === 'dark' || (appTheme === 'system' && prefersDark)
-    const nextColor = isDark ? '#0f172a' : '#f97316'
+    const nextColor = colors[theme] || colors['${DEFAULT_THEME}']
+    const isDark = !['hermes-official-light', 'hermes-classic-light', 'hermes-slate-light', 'hermes-mono-light'].includes(String(theme))
 
     let meta = document.querySelector('meta[name="theme-color"]')
     if (!meta) {
@@ -169,12 +109,12 @@ export const Route = createRootRoute({
           'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual',
       },
       {
-        title: 'ClawSuite',
+        title: 'Hermes Workspace',
       },
       {
         name: 'description',
         content:
-          'Supercharged chat interface for OpenClaw AI agents with file explorer, terminal, and usage tracking',
+          'Hermes Agent workspace for chat, tools, files, memory, and jobs.',
       },
       {
         property: 'og:image',
@@ -195,7 +135,7 @@ export const Route = createRootRoute({
       // PWA meta tags
       {
         name: 'theme-color',
-        content: '#f97316',
+        content: '#0A0E1A',
       },
       {
         name: 'apple-mobile-web-app-capable',
@@ -213,8 +153,8 @@ export const Route = createRootRoute({
       },
       {
         rel: 'icon',
-        type: 'image/svg+xml',
-        href: '/favicon.svg',
+        type: 'image/png',
+        href: '/hermes-avatar.png',
       },
       // PWA manifest and icons
       {
@@ -253,11 +193,6 @@ export const Route = createRootRoute({
 
 const queryClient = new QueryClient()
 
-function TaskReminderRunner() {
-  useTaskReminders()
-  return null
-}
-
 function RootLayout() {
   // Unregister any existing service workers — they cause stale asset issues
   // after Docker image updates and behind reverse proxies (Pangolin, Cloudflare, etc.)
@@ -283,22 +218,15 @@ function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GatewayRestartProvider>
-      <CompactionNotifier />
-      <FallbackBanner />
+      <HermesOnboarding />
       <GlobalShortcutListener />
       <TerminalShortcutListener />
-      <TaskReminderRunner />
-      <UpdateNotifier />
-      <OpenClawUpdateNotifier />
       <MobilePromptTrigger />
       <Toaster />
-      <ExecApprovalToast />
       <WorkspaceShell />
       <SearchModal />
       <OnboardingTour />
       <KeyboardShortcutsModal />
-      </GatewayRestartProvider>
     </QueryClientProvider>
   )
 }
@@ -316,33 +244,58 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             if (document.getElementById('splash-screen')) return;
-            var bg = '#f8fafc', txt = '#0f172a', muted = '#64748b';
+            var bg = '#0A0E1A', txt = '#E6EAF2', muted = '#9AA5BD', accent = '#6366F1';
             try {
-              var enterprise = localStorage.getItem('clawsuite-theme');
-              var s = localStorage.getItem('openclaw-settings');
-              var t = 'light';
-              if (enterprise === 'ops-dark' || enterprise === 'premium-dark') {
-                t = 'dark';
-              } else if (enterprise === 'paper-light') {
-                t = 'light';
-              } else if (s) {
-                var p = JSON.parse(s);
-                t = (p && p.state && p.state.settings && p.state.settings.theme) || 'light';
+              var theme = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_THEME}';
+              if (theme === 'hermes-classic') {
+                bg = '#0d0f12';
+                txt = '#eceff4';
+                muted = '#7f8a96';
+                accent = '#b98a44';
+              } else if (theme === 'hermes-official-light') {
+                bg = '#F6F8FC';
+                txt = '#111827';
+                muted = '#4B5563';
+                accent = '#4F46E5';
+              } else if (theme === 'hermes-classic-light') {
+                bg = '#F5F2ED';
+                txt = '#1a1f26';
+                muted = '#6F675E';
+                accent = '#b98a44';
+              } else if (theme === 'hermes-slate') {
+                bg = '#0d1117';
+                txt = '#c9d1d9';
+                muted = '#8b949e';
+                accent = '#7eb8f6';
+              } else if (theme === 'hermes-slate-light') {
+                bg = '#F6F8FA';
+                txt = '#24292f';
+                muted = '#57606A';
+                accent = '#3b82f6';
+              } else if (theme === 'hermes-mono') {
+                bg = '#111111';
+                txt = '#e6edf3';
+                muted = '#888888';
+                accent = '#aaaaaa';
+              } else if (theme === 'hermes-mono-light') {
+                bg = '#FAFAFA';
+                txt = '#1a1a1a';
+                muted = '#666666';
+                accent = '#666666';
               }
-              if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-              if (t === 'dark') { bg = '#0c0c12'; txt = '#f8fafc'; muted = '#94a3b8'; }
             } catch(e){}
 
-            var quips = ["Warming up the claws...","Brewing agent espresso...","Deploying crustacean intelligence...","Loading forbidden knowledge...","Calibrating sarcasm module...","Spinning up the hive mind...","Polishing the shell...","Teaching agents to behave...","Summoning the swarm...","Initializing world domination...","Crunching the numbers (with claws)...","Consulting the oracle lobster...","Booting the lobster mainframe...","Decrypting the claw protocol..."];
+            var isDark = !['hermes-official-light','hermes-classic-light','hermes-slate-light','hermes-mono-light'].includes(theme);
+            var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning Hermes...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
             var quip = quips[Math.floor(Math.random() * quips.length)];
 
             var d = document.createElement('div');
             d.id = 'splash-screen';
-            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.8s ease;';
-            d.innerHTML = '<div style="width:96px;height:96px;margin-bottom:20px;filter:drop-shadow(0 8px 32px rgba(249,115,22,0.5))"><svg width="96" height="96" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sOB" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ea580c"/><stop offset="50%" stop-color="#f97316"/><stop offset="100%" stop-color="#fb923c"/></linearGradient></defs><rect x="5" y="5" width="90" height="90" rx="16" fill="url(#sOB)"/><rect x="20" y="25" width="60" height="50" rx="4" stroke="#1e293b" stroke-width="3" fill="none"/><circle cx="28" cy="32" r="2.5" fill="#1e293b"/><circle cx="37" cy="32" r="2.5" fill="#1e293b"/><circle cx="46" cy="32" r="2.5" fill="#1e293b"/><path d="M38 45L32 50L38 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M62 45L68 50L62 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="47" y="46" width="4" height="10" rx="2" fill="#1e293b"><animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/></rect></svg></div>'
-              + '<div style="font:700 24px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.06em;color:'+txt+'">ClawSuite</div>'
-              + '<div style="margin-top:10px;font:italic 13px/1 system-ui,-apple-system,sans-serif;color:'+muted+'">'+quip+'</div>'
-              + '<div style="margin-top:28px;width:140px;height:3px;background:#1e293b;border-radius:3px;overflow:hidden"><div id=splash-bar style="width:0%;height:100%;background:linear-gradient(90deg,#ea580c,#f97316,#fb923c);border-radius:3px;transition:width 0.4s ease"></div></div>';
+            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
+            d.innerHTML = '<img src="/hermes-avatar.webp" alt="Hermes" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
+              + '<img src="'+(isDark ? '/hermes-banner.png' : '/hermes-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
+              + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
+              + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
             document.body.prepend(d);
 
             var bar = document.getElementById('splash-bar');
@@ -354,46 +307,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               setTimeout(function(){ bar.style.width='92%' }, 3200);
             }
 
-            // Logo entrance animation
-            var logo = d.querySelector('div');
-            if (logo) {
-              logo.style.cssText += ';opacity:0;transform:scale(0.85);transition:opacity 0.6s ease,transform 0.6s ease;';
-              setTimeout(function(){ logo.style.opacity='1'; logo.style.transform='scale(1)'; }, 100);
-            }
-
-            // Pulsing glow behind logo
-            var glow = document.createElement('div');
-            glow.style.cssText = 'position:absolute;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.15) 0%,transparent 70%);animation:splashPulse 2s ease-in-out infinite;pointer-events:none;';
-            d.insertBefore(glow, d.firstChild);
-            // Position glow behind logo
-            glow.style.cssText += 'top:50%;left:50%;transform:translate(-50%,-60%);';
-
-            // Shimmer on progress bar
-            var shimmer = document.createElement('div');
-            shimmer.style.cssText = 'position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:splashShimmer 1.5s ease-in-out infinite;';
-            var barWrap = bar ? bar.parentElement : null;
-            if (barWrap) { barWrap.style.position = 'relative'; barWrap.style.overflow = 'hidden'; barWrap.appendChild(shimmer); }
-
-            // Add keyframes
-            var style = document.createElement('style');
-            style.textContent = '@keyframes splashPulse{0%,100%{opacity:0.5;transform:translate(-50%,-60%) scale(1)}50%{opacity:1;transform:translate(-50%,-60%) scale(1.15)}} @keyframes splashShimmer{0%{left:-100%}100%{left:100%}}';
-            document.head.appendChild(style);
-
             window.__dismissSplash = function() {
               var el = document.getElementById('splash-screen');
               if (!el) return;
               if (bar) bar.style.width = '100%';
               setTimeout(function(){
                 el.style.opacity = '0';
-                setTimeout(function(){ el.remove(); }, 800);
+                setTimeout(function(){ el.remove(); }, 500);
               }, 300);
             };
-            // Fallback: always dismiss after 8s
-            setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 8000);
-            // Fast dismiss: if returning user (has gateway config in localStorage), skip splash quickly
+            // Fallback: always dismiss after 5s
+            setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 5000);
+            // Fast dismiss: returning users skip quickly
             try {
-              if (localStorage.getItem('clawsuite-gateway-url') || localStorage.getItem('gateway-url')) {
-                setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 800);
+              if (localStorage.getItem('hermes-hermes-url') || localStorage.getItem('hermes-url')) {
+                setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 600);
               }
             } catch(e) {}
           })()

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useGatewayChatStream } from '../../../hooks/use-gateway-chat-stream'
-import { useGatewayChatStore } from '../../../stores/gateway-chat-store'
-import type { StreamingState } from '../../../stores/gateway-chat-store'
+import { useChatStream } from '../../../hooks/use-chat-stream'
+import { useChatStore } from '../../../stores/chat-store'
+import type { StreamingState } from '../../../stores/chat-store'
 import { appendHistoryMessage, chatQueryKeys } from '../chat-queries'
 import { toast } from '../../../components/ui/toast'
-import type { GatewayMessage } from '../types'
+import type { ChatMessage } from '../types'
 import { textFromMessage } from '../utils'
 
 /** Read clientId from a message using either camelCase or snake_case field. */
-function readClientId(message: GatewayMessage): string {
+function readClientId(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   for (const key of ['clientId', 'client_id']) {
     const val = raw[key]
@@ -21,7 +21,7 @@ function readClientId(message: GatewayMessage): string {
 /**
  * Extract plain-text content from a user message for dedup comparison.
  *
- * Uses a multi-field strategy because different gateway versions / channel
+ * Uses a multi-field strategy because different server versions / channel
  * adapters shape the SSE payload differently:
  *   • Modern format:  content: [{type:'text', text:'...'}]
  *   • Legacy format:  text: '...' | body: '...' | message: '...'
@@ -30,7 +30,7 @@ function readClientId(message: GatewayMessage): string {
  * causes the dedup to miss echoes that carry a top-level `text` field,
  * leaving those duplicate messages visible in the chat.
  */
-function extractUserMessageText(message: GatewayMessage): string {
+function extractUserMessageText(message: ChatMessage): string {
   // Primary: content-array format (modern canonical)
   const fromContent = textFromMessage(message).trim()
   if (fromContent.length > 0) return fromContent
@@ -47,10 +47,10 @@ function extractUserMessageText(message: GatewayMessage): string {
 
 /**
  * Build a compact attachment-identity signature for image-only dedup.
- * Compares name + size because those survive the round-trip to the gateway;
+ * Compares name + size because those survive the round-trip to the server;
  * base64 content is stripped before storage.
  */
-function attachmentSignature(message: GatewayMessage): string {
+function attachmentSignature(message: ChatMessage): string {
   const attachments = Array.isArray((message as Record<string, unknown>).attachments)
     ? ((message as Record<string, unknown>).attachments as Array<Record<string, unknown>>)
     : []
@@ -61,23 +61,28 @@ function attachmentSignature(message: GatewayMessage): string {
     .join('|')
 }
 
-const EMPTY_MESSAGES: GatewayMessage[] = []
+const EMPTY_MESSAGES: ChatMessage[] = []
 const EMPTY_TOOL_CALLS: Array<{ id: string; name: string; phase: string; args?: unknown }> = []
 
 type UseRealtimeChatHistoryOptions = {
   sessionKey: string
   friendlyId: string
-  historyMessages: Array<GatewayMessage>
+  historyMessages: Array<ChatMessage>
   enabled?: boolean
-  onUserMessage?: (message: GatewayMessage, source?: string) => void
+  onUserMessage?: (message: ChatMessage, source?: string) => void
   onApprovalRequest?: (approval: Record<string, unknown>) => void
   onCompactionStart?: () => void
   onCompactionEnd?: () => void
 }
 
+type CompactionEvent = {
+  phase?: string
+  sessionKey: string
+}
+
 /**
  * Hook that makes SSE the PRIMARY source for new messages and streaming.
- * - Streaming chunks update the gateway-chat-store (already happens)
+ * - Streaming chunks update the chat-store (already happens)
  * - When 'done' arrives, the complete message is immediately available
  * - History polling is now just a backup/backfill mechanism
  */
@@ -114,7 +119,13 @@ export function useRealtimeChatHistory({
     }
   }, [friendlyId, queryClient, sessionKey])
 
-  const { connectionState, lastError, reconnect } = useGatewayChatStream({
+  useEffect(() => {
+    if (!enabled) return
+    if (!sessionKey || sessionKey === 'new') return
+    void backfillHistory()
+  }, [backfillHistory, enabled, sessionKey])
+
+  const { connectionState, lastError, reconnect } = useChatStream({
     sessionKey: sessionKey === 'new' ? undefined : sessionKey,
     enabled: enabled && sessionKey !== 'new',
     onReconnect: useCallback(() => {
@@ -124,10 +135,10 @@ export function useRealtimeChatHistory({
       void backfillHistory()
     }, [backfillHistory]),
     onUserMessage: useCallback(
-      (message: GatewayMessage, source?: string) => {
+      (message: ChatMessage, source?: string) => {
         // Filter internal system messages (pre-compaction flushes, heartbeat
         // prompts, subagent announcements) — these should never appear in the
-        // chat UI. The gateway-chat-store has its own filter, but this callback
+        // chat UI. The chat-store has its own filter, but this callback
         // also appends directly to the query cache via appendHistoryMessage,
         // bypassing the store filter entirely.
         if (message.role === 'user') {
@@ -156,7 +167,7 @@ export function useRealtimeChatHistory({
           // is already displayed.
           //
           // Bug: previous implementation used textFromMessage() which only
-          // reads from the content-array format. Some gateway / channel
+          // reads from the content-array format. Some server / channel
           // adapters echo the message with a top-level `text` or `body` field
           // instead, causing extractUserMessageText() to return '' and the
           // dedup guard to be skipped — resulting in a duplicate user message.
@@ -173,7 +184,7 @@ export function useRealtimeChatHistory({
             if (hasContent) {
               const key = chatQueryKeys.history(friendlyId, sessionKey)
               const cached = queryClient.getQueryData(key) as
-                | { messages?: GatewayMessage[] }
+                | { messages?: ChatMessage[] }
                 | undefined
               const existing = cached?.messages ?? []
               const hasOptimistic = existing.some((m) => {
@@ -235,7 +246,7 @@ export function useRealtimeChatHistory({
           if (sessionKey && sessionKey !== 'new') {
             const key = chatQueryKeys.history(friendlyId, sessionKey)
             const prevData = queryClient.getQueryData(key) as
-              | { messages?: GatewayMessage[] }
+              | { messages?: ChatMessage[] }
               | undefined
             const prevCount = prevData?.messages?.length ?? 0
 
@@ -246,7 +257,7 @@ export function useRealtimeChatHistory({
 
               // Check for compaction — significant message count drop
               const newData = queryClient.getQueryData(key) as
-                | { messages?: GatewayMessage[] }
+                | { messages?: ChatMessage[] }
                 | undefined
               const newCount = newData?.messages?.length ?? 0
               if (
@@ -270,19 +281,33 @@ export function useRealtimeChatHistory({
       },
       [sessionKey, friendlyId, queryClient, onCompactionEnd],
     ),
+    onCompaction: useCallback((event: CompactionEvent) => {
+      if (!event.sessionKey || event.sessionKey !== sessionKey) return
+
+      if (event.phase === 'start') {
+        lastCompactionSignalRef.current = `compaction:${event.sessionKey}:start`
+        onCompactionStart?.()
+        return
+      }
+
+      if (event.phase === 'end') {
+        lastCompactionSignalRef.current = ''
+        onCompactionEnd?.()
+      }
+    }, [onCompactionEnd, onCompactionStart, sessionKey]),
     onApprovalRequest,
   })
 
-  const mergeHistoryMessages = useGatewayChatStore((s) => s.mergeHistoryMessages)
-  const clearSession = useGatewayChatStore((s) => s.clearSession)
-  const lastEventAt = useGatewayChatStore((s) => s.lastEventAt)
-  const clearRealtimeBuffer = useGatewayChatStore((s) => s.clearRealtimeBuffer)
-  const realtimeMessages = useGatewayChatStore(
+  const mergeHistoryMessages = useChatStore((s) => s.mergeHistoryMessages)
+  const clearSession = useChatStore((s) => s.clearSession)
+  const lastEventAt = useChatStore((s) => s.lastEventAt)
+  const clearRealtimeBuffer = useChatStore((s) => s.clearRealtimeBuffer)
+  const realtimeMessages = useChatStore(
     (s) => s.realtimeMessages.get(sessionKey) ?? EMPTY_MESSAGES,
   )
 
   // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
-  const streamingState = useGatewayChatStore((s) => s.streamingState.get(sessionKey) ?? null)
+  const streamingState = useChatStore((s) => s.streamingState.get(sessionKey) ?? null)
   const streamingStateRef = useRef(streamingState)
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const delayedClearSessionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -333,7 +358,7 @@ export function useRealtimeChatHistory({
       .join('\n')
       .toLowerCase()
 
-    // Only trigger on OpenClaw's actual mid-compaction signal.
+    // Only trigger on Hermes's actual mid-compaction signal.
     // "pre-compaction memory flush" and "store durable memories now" are routine
     // heartbeat messages — do NOT match those here.
     if (!textCandidates.includes('compacting context')) return

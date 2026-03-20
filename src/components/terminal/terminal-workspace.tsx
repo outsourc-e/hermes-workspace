@@ -7,6 +7,8 @@ import {
   Cancel01Icon,
   ComputerTerminal01Icon,
   SidebarLeft01Icon,
+  Copy01Icon,
+  ArrowUp02Icon,
 } from '@hugeicons/core-free-icons'
 import type { FitAddon } from 'xterm-addon-fit'
 import type * as FitAddonModule from 'xterm-addon-fit'
@@ -60,7 +62,7 @@ type TerminalSessionResponse = {
   sessionId?: string
 }
 
-const DEFAULT_TERMINAL_CWD = '~/.openclaw/workspace'
+const DEFAULT_TERMINAL_CWD = '~/.hermes'
 const TERMINAL_BG = '#0d0d0d'
 
 function toDebugAnalysis(value: unknown): DebugAnalysis | null {
@@ -128,10 +130,12 @@ export function TerminalWorkspace({
   )
   const setTabStatus = useTerminalPanelStore((state) => state.setTabStatus)
 
+  const [termHeight, setTermHeight] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [debugAnalysis, setDebugAnalysis] = useState<DebugAnalysis | null>(null)
   const [debugLoading, setDebugLoading] = useState(false)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
+
 
   const containerMapRef = useRef(new Map<string, HTMLDivElement>())
   const terminalMapRef = useRef(new Map<string, Terminal>())
@@ -149,7 +153,7 @@ export function TerminalWorkspace({
     [activeTabId, tabs],
   )
 
-  const sendInput = useCallback(async function sendInput(
+  const sendInput = useCallback(function sendInput(
     tabId: string,
     data: string,
   ) {
@@ -158,7 +162,8 @@ export function TerminalWorkspace({
       .getState()
       .tabs.find((t) => t.id === tabId)
     if (!currentTab?.sessionId) return
-    await fetch('/api/terminal-input', {
+    // Fire-and-forget — never await, never block input
+    fetch('/api/terminal-input', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: currentTab.sessionId, data }),
@@ -272,6 +277,8 @@ export function TerminalWorkspace({
     [activeTab],
   )
 
+
+
   const closeTabResources = useCallback(async function closeTabResources(
     tabId: string,
     sessionId: string | null,
@@ -356,6 +363,28 @@ export function TerminalWorkspace({
       const decoder = new TextDecoder()
       let buffer = ''
 
+      // Throttled terminal writes — yields to input events between flushes
+      let writeBuf = ''
+      let flushTimer: ReturnType<typeof setTimeout> | null = null
+      const FLUSH_MS = 80 // ~12fps — generous gaps for input
+      const MAX_BUF = 8192 // drop old data if buffer overflows (screen redraws)
+      function flushWrites() {
+        flushTimer = null
+        if (writeBuf && terminal) {
+          const chunk = writeBuf
+          writeBuf = ''
+          terminal.write(chunk)
+        }
+      }
+      function queueWrite(data: string) {
+        writeBuf += data
+        // If buffer is huge (TUI redraw flood), keep only the tail
+        if (writeBuf.length > MAX_BUF) {
+          writeBuf = writeBuf.slice(-MAX_BUF)
+        }
+        if (!flushTimer) flushTimer = setTimeout(flushWrites, FLUSH_MS)
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
       while (true) {
         const readState = await reader.read().catch(function onReadError() {
@@ -369,7 +398,10 @@ export function TerminalWorkspace({
         const blocks = buffer.split('\n\n')
         buffer = blocks.pop() ?? ''
 
-        for (const block of blocks) {
+        for (let _bi = 0; _bi < blocks.length; _bi++) {
+          // Yield every 10 blocks to let input events through
+          if (_bi > 0 && _bi % 10 === 0) await new Promise((r) => setTimeout(r, 0))
+          const block = blocks[_bi]!
           if (!block.trim()) continue
           const lines = block.split('\n')
           let eventName = ''
@@ -402,7 +434,7 @@ export function TerminalWorkspace({
           if (eventName === 'data' && eventData) {
             const payload = JSON.parse(eventData) as { data?: string }
             if (typeof payload.data === 'string') {
-              terminal.write(payload.data)
+              queueWrite(payload.data)
             }
             continue
           }
@@ -424,6 +456,10 @@ export function TerminalWorkspace({
         }
       }
 
+      // Flush any remaining buffered writes
+      if (flushTimer) clearTimeout(flushTimer)
+      flushWrites()
+
       const latestTab = useTerminalPanelStore
         .getState()
         .tabs.find((item) => item.id === tab.id)
@@ -439,6 +475,8 @@ export function TerminalWorkspace({
       setTabSessionId(tab.id, null)
       setTabStatus(tab.id, 'idle')
       connectedRef.current.delete(tab.id)
+
+      // No auto-reconnect — user can create a new tab if needed
     },
     [renameTab, setTabSessionId, setTabStatus],
   )
@@ -463,9 +501,10 @@ export function TerminalWorkspace({
         return
       }
 
+      const isMobile = window.matchMedia('(max-width: 767px)').matches
       const terminal = new TerminalCtor({
         cursorBlink: true,
-        fontSize: 13,
+        fontSize: isMobile ? 11 : 13,
         fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
         theme: {
           background: TERMINAL_BG,
@@ -552,18 +591,29 @@ export function TerminalWorkspace({
   )
 
   useEffect(
-    function focusOnVisible() {
-      if (mode === 'panel' && !panelVisible) return
-      focusActiveTerminal()
+    function focusAndFitOnVisible() {
+      if (!panelVisible) return
+      // Refit all terminals when becoming visible (e.g. navigating back to terminal route)
+      window.setTimeout(() => {
+        for (const fitAddon of fitMapRef.current.values()) {
+          try { fitAddon.fit() } catch { /* ignore */ }
+        }
+        const snapshot = useTerminalPanelStore.getState().tabs
+        for (const tab of snapshot) {
+          const term = terminalMapRef.current.get(tab.id)
+          if (term) void resizeSession(tab.id, term)
+        }
+        focusActiveTerminal()
+      }, 100)
     },
-    [focusActiveTerminal, mode, panelVisible, activeTabId],
+    [focusActiveTerminal, panelVisible, resizeSession],
   )
 
   useEffect(
     function fitOnResize() {
-      function handleResize() {
+      function refitAll() {
         for (const fitAddon of fitMapRef.current.values()) {
-          fitAddon.fit()
+          try { fitAddon.fit() } catch { /* */ }
         }
         const snapshot = useTerminalPanelStore.getState().tabs
         for (const tab of snapshot) {
@@ -573,12 +623,25 @@ export function TerminalWorkspace({
         }
       }
 
+      function handleResize() {
+        // Update height from visualViewport (keyboard-aware on mobile)
+        const vv = window.visualViewport
+        if (vv) {
+          setTermHeight(vv.height)
+        }
+        refitAll()
+      }
+
       const timeout = window.setTimeout(handleResize, 50)
       window.addEventListener('resize', handleResize)
+      window.visualViewport?.addEventListener('resize', handleResize)
+      window.visualViewport?.addEventListener('scroll', handleResize)
 
       return function cleanup() {
         window.clearTimeout(timeout)
         window.removeEventListener('resize', handleResize)
+        window.visualViewport?.removeEventListener('resize', handleResize)
+        window.visualViewport?.removeEventListener('scroll', handleResize)
       }
     },
     [resizeSession],
@@ -603,22 +666,11 @@ export function TerminalWorkspace({
   }, [])
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-primary-50">
-      {mode === 'fullscreen' ? (
-        <div className="flex h-11 items-center border-b border-primary-300 bg-primary-100 px-2 text-sm font-medium">
-          <Button size="sm" variant="ghost" className="mr-2" onClick={onBack}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={1.5} />
-            Back
-          </Button>
-          <div className="text-balance text-sm font-medium">Terminal</div>
-          <div className="ml-auto flex items-center gap-1">
-            <Button size="sm" variant="ghost" onClick={handleCreateTab}>
-              <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
-              New Tab
-            </Button>
-          </div>
-        </div>
-      ) : null}
+    <div
+      className="relative flex min-h-0 flex-col bg-primary-50"
+      style={termHeight ? { height: termHeight, maxHeight: termHeight } : { height: '100%' }}
+    >
+      {/* fullscreen header removed — tab bar handles everything */}
 
       <div className="flex h-8 items-center border-b border-primary-300 bg-primary-100 px-1">
         <div className="flex min-w-0 flex-1 items-center overflow-x-auto">
@@ -702,60 +754,36 @@ export function TerminalWorkspace({
         </div>
 
         <div className="flex items-center gap-0.5">
+          {/* Debug — AI analyzes terminal output to suggest fixes */}
           <Button
-            size="sm"
+            size="icon-sm"
             variant="ghost"
             onClick={handleAnalyzeDebug}
             disabled={debugLoading}
-            aria-label="Analyze terminal output"
+            aria-label="AI Debug analysis"
+            title="AI Debug — analyze terminal output"
           >
-            🔍 Debug
+            🔍
           </Button>
           <Button
             size="icon-sm"
             variant="ghost"
             onClick={handleCreateTab}
             aria-label="New terminal tab"
+            title="New tab"
           >
             <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
           </Button>
           {mode === 'panel' ? (
             <>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                onClick={onMinimizePanel}
-                aria-label="Minimize terminal panel"
-              >
-                <HugeiconsIcon
-                  icon={SidebarLeft01Icon}
-                  size={20}
-                  strokeWidth={1.5}
-                />
+              <Button size="icon-sm" variant="ghost" onClick={onMinimizePanel} aria-label="Minimize">
+                <HugeiconsIcon icon={SidebarLeft01Icon} size={20} strokeWidth={1.5} />
               </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                onClick={onMaximizePanel}
-                aria-label="Maximize terminal panel"
-              >
-                <HugeiconsIcon
-                  icon={ArrowRight01Icon}
-                  size={20}
-                  strokeWidth={1.5}
-                />
+              <Button size="icon-sm" variant="ghost" onClick={onMaximizePanel} aria-label="Maximize">
+                <HugeiconsIcon icon={ArrowRight01Icon} size={20} strokeWidth={1.5} />
               </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                onClick={handleClosePanel}
-                aria-label="Close terminal panel"
-              >
-                <HugeiconsIcon
-                  icon={Cancel01Icon}
-                  size={20}
-                  strokeWidth={1.5}
-                />
+              <Button size="icon-sm" variant="ghost" onClick={handleClosePanel} aria-label="Close">
+                <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.5} />
               </Button>
             </>
           ) : null}
@@ -783,6 +811,9 @@ export function TerminalWorkspace({
                   }
                   containerMapRef.current.delete(tab.id)
                 }}
+                onClick={function tapToFocus() {
+                  terminalMapRef.current.get(tab.id)?.focus()
+                }}
                 className="h-full w-full bg-primary-50 font-mono text-primary-900"
                 style={{ backgroundColor: TERMINAL_BG }}
               />
@@ -790,6 +821,8 @@ export function TerminalWorkspace({
           )
         })}
       </div>
+
+      {/* Mobile input bar moved to WorkspaceShell as a sibling to prevent re-render freeze */}
 
       {showDebugPanel ? (
         <DebugPanel

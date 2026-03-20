@@ -1,5 +1,5 @@
 import type {
-  GatewayMessage,
+  ChatMessage,
   SessionMeta,
   SessionSummary,
   SessionTitleSource,
@@ -19,7 +19,7 @@ export function deriveFriendlyIdFromKey(key: string | undefined): string {
 
 /**
  * Strip channel prefixes like "[2026-02-11 14:00 Telegram]" from messages.
- * These are added by the gateway for multi-channel routing.
+ * These are added by the server for multi-channel routing.
  */
 const CHANNEL_PREFIX_REGEX = /^\[([^\]]+)\]\s*/
 const KNOWN_CHANNELS = [
@@ -47,7 +47,7 @@ function stripChannelPrefix(text: string): string {
 }
 
 /**
- * Strip OpenClaw system metadata from user messages.
+ * Strip Hermes system metadata from user messages.
  * Removes [media attached: ...] blocks, image-send instructions,
  * and [Telegram/Signal/etc ...] headers, leaving just the user's text.
  */
@@ -99,14 +99,14 @@ function cleanUserText(raw: string): string {
   return text.trim()
 }
 
-export function textFromMessage(msg: GatewayMessage): string {
+export function textFromMessage(msg: ChatMessage): string {
   const parts = Array.isArray(msg.content) ? msg.content : []
   let raw = parts
     .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
     .join('')
     .trim()
 
-  // Fallback: some gateway / channel adapters echo messages with a top-level
+  // Fallback: some server / channel adapters echo messages with a top-level
   // text/body/message field instead of the content array.  Without this
   // fallback, textFromMessage returns '' for those echoes which breaks dedup.
   if (raw.length === 0) {
@@ -131,7 +131,7 @@ export function textFromMessage(msg: GatewayMessage): string {
 }
 
 export function getToolCallsFromMessage(
-  msg: GatewayMessage,
+  msg: ChatMessage,
 ): Array<ToolCallContent> {
   const parts = Array.isArray(msg.content) ? msg.content : []
   return parts.filter(
@@ -141,8 +141,8 @@ export function getToolCallsFromMessage(
 
 export function findToolResultForCall(
   toolCallId: string,
-  messages: Array<GatewayMessage>,
-): GatewayMessage | undefined {
+  messages: Array<ChatMessage>,
+): ChatMessage | undefined {
   return messages.find(
     (msg) => msg.role === 'toolResult' && msg.toolCallId === toolCallId,
   )
@@ -160,7 +160,7 @@ function normalizeTimestamp(value: unknown): number | null {
   return null
 }
 
-export function getMessageTimestamp(message: GatewayMessage): number {
+export function getMessageTimestamp(message: ChatMessage): number {
   const candidates = [
     (message as any).createdAt,
     (message as any).created_at,
@@ -272,9 +272,9 @@ export async function readError(res: Response): Promise<string> {
   }
 }
 
-export const missingGatewayAuthMessage =
-  'Missing gateway auth. Set CLAWDBOT_GATEWAY_TOKEN (recommended) or CLAWDBOT_GATEWAY_PASSWORD in the server environment.'
+export const missingAuthMessage =
+  'Hermes Agent connection failed. Make sure Hermes is running on localhost:8642.'
 
-export function isMissingGatewayAuth(message: string): boolean {
-  return message.includes(missingGatewayAuthMessage)
+export function isMissingAuth(message: string): boolean {
+  return message.includes(missingAuthMessage)
 }

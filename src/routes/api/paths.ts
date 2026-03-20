@@ -1,38 +1,24 @@
-import os from 'node:os'
 import path from 'node:path'
+import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 
-function resolveSessionsDir() {
-  // Keep in sync with Clawdbot default layout:
-  // ~/.clawdbot/agents/<agentId>/sessions
-  const agentId = (process.env.CLAWDBOT_AGENT_ID || 'main').trim() || 'main'
-  const stateDir = (
-    process.env.CLAWDBOT_STATE_DIR || path.join(os.homedir(), '.clawdbot')
-  ).trim()
-  return {
-    agentId,
-    stateDir,
-    sessionsDir: path.join(stateDir, 'agents', agentId, 'sessions'),
-    storePath: path.join(
-      stateDir,
-      'agents',
-      agentId,
-      'sessions',
-      'sessions.json',
-    ),
-  }
-}
+const HERMES_HOME = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes')
 
 export const Route = createFileRoute('/api/paths')({
   server: {
     handlers: {
-      GET: ({ request }) => {
+      GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        return json(resolveSessionsDir())
+        return json({
+          ok: true,
+          hermesHome: HERMES_HOME,
+          memoriesDir: path.join(HERMES_HOME, 'memories'),
+          skillsDir: path.join(HERMES_HOME, 'skills'),
+        })
       },
     },
   },

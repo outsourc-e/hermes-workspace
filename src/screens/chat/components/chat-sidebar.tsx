@@ -3,33 +3,25 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   ArrowDown01Icon,
-  BotIcon,
   BrainIcon,
-  ChartLineData01Icon,
-  ChartLineData02Icon,
   Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
-  GlobeIcon,
-  Home01Icon,
-  ListViewIcon,
-  Notification03Icon,
+  MessageMultiple01Icon,
   PencilEdit02Icon,
   PuzzleIcon,
   Search01Icon,
-  ApiIcon,
+
   Settings01Icon,
-  ServerStack01Icon,
-  SmartPhone01Icon,
-  Task01Icon,
-  UserGroupIcon,
-  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
+import {
+  CHAT_OPEN_SETTINGS_EVENT,
+  type ChatOpenSettingsDetail,
+} from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
 import { useRenameSession } from '../hooks/use-rename-session'
@@ -47,7 +39,6 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { UserAvatar } from '@/components/avatars'
 import { SEARCH_MODAL_EVENTS, useSearchModal } from '@/hooks/use-search-modal'
 import {
@@ -55,7 +46,7 @@ import {
   selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { GatewayStatusDot } from '@/components/gateway-status-indicator'
+import { StatusDot } from '@/components/status-indicator'
 import {
   MenuRoot,
   MenuTrigger,
@@ -64,25 +55,46 @@ import {
 } from '@/components/ui/menu'
 import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+type WorkspaceStats = Record<string, unknown>
 
 function ThemeToggleMini() {
-  const theme = useSettingsStore((state) => state.settings.theme)
+  const _theme = useSettingsStore((state) => state.settings.theme)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
-  const isDark =
-    theme === 'dark' ||
-    (theme === 'system' &&
-      typeof document !== 'undefined' &&
-      document.documentElement.classList.contains('dark'))
+  void _theme
+  // Detect dark/light from actual data-theme attribute
+  const currentDataTheme = typeof document !== 'undefined'
+    ? document.documentElement.getAttribute('data-theme') || 'hermes-official'
+    : 'hermes-official'
+  const isDark = !currentDataTheme.endsWith('-light')
+
+  // Map between dark and light counterparts
+  const LIGHT_DARK_PAIRS: Record<string, string> = {
+    'hermes-official': 'hermes-official-light',
+    'hermes-official-light': 'hermes-official',
+    'hermes-classic': 'hermes-classic-light',
+    'hermes-classic-light': 'hermes-classic',
+    'hermes-slate': 'hermes-slate-light',
+    'hermes-slate-light': 'hermes-slate',
+    'hermes-mono': 'hermes-mono-light',
+    'hermes-mono-light': 'hermes-mono',
+  }
 
   return (
     <button
       type="button"
       onClick={() => {
-        const nextTheme = isDark ? 'light' : 'dark'
-        applyTheme(nextTheme)
-        updateSettings({ theme: nextTheme })
+        const nextDataTheme = LIGHT_DARK_PAIRS[currentDataTheme] || (isDark ? 'hermes-official-light' : 'hermes-official')
+        // Import and call setTheme to persist and apply
+        import('@/lib/theme').then(({ setTheme }) => {
+          setTheme(nextDataTheme as any)
+        })
+        // Also update settings hook
+        const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
+        applyTheme(nextMode)
+        updateSettings({ theme: nextMode })
       }}
-      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
+      className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80"
+      style={{ color: 'var(--theme-muted)' }}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
@@ -105,61 +117,36 @@ type ChatSidebarProps = {
   onRetrySessions: () => void
 }
 
-type RecentEventsResponse = {
-  events?: Array<unknown>
-}
 
-const DEBUG_ERROR_WINDOW_MS = 5 * 60 * 1000
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object') return null
-  if (Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-function hasRecentIssueEvent(item: unknown, cutoffMs: number): boolean {
-  const record = toRecord(item)
-  if (!record) return false
-
-  const level = record.level
-  const timestamp = record.timestamp
-  if (level !== 'warn' && level !== 'error') return false
-  if (typeof timestamp !== 'number') return false
-  if (!Number.isFinite(timestamp)) return false
-  return timestamp >= cutoffMs
-}
-
-async function fetchHasRecentIssues(): Promise<boolean> {
-  try {
-    const response = await fetch('/api/events/recent?count=40')
-    if (!response.ok) return false
-
-    const payload = (await response.json()) as RecentEventsResponse
-    const events = Array.isArray(payload.events) ? payload.events : []
-    const cutoffMs = Date.now() - DEBUG_ERROR_WINDOW_MS
-
-    for (const item of events) {
-      if (hasRecentIssueEvent(item, cutoffMs)) return true
-    }
-
-    return false
-  } catch {
-    return false
-  }
-}
 
 // ── Reusable nav item ───────────────────────────────────────────────────
 
 type NavItemDef = {
   kind: 'link' | 'button'
   to?: string
+  search?: Record<string, unknown>
+  hash?: string
   icon: unknown
   label: string
   active: boolean
   onClick?: () => void
   disabled?: boolean
-  badge?: 'error-dot'
+  badge?: 'error-dot' | string | number
   dataTour?: string
+}
+
+export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
+  try {
+    const response = await fetch('/api/workspace/stats')
+    if (!response.ok) return null
+    return (await response.json()) as WorkspaceStats
+  } catch {
+    return null
+  }
+}
+
+export async function fetchWorkspaceProjectShortcuts(): Promise<never[]> {
+  return []
 }
 
 function NavItem({
@@ -210,9 +197,14 @@ function NavItem({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={transition}
-          className="overflow-hidden whitespace-nowrap"
+          className="flex min-w-0 items-center gap-2"
         >
-          {item.label}
+          <span className="overflow-hidden whitespace-nowrap">{item.label}</span>
+          {item.badge && item.badge !== 'error-dot' ? (
+            <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full border border-primary-700 bg-primary-900 px-2 py-0.5 text-[10px] font-semibold leading-none text-primary-300">
+              {item.badge}
+            </span>
+          ) : null}
         </motion.span>
       ) : null}
     </AnimatePresence>
@@ -231,6 +223,8 @@ function NavItem({
               render={
                 <Link
                   to={item.to!}
+                  search={item.search}
+                  hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
                   data-tour={item.dataTour}
@@ -247,6 +241,8 @@ function NavItem({
     return (
       <Link
         to={item.to!}
+        search={item.search}
+        hash={item.hash}
         onClick={handleSelect}
         className={cls}
         data-tour={item.dataTour}
@@ -304,7 +300,7 @@ function NavItem({
 
 // ── Last-visited route tracking ─────────────────────────────────────────
 
-const LAST_ROUTE_KEY = 'openclaw-sidebar-last-route'
+const LAST_ROUTE_KEY = 'hermes-sidebar-last-route'
 
 function getLastRoute(section: string): string | null {
   try {
@@ -503,6 +499,7 @@ function ChatSidebarComponent({
 }: ChatSidebarProps) {
   const {
     settingsOpen,
+    settingsSection,
     setSettingsOpen,
     handleOpenSettings,
   } = useSidebarSettings()
@@ -520,8 +517,23 @@ function ChatSidebarComponent({
     },
   })
 
+  useEffect(() => {
+    function handleOpenSettingsEvent(event: Event) {
+      const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
+      handleOpenSettings(detail?.section === 'appearance' ? 'appearance' : 'hermes')
+    }
+
+    window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
+    return () => {
+      window.removeEventListener(
+        CHAT_OPEN_SETTINGS_EVENT,
+        handleOpenSettingsEvent,
+      )
+    }
+  }, [handleOpenSettings])
+
   // Platform-aware modifier key
-  const mod = useMemo(
+  const _mod = useMemo(
     () =>
       typeof navigator !== 'undefined' &&
       /Mac|iPod|iPhone|iPad/.test(navigator.userAgent)
@@ -530,91 +542,49 @@ function ChatSidebarComponent({
     [],
   )
 
-
-
   // Route active states
-  const isDashboardActive = pathname === '/dashboard'
-  const isAgentSwarmActive = pathname === '/agent-swarm'
+  const isChatActive =
+    pathname === '/' || pathname === '/new' || pathname.startsWith('/chat')
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
-  const isBrowserActive = pathname === '/browser'
-  const isTerminalActive = pathname === '/terminal'
-  const isTasksActive = pathname === '/tasks'
-  // Gateway
-  const isCronActive = pathname === '/cron'
-  const isChannelsActive = pathname === '/channels'
-  const isSessionsActive = pathname === '/sessions'
-  const isUsageActive = pathname === '/usage'
-  const isCostsActive = pathname === '/costs'
-  const isInstancesActive = pathname === '/instances'
-  // Agent
-  const isAgentsActive = pathname === '/agents'
-  const isNodesActive = pathname === '/nodes'
+  const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
+  const isTerminalActive = pathname === '/terminal'
+  const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
-  const isDebugActive = pathname === '/debug'
-  const isLogsActive = pathname === '/activity' || pathname === '/logs'
-
-  // Track last-visited route per section
-  const suiteRoutes = [
-    '/dashboard',
-    '/agent-swarm',
-    '/new',
-    '/browser',
-    '/terminal',
-    '/tasks',
-    '/skills',
-    '/cron',
-    '/activity',
-    '/logs',
-    '/debug',
-    '/files',
-    '/memory',
-    '/costs',
-  ]
-  const gatewayRoutes = [
-    '/channels',
-    '/instances',
-    '/sessions',
-    '/usage',
-    '/agents',
-    '/nodes',
-  ]
+  const mainRoutes = ['/chat', '/new', '/files', '/terminal']
+  const knowledgeRoutes = ['/memory', '/skills']
+  const systemRoutes = ['/settings', '/logs']
 
   useEffect(() => {
-    if (suiteRoutes.includes(pathname)) setLastRoute('suite', pathname)
-    else if (gatewayRoutes.includes(pathname)) setLastRoute('gateway', pathname)
+    if (mainRoutes.includes(pathname)) setLastRoute('main', pathname)
+    if (knowledgeRoutes.includes(pathname)) setLastRoute('knowledge', pathname)
+    if (systemRoutes.includes(pathname)) setLastRoute('system', pathname)
   }, [pathname])
 
-  // Resolve navigation targets (last visited or default)
-  const suiteNav = getLastRoute('suite') || '/dashboard'
-  const gatewayNav = getLastRoute('gateway') || '/channels'
+  const mainNav = getLastRoute('main') || '/chat'
+  const knowledgeNav = getLastRoute('knowledge') || '/memory'
+  const _systemNav = getLastRoute('system') || '/settings'
 
   const transition = {
     duration: 0.15,
     ease: isCollapsed ? 'easeIn' : 'easeOut',
   } as const
 
-  const recentIssuesQuery = useQuery({
-    queryKey: ['activity', 'recent-issues-indicator'],
-    queryFn: fetchHasRecentIssues,
-    refetchInterval: 20_000,
-    retry: false,
-  })
-  const showDebugErrorDot = Boolean(recentIssuesQuery.data)
+
 
   // Collapsible section states
-  const [suiteExpanded, toggleSuite] = usePersistedBool(
-    'openclaw-sidebar-suite-expanded',
+  const [mainExpanded, toggleMain] = usePersistedBool(
+    'hermes-sidebar-main-expanded',
     true,
   )
-  const [systemExpanded, toggleSystem] = usePersistedBool(
-    'openclaw-sidebar-system-expanded',
-    false,
+  const [knowledgeExpanded, toggleKnowledge] = usePersistedBool(
+    'hermes-sidebar-knowledge-expanded',
+    true,
   )
-  const [gatewayExpanded, toggleGateway] = usePersistedBool(
-    'openclaw-sidebar-gateway-expanded',
+  const [_systemExpanded, _toggleSystem] = usePersistedBool(
+    'hermes-sidebar-system-expanded',
     false,
   )
 
@@ -692,6 +662,7 @@ function ChatSidebarComponent({
 
   const isVisuallyCollapsed = isCollapsed && !isHoverExpanded
   const isHoverPreviewExpanded = !isMobile && isCollapsed && isHoverExpanded
+
 
   function handleSidebarToggle() {
     if (isHoverPreviewExpanded) {
@@ -772,74 +743,13 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
-  const suiteItems: NavItemDef[] = [
+  const mainItems: NavItemDef[] = [
     {
       kind: 'link',
-      to: '/dashboard',
-      icon: Home01Icon,
-      label: 'Dashboard',
-      active: isDashboardActive,
-      dataTour: 'dashboard',
-    },
-    {
-      kind: 'link',
-      to: '/agent-swarm',
-      icon: BotIcon,
-      label: 'Agent Hub',
-      active: isAgentSwarmActive,
-      dataTour: 'agent-hub',
-    },
-    {
-      kind: 'link',
-      to: '/browser',
-      icon: GlobeIcon,
-      label: 'Browser',
-      active: isBrowserActive,
-    },
-    {
-      kind: 'link',
-      to: '/terminal',
-      icon: ComputerTerminal01Icon,
-      label: 'Terminal',
-      active: isTerminalActive,
-      dataTour: 'terminal',
-    },
-    {
-      kind: 'link',
-      to: '/tasks',
-      icon: Task01Icon,
-      label: 'Tasks',
-      active: isTasksActive,
-    },
-    {
-      kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: 'Skills',
-      active: isSkillsActive,
-      dataTour: 'skills',
-    },
-    {
-      kind: 'link',
-      to: '/cron',
-      icon: Clock01Icon,
-      label: 'Cron Jobs',
-      active: isCronActive,
-    },
-    {
-      kind: 'link',
-      to: '/activity',
-      icon: ListViewIcon,
-      label: 'Logs',
-      active: isLogsActive,
-    },
-    {
-      kind: 'link',
-      to: '/debug',
-      icon: Notification03Icon,
-      label: 'Debug',
-      active: isDebugActive,
-      badge: showDebugErrorDot ? 'error-dot' : undefined,
+      to: '/chat',
+      icon: MessageMultiple01Icon,
+      label: 'Chat',
+      active: isChatActive,
     },
     {
       kind: 'link',
@@ -850,6 +760,23 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/terminal',
+      icon: ComputerTerminal01Icon,
+      label: 'Terminal',
+      active: isTerminalActive,
+    },
+    {
+      kind: 'link',
+      to: '/jobs',
+      icon: Clock01Icon,
+      label: 'Jobs',
+      active: isJobsActive,
+    },
+  ]
+
+  const knowledgeItems: NavItemDef[] = [
+    {
+      kind: 'link',
       to: '/memory',
       icon: BrainIcon,
       label: 'Memory',
@@ -857,73 +784,15 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/costs',
-      icon: ChartLineData02Icon,
-      label: 'Cost & Usage',
-      active: isCostsActive,
+      to: '/skills',
+      icon: PuzzleIcon,
+      label: 'Skills',
+      active: isSkillsActive,
+      dataTour: 'skills',
     },
   ]
 
-  const gatewayItems: NavItemDef[] = [
-    {
-      kind: 'link',
-      to: '/channels',
-      icon: Chat01Icon,
-      label: 'Channels',
-      active: isChannelsActive,
-    },
-    {
-      kind: 'link',
-      to: '/instances',
-      icon: ServerStack01Icon,
-      label: 'Instances',
-      active: isInstancesActive,
-    },
-    {
-      kind: 'link',
-      to: '/sessions',
-      icon: UserMultipleIcon,
-      label: 'Sessions',
-      active: isSessionsActive,
-    },
-    {
-      kind: 'link',
-      to: '/usage',
-      icon: ChartLineData01Icon,
-      label: 'Usage',
-      active: isUsageActive,
-    },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: isAgentsActive,
-    },
-    {
-      kind: 'link',
-      to: '/nodes',
-      icon: SmartPhone01Icon,
-      label: 'Nodes',
-      active: isNodesActive,
-    },
-  ]
-
-  // Auto-expand mobile System section if any child route is active.
-  const mobileSystemLabels = [
-    'Files',
-    'Memory',
-    'Tasks',
-    'Terminal',
-    'Browser',
-    'Cron Jobs',
-    'Logs',
-    'Debug',
-  ]
-  const mobileSecondarySuite = mobileSystemLabels
-    .map((label) => suiteItems.find((item) => item.label === label))
-    .filter((item): item is NavItemDef => Boolean(item))
-  const isAnySystemActive = mobileSecondarySuite.some((item) => item.active)
+  const systemItems: NavItemDef[] = []
 
   return (
     <motion.aside
@@ -947,7 +816,6 @@ function ChatSidebarComponent({
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
-      {/* Electron title bar is rendered at shell level (workspace-shell.tsx) */}
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
         layout
@@ -963,14 +831,14 @@ function ChatSidebarComponent({
               transition={transition}
             >
               <Link
-                to="/new"
+                to="/chat"
                 className={cn(
                   buttonVariants({ variant: 'ghost', size: 'sm' }),
-                  'w-full pl-1.5 justify-start',
+                  'w-full pl-1.5 justify-start gap-2',
                 )}
               >
-                <OpenClawStudioIcon className="size-5 rounded-lg overflow-hidden" />
-                ClawSuite
+                <img src="/hermes-avatar.webp" alt="Hermes" className="size-6 rounded-lg" />
+                <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--theme-text)' }}>Hermes Workspace</span>
               </Link>
             </motion.div>
           ) : null}
@@ -1058,61 +926,44 @@ function ChatSidebarComponent({
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
         <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
-          {!isMobile && (
-            <>
-              {/* SUITE */}
-              <SectionLabel
-                label="Suite"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={suiteExpanded}
-                onToggle={toggleSuite}
-                navigateTo={suiteNav}
-              />
-              <CollapsibleSection
-                expanded={suiteExpanded || isCollapsed}
-                items={suiteItems}
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                onSelectSession={onSelectSession}
-              />
-            </>
-          )}
-
-          {isMobile && mobileSecondarySuite.length > 0 && (
-            <>
-              <SectionLabel
-                label="System"
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                collapsible
-                expanded={systemExpanded || isAnySystemActive}
-                onToggle={toggleSystem}
-              />
-              <CollapsibleSection
-                expanded={systemExpanded || isAnySystemActive || isCollapsed}
-                items={mobileSecondarySuite}
-                isCollapsed={isVisuallyCollapsed}
-                transition={transition}
-                onSelectSession={onSelectSession}
-              />
-            </>
-          )}
-
-          {/* GATEWAY */}
           <SectionLabel
-            label="Gateway"
+            label="Main"
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
-            expanded={gatewayExpanded}
-            onToggle={toggleGateway}
-            navigateTo={gatewayNav}
+            expanded={mainExpanded}
+            onToggle={toggleMain}
+            navigateTo={mainNav}
           />
           <CollapsibleSection
-            expanded={gatewayExpanded || isCollapsed}
-            items={gatewayItems}
+            expanded={mainExpanded || isCollapsed}
+            items={mainItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+
+          <SectionLabel
+            label="Knowledge"
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            collapsible
+            expanded={knowledgeExpanded}
+            onToggle={toggleKnowledge}
+            navigateTo={knowledgeNav}
+          />
+          <CollapsibleSection
+            expanded={knowledgeExpanded || isCollapsed}
+            items={knowledgeItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+
+          {/* System */}
+          <CollapsibleSection
+            expanded={true}
+            items={systemItems}
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
@@ -1122,7 +973,7 @@ function ChatSidebarComponent({
         {/* Sessions list */}
         <div
           className={cn(
-            'shrink-0 border-t border-primary-200/60 mt-1',
+            'shrink-0 mt-1',
             isMobile && 'order-1',
           )}
         >
@@ -1189,7 +1040,7 @@ function ChatSidebarComponent({
                     <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                       {profileDisplayName}
                     </span>
-                    <GatewayStatusDot />
+                    <StatusDot />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1197,7 +1048,7 @@ function ChatSidebarComponent({
             <MenuContent side="top" align="start" className="min-w-[200px]">
               <MenuItem
                 onClick={function onOpenSettings() {
-                  setSettingsOpen(true)
+                  handleOpenSettings('hermes')
                 }}
                 className="justify-between"
               >
@@ -1209,23 +1060,6 @@ function ChatSidebarComponent({
                   />
                   Settings
                 </span>
-                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-neutral-400 font-mono">
-                  {mod},
-                </kbd>
-              </MenuItem>
-              <MenuItem
-                onClick={function onOpenProviders() {
-                  setProvidersOpen(true)
-                }}
-                className="justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <HugeiconsIcon icon={ApiIcon} size={20} strokeWidth={1.5} />
-                  Providers
-                </span>
-                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-neutral-400 font-mono">
-                  {mod}P
-                </kbd>
               </MenuItem>
             </MenuContent>
           </MenuRoot>
@@ -1235,7 +1069,7 @@ function ChatSidebarComponent({
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => handleOpenSettings('hermes')}
                 className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >
@@ -1248,7 +1082,11 @@ function ChatSidebarComponent({
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        initialSection={settingsSection}
+      />
 
       <ProvidersDialog open={providersOpen} onOpenChange={setProvidersOpen} />
 

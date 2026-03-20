@@ -1,13 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { applyAccentColor } from '@/lib/accent-colors'
+import { getTheme, setTheme } from '@/lib/theme'
 
 export type SettingsThemeMode = 'system' | 'light' | 'dark'
 export type AccentColor = 'orange' | 'purple' | 'blue' | 'green'
 
 export type StudioSettings = {
-  gatewayUrl: string
-  gatewayToken: string
+  hermesUrl: string
+  hermesToken: string
   theme: SettingsThemeMode
   accentColor: AccentColor
   editorFontSize: number
@@ -30,10 +30,10 @@ type SettingsState = {
 }
 
 export const defaultStudioSettings: StudioSettings = {
-  gatewayUrl: '',
-  gatewayToken: '',
+  hermesUrl: '',
+  hermesToken: '',
   theme: 'system',
-  accentColor: 'orange',
+  accentColor: 'blue',
   editorFontSize: 13,
   editorWordWrap: true,
   editorMinimap: false,
@@ -47,11 +47,6 @@ export const defaultStudioSettings: StudioSettings = {
   mobileChatNavMode: 'dock',
 }
 
-function resolveStoredAccent(value: string | null): AccentColor | null {
-  return value === 'purple' || value === 'blue' || value === 'green' || value === 'orange'
-    ? value
-    : null
-}
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -71,7 +66,7 @@ export const useSettingsStore = create<SettingsState>()(
       }
     },
     {
-      name: 'openclaw-settings',
+      name: 'hermes-settings',
       skipHydration: true,
     },
   ),
@@ -101,68 +96,12 @@ export function resolveTheme(theme: SettingsThemeMode): 'light' | 'dark' {
     : 'light'
 }
 
-export function applyTheme(theme: SettingsThemeMode) {
-  if (typeof document === 'undefined') return
-
-  const root = document.documentElement
-  const media = window.matchMedia('(prefers-color-scheme: dark)')
-
-  root.classList.remove('light', 'dark', 'system')
-  root.classList.add(theme)
-
-  if (theme === 'system' && media.matches) {
-    root.classList.add('dark')
-  }
-
-  // Sync data-theme so CSS variable overrides don't fight Tailwind dark: classes.
-  // paper-light CSS has !important overrides that win over dark: variants unless data-theme is correct.
-  const resolvedDark =
-    theme === 'dark' || (theme === 'system' && media.matches)
-  if (resolvedDark) {
-    // Preserve user's enterprise dark theme if set, otherwise default to ops-dark
-    const stored = localStorage.getItem('clawsuite-theme')
-    const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
-    root.setAttribute('data-theme', darkThemes.includes(stored ?? '') ? (stored as string) : 'ops-dark')
-  } else {
-    root.setAttribute('data-theme', 'paper-light')
-  }
-
-  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent')) || 'orange'
-  root.setAttribute('data-accent', storedAccent)
+export function applyTheme(_theme?: SettingsThemeMode) {
+  setTheme(getTheme())
+  document.documentElement.setAttribute('data-accent', 'orange')
 }
-
-function applySettingsAppearance(settings: StudioSettings) {
-  applyTheme(settings.theme)
-  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent'))
-  applyAccentColor(storedAccent ?? settings.accentColor)
-}
-
-let didInitializeSettingsAppearance = false
 
 export function initializeSettingsAppearance() {
-  if (didInitializeSettingsAppearance) return
-  if (typeof window === 'undefined') return
-
-  didInitializeSettingsAppearance = true
-
-  // Rehydrate persisted settings from localStorage (skipHydration: true requires manual call)
-  void useSettingsStore.persist.rehydrate()
-
-  applySettingsAppearance(useSettingsStore.getState().settings)
-
-  useSettingsStore.subscribe(
-    function handleSettingsChange(state, previousState) {
-      const nextSettings = state.settings
-      const previousSettings = previousState.settings
-
-      if (nextSettings.theme !== previousSettings.theme) {
-        applyTheme(nextSettings.theme)
-      }
-
-      if (nextSettings.accentColor !== previousSettings.accentColor) {
-        localStorage.setItem('clawsuite-accent', nextSettings.accentColor)
-        applyAccentColor(nextSettings.accentColor)
-      }
-    },
-  )
+  setTheme(getTheme())
+  document.documentElement.setAttribute('data-accent', 'orange')
 }

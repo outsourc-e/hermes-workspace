@@ -1,10 +1,3 @@
-import { gatewayRpc } from './gateway'
-
-type SessionsResolveResponse = {
-  ok?: boolean
-  key?: string
-}
-
 type ResolveSessionKeyInput = {
   rawSessionKey?: string
   friendlyId?: string
@@ -16,10 +9,17 @@ type ResolveSessionResult = {
   resolvedVia: 'raw' | 'friendly' | 'default'
 }
 
+const SYNTHETIC_SESSION_KEYS = new Set(['main', 'new'])
+
+export function isSyntheticSessionKey(value: string | null | undefined): boolean {
+  if (!value) return false
+  return SYNTHETIC_SESSION_KEYS.has(value.trim())
+}
+
 export async function resolveSessionKey({
   rawSessionKey,
   friendlyId,
-  defaultKey = 'main',
+  defaultKey = 'new',
 }: ResolveSessionKeyInput): Promise<ResolveSessionResult> {
   const trimmedRaw = rawSessionKey?.trim() ?? ''
   if (trimmedRaw.length > 0) {
@@ -28,20 +28,7 @@ export async function resolveSessionKey({
 
   const trimmedFriendly = friendlyId?.trim() ?? ''
   if (trimmedFriendly.length > 0) {
-    const resolved = await gatewayRpc<SessionsResolveResponse>(
-      'sessions.resolve',
-      {
-        key: trimmedFriendly,
-        includeUnknown: true,
-        includeGlobal: true,
-      },
-    )
-    const resolvedKey =
-      typeof resolved.key === 'string' ? resolved.key.trim() : ''
-    if (resolvedKey.length === 0) {
-      throw new Error('session not found')
-    }
-    return { sessionKey: resolvedKey, resolvedVia: 'friendly' }
+    return { sessionKey: trimmedFriendly, resolvedVia: 'friendly' }
   }
 
   return { sessionKey: defaultKey, resolvedVia: 'default' }

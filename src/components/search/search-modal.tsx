@@ -1,6 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  AiBrain01Icon,
   Chat01Icon,
   Clock01Icon,
   CommandIcon,
@@ -78,7 +77,7 @@ export function SearchModal() {
   const deferredQuery = useDeferredValue(debouncedQuery)
 
   // Real data (Phase 3.2)
-  const { sessions, files, skills, activity } = useSearchData(scope)
+  const { sessions, files, skills } = useSearchData(scope)
   const searchableFiles = useMemo(
     () => files.filter((entry) => entry.type === 'file'),
     [files],
@@ -93,17 +92,7 @@ export function SearchModal() {
         description: 'Start a new conversation session',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/new' })
-        },
-      },
-      {
-        id: 'qa-dashboard',
-        emoji: '🏠',
-        label: 'Dashboard',
-        description: 'Open the dashboard workspace',
-        onSelect: () => {
-          closeModal()
-          navigate({ to: '/dashboard' })
+          navigate({ to: '/chat' })
         },
       },
       {
@@ -117,33 +106,13 @@ export function SearchModal() {
         },
       },
       {
-        id: 'qa-terminal',
-        emoji: '🖥️',
-        label: 'Terminal',
-        description: 'Jump into terminal view',
+        id: 'qa-memory',
+        emoji: '🧠',
+        label: 'Memory',
+        description: 'Browse durable memory entries',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/terminal' })
-        },
-      },
-      {
-        id: 'qa-logs',
-        emoji: '📄',
-        label: 'Logs',
-        description: 'Open the real-time activity log viewer',
-        onSelect: () => {
-          closeModal()
-          navigate({ to: '/logs' })
-        },
-      },
-      {
-        id: 'qa-cron',
-        emoji: '⏰',
-        label: 'Cron',
-        description: 'Open cron job manager and run history',
-        onSelect: () => {
-          closeModal()
-          navigate({ to: '/cron' })
+          navigate({ to: '/memory' })
         },
       },
       {
@@ -164,16 +133,6 @@ export function SearchModal() {
         onSelect: () => {
           closeModal()
           navigate({ to: '/settings' })
-        },
-      },
-      {
-        id: 'qa-spawn-agent',
-        emoji: '🤖',
-        label: 'Spawn Agent',
-        description: 'Placeholder action for agent orchestration',
-        onSelect: () => {
-          closeModal()
-          window.alert('Spawn Agent is coming soon.')
         },
       },
       {
@@ -260,24 +219,7 @@ export function SearchModal() {
     }))
 
     // Real activity data
-    const activityResults = filterResults(
-      activity,
-      normalized,
-      ['title', 'detail', 'source'],
-      RESULT_LIMITS.agents,
-    ).map<SearchResultItemData>((entry) => ({
-      id: entry.id,
-      scope: 'agents',
-      icon: <HugeiconsIcon icon={AiBrain01Icon} size={20} strokeWidth={1.5} />,
-      title: entry.title,
-      snippet: entry.detail || '',
-      meta: new Date(entry.timestamp).toLocaleTimeString(),
-      badge: entry.level,
-      onSelect: () => {
-        closeModal()
-        navigate({ to: '/activity' })
-      },
-    }))
+    const activityResults: Array<SearchResultItemData> = []
 
     // Real skills data (static)
     const skillResults = filterResults(
@@ -313,9 +255,7 @@ export function SearchModal() {
             icon={
               entry.id === 'qa-logs'
                 ? ListViewIcon
-                : entry.id === 'qa-cron'
-                  ? Clock01Icon
-                  : FlashIcon
+                : FlashIcon
             }
             size={20}
             strokeWidth={1.5}
@@ -343,7 +283,6 @@ export function SearchModal() {
       ...actions,
     ].slice(0, RESULT_LIMITS.total)
   }, [
-    activity,
     closeModal,
     deferredQuery,
     navigate,

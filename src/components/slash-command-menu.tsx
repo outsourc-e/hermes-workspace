@@ -24,11 +24,12 @@ type SlashCommandMenuHandle = {
 }
 
 const SLASH_COMMANDS: Array<SlashCommandDefinition> = [
-  { command: '/model', description: 'Switch AI model' },
-  { command: '/status', description: 'Show session status' },
-  { command: '/reasoning', description: 'Toggle reasoning mode' },
   { command: '/new', description: 'Start new session' },
-  { command: '/clear', description: 'Clear conversation' },
+  { command: '/clear', description: 'Clear screen and start fresh' },
+  { command: '/model', description: 'Show or change the current model' },
+  { command: '/save', description: 'Save the current conversation' },
+  { command: '/skills', description: 'Browse and manage skills' },
+  { command: '/skin', description: 'Change the display theme' },
   { command: '/help', description: 'Show available commands' },
 ]
 
@@ -94,7 +95,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
 
   return (
     <div className="pointer-events-none absolute inset-x-2 bottom-[calc(100%+0.5rem)] z-[70]">
-      <div className="pointer-events-auto overflow-hidden rounded-xl border border-primary-200 bg-surface shadow-lg">
+      <div className="pointer-events-auto overflow-hidden rounded-xl border border-primary-200 shadow-lg" style={{ background: 'var(--color-surface, var(--theme-card, #1a1f2e))' }}>
         <Command
           items={filteredCommands}
           value={query}

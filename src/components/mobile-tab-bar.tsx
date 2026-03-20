@@ -1,9 +1,11 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BotIcon,
+  BrainIcon,
   Chat01Icon,
-  Home01Icon,
+  Clock01Icon,
+  CommandLineIcon,
+  File01Icon,
   PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
@@ -34,25 +36,39 @@ type TabItem = {
 
 const TABS: TabItem[] = [
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: Home01Icon,
-    to: '/dashboard',
-    match: (p) => p.startsWith('/dashboard'),
-  },
-  {
-    id: 'agents',
-    label: 'Agent Hub',
-    icon: BotIcon,
-    to: '/agent-swarm',
-    match: (p) => p.startsWith('/agent-swarm') || p.startsWith('/agents'),
-  },
-  {
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
     to: '/chat/main',
     match: (p) => p.startsWith('/chat') || p === '/new' || p === '/',
+  },
+  {
+    id: 'files',
+    label: 'Files',
+    icon: File01Icon,
+    to: '/files',
+    match: (p) => p.startsWith('/files'),
+  },
+  {
+    id: 'terminal',
+    label: 'Terminal',
+    icon: CommandLineIcon,
+    to: '/terminal',
+    match: (p) => p.startsWith('/terminal'),
+  },
+  {
+    id: 'jobs',
+    label: 'Jobs',
+    icon: Clock01Icon,
+    to: '/jobs',
+    match: (p) => p.startsWith('/jobs'),
+  },
+  {
+    id: 'memory',
+    label: 'Memory',
+    icon: BrainIcon,
+    to: '/memory',
+    match: (p) => p.startsWith('/memory'),
   },
   {
     id: 'skills',
@@ -190,11 +206,10 @@ export function MobileTabBar() {
         'fixed bottom-0 left-0 right-0 mx-auto w-fit z-[80] md:hidden',
         // Vertical position: above home indicator
         'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
-        // Frosted glass pill
-        'bg-white/75 dark:bg-neutral-900/75 backdrop-blur-2xl',
+        // Keep the pill visually isolated from page and error-state backgrounds
+        'bg-surface/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-surface/90',
         'rounded-full',
-        'border border-white/40 dark:border-white/10',
-        'shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
+        'border border-primary-200/40',
         // Inner padding
         'px-3 py-2',
         // Hide/show animation
@@ -244,7 +259,7 @@ export function MobileTabBar() {
                   circleSize,
                   isActive
                     ? 'bg-accent-500 text-white shadow-sm'
-                    : 'text-neutral-400 dark:text-neutral-500',
+                    : 'text-primary-500',
                 )}
               >
                 <HugeiconsIcon

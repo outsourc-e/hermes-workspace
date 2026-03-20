@@ -1,26 +1,24 @@
 {
-  "name": "ClawSuite",
-  "short_name": "ClawSuite",
-  "description": "The Full-Stack Command Center for OpenClaw",
+  "name": "Hermes Workspace",
+  "short_name": "Hermes",
+  "description": "Native web control surface for Hermes Agent",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fafaf9",
-  "theme_color": "#f97316",
-  "categories": ["productivity", "utilities"],
+  "background_color": "#0A0E1A",
+  "theme_color": "#6366F1",
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png"
-    },
-    {
-      "src": "/clawsuite-icon-192.png",
+      "src": "/hermes-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/clawsuite-icon-512.png",
+      "src": "/hermes-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

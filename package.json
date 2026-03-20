@@ -1,17 +1,11 @@
 {
-  "name": "clawsuite",
-  "version": "3.3.0",
-  "description": "Supercharged dashboard for OpenClaw AI agents — chat, file explorer, terminal, and usage tracking",
+  "name": "hermes-workspace",
+  "version": "0.1.0",
+  "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/outsourc-e/clawsuite.git"
-  },
-  "homepage": "https://clawsuite.io",
   "private": true,
   "type": "module",
-  "main": "electron/main.cjs",
   "scripts": {
     "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev --port 3000",
     "build": "vite build",
@@ -21,18 +15,14 @@
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix",
-    "electron:dev": "NODE_ENV=development electron .",
-    "electron:build": "npm run build && electron-builder --config electron-builder.config.cjs",
-    "electron:build:mac": "npm run build && electron-builder --mac --config electron-builder.config.cjs",
-    "electron:build:win": "npm run build && electron-builder --win --config electron-builder.config.cjs",
-    "beta:reset-state": "bash scripts/beta/reset_local_state.sh",
-    "beta:export-diagnostics": "bash scripts/beta/export_diagnostics_and_scan.sh"
+    "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
     "@hugeicons/core-free-icons": "^3.1.1",
     "@hugeicons/react": "^1.1.4",
+    "@lobehub/icons": "^5.0.1",
+    "@lobehub/icons-static-png": "^1.83.0",
     "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.84.1",
@@ -77,8 +67,6 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
-    "electron": "^40.8.0",
-    "electron-builder": "^26.8.1",
     "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
     "tsx": "^4.21.0",
@@ -88,3 +76,4 @@
     "web-vitals": "^5.1.0"
   }
 }
+

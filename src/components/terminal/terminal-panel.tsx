@@ -23,7 +23,7 @@ const ACTIVE_TAB_KEY = 'terminal.active'
 const DEFAULT_HEIGHT = 360
 const MIN_HEIGHT = 300
 const MAX_HEIGHT = 480
-const DEFAULT_CWD = '~/.openclaw/workspace'
+const DEFAULT_CWD = '~/.hermes'
 
 type TerminalTabState = {
   id: string
@@ -193,6 +193,8 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
         cursorBlink: true,
         fontSize: 13,
         fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+        scrollback: 500,
+        convertEol: true,
       })
       const fitAddon = new FitAddon()
       const webLinks = new WebLinksAddon()

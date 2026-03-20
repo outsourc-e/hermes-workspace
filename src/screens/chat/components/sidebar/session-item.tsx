@@ -127,7 +127,10 @@ function SessionItemComponent({
     <Link
       to="/chat/$sessionKey"
       params={{ sessionKey: session.friendlyId }}
-      onClick={onSelect}
+      onClick={() => {
+        try { localStorage.setItem('hermes-last-session', session.friendlyId) } catch {}
+        onSelect?.()
+      }}
       className={cn(
         'group inline-flex items-center justify-between',
         'w-full text-left pl-1.5 pr-0.5 h-14 rounded-lg transition-colors duration-0',

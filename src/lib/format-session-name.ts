@@ -1,5 +1,5 @@
 /**
- * Convert raw gateway session keys to human-readable names.
+ * Convert raw Hermes session keys to human-readable names.
  *
  * Examples:
  *   "agent:main:main" → "Main"
@@ -14,8 +14,8 @@ const PLATFORM_NAMES: Record<string, string> = {
   whatsapp: 'WhatsApp',
   signal: 'Signal',
   imessage: 'iMessage',
-  webchat: 'ClawSuite',
-  'openclaw-control-ui': 'ClawSuite',
+  webchat: 'Hermes',
+  'openclaw-control-ui': 'Hermes',
   slack: 'Slack',
   irc: 'IRC',
   googlechat: 'Google Chat',

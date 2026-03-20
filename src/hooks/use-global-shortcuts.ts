@@ -58,10 +58,10 @@ export function useGlobalShortcuts() {
         return
       }
 
-      // Cmd/Ctrl+Shift+L — Focus activity log
+      // Cmd/Ctrl+Shift+L — Focus chat workspace
       if (mod && event.shiftKey && event.key.toLowerCase() === 'l') {
         event.preventDefault()
-        void navigate({ to: '/activity' })
+        void navigate({ to: '/chat' })
         return
       }
     }

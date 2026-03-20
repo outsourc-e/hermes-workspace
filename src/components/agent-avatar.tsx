@@ -1,7 +1,6 @@
 'use client'
 
 import { useSyncExternalStore } from 'react'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import {
   TooltipContent,
   TooltipProvider,
@@ -13,8 +12,8 @@ import { cn } from '@/lib/utils'
 export type AgentAvatarPreference = 'lobster' | 'logo'
 export type AgentAvatarSize = 'sm' | 'md' | 'lg'
 
-export const AGENT_AVATAR_STORAGE_KEY = 'clawsuite-loader-preference'
-const AGENT_AVATAR_EVENT = 'clawsuite-loader-preference-change'
+export const AGENT_AVATAR_STORAGE_KEY = 'hermes-loader-preference'
+const AGENT_AVATAR_EVENT = 'hermes-loader-preference-change'
 
 type AgentAvatarProps = {
   size?: AgentAvatarSize
@@ -142,9 +141,7 @@ function AgentAvatar({
               🦞
             </span>
           ) : (
-            <OpenClawStudioIcon
-              className={cn(getLogoSizeClassName(size), iconClassName)}
-            />
+            <img src="/hermes-avatar.webp" alt="Hermes" className={cn(getLogoSizeClassName(size), iconClassName, 'rounded-xl')} />
           )}
         </TooltipTrigger>
         <TooltipContent side="top">Click to switch avatar</TooltipContent>

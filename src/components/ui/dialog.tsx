@@ -24,16 +24,22 @@ type DialogContentProps = {
 function DialogContent({ className, children }: DialogContentProps) {
   return (
     <Dialog.Portal>
-      <Dialog.Backdrop className="fixed inset-0 bg-ink/40 transition-all duration-150 data-[state=open]:opacity-100 data-[state=closed]:opacity-0 dark:bg-surface/40" />
+      <Dialog.Backdrop className="fixed inset-0 transition-all duration-150 data-[state=open]:opacity-100 data-[state=closed]:opacity-0" style={{ background: 'rgba(0,0,0,0.5)' }} />
       <Dialog.Popup
         className={cn(
           'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
-          'w-[min(400px,92vw)] rounded-[20px] border border-primary-200 bg-primary-50 p-0 shadow-lg',
+          'w-[min(400px,92vw)] rounded-[20px] p-0',
           'transition-all duration-150',
           'data-[state=open]:opacity-100 data-[state=closed]:opacity-0',
           'data-[state=open]:scale-100 data-[state=closed]:scale-95',
           className,
         )}
+        style={{
+          background: 'var(--theme-panel)',
+          border: '1px solid var(--theme-border)',
+          boxShadow: 'var(--theme-shadow-3)',
+          color: 'var(--theme-text)',
+        }}
       >
         {children}
       </Dialog.Popup>
@@ -46,7 +52,8 @@ type DialogTitleProps = React.ComponentProps<typeof Dialog.Title>
 function DialogTitle({ className, ...props }: DialogTitleProps) {
   return (
     <Dialog.Title
-      className={cn('text-lg font-medium text-primary-900', className)}
+      className={cn('text-lg font-medium', className)}
+      style={{ color: 'var(--theme-text)' }}
       {...props}
     />
   )
@@ -57,7 +64,8 @@ type DialogDescriptionProps = React.ComponentProps<typeof Dialog.Description>
 function DialogDescription({ className, ...props }: DialogDescriptionProps) {
   return (
     <Dialog.Description
-      className={cn('text-sm text-primary-600', className)}
+      className={cn('text-sm', className)}
+      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )

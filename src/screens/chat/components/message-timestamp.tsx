@@ -1,10 +1,3 @@
-import {
-  TooltipContent,
-  TooltipProvider,
-  TooltipRoot,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-
 type MessageTimestampProps = {
   timestamp: number
 }
@@ -52,13 +45,11 @@ export function MessageTimestamp({ timestamp }: MessageTimestampProps) {
   const fullLabel = formatFull(timestamp)
 
   return (
-    <TooltipProvider>
-      <TooltipRoot>
-        <TooltipTrigger className="inline-flex items-center text-xs text-primary-600">
-          {shortLabel}
-        </TooltipTrigger>
-        <TooltipContent side="top">{fullLabel}</TooltipContent>
-      </TooltipRoot>
-    </TooltipProvider>
+    <span
+      className="inline-flex items-center text-xs text-primary-600"
+      title={fullLabel}
+    >
+      {shortLabel}
+    </span>
   )
 }

@@ -39,9 +39,14 @@ function TooltipContent({
       <Tooltip.Positioner side={side}>
         <Tooltip.Popup
           className={cn(
-            'rounded-md border border-primary-900 bg-primary-950 px-2 py-1 text-xs text-primary-50 shadow-sm',
+            'rounded-md px-2 py-1 text-xs shadow-sm',
             className,
           )}
+          style={{
+            background: 'var(--theme-card)',
+            color: 'var(--theme-text)',
+            border: '1px solid var(--theme-border)',
+          }}
         >
           {children}
         </Tooltip.Popup>

@@ -5,13 +5,9 @@ import { ensureBusStarted, subscribeToChatEvents } from '../../server/chat-event
 /**
  * SSE endpoint for chat events.
  *
- * This is now a thin shell — all event processing and deduplication happens
- * in the singleton chat-event-bus. Each SSE connection just subscribes to
- * the bus and serializes events to SSE format.
- *
- * Architecture:
- *   Gateway WebSocket → 1 listener (chat-event-bus) → N SSE subscribers
- *   Dedup happens ONCE at the bus level, not N times per connection.
+ * Hermes does not expose a global browser-facing event stream, so the server
+ * keeps a local singleton bus of translated chat events and fans that out to
+ * any browser SSE subscribers.
  */
 export const Route = createFileRoute('/api/chat-events')({
   server: {

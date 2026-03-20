@@ -4,10 +4,9 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const TAB_ORDER = [
-  '/dashboard',
-  '/agent-swarm',
   '/chat/main',
-  '/skills',
+  '/files',
+  '/jobs',
   '/settings',
 ] as const
 
@@ -26,15 +25,12 @@ type GestureState = {
 }
 
 function findCurrentTabIndex(pathname: string): number {
-  if (pathname.startsWith('/dashboard')) return 0
-  if (pathname.startsWith('/agent-swarm') || pathname.startsWith('/agents')) {
-    return 1
-  }
   if (pathname.startsWith('/chat') || pathname === '/new' || pathname === '/') {
-    return 2
+    return 0
   }
-  if (pathname.startsWith('/skills')) return 3
-  if (pathname.startsWith('/settings')) return 4
+  if (pathname.startsWith('/files')) return 1
+  if (pathname.startsWith('/jobs')) return 2
+  if (pathname.startsWith('/settings')) return 3
   return -1
 }
 

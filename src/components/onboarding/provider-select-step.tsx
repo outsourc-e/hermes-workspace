@@ -76,7 +76,7 @@ const PROVIDERS: Provider[] = [
   {
     id: 'openrouter',
     name: 'OpenRouter',
-    description: 'One gateway to 200+ AI models. Ideal for flexibility and experimentation',
+    description: 'One Hermes connection to 200+ AI models. Ideal for flexibility and experimentation',
     badge: 'Popular',
     logo: <OpenRouterLogo className="size-8" />,
     placeholder: 'sk-or-v1-...',

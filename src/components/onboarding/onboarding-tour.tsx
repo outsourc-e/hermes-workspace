@@ -6,7 +6,7 @@ import { tourSteps } from './tour-steps'
 import { useSettingsStore } from '@/hooks/use-settings'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
 
-const TOUR_STORAGE_KEY = 'clawsuite-onboarding-completed'
+const TOUR_STORAGE_KEY = 'hermes-onboarding-completed'
 
 // Accent color mapping to hex values
 const ACCENT_COLORS = {
@@ -43,11 +43,11 @@ export function OnboardingTour() {
       const hasCompletedTour = localStorage.getItem(TOUR_STORAGE_KEY)
       if (hasCompletedTour) return
 
-      // Wait for gateway wizard to finish before starting tour
-      const GATEWAY_SETUP_KEY = 'clawsuite-gateway-configured'
+      // Wait for setup wizard to finish before starting tour
+      const HERMES_SETUP_KEY = 'hermes-configured'
       const checkAndStart = () => {
-        const gatewayConfigured = localStorage.getItem(GATEWAY_SETUP_KEY) === 'true'
-        if (gatewayConfigured) {
+        const hermesConfigured = localStorage.getItem(HERMES_SETUP_KEY) === 'true'
+        if (hermesConfigured) {
           setRun(true)
           return true
         }
@@ -57,7 +57,7 @@ export function OnboardingTour() {
       // Check immediately
       if (checkAndStart()) return
 
-      // Poll until gateway wizard completes (check every 2s)
+      // Poll until setup wizard completes (check every 2s)
       const interval = setInterval(() => {
         if (checkAndStart()) clearInterval(interval)
       }, 2000)

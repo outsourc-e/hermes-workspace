@@ -1,6 +1,6 @@
 /**
  * Phase 2.6: Workspace detection API
- * Auto-detects workspace from Gateway config, env, or default paths
+ * Auto-detects workspace from Hermes config, env, or default paths
  */
 import os from 'node:os'
 import path from 'node:path'
@@ -44,21 +44,23 @@ async function detectWorkspace(savedPath?: string): Promise<{
   }
 
   // Priority 2: Environment variable
-  const envWorkspace = process.env.OPENCLAW_WORKSPACE_DIR?.trim()
+  const envWorkspace =
+    process.env.HERMES_WORKSPACE_DIR?.trim() ||
+    process.env.HERMES_WORKSPACE_DIR?.trim()
   if (envWorkspace) {
     const isValid = await isValidDirectory(envWorkspace)
     if (isValid) {
       return {
         path: envWorkspace,
         folderName: extractFolderName(envWorkspace),
-        source: 'gateway',
+        source: 'hermes',
         isValid: true,
       }
     }
   }
 
-  // Priority 3: Default OpenClaw workspace path
-  const defaultPath = path.join(os.homedir(), '.openclaw', 'workspace')
+  // Priority 3: Default Hermes workspace path
+  const defaultPath = path.join(os.homedir(), '.hermes')
   const defaultValid = await isValidDirectory(defaultPath)
   if (defaultValid) {
     return {
@@ -69,13 +71,13 @@ async function detectWorkspace(savedPath?: string): Promise<{
     }
   }
 
-  // Priority 4: Home directory .openclaw (even if workspace subfolder doesn't exist)
-  const openclawDir = path.join(os.homedir(), '.openclaw')
-  const openclawValid = await isValidDirectory(openclawDir)
-  if (openclawValid) {
+  // Priority 4: Hermes home directory
+  const hermesDir = path.join(os.homedir(), '.hermes')
+  const hermesDirValid = await isValidDirectory(hermesDir)
+  if (hermesDirValid) {
     return {
-      path: openclawDir,
-      folderName: '.openclaw',
+      path: hermesDir,
+      folderName: '.hermes',
       source: 'default',
       isValid: true,
     }

@@ -1,11 +1,18 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { chatQueryKeys, fetchHistory } from '../chat-queries'
 import { getMessageTimestamp, textFromMessage } from '../utils'
+import {
+  cleanupExpiredPendingSends,
+  clearPendingMessage,
+  persistPendingMessage,
+  readPendingMessage,
+  type PendingSendPayload,
+} from '../pending-send'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
 import type { QueryClient } from '@tanstack/react-query'
-import type { GatewayMessage, HistoryResponse } from '../types'
+import type { ChatMessage, HistoryResponse } from '../types'
 
 type UseChatHistoryInput = {
   activeFriendlyId: string
@@ -108,6 +115,80 @@ function parseExecNotification(text: string): ExecNotification | null {
   }
 }
 
+function normalizeMessageValue(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function getMessageClientId(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  return (
+    normalizeMessageValue(raw.clientId) ||
+    normalizeMessageValue(raw.client_id) ||
+    normalizeMessageValue(raw.idempotencyKey)
+  )
+}
+
+function getAttachmentSignature(message: ChatMessage): string {
+  if (!Array.isArray(message.attachments) || message.attachments.length === 0) {
+    return ''
+  }
+
+  return message.attachments
+    .map((attachment) => {
+      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const size = typeof attachment?.size === 'number' ? String(attachment.size) : ''
+      const type =
+        typeof attachment?.contentType === 'string'
+          ? attachment.contentType
+          : ''
+      return `${name}:${size}:${type}`
+    })
+    .sort()
+    .join('|')
+}
+
+function isOptimisticUserMessage(message: ChatMessage): boolean {
+  if (message.role !== 'user') return false
+  const raw = message as Record<string, unknown>
+  return (
+    normalizeMessageValue(raw.status) === 'sending' ||
+    normalizeMessageValue(raw.__optimisticId).length > 0
+  )
+}
+
+function isSameUserMessage(a: ChatMessage, b: ChatMessage): boolean {
+  if (a.role !== 'user' || b.role !== 'user') return false
+
+  const aClientId = getMessageClientId(a)
+  const bClientId = getMessageClientId(b)
+  if (aClientId && bClientId && aClientId === bClientId) return true
+
+  const aText = textFromMessage(a).trim()
+  const bText = textFromMessage(b).trim()
+  if (aText && bText && aText === bText) return true
+
+  const aAttachments = getAttachmentSignature(a)
+  const bAttachments = getAttachmentSignature(b)
+  if (aAttachments && bAttachments && aAttachments === bAttachments) return true
+
+  return false
+}
+
+function hasConfirmedPendingMessage(
+  serverMessages: Array<ChatMessage>,
+  pendingMessage: ChatMessage,
+): boolean {
+  const pendingTimestamp = getMessageTimestamp(pendingMessage)
+
+  return serverMessages.some((message) => {
+    if (message.role !== 'user') return false
+    if (isOptimisticUserMessage(message)) return false
+    if (!isSameUserMessage(message, pendingMessage)) return false
+    const messageTimestamp = getMessageTimestamp(message)
+    return Math.abs(messageTimestamp - pendingTimestamp) <= 5 * 60 * 1000
+  })
+}
+
 export function useChatHistory({
   activeFriendlyId,
   activeSessionKey,
@@ -125,16 +206,42 @@ export function useChatHistory({
     if (normalizedFriendlyId === 'main') return ''
     return normalizedFriendlyId
   }, [activeFriendlyId])
+  const normalizedForcedSessionKey = useMemo(
+    () => normalizeSessionCandidate(forcedSessionKey),
+    [forcedSessionKey],
+  )
+  const normalizedActiveSessionKey = useMemo(
+    () => normalizeSessionCandidate(activeSessionKey),
+    [activeSessionKey],
+  )
 
   const sessionKeyForHistory = useMemo(() => {
     const candidates = [
-      normalizeSessionCandidate(forcedSessionKey),
-      normalizeSessionCandidate(activeSessionKey),
+      normalizedForcedSessionKey,
+      normalizedActiveSessionKey,
       explicitRouteSessionKey,
     ]
     const match = candidates.find((candidate) => candidate.length > 0)
     return match || 'main'
-  }, [activeSessionKey, explicitRouteSessionKey, forcedSessionKey])
+  }, [
+    explicitRouteSessionKey,
+    normalizedActiveSessionKey,
+    normalizedForcedSessionKey,
+  ])
+  const hasDirectSessionKey = Boolean(
+    normalizedForcedSessionKey ||
+      normalizedActiveSessionKey ||
+      explicitRouteSessionKey,
+  )
+  const canFetchWithoutSessions = Boolean(
+    normalizedForcedSessionKey || explicitRouteSessionKey,
+  )
+  const shouldFetchHistory =
+    !isNewChat &&
+    Boolean(sessionKeyForHistory) &&
+    (canFetchWithoutSessions ||
+      (!isRedirecting &&
+        (hasDirectSessionKey || !sessionsReady || activeExists)))
 
   const historyKey = chatQueryKeys.history(
     activeFriendlyId,
@@ -170,14 +277,11 @@ export function useChatHistory({
         messages: merged,
       }
     },
-    enabled:
-      !isNewChat && // Don't fetch history for new chats
-      Boolean(sessionKeyForHistory) &&
-      !isRedirecting &&
-      (!sessionsReady || activeExists || Boolean(explicitRouteSessionKey)),
+    enabled: shouldFetchHistory,
     placeholderData: function useCachedHistory(): HistoryResponse | undefined {
       return queryClient.getQueryData(historyKey)
     },
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval: historyRefetchInterval,
     gcTime: 1000 * 60 * 10,
@@ -185,12 +289,57 @@ export function useChatHistory({
     notifyOnChangeProps: ['data', 'error', 'isError'],
   })
 
+  const [persistedPending, setPersistedPending] =
+    useState<PendingSendPayload | null>(null)
+
+  useEffect(() => {
+    cleanupExpiredPendingSends()
+    setPersistedPending(readPendingMessage(sessionKeyForHistory, activeFriendlyId))
+  }, [activeFriendlyId, sessionKeyForHistory])
+
+  const rawHistoryMessages = useMemo(() => {
+    return Array.isArray(historyQuery.data?.messages) ? historyQuery.data.messages : []
+  }, [historyQuery.data?.messages])
+
+  useEffect(() => {
+    if (!sessionKeyForHistory || sessionKeyForHistory === 'new') return
+
+    const optimisticMessages = rawHistoryMessages.filter(isOptimisticUserMessage)
+    if (optimisticMessages.length === 0) return
+
+    const latestOptimisticMessage =
+      optimisticMessages[optimisticMessages.length - 1] ?? null
+    if (!latestOptimisticMessage) return
+
+    persistPendingMessage({
+      sessionKey: sessionKeyForHistory,
+      friendlyId: activeFriendlyId,
+      message: textFromMessage(latestOptimisticMessage),
+      attachments: Array.isArray(latestOptimisticMessage.attachments)
+        ? latestOptimisticMessage.attachments
+        : [],
+      optimisticMessage: latestOptimisticMessage,
+    })
+  }, [activeFriendlyId, rawHistoryMessages, sessionKeyForHistory])
+
+  useEffect(() => {
+    if (!persistedPending) return
+    if (
+      hasConfirmedPendingMessage(rawHistoryMessages, persistedPending.optimisticMessage)
+    ) {
+      clearPendingMessage(persistedPending.sessionKey)
+      setPersistedPending(null)
+    }
+  }, [persistedPending, rawHistoryMessages])
+
   const stableHistorySignatureRef = useRef('')
-  const stableHistoryMessagesRef = useRef<Array<GatewayMessage>>([])
+  const stableHistoryMessagesRef = useRef<Array<ChatMessage>>([])
   const historyMessages = useMemo(() => {
-    const messages = Array.isArray(historyQuery.data?.messages)
-      ? historyQuery.data.messages
-      : []
+    const messages = persistedPending
+      ? mergeOptimisticHistoryMessages(rawHistoryMessages, [
+          persistedPending.optimisticMessage,
+        ])
+      : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
@@ -205,7 +354,7 @@ export function useChatHistory({
     stableHistorySignatureRef.current = signature
     stableHistoryMessagesRef.current = messages
     return messages
-  }, [historyQuery.data?.messages])
+  }, [persistedPending, rawHistoryMessages])
 
   const showToolMessages = useChatSettingsStore(
     (s) => s.settings.showToolMessages,
@@ -213,7 +362,7 @@ export function useChatHistory({
 
   // Filter messages for display - hide tool calls, system events, etc.
   const displayMessages = useMemo(() => {
-    const filtered = historyMessages.filter((msg: GatewayMessage) => {
+    const filtered = historyMessages.filter((msg: ChatMessage) => {
       // Always show user messages (unless system events)
       if (msg.role === 'user') {
         const text = textFromMessage(msg)
@@ -296,7 +445,7 @@ export function useChatHistory({
 
       const hasLater = filtered
         .slice(i + 1)
-        .some((m: GatewayMessage) => m.role === 'assistant')
+        .some((m: ChatMessage) => m.role === 'assistant')
       if (hasLater) {
         if (!showToolMessages) {
           // Hide intermediate narration entirely
@@ -321,21 +470,19 @@ export function useChatHistory({
   const historyError =
     historyQuery.error instanceof Error ? historyQuery.error.message : null
   const resolvedSessionKey = useMemo(() => {
-    const normalizedForced = normalizeSessionCandidate(forcedSessionKey)
-    if (normalizedForced) return normalizedForced
+    if (normalizedForcedSessionKey) return normalizedForcedSessionKey
     const key = historyQuery.data?.sessionKey
     if (typeof key === 'string' && key.trim().length > 0) {
       return key.trim()
     }
-    const normalizedActive = normalizeSessionCandidate(activeSessionKey)
-    if (normalizedActive) return normalizedActive
+    if (normalizedActiveSessionKey) return normalizedActiveSessionKey
     if (explicitRouteSessionKey) return explicitRouteSessionKey
     return 'main'
   }, [
-    activeSessionKey,
     explicitRouteSessionKey,
-    forcedSessionKey,
     historyQuery.data?.sessionKey,
+    normalizedActiveSessionKey,
+    normalizedForcedSessionKey,
   ])
   const activeCanonicalKey =
     resolvedSessionKey || sessionKeyForHistory || 'main'
@@ -353,9 +500,9 @@ export function useChatHistory({
 }
 
 function mergeOptimisticHistoryMessages(
-  serverMessages: Array<GatewayMessage>,
-  optimisticMessages: Array<GatewayMessage>,
-): Array<GatewayMessage> {
+  serverMessages: Array<ChatMessage>,
+  optimisticMessages: Array<ChatMessage>,
+): Array<ChatMessage> {
   if (!optimisticMessages.length) return serverMessages
 
   const merged = [...serverMessages]

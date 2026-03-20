@@ -39,7 +39,7 @@ export function revokeSessionToken(token: string): void {
  */
 export function isPasswordProtectionEnabled(): boolean {
   return Boolean(
-    process.env.CLAWSUITE_PASSWORD && process.env.CLAWSUITE_PASSWORD.length > 0,
+    process.env.HERMES_PASSWORD && process.env.HERMES_PASSWORD.length > 0,
   )
 }
 
@@ -47,7 +47,7 @@ export function isPasswordProtectionEnabled(): boolean {
  * Verify password using timing-safe comparison.
  */
 export function verifyPassword(password: string): boolean {
-  const configured = process.env.CLAWSUITE_PASSWORD
+  const configured = process.env.HERMES_PASSWORD
   if (!configured || configured.length === 0) {
     return false
   }
@@ -78,8 +78,8 @@ export function getSessionTokenFromCookie(
 
   const cookies = cookieHeader.split(';').map((c) => c.trim())
   for (const cookie of cookies) {
-    if (cookie.startsWith('clawsuite-auth=')) {
-      return cookie.substring('clawsuite-auth='.length)
+    if (cookie.startsWith('hermes-auth=')) {
+      return cookie.substring('hermes-auth='.length)
     }
   }
   return null
@@ -89,7 +89,12 @@ function isLocalRequest(request: Request): boolean {
   const forwarded = request.headers.get('x-forwarded-for')
   const ip = forwarded?.split(',')[0]?.trim() || '127.0.0.1'
   const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1']
-  return localIPs.includes(ip)
+  if (localIPs.includes(ip)) return true
+  // Allow Tailscale (100.x.x.x) and private LAN ranges
+  if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return true
+  if (/^192\.168\./.test(ip)) return true
+  if (/^10\./.test(ip)) return true
+  return false
 }
 
 /**
@@ -132,5 +137,5 @@ export function createSessionCookie(token: string): string {
   // sameSite=strict: CSRF protection
   // path=/: available everywhere
   // maxAge: 30 days
-  return `clawsuite-auth=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${30 * 24 * 60 * 60}`
+  return `hermes-auth=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${30 * 24 * 60 * 60}`
 }

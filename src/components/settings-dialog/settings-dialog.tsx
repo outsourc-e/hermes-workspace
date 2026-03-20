@@ -11,16 +11,22 @@ import {
   Notification03Icon,
   PaintBoardIcon,
   Sun01Icon,
-  UserIcon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
-import { useState, useEffect, Component } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
 import type * as React from 'react'
 import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
-import type { ThemeId } from '@/lib/theme'
+import {
+  THEMES,
+  getTheme,
+  getThemeVariant,
+  isDarkTheme,
+  setTheme,
+  type ThemeId,
+} from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -34,6 +40,7 @@ import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 import { applyAccentColor } from '@/lib/accent-colors'
+import { ProviderLogo } from '@/components/provider-logo'
 import {
   DialogClose,
   DialogContent,
@@ -45,30 +52,30 @@ import {
 // ── Types ───────────────────────────────────────────────────────────────
 
 type SectionId =
-  | 'profile'
+  | 'hermes'
   | 'appearance'
   | 'chat'
   | 'notifications'
-  | 'advanced'
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
-  { id: 'profile', label: 'Profile', icon: UserIcon },
+  { id: 'hermes', label: 'Hermes Agent', icon: CloudIcon },
   { id: 'appearance', label: 'Appearance', icon: PaintBoardIcon },
   { id: 'chat', label: 'Chat', icon: MessageMultiple01Icon },
   { id: 'notifications', label: 'Notifications', icon: Notification03Icon },
-  { id: 'advanced', label: 'Advanced', icon: CloudIcon },
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
-  'ops-dark',
-  'premium-dark',
-  'sunset-brand',
+  'hermes-official',
+  'hermes-classic',
+  'hermes-slate',
+  'hermes-mono',
 ])
 
-function isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
+function _isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
   if (!theme) return false
   return DARK_ENTERPRISE_THEMES.has(theme as ThemeId)
 }
+void _isDarkEnterpriseTheme
 
 // ── Shared building blocks ──────────────────────────────────────────────
 
@@ -125,7 +132,257 @@ const SETTINGS_CARD_CLASS =
 
 // ── Section components ──────────────────────────────────────────────────
 
-function ProfileContent() {
+const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: string[]; authType: 'oauth' | 'api_key' | 'none'; envKey?: string }> = [
+  { id: 'nous', name: 'Nous Portal', logo: '/providers/nous.png', models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'], authType: 'oauth' },
+  { id: 'openai-codex', name: 'OpenAI Codex', logo: '/providers/openai.png', models: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'], authType: 'oauth' },
+  { id: 'anthropic', name: 'Anthropic', logo: '/providers/anthropic.png', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'], authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
+  { id: 'openrouter', name: 'OpenRouter', logo: '/providers/openrouter.png', models: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'], authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
+  { id: 'zai', name: 'Z.AI / GLM', logo: '/providers/zhipu.png', models: ['glm-4-plus', 'glm-4-air'], authType: 'api_key', envKey: 'GLM_API_KEY' },
+  { id: 'kimi-coding', name: 'Kimi', logo: '/providers/kimi.png', models: ['kimi-latest', 'moonshot-v1-128k'], authType: 'api_key', envKey: 'KIMI_API_KEY' },
+  { id: 'minimax', name: 'MiniMax', logo: '/providers/minimax.png', models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'], authType: 'api_key', envKey: 'MINIMAX_API_KEY' },
+  { id: 'ollama', name: 'Ollama', logo: '/providers/ollama.png', models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'], authType: 'none' },
+  { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
+]
+
+function HermesContent() {
+  const [activeProvider, setActiveProvider] = useState('')
+  const [activeModel, setActiveModel] = useState('')
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [keyInput, setKeyInput] = useState('')
+  const [_saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [configuredKeys, setConfiguredKeys] = useState<Record<string, string>>({})
+  const [memEnabled, setMemEnabled] = useState(true)
+  const [userProfileEnabled, setUserProfileEnabled] = useState(true)
+
+  const fetchModelsForProvider = useCallback((providerId: string) => {
+    fetch(`/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`)
+      .then((r) => r.json())
+      .then((d: { models?: Array<{ id: string }> }) => {
+        setAvailableModels((d.models || []).map((m) => m.id))
+      })
+      .catch(() => {
+        // Fall back to hardcoded
+        const card = PROVIDER_CARDS.find((p) => p.id === providerId)
+        setAvailableModels(card?.models || [])
+      })
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/hermes-config')
+      .then((r) => r.json())
+      .then((d: any) => {
+        setActiveProvider(d.activeProvider || '')
+        setActiveModel(d.activeModel || '')
+        if (d.activeProvider) fetchModelsForProvider(d.activeProvider)
+        const mem = (d.config?.memory as Record<string, unknown>) || {}
+        setMemEnabled(mem.memory_enabled !== false)
+        setUserProfileEnabled(mem.user_profile_enabled !== false)
+        // Build configured keys map
+        const keys: Record<string, string> = {}
+        for (const p of (d.providers || [])) {
+          if (p.configured && p.envKeys?.[0]) keys[p.envKeys[0]] = p.maskedKeys?.[p.envKeys[0]] || '••••'
+        }
+        setConfiguredKeys(keys)
+      })
+      .catch(() => {})
+  }, [])
+
+  const save = async (updates: { config?: Record<string, unknown>; env?: Record<string, string> }) => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await fetch('/api/hermes-config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) })
+      const r = await res.json() as { message?: string }
+      setMsg(r.message || 'Saved')
+      const ref = await fetch('/api/hermes-config')
+      const d = await ref.json() as any
+      setActiveProvider(d.activeProvider || ''); setActiveModel(d.activeModel || '')
+      const keys: Record<string, string> = {}
+      for (const p of (d.providers || [])) {
+        if (p.configured && p.envKeys?.[0]) keys[p.envKeys[0]] = p.maskedKeys?.[p.envKeys[0]] || '••••'
+      }
+      setConfiguredKeys(keys)
+      setTimeout(() => setMsg(null), 3000)
+    } catch { setMsg('Failed to save') }
+    setSaving(false)
+  }
+
+  const selectProvider = (providerId: string, model?: string) => {
+    setActiveProvider(providerId)
+    if (model) {
+      setActiveModel(model)
+      save({ config: { model, provider: providerId } })
+    } else {
+      // Switching provider without a model — fetch models and pick the first one
+      fetchModelsForProvider(providerId)
+      save({ config: { provider: providerId } })
+    }
+  }
+
+  const cardStyle: React.CSSProperties = { backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }
+  const mutedStyle: React.CSSProperties = { color: 'var(--theme-muted)' }
+
+  return (
+    <div className="space-y-5">
+      {msg && (
+        <div className={cn('rounded-lg px-3 py-2 text-sm font-medium', msg.includes('Failed') ? 'bg-red-500/15 text-red-400' : 'bg-green-500/15 text-green-400')}>
+          {msg}
+        </div>
+      )}
+
+      {/* Provider Selection */}
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Provider</p>
+        <p className="mb-3 text-[11px]" style={mutedStyle}>Select your AI provider. OAuth providers authenticate via browser.</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {PROVIDER_CARDS.map((p) => {
+            const isActive = activeProvider === p.id
+            const hasKey = p.authType === 'none' || p.authType === 'oauth' || (p.envKey ? !!configuredKeys[p.envKey] : false)
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  if (hasKey) selectProvider(p.id)
+                }}
+                className={cn(
+                  'flex flex-col items-start gap-1 rounded-xl px-3 py-2.5 text-left transition-all',
+                  isActive ? 'ring-2 ring-accent-500 shadow-md' : 'hover:brightness-110',
+                  !hasKey && p.authType === 'api_key' && 'opacity-60',
+                )}
+                style={cardStyle}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <ProviderLogo provider={p.id} size={32} />
+                  {isActive && <span className="size-2 rounded-full bg-green-500" />}
+                  {!isActive && hasKey && <span className="size-2 rounded-full bg-green-500/40" />}
+                  {!hasKey && p.authType === 'api_key' && <span className="size-2 rounded-full bg-red-500/60" />}
+                </div>
+                <span className="text-xs font-semibold mt-1">{p.name}</span>
+                <span className="text-[9px]" style={mutedStyle}>
+                  {p.authType === 'oauth' ? 'OAuth' : p.authType === 'none' ? 'Local' : hasKey ? 'Key set' : 'Key required'}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Model Selection for active provider */}
+      {activeProvider && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Model</p>
+          <div className="flex flex-wrap gap-2">
+            {(availableModels.length > 0 ? availableModels : PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models || []).map((model) => (
+              <button
+                key={model}
+                type="button"
+                onClick={() => selectProvider(activeProvider, model)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-all',
+                  activeModel === model ? 'ring-2 ring-accent-500' : 'hover:brightness-110',
+                )}
+                style={cardStyle}
+              >
+                {model}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* API Keys */}
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>API Keys</p>
+        <div className="space-y-1.5">
+          {PROVIDER_CARDS.filter((p) => p.envKey).map((p) => {
+            const key = p.envKey!
+            const hasKey = !!configuredKeys[key]
+            const isEditing = editingKey === key
+            return (
+              <div key={p.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
+                <ProviderLogo provider={p.id} size={28} className="rounded-md" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{p.name}</div>
+                  <div className="text-[11px] font-mono" style={mutedStyle}>
+                    {isEditing ? (
+                      <input
+                        type="password"
+                        value={keyInput}
+                        onChange={(e) => setKeyInput(e.target.value)}
+                        placeholder={`Paste ${key}`}
+                        className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
+                        style={{ color: 'var(--theme-text)' }}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && keyInput) { save({ env: { [key]: keyInput } }); setEditingKey(null); setKeyInput('') }
+                          if (e.key === 'Escape') { setEditingKey(null); setKeyInput('') }
+                        }}
+                      />
+                    ) : hasKey ? configuredKeys[key] : 'Not configured'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn('size-2 rounded-full', hasKey ? 'bg-green-500' : 'bg-neutral-500')} />
+                  {isEditing ? (
+                    <>
+                      <button type="button" onClick={() => { if (keyInput) { save({ env: { [key]: keyInput } }) }; setEditingKey(null); setKeyInput('') }}
+                        className="rounded-lg px-2 py-1 text-[11px] font-medium bg-accent-500 text-white">Save</button>
+                      <button type="button" onClick={() => { setEditingKey(null); setKeyInput('') }}
+                        className="rounded-lg px-2 py-1 text-[11px] font-medium" style={{ color: 'var(--theme-muted)' }}>Cancel</button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => { setEditingKey(key); setKeyInput('') }}
+                      className="rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-accent-500/10" style={{ color: 'var(--theme-accent, var(--theme-text))' }}>
+                      {hasKey ? 'Update' : 'Add'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Memory */}
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Memory</p>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={cardStyle}>
+            <div>
+              <div className="text-sm font-medium">Memory</div>
+              <div className="text-[11px]" style={mutedStyle}>Store & recall memories across sessions</div>
+            </div>
+            <Switch checked={memEnabled} onCheckedChange={(c) => { setMemEnabled(c); save({ config: { memory: { memory_enabled: c } } }) }} />
+          </div>
+          <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={cardStyle}>
+            <div>
+              <div className="text-sm font-medium">User Profile</div>
+              <div className="text-[11px]" style={mutedStyle}>Remember preferences & context</div>
+            </div>
+            <Switch checked={userProfileEnabled} onCheckedChange={(c) => { setUserProfileEnabled(c); save({ config: { memory: { user_profile_enabled: c } } }) }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Runtime Info */}
+      <div className="rounded-xl px-3 py-2.5" style={cardStyle}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="size-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>Runtime</span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+          <span style={mutedStyle}>Model</span><span className="font-mono font-medium">{activeModel || '—'}</span>
+          <span style={mutedStyle}>Provider</span><span className="font-mono font-medium">{PROVIDER_CARDS.find((p) => p.id === activeProvider)?.name || activeProvider || '—'}</span>
+          <span style={mutedStyle}>Config</span><span className="font-mono font-medium">~/.hermes/config.yaml</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function _ProfileContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const [profileError, setProfileError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
@@ -267,39 +524,21 @@ function AppearanceContent() {
   function handleThemeChange(value: string) {
     const theme = value as SettingsThemeMode
     applyTheme(theme)
-    updateSettings({ theme })
-    
-    // If user switches to light/dark via the standard toggle, update enterprise theme too
-    const currentEnterpriseTheme = localStorage.getItem('clawsuite-theme')
-    if (
-      theme === 'light' &&
-      currentEnterpriseTheme &&
-      isDarkEnterpriseTheme(currentEnterpriseTheme)
-    ) {
-      // Switch to Paper Light when going light
-      const html = document.documentElement
-      html.setAttribute('data-theme', 'paper-light')
-      localStorage.setItem('clawsuite-theme', 'paper-light')
-    } else if (
-      theme === 'dark' &&
-      (!currentEnterpriseTheme || !isDarkEnterpriseTheme(currentEnterpriseTheme))
-    ) {
-      // Switch to Ops Dark when going dark (default)
-      const html = document.documentElement
-      html.setAttribute('data-theme', 'ops-dark')
-      localStorage.setItem('clawsuite-theme', 'ops-dark')
+    if (theme === 'light' || theme === 'dark') {
+      setTheme(getThemeVariant(getTheme(), theme))
     }
+    updateSettings({ theme })
   }
 
-  function badgeClass(color: AccentColor): string {
+  function _badgeClass(color: AccentColor): string {
     if (color === 'orange') return 'bg-orange-500'
     if (color === 'purple') return 'bg-purple-500'
     if (color === 'blue') return 'bg-blue-500'
     return 'bg-green-500'
   }
 
-  function handleAccentColorChange(selectedAccent: AccentColor) {
-    localStorage.setItem('clawsuite-accent', selectedAccent)
+  function _handleAccentColorChange(selectedAccent: AccentColor) {
+    localStorage.setItem('hermes-accent', selectedAccent)
     document.documentElement.setAttribute('data-accent', selectedAccent)
     applyAccentColor(selectedAccent)
     updateSettings({ accentColor: selectedAccent })
@@ -315,7 +554,7 @@ function AppearanceContent() {
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
           Theme Mode
         </p>
-        <div className="inline-flex rounded-lg border border-primary-200 bg-white p-1">
+        <div className="inline-flex rounded-lg border border-primary-200 p-1">
           {[
             { value: 'light', label: 'Light', icon: Sun01Icon },
             { value: 'dark', label: 'Dark', icon: Moon01Icon },
@@ -338,29 +577,7 @@ function AppearanceContent() {
           ))}
         </div>
       </div>
-      <div className={SETTINGS_CARD_CLASS}>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-          Accent Color
-        </p>
-        <div className="flex items-center gap-2">
-          {(['orange', 'purple', 'blue', 'green'] as const).map((color) => (
-            <button
-              key={color}
-              type="button"
-              onClick={() => handleAccentColorChange(color)}
-              aria-label={`Set accent color to ${color}`}
-              className={cn(
-                'inline-flex size-8 items-center justify-center rounded-full border transition-colors',
-                settings.accentColor === color
-                  ? 'border-primary-900 bg-primary-100'
-                  : 'border-primary-200 bg-white hover:bg-primary-100',
-              )}
-            >
-              <span className={cn('size-4 rounded-full', badgeClass(color))} />
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Accent color removed — themes control accent */}
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
           Enterprise Theme
@@ -370,7 +587,7 @@ function AppearanceContent() {
       <div className={SETTINGS_CARD_CLASS}>
         <Row
           label="System metrics footer"
-          description="Show a persistent footer with CPU, RAM, disk, and gateway status."
+          description="Show a persistent footer with CPU, RAM, disk, and Hermes status."
         >
           <Switch
             checked={settings.showSystemMetricsFooter}
@@ -379,55 +596,39 @@ function AppearanceContent() {
           />
         </Row>
 
-        <Row
-          label="Mobile chat nav"
-          description="How the bottom nav behaves on chat screens."
-        >
-          <select
-            value={settings.mobileChatNavMode ?? 'dock'}
-            onChange={(e) => updateSettings({ mobileChatNavMode: e.target.value as 'dock' | 'integrated' | 'scroll-hide' })}
-            className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-          >
-            <option value="dock">Dock (iMessage)</option>
-            <option value="scroll-hide">Scroll-hide (B)</option>
-            <option value="integrated">Integrated (C)</option>
-          </select>
-        </Row>
+        {/* Mobile chat nav removed — not relevant for Hermes */}
       </div>
     </div>
   )
 }
 
-const ENTERPRISE_THEMES = [
-  {
-    id: 'paper-light',
-    label: 'Clean',
-    icon: '☀️',
-    desc: 'Warm gray canvas with white cards',
-    preview: { bg: '#f5f5f5', panel: '#ffffff', border: '#e5e5e5', accent: '#f97316', text: '#1a1a1a' },
-  },
-  {
-    id: 'ops-dark',
-    label: 'Slate',
-    icon: '🖥️',
-    desc: 'Deep slate with teal secondary glow',
-    preview: { bg: '#1e1e2e', panel: '#2a2a3e', border: '#3a3a4e', accent: '#14b8a6', text: '#e5e5e5' },
-  },
-  {
-    id: 'premium-dark',
-    label: 'Midnight',
-    icon: '✨',
-    desc: 'OLED true black with high contrast',
-    preview: { bg: '#000000', panel: '#0a0a0a', border: '#1a1a1a', accent: '#f97316', text: '#f5f5f5' },
-  },
-  {
-    id: 'sunset-brand',
-    label: 'Sunset',
-    icon: '🌇',
-    desc: 'Warm brown brand immersion',
-    preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
-  },
-] as const
+const ENTERPRISE_THEME_FAMILIES: ThemeId[] = [
+  'hermes-official',
+  'hermes-classic',
+  'hermes-slate',
+  'hermes-mono',
+]
+
+const ENTERPRISE_THEMES = THEMES.map((theme) => ({
+  ...theme,
+  desc: theme.description,
+  preview:
+    theme.id === 'hermes-official'
+      ? { bg: '#0A0E1A', panel: '#11182A', border: '#24304A', accent: '#6366F1', text: '#E6EAF2' }
+      : theme.id === 'hermes-official-light'
+        ? { bg: '#F6F8FC', panel: '#FFFFFF', border: '#D7DEEE', accent: '#4F46E5', text: '#111827' }
+        : theme.id === 'hermes-classic'
+      ? { bg: '#0d0f12', panel: '#1a1f26', border: '#2a313b', accent: '#b98a44', text: '#eceff4' }
+      : theme.id === 'hermes-classic-light'
+        ? { bg: '#F5F2ED', panel: '#FCFAF7', border: '#D8CCBC', accent: '#b98a44', text: '#1a1f26' }
+      : theme.id === 'hermes-slate'
+        ? { bg: '#0d1117', panel: '#1c2128', border: '#30363d', accent: '#7eb8f6', text: '#c9d1d9' }
+        : theme.id === 'hermes-slate-light'
+          ? { bg: '#F6F8FA', panel: '#FFFFFF', border: '#D0D7DE', accent: '#3b82f6', text: '#24292f' }
+          : theme.id === 'hermes-mono'
+            ? { bg: '#111111', panel: '#222222', border: '#333333', accent: '#aaaaaa', text: '#e6edf3' }
+            : { bg: '#FAFAFA', panel: '#FFFFFF', border: '#D4D4D4', accent: '#666666', text: '#1a1a1a' },
+}))
 
 function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['preview'] }) {
   return (
@@ -452,34 +653,63 @@ function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['pre
 function EnterpriseThemePicker() {
   const { updateSettings } = useSettings()
   const [current, setCurrent] = useState(() => {
-    if (typeof window === 'undefined') return 'paper-light'
-    const stored = localStorage.getItem('clawsuite-theme')
-    return ENTERPRISE_THEMES.some((theme) => theme.id === stored)
-      ? stored
-      : 'paper-light'
+    if (typeof window === 'undefined') return 'hermes-official'
+    return getTheme()
   })
+  const currentMode = isDarkTheme(current) ? 'dark' : 'light'
+
+  useEffect(() => {
+    setCurrent(getTheme())
+  }, [])
 
   function applyEnterpriseTheme(id: ThemeId) {
-    const html = document.documentElement
-    html.setAttribute('data-theme', id)
-    if (DARK_ENTERPRISE_THEMES.has(id)) {
-      html.classList.add('dark')
-      html.classList.remove('light')
-      // Sync with settings store
-      updateSettings({ theme: 'dark' })
-    } else {
-      html.classList.add('light')
-      html.classList.remove('dark')
-      // Sync with settings store
-      updateSettings({ theme: 'light' })
-    }
-    localStorage.setItem('clawsuite-theme', id)
+    setTheme(id)
+    updateSettings({ theme: isDarkTheme(id) ? 'dark' : 'light' })
     setCurrent(id)
   }
 
+  function toggleEnterpriseThemeMode() {
+    const nextMode = currentMode === 'dark' ? 'light' : 'dark'
+    applyEnterpriseTheme(getThemeVariant(current, nextMode))
+  }
+
+  const visibleThemes = ENTERPRISE_THEME_FAMILIES.map((themeId) =>
+    ENTERPRISE_THEMES.find(
+      (theme) => theme.id === getThemeVariant(themeId, currentMode),
+    ),
+  ).filter(Boolean) as typeof ENTERPRISE_THEMES
+
   return (
-    <div className="grid w-full grid-cols-2 gap-2">
-      {ENTERPRISE_THEMES.map((t) => {
+    <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-lg border border-primary-200 px-3 py-2">
+        <div>
+          <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+            {currentMode === 'dark' ? 'Dark mode' : 'Light mode'}
+          </p>
+          <p className="text-[11px] text-primary-500 dark:text-neutral-400">
+            Toggle the current theme family between paired light and dark variants.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleEnterpriseThemeMode}
+          className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-900 transition-colors hover:bg-primary-100"
+          aria-label={
+            currentMode === 'dark'
+              ? 'Switch enterprise theme to light mode'
+              : 'Switch enterprise theme to dark mode'
+          }
+        >
+          <HugeiconsIcon
+            icon={currentMode === 'dark' ? Sun01Icon : Moon01Icon}
+            size={16}
+            strokeWidth={1.5}
+          />
+          {currentMode === 'dark' ? 'Light' : 'Dark'}
+        </button>
+      </div>
+      <div className="grid w-full grid-cols-2 gap-2">
+      {visibleThemes.map((t) => {
         const isActive = current === t.id
         return (
           <button
@@ -505,15 +735,16 @@ function EnterpriseThemePicker() {
           </button>
         )
       })}
+      </div>
     </div>
   )
 }
 
-function LoaderContent() {
+function _LoaderContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const styles: Array<{ value: LoaderStyle; label: string }> = [
     { value: 'dots', label: 'Dots' },
-    { value: 'braille-claw', label: 'Claw' },
+    { value: 'braille-hermes', label: 'Hermes' },
     { value: 'braille-orbit', label: 'Orbit' },
     { value: 'braille-breathe', label: 'Breathe' },
     { value: 'braille-pulse', label: 'Pulse' },
@@ -523,7 +754,7 @@ function LoaderContent() {
   ]
   function getPreset(s: LoaderStyle): BrailleSpinnerPreset | null {
     const m: Record<string, BrailleSpinnerPreset> = {
-      'braille-claw': 'claw',
+      'braille-hermes': 'hermes',
       'braille-orbit': 'orbit',
       'braille-breathe': 'breathe',
       'braille-pulse': 'pulse',
@@ -608,9 +839,7 @@ function ChatContent() {
           />
         </Row>
       </div>
-      <div className={SETTINGS_CARD_CLASS}>
-        <LoaderContent />
-      </div>
+      {/* Loading animation removed — not relevant for Hermes */}
     </div>
   )
 }
@@ -658,7 +887,7 @@ function NotificationsContent() {
   )
 }
 
-function AdvancedContent() {
+function _AdvancedContent() {
   const { settings, updateSettings } = useSettings()
   const [connectionStatus, setConnectionStatus] = useState<
     'idle' | 'testing' | 'connected' | 'failed'
@@ -676,7 +905,7 @@ function AdvancedContent() {
     } else {
       setUrlError(null)
     }
-    updateSettings({ gatewayUrl: value })
+    updateSettings({ hermesUrl: value })
   }
 
   async function testConnection() {
@@ -690,24 +919,24 @@ function AdvancedContent() {
     }
   }
 
-  const urlErrorId = 'gateway-url-error'
+  const urlErrorId = 'hermes-url-error'
 
   return (
     <div className="space-y-4">
       <SectionHeader
         title="Advanced"
-        description="Gateway endpoint and connectivity."
+        description="Hermes endpoint and connectivity."
       />
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Gateway URL" description="Used for API requests from Studio">
+        <Row label="Hermes URL" description="Used for API requests from Studio">
           <div className="w-full max-w-sm">
             <Input
               type="url"
-              placeholder="https://api.openclaw.ai"
-              value={settings.gatewayUrl}
+              placeholder="https://api.hermesworkspace.app"
+              value={settings.hermesUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
-              aria-label="Gateway URL"
+              aria-label="Hermes URL"
               aria-invalid={!!urlError}
               aria-describedby={urlError ? urlErrorId : undefined}
             />
@@ -801,28 +1030,33 @@ class SettingsErrorBoundary extends Component<
 // ── Main Dialog ─────────────────────────────────────────────────────────
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
-  profile: ProfileContent,
+  hermes: HermesContent,
   appearance: AppearanceContent,
   chat: ChatContent,
   notifications: NotificationsContent,
-  advanced: AdvancedContent,
 }
 
 type SettingsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialSection?: SectionId
 }
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const [active, setActive] = useState<SectionId>('profile')
+export function SettingsDialog({
+  open,
+  onOpenChange,
+  initialSection = 'hermes',
+}: SettingsDialogProps) {
+  const [active, setActive] = useState<SectionId>(initialSection)
   const [mobileView, setMobileView] = useState<'nav' | 'content'>('nav')
   const ActiveContent = CONTENT_MAP[active]
 
   useEffect(() => {
     if (open) {
+      setActive(initialSection)
       setMobileView('nav')
     }
-  }, [open])
+  }, [initialSection, open])
 
   function handleSectionSelect(sectionId: SectionId) {
     setActive(sectionId)
@@ -831,7 +1065,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="inset-0 h-full w-full max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-white p-0 shadow-xl md:inset-auto md:left-1/2 md:top-1/2 md:h-[min(88dvh,740px)] md:min-h-[520px] md:w-full md:max-w-3xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-primary-200">
+      <DialogContent className="inset-0 h-full w-full max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 p-0 shadow-xl md:inset-auto md:left-1/2 md:top-1/2 md:h-[min(88dvh,740px)] md:min-h-[520px] md:w-full md:max-w-3xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-primary-200 bg-[var(--theme-bg)]">
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex items-center justify-between border-b border-primary-200 bg-primary-50/80 px-4 py-4 md:rounded-t-2xl md:px-5">
             <div>
@@ -839,7 +1073,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 Settings
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Configure ClawSuite
+                Configure Hermes Workspace
               </DialogDescription>
             </div>
             <DialogClose

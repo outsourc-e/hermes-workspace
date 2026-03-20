@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
   deriveFriendlyIdFromKey,
-  isMissingGatewayAuth,
+  isMissingAuth,
   readError,
   textFromMessage,
 } from './utils'
@@ -20,15 +20,16 @@ import {
   appendHistoryMessage,
   chatQueryKeys,
   clearHistoryMessages,
-  fetchGatewayStatus,
+  fetchStatus,
   updateHistoryMessageByClientId,
+  updateHistoryMessageByClientIdEverywhere,
   updateSessionLastMessage,
 } from './chat-queries'
 import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
-import { GatewayStatusMessage } from './components/gateway-status-message'
+import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
   consumePendingSend,
   hasPendingGeneration,
@@ -52,15 +53,15 @@ import {
   addApproval,
   loadApprovals,
   saveApprovals,
-} from '@/screens/gateway/lib/approvals-store'
+} from '@/lib/approvals-store'
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
   ChatComposerHelpers,
   ThinkingLevel,
 } from './components/chat-composer'
-import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
-import type { GatewayAttachment, GatewayMessage, SessionMeta } from './types'
+import type { ApprovalRequest } from '@/lib/approvals-store'
+import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import { stripQueuedWrapper } from '@/lib/strip-queued-wrapper'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
@@ -70,19 +71,26 @@ import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
-import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
-import { useAgentViewStore } from '@/hooks/use-agent-view'
+import { InspectorPanel } from '@/components/inspector/inspector-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
-import { useChatActivityStore } from '@/stores/chat-activity-store'
+// Activity store removed — not used in Hermes Workspace
+const _noopSetActivity = (_s: string) => {}
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
-import { useGatewayChatStore } from '@/stores/gateway-chat-store'
+import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
+import { ContextMeter } from '@/components/context-meter'
+import { useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
+import {
+  CHAT_OPEN_SETTINGS_EVENT,
+  CHAT_PENDING_COMMAND_STORAGE_KEY,
+  CHAT_RUN_COMMAND_EVENT,
+  type ChatRunCommandDetail,
+} from './chat-events'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
-import { BrailleSpinner } from '@/components/ui/braille-spinner'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -129,7 +137,59 @@ function normalizeMessageValue(value: unknown): string {
   return trimmed.length > 0 ? trimmed : ''
 }
 
-function messageFallbackSignature(message: GatewayMessage): string {
+
+function sanitizeExportToken(value: string): string {
+  return value.trim().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '')
+}
+
+function exportConversationTranscript(payload: {
+  sessionLabel: string
+  messages: Array<ChatMessage>
+}) {
+  if (typeof document === 'undefined') return false
+
+  const sessionToken = sanitizeExportToken(payload.sessionLabel) || 'conversation'
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const body = payload.messages
+    .map((message) => {
+      const role =
+        typeof message.role === 'string' && message.role.trim()
+          ? message.role.trim().toUpperCase()
+          : 'MESSAGE'
+      const text = textFromMessage(message).trim()
+      const attachments = Array.isArray(message.attachments)
+        ? message.attachments
+            .map((attachment) => attachment?.name?.trim())
+            .filter((value): value is string => Boolean(value))
+        : []
+
+      const lines = [`## ${role}`]
+      if (text) lines.push(text)
+      if (attachments.length > 0) {
+        lines.push('', 'Attachments:')
+        for (const attachment of attachments) {
+          lines.push(`- ${attachment}`)
+        }
+      }
+      return lines.join('\n')
+    })
+    .join('\n\n')
+    .trim()
+
+  const content = `# Hermes Conversation Export\n\nSession: ${payload.sessionLabel}\nExported: ${new Date().toISOString()}\n\n${body || '_No messages in this conversation._'}\n`
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${sessionToken}-${timestamp}.md`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  return true
+}
+
+function messageFallbackSignature(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   const timestamp = normalizeMessageValue(
     typeof raw.timestamp === 'number' ? String(raw.timestamp) : raw.timestamp,
@@ -170,7 +230,7 @@ function messageFallbackSignature(message: GatewayMessage): string {
   return `${message.role ?? 'unknown'}:${timestamp}:${contentParts}:${attachments}`
 }
 
-function getMessageClientId(message: GatewayMessage): string {
+function getMessageClientId(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   const directClientId = normalizeMessageValue(raw.clientId)
   if (directClientId) return directClientId
@@ -185,7 +245,7 @@ function getMessageClientId(message: GatewayMessage): string {
   return ''
 }
 
-function getRetryMessageKey(message: GatewayMessage): string {
+function getRetryMessageKey(message: ChatMessage): string {
   const clientId = getMessageClientId(message)
   if (clientId) return `client:${clientId}`
 
@@ -203,27 +263,33 @@ function getRetryMessageKey(message: GatewayMessage): string {
   return `fallback:${message.role ?? 'unknown'}:${timestamp}:${messageText}`
 }
 
-function isRetryableQueuedMessage(message: GatewayMessage): boolean {
+function isRetryableQueuedMessage(message: ChatMessage): boolean {
   if ((message.role || '') !== 'user') return false
   const raw = message as Record<string, unknown>
   const status = normalizeMessageValue(raw.status)
   return status === 'error'
 }
 
+const commandHelpers: ChatComposerHelpers = {
+  reset() {},
+  setValue() {},
+  setAttachments() {},
+}
+
 function getMessageRetryAttachments(
-  message: GatewayMessage,
-): Array<GatewayAttachment> {
+  message: ChatMessage,
+): Array<ChatAttachment> {
   if (!Array.isArray(message.attachments)) return []
   return message.attachments.filter((attachment) => {
     return Boolean(attachment) && typeof attachment === 'object'
   })
 }
 
-function getMessageStatusValue(message: GatewayMessage): string {
+function getMessageStatusValue(message: ChatMessage): string {
   return normalizeMessageValue((message as Record<string, unknown>).status)
 }
 
-function getMessageTimestampValue(message: GatewayMessage): number | null {
+function getMessageTimestampValue(message: ChatMessage): number | null {
   const raw = message as Record<string, unknown>
   const candidates = [
     raw.timestamp,
@@ -245,7 +311,7 @@ function getMessageTimestampValue(message: GatewayMessage): number | null {
   return null
 }
 
-function getMessageAttachmentSignature(message: GatewayMessage): string {
+function getMessageAttachmentSignature(message: ChatMessage): string {
   if (!Array.isArray(message.attachments) || message.attachments.length === 0) {
     return ''
   }
@@ -264,7 +330,7 @@ function getMessageAttachmentSignature(message: GatewayMessage): string {
     .join('|')
 }
 
-function isOptimisticUserMessage(message: GatewayMessage): boolean {
+function isOptimisticUserMessage(message: ChatMessage): boolean {
   const raw = message as Record<string, unknown>
   return (
     normalizeMessageValue(raw.__optimisticId).length > 0 ||
@@ -273,8 +339,8 @@ function isOptimisticUserMessage(message: GatewayMessage): boolean {
 }
 
 function shouldCollapseTextDuplicate(
-  existing: GatewayMessage,
-  candidate: GatewayMessage,
+  existing: ChatMessage,
+  candidate: ChatMessage,
 ): boolean {
   if (existing.role !== candidate.role) return false
 
@@ -300,7 +366,7 @@ function shouldCollapseTextDuplicate(
   )
 }
 
-function stripQueuedWrapperFromUserMessage(message: GatewayMessage): GatewayMessage {
+function stripQueuedWrapperFromUserMessage(message: ChatMessage): ChatMessage {
   if (message.role !== 'user') return message
 
   const text = textFromMessage(message)
@@ -316,38 +382,6 @@ function stripQueuedWrapperFromUserMessage(message: GatewayMessage): GatewayMess
   }
 }
 
-function CompactingOverlay({ onDismiss }: { onDismiss: () => void }) {
-  // Auto-dismiss after 30s in case onCompactionEnd never fires
-  useEffect(() => {
-    const t = window.setTimeout(onDismiss, 30_000)
-    return () => window.clearTimeout(t)
-  }, [onDismiss])
-
-  return (
-    <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={onDismiss}
-    >
-      <div
-        className="flex flex-col items-center gap-4 rounded-2xl border border-primary-200/60 bg-primary-50 px-10 py-8 shadow-2xl dark:border-primary-300/20 dark:bg-primary-100"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <BrailleSpinner preset="claw" size={36} className="text-primary-500 dark:text-primary-400" speed={90} />
-        <div className="text-center">
-          <p className="text-sm font-semibold text-ink">Compacting context</p>
-          <p className="mt-0.5 text-xs text-primary-500">Summarizing older messages to free up space…</p>
-        </div>
-        <button
-          onClick={onDismiss}
-          className="text-[10px] text-primary-400 hover:text-primary-600 transition-colors"
-        >
-          dismiss
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export function ChatScreen({
   activeFriendlyId,
   isNewChat = false,
@@ -356,6 +390,8 @@ export function ChatScreen({
   compact = false,
 }: ChatScreenProps) {
   const navigate = useNavigate()
+  const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
+  const setChatFocusMode = useWorkspaceStore((s) => s.setChatFocusMode)
   const queryClient = useQueryClient()
   const [sending, setSending] = useState(false)
   const [_creatingSession, setCreatingSession] = useState(false)
@@ -376,8 +412,8 @@ export function ChatScreen({
   const lastAssistantSignature = useRef('')
   const refreshHistoryRef = useRef<() => void>(() => {})
   const retriedQueuedMessageKeysRef = useRef(new Set<string>())
-  const hasSeenGatewayDisconnectRef = useRef(false)
-  const hadGatewayErrorRef = useRef(false)
+  const hasSeenDisconnectRef = useRef(false)
+  const hadErrorRef = useRef(false)
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
     [],
   )
@@ -386,7 +422,7 @@ export function ChatScreen({
   // Per-session thinking level — stored in sessionStorage keyed by session
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
     if (typeof window === 'undefined') return 'low'
-    const key = `clawsuite-thinking-${activeFriendlyId || 'new'}`
+    const key = `hermes-thinking-${activeFriendlyId || 'new'}`
     const stored = window.sessionStorage.getItem(key)
     if (stored === 'off' || stored === 'low' || stored === 'adaptive') return stored
     return 'low'
@@ -406,7 +442,7 @@ export function ChatScreen({
   } | null>(null)
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
-    const stored = localStorage.getItem('clawsuite-file-explorer-collapsed')
+    const stored = localStorage.getItem('hermes-file-explorer-collapsed')
     return stored === null ? true : stored === 'true'
   })
   const { isMobile } = useChatMobile(queryClient)
@@ -414,8 +450,6 @@ export function ChatScreen({
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const mobileKeyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   void mobileKeyboardActive // kept for future use
-  const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
-  const setAgentViewOpen = useAgentViewStore((state) => state.setOpen)
   const isTerminalPanelOpen = useTerminalPanelStore(
     (state) => state.isPanelOpen,
   )
@@ -423,7 +457,7 @@ export function ChatScreen({
     (state) => state.panelHeight,
   )
   const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
-  const sseConnectionState = useGatewayChatStore((s) => s.connectionState)
+  const sseConnectionState = useChatStore((s) => s.connectionState)
 
   const {
     sessionsQuery,
@@ -469,32 +503,35 @@ export function ChatScreen({
     completedStreamingThinking,
     activeToolCalls,
   } = useRealtimeChatHistory({
-      sessionKey: resolvedSessionKey || activeCanonicalKey,
+      sessionKey: resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey,
       friendlyId: activeFriendlyId,
       historyMessages,
-      enabled: !isNewChat && !isRedirecting,
+      enabled:
+        !isNewChat &&
+        Boolean(resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey) &&
+        !isRedirecting,
       onUserMessage: useCallback(() => {
         // External message arrived (e.g. from Telegram) — show thinking indicator
         setWaitingForResponse(true)
         setPendingGeneration(true)
       }, []),
       onApprovalRequest: useCallback((payload: Record<string, unknown>) => {
-        const gatewayApprovalId =
+        const approvalId =
           typeof payload.id === 'string'
             ? payload.id
             : typeof payload.approvalId === 'string'
               ? payload.approvalId
-              : typeof payload.gatewayApprovalId === 'string'
-                ? payload.gatewayApprovalId
+              : typeof payload.approvalId === 'string'
+                ? payload.approvalId
                 : ''
 
         const currentApprovals = loadApprovals()
         if (
-          gatewayApprovalId &&
+          approvalId &&
           currentApprovals.some((entry) => {
             return (
               entry.status === 'pending' &&
-              entry.gatewayApprovalId === gatewayApprovalId
+              entry.approvalId === approvalId
             )
           })
         ) {
@@ -527,15 +564,15 @@ export function ChatScreen({
         const agentId =
           typeof agentIdValue === 'string' && agentIdValue.trim().length > 0
             ? agentIdValue
-            : 'gateway'
+            : 'hermes'
 
         addApproval({
           agentId,
           agentName,
           action,
           context,
-          source: 'gateway',
-          gatewayApprovalId: gatewayApprovalId || undefined,
+          source: 'hermes',
+          approvalId: approvalId || undefined,
         })
         setPendingApprovals(loadApprovals().filter((entry) => entry.status === 'pending'))
       }, []),
@@ -621,12 +658,12 @@ export function ChatScreen({
       setPendingApprovals(
         nextApprovals.filter((entry) => entry.status === 'pending'),
       )
-      if (!approval.gatewayApprovalId) return
+      if (!approval.approvalId) return
 
       const endpoint =
         status === 'approved'
-          ? `/api/approvals/${approval.gatewayApprovalId}/approve`
-          : `/api/approvals/${approval.gatewayApprovalId}/deny`
+          ? `/api/approvals/${approval.approvalId}/approve`
+          : `/api/approvals/${approval.approvalId}/deny`
       try {
         await fetch(endpoint, { method: 'POST' })
       } catch {
@@ -689,8 +726,8 @@ export function ChatScreen({
       return 0
     })
     const seen = new Set<string>()
-    const seenByText = new Map<string, GatewayMessage>()
-    const dedupedSet = new Set<GatewayMessage>()
+    const seenByText = new Map<string, ChatMessage>()
+    const dedupedSet = new Set<ChatMessage>()
     for (const msg of sortedForDedup) {
       const raw = msg as Record<string, unknown>
       const rawOptimisticId = normalizeMessageValue(raw.__optimisticId)
@@ -797,7 +834,7 @@ export function ChatScreen({
       __streamingText: realtimeStreamingText,
       __streamingThinking: realtimeStreamingThinking,
       __streamToolCalls: streamToolCalls,
-    } as GatewayMessage
+    } as ChatMessage
 
     const existingStreamIdx = nextMessages.findIndex(
       (message) => message.__streamingStatus === 'streaming',
@@ -898,7 +935,34 @@ export function ChatScreen({
 
   refreshHistoryRef.current = function refreshHistory() {
     if (historyQuery.isFetching) return
-    void historyQuery.refetch()
+
+    // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
+    // The refetch replaces the query cache with server data — if the server
+    // hasn't processed the user's POST yet, the optimistic message vanishes.
+    const currentMessages = (historyQuery.data as any)?.messages as ChatMessage[] | undefined
+    const pendingOptimistic = (currentMessages ?? []).filter((msg) => {
+      const raw = msg as Record<string, unknown>
+      return (
+        msg.role === 'user' &&
+        (normalizeMessageValue(raw.__optimisticId).startsWith('opt-') ||
+          normalizeMessageValue(raw.status) === 'sending')
+      )
+    })
+
+    void historyQuery.refetch().then(() => {
+      // Re-inject optimistic messages that weren't in the server response
+      if (pendingOptimistic.length === 0) return
+      if (!activeFriendlyId || !activeSessionKey) return
+
+      for (const optimistic of pendingOptimistic) {
+        appendHistoryMessage(
+          queryClient,
+          activeFriendlyId,
+          activeSessionKey,
+          optimistic,
+        )
+      }
+    })
   }
 
   // Track message count when waiting started — only clear when NEW assistant msg appears
@@ -975,7 +1039,7 @@ export function ChatScreen({
   })
 
   const currentModelQuery = useQuery({
-    queryKey: ['gateway', 'session-status-model'],
+    queryKey: ['hermes', 'session-status-model'],
     queryFn: async () => {
       try {
         const res = await fetch('/api/session-status')
@@ -1017,7 +1081,7 @@ export function ChatScreen({
     thinkingInitializedRef.current = true
     const is46 = currentModel.toLowerCase().includes('4-6') || currentModel.toLowerCase().includes('claude-4.6')
     if (is46) {
-      const key = `clawsuite-thinking-${activeFriendlyId || 'new'}`
+      const key = `hermes-thinking-${activeFriendlyId || 'new'}`
       const stored = typeof window !== 'undefined' ? window.sessionStorage.getItem(key) : null
       // Only auto-set if not explicitly configured
       if (!stored) {
@@ -1030,7 +1094,7 @@ export function ChatScreen({
   const handleThinkingLevelChange = useCallback((level: ThinkingLevel) => {
     setThinkingLevel(level)
     if (typeof window !== 'undefined') {
-      const key = `clawsuite-thinking-${activeFriendlyId || 'new'}`
+      const key = `hermes-thinking-${activeFriendlyId || 'new'}`
       window.sessionStorage.setItem(key, level)
     }
   }, [activeFriendlyId])
@@ -1045,22 +1109,33 @@ export function ChatScreen({
     availableModels: availableModelIds,
   })
 
-  const { startStreaming } = useStreamingMessage({
+  const { startStreaming, cancelStreaming } = useStreamingMessage({
+    onSessionResolved: useCallback(
+      ({ sessionKey, friendlyId }: { sessionKey: string; friendlyId: string }) => {
+        const activeSend = activeSendRef.current
+        if (activeSend) {
+          activeSendRef.current = {
+            ...activeSend,
+            sessionKey,
+            friendlyId,
+          }
+        }
+        if (sessionKey === activeFriendlyId && friendlyId === activeFriendlyId) {
+          return
+        }
+        onSessionResolved?.({ sessionKey, friendlyId })
+      },
+      [activeFriendlyId, onSessionResolved],
+    ),
     onStarted: useCallback(
       ({ runId }: { runId: string | null }) => {
         const activeSend = activeSendRef.current
         if (!activeSend?.clientId) return
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeSend.friendlyId,
-          activeSend.sessionKey,
-          activeSend.clientId,
-          (message) => ({
-            ...message,
-            status: 'sent',
-            runId: runId ?? message.runId,
-          }),
-        )
+        updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+          ...message,
+          status: 'sent',
+          runId: runId ?? message.runId,
+        }))
         setSending(false)
       },
       [queryClient],
@@ -1068,13 +1143,11 @@ export function ChatScreen({
     onComplete: useCallback(() => {
       const activeSend = activeSendRef.current
       if (activeSend?.clientId) {
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeSend.friendlyId,
-          activeSend.sessionKey,
-          activeSend.clientId,
-          (message) => ({ ...message, status: 'done' }),
-        )
+        updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+          ...message,
+          status: 'done',
+          __optimisticId: undefined,
+        }))
       }
       activeSendRef.current = null
       refreshHistoryRef.current()
@@ -1085,21 +1158,18 @@ export function ChatScreen({
         const activeSend = activeSendRef.current
         if (
           activeSend?.clientId &&
-          !isMissingGatewayAuth(messageText)
+          !isMissingAuth(messageText)
         ) {
-          updateHistoryMessageByClientId(
-            queryClient,
-            activeSend.friendlyId,
-            activeSend.sessionKey,
-            activeSend.clientId,
-            (message) => ({ ...message, status: 'error' }),
-          )
+          updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+            ...message,
+            status: 'error',
+          }))
         }
         activeSendRef.current = null
         setSending(false)
-        if (isMissingGatewayAuth(messageText)) {
+        if (isMissingAuth(messageText)) {
           try {
-            navigate({ to: '/connect', replace: true })
+            navigate({ to: '/', replace: true })
           } catch {
             /* router not ready */
           }
@@ -1108,6 +1178,7 @@ export function ChatScreen({
         const errorMessage = `Failed to send message. ${messageText}`
         setError(errorMessage)
         toast('Failed to send message', { type: 'error' })
+        showErrorToast(messageText)
         setPendingGeneration(false)
         setWaitingForResponse(false)
       },
@@ -1115,17 +1186,18 @@ export function ChatScreen({
     ),
     onMessageAccepted: useCallback(
       (_sessionKey: string, friendlyId: string, clientId: string) => {
-        // HTTP 200 received — gateway accepted the message. Clear "sending"
+        // HTTP 200 received — server accepted the message. Clear "sending"
         // status immediately so the Retry timer never fires. This is the
-        // primary confirmation path since the gateway does NOT echo user
+        // primary confirmation path since the server does NOT echo user
         // messages back via SSE.
-        updateHistoryMessageByClientId(
-          queryClient,
-          friendlyId,
-          _sessionKey,
-          clientId,
-          (message) => ({ ...message, status: 'queued' }),
-        )
+        updateHistoryMessageByClientId(queryClient, friendlyId, _sessionKey, clientId, (message) => ({
+          ...message,
+          status: 'queued',
+        }))
+        updateHistoryMessageByClientIdEverywhere(queryClient, clientId, (message) => ({
+          ...message,
+          status: 'queued',
+        }))
       },
       [queryClient],
     ),
@@ -1156,7 +1228,7 @@ export function ChatScreen({
   }, [suggestion, resolvedSessionKey, dismiss])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity)
+  const setLocalActivity = _noopSetActivity
   useEffect(() => {
     if (liveToolActivity.length > 0) {
       setLocalActivity('tool-use')
@@ -1169,9 +1241,9 @@ export function ChatScreen({
     }
   }, [waitingForResponse, isRealtimeStreaming, liveToolActivity, setLocalActivity])
 
-  const gatewayStatusQuery = useQuery({
-    queryKey: ['gateway', 'status'],
-    queryFn: fetchGatewayStatus,
+  const statusQuery = useQuery({
+    queryKey: ['hermes', 'status'],
+    queryFn: fetchStatus,
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: true,
@@ -1180,30 +1252,30 @@ export function ChatScreen({
     staleTime: 30_000,
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
-  // Don't show gateway errors for new chats or when SSE is connected (proves gateway works)
-  const gatewayStatusError =
+  // Don't show errors for new chats or when SSE is connected
+  const statusError =
     !isNewChat && connectionState !== 'connected'
-      ? gatewayStatusQuery.error instanceof Error
+      ? statusQuery.error instanceof Error
         ? {
-            message: gatewayStatusQuery.error.message,
-            status: (gatewayStatusQuery.error as Error & { status?: number })
+            message: statusQuery.error.message,
+            status: (statusQuery.error as Error & { status?: number })
               .status,
           }
-        : gatewayStatusQuery.data && !gatewayStatusQuery.data.ok
+        : statusQuery.data && !statusQuery.data.ok
           ? {
-              message: gatewayStatusQuery.data.error || 'Gateway unavailable',
-              status: gatewayStatusQuery.data.status,
+              message: statusQuery.data.error || 'Hermes unavailable',
+              status: statusQuery.data.status,
             }
           : null
       : null
-  const gatewayError = gatewayStatusError?.message ?? sessionsError ?? historyError
-  const gatewayErrorStatus = gatewayStatusError?.status
-  const showErrorNotice = Boolean(gatewayError) && !isNewChat
-  const handleGatewayRefetch = useCallback(() => {
-    void gatewayStatusQuery.refetch()
+  const serverError = statusError?.message ?? sessionsError ?? historyError
+  const serverErrorStatus = statusError?.status
+  const showErrorNotice = Boolean(serverError) && !isNewChat
+  const handleRefetch = useCallback(() => {
+    void statusQuery.refetch()
     void sessionsQuery.refetch()
     void historyQuery.refetch()
-  }, [gatewayStatusQuery, sessionsQuery, historyQuery])
+  }, [statusQuery, sessionsQuery, historyQuery])
 
   const handleRefreshHistory = useCallback(() => {
     void historyQuery.refetch()
@@ -1213,9 +1285,9 @@ export function ChatScreen({
     const handleRefreshRequest = () => {
       void historyQuery.refetch()
     }
-    window.addEventListener('clawsuite:chat-refresh', handleRefreshRequest)
+    window.addEventListener('hermes:chat-refresh', handleRefreshRequest)
     return () => {
-      window.removeEventListener('clawsuite:chat-refresh', handleRefreshRequest)
+      window.removeEventListener('hermes:chat-refresh', handleRefreshRequest)
     }
   }, [historyQuery])
 
@@ -1233,14 +1305,14 @@ export function ChatScreen({
     function handleSSEDrop() {
       void historyQuery.refetch()
     }
-    window.addEventListener('clawsuite:sse-dropped', handleSSEDrop)
+    window.addEventListener('hermes:sse-dropped', handleSSEDrop)
     return () => {
-      window.removeEventListener('clawsuite:sse-dropped', handleSSEDrop)
+      window.removeEventListener('hermes:sse-dropped', handleSSEDrop)
     }
   }, [historyQuery])
 
   const terminalPanelInset =
-    !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
+    !isMobile && isTerminalPanelOpen && !chatFocusMode ? terminalPanelHeight : 0
   // --chat-composer-height is the measured offsetHeight of the composer wrapper,
   // which already includes its own paddingBottom (tab bar + safe area).
   // So content just needs composer-height + a small breathing gap.
@@ -1293,28 +1365,28 @@ export function ChatScreen({
       return
     }
     const messageText =
-      sessionsError ?? historyError ?? gatewayStatusError?.message
+      sessionsError ?? historyError ?? statusError?.message
     if (!messageText) {
       if (error?.startsWith('Failed to load')) {
         setError(null)
       }
       return
     }
-    if (isMissingGatewayAuth(messageText)) {
-      navigate({ to: '/connect', replace: true })
+    if (isMissingAuth(messageText)) {
+      navigate({ to: '/', replace: true })
     }
     const message = sessionsError
       ? `Failed to load sessions. ${sessionsError}`
       : historyError
         ? `Failed to load history. ${historyError}`
-        : gatewayStatusError
-          ? `Gateway unavailable. ${gatewayStatusError.message}`
+        : statusError
+          ? `Hermes unavailable. ${statusError.message}`
           : null
     if (message) setError(message)
   }, [
     activeExists,
     error,
-    gatewayStatusError,
+    statusError,
     historyError,
     isRedirecting,
     navigate,
@@ -1341,7 +1413,8 @@ export function ChatScreen({
     if (!shouldRedirectToNew) return
     resetPendingSend()
     clearHistoryMessages(queryClient, activeFriendlyId, sessionKeyForHistory)
-    navigate({ to: '/new', replace: true })
+    const latestSession = sessions[0]?.friendlyId ?? 'new'
+    navigate({ to: '/chat/$sessionKey', params: { sessionKey: latestSession }, replace: true })
   }, [
     activeFriendlyId,
     historyQuery.isFetching,
@@ -1356,7 +1429,49 @@ export function ChatScreen({
   ])
 
   const hideUi = shouldRedirectToNew || isRedirecting
+  const isFocusMode = !compact && chatFocusMode
   const showComposer = !isRedirecting
+
+  const handleToggleFocusMode = useCallback(() => {
+    if (compact) return
+    setChatFocusMode(!chatFocusMode)
+  }, [chatFocusMode, compact, setChatFocusMode])
+
+  useEffect(() => {
+    if (compact && chatFocusMode) {
+      setChatFocusMode(false)
+    }
+  }, [chatFocusMode, compact, setChatFocusMode])
+
+  useEffect(() => {
+    if (!chatFocusMode) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      setChatFocusMode(false)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [chatFocusMode, setChatFocusMode])
+
+  // ⌘. (Mac) / Ctrl+. (Win) to toggle focus mode
+  useEffect(() => {
+    if (compact) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '.' || !(event.metaKey || event.ctrlKey)) return
+      event.preventDefault()
+      setChatFocusMode(!chatFocusMode)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [compact, chatFocusMode, setChatFocusMode])
+
+  useEffect(() => {
+    return () => {
+      useWorkspaceStore.getState().setChatFocusMode(false)
+    }
+  }, [])
 
   // Reset state when session changes
   useEffect(() => {
@@ -1385,7 +1500,8 @@ export function ChatScreen({
       sessionKey: string,
       friendlyId: string,
       body: string,
-      attachments: Array<GatewayAttachment> = [],
+      attachments: Array<ChatAttachment> = [],
+      fastMode = false,
       skipOptimistic = false,
       existingClientId = '',
     ) {
@@ -1398,7 +1514,7 @@ export function ChatScreen({
       }))
 
     // Inject text/file attachment content directly into the message body.
-    // Gateways reliably forward text in the message body; file attachments
+    // Servers reliably forward text in the message body; file attachments
     // may be silently dropped for non-image types.
       const textBlocks = normalizedAttachments
         .filter((a) => {
@@ -1457,8 +1573,8 @@ export function ChatScreen({
         streamFinish()
       }, 120_000)
 
-      // Send a compatibility shape for gateway attachment parsing.
-      // Different gateway/channel versions read different keys.
+      // Send a compatibility shape for attachment parsing.
+      // Different server/channel versions read different keys.
       const payloadAttachments = normalizedAttachments.map((attachment) => {
         const mimeType =
           normalizeMimeType(attachment.contentType) ||
@@ -1509,6 +1625,7 @@ export function ChatScreen({
         attachments:
           payloadAttachments.length > 0 ? payloadAttachments : undefined,
         thinking: currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
+        fastMode,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
       }).catch((err: unknown) => {
         const messageText = err instanceof Error ? err.message : String(err)
@@ -1562,6 +1679,7 @@ export function ChatScreen({
       pending.friendlyId,
       pending.message,
       pending.attachments,
+      false,
       true,
       typeof pending.optimisticMessage.clientId === 'string'
         ? pending.optimisticMessage.clientId
@@ -1578,7 +1696,7 @@ export function ChatScreen({
   ])
 
   const retryQueuedMessage = useCallback(
-    function retryQueuedMessage(message: GatewayMessage, mode: 'manual' | 'auto') {
+    function retryQueuedMessage(message: ChatMessage, mode: 'manual' | 'auto') {
       if (!isRetryableQueuedMessage(message)) return false
 
       const body = textFromMessage(message).trim()
@@ -1596,15 +1714,12 @@ export function ChatScreen({
       const existingClientId = getMessageClientId(message)
 
       if (existingClientId) {
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeFriendlyId,
-          sessionKeyForMessage,
-          existingClientId,
-          function markSending(currentMessage) {
-            return { ...currentMessage, status: 'sending' }
-          },
-        )
+        updateHistoryMessageByClientId(queryClient, activeFriendlyId, sessionKeyForMessage, existingClientId, function markSending(currentMessage) {
+          return { ...currentMessage, status: 'sending' }
+        })
+        updateHistoryMessageByClientIdEverywhere(queryClient, existingClientId, function markSendingEverywhere(currentMessage) {
+          return { ...currentMessage, status: 'sending' }
+        })
       }
 
       if (mode === 'auto') {
@@ -1616,6 +1731,7 @@ export function ChatScreen({
         activeFriendlyId,
         body,
         attachments,
+        false,
         true,
         existingClientId,
       )
@@ -1642,7 +1758,7 @@ export function ChatScreen({
   )
 
   const handleRetryMessage = useCallback(
-    function handleRetryMessage(message: GatewayMessage) {
+    function handleRetryMessage(message: ChatMessage) {
       const retryKey = getRetryMessageKey(message)
       retriedQueuedMessageKeysRef.current.delete(retryKey)
       retryQueuedMessage(message, 'manual')
@@ -1651,48 +1767,48 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (connectionState === 'error' || connectionState === 'disconnected') {
-      hasSeenGatewayDisconnectRef.current = true
+    if (false) { // Server connection checks removed — Hermes uses direct API
+      hasSeenDisconnectRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return
     }
 
-    if (connectionState === 'connected' && hasSeenGatewayDisconnectRef.current) {
-      hasSeenGatewayDisconnectRef.current = false
+    if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
+      hasSeenDisconnectRef.current = false
       flushRetryableMessages()
     }
   }, [connectionState, flushRetryableMessages])
 
   useEffect(() => {
-    if (gatewayStatusError) {
-      hadGatewayErrorRef.current = true
+    if (statusError) {
+      hadErrorRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return
     }
 
-    const isGatewayHealthy = gatewayStatusQuery.data?.ok === true
-    if (isGatewayHealthy && hadGatewayErrorRef.current) {
-      hadGatewayErrorRef.current = false
+    const isHealthy = statusQuery.data?.ok === true
+    if (isHealthy && hadErrorRef.current) {
+      hadErrorRef.current = false
       flushRetryableMessages()
     }
-  }, [flushRetryableMessages, gatewayStatusError, gatewayStatusQuery.data])
+  }, [flushRetryableMessages, statusError, statusQuery.data])
 
   useEffect(() => {
-    function handleGatewayHealthRestored() {
+    function handleHealthRestored() {
       retriedQueuedMessageKeysRef.current.clear()
-      hadGatewayErrorRef.current = false
+      hadErrorRef.current = false
       flushRetryableMessages()
-      handleGatewayRefetch()
+      handleRefetch()
     }
 
-    window.addEventListener('gateway:health-restored', handleGatewayHealthRestored)
+    window.addEventListener('hermes:health-restored', handleHealthRestored)
     return () => {
       window.removeEventListener(
-        'gateway:health-restored',
-        handleGatewayHealthRestored,
+        'hermes:health-restored',
+        handleHealthRestored,
       )
     }
-  }, [flushRetryableMessages, handleGatewayRefetch])
+  }, [flushRetryableMessages, handleRefetch])
 
   const createSessionForMessage = useCallback(
     async (preferredFriendlyId?: string) => {
@@ -1737,7 +1853,7 @@ export function ChatScreen({
   )
 
   const upsertSessionInCache = useCallback(
-    (friendlyId: string, lastMessage: GatewayMessage) => {
+    (friendlyId: string, lastMessage: ChatMessage) => {
       if (!friendlyId) return
       queryClient.setQueryData(
         chatQueryKeys.sessions,
@@ -1786,14 +1902,74 @@ export function ChatScreen({
     }
   }, [])
 
+  const handleUiSlashCommand = useCallback(
+    (command: string) => {
+      const trimmedCommand = command.trim()
+      if (!trimmedCommand.startsWith('/')) return false
+
+      if (trimmedCommand === '/new') {
+        navigate({ to: '/chat' })
+        return true
+      }
+
+      if (trimmedCommand === '/clear') {
+        const sessionKey =
+          forcedSessionKey || resolvedSessionKey || activeSessionKey || activeFriendlyId
+        clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
+        toast('Chat cleared', { type: 'success' })
+        return true
+      }
+
+      if (trimmedCommand === '/model' || trimmedCommand === '/skin') {
+        window.dispatchEvent(
+          new CustomEvent(CHAT_OPEN_SETTINGS_EVENT, {
+            detail: {
+              section: trimmedCommand === '/skin' ? 'appearance' : 'hermes',
+            },
+          }),
+        )
+        return true
+      }
+
+      if (trimmedCommand === '/skills') {
+        navigate({ to: '/skills' })
+        return true
+      }
+
+      if (trimmedCommand === '/save') {
+        const exported = exportConversationTranscript({
+          sessionLabel: activeFriendlyId || 'conversation',
+          messages: finalDisplayMessages,
+        })
+        if (exported) {
+          toast('Conversation exported', { type: 'success' })
+        }
+        return true
+      }
+
+      return false
+    },
+    [
+      activeFriendlyId,
+      activeSessionKey,
+      finalDisplayMessages,
+      forcedSessionKey,
+      navigate,
+      queryClient,
+      resolvedSessionKey,
+    ],
+  )
+
   const send = useCallback(
     (
       body: string,
       attachments: Array<ChatComposerAttachment>,
+      fastMode: boolean,
       helpers: ChatComposerHelpers,
     ) => {
       const trimmedBody = body.trim()
       if (trimmedBody.length === 0 && attachments.length === 0) return
+      if (attachments.length === 0 && handleUiSlashCommand(trimmedBody)) return
 
       // Deduplicate sends with identical content within a 500ms window.
       // This prevents double-fire from paste events that trigger multiple send paths.
@@ -1811,7 +1987,7 @@ export function ChatScreen({
       // Scroll to bottom immediately so user sees their message + incoming response
       requestAnimationFrame(() => scrollChatToBottom('smooth'))
 
-      const attachmentPayload: Array<GatewayAttachment> = attachments.map(
+      const attachmentPayload: Array<ChatAttachment> = attachments.map(
         (attachment) => ({
           ...attachment,
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
@@ -1838,13 +2014,14 @@ export function ChatScreen({
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.sessions })
         })
 
-        // Send using the new thread id — gateway can still resolve/reroute under the hood
+        // Send using the new thread id — server can still resolve/reroute under the hood
         // Fire send BEFORE navigate — navigating unmounts the component and can cancel the fetch
         sendMessage(
           threadId,
           threadId,
           trimmedBody,
           attachmentPayload,
+          fastMode,
           true,
           typeof optimisticMessage.clientId === 'string'
             ? optimisticMessage.clientId
@@ -1866,6 +2043,7 @@ export function ChatScreen({
         activeFriendlyId,
         trimmedBody,
         attachmentPayload,
+        fastMode,
       )
     },
     [
@@ -1881,8 +2059,61 @@ export function ChatScreen({
       upsertSessionInCache,
       queryClient,
       resolvedSessionKey,
+      handleUiSlashCommand,
     ],
   )
+
+  const handleAbortStreaming = useCallback(() => {
+    const activeSend = activeSendRef.current
+    if (activeSend?.clientId) {
+      updateHistoryMessageByClientIdEverywhere(
+        queryClient,
+        activeSend.clientId,
+        (message) => ({
+          ...message,
+          status: 'sent',
+        }),
+      )
+    }
+    activeSendRef.current = null
+    cancelStreaming()
+    setSending(false)
+    setPendingGeneration(false)
+    setWaitingForResponse(false)
+  }, [cancelStreaming, queryClient])
+
+  const runPaletteSlashCommand = useCallback(
+    (command: string) => {
+      const trimmedCommand = command.trim()
+      if (!trimmedCommand.startsWith('/')) return
+      if (handleUiSlashCommand(trimmedCommand)) return
+      send(trimmedCommand, [], false, commandHelpers)
+    },
+    [commandHelpers, handleUiSlashCommand, send],
+  )
+
+  useEffect(() => {
+    function handleRunCommand(event: Event) {
+      const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
+      if (!detail?.command) return
+      runPaletteSlashCommand(detail.command)
+    }
+
+    window.addEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
+    return () => {
+      window.removeEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
+    }
+  }, [runPaletteSlashCommand])
+
+  useEffect(() => {
+    const pendingCommand = window.sessionStorage.getItem(
+      CHAT_PENDING_COMMAND_STORAGE_KEY,
+    )
+    if (!pendingCommand) return
+
+    window.sessionStorage.removeItem(CHAT_PENDING_COMMAND_STORAGE_KEY)
+    runPaletteSlashCommand(pendingCommand)
+  }, [runPaletteSlashCommand])
 
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
 
@@ -1894,7 +2125,7 @@ export function ChatScreen({
     setFileExplorerCollapsed((prev) => {
       const next = !prev
       if (typeof window !== 'undefined') {
-        localStorage.setItem('clawsuite-file-explorer-collapsed', String(next))
+        localStorage.setItem('hermes-file-explorer-collapsed', String(next))
       }
       return next
     })
@@ -1930,23 +2161,23 @@ export function ChatScreen({
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     (historyQuery.isLoading && !historyQuery.data) || isRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
-  const gatewayNotice = useMemo(() => {
+  const errorNotice = useMemo(() => {
     if (!showErrorNotice) return null
-    if (!gatewayError) return null
+    if (!serverError) return null
     return (
-      <GatewayStatusMessage
+      <ConnectionStatusMessage
         state="error"
-        error={gatewayError}
-        status={gatewayErrorStatus}
-        onRetry={handleGatewayRefetch}
+        error={serverError}
+        status={serverErrorStatus}
+        onRetry={handleRefetch}
       />
     )
-  }, [gatewayError, gatewayErrorStatus, handleGatewayRefetch, showErrorNotice])
+  }, [serverError, serverErrorStatus, handleRefetch, showErrorNotice])
 
   const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
     connectionState === 'connected'
       ? 'connected'
-      : gatewayStatusQuery.data?.ok === false || gatewayStatusQuery.isError
+      : statusQuery.data?.ok === false || statusQuery.isError
         ? 'disconnected'
         : 'connecting'
 
@@ -1969,8 +2200,8 @@ export function ChatScreen({
   // Pull-to-refresh offset removed
 
   const handleOpenAgentDetails = useCallback(() => {
-    setAgentViewOpen(true)
-  }, [setAgentViewOpen])
+    // agent view panel removed
+  }, [])
 
   const handleRenameActiveSessionTitle = useCallback(
     async (nextTitle: string) => {
@@ -1984,10 +2215,10 @@ export function ChatScreen({
 
   // Listen for mobile header agent-details tap
   useEffect(() => {
-    const handler = () => setAgentViewOpen(true)
-    window.addEventListener('clawsuite:chat-agent-details', handler)
-    return () => window.removeEventListener('clawsuite:chat-agent-details', handler)
-  }, [setAgentViewOpen])
+    const handler = () => { /* agent view removed */ }
+    window.addEventListener('hermes:chat-agent-details', handler)
+    return () => window.removeEventListener('hermes:chat-agent-details', handler)
+  }, [])
 
   return (
     <div
@@ -1995,6 +2226,7 @@ export function ChatScreen({
         'relative min-w-0 flex flex-col overflow-hidden',
         compact ? 'h-full flex-1 min-h-0' : 'h-full',
       )}
+      style={{ background: 'var(--theme-bg)' }}
     >
       <div
         className={cn(
@@ -2006,7 +2238,7 @@ export function ChatScreen({
               : 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]',
         )}
       >
-        {hideUi || compact ? null : isMobile ? null : (
+        {hideUi || compact || isFocusMode ? null : isMobile ? null : (
           <FileExplorerSidebar
             collapsed={fileExplorerCollapsed}
             onToggle={handleToggleFileExplorer}
@@ -2017,7 +2249,7 @@ export function ChatScreen({
         <main
           className={cn(
             'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
-            !compact && isAgentViewOpen ? 'min-[1024px]:mr-72' : 'mr-0',
+            'mr-0',
             (isRealtimeStreaming || hasPendingGeneration()) && 'chat-streaming-glow',
           )}
           style={{
@@ -2033,7 +2265,10 @@ export function ChatScreen({
               renamingTitle={renamingSessionTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
-              showFileExplorerButton={!isMobile}
+              sessions={sessions ?? []}
+              activeFriendlyId={activeFriendlyId}
+              onSelectSession={(key) => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: key } })}
+              showFileExplorerButton={!isMobile && !isFocusMode}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
               dataUpdatedAt={historyQuery.dataUpdatedAt}
@@ -2045,14 +2280,15 @@ export function ChatScreen({
               statusMode={headerStatusMode}
               activeToolName={activeHeaderToolName}
               thinkingLevel={thinkingLevel}
+              isFocusMode={isFocusMode}
+              onToggleFocusMode={handleToggleFocusMode}
             />
           )}
 
-          <ContextBar compact={compact} />
+          <div className="md:hidden"><ContextMeter variant="mobile" /></div>
+          <div className="hidden md:block px-4 py-1"><ContextMeter variant="desktop" /></div>
 
-          {isCompacting && <CompactingOverlay onDismiss={() => setIsCompacting(false)} />}
-
-          {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
+          {errorNotice && <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>}
           {pendingApprovals.length > 0 && (
             <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
               <div className="space-y-2">
@@ -2140,12 +2376,14 @@ export function ChatScreen({
               activeToolCalls={activeToolCalls}
               liveToolActivity={liveToolActivity}
               researchCard={researchCard}
+              isCompacting={isCompacting}
               sending={sending}
             />
           )}
           {showComposer ? (
             <ChatComposer
               onSubmit={send}
+              onAbort={handleAbortStreaming}
               isLoading={sending || waitingForResponse}
               disabled={sending || hideUi}
               sessionKey={
@@ -2162,9 +2400,10 @@ export function ChatScreen({
             />
           ) : null}
         </main>
-        {!compact && <AgentViewPanel />}
+
       </div>
-      {!compact && !hideUi && !isMobile && <TerminalPanel />}
+      {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
+      <InspectorPanel />
 
       {suggestion && (
         <ModelSuggestionToast
@@ -2200,6 +2439,8 @@ export function ChatScreen({
         threshold={alertThreshold}
         contextPercent={alertPercent}
       />
+
+      <ErrorToastContainer />
     </div>
   )
 }

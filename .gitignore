@@ -120,7 +120,6 @@ docs/ACTIVITY_LOGS.md
 docs/BROWSER-STRATEGY.md
 docs/CHAT-OPTIMIZATION.md
 docs/DASHBOARD_*.md
-docs/GATEWAY_CONSOLE_PARITY.md
 docs/NAVIGATION_ARCHITECTURE.md
 docs/ONBOARDING-SPEC.md
 docs/USAGE_AND_COST.md
@@ -132,5 +131,8 @@ docs/1*
 docs/INDEX.md
 docs/PHASE_*
 docs/specs/
-docs/CLAWSUITE-ROADMAP.md
 release/
+__pycache__/
+
+.env.docker
+.env.bak

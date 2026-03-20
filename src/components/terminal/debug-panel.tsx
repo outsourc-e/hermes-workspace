@@ -60,7 +60,7 @@ export function DebugPanel({
         {isLoading ? (
           <div className="flex items-center gap-2 rounded-lg border border-primary-700/50 bg-primary-900/40 px-3 py-2 text-sm text-primary-300">
             <BrailleSpinner
-              preset="claw"
+              preset="hermes"
               size={18}
               speed={100}
               className="text-primary-400"

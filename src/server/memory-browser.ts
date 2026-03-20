@@ -16,12 +16,11 @@ export type MemorySearchMatch = {
 }
 
 function isBrowserMemoryPath(relativePath: string): boolean {
-  return relativePath === 'MEMORY.md' || relativePath.startsWith('memory/')
+  return relativePath === 'MEMORY.md' || relativePath.startsWith('memories/')
 }
 
 function normalizeWorkspaceRoot(): string {
-  const configured = (process.env.OPENCLAW_WORKSPACE || '').trim()
-  return configured || path.join(os.homedir(), '.openclaw', 'workspace')
+  return path.join(os.homedir(), '.hermes')
 }
 
 export function getMemoryWorkspaceRoot(): string {
@@ -101,8 +100,8 @@ function compareMemoryFiles(a: MemoryFileMeta, b: MemoryFileMeta): number {
   if (a.path === 'MEMORY.md' && b.path !== 'MEMORY.md') return -1
   if (b.path === 'MEMORY.md' && a.path !== 'MEMORY.md') return 1
 
-  const aIsDaily = /^memory\/\d{4}-\d{2}-\d{2}\.md$/.test(a.path)
-  const bIsDaily = /^memory\/\d{4}-\d{2}-\d{2}\.md$/.test(b.path)
+  const aIsDaily = /^memories\/\d{4}-\d{2}-\d{2}\.md$/.test(a.path)
+  const bIsDaily = /^memories\/\d{4}-\d{2}-\d{2}\.md$/.test(b.path)
   if (aIsDaily && bIsDaily) return b.path.localeCompare(a.path)
 
   const modifiedDiff = Date.parse(b.modified) - Date.parse(a.modified)

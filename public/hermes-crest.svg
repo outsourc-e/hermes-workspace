@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Background circle - lighter -->
+  <circle cx="50" cy="50" r="46" fill="#1A2340" stroke="#3A4B78" stroke-width="2"/>
+  <!-- Staff -->
+  <line x1="50" y1="18" x2="50" y2="88" stroke="#D4A84B" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Wings (left) -->
+  <path d="M 50 24 C 38 20 22 22 18 30 C 16 34 20 38 28 36 C 34 34 42 28 50 24" fill="#A5B4FC" opacity="0.9"/>
+  <path d="M 50 28 C 40 25 28 27 24 32 C 23 34 26 36 32 35 C 36 34 44 30 50 28" fill="#818CF8" opacity="0.7"/>
+  <!-- Wings (right) -->
+  <path d="M 50 24 C 62 20 78 22 82 30 C 84 34 80 38 72 36 C 66 34 58 28 50 24" fill="#A5B4FC" opacity="0.9"/>
+  <path d="M 50 28 C 60 25 72 27 76 32 C 77 34 74 36 68 35 C 64 34 56 30 50 28" fill="#818CF8" opacity="0.7"/>
+  <!-- Left snake -->
+  <path d="M 50 75 C 38 70 32 62 38 55 C 44 48 50 52 50 52 C 50 52 38 46 36 40 C 34 34 42 30 50 35" stroke="#D4A84B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Right snake -->
+  <path d="M 50 75 C 62 70 68 62 62 55 C 56 48 50 52 50 52 C 50 52 62 46 64 40 C 66 34 58 30 50 35" stroke="#D4A84B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Top orb -->
+  <circle cx="50" cy="18" r="4.5" fill="#A5B4FC"/>
+</svg>

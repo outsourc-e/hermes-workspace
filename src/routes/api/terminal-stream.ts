@@ -115,7 +115,7 @@ export const Route = createFileRoute('/api/terminal-stream')({
 
             const keepAlive = setInterval(() => {
               send('ping', { t: Date.now() })
-            }, 15000)
+            }, 8000)
 
             const abort = () => {
               isStreamActive = false

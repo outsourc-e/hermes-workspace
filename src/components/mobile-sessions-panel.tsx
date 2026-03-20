@@ -79,7 +79,7 @@ export function MobileSessionsPanel({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[85] no-swipe md:hidden">
+    <div className="fixed inset-0 z-[97] no-swipe md:hidden">
       <button
         type="button"
         className="absolute inset-0 bg-black/40 animate-in fade-in duration-200"
@@ -87,9 +87,9 @@ export function MobileSessionsPanel({
         onClick={onClose}
       />
 
-      <aside className="no-swipe absolute inset-y-0 left-0 w-[80vw] max-w-sm border-r border-primary-200 bg-white shadow-2xl animate-in slide-in-from-left-8 duration-200 dark:border-gray-700 dark:bg-gray-900">
+      <aside className="no-swipe absolute inset-y-0 left-0 w-[80vw] max-w-sm border-r shadow-2xl animate-in slide-in-from-left-8 duration-200" style={{ background: 'var(--color-surface, #fff)', borderColor: 'var(--color-border, #e5e7eb)' }}>
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3 dark:border-gray-700">
+          <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
             <h2 className="text-sm font-semibold text-ink">Sessions</h2>
             <button
               type="button"

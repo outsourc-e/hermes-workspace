@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon, Tick01Icon, Sent02Icon } from '@hugeicons/core-free-icons';
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite';
 
-const STORAGE_KEY_SEEN = 'clawsuite-mobile-setup-seen';
+const STORAGE_KEY_SEEN = 'hermes-mobile-setup-seen';
 
 interface MobileSetupModalProps {
   isOpen: boolean;
@@ -79,7 +78,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
   const steps = [
     {
       title: 'Install Tailscale on your desktop',
-      body: 'Install Tailscale on the machine running ClawSuite, then sign in.',
+      body: 'Install Tailscale on the machine running Hermes Workspace, then sign in.',
       showTailscaleIcon: true,
       action: (
         <a
@@ -93,8 +92,8 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       ),
     },
     {
-      title: 'Make OpenClaw discoverable',
-      body: 'Send this to your OpenClaw agent so it exposes itself on the network for your phone to find it.',
+      title: 'Make Hermes discoverable',
+      body: 'Send this to your Hermes agent so it exposes itself on the network for your phone to find it.',
       showTailscaleIcon: false,
       action: (
         <div className="space-y-3">
@@ -115,7 +114,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
             ) : (
               <>
                 <HugeiconsIcon icon={Sent02Icon} size={16} strokeWidth={2} />
-                {exposeSending ? 'Sending…' : 'Send to OpenClaw'}
+                {exposeSending ? 'Sending…' : 'Send to Hermes'}
               </>
             )}
           </button>
@@ -148,7 +147,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       ),
     },
     {
-      title: 'Open ClawSuite on your phone',
+      title: 'Open Hermes Workspace on your phone',
       body: networkUrl?.source === 'tailscale'
         ? 'Your Tailscale address — open this on your phone browser.'
         : networkUrl?.source === 'lan'
@@ -217,7 +216,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
         </button>
 
         <div className="mb-4 flex items-center gap-3 pr-10">
-          <OpenClawStudioIcon className="size-9 overflow-hidden rounded-xl" />
+          <img src="/hermes-avatar.webp" alt="Hermes" className="size-9 rounded-xl" />
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-white">Mobile Setup</h2>
             <div className="mt-1 flex items-center gap-1.5">

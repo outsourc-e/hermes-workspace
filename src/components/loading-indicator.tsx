@@ -19,7 +19,7 @@ export type LoadingIndicatorProps = {
 function getBraillePreset(
   loaderStyle: LoaderStyle,
 ): BrailleSpinnerPreset | null {
-  if (loaderStyle === 'braille-claw') return 'claw'
+  if (loaderStyle === 'braille-hermes') return 'hermes'
   if (loaderStyle === 'braille-orbit') return 'orbit'
   if (loaderStyle === 'braille-breathe') return 'breathe'
   if (loaderStyle === 'braille-pulse') return 'pulse'

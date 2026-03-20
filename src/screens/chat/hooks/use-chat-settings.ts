@@ -5,6 +5,7 @@ import type { PathsPayload } from '../types'
 
 export function useChatSettings() {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<'hermes' | 'appearance'>('hermes')
   const [pathsLoading, setPathsLoading] = useState(false)
   const [pathsError, setPathsError] = useState<string | null>(null)
   const [paths, setPaths] = useState<PathsPayload | null>(null)
@@ -38,9 +39,13 @@ export function useChatSettings() {
     }
   }, [paths, pathsLoading])
 
-  const handleOpenSettings = useCallback(() => {
-    void openSettings()
-  }, [openSettings])
+  const handleOpenSettings = useCallback(
+    (section: 'hermes' | 'appearance' = 'hermes') => {
+      setSettingsSection(section)
+      void openSettings()
+    },
+    [openSettings],
+  )
 
   const closeSettings = useCallback(() => {
     setSettingsOpen(false)
@@ -66,7 +71,9 @@ export function useChatSettings() {
 
   return {
     settingsOpen,
+    settingsSection,
     setSettingsOpen,
+    setSettingsSection,
     pathsLoading,
     pathsError,
     paths,

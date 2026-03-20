@@ -20,8 +20,9 @@ import {
 const execFileAsync = promisify(execFile)
 
 const WORKSPACE_ROOT = (
-  process.env.OPENCLAW_WORKSPACE_DIR ||
-  path.join(os.homedir(), '.openclaw', 'workspace')
+  process.env.HERMES_WORKSPACE_DIR ||
+  process.env.HERMES_WORKSPACE_DIR ||
+  path.join(os.homedir(), '.hermes')
 ).trim()
 
 type FileEntry = {
@@ -97,7 +98,7 @@ const IGNORED_DIRS = new Set([
   '.DS_Store',
 ])
 
-const MAX_DIRECTORY_DEPTH = 8
+const MAX_DIRECTORY_DEPTH = 3
 const MAX_DIRECTORY_ENTRIES = 20_000
 
 type ReadDirectoryOptions = {

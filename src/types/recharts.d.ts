@@ -13,3 +13,4 @@ declare module 'recharts' {
   export const YAxis: ComponentType<any>
   export const Tooltip: ComponentType<any>
 }
+

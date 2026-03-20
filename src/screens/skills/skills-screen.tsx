@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,6 @@ import {
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
-import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 
 type SkillsTab = 'installed' | 'marketplace' | 'featured'
 type SkillsSort = 'name' | 'category'
@@ -46,7 +45,6 @@ type SkillSummary = {
   sourcePath: string
   installed: boolean
   enabled: boolean
-  builtin?: boolean
   featuredGroup?: string
   security?: SecurityRisk
 }
@@ -78,30 +76,6 @@ const DEFAULT_CATEGORIES = [
   'Data & Analytics',
   'Finance & Crypto',
 ]
-
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message?: string
-  onRetry: () => void
-}) {
-  return (
-    <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4">
-        <section className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
-          <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">Failed to load skills</h1>
-          <p className="mt-2 text-sm text-primary-600">
-            {message || 'Something went wrong while fetching skills.'}
-          </p>
-          <div className="mt-4">
-            <Button onClick={onRetry}>Retry</Button>
-          </div>
-        </section>
-      </div>
-    </div>
-  )
-}
 
 function resolveSkillSearchTier(
   skill: SkillSummary,
@@ -136,18 +110,6 @@ export function SkillsScreen() {
   const [selectedSkill, setSelectedSkill] = useState<SkillSummary | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  // Mobile detection for pull-to-refresh
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
-  )
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)')
-    const update = () => setIsMobile(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
-
   const skillsQuery = useQuery({
     queryKey: ['skills-browser', tab, searchInput, category, page, sort],
     queryFn: async function fetchSkills(): Promise<SkillsApiResponse> {
@@ -169,23 +131,6 @@ export function SkillsScreen() {
       return payload
     },
   })
-
-  // Pull-to-refresh: attach to the scrollable parent (<main> in workspace-shell)
-  const scrollContainerRef = useRef<HTMLElement | null>(null)
-  useEffect(() => {
-    const el = document.querySelector('main[data-tour="chat-area"]') as HTMLElement | null
-    scrollContainerRef.current = el
-  }, [])
-
-  const handleRefresh = useCallback(() => {
-    void skillsQuery.refetch()
-  }, [skillsQuery])
-
-  const { isPulling, pullDistance, threshold } = usePullToRefresh(
-    isMobile,
-    handleRefresh,
-    scrollContainerRef,
-  )
 
   const categories = useMemo(
     function resolveCategories() {
@@ -318,60 +263,21 @@ export function SkillsScreen() {
     setPage(1)
   }
 
-  if (skillsQuery.isError) {
-    return (
-      <ErrorState
-        message={
-          skillsQuery.error instanceof Error
-            ? skillsQuery.error.message
-            : 'Something went wrong while fetching skills.'
-        }
-        onRetry={() => {
-          void skillsQuery.refetch()
-        }}
-      />
-    )
-  }
-
-  const pullIndicatorStyle = isPulling
-    ? { transform: `translateY(${Math.min(pullDistance - 8, 48)}px)`, opacity: Math.min(pullDistance / threshold, 1) }
-    : undefined
-
   return (
-    <div className="relative min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
-      {/* Pull-to-refresh indicator (mobile) */}
-      {isMobile && isPulling ? (
-        <div
-          className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 transition-all duration-150"
-          style={pullIndicatorStyle}
-          aria-hidden
-        >
-          <div className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/90 px-3 py-1.5 shadow-md backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/90">
-            <span
-              className={cn(
-                'size-3 rounded-full border-2 border-accent-500',
-                pullDistance >= threshold ? 'border-t-transparent animate-spin' : 'opacity-50',
-              )}
-            />
-            <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
-              {pullDistance >= threshold ? 'Release to refresh' : 'Pull to refresh'}
-            </span>
-          </div>
-        </div>
-      ) : null}
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
-        <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase text-primary-500 tabular-nums">
-                ClawSuite Marketplace
+    <div className="min-h-full overflow-y-auto bg-surface text-ink">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+        <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
+                Hermes Workspace Marketplace
               </p>
-              <h1 className="truncate text-base font-semibold text-primary-900 dark:text-neutral-100">
+              <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
                 Skills Browser
               </h1>
-              <p className="mt-0.5 line-clamp-2 text-xs text-primary-500 text-pretty dark:text-neutral-400 sm:line-clamp-none">
-                Discover, install, and manage skills across your local
-                workspace and ClawHub registry.
+              <p className="text-sm text-primary-500 text-pretty sm:text-base">
+                Discover, install, and manage skills across your local workspace
+                and Skills Hub.
               </p>
             </div>
           </div>
@@ -381,16 +287,16 @@ export function SkillsScreen() {
           <Tabs value={tab} onValueChange={handleTabChange}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <TabsList
-                className="w-full overflow-x-auto rounded-xl border border-primary-200 bg-primary-100/60 p-1 scrollbar-none sm:w-auto"
+                className="w-full rounded-xl border border-primary-200 bg-primary-100/60 p-1 sm:w-auto"
                 variant="default"
               >
-                <TabsTab value="installed" className="min-w-0 shrink-0 px-3 text-xs sm:min-w-[132px] sm:text-sm">
+                <TabsTab value="installed" className="flex-1 sm:min-w-[132px]">
                   Installed
                 </TabsTab>
-                <TabsTab value="marketplace" className="min-w-0 shrink-0 px-3 text-xs sm:min-w-[168px] sm:text-sm">
+                <TabsTab value="marketplace" className="flex-1 sm:min-w-[168px]">
                   Marketplace
                 </TabsTab>
-                <TabsTab value="featured" className="min-w-0 shrink-0 px-3 text-xs sm:min-w-[120px] sm:text-sm">
+                <TabsTab value="featured" className="flex-1 sm:min-w-[120px]">
                   Featured
                 </TabsTab>
               </TabsList>
@@ -399,8 +305,8 @@ export function SkillsScreen() {
                 <input
                   value={searchInput}
                   onChange={(event) => handleSearchChange(event.target.value)}
-                  placeholder="Search skills..."
-                  className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px] sm:w-auto"
+                  placeholder="Search by name, tags, or description"
+                  className="h-9 w-full min-w-0 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
                 />
 
                 {tab === 'marketplace' ? (
@@ -492,27 +398,25 @@ export function SkillsScreen() {
         </section>
 
         {tab !== 'featured' ? (
-          <footer className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-xs text-primary-500 tabular-nums sm:text-sm">
+          <footer className="flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-sm text-primary-500 tabular-nums">
             <span>
-              {(skillsQuery.data?.total || 0).toLocaleString()} skills
+              {(skillsQuery.data?.total || 0).toLocaleString()} total skills
             </span>
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm"
                 disabled={page <= 1 || skillsQuery.isPending}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
-                Prev
+                Previous
               </Button>
-              <span className="min-w-[50px] text-center sm:min-w-[82px]">
+              <span className="min-w-[82px] text-center">
                 {page} / {totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm"
                 disabled={page >= totalPages || skillsQuery.isPending}
                 onClick={() =>
                   setPage((current) => Math.min(totalPages, current + 1))
@@ -753,7 +657,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="text-primary-500 font-medium w-16 shrink-0">
-              ClawSuite
+              Hermes Workspace
             </span>
             <span
               className={cn(
@@ -823,38 +727,32 @@ function SkillsGrid({
   onToggle,
 }: SkillsGridProps) {
   if (loading) {
-    return (
-      <>
-        {tab !== 'installed' && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-accent-200 bg-accent-50/60 px-3 py-2 text-xs text-accent-700">
-            <span className="inline-block size-2 animate-pulse rounded-full bg-accent-400" />
-            Loading skills from ClawHub...
-          </div>
-        )}
-        <SkillsSkeleton count={tab === 'installed' ? 6 : 9} />
-      </>
-    )
+    return <SkillsSkeleton count={tab === 'installed' ? 6 : 9} />
   }
 
   if (skills.length === 0) {
-    const isMarketplace = tab === 'marketplace'
+    const isMarketplace = tab === 'marketplace' || tab === ('featured' as string)
     return (
       <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
         <p className="text-sm font-medium text-primary-700">
-          {isMarketplace ? 'No marketplace skills available' : 'No skills found'}
+          {isMarketplace ? 'Marketplace Not Configured' : 'No skills found'}
         </p>
         <p className="mt-1 text-xs text-primary-500 text-pretty max-w-sm mx-auto">
           {isMarketplace ? (
             <>
-              Could not load skills from ClawHub. Check your internet connection
-              or browse skills at{' '}
+              Run{' '}
+              <code className="rounded bg-primary-200 px-1.5 py-0.5 font-mono text-[11px]">
+                hermes skills sync
+              </code>{' '}
+              in your terminal to download the skills registry, or browse skills
+              at{' '}
               <a
-                href="https://clawhub.ai"
+                href="https://github.com/NousResearch/hermes-agent"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-accent-500 hover:underline"
               >
-                clawhub.ai
+                Skills Hub
               </a>
             </>
           ) : (
@@ -877,45 +775,35 @@ function SkillsGrid({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18 }}
-              className="flex flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-3 shadow-sm backdrop-blur-sm md:min-h-[220px] md:p-4"
+              className="flex min-h-[220px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
             >
-              {/* Header: icon + name + badge */}
-              <div className="mb-1.5 flex items-start gap-2.5 md:mb-2">
-                <span className="mt-0.5 text-2xl leading-none md:text-xl">{skill.icon}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="line-clamp-1 text-sm font-medium text-ink md:text-base">
-                      {skill.name}
-                    </h3>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded-md border text-[10px] px-1.5 py-0 md:px-2 md:py-0.5 md:text-xs tabular-nums',
-                        skill.installed
-                          ? 'border-primary/40 bg-primary/15 text-primary'
-                          : 'border-primary-200 bg-primary-100/60 text-primary-500',
-                      )}
-                    >
-                      {skill.installed ? 'Installed' : 'Available'}
-                    </span>
-                  </div>
-                  <p className="line-clamp-1 text-[11px] text-primary-500 md:text-xs">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <p className="text-xl leading-none">{skill.icon}</p>
+                  <h3 className="line-clamp-1 text-base font-medium text-ink text-balance">
+                    {skill.name}
+                  </h3>
+                  <p className="line-clamp-1 text-xs text-primary-500">
                     by {skill.author}
                   </p>
                 </div>
+                <span
+                  className={cn(
+                    'rounded-md border px-2 py-0.5 text-xs tabular-nums',
+                    skill.installed
+                      ? 'border-primary/40 bg-primary/15 text-primary'
+                      : 'border-primary-200 bg-primary-100/60 text-primary-500',
+                  )}
+                >
+                  {skill.installed ? 'Installed' : 'Available'}
+                </span>
               </div>
 
-              {/* Description: 1 line mobile, 3 lines desktop */}
-              <p className="line-clamp-1 text-xs text-primary-500 md:line-clamp-3 md:min-h-[58px] md:text-sm">
+              <p className="line-clamp-3 min-h-[58px] text-sm text-primary-500 text-pretty">
                 {skill.description}
               </p>
 
-              {/* Tags: hidden on mobile, shown on desktop */}
-              <div className="mt-2 hidden flex-wrap items-center gap-1.5 md:flex">
-                {skill.builtin && (
-                  <span className="rounded-md border border-accent-300 bg-accent-100/50 px-2 py-0.5 text-xs font-medium text-accent-600">
-                    Built-in
-                  </span>
-                )}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <SecurityBadge security={skill.security} />
                 <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
                   {skill.category}
@@ -930,12 +818,10 @@ function SkillsGrid({
                 ))}
               </div>
 
-              {/* Actions row */}
-              <div className="mt-2 flex items-center justify-between gap-2 md:mt-auto md:pt-3">
+              <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs md:h-9 md:text-sm"
                   onClick={() => onOpenDetails(skill)}
                 >
                   Details
@@ -943,36 +829,30 @@ function SkillsGrid({
 
                 {tab === 'installed' ? (
                   <div className="flex items-center gap-2">
-                    {!skill.builtin && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-primary-500 md:text-xs">
-                        <Switch
-                          checked={skill.enabled}
-                          disabled={isActing}
-                          onCheckedChange={(checked) =>
-                            onToggle(skill.id, checked)
-                          }
-                          aria-label={`Toggle ${skill.name}`}
-                        />
-                        <span className="hidden sm:inline">{skill.enabled ? 'Enabled' : 'Disabled'}</span>
-                      </div>
-                    )}
-                    {!skill.builtin && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs md:h-9 md:text-sm"
+                    <div className="flex items-center gap-1.5 text-xs text-primary-500">
+                      <Switch
+                        checked={skill.enabled}
                         disabled={isActing}
-                        onClick={() => onUninstall(skill.id)}
-                      >
-                        Uninstall
-                      </Button>
-                    )}
+                        onCheckedChange={(checked) =>
+                          onToggle(skill.id, checked)
+                        }
+                        aria-label={`Toggle ${skill.name}`}
+                      />
+                      {skill.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isActing}
+                      onClick={() => onUninstall(skill.id)}
+                    >
+                      Uninstall
+                    </Button>
                   </div>
                 ) : skill.installed ? (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs md:h-9 md:text-sm"
                     disabled={isActing}
                     onClick={() => onUninstall(skill.id)}
                   >
@@ -981,7 +861,6 @@ function SkillsGrid({
                 ) : (
                   <Button
                     size="sm"
-                    className="h-8 text-xs md:h-9 md:text-sm"
                     disabled={isActing}
                     onClick={() => onInstall(skill.id)}
                   >
@@ -1027,13 +906,13 @@ function FeaturedGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 pb-2 lg:grid-cols-2">
       {skills.map((skill) => {
         const isActing = actionSkillId === skill.id
         return (
           <article
             key={skill.id}
-            className="flex min-h-[258px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
+            className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <div className="space-y-1">
@@ -1117,7 +996,7 @@ function SkillsSkeleton({
           key={index}
           className={cn(
             'animate-pulse rounded-2xl border border-primary-200 bg-primary-50/70 p-4',
-            large ? 'min-h-[258px]' : 'min-h-[220px]',
+            large ? 'min-h-[120px]' : 'min-h-[100px]',
           )}
         >
           <div className="mb-3 h-5 w-2/5 rounded-md bg-primary-100" />

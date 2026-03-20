@@ -61,7 +61,7 @@ function isDailyMemoryPath(pathValue: string): boolean {
 function splitFiles(files: Array<MemoryFileMeta>) {
   const rootMemory = files.find((file) => file.path === 'MEMORY.md') || null
   const memoryFiles = files
-    .filter((file) => file.path.startsWith('memory/'))
+    .filter((file) => file.path.startsWith('memory/') || file.path.startsWith('memories/'))
     .sort((a, b) => {
       if (isDailyMemoryPath(a.path) && isDailyMemoryPath(b.path)) {
         return b.path.localeCompare(a.path)
@@ -230,10 +230,10 @@ export function MemoryBrowserScreen() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-primary-50 text-primary-900 dark:bg-neutral-950 dark:text-neutral-100">
-      <div className="border-b border-primary-200 bg-primary-50 px-3 py-3 dark:border-neutral-800 dark:bg-neutral-950 md:px-4">
+    <div className="flex h-full min-h-0 flex-col" style={{ backgroundColor: 'var(--theme-bg)', color: 'var(--theme-text)' }}>
+      <div className="px-3 py-3 md:px-4" style={{ borderBottom: '1px solid var(--theme-border)', backgroundColor: 'var(--theme-bg)' }}>
         <div className="flex items-center gap-3">
-          <div className="inline-flex size-9 items-center justify-center rounded-xl border border-primary-200 bg-white text-primary-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">
+          <div className="inline-flex size-9 items-center justify-center rounded-xl" style={{ border: '1px solid var(--theme-border)', backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>
             <HugeiconsIcon icon={BrainIcon} size={18} strokeWidth={1.6} />
           </div>
           <div className="min-w-0 flex-1">
@@ -242,13 +242,15 @@ export function MemoryBrowserScreen() {
                 icon={Search01Icon}
                 size={16}
                 strokeWidth={1.7}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 dark:text-neutral-500"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--theme-muted)' }}
               />
               <input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder="Search memory files"
-                className="w-full rounded-xl border border-primary-200 bg-white py-2 pl-9 pr-3 text-sm text-primary-900 outline-none transition-colors placeholder:text-primary-400 focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                className="w-full rounded-xl py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent-500"
+                style={{ border: '1px solid var(--theme-border)', backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}
               />
             </div>
           </div>
@@ -328,11 +330,11 @@ export function MemoryBrowserScreen() {
                 ) : null}
 
                 <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                  memory/
+                  memories/
                 </div>
                 {memoryFiles.length === 0 ? (
                   <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500">
-                    No files in memory/
+                    No files in memories/
                   </div>
                 ) : (
                   memoryFiles.map((file) => (
@@ -381,7 +383,7 @@ export function MemoryBrowserScreen() {
                       type="button"
                       disabled={isSaving}
                       onClick={handleCancelEditing}
-                      className="rounded-md border border-primary-200 bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                      className="rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                     >
                       Cancel
                     </button>
@@ -396,7 +398,7 @@ export function MemoryBrowserScreen() {
                   <button
                     type="button"
                     onClick={handleStartEditing}
-                    className="relative inline-flex items-center gap-1.5 rounded-md border border-primary-200 bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                    className="relative inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                   >
                     <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.7} />
                     Edit
@@ -421,7 +423,7 @@ export function MemoryBrowserScreen() {
             ) : contentQuery.error instanceof Error ? (
               <StateBox label={contentQuery.error.message} error />
             ) : isEditing ? (
-              <div className="h-full rounded-xl border border-primary-200 bg-primary-50 p-2 dark:border-neutral-800 dark:bg-neutral-950">
+              <div className="h-full rounded-xl p-2" style={{ border: '1px solid var(--theme-border)', backgroundColor: 'var(--theme-card)' }}>
                 <textarea
                   value={draftContent}
                   onChange={(event) => {
@@ -429,12 +431,13 @@ export function MemoryBrowserScreen() {
                     setDraftContent(nextValue)
                     setHasUnsavedChanges(nextValue !== content)
                   }}
-                  className="h-full w-full resize-none rounded-lg border border-neutral-800 bg-primary-50 px-3 py-2 font-mono text-[13px] text-neutral-900 outline-none ring-0 placeholder:text-neutral-500 dark:border-primary-300 dark:bg-primary-50 dark:text-neutral-100"
+                  className="h-full w-full resize-none rounded-lg px-3 py-2 font-mono text-[13px] outline-none ring-0"
+                  style={{ border: '1px solid var(--theme-border)', backgroundColor: 'var(--theme-bg)', color: 'var(--theme-text)' }}
                   spellCheck={false}
                 />
               </div>
             ) : (
-              <div className="rounded-xl border border-primary-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+              <div className="rounded-xl" style={{ border: '1px solid var(--theme-border)', backgroundColor: 'var(--theme-card)' }}>
                 <div className="font-mono text-xs">
                   {lines.map((line, index) => {
                     const lineNumber = index + 1

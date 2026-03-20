@@ -1,6 +1,6 @@
 'use client';
 
-const STORAGE_KEY = 'clawsuite-session-pinged';
+const STORAGE_KEY = 'hermes-session-pinged';
 
 export async function generateFingerprint(): Promise<string> {
   const data = `${navigator.userAgent}${window.screen.width}${navigator.language}`;

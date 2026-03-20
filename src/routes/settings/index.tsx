@@ -2,32 +2,26 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   CheckmarkCircle02Icon,
   CloudIcon,
-  ComputerIcon,
   MessageMultiple01Icon,
-  Moon01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Settings02Icon,
   SourceCodeSquareIcon,
-  Sun01Icon,
   UserIcon,
 } from '@hugeicons/core-free-icons'
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type * as React from 'react'
-import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
-import { applyTheme, useSettings } from '@/hooks/use-settings'
-import type { ThemeId } from '@/lib/theme'
+import { useSettings } from '@/hooks/use-settings'
+import { THEMES, getTheme, isDarkTheme, setTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import { UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
@@ -35,52 +29,22 @@ import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
-import { getConnectionErrorInfo } from '@/lib/connection-errors'
 // useWorkspaceStore removed — hamburger eliminated on mobile
 
 export const Route = createFileRoute('/settings/')({
   component: SettingsRoute,
 })
 
-// ── Enterprise Theme Picker (P1-2) ─────────────────────────────────────
-
-const ENTERPRISE_THEMES_PAGE = [
-  {
-    id: 'paper-light' as ThemeId,
-    label: 'Clean',
-    icon: '☀️',
-    desc: 'Warm gray canvas with white cards',
-    preview: { bg: '#f5f5f5', panel: '#ffffff', border: '#e5e5e5', accent: '#f97316', text: '#1a1a1a' },
-  },
-  {
-    id: 'ops-dark' as ThemeId,
-    label: 'Slate',
-    icon: '🖥️',
-    desc: 'Deep slate with teal secondary glow',
-    preview: { bg: '#1e1e2e', panel: '#2a2a3e', border: '#3a3a4e', accent: '#14b8a6', text: '#e5e5e5' },
-  },
-  {
-    id: 'premium-dark' as ThemeId,
-    label: 'Midnight',
-    icon: '✨',
-    desc: 'OLED true black with high contrast',
-    preview: { bg: '#000000', panel: '#0a0a0a', border: '#1a1a1a', accent: '#f97316', text: '#f5f5f5' },
-  },
-  {
-    id: 'sunset-brand' as ThemeId,
-    label: 'Sunset',
-    icon: '🌇',
-    desc: 'Warm brown brand immersion',
-    preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
-  },
-] as const
-
-const DARK_ENTERPRISE_SET = new Set<ThemeId>(['ops-dark', 'premium-dark', 'sunset-brand'])
-
 function PageThemeSwatch({
   colors,
 }: {
-  colors: (typeof ENTERPRISE_THEMES_PAGE)[number]['preview']
+  colors: {
+    bg: string
+    panel: string
+    border: string
+    accent: string
+    text: string
+  }
 }) {
   return (
     <div
@@ -117,60 +81,106 @@ function PageThemeSwatch({
   )
 }
 
-function EnterpriseThemePickerPage() {
-  const { updateSettings } = useSettings()
-  const [current, setCurrent] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'paper-light'
-    const stored = localStorage.getItem('clawsuite-theme')
-    return ENTERPRISE_THEMES_PAGE.some((t) => t.id === stored) ? (stored as string) : 'paper-light'
-  })
+const THEME_PREVIEWS: Record<
+  ThemeId,
+  { bg: string; panel: string; border: string; accent: string; text: string }
+> = {
+  'hermes-official': {
+    bg: '#0A0E1A',
+    panel: '#11182A',
+    border: '#24304A',
+    accent: '#6366F1',
+    text: '#E6EAF2',
+  },
+  'hermes-official-light': {
+    bg: '#F6F8FC',
+    panel: '#FFFFFF',
+    border: '#D7DEEE',
+    accent: '#4F46E5',
+    text: '#111827',
+  },
+  'hermes-classic': {
+    bg: '#0d0f12',
+    panel: '#1a1f26',
+    border: '#2a313b',
+    accent: '#b98a44',
+    text: '#eceff4',
+  },
+  'hermes-slate': {
+    bg: '#0d1117',
+    panel: '#1c2128',
+    border: '#30363d',
+    accent: '#7eb8f6',
+    text: '#c9d1d9',
+  },
+  'hermes-mono': {
+    bg: '#111111',
+    panel: '#222222',
+    border: '#333333',
+    accent: '#aaaaaa',
+    text: '#e6edf3',
+  },
+  'hermes-classic-light': {
+    bg: '#F5F2ED',
+    panel: '#FFFFFF',
+    border: '#D9D0C4',
+    accent: '#b98a44',
+    text: '#1a1f26',
+  },
+  'hermes-slate-light': {
+    bg: '#F6F8FA',
+    panel: '#FFFFFF',
+    border: '#D0D7DE',
+    accent: '#3b82f6',
+    text: '#1F2328',
+  },
+  'hermes-mono-light': {
+    bg: '#FAFAFA',
+    panel: '#FFFFFF',
+    border: '#D4D4D4',
+    accent: '#666666',
+    text: '#1a1a1a',
+  },
+}
 
-  function applyEnterpriseTheme(id: ThemeId) {
-    const html = document.documentElement
-    html.setAttribute('data-theme', id)
-    if (DARK_ENTERPRISE_SET.has(id)) {
-      html.classList.add('dark')
-      html.classList.remove('light')
-      updateSettings({ theme: 'dark' })
-    } else {
-      html.classList.add('light')
-      html.classList.remove('dark')
-      updateSettings({ theme: 'light' })
-    }
-    localStorage.setItem('clawsuite-theme', id)
+function WorkspaceThemePicker() {
+  const { updateSettings } = useSettings()
+  const [current, setCurrent] = useState<ThemeId>(() => getTheme())
+
+  function applyWorkspaceTheme(id: ThemeId) {
+    setTheme(id)
+    updateSettings({ theme: isDarkTheme(id) ? 'dark' : 'light' })
     setCurrent(id)
   }
 
   return (
-    <div className="grid w-full grid-cols-2 gap-2">
-      {ENTERPRISE_THEMES_PAGE.map((t) => {
+    <div className="grid w-full gap-2 md:grid-cols-3">
+      {THEMES.map((t) => {
         const isActive = current === t.id
         return (
           <button
             key={t.id}
             type="button"
-            onClick={() => applyEnterpriseTheme(t.id)}
+            onClick={() => applyWorkspaceTheme(t.id)}
             className={cn(
-              'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
+              'flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
               isActive
-                ? 'border-accent-500 bg-accent-50 text-accent-700'
-                : 'border-primary-200 bg-primary-50/80 hover:bg-primary-100',
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-subtle)] text-[var(--theme-text)]'
+                : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
             )}
           >
-            <PageThemeSwatch colors={t.preview} />
-            <div className="flex items-center gap-1">
+            <PageThemeSwatch colors={THEME_PREVIEWS[t.id]} />
+            <div className="flex items-center gap-1.5">
               <span className="text-xs">{t.icon}</span>
-              <span className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
-                {t.label}
-              </span>
+              <span className="text-xs font-semibold">{t.label}</span>
               {isActive && (
-                <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-accent-600">
+                <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-[var(--theme-accent)]">
                   Active
                 </span>
               )}
             </div>
-            <p className="text-[10px] leading-tight text-primary-500 dark:text-neutral-400">
-              {t.desc}
+            <p className="text-[10px] leading-tight text-[var(--theme-muted)]">
+              {t.description}
             </p>
           </button>
         )
@@ -233,7 +243,7 @@ type SettingsSectionId =
   | 'profile'
   | 'appearance'
   | 'chat'
-  | 'editor'
+  | 'hermes'
   | 'notifications'
   | 'advanced'
 
@@ -243,39 +253,15 @@ type SettingsNavItem = {
 }
 
 const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
-  { id: 'profile', label: 'Profile' },
+  { id: 'hermes', label: 'Hermes Agent' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'chat', label: 'Chat' },
-  { id: 'editor', label: 'Editor' },
   { id: 'notifications', label: 'Notifications' },
-  { id: 'advanced', label: 'Advanced' },
 ]
 
 function SettingsRoute() {
   usePageTitle('Settings')
   const { settings, updateSettings } = useSettings()
-  const gatewayUrl = useGatewaySetupStore((state) => state.gatewayUrl)
-  const gatewayToken = useGatewaySetupStore((state) => state.gatewayToken)
-  const gatewayTestStatus = useGatewaySetupStore((state) => state.testStatus)
-  const gatewayTestError = useGatewaySetupStore((state) => state.testError)
-  const gatewaySaving = useGatewaySetupStore((state) => state.saving)
-  const gatewayErrorInfo = getConnectionErrorInfo(gatewayTestError)
-  const loadCurrentGatewayConfig = useGatewaySetupStore(
-    (state) => state.loadCurrentConfig,
-  )
-  const setGatewayUrl = useGatewaySetupStore((state) => state.setGatewayUrl)
-  const setGatewayToken = useGatewaySetupStore((state) => state.setGatewayToken)
-  const saveAndTestGateway = useGatewaySetupStore((state) => state.saveAndTest)
-  const testGatewayConnection = useGatewaySetupStore(
-    (state) => state.testConnection,
-  )
-  const autoDetectGateway = useGatewaySetupStore(
-    (state) => state.autoDetectGateway,
-  )
-  const openGatewayWizard = useGatewaySetupStore((state) => state.open)
-  const [autoDetectingGateway, setAutoDetectingGateway] = useState(false)
-  const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null)
-  const [autoDetectError, setAutoDetectError] = useState<string | null>(null)
 
   // Phase 4.2: Fetch models for preferred model dropdowns
   const [availableModels, setAvailableModels] = useState<
@@ -307,66 +293,8 @@ function SettingsRoute() {
     void fetchModels()
   }, [])
 
-  useEffect(() => {
-    async function initializeGatewayConnectionSettings() {
-      await loadCurrentGatewayConfig()
-      await testGatewayConnection()
-    }
-
-    void initializeGatewayConnectionSettings()
-  }, [loadCurrentGatewayConfig, testGatewayConnection])
-
-  async function handleAutoDetectGateway() {
-    setAutoDetectingGateway(true)
-    setAutoDetectMessage(null)
-    setAutoDetectError(null)
-
-    const result = await autoDetectGateway()
-    if (!result.ok || !result.url) {
-      setAutoDetectError(
-        result.error || 'No gateway found on localhost ports 18789-18800.',
-      )
-      setAutoDetectingGateway(false)
-      return
-    }
-
-    setAutoDetectMessage(`Detected gateway at ${result.url}`)
-    setAutoDetectingGateway(false)
-  }
-
-  function handleThemeChange(value: string) {
-    const theme = value as SettingsThemeMode
-    applyTheme(theme)
-    updateSettings({ theme })
-
-    // P1-1: Persist enterprise theme to localStorage, mirroring settings-dialog behaviour
-    if (theme === 'light') {
-      localStorage.setItem('clawsuite-theme', 'paper-light')
-    } else if (theme === 'dark') {
-      const current = localStorage.getItem('clawsuite-theme')
-      const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
-      if (!darkThemes.includes(current ?? '')) {
-        localStorage.setItem('clawsuite-theme', 'ops-dark')
-      }
-    }
-  }
-
-  function getAccentBadgeClass(color: AccentColor): string {
-    if (color === 'orange') return 'bg-orange-500'
-    if (color === 'purple') return 'bg-purple-500'
-    if (color === 'blue') return 'bg-blue-500'
-    return 'bg-green-500'
-  }
-
-  function getConnectionDotClass(): string {
-    if (gatewayTestStatus === 'success') return 'bg-green-500'
-    if (gatewayTestStatus === 'error') return 'bg-red-500'
-    if (gatewayTestStatus === 'testing') return 'bg-accent-500'
-    return 'bg-primary-500'
-  }
-
   const [activeSection, setActiveSection] =
-    useState<SettingsSectionId>('profile')
+    useState<SettingsSectionId>('hermes')
 
   return (
     <div className="min-h-screen bg-surface text-primary-900">
@@ -400,10 +328,7 @@ function SettingsRoute() {
           </div>
         </nav>
 
-        {/* Mobile header */}
-        <div className="flex items-center gap-2 md:hidden">
-          <h1 className="text-lg font-semibold text-primary-900">Settings</h1>
-        </div>
+        {/* Mobile header — intentionally omitted; MobilePageHeader above shows "Settings" */}
 
         {/* Mobile section pills */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none md:hidden">
@@ -426,100 +351,30 @@ function SettingsRoute() {
 
         {/* Content area */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
-          {/* ── Profile ─────────────────────────────────────────── */}
-          {activeSection === 'profile' && <ProfileSection />}
+          {/* ── Hermes Agent ──────────────────────────────────── */}
+          {activeSection === 'hermes' && <HermesConfigSection />}
 
           {/* ── Appearance ──────────────────────────────────────── */}
           {activeSection === 'appearance' && (
             <>
               <SettingsSection
                 title="Appearance"
-                description="Choose app theme and accent color."
+                description="Choose a workspace theme and accent color."
                 icon={PaintBoardIcon}
               >
                 <SettingsRow
                   label="Theme"
-                  description="Apply light, dark, or follow system preference."
-                >
-                  <Tabs
-                    value={settings.theme}
-                    onValueChange={handleThemeChange}
-                  >
-                    <TabsList variant="default" className="gap-1">
-                      <TabsTab value="system">
-                        <HugeiconsIcon
-                          icon={ComputerIcon}
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        <span>System</span>
-                      </TabsTab>
-                      <TabsTab value="light">
-                        <HugeiconsIcon
-                          icon={Sun01Icon}
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        <span>Light</span>
-                      </TabsTab>
-                      <TabsTab value="dark">
-                        <HugeiconsIcon
-                          icon={Moon01Icon}
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        <span>Dark</span>
-                      </TabsTab>
-                    </TabsList>
-                  </Tabs>
-                </SettingsRow>
-
-                <SettingsRow
-                  label="Accent color"
-                  description="Select the primary accent for controls and highlights."
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {(['orange', 'purple', 'blue', 'green'] as const).map(
-                      function mapAccent(color) {
-                        const active = settings.accentColor === color
-                        return (
-                          <Button
-                            key={color}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              updateSettings({ accentColor: color })
-                            }
-                            className={cn(
-                              'border border-primary-200 bg-primary-100/70 text-primary-900 hover:bg-primary-200',
-                              active && 'border-primary-500 bg-primary-200',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'size-2.5 rounded-full',
-                                getAccentBadgeClass(color),
-                              )}
-                            />
-                            <span className="capitalize">{color}</span>
-                          </Button>
-                        )
-                      },
-                    )}
-                  </div>
-                </SettingsRow>
-
-                {/* P1-2: Enterprise theme picker — mobile-only settings UI needs this */}
-                <SettingsRow
-                  label="Enterprise theme"
-                  description="Full brand theme presets with custom color palettes."
+                  description="All workspace themes are dark. Pick the palette you want to use."
                 >
                   <div className="w-full">
-                    <EnterpriseThemePickerPage />
+                    <WorkspaceThemePicker />
                   </div>
                 </SettingsRow>
+
+                {/* Accent color removed — themes control accent */}
+
               </SettingsSection>
-              <LoaderStyleSection />
+              {/* LoaderStyleSection removed — not relevant for Hermes */}
             </>
           )}
 
@@ -527,7 +382,7 @@ function SettingsRoute() {
           {activeSection === 'chat' && <ChatDisplaySection />}
 
           {/* ── Editor ──────────────────────────────────────────── */}
-          {activeSection === 'editor' && (
+          {activeSection === ('editor' as SettingsSectionId) && (
             <SettingsSection
               title="Editor"
               description="Configure Monaco defaults for the files workspace."
@@ -586,210 +441,48 @@ function SettingsRoute() {
 
           {/* ── Notifications ───────────────────────────────────── */}
           {activeSection === 'notifications' && (
-            <SettingsSection
-              title="Notifications"
-              description="Control alert delivery and usage warning threshold."
-              icon={Notification03Icon}
-            >
-              <SettingsRow
-                label="Enable alerts"
-                description="Show usage and system alert notifications."
-              >
-                <Switch
-                  checked={settings.notificationsEnabled}
-                  onCheckedChange={(checked) =>
-                    updateSettings({ notificationsEnabled: checked })
-                  }
-                  aria-label="Enable alerts"
-                />
-              </SettingsRow>
-              <SettingsRow
-                label="Usage threshold"
-                description="Set usage warning trigger between 50% and 100%."
-              >
-                <div className="flex w-full items-center gap-2 md:max-w-xs">
-                  <input
-                    type="range"
-                    min={50}
-                    max={100}
-                    value={settings.usageThreshold}
-                    onChange={(e) =>
-                      updateSettings({ usageThreshold: Number(e.target.value) })
-                    }
-                    className="w-full accent-primary-900 dark:accent-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!settings.notificationsEnabled}
-                    aria-label={`Usage threshold: ${settings.usageThreshold} percent`}
-                    aria-valuemin={50}
-                    aria-valuemax={100}
-                    aria-valuenow={settings.usageThreshold}
-                  />
-                  <span className="w-12 text-right text-sm tabular-nums text-primary-700">
-                    {settings.usageThreshold}%
-                  </span>
-                </div>
-              </SettingsRow>
-            </SettingsSection>
-          )}
-
-          {/* ── Advanced ────────────────────────────────────────── */}
-          {activeSection === 'advanced' && (
             <>
               <SettingsSection
-                title="Gateway Connection"
-                description="Edit the saved gateway connection, reconnect, and rerun setup if needed."
-                icon={CloudIcon}
+                title="Notifications"
+                description="Control alert delivery and usage warning threshold."
+                icon={Notification03Icon}
               >
                 <SettingsRow
-                  label="Gateway URL"
-                  description="Saved gateway WebSocket endpoint."
+                  label="Enable alerts"
+                  description="Show usage and system alert notifications."
                 >
-                  <div className="w-full md:max-w-md">
-                    <Input
-                      type="url"
-                      placeholder="ws://127.0.0.1:18789"
-                      value={gatewayUrl}
-                      onChange={(e) => setGatewayUrl(e.target.value)}
-                      className="h-9 w-full"
-                      aria-label="Gateway URL"
-                    />
-                  </div>
+                  <Switch
+                    checked={settings.notificationsEnabled}
+                    onCheckedChange={(checked) =>
+                      updateSettings({ notificationsEnabled: checked })
+                    }
+                    aria-label="Enable alerts"
+                  />
                 </SettingsRow>
                 <SettingsRow
-                  label="Gateway Token"
-                  description="Saved token for the gateway connection."
+                  label="Usage threshold"
+                  description="Set usage warning trigger between 50% and 100%."
                 >
-                  <div className="w-full md:max-w-md">
-                    <Input
-                      type="password"
-                      placeholder="Leave empty if no token is set"
-                      value={gatewayToken}
-                      onChange={(e) => setGatewayToken(e.target.value)}
-                      className="h-9 w-full"
-                      aria-label="Gateway Token"
-                    />
-                  </div>
-                </SettingsRow>
-                <SettingsRow
-                  label="Connection status"
-                  description="Current gateway reachability."
-                >
-                  <div className="flex w-full flex-col items-start gap-2 md:w-auto">
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium',
-                        gatewayTestStatus === 'success' &&
-                          'border-green-500/35 bg-green-500/10 text-green-600',
-                        gatewayTestStatus === 'error' &&
-                          'border-red-500/35 bg-red-500/10 text-red-600',
-                        gatewayTestStatus === 'testing' &&
-                          'border-accent-500/35 bg-accent-500/10 text-accent-600',
-                        gatewayTestStatus === 'idle' &&
-                          'border-primary-300 bg-primary-100 text-primary-700',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'size-2 rounded-full',
-                          getConnectionDotClass(),
-                        )}
-                      />
-                      {gatewayTestStatus === 'idle' ? 'Disconnected' : null}
-                      {gatewayTestStatus === 'testing' ? 'Reconnecting...' : null}
-                      {gatewayTestStatus === 'success' ? 'Connected' : null}
-                      {gatewayTestStatus === 'error' ? 'Disconnected' : null}
-                    </span>
-                    {gatewayTestError ? (
-                      <div className="text-xs text-red-600">
-                        <p className="font-medium">{gatewayErrorInfo.title}</p>
-                        <p className="mt-0.5">{gatewayErrorInfo.description}</p>
-                        {gatewayErrorInfo.action ? (
-                          <p className="mt-1 font-medium text-red-700">
-                            {gatewayErrorInfo.action}
-                          </p>
-                        ) : null}
-                        {gatewayErrorInfo.details ? (
-                          <p className="mt-1 text-[11px] text-red-500">
-                            {gatewayErrorInfo.details}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </SettingsRow>
-                <SettingsRow
-                  label="Actions"
-                  description="Save changes, reconnect, or scan localhost ports 18789-18800."
-                >
-                  <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void saveAndTestGateway()}
-                      disabled={
-                        gatewaySaving ||
-                        gatewayTestStatus === 'testing' ||
-                        !gatewayUrl.trim()
+                  <div className="flex w-full items-center gap-2 md:max-w-xs">
+                    <input
+                      type="range"
+                      min={50}
+                      max={100}
+                      value={settings.usageThreshold}
+                      onChange={(e) =>
+                        updateSettings({ usageThreshold: Number(e.target.value) })
                       }
-                    >
-                      <HugeiconsIcon
-                        icon={CheckmarkCircle02Icon}
-                        size={20}
-                        strokeWidth={1.5}
-                      />
-                      {gatewaySaving
-                        ? 'Saving...'
-                        : gatewayTestStatus === 'testing'
-                          ? 'Reconnecting...'
-                          : 'Save & Reconnect'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleAutoDetectGateway()}
-                      disabled={autoDetectingGateway || gatewaySaving}
-                    >
-                      {autoDetectingGateway
-                        ? 'Scanning localhost...'
-                        : 'Auto-detect'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        // Clear stale connection state and reload
-                        try {
-                          const keys = Object.keys(localStorage)
-                          for (const key of keys) {
-                            if (key.startsWith('clawsuite-') || key.startsWith('gateway-')) {
-                              localStorage.removeItem(key)
-                            }
-                          }
-                        } catch { /* ignore */ }
-                        window.location.reload()
-                      }}
-                      className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
-                    >
-                      Reset Connection
-                    </Button>
+                      className="w-full accent-primary-900 dark:accent-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!settings.notificationsEnabled}
+                      aria-label={`Usage threshold: ${settings.usageThreshold} percent`}
+                      aria-valuemin={50}
+                      aria-valuemax={100}
+                      aria-valuenow={settings.usageThreshold}
+                    />
+                    <span className="w-12 text-right text-sm tabular-nums text-primary-700">
+                      {settings.usageThreshold}%
+                    </span>
                   </div>
-                </SettingsRow>
-                {autoDetectError ? (
-                  <p className="text-sm text-red-600">{autoDetectError}</p>
-                ) : null}
-                {autoDetectMessage ? (
-                  <p className="text-sm text-green-600">{autoDetectMessage}</p>
-                ) : null}
-                <SettingsRow
-                  label="Setup wizard"
-                  description="Open the full setup wizard again."
-                >
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void openGatewayWizard()}
-                  >
-                    Run Setup Wizard
-                  </Button>
                 </SettingsRow>
               </SettingsSection>
 
@@ -895,7 +588,7 @@ function SettingsRoute() {
 const PROFILE_IMAGE_MAX_DIMENSION = 128
 const PROFILE_IMAGE_MAX_FILE_SIZE = 10 * 1024 * 1024
 
-function ProfileSection() {
+function _ProfileSection() {
   const { settings: chatSettings, updateSettings: updateChatSettings } =
     useChatSettingsStore()
   const [profileError, setProfileError] = useState<string | null>(null)
@@ -1073,25 +766,7 @@ function ChatDisplaySection() {
         />
       </SettingsRow>
     </SettingsSection>
-    <SettingsSection
-      title="Mobile Navigation"
-      description="How the bottom nav bar behaves on chat screens."
-      icon={MessageMultiple01Icon}
-    >
-      <SettingsRow
-        label="Chat nav mode"
-        description="Dock: hides nav in chat (iMessage). Scroll-hide: nav stays, composer floats above."
-      >
-        <select
-          value={settings.mobileChatNavMode ?? 'dock'}
-          onChange={(e) => updateSettings({ mobileChatNavMode: e.target.value as 'dock' | 'integrated' | 'scroll-hide' })}
-          className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-        >
-          <option value="dock">Dock (iMessage)</option>
-          <option value="scroll-hide">Nav visible (pill above)</option>
-        </select>
-      </SettingsRow>
-    </SettingsSection>
+    {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>
   )
 }
@@ -1102,7 +777,7 @@ type LoaderStyleOption = { value: LoaderStyle; label: string }
 
 const LOADER_STYLES: LoaderStyleOption[] = [
   { value: 'dots', label: 'Dots' },
-  { value: 'braille-claw', label: 'Claw' },
+  { value: 'braille-hermes', label: 'Hermes' },
   { value: 'braille-orbit', label: 'Orbit' },
   { value: 'braille-breathe', label: 'Breathe' },
   { value: 'braille-pulse', label: 'Pulse' },
@@ -1113,7 +788,7 @@ const LOADER_STYLES: LoaderStyleOption[] = [
 
 function getPreset(style: LoaderStyle): BrailleSpinnerPreset | null {
   const map: Record<string, BrailleSpinnerPreset> = {
-    'braille-claw': 'claw',
+    'braille-hermes': 'hermes',
     'braille-orbit': 'orbit',
     'braille-breathe': 'breathe',
     'braille-pulse': 'pulse',
@@ -1140,7 +815,7 @@ function LoaderPreview({ style }: { style: LoaderStyle }) {
   )
 }
 
-function LoaderStyleSection() {
+function _LoaderStyleSection() {
   const { settings: chatSettings, updateSettings: updateChatSettings } =
     useChatSettingsStore()
 
@@ -1177,5 +852,369 @@ function LoaderStyleSection() {
         })}
       </div>
     </SettingsSection>
+  )
+}
+
+// ── Hermes Agent Configuration ──────────────────────────────────────
+
+type HermesProvider = {
+  id: string
+  name: string
+  authType: string
+  envKeys: string[]
+  configured: boolean
+  maskedKeys: Record<string, string>
+}
+
+type HermesConfigData = {
+  config: Record<string, unknown>
+  providers: HermesProvider[]
+  activeProvider: string
+  activeModel: string
+  hermesHome: string
+}
+
+const HERMES_API = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+
+type AvailableModelsResponse = {
+  provider: string
+  models: Array<{ id: string; description: string }>
+  providers: Array<{ id: string; label: string; authenticated: boolean }>
+}
+
+function HermesConfigSection() {
+  const [data, setData] = useState<HermesConfigData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [keyInput, setKeyInput] = useState('')
+  const [modelInput, setModelInput] = useState('')
+  const [providerInput, setProviderInput] = useState('')
+  const [baseUrlInput, setBaseUrlInput] = useState('')
+
+  // Available providers + models from hermes-agent
+  const [availableProviders, setAvailableProviders] = useState<Array<{ id: string; label: string; authenticated: boolean }>>([])
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; description: string }>>([])
+  const [loadingModels, setLoadingModels] = useState(false)
+
+  const fetchModelsForProvider = useCallback(async (provider: string) => {
+    setLoadingModels(true)
+    try {
+      const res = await fetch(`/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(provider)}`)
+      if (res.ok) {
+        const result = await res.json() as AvailableModelsResponse
+        setAvailableModels(result.models || [])
+        if (result.providers?.length) setAvailableProviders(result.providers)
+      }
+    } catch { /* ignore */ }
+    setLoadingModels(false)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/hermes-config')
+      .then((r) => r.json())
+      .then((d: HermesConfigData) => {
+        setData(d)
+        setModelInput((d.activeModel as string) || '')
+        setProviderInput((d.activeProvider as string) || '')
+        setBaseUrlInput((d.config?.base_url as string) || '')
+        setLoading(false)
+        // Fetch available models for current provider
+        if (d.activeProvider) {
+          void fetchModelsForProvider(d.activeProvider)
+        }
+      })
+      .catch(() => setLoading(false))
+  }, [fetchModelsForProvider])
+
+  const saveConfig = async (updates: { config?: Record<string, unknown>; env?: Record<string, string> }) => {
+    setSaving(true)
+    setSaveMessage(null)
+    try {
+      const res = await fetch('/api/hermes-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      const result = await res.json() as { message?: string }
+      setSaveMessage(result.message || 'Saved')
+      // Refresh data
+      const refreshRes = await fetch('/api/hermes-config')
+      const refreshData = await refreshRes.json() as HermesConfigData
+      setData(refreshData)
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch {
+      setSaveMessage('Failed to save')
+    }
+    setSaving(false)
+  }
+
+  if (loading) {
+    return (
+      <SettingsSection title="Hermes Agent" description="Loading configuration..." icon={Settings02Icon}>
+        <div className="animate-pulse h-20 rounded-lg" style={{ backgroundColor: 'var(--theme-panel)' }} />
+      </SettingsSection>
+    )
+  }
+
+  if (!data) {
+    return (
+      <SettingsSection title="Hermes Agent" description="Could not load Hermes configuration." icon={Settings02Icon}>
+        <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
+          Make sure Hermes Agent is running on localhost:8642
+        </p>
+      </SettingsSection>
+    )
+  }
+
+  const memoryConfig = (data.config.memory as Record<string, unknown>) || {}
+  const terminalConfig = (data.config.terminal as Record<string, unknown>) || {}
+  const displayConfig = (data.config.display as Record<string, unknown>) || {}
+
+  return (
+    <>
+      {saveMessage && (
+        <div className="rounded-lg px-3 py-2 text-sm font-medium" style={{
+          backgroundColor: saveMessage.includes('Failed') ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+          color: saveMessage.includes('Failed') ? '#ef4444' : '#22c55e',
+        }}>
+          {saveMessage}
+        </div>
+      )}
+
+      {/* Model & Provider */}
+      <SettingsSection
+        title="Model & Provider"
+        description="Configure the default AI model for Hermes Agent."
+        icon={SourceCodeSquareIcon}
+      >
+        <SettingsRow label="Provider" description="Select the inference provider.">
+          <div className="flex gap-2 w-full max-w-sm">
+            {availableProviders.length > 0 ? (
+              <select
+                value={providerInput}
+                onChange={(e) => {
+                  const newProvider = e.target.value
+                  setProviderInput(newProvider)
+                  setModelInput('')
+                  void fetchModelsForProvider(newProvider)
+                }}
+                className="flex-1 rounded-md border border-primary-300 bg-white dark:bg-primary-800 px-3 py-2 text-sm text-primary-900 dark:text-primary-100 dark:border-primary-600 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                {availableProviders.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}{p.authenticated ? ' ✓' : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                value={providerInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProviderInput(e.target.value)}
+                placeholder="e.g. ollama, anthropic, openai-codex"
+                className="flex-1"
+              />
+            )}
+          </div>
+        </SettingsRow>
+        <SettingsRow label="Model" description="The model Hermes uses for conversations.">
+          <div className="flex gap-2 w-full max-w-sm">
+            {availableModels.length > 0 ? (
+              <select
+                value={modelInput}
+                onChange={(e) => setModelInput(e.target.value)}
+                className="flex-1 rounded-md border border-primary-300 bg-white dark:bg-primary-800 px-3 py-2 text-sm font-mono text-primary-900 dark:text-primary-100 dark:border-primary-600 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                {!availableModels.some(m => m.id === modelInput) && modelInput && (
+                  <option value={modelInput}>{modelInput} (current)</option>
+                )}
+                {availableModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id}{m.description ? ` — ${m.description}` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                value={modelInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setModelInput(e.target.value)}
+                placeholder={loadingModels ? 'Loading models...' : 'e.g. qwen3.5:35b'}
+                className="flex-1 font-mono"
+              />
+            )}
+          </div>
+        </SettingsRow>
+        <SettingsRow label="Base URL" description="For local providers (Ollama, LM Studio, MLX). Leave blank for cloud.">
+          <div className="flex gap-2 w-full max-w-sm">
+            <Input
+              value={baseUrlInput}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBaseUrlInput(e.target.value)}
+              placeholder="e.g. http://localhost:11434/v1"
+              className="flex-1 font-mono text-sm"
+            />
+          </div>
+        </SettingsRow>
+        <div className="flex justify-end pt-2">
+          <Button
+            size="sm"
+            disabled={saving}
+            onClick={() => {
+              const configUpdate: Record<string, unknown> = {
+                model: modelInput.trim(),
+                provider: providerInput.trim(),
+                base_url: baseUrlInput.trim() || null,
+              }
+              void saveConfig({ config: configUpdate })
+            }}
+          >
+            {saving ? 'Saving...' : 'Save Model'}
+          </Button>
+        </div>
+      </SettingsSection>
+
+      {/* API Keys */}
+      <SettingsSection
+        title="API Keys"
+        description="Manage provider API keys stored in ~/.hermes/.env"
+        icon={CloudIcon}
+      >
+        {data.providers
+          .filter((p) => p.envKeys.length > 0)
+          .map((provider) => (
+            <SettingsRow
+              key={provider.id}
+              label={provider.name}
+              description={provider.configured ? '✅ Configured' : '❌ Not configured'}
+            >
+              <div className="flex items-center gap-2 w-full max-w-sm">
+                {provider.envKeys.map((envKey) => (
+                  <div key={envKey} className="flex-1">
+                    {editingKey === envKey ? (
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          value={keyInput}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKeyInput(e.target.value)}
+                          placeholder={`Enter ${envKey}`}
+                          className="flex-1"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            saveConfig({ env: { [envKey]: keyInput } })
+                            setEditingKey(null)
+                            setKeyInput('')
+                          }}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setEditingKey(null); setKeyInput('') }}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono" style={{ color: 'var(--theme-muted)' }}>
+                          {provider.maskedKeys[envKey] || 'Not set'}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setEditingKey(envKey); setKeyInput('') }}
+                        >
+                          {provider.configured ? 'Change' : 'Add'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </SettingsRow>
+          ))}
+      </SettingsSection>
+
+      {/* Memory */}
+      <SettingsSection
+        title="Memory"
+        description="Configure Hermes Agent memory and user profiles."
+        icon={UserIcon}
+      >
+        <SettingsRow label="Memory enabled" description="Store and recall memories across sessions.">
+          <Switch
+            checked={memoryConfig.memory_enabled !== false}
+            onCheckedChange={(checked: boolean) =>
+              saveConfig({ config: { memory: { memory_enabled: checked } } })
+            }
+          />
+        </SettingsRow>
+        <SettingsRow label="User profile" description="Remember user preferences and context.">
+          <Switch
+            checked={memoryConfig.user_profile_enabled !== false}
+            onCheckedChange={(checked: boolean) =>
+              saveConfig({ config: { memory: { user_profile_enabled: checked } } })
+            }
+          />
+        </SettingsRow>
+      </SettingsSection>
+
+      {/* Terminal */}
+      <SettingsSection
+        title="Terminal"
+        description="Shell execution settings."
+        icon={SourceCodeSquareIcon}
+      >
+        <SettingsRow label="Backend" description="Terminal execution backend.">
+          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
+            {(terminalConfig.backend as string) || 'local'}
+          </span>
+        </SettingsRow>
+        <SettingsRow label="Timeout" description="Max seconds for terminal commands.">
+          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
+            {(terminalConfig.timeout as number) || 180}s
+          </span>
+        </SettingsRow>
+      </SettingsSection>
+
+      {/* Display */}
+      <SettingsSection
+        title="Display"
+        description="CLI display preferences (reflected in agent behavior)."
+        icon={PaintBoardIcon}
+      >
+        <SettingsRow label="Personality" description="Agent response style.">
+          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
+            {(displayConfig.personality as string) || 'default'}
+          </span>
+        </SettingsRow>
+        <SettingsRow label="Skin" description="CLI theme skin.">
+          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
+            {(displayConfig.skin as string) || 'default'}
+          </span>
+        </SettingsRow>
+      </SettingsSection>
+
+      {/* Info */}
+      <SettingsSection
+        title="About"
+        description="Hermes Agent runtime information."
+        icon={Notification03Icon}
+      >
+        <SettingsRow label="Config location" description="Where Hermes stores its configuration.">
+          <span className="text-xs font-mono" style={{ color: 'var(--theme-muted)' }}>
+            {data.hermesHome}
+          </span>
+        </SettingsRow>
+        <SettingsRow label="Active provider" description="Current inference provider.">
+          <span className="text-sm font-medium" style={{ color: 'var(--theme-accent)' }}>
+            {data.providers.find((p) => p.id === data.activeProvider)?.name || data.activeProvider}
+          </span>
+        </SettingsRow>
+      </SettingsSection>
+    </>
   )
 }
