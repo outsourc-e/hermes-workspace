@@ -15,6 +15,10 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
+import {
+  selectChatProfileDisplayName,
+  useChatSettingsStore,
+} from '@/hooks/use-chat-settings'
 
 const NAV_ITEMS = [
   { id: 'chat',     label: 'Chat',     icon: Chat01Icon,      to: '/chat/main',  match: (p: string) => p.startsWith('/chat') || p === '/new' || p === '/' },
@@ -67,6 +71,7 @@ export function MobileHamburgerMenu() {
 
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const isChatRoute = pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
   function handleNav(to: string) {
@@ -164,7 +169,9 @@ export function MobileHamburgerMenu() {
                 <circle cx="12" cy="7" r="4"/>
               </svg>
             </div>
-            <span className="text-[15px] font-semibold truncate" style={{ color: 'var(--color-ink, #111)' }}>Eric</span>
+            <span className="text-[15px] font-semibold truncate" style={{ color: 'var(--color-ink, #111)' }}>
+              {profileDisplayName}
+            </span>
             <span className="size-2.5 rounded-full bg-green-500 shrink-0" />
 
             <div className="flex-1" />
