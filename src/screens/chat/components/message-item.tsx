@@ -16,8 +16,11 @@ import type {
   ToolCallContent,
 } from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
-import { Message, MessageContent } from '@/components/prompt-kit/message'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
+import { CodeBlock } from '@/components/prompt-kit/code-block'
+import { Markdown } from '@/components/prompt-kit/markdown'
+import { Message, MessageContent } from '@/components/prompt-kit/message'
+import { Button } from '@/components/ui/button'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -905,6 +908,165 @@ function isImageAttachment(attachment: ChatAttachment): boolean {
   return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)
 }
 
+function isMarkdownAttachment(attachment: ChatAttachment): boolean {
+  const ext = attachmentExtension(attachment)
+  if (ext === 'md' || ext === 'markdown' || ext === 'mdx') return true
+
+  const contentType =
+    typeof attachment.contentType === 'string'
+      ? attachment.contentType.trim().toLowerCase()
+      : ''
+  return contentType.includes('markdown')
+}
+
+function decodeAttachmentText(attachment: ChatAttachment): string {
+  const candidates = [attachment.dataUrl, attachment.previewUrl, attachment.url]
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string' || candidate.trim().length === 0) continue
+    const trimmed = candidate.trim()
+
+    if (!trimmed.startsWith('data:')) {
+      return trimmed
+    }
+
+    const commaIndex = trimmed.indexOf(',')
+    if (commaIndex < 0) continue
+
+    const metadata = trimmed.slice(0, commaIndex).toLowerCase()
+    const payload = trimmed.slice(commaIndex + 1)
+
+    try {
+      if (metadata.includes(';base64')) {
+        return decodeURIComponent(escape(atob(payload)))
+      }
+      return decodeURIComponent(payload)
+    } catch {
+      continue
+    }
+  }
+
+  return ''
+}
+
+function MarkdownDocumentCard({
+  title,
+  content,
+  openHref,
+  className,
+}: {
+  title: string
+  content: string
+  openHref?: string
+  className?: string
+}) {
+  const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview')
+  const hasContent = content.trim().length > 0
+
+  return (
+    <div
+      className={cn(
+        'w-full max-w-[42rem] overflow-hidden rounded-2xl border border-primary-200 bg-primary-50/70',
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-primary-200 px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium text-primary-900">{title}</div>
+          <div className="text-[11px] text-primary-600">Markdown document</div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {hasContent ? (
+            <div className="flex items-center rounded-lg border border-primary-200 bg-primary-100/70 p-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'h-7 px-2.5 text-xs',
+                  viewMode === 'preview' &&
+                    'bg-primary-200 text-primary-900 hover:bg-primary-200',
+                )}
+                onClick={() => setViewMode('preview')}
+              >
+                Preview
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'h-7 px-2.5 text-xs',
+                  viewMode === 'source' &&
+                    'bg-primary-200 text-primary-900 hover:bg-primary-200',
+                )}
+                onClick={() => setViewMode('source')}
+              >
+                Source
+              </Button>
+            </div>
+          ) : null}
+          {openHref ? (
+            <a
+              href={openHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary-700 underline decoration-primary-300 underline-offset-4 hover:decoration-primary-500"
+            >
+              Open
+            </a>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="max-h-[26rem] overflow-auto p-3">
+        {hasContent ? (
+          viewMode === 'preview' ? (
+            <Markdown className="text-sm">{content}</Markdown>
+          ) : (
+            <CodeBlock content={content} language="markdown" className="my-0" />
+          )
+        ) : (
+          <div className="text-sm text-primary-600">
+            Preview unavailable for this markdown content.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MarkdownAttachmentCard({ attachment }: { attachment: ChatAttachment }) {
+  const source = attachmentSource(attachment)
+  const content = useMemo(() => decodeAttachmentText(attachment), [attachment])
+  const ext = attachmentExtension(attachment)
+
+  return (
+    <MarkdownDocumentCard
+      title={`${attachment.name || 'Markdown attachment'}${ext ? ` • ${ext.toUpperCase()}` : ''}`}
+      content={content}
+      openHref={source || undefined}
+    />
+  )
+}
+
+function extractStandaloneMarkdownFence(text: string): string | null {
+  const trimmed = text.trim()
+  const match = trimmed.match(/^```(?:md|markdown)\n([\s\S]*?)\n```$/i)
+  if (!match) return null
+  return typeof match[1] === 'string' ? match[1].trim() : null
+}
+
+function MarkdownMessageCard({ content }: { content: string }) {
+  return (
+    <MarkdownDocumentCard
+      title="Markdown preview"
+      content={content}
+      className="max-w-full"
+    />
+  )
+}
+
 const TOOL_ICONS: Record<string, string> = {
   exec: '\u2699',
   terminal: '\u2699',
@@ -938,6 +1100,7 @@ function InlineToolSectionItem({
 }) {
   const [open, setOpen] = useState(false)
   const [showRawJson, setShowRawJson] = useState(false)
+  const [showFullOutput, setShowFullOutput] = useState(false)
   useEffect(() => {
     if (forceOpen) setOpen(true)
   }, [forceOpen])
@@ -954,10 +1117,20 @@ function InlineToolSectionItem({
     headerArg && headerArg.length > 60 ? `${headerArg.slice(0, 57)}…` : headerArg
 
   const rawJsonPayload = JSON.stringify(
-    { type: toolSection.type, input: toolSection.input ?? {}, output: toolSection.outputText || toolSection.errorText || null },
+    {
+      type: toolSection.type,
+      input: toolSection.input ?? {},
+      output: toolSection.outputText || toolSection.errorText || null,
+    },
     null,
     2,
   )
+  const outputText = toolSection.outputText || toolSection.errorText || ''
+  const shouldTruncateOutput = outputText.length > 800
+  const displayedOutputText =
+    shouldTruncateOutput && !showFullOutput
+      ? `${outputText.slice(0, 800)}…`
+      : outputText
 
   return (
     <Collapsible
@@ -1026,16 +1199,14 @@ function InlineToolSectionItem({
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">Error</div>
                 <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-xs font-mono text-red-500" style={{ background: 'var(--code-bg, var(--theme-card))' }}>
-                  {toolSection.errorText}
+                  {displayedOutputText}
                 </pre>
               </div>
             ) : toolSection.outputText ? (
               <div>
-                <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Result</div>
+                <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Output</div>
                 <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-xs font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
-                  {toolSection.outputText.length > 800
-                    ? `${toolSection.outputText.slice(0, 800)}…`
-                    : toolSection.outputText}
+                  {displayedOutputText}
                 </pre>
               </div>
             ) : isRunning ? (
@@ -1049,14 +1220,32 @@ function InlineToolSectionItem({
             </pre>
           )}
 
-          {/* Raw JSON toggle */}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setShowRawJson((v) => !v) }}
-            className="self-start text-[9px] font-sans text-primary-500 hover:text-primary-700 transition-colors"
-          >
-            {showRawJson ? '← formatted' : 'raw JSON →'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {shouldTruncateOutput ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowFullOutput((value) => !value)
+                }}
+                className="self-start text-[9px] font-sans text-primary-500 hover:text-primary-700 transition-colors"
+              >
+                {showFullOutput ? 'show less output' : 'show full output'}
+              </button>
+            ) : null}
+
+            {/* Raw JSON toggle */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowRawJson((v) => !v)
+              }}
+              className="self-start text-[9px] font-sans text-primary-500 hover:text-primary-700 transition-colors"
+            >
+              {showRawJson ? '← formatted' : 'raw JSON →'}
+            </button>
+          </div>
         </div>
       </CollapsiblePanel>
     </Collapsible>
@@ -1167,6 +1356,10 @@ function MessageItemComponent({
   const effectiveIsStreaming =
     remoteStreamingActive || (_simulateStreaming && !revealComplete)
   const assistantDisplayText = effectiveIsStreaming ? revealedText : displayText
+  const standaloneMarkdownDocument = useMemo(
+    () => extractStandaloneMarkdownFence(assistantDisplayText),
+    [assistantDisplayText],
+  )
 
   useEffect(() => {
     const totalWords = countWords(displayText)
@@ -1625,6 +1818,7 @@ function MessageItemComponent({
                     const source = attachmentSource(attachment)
                     const ext = attachmentExtension(attachment)
                     const imageAttachment = isImageAttachment(attachment)
+                    const markdownAttachment = isMarkdownAttachment(attachment)
 
                     if (imageAttachment) {
                       return (
@@ -1642,6 +1836,15 @@ function MessageItemComponent({
                             loading="lazy"
                           />
                         </a>
+                      )
+                    }
+
+                    if (markdownAttachment) {
+                      return (
+                        <MarkdownAttachmentCard
+                          key={attachment.id || attachment.name || source}
+                          attachment={attachment}
+                        />
                       )
                     }
 
@@ -1690,16 +1893,20 @@ function MessageItemComponent({
                   </span>
                 ) : hasRevealedText ? (
                   <div className="relative">
-                    <MessageContent
-                      markdown
-                      className={cn(
-                        'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
-                        effectiveIsStreaming && 'chat-streaming-content',
-                        isUser && 'text-white',
-                      )}
-                    >
-                      {assistantDisplayText}
-                    </MessageContent>
+                    {standaloneMarkdownDocument ? (
+                      <MarkdownMessageCard content={standaloneMarkdownDocument} />
+                    ) : (
+                      <MessageContent
+                        markdown
+                        className={cn(
+                          'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
+                          effectiveIsStreaming && 'chat-streaming-content',
+                          isUser && 'text-white',
+                        )}
+                      >
+                        {assistantDisplayText}
+                      </MessageContent>
+                    )}
                     {effectiveIsStreaming && (
                       <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent-500 align-text-bottom" />
                     )}
