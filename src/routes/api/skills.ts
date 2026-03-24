@@ -179,8 +179,8 @@ function normalizeSkill(value: unknown): SkillSummary | null {
         ? record.fileCount
         : 0,
     sourcePath,
-    installed: Boolean(record.installed ?? true),
-    enabled: Boolean(record.enabled ?? true),
+    installed: Boolean(record.installed ?? false),
+    enabled: Boolean(record.enabled ?? record.installed ?? false),
     builtin: Boolean(record.builtin),
     featuredGroup: undefined,
     security: normalizeSecurity(record.security),
