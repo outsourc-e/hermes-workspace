@@ -654,9 +654,20 @@ function ChatMessageListComponent({
           .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
           .join('')
           .trim()
+        const hasAttachments =
+          Array.isArray((msg as any).attachments) && (msg as any).attachments.length > 0
+        const hasInlineImages =
+          Array.isArray((msg as any).inlineImages) && (msg as any).inlineImages.length > 0
+        const isPendingOptimisticUserMessage =
+          typeof (msg as any).__optimisticId === 'string' ||
+          msg.status === 'sending' ||
+          msg.status === 'queued'
 
-        // Hide metadata-only user messages after cleanup.
-        if (cleanedText.length === 0) return false
+        // Keep optimistic/pending user messages visible for the whole response cycle,
+        // even if the server hasn't echoed normalized text content back yet.
+        if (cleanedText.length === 0 && !hasAttachments && !hasInlineImages) {
+          if (!isPendingOptimisticUserMessage) return false
+        }
 
         const isSystemPrefixed = /^System:/i.test(rawText)
         if (hideSystemMessages && isSystemPrefixed) return false

@@ -567,9 +567,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         if (optimisticIndex >= 0) {
+          const optimisticMessage = sessionMessages[optimisticIndex]
+          const incomingText = extractMessageText(incomingMessage)
+          const optimisticText = extractMessageText(optimisticMessage)
+          const incomingHasAttachments =
+            Array.isArray((incomingMessage as any).attachments) &&
+            (incomingMessage as any).attachments.length > 0
+          const optimisticHasAttachments =
+            Array.isArray((optimisticMessage as any).attachments) &&
+            (optimisticMessage as any).attachments.length > 0
+
           sessionMessages[optimisticIndex] = {
-            ...sessionMessages[optimisticIndex],
+            ...optimisticMessage,
             ...incomingMessage,
+            content:
+              incomingText.length > 0 || !optimisticText.length
+                ? incomingMessage.content
+                : optimisticMessage.content,
+            attachments:
+              incomingHasAttachments || !optimisticHasAttachments
+                ? incomingMessage.attachments
+                : optimisticMessage.attachments,
             __optimisticId: undefined,
             status: undefined,
           }
