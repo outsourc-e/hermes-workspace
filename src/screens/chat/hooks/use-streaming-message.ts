@@ -361,11 +361,21 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'chunk': {
           const chunk = payload as StreamChunk
+          const fullReplace = (chunk as Record<string, unknown>).fullReplace === true
           const newText =
             chunk.delta ?? chunk.text ?? chunk.content ?? chunk.chunk ?? ''
           if (newText) {
             markActivity()
-            pushTargetText(fullTextRef.current + newText)
+            const accumulated = fullReplace ? newText : fullTextRef.current + newText
+            pushTargetText(accumulated)
+            processStoreEvent({
+              type: 'chunk',
+              text: accumulated,
+              fullReplace: true,
+              runId: activeRunIdRef.current ?? undefined,
+              sessionKey: activeSessionKeyRef.current,
+              transport: 'send-stream',
+            })
           }
           break
         }
