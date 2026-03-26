@@ -349,25 +349,21 @@ export function DashboardScreen() {
 
   return (
     <div className="min-h-full px-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
-      {/* ── Header: Hermes Logo ── */}
-      <div className="flex flex-col items-center gap-2 py-3">
+      {/* ── Header: Hermes Logo + Quick Actions ── */}
+      <div className="flex flex-col items-center gap-3 py-3">
         <img
           src="/hermes-avatar.webp"
           alt="Hermes"
           className="size-12 md:size-14 rounded-xl shadow-md shadow-indigo-500/10 border border-neutral-200 dark:border-neutral-800"
         />
         <h1 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 tracking-wide">Hermes Workspace</h1>
+        <div className="flex items-center gap-2 mt-1">
+          <QuickAction label="New Chat" icon="💬" accentColor="#6366f1" onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })} />
+          <QuickAction label="Terminal" icon="💻" accentColor="#22c55e" onClick={() => navigate({ to: '/terminal' })} />
+          <QuickAction label="Skills" icon="🧩" accentColor="#f59e0b" onClick={() => navigate({ to: '/skills' })} />
+          <QuickAction label="Settings" icon="⚙️" accentColor="#a855f7" onClick={() => navigate({ to: '/settings' })} />
+        </div>
       </div>
-
-      {/* ── System Glance Bar ── */}
-      <SystemGlance
-        sessions={stats.totalSessions}
-        connected={connected}
-        model={typeof modelName === 'string' ? modelName : '—'}
-        provider={typeof provider === 'string' ? provider : '—'}
-        tokens={formatNumber(stats.totalTokens)}
-        cost={costEstimate}
-      />
 
       {/* ── Metrics Row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -387,17 +383,6 @@ export function DashboardScreen() {
         </div>
         <div className="lg:col-span-3">
           <SkillsWidget />
-        </div>
-      </div>
-
-      {/* ── Quick Actions ── */}
-      <div>
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-400 dark:text-neutral-500 mb-2.5">Quick Actions</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          <QuickAction label="New Chat" icon="💬" accentColor="#6366f1" onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })} />
-          <QuickAction label="Terminal" icon="💻" accentColor="#22c55e" onClick={() => navigate({ to: '/terminal' })} />
-          <QuickAction label="Skills" icon="🧩" accentColor="#f59e0b" onClick={() => navigate({ to: '/skills' })} />
-          <QuickAction label="Settings" icon="⚙️" accentColor="#a855f7" onClick={() => navigate({ to: '/settings' })} />
         </div>
       </div>
 
