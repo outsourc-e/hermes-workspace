@@ -7,6 +7,8 @@ import type {
   ToolCallContent,
 } from '../screens/chat/types'
 
+let _streamingPersistTimer: ReturnType<typeof setTimeout> | null = null
+
 export type ChatStreamEvent =
   | {
       type: 'message'
@@ -120,6 +122,44 @@ const createEmptyStreamingState = (): StreamingState => ({
   thinking: '',
   toolCalls: [],
 })
+
+function persistStreamingState(sessionKey: string, state: StreamingState): void {
+  if (typeof sessionStorage === 'undefined') return
+  if (_streamingPersistTimer) clearTimeout(_streamingPersistTimer)
+  _streamingPersistTimer = setTimeout(() => {
+    sessionStorage.setItem(
+      `hermes_streaming_${sessionKey}`,
+      JSON.stringify({ ...state, _savedAt: Date.now() }),
+    )
+  }, 500)
+}
+
+export function restoreStreamingState(sessionKey: string): StreamingState | null {
+  if (typeof sessionStorage === 'undefined') return null
+
+  const storageKey = `hermes_streaming_${sessionKey}`
+  const raw = sessionStorage.getItem(storageKey)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as StreamingState & { _savedAt?: unknown }
+    const savedAt =
+      typeof parsed._savedAt === 'number' && Number.isFinite(parsed._savedAt)
+        ? parsed._savedAt
+        : null
+
+    if (!savedAt || Date.now() - savedAt > 60_000) {
+      sessionStorage.removeItem(storageKey)
+      return null
+    }
+
+    const { _savedAt, ...streamingState } = parsed
+    return streamingState
+  } catch {
+    sessionStorage.removeItem(storageKey)
+    return null
+  }
+}
 
 let realtimeMessageSequence = 0
 
@@ -637,6 +677,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
+        persistStreamingState(sessionKey, next)
         break
       }
 
@@ -652,6 +693,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
+        persistStreamingState(sessionKey, next)
         break
       }
 
@@ -696,6 +738,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
+        persistStreamingState(sessionKey, next)
         break
       }
 
@@ -814,6 +857,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // injects an invisible streaming placeholder that causes a blank gap.
         streamingMap.delete(sessionKey)
         set({ streamingState: streamingMap, lastEventAt: now })
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem(`hermes_streaming_${sessionKey}`)
+        }
         break
       }
     }
