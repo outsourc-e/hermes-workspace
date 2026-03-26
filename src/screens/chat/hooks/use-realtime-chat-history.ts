@@ -63,6 +63,7 @@ function attachmentSignature(message: ChatMessage): string {
 
 const EMPTY_MESSAGES: Array<ChatMessage> = []
 const EMPTY_TOOL_CALLS: Array<{ id: string; name: string; phase: string; args?: unknown }> = []
+const EMPTY_LIFECYCLE_EVENTS: StreamingState['lifecycleEvents'] = []
 
 type UseRealtimeChatHistoryOptions = {
   sessionKey: string
@@ -417,6 +418,8 @@ export function useRealtimeChatHistory({
   const isRealtimeStreaming = streamingState !== null
   const realtimeStreamingText = streamingState?.text ?? ''
   const realtimeStreamingThinking = streamingState?.thinking ?? ''
+  const realtimeLifecycleEvents =
+    streamingState?.lifecycleEvents ?? EMPTY_LIFECYCLE_EVENTS
 
   return {
     messages: mergedMessages,
@@ -426,6 +429,7 @@ export function useRealtimeChatHistory({
     isRealtimeStreaming,
     realtimeStreamingText,
     realtimeStreamingThinking,
+    realtimeLifecycleEvents,
     completedStreamingText: completedStreamingTextRef,
     completedStreamingThinking: completedStreamingThinkingRef,
     streamingRunId: streamingState?.runId ?? null,

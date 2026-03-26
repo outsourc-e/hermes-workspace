@@ -59,6 +59,13 @@ export type ChatStreamEvent =
       runId?: string
       transport?: 'chat-events' | 'send-stream'
     }
+  | {
+      type: 'status' | 'lifecycle'
+      text: string
+      sessionKey: string
+      runId?: string
+      transport?: 'chat-events' | 'send-stream'
+    }
 
 export type ConnectionState =
   | 'disconnected'
@@ -70,6 +77,12 @@ export type StreamingState = {
   runId: string | null
   text: string
   thinking: string
+  lifecycleEvents: Array<{
+    text: string
+    emoji: string
+    timestamp: number
+    isError: boolean
+  }>
   toolCalls: Array<{
     id: string
     name: string
@@ -120,6 +133,7 @@ const createEmptyStreamingState = (): StreamingState => ({
   runId: null,
   text: '',
   thinking: '',
+  lifecycleEvents: [],
   toolCalls: [],
 })
 
@@ -211,6 +225,35 @@ function stripInternalTags(text: string): string {
       .replace(/<relevant_memories>[\s\S]*?<\/relevant_memories>/gi, '')
       .trim()
   }).join('')
+}
+
+const LIFECYCLE_PREFIX_EMOJIS = ['⏳', '⚠️', '🔄', '🗜️', '❌'] as const
+
+function parseLifecycleEvent(text: string, timestamp: number): {
+  text: string
+  emoji: string
+  timestamp: number
+  isError: boolean
+} {
+  const trimmed = text.trim()
+  const matchedEmoji =
+    LIFECYCLE_PREFIX_EMOJIS.find((emoji) => trimmed.startsWith(emoji)) ?? ''
+  const normalizedText = matchedEmoji
+    ? trimmed.slice(matchedEmoji.length).trimStart()
+    : trimmed
+  const lowerText = normalizedText.toLowerCase()
+  const isError =
+    matchedEmoji === '❌' ||
+    matchedEmoji === '⚠️' ||
+    lowerText.includes('error') ||
+    lowerText.includes('failed')
+
+  return {
+    text: normalizedText || trimmed,
+    emoji: matchedEmoji,
+    timestamp,
+    isError,
+  }
 }
 
 /**
@@ -689,6 +732,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ...prev,
           thinking: event.text,
           runId: event.runId ?? prev.runId,
+        }
+
+        streamingMap.set(sessionKey, next)
+        set({ streamingState: streamingMap, lastEventAt: now })
+        persistStreamingState(sessionKey, next)
+        break
+      }
+
+      case 'status':
+      case 'lifecycle': {
+        const streamingMap = new Map(state.streamingState)
+        const prev =
+          streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const next: StreamingState = {
+          ...prev,
+          runId: event.runId ?? prev.runId,
+          lifecycleEvents: [
+            ...prev.lifecycleEvents,
+            parseLifecycleEvent(event.text, now),
+          ],
         }
 
         streamingMap.set(sessionKey, next)

@@ -111,11 +111,19 @@ type ExecNotification = {
   ok: boolean | null
 }
 
+type LifecycleEvent = {
+  text: string
+  emoji: string
+  timestamp: number
+  isError: boolean
+}
+
 type MessageItemProps = {
   message: ChatMessage
   attachedToolMessages?: Array<ChatMessage>
   toolResultsByCallId?: Map<string, ChatMessage>
   toolCalls?: Array<StreamToolCall>
+  lifecycleEvents?: Array<LifecycleEvent>
   onRetryMessage?: (message: ChatMessage) => void
   forceActionsVisible?: boolean
   wrapperRef?: React.RefObject<HTMLDivElement | null>
@@ -900,6 +908,34 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   )
 }
 
+function LifecycleEventCard({
+  text,
+  emoji,
+  isError,
+}: {
+  text: string
+  emoji: string
+  isError: boolean
+}) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-1.5 text-[11px]"
+      style={{
+        background: 'var(--theme-card2)',
+        borderColor: isError
+          ? 'color-mix(in srgb, var(--theme-danger) 45%, var(--theme-border))'
+          : 'var(--theme-border)',
+        color: 'var(--theme-muted)',
+      }}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        {emoji ? <span className="leading-none">{emoji}</span> : null}
+        <span>{text}</span>
+      </span>
+    </div>
+  )
+}
+
 function attachmentSource(attachment: ChatAttachment | undefined): string {
   if (!attachment) return ''
   const candidates = [attachment.previewUrl, attachment.dataUrl, attachment.url]
@@ -1286,6 +1322,7 @@ function MessageItemComponent({
   attachedToolMessages = [],
   toolResultsByCallId,
   toolCalls: streamToolCalls = [],
+  lifecycleEvents = [],
   onRetryMessage,
   forceActionsVisible = false,
   wrapperRef,
@@ -1525,6 +1562,8 @@ function MessageItemComponent({
   const effectiveStreamToolCalls =
     streamToolCalls.length > 0 ? streamToolCalls : embeddedStreamToolCalls
   const hasStreamToolCalls = effectiveStreamToolCalls.length > 0
+  const effectiveLifecycleEvents = lifecycleEvents
+  const hasLifecycleEvents = effectiveLifecycleEvents.length > 0
   const activeStreamToolLabels = useMemo(() => {
     const labels: Array<string> = []
     const seen = new Set<string>()
@@ -1783,6 +1822,18 @@ function MessageItemComponent({
           </Collapsible>
         </div>
       )}
+      {effectiveIsStreaming && hasLifecycleEvents && (
+        <div className="w-full max-w-[900px] flex flex-col gap-1">
+          {effectiveLifecycleEvents.map((event, index) => (
+            <LifecycleEventCard
+              key={`${event.timestamp}-${index}-${event.text}`}
+              text={event.text}
+              emoji={event.emoji}
+              isError={event.isError}
+            />
+          ))}
+        </div>
+      )}
       {/* Narration messages (tool-call activity) — compact collapsible row */}
       {!isUser && (message as any).__isNarration && hasText && (
         <div className="w-full max-w-[900px]">
@@ -2025,6 +2076,7 @@ function areMessagesEqual(
   if (prevProps.wrapperClassName !== nextProps.wrapperClassName) return false
   if (prevProps.onRetryMessage !== nextProps.onRetryMessage) return false
   if (prevProps.toolCalls !== nextProps.toolCalls) return false
+  if (prevProps.lifecycleEvents !== nextProps.lifecycleEvents) return false
   if (prevProps.wrapperDataMessageId !== nextProps.wrapperDataMessageId) {
     return false
   }

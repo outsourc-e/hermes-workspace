@@ -500,6 +500,7 @@ export function ChatScreen({
     isRealtimeStreaming,
     realtimeStreamingText,
     realtimeStreamingThinking,
+    realtimeLifecycleEvents,
     completedStreamingText,
     completedStreamingThinking,
     activeToolCalls,
@@ -2383,6 +2384,7 @@ export function ChatScreen({
                 completedStreamingThinking.current ||
                 undefined
               }
+              lifecycleEvents={realtimeLifecycleEvents}
               hideSystemMessages
               activeToolCalls={activeToolCalls}
               liveToolActivity={liveToolActivity}

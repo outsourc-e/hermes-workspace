@@ -495,6 +495,12 @@ type ChatMessageListProps = {
   streamingMessageId?: string | null
   streamingText?: string
   streamingThinking?: string
+  lifecycleEvents?: Array<{
+    text: string
+    emoji: string
+    timestamp: number
+    isError: boolean
+  }>
   isStreaming?: boolean
   bottomOffset?: number | string
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
@@ -526,6 +532,7 @@ function ChatMessageListComponent({
   streamingMessageId,
   streamingText,
   streamingThinking,
+  lifecycleEvents = [],
   isStreaming = false,
   bottomOffset = 0,
   activeToolCalls = [],
@@ -1183,6 +1190,7 @@ function ChatMessageListComponent({
             isStreaming={messageIsStreaming}
             streamingText={streamingText}
             streamingThinking={messageIsStreaming ? streamingThinking : undefined}
+            lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
             simulateStreaming={simulateStreaming}
             streamingKey={signature}
             expandAllToolSections={expandAllToolSections}
@@ -1211,6 +1219,7 @@ function ChatMessageListComponent({
         isStreaming={messageIsStreaming}
         streamingText={messageIsStreaming ? streamingText : undefined}
         streamingThinking={messageIsStreaming ? streamingThinking : undefined}
+        lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
         simulateStreaming={simulateStreaming}
         streamingKey={signature}
         expandAllToolSections={expandAllToolSections}
@@ -1650,6 +1659,9 @@ function ChatMessageListComponent({
                         streamingThinking={
                           messageIsStreaming ? streamingThinking : undefined
                         }
+                        lifecycleEvents={
+                          messageIsStreaming ? lifecycleEvents : undefined
+                        }
                         simulateStreaming={simulateStreaming}
                         streamingKey={signature}
                         expandAllToolSections={expandAllToolSections}
@@ -1815,6 +1827,7 @@ function areChatMessageListEqual(
     prev.streamingMessageId === next.streamingMessageId &&
     prev.streamingText === next.streamingText &&
     prev.streamingThinking === next.streamingThinking &&
+    prev.lifecycleEvents === next.lifecycleEvents &&
     prev.isStreaming === next.isStreaming &&
     prev.bottomOffset === next.bottomOffset &&
     prev.activeToolCalls === next.activeToolCalls &&
