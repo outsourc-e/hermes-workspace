@@ -356,6 +356,12 @@ export async function getConfig(): Promise<HermesConfig> {
   return hermesGet<HermesConfig>('/api/config')
 }
 
+export async function patchConfig(
+  patch: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return hermesPatch<Record<string, unknown>>('/api/config', patch)
+}
+
 // ── Models ───────────────────────────────────────────────────────
 
 export async function listModels(): Promise<{
