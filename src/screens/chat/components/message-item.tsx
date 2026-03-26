@@ -819,8 +819,13 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.15)' : 'none',
       }}
     >
-      {/* Header row */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+      {/* Header row — always clickable */}
+      <button
+        type="button"
+        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 hover:opacity-80 text-left"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className="shrink-0 text-[10px] opacity-50">{expanded ? '▾' : '▸'}</span>
         <span className="shrink-0 text-sm leading-none">{emoji}</span>
         <span className="shrink-0 font-mono font-semibold text-ink">{displayName}</span>
         {truncated && truncated !== displayName && (
@@ -833,43 +838,62 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         {isDone && <span className="shrink-0 text-xs text-green-500">✅</span>}
         {isError && <span className="shrink-0 text-xs text-red-500">❌</span>}
         {isRunning && <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-indigo-500" />}
-      </div>
-      {isRunning && (
+      </button>
+      {isRunning && !expanded && (
         <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
           <span>{verb}{dots}</span>
         </div>
       )}
-      {isError && result && (
-        <div className="px-2.5 pb-1.5 text-[10px] font-mono truncate text-red-500">
-          {result.slice(0, 80)}
+      {/* Expanded content — args while running, result when done */}
+      {expanded && (
+        <div className="border-t" style={{ borderColor: 'var(--theme-border)' }}>
+          {/* Show args (input) */}
+          {toolCall.args != null && typeof toolCall.args === 'object' && Object.keys(toolCall.args as Record<string, unknown>).length > 0 && (
+            <div className="px-2.5 py-1.5">
+              <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">Input</div>
+              <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto text-ink opacity-70">
+                {JSON.stringify(toolCall.args, null, 2)}
+              </pre>
+            </div>
+          )}
+          {/* Show result when done */}
+          {isDone && result && (
+            <div className="px-2.5 py-1.5 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+              <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">Output</div>
+              <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-ink opacity-80">
+                {showMore ? result : detail}
+                {hasMore && !showMore && (
+                  <button
+                    type="button"
+                    className="block mt-1 text-[10px] underline text-accent-500"
+                    onClick={(e) => { e.stopPropagation(); setShowMore(true) }}
+                  >
+                    Show more
+                  </button>
+                )}
+              </pre>
+            </div>
+          )}
+          {/* Show error */}
+          {isError && result && (
+            <div className="px-2.5 py-1.5">
+              <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5">Error</div>
+              <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-red-500">
+                {result}
+              </pre>
+            </div>
+          )}
+          {/* Running indicator when expanded */}
+          {isRunning && (
+            <div className="px-2.5 py-1.5 text-[10px] text-primary-400 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+              <span>{verb}{dots}</span>
+            </div>
+          )}
         </div>
       )}
-      {/* Result preview when done */}
-      {isDone && result && (
-        <div className="border-t" style={{ borderColor: 'var(--theme-border)' }}>
-          <button
-            type="button"
-            className="w-full flex items-center gap-1 px-2.5 py-1 text-[10px] hover:opacity-80 text-left"
-            style={{ color: 'var(--theme-muted)' }}
-            onClick={() => setExpanded((v) => !v)}
-          >
-            <span>{expanded ? '▾' : '▸'}</span>
-            <span className="truncate">{preview}{result.length > 100 ? '…' : ''}</span>
-          </button>
-          {expanded && (
-            <pre className="px-2.5 pb-2 text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-ink opacity-80">
-              {showMore ? result : detail}
-              {hasMore && !showMore && (
-                <button
-                  type="button"
-                  className="block mt-1 text-[10px] underline text-accent-500"
-                  onClick={(e) => { e.stopPropagation(); setShowMore(true) }}
-                >
-                  Show more
-                </button>
-              )}
-            </pre>
-          )}
+      {!expanded && isError && result && (
+        <div className="px-2.5 pb-1.5 text-[10px] font-mono truncate text-red-500">
+          {result.slice(0, 80)}
         </div>
       )}
     </div>
