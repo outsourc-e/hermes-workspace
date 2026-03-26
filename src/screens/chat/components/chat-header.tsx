@@ -97,6 +97,8 @@ type ChatHeaderProps = {
   activeToolName?: string
   isFocusMode?: boolean
   onToggleFocusMode?: () => void
+  onUndo?: () => void
+  onClear?: () => void
 }
 
 function ChatHeaderComponent({
@@ -122,7 +124,10 @@ function ChatHeaderComponent({
   thinkingLevel = 'low',
   isFocusMode = false,
   onToggleFocusMode,
+  onUndo,
+  onClear,
 }: ChatHeaderProps) {
+  const [clearConfirm, setClearConfirm] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -422,6 +427,53 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
+        {/* Undo / Clear actions */}
+        {onUndo && (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                onClick={onUndo}
+                render={
+                  <Button size="icon-sm" variant="ghost" className="text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800" aria-label="Undo last message">
+                    <span className="text-sm">↩️</span>
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">Undo last message</TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        )}
+        {onClear && (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                onClick={() => {
+                  if (clearConfirm) {
+                    onClear()
+                    setClearConfirm(false)
+                  } else {
+                    setClearConfirm(true)
+                    setTimeout(() => setClearConfirm(false), 3000)
+                  }
+                }}
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className={cn(
+                      'hover:bg-primary-100 dark:hover:bg-primary-800',
+                      clearConfirm ? 'text-red-500' : 'text-primary-500',
+                    )}
+                    aria-label={clearConfirm ? 'Confirm clear' : 'Clear session'}
+                  >
+                    <span className="text-sm">{clearConfirm ? '⚠️' : '🗑️'}</span>
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">{clearConfirm ? 'Click again to confirm' : 'Clear session'}</TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        )}
         <InspectorToggleButton className="ml-2" />
       </div>
     </div>

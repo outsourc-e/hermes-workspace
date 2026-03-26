@@ -2283,6 +2283,16 @@ export function ChatScreen({
               thinkingLevel={thinkingLevel}
               isFocusMode={isFocusMode}
               onToggleFocusMode={handleToggleFocusMode}
+              onUndo={() => {
+                if (resolvedSessionKey) {
+                  sendMessage(resolvedSessionKey, activeFriendlyId, '/undo', [], false, true)
+                }
+              }}
+              onClear={() => {
+                if (resolvedSessionKey) {
+                  sendMessage(resolvedSessionKey, activeFriendlyId, '/clear', [], false, true)
+                }
+              }}
             />
           )}
 
