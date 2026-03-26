@@ -311,7 +311,7 @@ export function DashboardScreen() {
   const costEstimate = ((stats.totalTokens / 1_000_000) * 5).toFixed(2)
 
   return (
-    <div className="min-h-full p-4 md:p-8 max-w-5xl mx-auto space-y-6 pb-24">
+    <div className="min-h-full p-4 md:p-6 lg:p-8 space-y-6 pb-24">
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
