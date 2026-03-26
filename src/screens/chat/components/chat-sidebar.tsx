@@ -7,6 +7,7 @@ import {
   Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
+  DashboardSquare01Icon,
   File01Icon,
   MessageMultiple01Icon,
   Moon02Icon,
@@ -744,7 +745,16 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
+  const isDashboardActive = pathname === '/dashboard'
+
   const mainItems: Array<NavItemDef> = [
+    {
+      kind: 'link',
+      to: '/dashboard',
+      icon: DashboardSquare01Icon,
+      label: 'Dashboard',
+      active: isDashboardActive,
+    },
     {
       kind: 'link',
       to: '/chat',
