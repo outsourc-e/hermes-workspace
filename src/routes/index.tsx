@@ -1,13 +1,9 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
-  beforeLoad: function redirectToWorkspace() {
-    throw redirect({
-      to: '/chat' as string,
-      replace: true,
-    })
-  },
-  component: function IndexRoute() {
-    return null
-  },
+  component: RouteComponent,
 })
+
+function RouteComponent() {
+  return <div>Hello "/"!</div>
+}

@@ -5,6 +5,7 @@ import {
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
+  DashboardSquare01Icon,
   File01Icon,
   PuzzleIcon,
   Settings01Icon,
@@ -36,11 +37,18 @@ type TabItem = {
 
 const TABS: Array<TabItem> = [
   {
+    id: 'dashboard',
+    label: 'Home',
+    icon: DashboardSquare01Icon,
+    to: '/dashboard',
+    match: (p) => p === '/dashboard',
+  },
+  {
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
     to: '/chat/main',
-    match: (p) => p.startsWith('/chat') || p === '/new' || p === '/',
+    match: (p) => p.startsWith('/chat') || p === '/new',
   },
   {
     id: 'files',
