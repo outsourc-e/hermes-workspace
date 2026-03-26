@@ -247,12 +247,33 @@ function ThinkingBubble({
     return () => window.clearTimeout(swapTimer)
   }, [statusLabel])
 
-  // When a tool is active, render tool pill cards instead of shimmer bubble
+  // When a tool is active, render grouped tool pill cards instead of shimmer bubble
   if (allTools.length > 0 && !isCompacting) {
+    // Group consecutive same-name tools to avoid flooding the UI
+    const grouped: Array<{ name: string; phase: string; count: number }> = []
+    for (const tc of allTools) {
+      const last = grouped[grouped.length - 1]
+      if (last && last.name === tc.name) {
+        last.count++
+        // Keep the most "active" phase (running > complete > error)
+        if (tc.phase !== 'done' && tc.phase !== 'complete' && tc.phase !== 'completed') {
+          last.phase = tc.phase
+        }
+      } else {
+        grouped.push({ name: tc.name, phase: tc.phase, count: 1 })
+      }
+    }
     return (
       <div className="flex flex-col gap-1.5 max-w-sm animate-in fade-in duration-200">
-        {allTools.map((tc, i) => (
-          <ToolCallCard key={`${tc.name}-${i}`} name={tc.name} phase={tc.phase} />
+        {grouped.map((tc, i) => (
+          <div key={`${tc.name}-${i}`} className="relative">
+            <ToolCallCard name={tc.name} phase={tc.phase} />
+            {tc.count > 1 && (
+              <span className="absolute -top-1 -right-1 text-[9px] font-bold bg-indigo-500 text-white rounded-full size-5 flex items-center justify-center shadow-sm">
+                {tc.count}
+              </span>
+            )}
+          </div>
         ))}
       </div>
     )
