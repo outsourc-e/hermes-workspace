@@ -32,7 +32,7 @@ import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
 import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
-import { HermesHealthBanner } from '@/components/hermes-health-banner'
+import { HermesReconnectBanner } from '@/components/hermes-reconnect-banner'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
 // System metrics footer removed — not used in Hermes Workspace
@@ -258,7 +258,7 @@ export function WorkspaceShell() {
         className="relative overflow-hidden theme-bg theme-text"
         style={shellStyle}
       >
-        <HermesHealthBanner enabled={authState.checked} />
+        <HermesReconnectBanner enabled={authState.checked} />
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div

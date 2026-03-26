@@ -164,4 +164,8 @@ export function getCapabilities(): GatewayCapabilities {
   return capabilities
 }
 
+export function isHermesConnected(): boolean {
+  return capabilities.health
+}
+
 void ensureGatewayProbed()

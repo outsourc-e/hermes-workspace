@@ -28,6 +28,7 @@ import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-res
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiStartHermesRouteImport } from './routes/api/start-hermes'
+import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
@@ -148,6 +149,11 @@ const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
 const ApiStartHermesRoute = ApiStartHermesRouteImport.update({
   id: '/api/start-hermes',
   path: '/api/start-hermes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStartAgentRoute = ApiStartAgentRouteImport.update({
+  id: '/api/start-agent',
+  path: '/api/start-agent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSkillsRoute = ApiSkillsRouteImport.update({
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/start-agent': typeof ApiStartAgentRoute
   '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -355,6 +362,7 @@ export interface FileRoutesByTo {
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/start-agent': typeof ApiStartAgentRoute
   '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -403,6 +411,7 @@ export interface FileRoutesById {
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/start-agent': typeof ApiStartAgentRoute
   '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -452,6 +461,7 @@ export interface FileRouteTypes {
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/start-agent'
     | '/api/start-hermes'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -498,6 +508,7 @@ export interface FileRouteTypes {
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/start-agent'
     | '/api/start-hermes'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -545,6 +556,7 @@ export interface FileRouteTypes {
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/start-agent'
     | '/api/start-hermes'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -593,6 +605,7 @@ export interface RootRouteChildren {
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRoute
+  ApiStartAgentRoute: typeof ApiStartAgentRoute
   ApiStartHermesRoute: typeof ApiStartHermesRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
@@ -742,6 +755,13 @@ declare module '@tanstack/react-router' {
       path: '/api/start-hermes'
       fullPath: '/api/start-hermes'
       preLoaderRoute: typeof ApiStartHermesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/start-agent': {
+      id: '/api/start-agent'
+      path: '/api/start-agent'
+      fullPath: '/api/start-agent'
+      preLoaderRoute: typeof ApiStartAgentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/skills': {
@@ -996,6 +1016,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionStatusRoute: ApiSessionStatusRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRoute,
+  ApiStartAgentRoute: ApiStartAgentRoute,
   ApiStartHermesRoute: ApiStartHermesRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,

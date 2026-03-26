@@ -378,10 +378,14 @@ export async function isHermesAvailable(): Promise<boolean> {
     const res = await fetch(`${HERMES_API}/health`, {
       signal: AbortSignal.timeout(3000),
     })
-    if (!res.ok) return false
+    if (!res.ok) {
+      await probeGateway({ force: true })
+      return false
+    }
     await probeGateway({ force: true })
     return true
   } catch {
+    await probeGateway({ force: true }).catch(() => undefined)
     return false
   }
 }
