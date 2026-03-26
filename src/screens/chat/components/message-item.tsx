@@ -1140,15 +1140,18 @@ function InlineToolSectionItem({
   const headerArgTruncated =
     headerArg && headerArg.length > 60 ? `${headerArg.slice(0, 57)}…` : headerArg
 
-  const rawJsonPayload = JSON.stringify(
-    {
-      type: toolSection.type,
-      input: toolSection.input ?? {},
-      output: toolSection.outputText || toolSection.errorText || null,
-    },
-    null,
-    2,
-  )
+  const rawJsonPayload = useMemo(() => {
+    if (!showRawJson) return ''
+    return JSON.stringify(
+      {
+        type: toolSection.type,
+        input: toolSection.input ?? {},
+        output: toolSection.outputText || toolSection.errorText || null,
+      },
+      null,
+      2,
+    )
+  }, [showRawJson, toolSection.type, toolSection.input, toolSection.outputText, toolSection.errorText])
   const outputText = toolSection.outputText || toolSection.errorText || ''
   const shouldTruncateOutput = outputText.length > 800
   const displayedOutputText =
@@ -1864,12 +1867,17 @@ function MessageItemComponent({
                     }
 
                     if (markdownAttachment) {
-                      return (
-                        <MarkdownAttachmentCard
-                          key={attachment.id || attachment.name || source}
-                          attachment={attachment}
-                        />
-                      )
+                      const mdContent = decodeAttachmentText(attachment)
+                      // Only render preview if actual content exists (base64 is stripped on history reload)
+                      if (mdContent.trim().length > 0) {
+                        return (
+                          <MarkdownAttachmentCard
+                            key={attachment.id || attachment.name || source}
+                            attachment={attachment}
+                          />
+                        )
+                      }
+                      // Fall through to generic attachment link
                     }
 
                     return (
