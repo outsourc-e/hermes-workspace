@@ -372,6 +372,23 @@ export const Route = createFileRoute('/api/send-stream')({
                       return
                     }
 
+                    if (event === 'assistant.completed') {
+                      // Send full content as a chunk — covers cases where
+                      // deltas were missed or response was too short for streaming
+                      const content = typeof data.content === 'string' ? data.content : ''
+                      if (content) {
+                        const translated = {
+                          text: content,
+                          fullReplace: true,
+                          sessionKey: sessionKeyFromEvent,
+                          runId,
+                        }
+                        sendEvent('chunk', translated)
+                        publishChatEvent('chunk', translated)
+                      }
+                      return
+                    }
+
                     if (event === 'assistant.delta') {
                       const delta = typeof data.delta === 'string' ? data.delta : ''
                       if (!delta) return
