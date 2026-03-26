@@ -41,6 +41,7 @@ import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
@@ -216,6 +217,11 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEventsRoute = ApiEventsRouteImport.update({
+  id: '/api/events',
+  path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiContextUsageRoute = ApiContextUsageRouteImport.update({
   id: '/api/context-usage',
   path: '/api/context-usage',
@@ -303,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
+  '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -350,6 +357,7 @@ export interface FileRoutesByTo {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
+  '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -399,6 +407,7 @@ export interface FileRoutesById {
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
+  '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -449,6 +458,7 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/connection-status'
     | '/api/context-usage'
+    | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -496,6 +506,7 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/connection-status'
     | '/api/context-usage'
+    | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -544,6 +555,7 @@ export interface FileRouteTypes {
     | '/api/chat-events'
     | '/api/connection-status'
     | '/api/context-usage'
+    | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -593,6 +605,7 @@ export interface RootRouteChildren {
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiConnectionStatusRoute: typeof ApiConnectionStatusRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
+  ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
@@ -848,6 +861,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/events': {
+      id: '/api/events'
+      path: '/api/events'
+      fullPath: '/api/events'
+      preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/context-usage': {
       id: '/api/context-usage'
       path: '/api/context-usage'
@@ -1004,6 +1024,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiConnectionStatusRoute: ApiConnectionStatusRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
+  ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
