@@ -53,8 +53,8 @@ function GlassCard({
   return (
     <div className={cn(
       'relative flex flex-col overflow-hidden rounded-xl border transition-colors',
-      'border-neutral-800/60 bg-neutral-900/80 backdrop-blur-sm',
-      'hover:border-neutral-700/80',
+      'border-neutral-200 bg-white dark:border-neutral-800/60 dark:bg-neutral-900/80 backdrop-blur-sm',
+      'hover:border-neutral-300 dark:hover:border-neutral-700/80',
       className,
     )}>
       {accentColor && (
@@ -64,7 +64,7 @@ function GlassCard({
       )}
       {title && (
         <div className="flex items-center justify-between px-5 pt-4 pb-0">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">{title}</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-400 dark:text-neutral-500">{title}</h3>
           {titleRight}
         </div>
       )}
@@ -79,17 +79,17 @@ function SystemGlance({ sessions, connected, model, provider, tokens, cost }: {
   sessions: number; connected: boolean; model: string; provider: string; tokens: string; cost: string
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-neutral-800/60 bg-neutral-900/80 px-5 py-3 backdrop-blur-sm">
+    <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white dark:border-neutral-800/60 dark:bg-neutral-900/80 px-5 py-2.5 backdrop-blur-sm">
       <span className={cn('size-2 shrink-0 rounded-full', connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500')} />
       <div className="flex flex-1 items-center gap-x-4 overflow-x-auto">
-        <span className="text-xs font-medium text-neutral-300">{model}</span>
-        <span className="text-neutral-700">·</span>
+        <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">{model}</span>
+        <span className="text-neutral-300 dark:text-neutral-700">·</span>
         <span className="text-xs text-neutral-500">{provider}</span>
-        <span className="text-neutral-700">·</span>
+        <span className="text-neutral-300 dark:text-neutral-700">·</span>
         <span className="text-xs text-neutral-500">{sessions} sessions</span>
-        <span className="text-neutral-700">·</span>
-        <span className="text-xs font-bold tabular-nums text-neutral-200">{tokens} tokens</span>
-        <span className="text-neutral-700">·</span>
+        <span className="text-neutral-300 dark:text-neutral-700">·</span>
+        <span className="text-xs font-bold tabular-nums text-neutral-800 dark:text-neutral-200">{tokens} tokens</span>
+        <span className="text-neutral-300 dark:text-neutral-700">·</span>
         <span className="text-xs text-neutral-400">{cost}</span>
       </div>
     </div>
@@ -102,14 +102,14 @@ function MetricTile({ label, value, sub, icon, accentColor }: {
   label: string; value: string; sub?: string; icon: string; accentColor: string
 }) {
   return (
-    <GlassCard accentColor={accentColor} className="min-h-[100px]">
+    <GlassCard accentColor={accentColor}>
       <div className="flex items-start justify-between">
-        <div className="flex flex-col gap-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">{label}</div>
-          <div className="text-2xl md:text-3xl font-bold tabular-nums text-neutral-100">{value}</div>
-          {sub && <div className="text-[11px] text-neutral-500">{sub}</div>}
+        <div className="flex flex-col gap-0.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-400 dark:text-neutral-500">{label}</div>
+          <div className="text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">{value}</div>
+          {sub && <div className="text-[11px] text-neutral-400 dark:text-neutral-500">{sub}</div>}
         </div>
-        <div className="flex size-9 items-center justify-center rounded-lg text-lg" style={{ background: `${accentColor}18` }}>{icon}</div>
+        <div className="flex size-8 items-center justify-center rounded-lg text-base" style={{ background: `${accentColor}15` }}>{icon}</div>
       </div>
     </GlassCard>
   )
@@ -200,20 +200,20 @@ function ModelCard() {
       accentColor={connected ? '#22c55e' : '#ef4444'}
       className="h-full"
     >
-      <div className="space-y-2.5">
-        <div className="flex items-center gap-3 rounded-lg p-3 bg-neutral-800/50 border border-neutral-800">
-          <div className="flex size-8 items-center justify-center rounded-md bg-indigo-500/10 text-base">🤖</div>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3 rounded-lg p-2.5 bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-100 dark:border-neutral-800">
+          <div className="flex size-7 items-center justify-center rounded-md bg-indigo-500/10 text-sm">🤖</div>
           <div className="min-w-0 flex-1">
-            <div className="font-mono text-sm font-bold text-neutral-100 truncate">{typeof modelName === 'string' ? modelName : '—'}</div>
-            <div className="text-[10px] text-neutral-500 font-mono truncate">{provider}{baseUrl ? ` · ${baseUrl}` : ''}</div>
+            <div className="font-mono text-[13px] font-bold text-neutral-900 dark:text-neutral-100 truncate">{typeof modelName === 'string' ? modelName : '—'}</div>
+            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono truncate">{provider}{baseUrl ? ` · ${baseUrl}` : ''}</div>
           </div>
         </div>
         {fallbackModel && (
-          <div className="flex items-center gap-3 rounded-lg p-3 bg-neutral-800/50 border border-neutral-800">
-            <div className="flex size-8 items-center justify-center rounded-md bg-amber-500/10 text-base">🔄</div>
+          <div className="flex items-center gap-3 rounded-lg p-2.5 bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-100 dark:border-neutral-800">
+            <div className="flex size-7 items-center justify-center rounded-md bg-amber-500/10 text-sm">🔄</div>
             <div className="min-w-0 flex-1">
-              <div className="font-mono text-sm text-neutral-200 truncate">{fallbackModel}</div>
-              <div className="text-[10px] text-neutral-500 font-mono truncate">{(fallbackBlock?.provider as string) ?? ''}</div>
+              <div className="font-mono text-[13px] text-neutral-900 dark:text-neutral-200 truncate">{fallbackModel}</div>
+              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono truncate">{(fallbackBlock?.provider as string) ?? ''}</div>
             </div>
           </div>
         )}
@@ -241,13 +241,13 @@ function SkillsWidget() {
   return (
     <GlassCard title="Skills" titleRight={<span className="text-[10px] text-neutral-600">{skills.length} installed</span>} accentColor="#f59e0b">
       {skills.length === 0 ? (
-        <div className="text-xs text-neutral-600 py-4 text-center">No skills installed</div>
+        <div className="text-xs text-neutral-400 py-4 text-center">No skills installed</div>
       ) : (
         <div className="space-y-1.5">
           {skills.slice(0, 6).map((skill, i) => (
-            <div key={String(skill.name ?? i)} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-neutral-800/50 transition-colors">
+            <div key={String(skill.name ?? i)} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
               <span className="text-xs">📦</span>
-              <span className="text-xs font-medium text-neutral-300 truncate flex-1">{String(skill.name ?? 'Unnamed')}</span>
+              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate flex-1">{String(skill.name ?? 'Unnamed')}</span>
               {skill.enabled !== false && <span className="size-1.5 rounded-full bg-emerald-500/60" />}
             </div>
           ))}
@@ -265,11 +265,11 @@ function QuickAction({ label, icon, onClick, accentColor }: {
   return (
     <button type="button" onClick={onClick} className={cn(
       'relative overflow-hidden flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all',
-      'border-neutral-800/60 bg-neutral-900/80',
-      'hover:border-neutral-700 hover:scale-[1.01] active:scale-[0.99]',
+      'border-neutral-200 bg-white dark:border-neutral-800/60 dark:bg-neutral-900/80',
+      'hover:border-neutral-300 dark:hover:border-neutral-700 hover:scale-[1.01] active:scale-[0.99]',
     )}>
       <div className="flex size-7 items-center justify-center rounded-md text-sm" style={{ background: `${accentColor}18` }}>{icon}</div>
-      <span className="text-neutral-200 text-xs font-medium">{label}</span>
+      <span className="text-neutral-700 dark:text-neutral-200 text-xs font-medium">{label}</span>
       <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
     </button>
   )
@@ -286,9 +286,9 @@ function SessionRow({ session, maxTokens, onClick }: {
   const barWidth = maxTokens > 0 ? Math.max(1, (tokens / maxTokens) * 100) : 0
 
   return (
-    <button type="button" onClick={onClick} className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-neutral-800/40 transition-colors group">
+    <button type="button" onClick={onClick} className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors group">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[13px] font-medium text-neutral-200 truncate flex-1 group-hover:text-neutral-100">
+        <span className="text-[13px] font-medium text-neutral-800 dark:text-neutral-200 truncate flex-1 group-hover:text-neutral-900 dark:group-hover:text-neutral-100">
           {session.title || session.id}
         </span>
         <span className="text-[10px] tabular-nums text-neutral-600 shrink-0">
@@ -303,7 +303,7 @@ function SessionRow({ session, maxTokens, onClick }: {
         {tools > 0 && <span>{tools} tools</span>}
         {tokens > 0 && <span>{formatNumber(tokens)} tok</span>}
       </div>
-      <div className="h-[3px] rounded-full w-full bg-neutral-800/60 overflow-hidden">
+      <div className="h-[3px] rounded-full w-full bg-neutral-100 dark:bg-neutral-800/60 overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${barWidth}%`, background: 'linear-gradient(90deg, #6366f1, #a855f7)' }} />
       </div>
     </button>
@@ -348,20 +348,15 @@ export function DashboardScreen() {
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
 
   return (
-    <div className="min-h-full px-6 py-6 md:px-10 md:py-8 lg:px-12 space-y-6 pb-28">
-      {/* ── Header: Hermes Logo + Date ── */}
-      <div className="flex flex-col items-center gap-3 py-4">
+    <div className="min-h-full px-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
+      {/* ── Header: Hermes Logo ── */}
+      <div className="flex flex-col items-center gap-2 py-3">
         <img
           src="/hermes-avatar.webp"
           alt="Hermes"
-          className="size-16 md:size-20 rounded-2xl shadow-lg shadow-indigo-500/10 border border-neutral-800"
+          className="size-12 md:size-14 rounded-xl shadow-md shadow-indigo-500/10 border border-neutral-200 dark:border-neutral-800"
         />
-        <div className="text-center">
-          <h1 className="text-lg font-bold text-neutral-100 tracking-wide">Hermes Workspace</h1>
-          <p className="text-[11px] text-neutral-500 mt-0.5 tabular-nums">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-          </p>
-        </div>
+        <h1 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 tracking-wide">Hermes Workspace</h1>
       </div>
 
       {/* ── System Glance Bar ── */}
@@ -397,7 +392,7 @@ export function DashboardScreen() {
 
       {/* ── Quick Actions ── */}
       <div>
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-2.5">Quick Actions</h3>
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-400 dark:text-neutral-500 mb-2.5">Quick Actions</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <QuickAction label="New Chat" icon="💬" accentColor="#6366f1" onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })} />
           <QuickAction label="Terminal" icon="💻" accentColor="#22c55e" onClick={() => navigate({ to: '/terminal' })} />
@@ -420,7 +415,7 @@ export function DashboardScreen() {
       >
         <div className="py-1">
           {recentSessions.length === 0 ? (
-            <div className="text-xs text-neutral-600 py-8 text-center">No sessions yet — start a chat!</div>
+            <div className="text-xs text-neutral-400 py-8 text-center">No sessions yet — start a chat!</div>
           ) : (
             recentSessions.map((s) => (
               <SessionRow key={s.id} session={s} maxTokens={maxTokens}
