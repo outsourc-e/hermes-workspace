@@ -136,3 +136,5 @@ __pycache__/
 
 .env.docker
 .env.bak
+public/screenshots/
+docs/screenshots/
