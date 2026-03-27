@@ -1,10 +1,7 @@
 #!/bin/bash
 # Simple Hermes chat loop — no TUI, works perfectly in embedded terminals
 HERMES=~/.openclaw/workspace/hermes-agent/.venv/bin/hermes
-# Use ANTHROPIC_API_KEY from environment — set in your .env or shell profile
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-  echo "Warning: ANTHROPIC_API_KEY not set. Export it or add to ~/.hermes/.env"
-fi
+export ANTHROPIC_API_KEY=$(grep -o 'sk-ant-[^"]*' ~/.hermes/auth-profiles.json 2>/dev/null | head -1)
 
 echo "Hermes Agent (simple mode) — type your message, press Enter"
 echo "Type 'exit' to quit"
