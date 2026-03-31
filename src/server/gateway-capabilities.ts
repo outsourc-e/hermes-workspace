@@ -2,6 +2,10 @@
  * Probes the Hermes gateway to detect which API groups are available.
  * Results are cached and refreshed periodically so route handlers can
  * degrade cleanly against older Hermes gateways.
+ *
+ * Two-tier capability model:
+ *   - Core: portable chat readiness (health, chat completions, models)
+ *   - Enhanced: Hermes-native extras (sessions, skills, memory, config, jobs)
  */
 
 export let HERMES_API =
@@ -16,20 +20,38 @@ export const SESSIONS_API_UNAVAILABLE_MESSAGE =
 const PROBE_TIMEOUT_MS = 3_000
 const PROBE_TTL_MS = 30_000
 
-export type GatewayCapabilities = {
+// ── Types ─────────────────────────────────────────────────────────
+
+export type CoreCapabilities = {
   health: boolean
+  chatCompletions: boolean
   models: boolean
+  streaming: boolean
+  probed: boolean
+}
+
+export type EnhancedCapabilities = {
   sessions: boolean
   skills: boolean
   memory: boolean
   config: boolean
   jobs: boolean
-  probed: boolean
 }
+
+/** Full capabilities — backward compat with existing code */
+export type GatewayCapabilities = CoreCapabilities & EnhancedCapabilities
+
+export type ChatMode = 'enhanced-hermes' | 'portable' | 'disconnected'
+
+export type ConnectionStatus = 'connected' | 'enhanced' | 'partial' | 'disconnected'
+
+// ── State ─────────────────────────────────────────────────────────
 
 let capabilities: GatewayCapabilities = {
   health: false,
+  chatCompletions: false,
   models: false,
+  streaming: false,
   sessions: false,
   skills: false,
   memory: false,
@@ -42,46 +64,75 @@ let probePromise: Promise<GatewayCapabilities> | null = null
 let lastProbeAt = 0
 let lastLoggedSummary = ''
 
+// ── Probing ───────────────────────────────────────────────────────
+
 async function probe(path: string): Promise<boolean> {
   try {
     const res = await fetch(`${HERMES_API}${path}`, {
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
+    // 404 = endpoint doesn't exist. Anything else (200, 405, 400) = exists.
     return res.status !== 404
   } catch {
     return false
   }
 }
 
-function summarizeCapabilities(next: GatewayCapabilities): {
-  available: Array<string>
-  missing: Array<string>
-} {
-  const available: Array<string> = []
-  const missing: Array<string> = []
-
-  for (const [key, value] of Object.entries(next)) {
-    if (key === 'probed') continue
-    ;(value ? available : missing).push(key)
+/** Probe /v1/chat/completions with OPTIONS to avoid sending real chat */
+async function probeChatCompletions(): Promise<boolean> {
+  try {
+    const res = await fetch(`${HERMES_API}/v1/chat/completions`, {
+      method: 'OPTIONS',
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+    // Any non-connection-error response means the endpoint exists
+    return res.status !== 404
+  } catch {
+    // OPTIONS might not be supported — try POST with empty body
+    try {
+      const res = await fetch(`${HERMES_API}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      // 400/422 = endpoint exists but bad request. 404 = doesn't exist.
+      return res.status !== 404
+    } catch {
+      return false
+    }
   }
-
-  return { available, missing }
 }
 
 // APIs that are optional and do not warrant an upgrade warning when absent.
-// The jobs endpoint is not implemented in all Hermes versions; the UI already
-// handles its absence gracefully (returns an empty list instead of 404).
-const OPTIONAL_APIS = new Set(['jobs'])
+const OPTIONAL_APIS = new Set(['jobs', 'chatCompletions', 'streaming'])
 
 function logCapabilities(next: GatewayCapabilities): void {
-  const { available, missing } = summarizeCapabilities(next)
+  const core: Array<string> = []
+  const enhanced: Array<string> = []
+  const missing: Array<string> = []
+
+  const coreKeys: Array<keyof CoreCapabilities> = ['health', 'chatCompletions', 'models', 'streaming']
+  const enhancedKeys: Array<keyof EnhancedCapabilities> = ['sessions', 'skills', 'memory', 'config', 'jobs']
+
+  for (const key of coreKeys) {
+    if (key === 'probed') continue
+    ;(next[key] ? core : missing).push(key)
+  }
+  for (const key of enhancedKeys) {
+    ;(next[key] ? enhanced : missing).push(key)
+  }
+
+  const mode = getChatMode()
   const summary =
-    `[gateway] ${HERMES_API} available: ${available.join(', ') || 'none'}; missing: ${missing.join(', ') || 'none'}`
+    `[gateway] ${HERMES_API} mode=${mode} core=[${core.join(', ')}] enhanced=[${enhanced.join(', ')}] missing=[${missing.join(', ')}]`
   if (summary === lastLoggedSummary) return
   lastLoggedSummary = summary
   console.log(summary)
+
+  // Only warn about critical missing APIs (not optional ones)
   const criticalMissing = missing.filter((key) => !OPTIONAL_APIS.has(key))
-  if (criticalMissing.length > 0) {
+  if (criticalMissing.length > 0 && next.health) {
     console.warn(
       `[gateway] Missing Hermes APIs detected. ${HERMES_UPGRADE_INSTRUCTIONS}`,
     )
@@ -119,9 +170,10 @@ export async function probeGateway(options?: {
       }
     }
 
-    const [health, models, sessions, skills, memory, config, jobs] =
+    const [health, chatCompletions, models, sessions, skills, memory, config, jobs] =
       await Promise.all([
         probe('/health'),
+        probeChatCompletions(),
         probe('/v1/models'),
         probe('/api/sessions'),
         probe('/api/skills'),
@@ -131,14 +183,18 @@ export async function probeGateway(options?: {
       ])
 
     capabilities = {
+      // Core
       health,
+      chatCompletions,
       models,
+      streaming: chatCompletions, // If chat completions exists, streaming is supported
+      probed: true,
+      // Enhanced
       sessions,
       skills,
       memory,
       config,
       jobs,
-      probed: true,
     }
     lastProbeAt = Date.now()
     logCapabilities(capabilities)
@@ -160,8 +216,60 @@ export async function ensureGatewayProbed(): Promise<GatewayCapabilities> {
   return capabilities
 }
 
+// ── Accessors ─────────────────────────────────────────────────────
+
+/** Full capabilities — backward compatible */
 export function getCapabilities(): GatewayCapabilities {
   return capabilities
+}
+
+/** Core portable capabilities only */
+export function getCoreCapabilities(): CoreCapabilities {
+  return {
+    health: capabilities.health,
+    chatCompletions: capabilities.chatCompletions,
+    models: capabilities.models,
+    streaming: capabilities.streaming,
+    probed: capabilities.probed,
+  }
+}
+
+/** Hermes-native enhanced capabilities only */
+export function getEnhancedCapabilities(): EnhancedCapabilities {
+  return {
+    sessions: capabilities.sessions,
+    skills: capabilities.skills,
+    memory: capabilities.memory,
+    config: capabilities.config,
+    jobs: capabilities.jobs,
+  }
+}
+
+/**
+ * Current chat transport mode:
+ * - 'enhanced-hermes': full Hermes session API available
+ * - 'portable': OpenAI-compatible /v1/chat/completions available
+ * - 'disconnected': no usable chat backend
+ */
+export function getChatMode(): ChatMode {
+  if (capabilities.sessions) return 'enhanced-hermes'
+  if (capabilities.chatCompletions || capabilities.health) return 'portable'
+  return 'disconnected'
+}
+
+/**
+ * Connection status for UI display:
+ * - 'enhanced': full Hermes APIs detected
+ * - 'connected': chat works
+ * - 'partial': chat works, some advanced features unavailable
+ * - 'disconnected': no backend
+ */
+export function getConnectionStatus(): ConnectionStatus {
+  if (!capabilities.health && !capabilities.chatCompletions) return 'disconnected'
+  const enhanced = capabilities.sessions && capabilities.skills && capabilities.memory && capabilities.config
+  if (enhanced) return 'enhanced'
+  if (capabilities.chatCompletions || capabilities.sessions) return 'partial'
+  return 'connected'
 }
 
 export function isHermesConnected(): boolean {
