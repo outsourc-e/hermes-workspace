@@ -1,17 +1,13 @@
 /**
- * Connection status endpoint — returns a summary of gateway capability state
- * for the client-side connection indicator.
- *
- * Status meanings:
- *   connected  — backend health OK + a model is configured
- *   partial    — backend healthy but model not configured or jobs API missing
- *   disconnected — backend health check failed
+ * Connection status endpoint — returns a summary of portable chat readiness
+ * plus whether Hermes gateway enhancements are available.
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   HERMES_API,
   ensureGatewayProbed,
+  getChatMode,
 } from '../../server/gateway-capabilities'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -37,10 +33,14 @@ function readActiveModel(): string {
 }
 
 type ConnectionStatus = {
-  status: 'connected' | 'partial' | 'disconnected'
+  status: 'connected' | 'enhanced' | 'partial' | 'disconnected'
+  label: 'Connected' | 'Enhanced' | 'Partial' | 'Disconnected'
+  detail: string
   health: boolean
+  chatReady: boolean
   modelConfigured: boolean
   activeModel: string
+  chatMode: 'enhanced-hermes' | 'portable' | 'disconnected'
   capabilities: Record<string, boolean>
   hermesUrl: string
 }
@@ -56,23 +56,60 @@ export const Route = createFileRoute('/api/connection-status')({
         const activeModel = readActiveModel()
         const modelConfigured = Boolean(activeModel)
 
+        const chatReady = caps.chatCompletions
+        const enhancedReady =
+          chatReady &&
+          caps.sessions &&
+          caps.skills &&
+          caps.memory &&
+          caps.config
+
         let status: ConnectionStatus['status']
-        if (!caps.health) {
+        let label: ConnectionStatus['label']
+        let detail: string
+
+        if (!caps.health && !chatReady) {
           status = 'disconnected'
-        } else if (!modelConfigured || !caps.jobs) {
-          status = 'partial'
-        } else {
+          label = 'Disconnected'
+          detail = 'No compatible backend detected.'
+        } else if (enhancedReady) {
+          status = 'enhanced'
+          label = 'Enhanced'
+          detail = modelConfigured
+            ? 'Core chat works and Hermes gateway APIs are available.'
+            : 'Hermes gateway APIs are available. Choose a model to start chatting.'
+        } else if (chatReady && modelConfigured) {
           status = 'connected'
+          label = 'Connected'
+          detail = 'Core chat is ready on this backend.'
+        } else {
+          status = 'partial'
+          label = 'Partial'
+          if (!chatReady) {
+            detail = 'Backend reachable, but chat API is not ready yet.'
+          } else if (!modelConfigured) {
+            detail =
+              'Backend connected. Choose a provider and model to test chat.'
+          } else {
+            detail =
+              'Core chat works. Enhanced Hermes gateway APIs are optional and unlock automatically when available.'
+          }
         }
 
         const body: ConnectionStatus = {
           status,
+          label,
+          detail,
           health: caps.health,
+          chatReady,
           modelConfigured,
           activeModel,
+          chatMode: getChatMode(),
           capabilities: {
             health: caps.health,
+            chatCompletions: caps.chatCompletions,
             models: caps.models,
+            streaming: caps.streaming,
             sessions: caps.sessions,
             skills: caps.skills,
             memory: caps.memory,

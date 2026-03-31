@@ -16,24 +16,31 @@ function detectPlatform(): Platform {
   return 'unknown'
 }
 
-function getSetupSteps(platform: Platform): Array<{ title: string; command: string; note?: string }> {
+function getSetupSteps(
+  platform: Platform,
+): Array<{ title: string; command: string; note?: string }> {
   const pip = platform === 'windows' ? 'pip' : 'pip3'
   const python = platform === 'windows' ? 'python' : 'python3'
 
   return [
     {
-      title: 'Clone Hermes Agent (with WebAPI)',
+      title: 'Use any OpenAI-compatible backend',
+      command: 'Set HERMES_API_URL to your backend base URL',
+      note: 'Portable chat works with any backend that exposes /v1/chat/completions',
+    },
+    {
+      title: 'Optional: run a Hermes gateway locally',
       command: 'git clone https://github.com/outsourc-e/hermes-agent.git',
-      note: 'Clone as a sibling to hermes-workspace for auto-discovery',
+      note: 'Hermes gateway APIs unlock sessions, skills, memory, and other workspace extras automatically',
     },
     {
-      title: 'Install dependencies',
-      command: `cd hermes-agent && ${python} -m venv .venv && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${pip} install -e ".[webapi]"`,
+      title: 'Install the gateway',
+      command: `cd hermes-agent && ${python} -m venv .venv && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${pip} install -e .`,
     },
     {
-      title: 'Start the WebAPI server',
-      command: `cd hermes-agent && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${python} -m uvicorn webapi.app:app --host 0.0.0.0 --port 8642`,
-      note: 'Or click "Start Server" below if hermes-agent is already installed',
+      title: 'Start the gateway',
+      command: `cd hermes-agent && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && hermes gateway`,
+      note: 'Or use Auto-Start below if hermes-agent is already installed locally',
     },
   ]
 }
@@ -102,7 +109,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       if (pollTimer) clearTimeout(pollTimer)
       clearTimeout(failureTimer)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -140,7 +147,9 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
       const data = (await res.json()) as Record<string, unknown>
       if (res.ok && data.ok) {
-        setServerLog([String(data.message || 'Started — waiting for connection...')])
+        setServerLog([
+          String(data.message || 'Started — waiting for connection...'),
+        ])
         setServerStarting(false)
         return
       }
@@ -165,7 +174,10 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-white"
-      style={{ backgroundColor: '#0A0E1A', fontFamily: 'Inter, system-ui, sans-serif' }}
+      style={{
+        backgroundColor: '#0A0E1A',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
     >
       <div className="flex w-full max-w-lg flex-col items-center text-center">
         <img
@@ -187,7 +199,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           aria-hidden={showFailureState}
         >
           <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
-          <span>Connecting to Hermes Agent...</span>
+          <span>Connecting to your backend...</span>
         </div>
 
         {/* Failure state — setup guide */}
@@ -201,11 +213,12 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         >
           <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-sm">
             <p className="text-base font-medium text-white">
-              Welcome! Let's connect to Hermes Agent
+              Welcome! Let&apos;s connect your backend
             </p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace needs a running Hermes Agent backend.
-              {' '}This page will auto-refresh when a connection is detected.
+              Hermes Workspace works with any OpenAI-compatible backend. Hermes
+              gateway APIs unlock enhanced features automatically when they are
+              available.
             </p>
 
             {/* Auto-start section */}
@@ -227,7 +240,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                     Detecting...
                   </span>
                 ) : (
-                  '⚡ Auto-Start (detect & launch)'
+                  'Auto-Start Hermes Gateway'
                 )}
               </button>
 
@@ -236,7 +249,9 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                 <div
                   className={[
                     'mt-3 rounded-xl border p-3',
-                    serverError ? 'border-red-500/20 bg-red-950/30' : 'border-emerald-500/20 bg-emerald-950/30',
+                    serverError
+                      ? 'border-red-500/20 bg-red-950/30'
+                      : 'border-emerald-500/20 bg-emerald-950/30',
                   ].join(' ')}
                 >
                   <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-white/70">
@@ -268,13 +283,18 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
             >
               <div className="space-y-4">
                 {steps.map((step, idx) => (
-                  <div key={idx} className="rounded-xl border border-white/8 bg-black/20 p-4">
+                  <div
+                    key={idx}
+                    className="rounded-xl border border-white/8 bg-black/20 p-4"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-300">
                           {idx + 1}
                         </span>
-                        <span className="text-sm font-medium text-white/90">{step.title}</span>
+                        <span className="text-sm font-medium text-white/90">
+                          {step.title}
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -297,8 +317,11 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               {/* Env var hint */}
               <div className="mt-4 rounded-xl border border-white/6 bg-white/3 p-3">
                 <p className="text-xs font-medium text-white/50">
-                  Custom setup? Set <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">HERMES_API_URL</code> to
-                  point to your Hermes Agent:
+                  Point{' '}
+                  <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">
+                    HERMES_API_URL
+                  </code>{' '}
+                  at any OpenAI-compatible backend:
                 </p>
                 <pre className="mt-2 overflow-x-auto font-mono text-xs text-white/60">
                   HERMES_API_URL=http://your-server:8642 pnpm dev
@@ -310,7 +333,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
         {!showFailureState ? (
           <p className="mt-6 text-xs text-white/45">
-            This page auto-refreshes when Hermes Agent is detected
+            This page auto-refreshes when a compatible backend is detected
           </p>
         ) : null}
       </div>

@@ -32,53 +32,52 @@
 
 ## 📸 Screenshots
 
-| Chat | Files |
-|:---:|:---:|
+|                 Chat                 |                 Files                  |
+| :----------------------------------: | :------------------------------------: |
 | ![Chat](./docs/screenshots/chat.png) | ![Files](./docs/screenshots/files.png) |
 
-| Terminal | Memory |
-|:---:|:---:|
+|                   Terminal                   |                  Memory                  |
+| :------------------------------------------: | :--------------------------------------: |
 | ![Terminal](./docs/screenshots/terminal.png) | ![Memory](./docs/screenshots/memory.png) |
 
-| Skills | Settings |
-|:---:|:---:|
+|                  Skills                  |                   Settings                   |
+| :--------------------------------------: | :------------------------------------------: |
 | ![Skills](./docs/screenshots/skills.png) | ![Settings](./docs/screenshots/settings.png) |
 
 ---
 
 ## 🚀 Quick Start
 
+Hermes Workspace works with any OpenAI-compatible backend. If your backend also exposes Hermes gateway APIs, enhanced features like sessions, memory, skills, and jobs unlock automatically.
+
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **Python 3.11+** — [python.org](https://www.python.org/)
-- **Hermes Agent (with WebAPI)** — see below
+- **An OpenAI-compatible backend** — local, self-hosted, or remote
+- **Optional:** Python 3.11+ if you want to run a Hermes gateway locally
 
-### Step 1: Set up Hermes Agent (backend)
+### Step 1: Start your backend
 
-> **⚠️ Important:** Hermes Workspace requires the **WebAPI backend** (`hermes webapi`), which provides the FastAPI server with session management, chat streaming, skills, and memory endpoints. The upstream NousResearch/hermes-agent does not include this yet — use our fork which adds the WebAPI layer.
+Point Hermes Workspace at any backend that supports:
+
+- `POST /v1/chat/completions`
+- `GET /v1/models` recommended
+
+Example Hermes gateway setup:
 
 ```bash
-# Clone the fork with WebAPI support
 git clone https://github.com/outsourc-e/hermes-agent.git
 cd hermes-agent
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
-
-# Run the interactive setup (configures your API keys)
 hermes setup
-
-# Start the WebAPI server on port 8642
-hermes webapi
-# Or manually: uvicorn webapi.app:app --host 0.0.0.0 --port 8642
+hermes gateway
 ```
 
-> **Using upstream hermes-agent?** The workspace will still load — it auto-detects which API endpoints your gateway supports and gracefully disables features that aren't available. You'll see a log message listing which APIs are missing. For full functionality (chat, sessions, skills, memory), use our fork.
+If you're using another OpenAI-compatible server, just note its base URL.
 
-> **API keys:** Hermes supports Anthropic (Claude), OpenAI, OpenRouter, and local models via Ollama. Run `hermes setup` to configure your provider, or set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in `~/.hermes/.env`.
-
-### Step 2: Install & Run Hermes Workspace (frontend)
+### Step 2: Install & Run Hermes Workspace
 
 ```bash
 # In a new terminal
@@ -90,16 +89,16 @@ printf '\nHERMES_API_URL=http://127.0.0.1:8642\n' >> .env
 pnpm dev                   # Starts on http://localhost:3000
 ```
 
-> **Verify:** Open `http://localhost:3000` — you should see the chat interface. If you get connection errors, make sure Hermes Agent is running on port 8642 (`curl http://localhost:8642/health` should return `{"status": "ok"}`).
+> **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes APIs, advanced features appear automatically.
 
 ### Environment Variables
 
 ```env
-# Anthropic key for Hermes Agent (optional for demo mode, required for chat)
-ANTHROPIC_API_KEY=your-key-here
-
-# Hermes FastAPI backend URL
+# OpenAI-compatible backend URL
 HERMES_API_URL=http://127.0.0.1:8642
+
+# Optional provider keys for Hermes gateway-managed config
+ANTHROPIC_API_KEY=your-key-here
 
 # Optional: password-protect the web UI
 # HERMES_PASSWORD=your_password
@@ -171,12 +170,14 @@ Access Hermes Workspace from anywhere on your devices — no port forwarding, no
 2. **Sign in** to the same Tailscale account on both devices
 
 3. **Find your Mac's Tailscale IP:**
+
    ```bash
    tailscale ip -4
    # Example output: 100.x.x.x
    ```
 
 4. **Open Hermes Workspace on your phone:**
+
    ```
    http://100.x.x.x:3000
    ```
@@ -192,6 +193,7 @@ Access Hermes Workspace from anywhere on your devices — no port forwarding, no
 > **Status: In Development** — A native Electron-based desktop app is in active development.
 
 The desktop app will offer:
+
 - Native window management and tray icon
 - System notifications for agent events and mission completions
 - Auto-launch on startup
@@ -213,6 +215,7 @@ A fully managed cloud version of Hermes Workspace is in development:
 - **Automatic updates** — Always on the latest version
 
 Features pending cloud infrastructure:
+
 - Cross-device session sync
 - Team shared memory and workspaces
 - Cloud-hosted backend with managed uptime
@@ -223,6 +226,7 @@ Features pending cloud infrastructure:
 ## ✨ Features
 
 ### 💬 Chat
+
 - Real-time SSE streaming with tool call rendering
 - Multi-session management with full history
 - Markdown + syntax highlighting
@@ -230,31 +234,37 @@ Features pending cloud infrastructure:
 - Inspector panel for session activity, memory, and skills
 
 ### 🧠 Memory
+
 - Browse and edit agent memory files
 - Search across memory entries
 - Markdown preview with live editing
 
 ### 🧩 Skills
+
 - Browse 2,000+ skills from the registry
 - View skill details, categories, and documentation
 - Skill management per session
 
 ### 📁 Files
+
 - Full workspace file browser
 - Navigate directories, preview and edit files
 - Monaco editor integration
 
 ### 💻 Terminal
+
 - Full PTY terminal with cross-platform support
 - Persistent shell sessions
 - Direct workspace access
 
 ### 🎨 Themes
+
 - 8 themes: Official, Classic, Slate, Mono — each with light and dark variants
 - Theme persists across sessions
 - Full mobile dark mode support
 
 ### 🔒 Security
+
 - Auth middleware on all API routes
 - CSP headers via meta tags
 - Path traversal prevention on file/memory routes
@@ -275,6 +285,7 @@ The workspace auto-detects your gateway's capabilities on startup. Check your te
 ```
 
 **Fix:** You need the WebAPI backend. Use our fork:
+
 ```bash
 git clone https://github.com/outsourc-e/hermes-agent.git
 cd hermes-agent && pip install -e . && hermes webapi
@@ -283,6 +294,7 @@ cd hermes-agent && pip install -e . && hermes webapi
 ### "Connection refused" or workspace hangs on load
 
 Your Hermes gateway isn't running. Start it:
+
 ```bash
 cd hermes-agent
 source .venv/bin/activate
@@ -299,26 +311,25 @@ The upstream hermes-agent doesn't include the WebAPI server yet. The workspace w
 
 ## 🗺️ Roadmap
 
-| Feature | Status |
-|---------|--------|
-| Chat + SSE Streaming | ✅ Shipped |
-| Files + Terminal | ✅ Shipped |
-| Memory Browser | ✅ Shipped |
-| Skills Browser | ✅ Shipped |
-| Mobile PWA + Tailscale | ✅ Shipped |
-| 8-Theme System | ✅ Shipped |
+| Feature                       | Status            |
+| ----------------------------- | ----------------- |
+| Chat + SSE Streaming          | ✅ Shipped        |
+| Files + Terminal              | ✅ Shipped        |
+| Memory Browser                | ✅ Shipped        |
+| Skills Browser                | ✅ Shipped        |
+| Mobile PWA + Tailscale        | ✅ Shipped        |
+| 8-Theme System                | ✅ Shipped        |
 | Native Desktop App (Electron) | 🔨 In Development |
-| Model Switching & Config | 🔨 In Development |
-| Chat Abort / Cancel | 🔨 In Development |
-| Cloud / Hosted Version | 🔜 Coming Soon |
-| Team Collaboration | 🔜 Coming Soon |
+| Model Switching & Config      | 🔨 In Development |
+| Chat Abort / Cancel           | 🔨 In Development |
+| Cloud / Hosted Version        | 🔜 Coming Soon    |
+| Team Collaboration            | 🔜 Coming Soon    |
 
 ---
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)](https://www.star-history.com/#outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)
----
+## [![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)](https://www.star-history.com/#outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)
 
 ## 💛 Support the Project
 

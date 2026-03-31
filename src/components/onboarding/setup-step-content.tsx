@@ -102,20 +102,24 @@ export function ConnectionCheckStep({
 
       <p className="mb-6 max-w-md text-base leading-relaxed text-primary-600">
         {status === 'connected'
-          ? 'Hermes Agent is reachable and ready.'
+          ? 'Your backend is reachable and ready for setup.'
           : status === 'checking'
-            ? 'Checking whether Hermes Agent is available...'
-            : 'Hermes Agent is not connected yet.'}
+            ? 'Checking whether an OpenAI-compatible backend is available...'
+            : 'No compatible backend is connected yet.'}
       </p>
 
       {status === 'disconnected' && (
         <div className="mb-6 w-full rounded-2xl border border-red-200 bg-red-50 p-4 text-left">
           <p className="mb-3 text-sm font-medium text-red-700">
-            Start Hermes Agent:
+            Example Hermes gateway command:
           </p>
           <code className="block overflow-x-auto rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900">
-            cd ~/.openclaw/workspace/hermes-agent && hermes-webapi
+            cd ~/.openclaw/workspace/hermes-agent && hermes gateway
           </code>
+          <p className="mt-3 text-xs text-red-700">
+            Or point <code>HERMES_API_URL</code> at any OpenAI-compatible
+            backend.
+          </p>
           {lastError && (
             <p className="mt-3 text-xs text-red-700">{lastError}</p>
           )}
@@ -182,7 +186,11 @@ export function ModelConfigurationStep({
   return (
     <div className="flex w-full flex-col items-center text-center">
       <div className="mb-5 flex size-20 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700">
-        <HugeiconsIcon icon={Settings01Icon} className="size-10" strokeWidth={1.8} />
+        <HugeiconsIcon
+          icon={Settings01Icon}
+          className="size-10"
+          strokeWidth={1.8}
+        />
       </div>
 
       <h2 className="mb-3 text-2xl font-semibold text-primary-900">
@@ -190,37 +198,48 @@ export function ModelConfigurationStep({
       </h2>
 
       <p className="mb-6 max-w-md text-base leading-relaxed text-primary-600">
-        Review the model Hermes will use when you send your first message.
+        Core chat works with any OpenAI-compatible backend. Hermes gateway APIs
+        make provider and model setup editable from the workspace.
       </p>
 
       <div className="mb-6 w-full rounded-2xl border border-primary-200 bg-primary-100/70 p-4 text-left">
         {status === 'loading' && (
           <p className="text-sm text-primary-600">
-            Loading current Hermes model configuration...
+            Loading current provider and model information...
           </p>
         )}
 
         {status === 'error' && (
           <div className="flex items-start gap-3 text-amber-700">
-            <HugeiconsIcon icon={Alert02Icon} className="mt-0.5 size-5 shrink-0" />
+            <HugeiconsIcon
+              icon={Alert02Icon}
+              className="mt-0.5 size-5 shrink-0"
+            />
             <p className="text-sm">
-              Could not load Hermes configuration right now. You can still continue and update it in settings.
+              Could not load editable backend configuration right now. You can
+              still continue if chat works and update settings where your
+              backend manages them.
             </p>
           </div>
         )}
 
         {status === 'ready' && hasModel && (
           <p className="text-sm font-medium text-primary-900">
-            Connected to: <span className="text-accent-700">{model}</span> via{' '}
+            Current model: <span className="text-accent-700">{model}</span> via{' '}
             <span className="text-accent-700">{provider}</span>
           </p>
         )}
 
         {status === 'ready' && !hasModel && (
           <div className="flex items-start gap-3 text-amber-700">
-            <HugeiconsIcon icon={Alert02Icon} className="mt-0.5 size-5 shrink-0" />
+            <HugeiconsIcon
+              icon={Alert02Icon}
+              className="mt-0.5 size-5 shrink-0"
+            />
             <p className="text-sm">
-              No model is configured yet. Hermes can open, but you should choose a provider and default model before relying on responses.
+              No model is reported yet. If your backend manages models
+              externally, finish setup there and use the chat test to verify the
+              connection.
             </p>
           </div>
         )}
@@ -231,7 +250,7 @@ export function ModelConfigurationStep({
         className={buttonVariants({ variant: 'outline', className: 'gap-2' })}
       >
         <HugeiconsIcon icon={Settings01Icon} className="size-4" />
-        Open Model Settings
+        Open Provider Settings
       </Link>
     </div>
   )

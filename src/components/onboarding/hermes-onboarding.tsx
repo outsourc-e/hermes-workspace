@@ -5,15 +5,17 @@ import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { ProviderLogo } from '@/components/provider-logo'
 
-/**
- * Strip the provider prefix that hermes-agent adds internally via litellm.
- * e.g. "openrouter/nvidia/nemotron-..." → "nvidia/nemotron-..."
- *      "anthropic/claude-3-5-sonnet"    → "claude-3-5-sonnet"
- * Only strips the first path segment if it matches a known provider ID.
- */
 const KNOWN_PROVIDER_PREFIXES = [
-  'openrouter', 'anthropic', 'openai', 'openai-codex', 'nous',
-  'ollama', 'zai', 'kimi-coding', 'minimax', 'minimax-cn',
+  'openrouter',
+  'anthropic',
+  'openai',
+  'openai-codex',
+  'nous',
+  'ollama',
+  'zai',
+  'kimi-coding',
+  'minimax',
+  'minimax-cn',
 ]
 
 function stripProviderPrefix(model: string): string {
@@ -31,19 +33,95 @@ const ONBOARDING_KEY = 'hermes-onboarding-complete'
 
 type Step = 'welcome' | 'connect' | 'provider' | 'test' | 'done'
 
+type GatewayStatusResponse = {
+  capabilities?: {
+    health?: boolean
+    chatCompletions?: boolean
+    models?: boolean
+    streaming?: boolean
+    sessions?: boolean
+    skills?: boolean
+    memory?: boolean
+    config?: boolean
+    jobs?: boolean
+  }
+  hermesUrl?: string
+}
+
 const PROVIDERS = [
-  { id: 'nous', name: 'Nous Portal', logo: '/providers/nous.png', desc: 'Free via OAuth', authType: 'oauth' },
-  { id: 'openai-codex', name: 'OpenAI Codex', logo: '/providers/openai.png', desc: 'Free via ChatGPT Pro', authType: 'oauth' },
-  { id: 'anthropic', name: 'Anthropic', logo: '/providers/anthropic.png', desc: 'API key required', authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
-  { id: 'openrouter', name: 'OpenRouter', logo: '/providers/openrouter.png', desc: 'API key required', authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
-  { id: 'ollama', name: 'Ollama', logo: '/providers/ollama.png', desc: 'Local models, no key needed', authType: 'none' },
-  { id: 'custom', name: 'Custom (OpenAI-compat)', logo: '/providers/openai.png', desc: 'Any OpenAI-compatible endpoint', authType: 'custom' },
+  {
+    id: 'nous',
+    name: 'Nous Portal',
+    logo: '/providers/nous.png',
+    desc: 'Free via OAuth',
+    authType: 'oauth',
+  },
+  {
+    id: 'openai-codex',
+    name: 'OpenAI Codex',
+    logo: '/providers/openai.png',
+    desc: 'Free via ChatGPT Pro',
+    authType: 'oauth',
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    logo: '/providers/anthropic.png',
+    desc: 'API key required',
+    authType: 'api_key',
+    envKey: 'ANTHROPIC_API_KEY',
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    logo: '/providers/openrouter.png',
+    desc: 'API key required',
+    authType: 'api_key',
+    envKey: 'OPENROUTER_API_KEY',
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    logo: '/providers/ollama.png',
+    desc: 'Local models, no key needed',
+    authType: 'none',
+  },
+  {
+    id: 'custom',
+    name: 'Custom (OpenAI-compat)',
+    logo: '/providers/openai.png',
+    desc: 'Any OpenAI-compatible endpoint',
+    authType: 'custom',
+  },
 ]
+
+function getEnhancedFeatureNames(
+  capabilities?: GatewayStatusResponse['capabilities'],
+): Array<string> {
+  if (!capabilities) return []
+  const features: Array<{ enabled?: boolean; label: string }> = [
+    { enabled: capabilities.sessions, label: 'Sessions' },
+    { enabled: capabilities.skills, label: 'Skills' },
+    { enabled: capabilities.memory, label: 'Memory' },
+    { enabled: capabilities.config, label: 'In-app config' },
+    { enabled: capabilities.jobs, label: 'Jobs' },
+  ]
+
+  return features
+    .filter((feature) => feature.enabled)
+    .map((feature) => feature.label)
+}
 
 export function HermesOnboarding() {
   const [show, setShow] = useState(false)
   const [step, setStep] = useState<Step>('welcome')
-  const [hermesOk, setHermesOk] = useState<boolean | null>(null)
+  const [backendStatus, setBackendStatus] = useState<
+    'idle' | 'checking' | 'ready' | 'error'
+  >('idle')
+  const [backendInfo, setBackendInfo] = useState<GatewayStatusResponse | null>(
+    null,
+  )
+  const [backendMessage, setBackendMessage] = useState('')
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -51,74 +129,130 @@ export function HermesOnboarding() {
   const [saveError, setSaveError] = useState('')
   const [availableModels, setAvailableModels] = useState<Array<string>>([])
   const [selectedModel, setSelectedModel] = useState('')
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  const [testStatus, setTestStatus] = useState<
+    'idle' | 'testing' | 'success' | 'error'
+  >('idle')
   const [testMessage, setTestMessage] = useState('')
   const [configuredModel, setConfiguredModel] = useState('')
 
-  // OAuth device flow state
-  const [oauthStep, setOauthStep] = useState<'idle' | 'loading' | 'waiting' | 'success' | 'error'>('idle')
+  const [oauthStep, setOauthStep] = useState<
+    'idle' | 'loading' | 'waiting' | 'success' | 'error'
+  >('idle')
   const [oauthUserCode, setOauthUserCode] = useState('')
   const [oauthVerificationUrl, setOauthVerificationUrl] = useState('')
-  const [oauthDeviceCode, setOauthDeviceCode] = useState('')
   const [oauthError, setOauthError] = useState('')
   const oauthPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const checkConfig = useCallback(async () => {
+  const provider = PROVIDERS.find((p) => p.id === selectedProvider)
+  const needsApiKey =
+    provider?.authType === 'api_key' || provider?.authType === 'custom'
+  const needsBaseUrl =
+    provider?.id === 'ollama' || provider?.authType === 'custom'
+  const isOAuth = provider?.authType === 'oauth'
+  const capabilities = backendInfo?.capabilities
+  const canEditConfig = Boolean(capabilities?.config)
+  const enhancedFeatures = getEnhancedFeatureNames(capabilities)
+  const canFetchModels = Boolean(capabilities?.models)
+  const backendSupportsChat = Boolean(capabilities?.chatCompletions)
+
+  const loadCurrentConfig = useCallback(async () => {
     try {
       const res = await fetch('/api/hermes-config')
-      if (res.ok) {
-        const data = await res.json() as { activeModel?: string; activeProvider?: string }
-        return { activeModel: data.activeModel || '', activeProvider: data.activeProvider || '' }
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        activeModel?: string
+        activeProvider?: string
+      }
+      if (data.activeModel) {
+        const normalizedModel = stripProviderPrefix(data.activeModel)
+        setConfiguredModel(normalizedModel)
+        setSelectedModel((current) => current || normalizedModel)
+      }
+      if (data.activeProvider) {
+        setSelectedProvider((current) => current || data.activeProvider || null)
       }
     } catch {}
-    return { activeModel: '', activeProvider: '' }
   }, [])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const done = localStorage.getItem(ONBOARDING_KEY)
-    if (!done) {
-      setShow(true)
-    }
-  }, [])
-
-  const complete = useCallback(() => {
-    localStorage.setItem(ONBOARDING_KEY, 'true')
-    setShow(false)
-  }, [])
-
-  const checkHermes = useCallback(async () => {
+  const loadModels = useCallback(async () => {
+    if (!canFetchModels) return
     try {
-      const res = await fetch('/api/hermes-config')
-      if (res.ok) {
-        const data = await res.json() as { activeModel?: string; activeProvider?: string }
-        setHermesOk(true)
-        setConfiguredModel(data.activeModel || '')
-        setSelectedProvider(data.activeProvider || null)
-        setStep('provider')
-      } else {
-        setHermesOk(false)
+      const modelsRes = await fetch('/api/models')
+      if (!modelsRes.ok) return
+      const modelsData = (await modelsRes.json()) as {
+        data?: Array<{ id?: string }>
+        models?: Array<{ id?: string }>
       }
+      const rawModels = modelsData.data || modelsData.models || []
+      const models = rawModels
+        .map((model) => (typeof model.id === 'string' ? model.id : ''))
+        .filter(Boolean)
+        .slice(0, 20)
+
+      setAvailableModels(models)
+      setSelectedModel(
+        (current) => current || stripProviderPrefix(models[0] || ''),
+      )
     } catch {
-      setHermesOk(false)
+      setAvailableModels([])
+    }
+  }, [canFetchModels])
+
+  const checkBackend = useCallback(async () => {
+    setBackendStatus('checking')
+    setBackendMessage('')
+
+    try {
+      const res = await fetch('/api/gateway-status')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+
+      const data = (await res.json()) as GatewayStatusResponse
+      setBackendInfo(data)
+
+      if (data.capabilities?.chatCompletions) {
+        setBackendStatus('ready')
+        setBackendMessage(
+          data.capabilities.sessions
+            ? 'Backend connected. Core chat works, and Hermes gateway enhancements are available.'
+            : 'Backend connected. Core chat is ready.',
+        )
+        return
+      }
+
+      if (data.capabilities?.health) {
+        setBackendStatus('error')
+        setBackendMessage(
+          'Backend is reachable, but /v1/chat/completions is not available yet.',
+        )
+        return
+      }
+
+      setBackendStatus('error')
+      setBackendMessage('No compatible backend detected yet.')
+    } catch (err) {
+      setBackendInfo(null)
+      setBackendStatus('error')
+      setBackendMessage(
+        err instanceof Error ? err.message : 'Connection check failed',
+      )
     }
   }, [])
-
-  const provider = PROVIDERS.find((p) => p.id === selectedProvider)
-  const needsApiKey = provider?.authType === 'api_key' || provider?.authType === 'custom'
-  const needsBaseUrl = provider?.id === 'ollama' || provider?.authType === 'custom'
-  const isOAuth = provider?.authType === 'oauth'
 
   const saveProviderConfig = useCallback(async () => {
-    if (!selectedProvider) return
+    if (!selectedProvider) return true
+    if (!canEditConfig) return true
+
     setSaving(true)
     setSaveError('')
-    setAvailableModels([])
+
     try {
       const prov = PROVIDERS.find((p) => p.id === selectedProvider)
       const body: Record<string, unknown> = {
         config: { model: { provider: selectedProvider } },
       }
+
       if (prov?.envKey && apiKey) {
         body.env = { [prov.envKey]: apiKey }
       }
@@ -133,41 +267,54 @@ export function HermesOnboarding() {
       })
       if (!res.ok) throw new Error(`Save failed: ${res.status}`)
 
-      // Try to fetch available models
-      try {
-        const modelsRes = await fetch('/v1/models')
-        if (modelsRes.ok) {
-          const modelsData = await modelsRes.json() as { data?: Array<{ id: string }> }
-          const models = (modelsData.data || []).map((m) => m.id).slice(0, 20)
-          setAvailableModels(models)
-          if (models.length > 0) setSelectedModel(models[0])
-        }
-      } catch {
-        // Models endpoint not available — that's ok
-      }
+      await loadCurrentConfig()
+      await loadModels()
+      return true
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save')
+      return false
     } finally {
       setSaving(false)
     }
-  }, [selectedProvider, apiKey, baseUrl])
+  }, [
+    apiKey,
+    baseUrl,
+    canEditConfig,
+    loadCurrentConfig,
+    loadModels,
+    selectedProvider,
+  ])
 
   const saveModelSelection = useCallback(async () => {
-    if (!selectedModel) return
+    const modelToSave = stripProviderPrefix(selectedModel || configuredModel)
+    if (!modelToSave) return true
+
+    setConfiguredModel(modelToSave)
+
+    if (!canEditConfig || !selectedProvider) return true
+
     try {
-      const normalizedModel = stripProviderPrefix(selectedModel)
-      await fetch('/api/hermes-config', {
+      const res = await fetch('/api/hermes-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: { model: { provider: selectedProvider, default: normalizedModel } } }),
+        body: JSON.stringify({
+          config: {
+            model: { provider: selectedProvider, default: modelToSave },
+          },
+        }),
       })
-      setConfiguredModel(normalizedModel)
-    } catch {}
-  }, [selectedModel, selectedProvider])
+      if (!res.ok) throw new Error(`Save failed: ${res.status}`)
+      return true
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save model')
+      return false
+    }
+  }, [canEditConfig, configuredModel, selectedModel, selectedProvider])
 
   const testConnection = useCallback(async () => {
     setTestStatus('testing')
     setTestMessage('')
+
     try {
       const res = await fetch('/api/send-stream', {
         method: 'POST',
@@ -175,122 +322,164 @@ export function HermesOnboarding() {
         body: JSON.stringify({
           sessionKey: 'new',
           friendlyId: 'new',
-          message: 'Say "Hello! Hermes Workspace is ready." in one sentence.',
+          message:
+            'Reply with one short sentence confirming the backend connection works.',
         }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status} — check your API key and model config`)
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const reader = res.body?.getReader()
-      if (!reader) throw new Error('No stream')
+      if (!reader) throw new Error('No stream returned')
+
       const decoder = new TextDecoder()
       let text = ''
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         const chunk = decoder.decode(value)
         const matches = chunk.match(/(?:delta|text|content)":"([^"]+)"/g)
         if (matches) {
-          for (const m of matches) {
-            const val = m.replace(/.*":"/, '').replace(/"$/, '')
-            text += val
+          for (const match of matches) {
+            text += match.replace(/.*":"/, '').replace(/"$/, '')
           }
         }
       }
-      setTestMessage(text.slice(0, 200) || 'Connected successfully!')
+
+      setTestMessage(text.slice(0, 240) || 'Chat test succeeded.')
       setTestStatus('success')
+      void checkBackend()
     } catch (err) {
       setTestMessage(err instanceof Error ? err.message : 'Connection failed')
       setTestStatus('error')
     }
-  }, [])
+  }, [checkBackend])
 
   const startNousOAuth = useCallback(async () => {
     setOauthStep('loading')
     setOauthError('')
+
     try {
       const res = await fetch('/api/oauth/device-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: 'nous' }),
       })
-      const data = await res.json() as { device_code?: string; user_code?: string; verification_uri_complete?: string; interval?: number; error?: string }
+      const data = (await res.json()) as {
+        device_code?: string
+        user_code?: string
+        verification_uri_complete?: string
+        interval?: number
+        error?: string
+      }
+
       if (!res.ok || data.error) {
         setOauthError(data.error || 'Failed to start OAuth')
         setOauthStep('error')
         return
       }
-      setOauthDeviceCode(data.device_code || '')
+
       setOauthUserCode(data.user_code || '')
       setOauthVerificationUrl(data.verification_uri_complete || '')
       setOauthStep('waiting')
 
-      // Open the verification URL in a new tab automatically
       if (data.verification_uri_complete) {
         window.open(data.verification_uri_complete, '_blank')
       }
 
-      // Start polling
       const intervalMs = Math.max((data.interval || 5) * 1000, 3000)
       oauthPollRef.current = setInterval(async () => {
         try {
           const pollRes = await fetch('/api/oauth/poll-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ provider: 'nous', deviceCode: data.device_code }),
+            body: JSON.stringify({
+              provider: 'nous',
+              deviceCode: data.device_code,
+            }),
           })
-          const pollData = await pollRes.json() as { status: string; message?: string }
+          const pollData = (await pollRes.json()) as {
+            status: string
+            message?: string
+          }
+
           if (pollData.status === 'success') {
             if (oauthPollRef.current) clearInterval(oauthPollRef.current)
             setOauthStep('success')
-            // Save provider config and fetch models
             await saveProviderConfig()
-            try {
-              const modelsRes = await fetch('/v1/models')
-              if (modelsRes.ok) {
-                const modelsData = await modelsRes.json() as { data?: Array<{ id: string }> }
-                const models = (modelsData.data || []).map((m: { id: string }) => m.id).slice(0, 20)
-                setAvailableModels(models)
-                if (models.length > 0) setSelectedModel(models[0])
-              }
-            } catch { /* ignore */ }
-          } else if (pollData.status === 'error') {
+            await loadModels()
+            return
+          }
+
+          if (pollData.status === 'error') {
             if (oauthPollRef.current) clearInterval(oauthPollRef.current)
             setOauthError(pollData.message || 'Authentication failed')
             setOauthStep('error')
           }
-          // 'pending' — keep polling
-        } catch { /* network error — keep polling */ }
+        } catch {}
       }, intervalMs)
     } catch (err) {
-      setOauthError(err instanceof Error ? err.message : 'Failed to start OAuth')
+      setOauthError(
+        err instanceof Error ? err.message : 'Failed to start OAuth',
+      )
       setOauthStep('error')
     }
-  }, [saveProviderConfig])
+  }, [loadModels, saveProviderConfig])
 
-  // Cleanup polling on unmount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!localStorage.getItem(ONBOARDING_KEY)) {
+      setShow(true)
+    }
+  }, [])
+
   useEffect(() => {
     return () => {
       if (oauthPollRef.current) clearInterval(oauthPollRef.current)
     }
   }, [])
 
-  // Reset OAuth state when provider changes
   useEffect(() => {
     if (oauthPollRef.current) clearInterval(oauthPollRef.current)
     setOauthStep('idle')
     setOauthUserCode('')
     setOauthVerificationUrl('')
-    setOauthDeviceCode('')
     setOauthError('')
   }, [selectedProvider])
 
+  useEffect(() => {
+    if (show) {
+      void loadCurrentConfig()
+    }
+  }, [loadCurrentConfig, show])
+
+  const complete = useCallback(() => {
+    localStorage.setItem(ONBOARDING_KEY, 'true')
+    setShow(false)
+  }, [])
+
   if (!show) return null
 
-  const cardStyle: React.CSSProperties = { backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: 'var(--theme-card)',
+    border: '1px solid var(--theme-border)',
+    color: 'var(--theme-text)',
+  }
   const mutedStyle: React.CSSProperties = { color: 'var(--theme-muted)' }
-  const inputStyle: React.CSSProperties = { backgroundColor: 'var(--theme-bg)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }
+  const inputStyle: React.CSSProperties = {
+    backgroundColor: 'var(--theme-bg)',
+    border: '1px solid var(--theme-border)',
+    color: 'var(--theme-text)',
+  }
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center px-4"
+      style={{
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(12px)',
+      }}
+    >
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
@@ -301,19 +490,29 @@ export function HermesOnboarding() {
           className="w-full max-w-md rounded-2xl p-8"
           style={cardStyle}
         >
-          {/* Step: Welcome */}
           {step === 'welcome' && (
-            <div className="text-center space-y-4">
-              <img src="/hermes-avatar.webp" alt="Hermes" className="size-20 rounded-2xl mx-auto" style={{ filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.3))' }} />
+            <div className="space-y-4 text-center">
+              <img
+                src="/hermes-avatar.webp"
+                alt="Hermes"
+                className="mx-auto size-20 rounded-2xl"
+                style={{
+                  filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.3))',
+                }}
+              />
               <h2 className="text-xl font-bold">Welcome to Hermes Workspace</h2>
               <p className="text-sm" style={mutedStyle}>
-                Your native web control surface for Hermes Agent. Chat, tools, memory, skills — all in one place.
+                Works with any OpenAI-compatible backend. Hermes gateway APIs
+                unlock sessions, memory, skills, and other extras automatically.
               </p>
               <button
-                onClick={() => { setStep('connect'); checkHermes() }}
-                className="w-full rounded-xl py-3 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 transition-colors"
+                onClick={() => {
+                  setStep('connect')
+                  void checkBackend()
+                }}
+                className="w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
               >
-                Get Started
+                Connect Backend
               </button>
               <button onClick={complete} className="text-xs" style={mutedStyle}>
                 Skip setup
@@ -321,180 +520,306 @@ export function HermesOnboarding() {
             </div>
           )}
 
-          {/* Step: Connect */}
           {step === 'connect' && (
-            <div className="text-center space-y-4">
+            <div className="space-y-4 text-center">
               <div className="text-4xl">🔌</div>
-              <h2 className="text-lg font-bold">Connecting to Hermes Agent</h2>
-              {hermesOk === null && (
-                <div className="flex items-center justify-center gap-2 text-sm" style={mutedStyle}>
-                  <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
-                  Checking localhost:8642...
+              <h2 className="text-lg font-bold">Connect Your Backend</h2>
+              <p className="text-sm" style={mutedStyle}>
+                Start by verifying that Hermes Workspace can reach your
+                OpenAI-compatible backend.
+              </p>
+
+              {backendStatus === 'checking' && (
+                <div
+                  className="flex items-center justify-center gap-2 text-sm"
+                  style={mutedStyle}
+                >
+                  <span className="size-2 animate-pulse rounded-full bg-accent-500" />
+                  Checking backend capabilities...
                 </div>
               )}
-              {hermesOk === true && (
-                <div className="flex items-center justify-center gap-2 text-sm text-green-500">
-                  <span className="size-2 rounded-full bg-green-500" />
-                  Hermes Agent is running
+
+              {backendStatus === 'ready' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-sm text-green-500">
+                    <span className="size-2 rounded-full bg-green-500" />
+                    {backendMessage}
+                  </div>
+                  <div
+                    className="rounded-xl p-3 text-left text-xs"
+                    style={cardStyle}
+                  >
+                    <p style={mutedStyle}>Backend URL</p>
+                    <p className="mt-1 font-mono">
+                      {backendInfo?.hermesUrl || 'Configured automatically'}
+                    </p>
+                  </div>
                 </div>
               )}
-              {hermesOk === false && (
+
+              {backendStatus === 'error' && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-center gap-2 text-sm text-red-400">
                     <span className="size-2 rounded-full bg-red-500" />
-                    Hermes Agent not found
+                    {backendMessage}
                   </div>
-                  <div className="rounded-xl p-3 text-xs text-left font-mono" style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}>
-                    <p style={mutedStyle}>Start Hermes Agent:</p>
-                    <p className="mt-1">pip install hermes-agent</p>
-                    <p>hermes setup</p>
-                    <p>hermes --web</p>
+                  <div
+                    className="rounded-xl p-3 text-left text-xs"
+                    style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}
+                  >
+                    <p className="font-medium text-white">
+                      Compatible backends
+                    </p>
+                    <p className="mt-2" style={mutedStyle}>
+                      Use any backend that exposes{' '}
+                      <code>/v1/chat/completions</code>. If you point Hermes
+                      Workspace at a Hermes gateway, enhanced features unlock
+                      automatically.
+                    </p>
+                    <div
+                      className="mt-3 rounded-lg px-3 py-2 font-mono text-[11px]"
+                      style={{ background: 'rgba(0,0,0,0.2)' }}
+                    >
+                      HERMES_API_URL=http://127.0.0.1:8642 pnpm dev
+                    </div>
+                    <div
+                      className="mt-2 rounded-lg px-3 py-2 font-mono text-[11px]"
+                      style={{ background: 'rgba(0,0,0,0.2)' }}
+                    >
+                      hermes gateway
+                    </div>
                   </div>
-                  <button onClick={checkHermes} className="rounded-lg px-4 py-2 text-xs font-medium bg-accent-500 text-white">
-                    Retry
-                  </button>
                 </div>
               )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void checkBackend()}
+                  className="flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors"
+                  style={{ borderColor: 'var(--theme-border)' }}
+                >
+                  Retry
+                </button>
+                <button
+                  onClick={() => {
+                    setStep('provider')
+                    void loadModels()
+                  }}
+                  disabled={backendStatus !== 'ready'}
+                  className="flex-1 rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Step: Provider */}
           {step === 'provider' && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold text-center">Choose Provider</h2>
-              <p className="text-xs text-center" style={mutedStyle}>
-                {configuredModel ? `Currently using ${configuredModel}` : 'Select your AI model provider'}
+              <h2 className="text-center text-lg font-bold">
+                Choose Provider and Model
+              </h2>
+              <p className="text-center text-xs" style={mutedStyle}>
+                {canEditConfig
+                  ? 'Save provider settings here, then choose a model before testing chat.'
+                  : 'This backend manages provider settings outside Hermes Workspace. Confirm the model you expect to use, then test chat.'}
               </p>
-              <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
+
+              <div className="rounded-xl p-3 text-xs" style={cardStyle}>
+                <p style={mutedStyle}>Backend mode</p>
+                <p className="mt-1">
+                  {backendInfo?.capabilities?.sessions
+                    ? 'Hermes gateway detected'
+                    : 'Portable OpenAI-compatible backend'}
+                </p>
+                {configuredModel ? (
+                  <p className="mt-2" style={mutedStyle}>
+                    Current model:{' '}
+                    <span className="font-mono text-accent-400">
+                      {configuredModel}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto pr-1">
                 {PROVIDERS.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => { setSelectedProvider(p.id); setApiKey(''); setBaseUrl(''); setSaveError(''); setAvailableModels([]) }}
+                    onClick={() => {
+                      setSelectedProvider(p.id)
+                      setApiKey('')
+                      setBaseUrl('')
+                      setSaveError('')
+                    }}
                     className={cn(
                       'flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all',
                       selectedProvider === p.id ? 'ring-2 ring-accent-500' : '',
                     )}
                     style={cardStyle}
                   >
-                    <ProviderLogo provider={p.id} size={40} className="rounded-xl shrink-0" />
-                    <div className="flex-1 min-w-0">
+                    <ProviderLogo
+                      provider={p.id}
+                      size={40}
+                      className="shrink-0 rounded-xl"
+                    />
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold">{p.name}</div>
-                      <div className="text-xs" style={mutedStyle}>{p.desc}</div>
+                      <div className="text-xs" style={mutedStyle}>
+                        {p.desc}
+                      </div>
                     </div>
-                    {selectedProvider === p.id && <span className="ml-auto size-2.5 rounded-full bg-green-500 shrink-0" />}
+                    {selectedProvider === p.id ? (
+                      <span className="ml-auto size-2.5 shrink-0 rounded-full bg-green-500" />
+                    ) : null}
                   </button>
                 ))}
               </div>
 
-              {/* OAuth provider — in-browser device flow (Nous) or terminal fallback (Codex) */}
-              {selectedProvider && isOAuth && selectedProvider === 'nous' && (
-                <div className="rounded-xl p-4 text-left space-y-3" style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}>
-                  {oauthStep === 'idle' && (
-                    <button
-                      onClick={startNousOAuth}
-                      className="w-full rounded-lg py-2.5 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 transition-colors"
-                    >
-                      Connect with Nous Portal
-                    </button>
-                  )}
-                  {oauthStep === 'loading' && (
-                    <div className="flex items-center justify-center gap-2 text-sm py-2" style={mutedStyle}>
-                      <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
-                      Starting OAuth flow...
-                    </div>
-                  )}
-                  {oauthStep === 'waiting' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-sm" style={mutedStyle}>
-                        <span className="size-2 rounded-full bg-yellow-400 animate-pulse" />
-                        Waiting for approval...
-                      </div>
-                      {oauthUserCode && (
-                        <div className="text-center space-y-1">
-                          <p className="text-xs" style={mutedStyle}>Your code:</p>
-                          <p className="text-2xl font-mono font-bold tracking-widest">{oauthUserCode}</p>
-                        </div>
-                      )}
-                      {oauthVerificationUrl && (
-                        <button
-                          onClick={() => window.open(oauthVerificationUrl, '_blank')}
-                          className="w-full rounded-lg py-2 text-xs font-medium border"
-                          style={{ borderColor: 'var(--theme-border)' }}
-                        >
-                          Open Nous Portal ↗
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {oauthStep === 'success' && (
-                    <div className="flex items-center gap-2 text-sm text-green-500">
-                      <span>✓</span>
-                      <span>Authenticated with Nous Portal!</span>
-                    </div>
-                  )}
-                  {oauthStep === 'error' && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-red-400">{oauthError || 'Authentication failed'}</p>
+              {selectedProvider &&
+                isOAuth &&
+                selectedProvider === 'nous' &&
+                canEditConfig && (
+                  <div
+                    className="space-y-3 rounded-xl p-4 text-left"
+                    style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}
+                  >
+                    {oauthStep === 'idle' && (
                       <button
                         onClick={startNousOAuth}
-                        className="w-full rounded-lg py-2 text-xs font-medium bg-accent-500 text-white"
+                        className="w-full rounded-lg bg-accent-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
                       >
-                        Retry
+                        Connect with Nous Portal
                       </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              {selectedProvider && isOAuth && selectedProvider === 'openai-codex' && (
-                <div className="rounded-xl p-4 text-left space-y-2" style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}>
-                  <p className="text-sm font-medium">Run in your terminal:</p>
-                  <div className="rounded-lg px-3 py-2 font-mono text-xs" style={{ background: 'rgba(0,0,0,0.2)' }}>
-                    hermes auth login openai-codex
+                    )}
+                    {oauthStep === 'loading' && (
+                      <div
+                        className="flex items-center justify-center gap-2 py-2 text-sm"
+                        style={mutedStyle}
+                      >
+                        <span className="size-2 animate-pulse rounded-full bg-accent-500" />
+                        Starting OAuth flow...
+                      </div>
+                    )}
+                    {oauthStep === 'waiting' && (
+                      <div className="space-y-3">
+                        <div
+                          className="flex items-center gap-2 text-sm"
+                          style={mutedStyle}
+                        >
+                          <span className="size-2 animate-pulse rounded-full bg-yellow-400" />
+                          Waiting for approval...
+                        </div>
+                        {oauthUserCode ? (
+                          <div className="space-y-1 text-center">
+                            <p className="text-xs" style={mutedStyle}>
+                              Your code
+                            </p>
+                            <p className="text-2xl font-mono font-bold tracking-widest">
+                              {oauthUserCode}
+                            </p>
+                          </div>
+                        ) : null}
+                        {oauthVerificationUrl ? (
+                          <button
+                            onClick={() =>
+                              window.open(oauthVerificationUrl, '_blank')
+                            }
+                            className="w-full rounded-lg border py-2 text-xs font-medium"
+                            style={{ borderColor: 'var(--theme-border)' }}
+                          >
+                            Open Nous Portal ↗
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+                    {oauthStep === 'success' && (
+                      <div className="flex items-center gap-2 text-sm text-green-500">
+                        <span>✓</span>
+                        <span>Authenticated successfully.</span>
+                      </div>
+                    )}
+                    {oauthStep === 'error' && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-red-400">
+                          {oauthError || 'Authentication failed'}
+                        </p>
+                        <button
+                          onClick={startNousOAuth}
+                          className="w-full rounded-lg bg-accent-500 py-2 text-xs font-medium text-white"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs" style={mutedStyle}>
-                    This opens a browser for OpenAI Codex OAuth. Once authenticated, Hermes saves the token automatically.
-                  </p>
-                  <button
-                    onClick={async () => {
-                      await saveProviderConfig()
-                      try {
-                        const modelsRes = await fetch('/v1/models')
-                        if (modelsRes.ok) {
-                          const modelsData = await modelsRes.json() as { data?: Array<{ id: string }> }
-                          const models = (modelsData.data || []).map((m: { id: string }) => m.id).slice(0, 20)
-                          setAvailableModels(models)
-                          if (models.length > 0) setSelectedModel(models[0])
-                        }
-                      } catch { /* ignore */ }
-                    }}
-                    className="w-full rounded-lg py-2 text-xs font-medium bg-accent-500 text-white"
-                  >
-                    I&apos;ve authenticated — check connection
-                  </button>
-                </div>
-              )}
+                )}
 
-              {/* API key / base URL inputs */}
+              {selectedProvider &&
+                isOAuth &&
+                selectedProvider === 'openai-codex' &&
+                canEditConfig && (
+                  <div
+                    className="space-y-2 rounded-xl p-4 text-left"
+                    style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}
+                  >
+                    <p className="text-sm font-medium">Run in your terminal</p>
+                    <div
+                      className="rounded-lg px-3 py-2 font-mono text-xs"
+                      style={{ background: 'rgba(0,0,0,0.2)' }}
+                    >
+                      hermes auth login openai-codex
+                    </div>
+                    <p className="text-xs" style={mutedStyle}>
+                      After the login flow completes, click below to refresh
+                      provider settings.
+                    </p>
+                    <button
+                      onClick={async () => {
+                        await saveProviderConfig()
+                        await loadModels()
+                      }}
+                      className="w-full rounded-lg bg-accent-500 py-2 text-xs font-medium text-white"
+                    >
+                      I&apos;ve authenticated
+                    </button>
+                  </div>
+                )}
+
               {selectedProvider && (needsApiKey || needsBaseUrl) && (
                 <div className="space-y-2 pt-1">
-                  {needsBaseUrl && (
+                  {needsBaseUrl ? (
                     <div>
-                      <label className="text-xs font-medium mb-1 block" style={mutedStyle}>
-                        {selectedProvider === 'ollama' ? 'Ollama URL' : 'Base URL'}
+                      <label
+                        className="mb-1 block text-xs font-medium"
+                        style={mutedStyle}
+                      >
+                        {selectedProvider === 'ollama'
+                          ? 'Ollama URL'
+                          : 'Base URL'}
                       </label>
                       <input
                         type="text"
                         value={baseUrl}
                         onChange={(e) => setBaseUrl(e.target.value)}
-                        placeholder={selectedProvider === 'ollama' ? 'http://localhost:11434' : 'https://api.example.com/v1'}
+                        placeholder={
+                          selectedProvider === 'ollama'
+                            ? 'http://localhost:11434'
+                            : 'https://api.example.com/v1'
+                        }
                         className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500"
                         style={inputStyle}
                       />
                     </div>
-                  )}
-                  {needsApiKey && (
+                  ) : null}
+                  {needsApiKey ? (
                     <div>
-                      <label className="text-xs font-medium mb-1 block" style={mutedStyle}>API Key</label>
+                      <label
+                        className="mb-1 block text-xs font-medium"
+                        style={mutedStyle}
+                      >
+                        API Key
+                      </label>
                       <input
                         type="password"
                         value={apiKey}
@@ -504,53 +829,96 @@ export function HermesOnboarding() {
                         style={inputStyle}
                       />
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
 
-              {saveError && <p className="text-xs text-red-400">{saveError}</p>}
-
-              {/* Model selector if models were fetched */}
-              {availableModels.length > 0 && (
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={mutedStyle}>Select Model</label>
+              <div>
+                <label
+                  className="mb-1 block text-xs font-medium"
+                  style={mutedStyle}
+                >
+                  Model
+                </label>
+                {availableModels.length > 0 ? (
                   <select
                     value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
+                    onChange={(e) =>
+                      setSelectedModel(stripProviderPrefix(e.target.value))
+                    }
                     className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500"
                     style={inputStyle}
                   >
-                    {availableModels.map((m) => (
-                      <option key={m} value={m}>{m}</option>
+                    {availableModels.map((model) => (
+                      <option key={model} value={model}>
+                        {stripProviderPrefix(model)}
+                      </option>
                     ))}
                   </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    placeholder={configuredModel || 'gpt-4.1'}
+                    className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500"
+                    style={inputStyle}
+                  />
+                )}
+                <p className="mt-2 text-xs" style={mutedStyle}>
+                  {canFetchModels
+                    ? 'Models were fetched from the backend when available.'
+                    : 'If your backend does not expose /v1/models, enter the model name manually.'}
+                </p>
+              </div>
+
+              {!canEditConfig ? (
+                <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-200">
+                  In-app provider editing is unavailable on this backend. That
+                  is optional. If the backend is already configured, continue to
+                  the chat test.
                 </div>
-              )}
+              ) : null}
+
+              {saveError ? (
+                <p className="text-xs text-red-400">{saveError}</p>
+              ) : null}
 
               <div className="flex gap-2">
-                {/* Save button for key-based providers */}
-                {selectedProvider && (needsApiKey || needsBaseUrl) && (
+                {selectedProvider &&
+                canEditConfig &&
+                (needsApiKey || needsBaseUrl) ? (
                   <button
-                    onClick={saveProviderConfig}
-                    disabled={saving || (needsApiKey && !apiKey && !needsBaseUrl)}
-                    className="flex-1 rounded-xl py-3 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    onClick={() => void saveProviderConfig()}
+                    disabled={
+                      saving || (needsApiKey && !apiKey && !needsBaseUrl)
+                    }
+                    className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
                   >
-                    {saving ? 'Saving...' : 'Save Key'}
+                    {saving ? 'Saving...' : 'Save Settings'}
                   </button>
-                )}
+                ) : null}
                 <button
                   onClick={async () => {
-                    // For OAuth providers, just save provider choice then proceed
-                    if (selectedProvider && !needsApiKey && !needsBaseUrl) {
-                      await saveProviderConfig()
+                    let ok = true
+                    if (
+                      selectedProvider &&
+                      canEditConfig &&
+                      (!isOAuth || oauthStep === 'success')
+                    ) {
+                      ok = await saveProviderConfig()
                     }
-                    if (availableModels.length > 0 && selectedModel) {
-                      await saveModelSelection()
+                    if (ok) {
+                      ok = await saveModelSelection()
                     }
-                    setStep('test')
+                    if (ok) {
+                      setStep('test')
+                      setTestStatus('idle')
+                      setTestMessage('')
+                    }
                   }}
-                  disabled={!selectedProvider}
-                  className="flex-1 rounded-xl py-3 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 transition-colors disabled:opacity-50"
+                  disabled={!backendSupportsChat}
+                  className="flex-1 rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
                 >
                   Continue →
                 </button>
@@ -558,101 +926,166 @@ export function HermesOnboarding() {
             </div>
           )}
 
-          {/* Step: Test */}
           {step === 'test' && (
-            <div className="text-center space-y-4">
+            <div className="space-y-4 text-center">
               <div className="text-4xl">🧪</div>
-              <h2 className="text-lg font-bold">Test Connection</h2>
-              {configuredModel ? (
-                <p className="text-xs" style={mutedStyle}>
-                  Model: <span className="font-mono text-accent-400">{configuredModel}</span>
-                </p>
-              ) : (
-                <p className="text-xs" style={mutedStyle}>Send a test message to verify everything works.</p>
-              )}
+              <h2 className="text-lg font-bold">Test Chat</h2>
+              <p className="text-sm" style={mutedStyle}>
+                Verify that core chat works first. Enhanced Hermes features are
+                optional and appear automatically when supported.
+              </p>
 
-              {testStatus === 'idle' && (
+              <div
+                className="rounded-xl p-3 text-left text-xs"
+                style={cardStyle}
+              >
+                <p style={mutedStyle}>Backend</p>
+                <p className="mt-1 font-mono">
+                  {backendInfo?.hermesUrl || 'Configured automatically'}
+                </p>
+                {selectedModel || configuredModel ? (
+                  <p className="mt-2" style={mutedStyle}>
+                    Model:{' '}
+                    <span className="font-mono text-accent-400">
+                      {stripProviderPrefix(selectedModel || configuredModel)}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+
+              {testStatus === 'idle' ? (
                 <button
                   onClick={testConnection}
-                  className="w-full rounded-xl py-3 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 transition-colors"
+                  className="w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
                 >
                   Send Test Message
                 </button>
-              )}
-              {testStatus === 'testing' && (
-                <div className="flex items-center justify-center gap-2 text-sm" style={mutedStyle}>
-                  <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
-                  Thinking...
+              ) : null}
+
+              {testStatus === 'testing' ? (
+                <div
+                  className="flex items-center justify-center gap-2 text-sm"
+                  style={mutedStyle}
+                >
+                  <span className="size-2 animate-pulse rounded-full bg-accent-500" />
+                  Waiting for the backend response...
                 </div>
-              )}
-              {testStatus === 'success' && (
+              ) : null}
+
+              {testStatus === 'success' ? (
                 <div className="space-y-3">
-                  <div className="rounded-xl p-3 text-sm text-left" style={cardStyle}>
-                    <span className="text-green-500 font-medium">⚕ Hermes:</span>{' '}
+                  <div
+                    className="rounded-xl p-3 text-left text-sm"
+                    style={cardStyle}
+                  >
+                    <span className="font-medium text-green-500">
+                      Assistant:
+                    </span>{' '}
                     <span>{testMessage}</span>
                   </div>
                   <button
                     onClick={() => setStep('done')}
-                    className="w-full rounded-xl py-3 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 transition-colors"
+                    className="w-full rounded-xl bg-green-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-700"
                   >
-                    ✓ It works!
+                    Continue
                   </button>
                 </div>
-              )}
-              {testStatus === 'error' && (
+              ) : null}
+
+              {testStatus === 'error' ? (
                 <div className="space-y-3">
-                  <div className="rounded-xl p-3 text-sm text-left bg-red-900/20 border border-red-500/30">
-                    <p className="text-red-400 font-medium mb-1">Connection failed</p>
-                    <p className="text-xs" style={mutedStyle}>{testMessage}</p>
-                    {testMessage.includes('401') || testMessage.includes('key') ? (
-                      <p className="text-xs mt-2 text-yellow-400">→ Check your API key is correct and has credits.</p>
-                    ) : testMessage.includes('model') ? (
-                      <p className="text-xs mt-2 text-yellow-400">→ The selected model may not be available on your plan.</p>
+                  <div className="rounded-xl border border-red-500/30 bg-red-900/20 p-3 text-left text-sm">
+                    <p className="mb-1 font-medium text-red-400">
+                      Chat test failed
+                    </p>
+                    <p className="text-xs" style={mutedStyle}>
+                      {testMessage}
+                    </p>
+                    {testMessage.includes('401') ||
+                    testMessage.toLowerCase().includes('key') ? (
+                      <p className="mt-2 text-xs text-yellow-400">
+                        Check your provider credentials and account access.
+                      </p>
+                    ) : testMessage.toLowerCase().includes('model') ? (
+                      <p className="mt-2 text-xs text-yellow-400">
+                        Confirm the selected model exists on this backend.
+                      </p>
                     ) : (
-                      <p className="text-xs mt-2 text-yellow-400">→ Is Hermes Agent running? Try: <code>hermes --web</code></p>
+                      <p className="mt-2 text-xs text-yellow-400">
+                        Confirm the backend is running and still reachable from
+                        Hermes Workspace.
+                      </p>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={testConnection} className="flex-1 rounded-lg py-2 text-xs font-medium bg-accent-500 text-white">
+                    <button
+                      onClick={testConnection}
+                      className="flex-1 rounded-lg bg-accent-500 py-2 text-xs font-medium text-white"
+                    >
                       Retry
                     </button>
-                    <button onClick={() => setStep('provider')} className="flex-1 rounded-lg py-2 text-xs font-medium border" style={{ borderColor: 'var(--theme-border)' }}>
+                    <button
+                      onClick={() => setStep('provider')}
+                      className="flex-1 rounded-lg border py-2 text-xs font-medium"
+                      style={{ borderColor: 'var(--theme-border)' }}
+                    >
                       ← Back
                     </button>
                   </div>
-                  <button onClick={() => setStep('done')} className="block mx-auto text-xs" style={mutedStyle}>
+                  <button
+                    onClick={() => setStep('done')}
+                    className="mx-auto block text-xs"
+                    style={mutedStyle}
+                  >
                     Skip for now
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
-          {/* Step: Done */}
           {step === 'done' && (
-            <div className="text-center space-y-4">
+            <div className="space-y-4 text-center">
               <div className="text-5xl">🎉</div>
-              <h2 className="text-xl font-bold">You're all set!</h2>
+              <h2 className="text-xl font-bold">Workspace Ready</h2>
               <p className="text-sm" style={mutedStyle}>
-                Hermes Workspace is ready. Start chatting, explore tools, browse skills.
+                Core chat is set up.{' '}
+                {enhancedFeatures.length > 0
+                  ? 'This backend also exposes Hermes gateway enhancements.'
+                  : 'If you later connect a Hermes gateway, enhanced features unlock automatically.'}
               </p>
-              <div className="grid grid-cols-3 gap-2 text-xs" style={mutedStyle}>
+              <div
+                className="grid grid-cols-3 gap-2 text-xs"
+                style={mutedStyle}
+              >
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="text-lg mb-1">💬</div>
-                  <div>Chat</div>
+                  <div className="mb-1 text-lg">💬</div>
+                  <div>Chat Ready</div>
                 </div>
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="text-lg mb-1">🛠</div>
-                  <div>28+ Tools</div>
+                  <div className="mb-1 text-lg">🔗</div>
+                  <div>
+                    {enhancedFeatures.length > 0 ? 'Enhanced' : 'Portable'}
+                  </div>
                 </div>
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="text-lg mb-1">📦</div>
-                  <div>90 Skills</div>
+                  <div className="mb-1 text-lg">🧠</div>
+                  <div>
+                    {enhancedFeatures.length > 0
+                      ? enhancedFeatures.length
+                      : 'Optional'}{' '}
+                    Extras
+                  </div>
                 </div>
               </div>
+              {enhancedFeatures.length > 0 ? (
+                <p className="text-xs" style={mutedStyle}>
+                  Available now: {enhancedFeatures.join(', ')}.
+                </p>
+              ) : null}
               <button
                 onClick={complete}
-                className="w-full rounded-xl py-3 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 transition-colors"
+                className="w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
               >
                 Open Workspace
               </button>

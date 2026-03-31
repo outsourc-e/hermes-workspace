@@ -3,10 +3,14 @@
 import { useQuery } from '@tanstack/react-query'
 
 type ConnectionStatus = {
-  status: 'connected' | 'partial' | 'disconnected'
+  status: 'connected' | 'enhanced' | 'partial' | 'disconnected'
+  label: 'Connected' | 'Enhanced' | 'Partial' | 'Disconnected'
+  detail: string
   health: boolean
+  chatReady: boolean
   modelConfigured: boolean
   activeModel: string
+  chatMode: 'enhanced-hermes' | 'portable' | 'disconnected'
   capabilities: Record<string, boolean>
   hermesUrl: string
 }
@@ -18,9 +22,13 @@ async function fetchConnectionStatus(): Promise<ConnectionStatus> {
   if (!response.ok) {
     return {
       status: 'disconnected',
+      label: 'Disconnected',
+      detail: 'No compatible backend detected.',
       health: false,
+      chatReady: false,
       modelConfigured: false,
       activeModel: '',
+      chatMode: 'disconnected',
       capabilities: {},
       hermesUrl: '',
     }
@@ -28,27 +36,55 @@ async function fetchConnectionStatus(): Promise<ConnectionStatus> {
   return response.json() as Promise<ConnectionStatus>
 }
 
-function statusToColors(status: ConnectionStatus['status'] | undefined, isLoading: boolean) {
+function statusToColors(
+  status: ConnectionStatus['status'] | undefined,
+  isLoading: boolean,
+) {
   if (isLoading || status === undefined) {
-    return { dot: 'bg-yellow-400', pulse: 'bg-yellow-400/40', label: 'Checking...' }
+    return {
+      dot: 'bg-yellow-400',
+      pulse: 'bg-yellow-400/40',
+      label: 'Checking...',
+    }
   }
   switch (status) {
+    case 'enhanced':
+      return { dot: 'bg-cyan-400', pulse: 'bg-cyan-400/40', label: 'Enhanced' }
     case 'connected':
-      return { dot: 'bg-emerald-400', pulse: 'bg-emerald-400/40', label: 'Connected' }
+      return {
+        dot: 'bg-emerald-400',
+        pulse: 'bg-emerald-400/40',
+        label: 'Connected',
+      }
     case 'partial':
-      return { dot: 'bg-yellow-400', pulse: 'bg-yellow-400/40', label: 'Partial' }
+      return {
+        dot: 'bg-yellow-400',
+        pulse: 'bg-yellow-400/40',
+        label: 'Partial',
+      }
     case 'disconnected':
     default:
-      return { dot: 'bg-red-400', pulse: 'bg-red-400/40', label: 'Disconnected' }
+      return {
+        dot: 'bg-red-400',
+        pulse: 'bg-red-400/40',
+        label: 'Disconnected',
+      }
   }
 }
 
-function buildTooltip(data: ConnectionStatus | undefined, label: string): string {
-  if (!data) return `Hermes: ${label}`
-  const parts: Array<string> = [`Hermes: ${label}`]
+function buildTooltip(
+  data: ConnectionStatus | undefined,
+  label: string,
+): string {
+  if (!data) return `Backend: ${label}`
+  const parts: Array<string> = [`Backend: ${label}`]
+  if (data.detail) parts.push(data.detail)
   if (data.status === 'partial') {
-    if (!data.modelConfigured) parts.push('No model configured')
-    if (!data.capabilities.jobs) parts.push('Jobs API unavailable')
+    if (!data.chatReady) parts.push('Missing /v1/chat/completions')
+    if (!data.modelConfigured) parts.push('No model selected')
+  }
+  if (data.status === 'enhanced') {
+    parts.push('Hermes gateway enhancements detected')
   }
   if (data.activeModel) parts.push(`Model: ${data.activeModel}`)
   return parts.join(' · ')
@@ -56,7 +92,7 @@ function buildTooltip(data: ConnectionStatus | undefined, label: string): string
 
 /**
  * Minimal dot-only status indicator (no text).
- * Shows green (connected), yellow (partial/checking), or red (disconnected).
+ * Shows connected, enhanced, partial, or disconnected backend state.
  */
 export function StatusDot() {
   const { data, isLoading } = useQuery({
@@ -67,7 +103,8 @@ export function StatusDot() {
   })
 
   const { dot: dotColor, label } = statusToColors(data?.status, isLoading)
-  const isConnected = data?.status === 'connected'
+  const isConnected =
+    data?.status === 'connected' || data?.status === 'enhanced'
   const tooltip = buildTooltip(data, label)
 
   return (
@@ -75,7 +112,9 @@ export function StatusDot() {
       {isConnected && (
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/40" />
       )}
-      <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
+      <span
+        className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`}
+      />
     </span>
   )
 }
@@ -94,8 +133,13 @@ export function StatusIndicator({
     retry: false,
   })
 
-  const { dot: dotColor, pulse: pulseColor, label } = statusToColors(data?.status, isLoading)
-  const isConnected = data?.status === 'connected'
+  const {
+    dot: dotColor,
+    pulse: pulseColor,
+    label,
+  } = statusToColors(data?.status, isLoading)
+  const isConnected =
+    data?.status === 'connected' || data?.status === 'enhanced'
   const isPartial = data?.status === 'partial'
   const tooltip = buildTooltip(data, label)
 
@@ -112,7 +156,9 @@ export function StatusIndicator({
             className={`relative inline-flex h-1.5 w-1.5 rounded-full ${dotColor}`}
           />
         </span>
-        <span className="text-[10px] text-primary-400 dark:text-gray-500">{label}</span>
+        <span className="text-[10px] text-primary-400 dark:text-gray-500">
+          {label}
+        </span>
       </span>
     )
   }
@@ -130,7 +176,9 @@ export function StatusIndicator({
         />
       </span>
       {!collapsed && (
-        <span className="truncate text-[11px] text-primary-500 dark:text-gray-400">{label}</span>
+        <span className="truncate text-[11px] text-primary-500 dark:text-gray-400">
+          {label}
+        </span>
       )}
     </div>
   )
