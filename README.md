@@ -317,13 +317,7 @@ The upstream hermes-agent doesn't include the WebAPI server yet. The workspace w
 
 ## ⭐ Star History
 
-<a href="https://www.star-history.com/?repos=outsourc-e%2Fhermes-workspace&type=date&legend=top-left">
- <picture>
- <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=outsourc-e/hermes-workspace&type=date&theme=dark&legend=top-left" />
- <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=outsourc-e/hermes-workspace&type=date&legend=top-left" />
- <img alt="Star History Chart" src="https://api.star-history.com/image?repos=outsourc-e/hermes-workspace&type=date&legend=top-left" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/hermes-workspace&type=Date)](https://star-history.com/#outsourc-e/hermes-workspace&Date)
 ---
 
 ## 💛 Support the Project
