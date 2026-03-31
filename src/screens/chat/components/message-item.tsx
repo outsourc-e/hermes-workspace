@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
-const STUCK_SENDING_THRESHOLD_MS = 30_000
+const STUCK_SENDING_THRESHOLD_MS = 120_000
 
 function isWhitespaceCharacter(value: string): boolean {
   return /\s/.test(value)
