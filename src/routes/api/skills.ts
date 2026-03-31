@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   HERMES_UPGRADE_INSTRUCTIONS,
@@ -246,13 +247,12 @@ export const Route = createFileRoute('/api/skills')({
         await ensureGatewayProbed()
         if (!getCapabilities().skills) {
           return json({
+            ...createCapabilityUnavailablePayload('skills'),
             items: [],
             skills: [],
             total: 0,
             page: 1,
             categories: KNOWN_CATEGORIES,
-            source: 'unavailable',
-            message: `Gateway does not support /api/skills. ${HERMES_UPGRADE_INSTRUCTIONS}`,
           })
         }
 
@@ -336,8 +336,9 @@ export const Route = createFileRoute('/api/skills')({
         if (!getCapabilities().skills) {
           return json(
             {
-              ok: false,
-              error: `Gateway does not support /api/skills. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+              ...createCapabilityUnavailablePayload('skills', {
+                error: `Gateway does not support /api/skills. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+              }),
             },
             { status: 503 },
           )

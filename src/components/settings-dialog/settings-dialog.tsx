@@ -40,7 +40,9 @@ import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
+import BackendUnavailableState from '@/components/backend-unavailable-state'
 import { applyAccentColor } from '@/lib/accent-colors'
+import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
 import { ProviderLogo } from '@/components/provider-logo'
 import {
   DialogClose,
@@ -146,6 +148,7 @@ const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: Ar
 ]
 
 function HermesContent() {
+  const configAvailable = isFeatureAvailable('config')
   const [activeProvider, setActiveProvider] = useState('')
   const [activeModel, setActiveModel] = useState('')
   const [availableModels, setAvailableModels] = useState<Array<string>>([])
@@ -219,6 +222,15 @@ function HermesContent() {
       fetchModelsForProvider(providerId)
       save({ config: { provider: providerId } })
     }
+  }
+
+  if (!configAvailable) {
+    return (
+      <BackendUnavailableState
+        feature="Hermes Agent Settings"
+        description={getUnavailableReason('config')}
+      />
+    )
   }
 
   const cardStyle: React.CSSProperties = { backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }

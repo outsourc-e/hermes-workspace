@@ -32,6 +32,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { ProviderIcon } from './components/provider-icon'
 import { ProviderWizard } from './components/provider-wizard'
+import BackendUnavailableState from '@/components/backend-unavailable-state'
 import type { ModelCatalogEntry } from '@/lib/model-types'
 import type { ProviderSummaryForEdit } from './components/provider-wizard'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
+import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
 import {
   getProviderDisplayName,
   getProviderInfo,
@@ -1321,6 +1323,7 @@ function ProviderManagementSection(props: {
 
 export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
   const queryClient = useQueryClient()
+  const configAvailable = isFeatureAvailable('config')
   const [activeTab, setActiveTab] = useState<SettingsTabId>('providers')
   const [search, setSearch] = useState('')
   const [draftValues, setDraftValues] = useState<Record<string, string>>({})
@@ -1334,6 +1337,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
     queryFn: fetchModels,
     refetchInterval: 60_000,
     retry: false,
+    enabled: configAvailable,
   })
 
   const configQuery = useQuery({
@@ -1347,6 +1351,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
       return (payload.payload ?? {})
     },
     retry: 1,
+    enabled: configAvailable,
   })
 
   const saveMutation = useMutation({
@@ -1479,6 +1484,17 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
   }
 
   const totalSearchMatches = filteredSettings.length
+
+  if (!configAvailable) {
+    return (
+      <div className={cn(embedded ? 'h-full bg-primary-50' : 'min-h-full bg-surface')}>
+        <BackendUnavailableState
+          feature="Provider Setup"
+          description={getUnavailableReason('config')}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className={cn(embedded ? 'h-full bg-primary-50' : 'min-h-full bg-surface')}>

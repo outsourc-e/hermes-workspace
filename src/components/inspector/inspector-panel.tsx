@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import {  useActivityStore } from './activity-store'
 import type {ActivityEvent} from './activity-store';
+import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
-
-const HERMES_API = 'http://localhost:8642'
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
@@ -24,11 +23,15 @@ export const useInspectorStore = create<InspectorStore>((set) => ({
 
 type TabId = 'activity' | 'files' | 'memory' | 'skills' | 'logs'
 
-const TABS: Array<{ id: TabId; label: string }> = [
+const TABS: Array<{
+  id: TabId
+  label: string
+  feature?: 'memory' | 'skills'
+}> = [
   { id: 'activity', label: 'Activity' },
   { id: 'files', label: 'Files' },
-  { id: 'memory', label: 'Memory' },
-  { id: 'skills', label: 'Skills' },
+  { id: 'memory', label: 'Memory', feature: 'memory' },
+  { id: 'skills', label: 'Skills', feature: 'skills' },
   { id: 'logs', label: 'Logs' },
 ]
 
@@ -137,20 +140,26 @@ function FilesTab() {
 // ── Memory Tab ────────────────────────────────────────────────────────────────
 
 function MemoryTab() {
-  const [data, setData] = useState<Record<string, unknown> | Array<unknown> | null>(null)
+  const [files, setFiles] = useState<Array<{ path: string; name: string }> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${HERMES_API}/api/memory`)
+    fetch('/api/memory/list')
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
       .then((json) => {
         if (!cancelled) {
-          setData(json)
+          const list = Array.isArray(json?.files) ? json.files : []
+          setFiles(
+            list.map((entry: Record<string, unknown>) => ({
+              path: String(entry?.path || ''),
+              name: String(entry?.name || entry?.path || ''),
+            })),
+          )
           setLoading(false)
         }
       })
@@ -165,43 +174,21 @@ function MemoryTab() {
 
   if (loading) return <LoadingState text="Loading memory…" />
   if (error) return <ErrorState text={`Memory: ${error}`} />
-  if (!data) return <EmptyState text="No memory entries" />
-
-  // Parse Hermes memory format: { targets: [{ target, entries, usage }] }
-  const targets = (data as any)?.targets || (Array.isArray(data) ? data : [])
-  const allEntries: Array<{ target: string; text: string; usage: string }> = []
-  for (const t of targets) {
-    const target = t.target || 'memory'
-    const usage = t.usage || ''
-    for (const entry of (t.entries || [])) {
-      allEntries.push({ target, text: typeof entry === 'string' ? entry : JSON.stringify(entry), usage })
-    }
-  }
-
-  if (allEntries.length === 0) return <EmptyState text="No memory entries" />
+  if (!files || files.length === 0) return <EmptyState text="No memory files available" />
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
       <p className="mb-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
-        {allEntries.length} memories across {targets.length} targets
+        {files.length} memory files available
       </p>
-      {targets.map((t: any) => (
-        <div key={t.target} className="space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-accent)' }}>
-              {t.target}
-            </span>
-            <span className="text-[10px]" style={{ color: 'var(--theme-muted)' }}>{t.usage}</span>
-          </div>
-          {(t.entries || []).map((entry: string, i: number) => (
-            <div
-              key={i}
-              className="rounded-lg px-3 py-2 text-xs leading-relaxed"
-              style={{ backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }}
-            >
-              {typeof entry === 'string' ? entry : JSON.stringify(entry, null, 2)}
-            </div>
-          ))}
+      {files.map((file, index) => (
+        <div
+          key={`${file.path}-${index}`}
+          className="rounded-lg px-3 py-2 text-xs leading-relaxed"
+          style={{ backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }}
+        >
+          <div className="font-medium">{file.name}</div>
+          <div style={{ color: 'var(--theme-muted)' }}>{file.path}</div>
         </div>
       ))}
     </div>
@@ -224,7 +211,7 @@ function SkillsTab() {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${HERMES_API}/api/skills`)
+    fetch('/api/skills')
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
@@ -336,7 +323,18 @@ function LogsTab() {
 
 export function InspectorPanel() {
   const isOpen = useInspectorStore((s) => s.isOpen)
+  const memoryAvailable = isFeatureAvailable('memory')
+  const skillsAvailable = isFeatureAvailable('skills')
   const [activeTab, setActiveTab] = useState<TabId>('activity')
+
+  useEffect(() => {
+    if (activeTab === 'memory' && !memoryAvailable) {
+      setActiveTab('activity')
+    }
+    if (activeTab === 'skills' && !skillsAvailable) {
+      setActiveTab('activity')
+    }
+  }, [activeTab, memoryAvailable, skillsAvailable])
 
   return (
     <div
@@ -377,23 +375,48 @@ export function InspectorPanel() {
             style={{ borderBottom: '1px solid var(--theme-border)' }}
           >
             {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'px-3 py-2 text-xs font-medium shrink-0 transition-colors',
-                  activeTab === tab.id
-                    ? 'border-b-2'
-                    : 'hover:opacity-80',
-                )}
-                style={{
-                  color: activeTab === tab.id ? 'var(--theme-accent)' : 'var(--theme-muted)',
-                  borderBottomColor: activeTab === tab.id ? 'var(--theme-accent)' : 'transparent',
-                }}
-              >
-                {tab.label}
-              </button>
+              (() => {
+                const available =
+                  tab.feature === 'memory'
+                    ? memoryAvailable
+                    : tab.feature === 'skills'
+                      ? skillsAvailable
+                      : true
+
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      if (available) setActiveTab(tab.id)
+                    }}
+                    disabled={!available}
+                    className={cn(
+                      'px-3 py-2 text-xs font-medium shrink-0 transition-colors',
+                      activeTab === tab.id
+                        ? 'border-b-2'
+                        : 'hover:opacity-80',
+                      !available && 'cursor-not-allowed opacity-50',
+                    )}
+                    style={{
+                      color: activeTab === tab.id ? 'var(--theme-accent)' : 'var(--theme-muted)',
+                      borderBottomColor: activeTab === tab.id ? 'var(--theme-accent)' : 'transparent',
+                    }}
+                    title={
+                      !available && tab.feature
+                        ? getUnavailableReason(tab.feature)
+                        : undefined
+                    }
+                  >
+                    <span>{tab.label}</span>
+                    {!available ? (
+                      <span className="ml-1 rounded-full border border-amber-300 bg-amber-100 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                        Gate
+                      </span>
+                    ) : null}
+                  </button>
+                )
+              })()
             ))}
           </div>
 

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 // import type { ActivityEvent } from '@/types/activity-event'
 // Activity events disabled in search — SSE connection caused freezing
 // import { useActivityEvents } from '@/screens/activity/use-activity-events'
+import { isFeatureAvailable } from '@/lib/feature-gates'
 
 const REQUEST_TIMEOUT_MS = 3_000
 const SESSIONS_STALE_TIME_MS = 60_000
@@ -207,11 +208,14 @@ async function fetchSkills(
 }
 
 export function useSearchData(scope: SearchQueryScope) {
+  const sessionsAvailable = isFeatureAvailable('sessions')
+  const skillsAvailable = isFeatureAvailable('skills')
+
   // Sessions
   const sessionsQuery = useQuery({
     queryKey: ['search', 'sessions'],
     queryFn: ({ signal }) => fetchSessions(signal),
-    enabled: scope === 'all' || scope === 'chats',
+    enabled: sessionsAvailable && (scope === 'all' || scope === 'chats'),
     staleTime: SESSIONS_STALE_TIME_MS,
     gcTime: SEARCH_QUERY_GC_TIME_MS,
     retry: false,
@@ -235,7 +239,7 @@ export function useSearchData(scope: SearchQueryScope) {
   const skillsQuery = useQuery({
     queryKey: ['search', 'skills'],
     queryFn: ({ signal }) => fetchSkills(signal),
-    enabled: scope === 'all' || scope === 'skills',
+    enabled: skillsAvailable && (scope === 'all' || scope === 'skills'),
     staleTime: SKILLS_STALE_TIME_MS,
     gcTime: SEARCH_QUERY_GC_TIME_MS,
     retry: false,

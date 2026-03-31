@@ -2,7 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import {
+  ensureGatewayProbed,
+  getCapabilities,
+} from '../../../server/gateway-capabilities'
 import { getMemoryWorkspaceRoot } from '../../../server/memory-browser'
 import { requireJsonContentType } from '../../../server/rate-limit'
 
@@ -36,6 +41,15 @@ export const Route = createFileRoute('/api/memory/write')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        await ensureGatewayProbed()
+        if (!getCapabilities().memory) {
+          return json(
+            createCapabilityUnavailablePayload('memory', {
+              error: 'Memory writes are unavailable on this backend.',
+            }),
+            { status: 503 },
+          )
+        }
 
         try {
           const body = (await request.json().catch(() => ({}))) as {

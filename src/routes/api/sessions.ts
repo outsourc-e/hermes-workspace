@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
@@ -52,9 +53,15 @@ export const Route = createFileRoute('/api/sessions')({
         if (csrfCheckPost) return csrfCheckPost
         await ensureGatewayProbed()
         if (!getGatewayCapabilities().sessions) {
+          const friendlyId = randomUUID()
           return json(
-            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
-            { status: 503 },
+            {
+              ...createCapabilityUnavailablePayload('sessions'),
+              ok: true,
+              sessionKey: friendlyId,
+              friendlyId,
+              persisted: false,
+            },
           )
         }
         try {
@@ -105,10 +112,23 @@ export const Route = createFileRoute('/api/sessions')({
         if (csrfCheckPatch) return csrfCheckPatch
         await ensureGatewayProbed()
         if (!getGatewayCapabilities().sessions) {
-          return json(
-            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
-            { status: 503 },
-          )
+          const body = (await request.json().catch(() => ({}))) as Record<
+            string,
+            unknown
+          >
+          const rawSessionKey =
+            typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
+          const rawFriendlyId =
+            typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
+          const sessionKey = rawSessionKey || rawFriendlyId || randomUUID()
+
+          return json({
+            ...createCapabilityUnavailablePayload('sessions'),
+            ok: true,
+            sessionKey,
+            friendlyId: rawFriendlyId || sessionKey,
+            updated: false,
+          })
         }
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
@@ -156,10 +176,17 @@ export const Route = createFileRoute('/api/sessions')({
         }
         await ensureGatewayProbed()
         if (!getGatewayCapabilities().sessions) {
-          return json(
-            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
-            { status: 503 },
-          )
+          const url = new URL(request.url)
+          const rawSessionKey = url.searchParams.get('sessionKey') ?? ''
+          const rawFriendlyId = url.searchParams.get('friendlyId') ?? ''
+          const sessionKey = rawSessionKey.trim() || rawFriendlyId.trim()
+
+          return json({
+            ...createCapabilityUnavailablePayload('sessions'),
+            ok: true,
+            sessionKey,
+            deleted: false,
+          })
         }
         try {
           const url = new URL(request.url)

@@ -15,6 +15,7 @@ import { listSessions, getConfig } from '@/server/hermes-api'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { getCapabilities } from '@/server/gateway-capabilities'
 import type { HermesSession } from '@/server/hermes-api'
+import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -68,6 +69,35 @@ function GlassCard({
       )}
       <div className={cn('flex-1', noPadding ? '' : 'px-5 pb-4 pt-3')}>{children}</div>
     </div>
+  )
+}
+
+function EnhancedBadge({ label = 'Enhanced API' }: { label?: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+      {label}
+    </span>
+  )
+}
+
+function UnavailableWidget({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <GlassCard
+      title={title}
+      titleRight={<EnhancedBadge />}
+      accentColor="#f59e0b"
+      className="h-full"
+    >
+      <div className="flex h-full min-h-[180px] items-center justify-center rounded-lg border border-dashed border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 text-center">
+        <p className="text-sm text-muted">{description}</p>
+      </div>
+    </GlassCard>
   )
 }
 
@@ -172,7 +202,13 @@ function ActivityChart({ sessions }: { sessions: HermesSession[] }) {
 // ── Model Card ───────────────────────────────────────────────────
 
 function ModelCard() {
-  const configQuery = useQuery({ queryKey: ['hermes-config'], queryFn: getConfig, staleTime: 30_000 })
+  const configAvailable = isFeatureAvailable('config')
+  const configQuery = useQuery({
+    queryKey: ['hermes-config'],
+    queryFn: getConfig,
+    staleTime: 30_000,
+    enabled: configAvailable,
+  })
   const caps = getCapabilities()
   const config = configQuery.data as Record<string, unknown> | undefined
   const modelBlock = config?.model as Record<string, unknown> | undefined
@@ -182,6 +218,15 @@ function ModelCard() {
   const connected = caps?.sessions === true
   const fallbackBlock = config?.fallback_model as Record<string, unknown> | undefined
   const fallbackModel = fallbackBlock?.model as string | undefined
+
+  if (!configAvailable) {
+    return (
+      <UnavailableWidget
+        title="Model"
+        description={getUnavailableReason('config')}
+      />
+    )
+  }
 
   return (
     <GlassCard
@@ -223,6 +268,7 @@ function ModelCard() {
 // ── Skills Widget ────────────────────────────────────────────────
 
 function SkillsWidget() {
+  const skillsAvailable = isFeatureAvailable('skills')
   const skillsQuery = useQuery({
     queryKey: ['hermes-skills'],
     queryFn: async () => {
@@ -232,9 +278,19 @@ function SkillsWidget() {
       return (data?.skills ?? []) as Array<Record<string, unknown>>
     },
     staleTime: 30_000,
+    enabled: skillsAvailable,
   })
 
   const skills = skillsQuery.data ?? []
+
+  if (!skillsAvailable) {
+    return (
+      <UnavailableWidget
+        title="Skills"
+        description={getUnavailableReason('skills')}
+      />
+    )
+  }
 
   return (
     <GlassCard title="Skills" titleRight={<span className="text-[10px] text-neutral-600">{skills.length} installed</span>} accentColor="#f59e0b">
@@ -257,17 +313,24 @@ function SkillsWidget() {
 
 // ── Quick Action ─────────────────────────────────────────────────
 
-function QuickAction({ label, icon, onClick, accentColor }: {
-  label: string; icon: string; onClick: () => void; accentColor: string
+function QuickAction({ label, icon, onClick, accentColor, disabled, badge }: {
+  label: string; icon: string; onClick: () => void; accentColor: string; disabled?: boolean; badge?: string
 }) {
   return (
-    <button type="button" onClick={onClick} className={cn(
+    <button type="button" onClick={onClick} disabled={disabled} className={cn(
       'relative overflow-hidden flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all',
       'border-[var(--theme-border)] bg-[var(--theme-card)]',
-      'hover:border-neutral-300 dark:hover:border-neutral-700 hover:scale-[1.01] active:scale-[0.99]',
+      disabled
+        ? 'cursor-not-allowed opacity-60'
+        : 'hover:border-neutral-300 dark:hover:border-neutral-700 hover:scale-[1.01] active:scale-[0.99]',
     )}>
       <div className="flex size-7 items-center justify-center rounded-md text-sm" style={{ background: `${accentColor}18` }}>{icon}</div>
       <span className="text-neutral-700 dark:text-neutral-200 text-xs font-medium">{label}</span>
+      {badge ? (
+        <span className="ml-auto rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+          {badge}
+        </span>
+      ) : null}
       <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
     </button>
   )
@@ -312,16 +375,17 @@ function SessionRow({ session, maxTokens, onClick }: {
 
 export function DashboardScreen() {
   const navigate = useNavigate()
-  const sessionsQuery = useQuery({ queryKey: chatQueryKeys.sessions, queryFn: () => listSessions(50, 0), staleTime: 10_000 })
-  const configQuery = useQuery({ queryKey: ['hermes-config'], queryFn: getConfig, staleTime: 30_000 })
+  const sessionsAvailable = isFeatureAvailable('sessions')
+  const skillsAvailable = isFeatureAvailable('skills')
+  const sessionsQuery = useQuery({
+    queryKey: chatQueryKeys.sessions,
+    queryFn: () => listSessions(50, 0),
+    staleTime: 10_000,
+    enabled: sessionsAvailable,
+  })
 
   const sessions = (sessionsQuery.data ?? []) as HermesSession[]
-  const config = configQuery.data as Record<string, unknown> | undefined
-  const modelBlock = config?.model as Record<string, unknown> | undefined
-  const modelName = (modelBlock?.default ?? config?.model ?? '—') as string
-  const provider = (modelBlock?.provider ?? config?.provider ?? '—') as string
   const caps = getCapabilities()
-  const connected = caps?.sessions === true
 
   const stats = useMemo(() => {
     let totalMessages = 0, totalToolCalls = 0, totalTokens = 0
@@ -358,23 +422,44 @@ export function DashboardScreen() {
         <div className="flex items-center gap-2 mt-1">
           <QuickAction label="New Chat" icon="💬" accentColor="#6366f1" onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })} />
           <QuickAction label="Terminal" icon="💻" accentColor="#22c55e" onClick={() => navigate({ to: '/terminal' })} />
-          <QuickAction label="Skills" icon="🧩" accentColor="#f59e0b" onClick={() => navigate({ to: '/skills' })} />
+          <QuickAction
+            label="Skills"
+            icon="🧩"
+            accentColor="#f59e0b"
+            onClick={() => navigate({ to: '/skills' })}
+            disabled={!skillsAvailable}
+            badge={!skillsAvailable ? 'Enhanced' : undefined}
+          />
           <QuickAction label="Settings" icon="⚙️" accentColor="#a855f7" onClick={() => navigate({ to: '/settings' })} />
         </div>
       </div>
 
       {/* ── Metrics Row ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricTile label="Sessions" value={formatNumber(stats.totalSessions)} icon="💬" accentColor="#6366f1" />
-        <MetricTile label="Messages" value={formatNumber(stats.totalMessages)} icon="✉️" accentColor="#22c55e" />
-        <MetricTile label="Tool Calls" value={formatNumber(stats.totalToolCalls)} icon="🔧" accentColor="#f59e0b" />
-        <MetricTile label="Tokens" value={formatNumber(stats.totalTokens)} sub={costEstimate} icon="⚡" accentColor="#a855f7" />
-      </div>
+      {sessionsAvailable ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricTile label="Sessions" value={formatNumber(stats.totalSessions)} icon="💬" accentColor="#6366f1" />
+          <MetricTile label="Messages" value={formatNumber(stats.totalMessages)} icon="✉️" accentColor="#22c55e" />
+          <MetricTile label="Tool Calls" value={formatNumber(stats.totalToolCalls)} icon="🔧" accentColor="#f59e0b" />
+          <MetricTile label="Tokens" value={formatNumber(stats.totalTokens)} sub={costEstimate} icon="⚡" accentColor="#a855f7" />
+        </div>
+      ) : (
+        <UnavailableWidget
+          title="Workspace Analytics"
+          description={getUnavailableReason('sessions')}
+        />
+      )}
 
       {/* ── Charts + Model + Skills ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
         <div className="lg:col-span-5">
-          <ActivityChart sessions={sessions} />
+          {sessionsAvailable ? (
+            <ActivityChart sessions={sessions} />
+          ) : (
+            <UnavailableWidget
+              title="Activity"
+              description={getUnavailableReason('sessions')}
+            />
+          )}
         </div>
         <div className="lg:col-span-4">
           <ModelCard />
@@ -385,28 +470,35 @@ export function DashboardScreen() {
       </div>
 
       {/* ── Recent Sessions (minimal) ── */}
-      <GlassCard
-        title="Recent Sessions"
-        titleRight={
-          <button type="button" className="text-[10px] text-neutral-600 hover:text-neutral-400 transition-colors"
-            onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}>
-            View all →
-          </button>
-        }
-        accentColor="#6366f1"
-        noPadding
-      >
-        <div className="py-1">
-          {recentSessions.length === 0 ? (
-            <div className="text-xs text-neutral-400 py-8 text-center">No sessions yet — start a chat!</div>
-          ) : (
-            recentSessions.map((s) => (
-              <SessionRow key={s.id} session={s} maxTokens={maxTokens}
-                onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: s.id } })} />
-            ))
-          )}
-        </div>
-      </GlassCard>
+      {sessionsAvailable ? (
+        <GlassCard
+          title="Recent Sessions"
+          titleRight={
+            <button type="button" className="text-[10px] text-neutral-600 hover:text-neutral-400 transition-colors"
+              onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}>
+              View all →
+            </button>
+          }
+          accentColor="#6366f1"
+          noPadding
+        >
+          <div className="py-1">
+            {recentSessions.length === 0 ? (
+              <div className="text-xs text-neutral-400 py-8 text-center">No sessions yet — start a chat!</div>
+            ) : (
+              recentSessions.map((s) => (
+                <SessionRow key={s.id} session={s} maxTokens={maxTokens}
+                  onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: s.id } })} />
+              ))
+            )}
+          </div>
+        </GlassCard>
+      ) : (
+        <UnavailableWidget
+          title="Recent Sessions"
+          description={getUnavailableReason('sessions')}
+        />
+      )}
     </div>
   )
 }

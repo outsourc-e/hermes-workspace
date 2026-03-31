@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import {
+  ensureGatewayProbed,
+  getCapabilities,
+} from '../../../server/gateway-capabilities'
 import { listMemoryFiles } from '../../../server/memory-browser'
 
 export const Route = createFileRoute('/api/memory/list')({
@@ -9,6 +14,13 @@ export const Route = createFileRoute('/api/memory/list')({
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        await ensureGatewayProbed()
+        if (!getCapabilities().memory) {
+          return json({
+            ...createCapabilityUnavailablePayload('memory'),
+            files: [],
+          })
         }
 
         try {
