@@ -90,6 +90,7 @@ import { useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
+import { useChatMode } from '@/hooks/use-chat-mode'
 // Activity store removed — not used in Hermes Workspace
 const _noopSetActivity = (_s: string) => {}
 
@@ -402,6 +403,8 @@ export function ChatScreen({
   const { headerRef, composerRef, mainRef, pinGroupMinHeight, headerHeight } =
     useChatMeasurements()
   useTapDebug(mainRef, { label: 'chat-main' })
+  const chatMode = useChatMode()
+  const isPortableMode = chatMode === 'portable'
   const [waitingForResponse, setWaitingForResponse] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
@@ -490,6 +493,7 @@ export function ChatScreen({
     sessionsReady: sessionsQuery.isSuccess,
     queryClient,
     historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
+    portableMode: isPortableMode,
   })
 
   // Wire SSE realtime stream for instant message delivery
@@ -505,12 +509,14 @@ export function ChatScreen({
     completedStreamingThinking,
     activeToolCalls,
   } = useRealtimeChatHistory({
-      sessionKey: resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey,
+      sessionKey: resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey || 'main',
       friendlyId: activeFriendlyId,
       historyMessages,
+      portableMode: isPortableMode,
       enabled:
-        !isNewChat &&
-        Boolean(resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey) &&
+        // Always enable for new chats in portable mode (no sessions API to resolve).
+        // In enhanced mode, wait for session resolution before subscribing.
+        (isNewChat || Boolean(resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey)) &&
         !isRedirecting,
       onUserMessage: useCallback(() => {
         // External message arrived (e.g. from Telegram) — show thinking indicator
@@ -886,10 +892,22 @@ export function ChatScreen({
         : null
       return { isStreaming: true, streamingMessageId: id }
     }
-    // Fallback: waiting for response + last message is assistant
+    // Fallback: waiting for response but last message is NOT yet a complete
+    // assistant response. Only report isStreaming=true if the last message is
+    // NOT a completed assistant message — otherwise ThinkingBubble stays visible
+    // forever via streamingButEmpty (isStreaming=true, streamingText=undefined).
     if (waitingForResponse && finalDisplayMessages.length > 0) {
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
       if (last && last.role === 'assistant') {
+        // If this is a complete (non-streaming) assistant message with actual
+        // text content, DON'T report isStreaming — the response is already here
+        // and waitingForResponse will clear shortly. Reporting isStreaming=true
+        // here causes streamingButEmpty=true which keeps ThinkingBubble visible.
+        const isStreamingPlaceholder = (last as any).__streamingStatus === 'streaming'
+        if (!isStreamingPlaceholder) {
+          // Complete message already rendered — don't falsely report streaming
+          return { isStreaming: false, streamingMessageId: null as string | null }
+        }
         const id = (last as any).__optimisticId || (last as any).id || null
         return { isStreaming: true, streamingMessageId: id }
       }
@@ -967,17 +985,34 @@ export function ChatScreen({
     })
   }
 
-  // Track message count when waiting started — only clear when NEW assistant msg appears
+  // Track message count AND last assistant message identity when waiting started
   const messageCountAtSendRef = useRef(0)
+  const lastAssistantIdAtSendRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (waitingForResponse) {
       messageCountAtSendRef.current = finalDisplayMessages.length
+      // Snapshot the identity of the last assistant message at send time so we
+      // can detect when a NEW (different) assistant message arrives even if the
+      // total count doesn't grow (race condition: fast responses arrive in the
+      // same React batch as waitingForResponse becoming true).
+      const lastMsg = finalDisplayMessages[finalDisplayMessages.length - 1]
+      if (lastMsg?.role === 'assistant') {
+        const raw = lastMsg as Record<string, unknown>
+        lastAssistantIdAtSendRef.current =
+          String(raw.__optimisticId ?? raw.id ?? raw.messageId ?? raw.__realtimeSequence ?? '')
+      } else {
+        lastAssistantIdAtSendRef.current = null
+      }
     }
   }, [waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Clear waitingForResponse when a NEW assistant message appears after send
-  // Use a ref to prevent the cleanup/restart race condition
+  // Clear waitingForResponse when a NEW assistant message appears after send.
+  // Uses two signals to handle both normal and fast-response cases:
+  //   1. Message count grew — normal case
+  //   2. Last assistant message identity changed — fast response race condition
+  //      (response arrives in same React batch as waitingForResponse=true, so
+  //      count doesn't grow but the message IS different)
   const clearTimerRef = useRef<number | null>(null)
   useEffect(() => {
     if (!waitingForResponse) {
@@ -987,10 +1022,18 @@ export function ChatScreen({
       }
       return
     }
-    // Only check if display has grown since we sent
-    if (finalDisplayMessages.length <= messageCountAtSendRef.current) return
     const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-    if (last && last.role === 'assistant') {
+    if (!last || last.role !== 'assistant') return
+    // Skip streaming placeholders — they're not real responses
+    if ((last as any).__streamingStatus === 'streaming') return
+    // Check if this is a NEW assistant message (count grew OR identity changed)
+    const countGrew = finalDisplayMessages.length > messageCountAtSendRef.current
+    const raw = last as Record<string, unknown>
+    const currentId = String(raw.__optimisticId ?? raw.id ?? raw.messageId ?? raw.__realtimeSequence ?? '')
+    const identityChanged =
+      currentId.length > 0 && currentId !== (lastAssistantIdAtSendRef.current ?? '')
+    const noAssistantAtSend = lastAssistantIdAtSendRef.current === null
+    if (countGrew || identityChanged || noAssistantAtSend) {
       // Already scheduled? Don't restart
       if (clearTimerRef.current) return
       clearTimerRef.current = window.setTimeout(() => {
@@ -998,7 +1041,25 @@ export function ChatScreen({
         streamFinish()
       }, 50) // Tiny delay to let React render the message first
     }
-  }, [finalDisplayMessages.length, waitingForResponse, streamFinish])
+  }, [finalDisplayMessages, waitingForResponse, streamFinish])
+
+  // Also clear waitingForResponse immediately when SSE streaming ends (isRealtimeStreaming
+  // transitions true→false). This is the most reliable signal in portable mode since
+  // lastCompletedRunAt is never set (useChatStream stub never calls onDone).
+  const prevIsRealtimeStreamingRef = useRef(isRealtimeStreaming)
+  useEffect(() => {
+    const wasStreaming = prevIsRealtimeStreamingRef.current
+    prevIsRealtimeStreamingRef.current = isRealtimeStreaming
+    if (wasStreaming && !isRealtimeStreaming && waitingForResponse) {
+      // Streaming just ended — schedule a clear with a tiny delay to let the
+      // done-event message render before removing the waiting indicator
+      if (clearTimerRef.current) return
+      clearTimerRef.current = window.setTimeout(() => {
+        clearTimerRef.current = null
+        streamFinish()
+      }, 100)
+    }
+  }, [isRealtimeStreaming, waitingForResponse, streamFinish])
 
   // Failsafe: clear after done event + 10s if response never shows in display
   useEffect(() => {
