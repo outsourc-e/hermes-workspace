@@ -3,6 +3,8 @@ import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
+import { getChatMode } from '../../server/gateway-capabilities'
+import { openaiChat } from '../../server/openai-compat-api'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   createSession,
@@ -178,12 +180,6 @@ export const Route = createFileRoute('/api/send-stream')({
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         await ensureGatewayProbed()
-        if (!getGatewayCapabilities().sessions) {
-          return new Response(
-            JSON.stringify({ ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE }),
-            { status: 503, headers: { 'Content-Type': 'application/json' } },
-          )
-        }
 
         // Read body manually to handle large payloads (image attachments
         // can push the JSON body above the default ~1MB parse limit).
@@ -224,11 +220,6 @@ export const Route = createFileRoute('/api/send-stream')({
           })
           sessionKey = resolved.sessionKey
           resolvedFriendlyId = resolved.sessionKey
-          if (SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
-            const session = await createSession()
-            sessionKey = session.id
-            resolvedFriendlyId = session.id
-          }
         } catch (err) {
           const errorMsg = normalizeHermesErrorMessage(err)
           if (errorMsg === 'session not found') {
@@ -245,6 +236,8 @@ export const Route = createFileRoute('/api/send-stream')({
             headers: { 'Content-Type': 'application/json' },
           })
         }
+
+        const chatMode = getChatMode()
 
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
@@ -284,6 +277,90 @@ export const Route = createFileRoute('/api/send-stream')({
             }
 
             try {
+              if (chatMode === 'portable') {
+                const runId = crypto.randomUUID()
+                const portableSessionKey =
+                  SESSION_BOOTSTRAP_KEYS.has(sessionKey) || !sessionKey
+                    ? `portable-${crypto.randomUUID()}`
+                    : sessionKey
+                const portableFriendlyId =
+                  requestedFriendlyId || rawSessionKey || portableSessionKey
+                let accumulated = ''
+
+                activeRunId = runId
+                registerActiveSendRun(runId)
+                unregisterTimer = setTimeout(() => {
+                  if (activeRunId) {
+                    unregisterActiveSendRun(activeRunId)
+                    activeRunId = null
+                  }
+                }, SEND_STREAM_RUN_TIMEOUT_MS)
+
+                sendEvent('started', {
+                  runId,
+                  sessionKey: portableSessionKey,
+                  friendlyId: portableFriendlyId,
+                })
+
+                try {
+                  const stream = await openaiChat(
+                    [
+                      {
+                        role: 'user',
+                        content: getChatMessage(message, attachments),
+                      },
+                    ],
+                    {
+                      model: typeof body.model === 'string' ? body.model : undefined,
+                      temperature:
+                        typeof body.temperature === 'number'
+                          ? body.temperature
+                          : undefined,
+                      signal: abortController.signal,
+                      stream: true,
+                    },
+                  )
+
+                  for await (const delta of stream) {
+                    accumulated += delta
+                    sendEvent('chunk', {
+                      delta,
+                      text: accumulated,
+                      fullReplace: true,
+                      sessionKey: portableSessionKey,
+                      runId,
+                    })
+                  }
+
+                  sendEvent('done', {
+                    state: 'complete',
+                    sessionKey: portableSessionKey,
+                    runId,
+                  })
+                  closeStream()
+                } catch (err) {
+                  if (!streamClosed) {
+                    sendEvent('error', {
+                      message: normalizeHermesErrorMessage(err),
+                      sessionKey: portableSessionKey,
+                      runId,
+                    })
+                    closeStream()
+                  }
+                }
+                return
+              }
+
+              if (!getGatewayCapabilities().sessions) {
+                throw new Error(SESSIONS_API_UNAVAILABLE_MESSAGE)
+              }
+
+              if (SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
+                const session = await createSession()
+                sessionKey = session.id
+                resolvedFriendlyId = session.id
+              }
+
               let startedSent = false
               await streamChat(
                 sessionKey,
