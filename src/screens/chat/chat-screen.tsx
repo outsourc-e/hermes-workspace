@@ -625,14 +625,6 @@ export function ChatScreen({
       }, []),
     })
 
-  // Apply smooth character-reveal animation to the raw SSE text
-  const smoothRealtimeStreamingText = useSmoothStreamingText(
-    realtimeStreamingText,
-    isRealtimeStreaming,
-  )
-
-
-
   // Keep activity stream open persistently — opens on mount so it's ready
   // before the first tool call fires (avoids connection latency gap).
   const waitingForResponseRef = useRef(waitingForResponse)
@@ -716,237 +708,6 @@ export function ChatScreen({
     [],
   )
 
-  // Use realtime-merged messages for display (SSE + history)
-  // Re-apply display filter to realtime messages
-  const finalDisplayMessages = useMemo(() => {
-    // Rebuild display filter on merged messages
-    const filtered = realtimeMessages.filter((msg) => {
-      if (msg.role === 'user') {
-        const text = stripQueuedWrapper(textFromMessage(msg))
-        if (text.startsWith('A subagent task')) return false
-        return true
-      }
-      if (msg.role === 'assistant') {
-        if (msg.__streamingStatus === 'streaming') return true
-        if ((msg as any).__optimisticId && !msg.content?.length) return true
-        if (textFromMessage(msg).trim().length > 0) return true
-        const content = Array.isArray(msg.content) ? msg.content : []
-        const hasToolCalls = content.some((part) => part.type === 'toolCall')
-        const hasStreamToolCalls =
-          Array.isArray((msg as any).__streamToolCalls) &&
-          (msg as any).__streamToolCalls.length > 0
-        return hasToolCalls || hasStreamToolCalls
-      }
-      return false
-    })
-    // Dedup: SSE + history merge can produce duplicates (optimistic + SSE).
-    // Prefer stable identifiers (id/messageId/clientId/nonce), then fallback signature.
-    // Bug 1 fix: also normalise clientId so that an optimistic message (key =
-    // "opt-<uuid>") and the server's confirmed copy (key = clientId "<uuid>")
-    // collapse to the same dedup slot, preferring the non-optimistic copy.
-    //
-    // Strategy:
-    //   1. Collect all candidate IDs, including extracting the bare UUID from
-    //      "__optimisticId" (strip the "opt-" prefix).
-    //   2. For each candidate key, mark it seen. The first message wins.
-    //   3. Before filtering, sort so that non-optimistic messages (server
-    //      confirmed, have a real .id) come before optimistic ones — this way
-    //      the server copy wins the dedup race.
-    const sortedForDedup = [...filtered].sort((a, b) => {
-      const aRaw = a as Record<string, unknown>
-      const bRaw = b as Record<string, unknown>
-      const aIsOptimistic =
-        normalizeMessageValue(aRaw.__optimisticId).startsWith('opt-') &&
-        !normalizeMessageValue(aRaw.id)
-      const bIsOptimistic =
-        normalizeMessageValue(bRaw.__optimisticId).startsWith('opt-') &&
-        !normalizeMessageValue(bRaw.id)
-      if (aIsOptimistic && !bIsOptimistic) return 1
-      if (!aIsOptimistic && bIsOptimistic) return -1
-      return 0
-    })
-    const seen = new Set<string>()
-    const seenByText = new Map<string, ChatMessage>()
-    const dedupedSet = new Set<ChatMessage>()
-    for (const msg of sortedForDedup) {
-      const raw = msg as Record<string, unknown>
-      const rawOptimisticId = normalizeMessageValue(raw.__optimisticId)
-      // Bare UUID from optimistic id — strips "opt-" prefix so that the
-      // optimistic and confirmed copies share the same dedup key.
-      const bareOptimisticUuid = rawOptimisticId.startsWith('opt-')
-        ? rawOptimisticId.slice(4)
-        : ''
-      const idCandidates = [
-        normalizeMessageValue(raw.id),
-        normalizeMessageValue(raw.messageId),
-        normalizeMessageValue(raw.clientId),
-        normalizeMessageValue(raw.client_id),
-        normalizeMessageValue(raw.nonce),
-        normalizeMessageValue(raw.idempotencyKey),
-        bareOptimisticUuid,
-        rawOptimisticId,
-      ].filter(Boolean)
-
-      const primaryKey =
-        idCandidates.length > 0
-          ? `${msg.role}:id:${idCandidates[0]}`
-          : `${msg.role}:fallback:${messageFallbackSignature(msg)}`
-
-      if (seen.has(primaryKey)) continue
-
-      // Text-based dedup for ALL messages: the realtime version (from SSE done
-      // event) and the history version (from API refetch) may have different IDs
-      // or no IDs at all, causing ID-based dedup to miss. Normalised text
-      // catches the overlap regardless of message shape or ID availability.
-      {
-        const text = stripQueuedWrapper(textFromMessage(msg)).trim()
-        if (text.length > 0) {
-          const normalizedText = text.replace(/\s+/g, ' ')
-          const textKey = `${msg.role}:text:${normalizedText}`
-          const existingTextMatch = seenByText.get(textKey)
-          if (
-            existingTextMatch &&
-            shouldCollapseTextDuplicate(existingTextMatch, msg)
-          ) {
-            continue
-          }
-          if (!existingTextMatch) {
-            seenByText.set(textKey, msg)
-          }
-        }
-      }
-
-      seen.add(primaryKey)
-      // Register all candidate keys so later messages that share any ID are
-      // collapsed (handles the optimistic-nonce = server-clientId overlap).
-      for (const candidate of idCandidates.slice(1)) {
-        seen.add(`${msg.role}:id:${candidate}`)
-      }
-      dedupedSet.add(msg)
-    }
-    // Restore original order (filtered array order, not sort order).
-    const deduped = filtered
-      .filter((msg) => dedupedSet.has(msg))
-      .map((msg) => stripQueuedWrapperFromUserMessage(msg))
-
-    // Only inject the streaming placeholder when SSE streaming is actually
-    // active. The ThinkingBubble (in chat-message-list) handles the visual
-    // indicator during the waitingForResponse phase before SSE starts.
-    //
-    // Previous bug: gating on `!waitingForResponse` caused a phantom streaming
-    // placeholder to be injected after `done` cleared streamingState but before
-    // waitingForResponse was cleared, leading to a race where the real response
-    // flashed then disappeared when history refetched.
-    if (!isRealtimeStreaming) {
-      return deduped
-    }
-
-    // Always inject the streaming placeholder as soon as isRealtimeStreaming is
-    // true — do NOT gate on realtimeStreamingText.trim().length > 0.
-    //
-    // Gating on text content breaks word-by-word streaming because:
-    //   1. React batches state updates, so multiple chunks arrive before the
-    //      placeholder even mounts.
-    //   2. Each mount/unmount resets MessageItem's internal reveal timer,
-    //      causing all accumulated text to display at once instead of
-    //      streaming word by word.
-    //
-    // Visual blank-box problem is solved differently:
-    //   • The placeholder is always mounted (DOM node stays alive, timer persists).
-    //   • When text is empty the chat-message-list wraps it with opacity:0 so
-    //     nothing is visually shown.
-    //   • ThinkingBubble stays visible via the `streamingButEmpty` condition in
-    //     showTypingIndicator (isStreaming && !streamingText).
-    //   • First chunk arrives → opacity:1 → text streams word-by-word.
-    //   • ThinkingBubble hides once streamingText has content.
-
-    const nextMessages = [...deduped]
-    const streamToolCalls = activeToolCalls.map((toolCall) => ({
-      ...toolCall,
-      phase: toolCall.phase,
-    }))
-
-    const streamingMsg = {
-      role: 'assistant',
-      content: [],
-      __optimisticId: 'streaming-current',
-      __streamingStatus: 'streaming',
-      __streamingText: realtimeStreamingText,
-      __streamingThinking: realtimeStreamingThinking,
-      __streamToolCalls: streamToolCalls,
-    } as ChatMessage
-
-    const existingStreamIdx = nextMessages.findIndex(
-      (message) => message.__streamingStatus === 'streaming',
-    )
-
-    if (existingStreamIdx >= 0) {
-      // Always update the existing placeholder — never remove it while streaming.
-      // Removing it resets the reveal timer and causes batched/all-at-once display.
-      nextMessages[existingStreamIdx] = {
-        ...nextMessages[existingStreamIdx],
-        ...streamingMsg,
-      }
-      return nextMessages
-    }
-
-    // Insert streaming message after the last user message to prevent
-    // user messages appearing after the assistant response (race condition)
-    const lastUserIdx = nextMessages.reduce(
-      (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
-      -1,
-    )
-    if (lastUserIdx >= 0 && lastUserIdx === nextMessages.length - 1) {
-      // User message is last — append streaming after it (normal case)
-      nextMessages.push(streamingMsg)
-    } else if (lastUserIdx >= 0) {
-      // User message is NOT last — insert streaming right after it
-      nextMessages.splice(lastUserIdx + 1, 0, streamingMsg)
-    } else {
-      nextMessages.push(streamingMsg)
-    }
-    return nextMessages
-  }, [
-    activeToolCalls,
-    isRealtimeStreaming,
-    realtimeMessages,
-    realtimeStreamingText,
-    realtimeStreamingThinking,
-  ])
-
-  // Derive streaming state from realtime SSE state (bug #2 fix)
-  const derivedStreamingInfo = useMemo(() => {
-    // Use actual realtime streaming state when available
-    if (isRealtimeStreaming) {
-      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-      const id = last?.role === 'assistant'
-        ? ((last as any).__optimisticId || (last as any).id || null)
-        : null
-      return { isStreaming: true, streamingMessageId: id }
-    }
-    // Fallback: waiting for response but last message is NOT yet a complete
-    // assistant response. Only report isStreaming=true if the last message is
-    // NOT a completed assistant message — otherwise ThinkingBubble stays visible
-    // forever via streamingButEmpty (isStreaming=true, streamingText=undefined).
-    if (waitingForResponse && finalDisplayMessages.length > 0) {
-      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (last && last.role === 'assistant') {
-        // If this is a complete (non-streaming) assistant message with actual
-        // text content, DON'T report isStreaming — the response is already here
-        // and waitingForResponse will clear shortly. Reporting isStreaming=true
-        // here causes streamingButEmpty=true which keeps ThinkingBubble visible.
-        const isStreamingPlaceholder = (last as any).__streamingStatus === 'streaming'
-        if (!isStreamingPlaceholder) {
-          // Complete message already rendered — don't falsely report streaming
-          return { isStreaming: false, streamingMessageId: null as string | null }
-        }
-        const id = (last as any).__optimisticId || (last as any).id || null
-        return { isStreaming: true, streamingMessageId: id }
-      }
-    }
-    return { isStreaming: false, streamingMessageId: null as string | null }
-  }, [waitingForResponse, finalDisplayMessages, isRealtimeStreaming])
-
   // --- Stream management ---
   const streamStop = useCallback(() => {
     if (streamTimer.current) {
@@ -1020,81 +781,7 @@ export function ChatScreen({
     })
   }
 
-  // Track message count AND last assistant message identity when waiting started
-  const messageCountAtSendRef = useRef(0)
-  const lastAssistantIdAtSendRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (waitingForResponse) {
-      messageCountAtSendRef.current = finalDisplayMessages.length
-      // Snapshot the identity of the last assistant message at send time so we
-      // can detect when a NEW (different) assistant message arrives even if the
-      // total count doesn't grow (race condition: fast responses arrive in the
-      // same React batch as waitingForResponse becoming true).
-      const lastMsg = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (lastMsg?.role === 'assistant') {
-        const raw = lastMsg as Record<string, unknown>
-        lastAssistantIdAtSendRef.current =
-          String(raw.__optimisticId ?? raw.id ?? raw.messageId ?? raw.__realtimeSequence ?? '')
-      } else {
-        lastAssistantIdAtSendRef.current = null
-      }
-    }
-  }, [waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Clear waitingForResponse when a NEW assistant message appears after send.
-  // Uses two signals to handle both normal and fast-response cases:
-  //   1. Message count grew — normal case
-  //   2. Last assistant message identity changed — fast response race condition
-  //      (response arrives in same React batch as waitingForResponse=true, so
-  //      count doesn't grow but the message IS different)
   const clearTimerRef = useRef<number | null>(null)
-  useEffect(() => {
-    if (!waitingForResponse) {
-      if (clearTimerRef.current) {
-        window.clearTimeout(clearTimerRef.current)
-        clearTimerRef.current = null
-      }
-      return
-    }
-    const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-    if (!last || last.role !== 'assistant') return
-    // Skip streaming placeholders — they're not real responses
-    if ((last as any).__streamingStatus === 'streaming') return
-    // Check if this is a NEW assistant message (count grew OR identity changed)
-    const countGrew = finalDisplayMessages.length > messageCountAtSendRef.current
-    const raw = last as Record<string, unknown>
-    const currentId = String(raw.__optimisticId ?? raw.id ?? raw.messageId ?? raw.__realtimeSequence ?? '')
-    const identityChanged =
-      currentId.length > 0 && currentId !== (lastAssistantIdAtSendRef.current ?? '')
-    const noAssistantAtSend = lastAssistantIdAtSendRef.current === null
-    if (countGrew || identityChanged || noAssistantAtSend) {
-      // Already scheduled? Don't restart
-      if (clearTimerRef.current) return
-      clearTimerRef.current = window.setTimeout(() => {
-        clearTimerRef.current = null
-        streamFinish()
-      }, 50) // Tiny delay to let React render the message first
-    }
-  }, [finalDisplayMessages, waitingForResponse, streamFinish])
-
-  // Also clear waitingForResponse immediately when SSE streaming ends (isRealtimeStreaming
-  // transitions true→false). This is the most reliable signal in portable mode since
-  // lastCompletedRunAt is never set (useChatStream stub never calls onDone).
-  const prevIsRealtimeStreamingRef = useRef(isRealtimeStreaming)
-  useEffect(() => {
-    const wasStreaming = prevIsRealtimeStreamingRef.current
-    prevIsRealtimeStreamingRef.current = isRealtimeStreaming
-    if (wasStreaming && !isRealtimeStreaming && waitingForResponse) {
-      // Streaming just ended — schedule a clear with a tiny delay to let the
-      // done-event message render before removing the waiting indicator
-      if (clearTimerRef.current) return
-      clearTimerRef.current = window.setTimeout(() => {
-        clearTimerRef.current = null
-        streamFinish()
-      }, 100)
-    }
-  }, [isRealtimeStreaming, waitingForResponse, streamFinish])
 
   // Failsafe: clear after done event + 10s if response never shows in display
   useEffect(() => {
@@ -1207,7 +894,13 @@ export function ChatScreen({
     availableModels: availableModelIds,
   })
 
-  const { startStreaming, cancelStreaming } = useStreamingMessage({
+  const {
+    isStreaming: localIsStreaming,
+    streamingText: localStreamingText,
+    streamingMessageId: localStreamingMessageId,
+    startStreaming,
+    cancelStreaming,
+  } = useStreamingMessage({
     onSessionResolved: useCallback(
       ({ sessionKey, friendlyId }: { sessionKey: string; friendlyId: string }) => {
         const activeSend = activeSendRef.current
@@ -1303,6 +996,242 @@ export function ChatScreen({
     ),
   })
 
+  const activeIsRealtimeStreaming = isPortableMode ? localIsStreaming : isRealtimeStreaming
+  const activeRealtimeStreamingText = isPortableMode ? localStreamingText : realtimeStreamingText
+  const smoothActiveStreamingText = useSmoothStreamingText(
+    activeRealtimeStreamingText,
+    activeIsRealtimeStreaming,
+  )
+
+  // Use realtime-merged messages for display (SSE + history)
+  // Re-apply display filter to realtime messages
+  const finalDisplayMessages = useMemo(() => {
+    const filtered = realtimeMessages.filter((msg) => {
+      if (msg.role === 'user') {
+        const text = stripQueuedWrapper(textFromMessage(msg))
+        if (text.startsWith('A subagent task')) return false
+        return true
+      }
+      if (msg.role === 'assistant') {
+        if (msg.__streamingStatus === 'streaming') return true
+        if ((msg as any).__optimisticId && !msg.content?.length) return true
+        if (textFromMessage(msg).trim().length > 0) return true
+        const content = Array.isArray(msg.content) ? msg.content : []
+        const hasToolCalls = content.some((part) => part.type === 'toolCall')
+        const hasStreamToolCalls =
+          Array.isArray((msg as any).__streamToolCalls) &&
+          (msg as any).__streamToolCalls.length > 0
+        return hasToolCalls || hasStreamToolCalls
+      }
+      return false
+    })
+
+    const sortedForDedup = [...filtered].sort((a, b) => {
+      const aRaw = a as Record<string, unknown>
+      const bRaw = b as Record<string, unknown>
+      const aIsOptimistic =
+        normalizeMessageValue(aRaw.__optimisticId).startsWith('opt-') &&
+        !normalizeMessageValue(aRaw.id)
+      const bIsOptimistic =
+        normalizeMessageValue(bRaw.__optimisticId).startsWith('opt-') &&
+        !normalizeMessageValue(bRaw.id)
+      if (aIsOptimistic && !bIsOptimistic) return 1
+      if (!aIsOptimistic && bIsOptimistic) return -1
+      return 0
+    })
+
+    const seen = new Set<string>()
+    const seenByText = new Map<string, ChatMessage>()
+    const dedupedSet = new Set<ChatMessage>()
+    for (const msg of sortedForDedup) {
+      const raw = msg as Record<string, unknown>
+      const rawOptimisticId = normalizeMessageValue(raw.__optimisticId)
+      const bareOptimisticUuid = rawOptimisticId.startsWith('opt-')
+        ? rawOptimisticId.slice(4)
+        : ''
+      const idCandidates = [
+        normalizeMessageValue(raw.id),
+        normalizeMessageValue(raw.messageId),
+        normalizeMessageValue(raw.clientId),
+        normalizeMessageValue(raw.client_id),
+        normalizeMessageValue(raw.nonce),
+        normalizeMessageValue(raw.idempotencyKey),
+        bareOptimisticUuid,
+        rawOptimisticId,
+      ].filter(Boolean)
+
+      const primaryKey =
+        idCandidates.length > 0
+          ? `${msg.role}:id:${idCandidates[0]}`
+          : `${msg.role}:fallback:${messageFallbackSignature(msg)}`
+
+      if (seen.has(primaryKey)) continue
+
+      const text = stripQueuedWrapper(textFromMessage(msg)).trim()
+      if (text.length > 0) {
+        const normalizedText = text.replace(/\s+/g, ' ')
+        const textKey = `${msg.role}:text:${normalizedText}`
+        const existingTextMatch = seenByText.get(textKey)
+        if (
+          existingTextMatch &&
+          shouldCollapseTextDuplicate(existingTextMatch, msg)
+        ) {
+          continue
+        }
+        if (!existingTextMatch) {
+          seenByText.set(textKey, msg)
+        }
+      }
+
+      seen.add(primaryKey)
+      for (const candidate of idCandidates.slice(1)) {
+        seen.add(`${msg.role}:id:${candidate}`)
+      }
+      dedupedSet.add(msg)
+    }
+
+    const deduped = filtered
+      .filter((msg) => dedupedSet.has(msg))
+      .map((msg) => stripQueuedWrapperFromUserMessage(msg))
+
+    if (!activeIsRealtimeStreaming) {
+      return deduped
+    }
+
+    const nextMessages = [...deduped]
+    const streamToolCalls = activeToolCalls.map((toolCall) => ({
+      ...toolCall,
+      phase: toolCall.phase,
+    }))
+
+    const streamingMsg = {
+      role: 'assistant',
+      content: [],
+      __optimisticId: 'streaming-current',
+      __streamingStatus: 'streaming',
+      __streamingText: activeRealtimeStreamingText,
+      __streamingThinking: realtimeStreamingThinking,
+      __streamToolCalls: streamToolCalls,
+    } as ChatMessage
+
+    const existingStreamIdx = nextMessages.findIndex(
+      (message) => message.__streamingStatus === 'streaming',
+    )
+
+    if (existingStreamIdx >= 0) {
+      nextMessages[existingStreamIdx] = {
+        ...nextMessages[existingStreamIdx],
+        ...streamingMsg,
+      }
+      return nextMessages
+    }
+
+    const lastUserIdx = nextMessages.reduce(
+      (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
+      -1,
+    )
+    if (lastUserIdx >= 0 && lastUserIdx === nextMessages.length - 1) {
+      nextMessages.push(streamingMsg)
+    } else if (lastUserIdx >= 0) {
+      nextMessages.splice(lastUserIdx + 1, 0, streamingMsg)
+    } else {
+      nextMessages.push(streamingMsg)
+    }
+    return nextMessages
+  }, [
+    activeToolCalls,
+    activeIsRealtimeStreaming,
+    activeRealtimeStreamingText,
+    realtimeMessages,
+    realtimeStreamingThinking,
+  ])
+
+  const derivedStreamingInfo = useMemo(() => {
+    if (activeIsRealtimeStreaming) {
+      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+      const id = isPortableMode
+        ? localStreamingMessageId
+        : last?.role === 'assistant'
+          ? ((last as any).__optimisticId || (last as any).id || null)
+          : null
+      return { isStreaming: true, streamingMessageId: id }
+    }
+    if (waitingForResponse && finalDisplayMessages.length > 0) {
+      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+      if (last && last.role === 'assistant') {
+        const isStreamingPlaceholder = (last as any).__streamingStatus === 'streaming'
+        if (!isStreamingPlaceholder) {
+          return { isStreaming: false, streamingMessageId: null as string | null }
+        }
+        const id = (last as any).__optimisticId || (last as any).id || null
+        return { isStreaming: true, streamingMessageId: id }
+      }
+    }
+    return { isStreaming: false, streamingMessageId: null as string | null }
+  }, [
+    waitingForResponse,
+    finalDisplayMessages,
+    activeIsRealtimeStreaming,
+    isPortableMode,
+    localStreamingMessageId,
+  ])
+
+  const messageCountAtSendRef = useRef(0)
+  const lastAssistantIdAtSendRef = useRef<string | null>(null)
+  const prevIsRealtimeStreamingRef = useRef(activeIsRealtimeStreaming)
+
+  useEffect(() => {
+    if (waitingForResponse) {
+      messageCountAtSendRef.current = finalDisplayMessages.length
+      const lastMsg = finalDisplayMessages[finalDisplayMessages.length - 1]
+      if (lastMsg?.role === 'assistant') {
+        const raw = lastMsg as Record<string, unknown>
+        lastAssistantIdAtSendRef.current =
+          String(raw.__optimisticId ?? raw.id ?? raw.messageId ?? raw.__realtimeSequence ?? '')
+      } else {
+        lastAssistantIdAtSendRef.current = null
+      }
+    }
+  }, [waitingForResponse, finalDisplayMessages])
+
+  useEffect(() => {
+    if (!waitingForResponse) {
+      if (clearTimerRef.current) {
+        window.clearTimeout(clearTimerRef.current)
+        clearTimerRef.current = null
+      }
+      return
+    }
+    const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+    if (!last || last.role !== 'assistant') return
+    if ((last as any).__streamingStatus === 'streaming') return
+    const countGrew = finalDisplayMessages.length > messageCountAtSendRef.current
+    const raw = last as Record<string, unknown>
+    const currentId = String(raw.__optimisticId ?? raw.id ?? raw.messageId ?? raw.__realtimeSequence ?? '')
+    const identityChanged =
+      currentId.length > 0 && currentId !== (lastAssistantIdAtSendRef.current ?? '')
+    const noAssistantAtSend = lastAssistantIdAtSendRef.current === null
+    if (countGrew || identityChanged || noAssistantAtSend) {
+      if (clearTimerRef.current) return
+      clearTimerRef.current = window.setTimeout(() => {
+        clearTimerRef.current = null
+        streamFinish()
+      }, 50)
+    }
+  }, [finalDisplayMessages, waitingForResponse, streamFinish])
+
+  useEffect(() => {
+    const wasStreaming = prevIsRealtimeStreamingRef.current
+    prevIsRealtimeStreamingRef.current = activeIsRealtimeStreaming
+    if (wasStreaming && !activeIsRealtimeStreaming && waitingForResponse) {
+      if (clearTimerRef.current) return
+      clearTimerRef.current = window.setTimeout(() => {
+        clearTimerRef.current = null
+        streamFinish()
+      }, 100)
+    }
+  }, [activeIsRealtimeStreaming, waitingForResponse, streamFinish])
+
   const handleSwitchModel = useCallback(async () => {
     if (!suggestion) return
 
@@ -1332,14 +1261,14 @@ export function ChatScreen({
   useEffect(() => {
     if (liveToolActivity.length > 0) {
       setLocalActivity('tool-use')
-    } else if (isRealtimeStreaming) {
+    } else if (activeIsRealtimeStreaming) {
       setLocalActivity('responding')
     } else if (waitingForResponse) {
       setLocalActivity('thinking')
     } else {
       setLocalActivity('idle')
     }
-  }, [waitingForResponse, isRealtimeStreaming, liveToolActivity, setLocalActivity])
+  }, [waitingForResponse, activeIsRealtimeStreaming, liveToolActivity, setLocalActivity])
 
   const statusQuery = useQuery({
     queryKey: ['hermes', 'status'],
@@ -2365,7 +2294,7 @@ export function ChatScreen({
           className={cn(
             'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
             'mr-0',
-            (isRealtimeStreaming || hasPendingGeneration()) && 'chat-streaming-glow',
+            (activeIsRealtimeStreaming || hasPendingGeneration()) && 'chat-streaming-glow',
           )}
           style={{
             marginBottom:
@@ -2480,7 +2409,7 @@ export function ChatScreen({
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
               streamingText={
-                smoothRealtimeStreamingText ||
+                smoothActiveStreamingText ||
                 completedStreamingText.current ||
                 undefined
               }
