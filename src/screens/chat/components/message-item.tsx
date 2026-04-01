@@ -1636,8 +1636,29 @@ function MessageItemComponent({
       }),
     [attachedToolMessages],
   )
+  const streamToolSections = useMemo<Array<InlineToolSection>>(
+    () =>
+      effectiveStreamToolCalls.map((toolCall, index) => ({
+        key: toolCall.id || `${toolCall.name}-${index}`,
+        type: toolCall.name,
+        input:
+          toolCall.args && typeof toolCall.args === 'object'
+            ? (toolCall.args as Record<string, unknown>)
+            : undefined,
+        outputText: toolCall.result,
+        errorText: toolCall.phase === 'error' ? toolCall.result || 'Tool failed' : undefined,
+        state:
+          toolCall.phase === 'error'
+            ? 'output-error'
+            : toolCall.phase === 'done'
+              ? 'output-available'
+              : 'input-available',
+      })),
+    [effectiveStreamToolCalls],
+  )
   const inlineToolSections = useMemo<Array<InlineToolSection>>(
     () => [
+      ...streamToolSections,
       ...toolParts.map((toolPart, index) => {
         const rawOutput = toolPart.output
         let outputText = ''
@@ -1660,7 +1681,7 @@ function MessageItemComponent({
       }),
       ...attachedToolSections,
     ],
-    [attachedToolSections, toolParts],
+    [attachedToolSections, streamToolSections, toolParts],
   )
   const hasToolCalls = inlineToolSections.length > 0
 
@@ -2030,8 +2051,7 @@ function MessageItemComponent({
         ) : null}
 
       {/* Render tool calls — one collapsible card per tool with independent open state */}
-      {/* Suppress inline sections when streaming pills are active to avoid double rendering */}
-      {hasToolCalls && !hasStreamToolCalls && (
+      {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-1 flex flex-col gap-1">
           {inlineToolSections.map((toolSection, index) => (
             <InlineToolSectionItem
@@ -2043,8 +2063,6 @@ function MessageItemComponent({
           ))}
         </div>
       )}
-
-      {/* Tool call pills removed — rendering handled by ThinkingBubble/ToolCallCard in chat-message-list.tsx */}
 
       {(!hasToolCalls || hasText) && (
         <MessageActionsBar

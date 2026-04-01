@@ -979,95 +979,90 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return sortMessagesChronologically(historyMessages)
     }
 
-    // Find messages in realtime that aren't in history yet.
-    //
-    // CRITICAL: use extractMessageText() (not extractTextFromContent) so that
-    // SSE echoes with top-level text/body/message fields are matched against
-    // optimistic messages that use the content-array format. This was the root
-    // cause of the persistent duplicate-message bug — mergeHistoryMessages was
-    // the only layer that didn't handle the format mismatch, so the SSE echo
-    // always survived the merge and appeared alongside the optimistic copy.
-    const newRealtimeMessages = realtimeMessages.filter((rtMsg) => {
+    const matchesRealtimeMessage = (histMsg: ChatMessage, rtMsg: ChatMessage): boolean => {
       const rtId = getMessageId(rtMsg)
       const rtText = extractMessageText(rtMsg)
       const rtNonce = getClientNonce(rtMsg)
       const rtSignature = messageMultipartSignature(rtMsg)
+      const histId = getMessageId(histMsg)
+      if (rtId && histId && rtId === histId) {
+        return true
+      }
 
-      return !historyMessages.some((histMsg) => {
-        const histId = getMessageId(histMsg)
-        if (rtId && histId && rtId === histId) {
-          return true
-        }
+      const histNonce = getClientNonce(histMsg)
+      if (rtNonce && histNonce && rtNonce === histNonce) {
+        return true
+      }
 
-        const histNonce = getClientNonce(histMsg)
-        if (rtNonce && histNonce && rtNonce === histNonce) {
-          return true
-        }
+      if (histMsg.role === rtMsg.role && rtText) {
+        const histText = extractMessageText(histMsg)
+        if (histText === rtText) return true
+      }
 
-        // Text match: use multi-format extraction for both sides so that
-        // content-array messages match top-level text field messages.
-        if (histMsg.role === rtMsg.role && rtText) {
+      const histRaw = histMsg as Record<string, unknown>
+      const histIsOptimistic =
+        normalizeString(histRaw.status) === 'sending' ||
+        normalizeString(histRaw.__optimisticId).length > 0
+
+      if (histIsOptimistic && histMsg.role === rtMsg.role) {
+        if (rtText) {
           const histText = extractMessageText(histMsg)
           if (histText === rtText) return true
+          if (histText && rtText.startsWith(histText)) return true
         }
-
-        // Optimistic message match: same role + (text OR attachment sig)
-        const histRaw = histMsg as Record<string, unknown>
-        const histIsOptimistic =
-          normalizeString(histRaw.status) === 'sending' ||
-          normalizeString(histRaw.__optimisticId).length > 0
-
-        if (histIsOptimistic && histMsg.role === rtMsg.role) {
-          // Text-based match (plain text messages)
-          if (rtText) {
-            const histText = extractMessageText(histMsg)
-            if (histText === rtText) return true
-            // Prefix match: the server may enrich the body with inline
-            // <attachment> tags that weren't in the original optimistic message.
-            // The enriched body starts with the original text.
-            if (histText && rtText.startsWith(histText)) return true
-          }
-          // Attachment-based match for paste/image messages
-          const rtAttachments = Array.isArray((rtMsg as any).attachments)
-            ? (rtMsg as any).attachments as Array<Record<string, unknown>>
-            : []
-          const histAttachments = Array.isArray((histMsg as any).attachments)
-            ? (histMsg as any).attachments as Array<Record<string, unknown>>
-            : []
-          if (
-            rtAttachments.length > 0 &&
-            rtAttachments.length === histAttachments.length
-          ) {
-            const rtSig = rtAttachments
-              .map(
-                (a) =>
-                  `${normalizeString(a.name)}:${String(a.size ?? '')}`,
-              )
-              .sort()
-              .join('|')
-            const histSig = histAttachments
-              .map(
-                (a) =>
-                  `${normalizeString(a.name)}:${String(a.size ?? '')}`,
-              )
-              .sort()
-              .join('|')
-            if (rtSig && rtSig === histSig) return true
-          }
+        const rtAttachments = Array.isArray((rtMsg as any).attachments)
+          ? (rtMsg as any).attachments as Array<Record<string, unknown>>
+          : []
+        const histAttachments = Array.isArray((histMsg as any).attachments)
+          ? (histMsg as any).attachments as Array<Record<string, unknown>>
+          : []
+        if (
+          rtAttachments.length > 0 &&
+          rtAttachments.length == histAttachments.length
+        ) {
+          const rtSig = rtAttachments
+            .map(
+              (a) =>
+                `${normalizeString(a.name)}:${String(a.size ?? '')}`,
+            )
+            .sort()
+            .join('|')
+          const histSig = histAttachments
+            .map(
+              (a) =>
+                `${normalizeString(a.name)}:${String(a.size ?? '')}`,
+            )
+            .sort()
+            .join('|')
+          if (rtSig && rtSig === histSig) return true
         }
+      }
 
-        return (
-          rtSignature.length > 0 &&
-          rtSignature === messageMultipartSignature(histMsg)
-        )
-      })
-    })
-
-    if (newRealtimeMessages.length === 0) {
-      return sortMessagesChronologically(historyMessages)
+      return (
+        rtSignature.length > 0 &&
+        rtSignature === messageMultipartSignature(histMsg)
+      )
     }
 
-    return sortMessagesChronologically([...historyMessages, ...newRealtimeMessages])
+    const mergedHistoryMessages = historyMessages.map((histMsg) => {
+      const matchingRealtime = realtimeMessages.find((rtMsg) =>
+        matchesRealtimeMessage(histMsg, rtMsg),
+      )
+      return matchingRealtime
+        ? mergeRealtimeAssistantMetadata(histMsg, matchingRealtime)
+        : histMsg
+    })
+
+    const newRealtimeMessages = realtimeMessages.filter(
+      (rtMsg) =>
+        !mergedHistoryMessages.some((histMsg) => matchesRealtimeMessage(histMsg, rtMsg)),
+    )
+
+    if (newRealtimeMessages.length === 0) {
+      return sortMessagesChronologically(mergedHistoryMessages)
+    }
+
+    return sortMessagesChronologically([...mergedHistoryMessages, ...newRealtimeMessages])
   },
 }))
 
@@ -1119,5 +1114,38 @@ function ensureAssistantTextContent(msg: ChatMessage): ChatMessage {
   return {
     ...msg,
     content: [{ type: 'text', text } as TextContent],
+  }
+}
+
+function mergeRealtimeAssistantMetadata(
+  historyMessage: ChatMessage,
+  realtimeMessage: ChatMessage,
+): ChatMessage {
+  if (historyMessage.role !== 'assistant' || realtimeMessage.role !== 'assistant') {
+    return historyMessage
+  }
+
+  const realtimeToolCalls = Array.isArray((realtimeMessage as any).__streamToolCalls)
+    ? (realtimeMessage as any).__streamToolCalls
+    : []
+  const historyToolCalls = Array.isArray((historyMessage as any).__streamToolCalls)
+    ? (historyMessage as any).__streamToolCalls
+    : []
+  const historyStreamToolCalls = Array.isArray((historyMessage as any).streamToolCalls)
+    ? (historyMessage as any).streamToolCalls
+    : []
+
+  if (
+    realtimeToolCalls.length === 0 ||
+    historyToolCalls.length > 0 ||
+    historyStreamToolCalls.length > 0
+  ) {
+    return historyMessage
+  }
+
+  return {
+    ...historyMessage,
+    __streamToolCalls: realtimeToolCalls,
+    streamToolCalls: realtimeToolCalls,
   }
 }

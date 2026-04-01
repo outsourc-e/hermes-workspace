@@ -3,6 +3,10 @@ import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
+import {
+  registerActiveSendRun,
+  unregisterActiveSendRun,
+} from '../../server/send-run-tracker'
 import { getChatMode } from '../../server/gateway-capabilities'
 import { openaiChat } from '../../server/openai-compat-api'
 import {
@@ -12,11 +16,6 @@ import {
   getGatewayCapabilities,
   streamChat,
 } from '../../server/hermes-api'
-// Active run tracking (replaces legacy imports)
-const _activeSendRuns = new Set<string>()
-function registerActiveSendRun(runId: string): void { if (runId) _activeSendRuns.add(runId) }
-function unregisterActiveSendRun(runId: string): void { if (runId) _activeSendRuns.delete(runId) }
-
 // Hermes agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
@@ -406,6 +405,10 @@ export const Route = createFileRoute('/api/send-stream')({
               }
 
               let startedSent = false
+              // In enhanced mode, the HTTP stream response delivers all events
+              // directly to useStreamingMessage. Skip publishChatEvent to prevent
+              // useRealtimeChatHistory from creating duplicate message bubbles.
+              const skipPublish = true
               await streamChat(
                 sessionKey,
                 {
@@ -452,7 +455,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           ? (data.user_message as Record<string, unknown>)
                           : null
                       if (userMessage) {
-                        publishChatEvent('user_message', {
+                        skipPublish || publishChatEvent('user_message', {
                           message: {
                             id: userMessage.id,
                             role: userMessage.role ?? 'user',
@@ -489,7 +492,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('message', translated)
-                      publishChatEvent('message', translated)
+                      skipPublish || publishChatEvent('message', translated)
                       return
                     }
 
@@ -505,7 +508,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           runId,
                         }
                         sendEvent('chunk', translated)
-                        publishChatEvent('chunk', translated)
+                        skipPublish || publishChatEvent('chunk', translated)
                       }
                       return
                     }
@@ -519,7 +522,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('chunk', translated)
-                      publishChatEvent('chunk', translated)
+                      skipPublish || publishChatEvent('chunk', translated)
                       return
                     }
 
@@ -541,7 +544,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('tool', translated)
-                      publishChatEvent('tool', translated)
+                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -556,7 +559,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           runId,
                         }
                         sendEvent('thinking', translated)
-                        publishChatEvent('thinking', translated)
+                        skipPublish || publishChatEvent('thinking', translated)
                         return
                       }
                       const translated = {
@@ -569,7 +572,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('tool', translated)
-                      publishChatEvent('tool', translated)
+                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -585,7 +588,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('tool', translated)
-                      publishChatEvent('tool', translated)
+                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -607,7 +610,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('tool', translated)
-                      publishChatEvent('tool', translated)
+                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -623,7 +626,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('tool', translated)
-                      publishChatEvent('tool', translated)
+                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -644,7 +647,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('tool', translated)
-                      publishChatEvent('tool', translated)
+                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -663,7 +666,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('tool', translated)
-                      publishChatEvent('tool', translated)
+                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -688,7 +691,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('done', translated)
-                      publishChatEvent('done', translated)
+                      skipPublish || publishChatEvent('done', translated)
                       closeStream()
                     }
                   },

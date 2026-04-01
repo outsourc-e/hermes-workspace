@@ -1049,14 +1049,19 @@ function ChatMessageListComponent({
     // sending covers the instant the HTTP request fires before waitingForResponse
     // is confirmed by the server (they're typically batched but this is belt+suspenders)
     const effectivelyWaiting = waitingForResponse || thinkingGrace || sending
-    // Streaming-but-empty condition: the SSE stream is active (isRealtimeStreaming)
-    // but no text chunk has arrived yet. Keep the indicator visible so there's
-    // NEVER a blank gap between tool completion / thinking and the first visible
-    // text — regardless of whether tool calls are still in flight.
-    // Key invariant: one of {thinking bubble, message with text} must ALWAYS be
-    // on screen from send until response is complete.
+    const hasInThreadStreamingActivity =
+      isStreaming &&
+      (
+        activeToolCalls.length > 0 ||
+        lifecycleEvents.length > 0 ||
+        Boolean(streamingThinking && streamingThinking.trim().length > 0)
+      )
+    // Streaming-but-empty only needs the detached thinking bubble when the
+    // in-thread streaming row has nothing to show yet.
     const streamingButEmpty =
-      isStreaming && (!streamingText || streamingText.trim().length === 0)
+      isStreaming &&
+      (!streamingText || streamingText.trim().length === 0) &&
+      !hasInThreadStreamingActivity
     if (isCompacting) return true
     if (streamingButEmpty) return true
     if (!effectivelyWaiting) return false
@@ -1094,6 +1099,26 @@ function ChatMessageListComponent({
     (isStreaming && !streamingText) ||
     (isStreaming && activeToolCalls.length > 0)
 
+  const normalizedStreamingToolCalls = useMemo<
+    Array<{ id: string; name: string; phase: 'calling' | 'running' | 'done' | 'error' }>
+  >(
+    () =>
+      activeToolCalls.map((toolCall) => ({
+        id: toolCall.id,
+        name: toolCall.name,
+        phase:
+          toolCall.phase === 'complete' || toolCall.phase === 'completed'
+            ? 'done'
+            : toolCall.phase === 'start'
+              ? 'calling'
+              : toolCall.phase === 'failed'
+                ? 'error'
+                : toolCall.phase === 'calling' || toolCall.phase === 'running'
+                  ? toolCall.phase
+                  : 'calling',
+      })),
+    [activeToolCalls],
+  )
 
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
@@ -1182,11 +1207,17 @@ function ChatMessageListComponent({
     // ThinkingBubble stays visible via `streamingButEmpty` in showTypingIndicator
     // while this wrapper is invisible.
     if (messageIsStreaming) {
-      const isEmptyPlaceholder = !streamingText || streamingText.trim().length === 0
+      const hasStreamingActivity =
+        activeToolCalls.length > 0 ||
+        lifecycleEvents.length > 0 ||
+        Boolean(streamingThinking && streamingThinking.trim().length > 0)
+      const isEmptyPlaceholder =
+        (!streamingText || streamingText.trim().length === 0) && !hasStreamingActivity
       return (
         <div
           key={stableId}
           style={{
+            display: isEmptyPlaceholder ? 'none' : undefined,
             opacity: isEmptyPlaceholder ? 0 : 1,
             pointerEvents: isEmptyPlaceholder ? 'none' : undefined,
             transition: 'opacity 150ms ease',
@@ -1208,6 +1239,7 @@ function ChatMessageListComponent({
                   ? 'bg-amber-50/30'
                   : undefined
             }
+            toolCalls={messageIsStreaming ? normalizedStreamingToolCalls : undefined}
             isStreaming={messageIsStreaming}
             streamingText={streamingText}
             streamingThinking={messageIsStreaming ? streamingThinking : undefined}
@@ -1237,6 +1269,7 @@ function ChatMessageListComponent({
               ? 'bg-amber-50/30'
               : undefined
         }
+        toolCalls={messageIsStreaming ? normalizedStreamingToolCalls : undefined}
         isStreaming={messageIsStreaming}
         streamingText={messageIsStreaming ? streamingText : undefined}
         streamingThinking={messageIsStreaming ? streamingThinking : undefined}

@@ -748,6 +748,7 @@ export function ChatScreen({
     // Single delayed fetch as fallback to catch the initial response.
     if (streamTimer.current) window.clearTimeout(streamTimer.current)
     streamTimer.current = window.setTimeout(() => {
+      if (activeRealtimeStreamingRef.current) return
       refreshHistoryRef.current()
     }, 2000)
   }, [activeFriendlyId, isNewChat])
@@ -801,6 +802,7 @@ export function ChatScreen({
   useEffect(() => {
     if (!waitingForResponse) return
     const fallback = window.setTimeout(() => {
+      if (activeRealtimeStreamingRef.current) return
       refreshHistoryRef.current()
     }, 5000)
     return () => window.clearTimeout(fallback)
@@ -1185,6 +1187,11 @@ export function ChatScreen({
   const messageCountAtSendRef = useRef(0)
   const lastAssistantIdAtSendRef = useRef<string | null>(null)
   const prevIsRealtimeStreamingRef = useRef(activeIsRealtimeStreaming)
+  const activeRealtimeStreamingRef = useRef(activeIsRealtimeStreaming)
+
+  useEffect(() => {
+    activeRealtimeStreamingRef.current = activeIsRealtimeStreaming
+  }, [activeIsRealtimeStreaming])
 
   useEffect(() => {
     if (waitingForResponse) {

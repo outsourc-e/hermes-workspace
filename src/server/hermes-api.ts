@@ -186,18 +186,32 @@ export function toChatMessage(
   // Build content array
   const content: Array<Record<string, unknown>> = []
 
-  // Build streamToolCalls array for separate pill rendering (outside bubble)
+  // Build streamToolCalls array for separate pill rendering and content blocks
   const streamToolCallsArr: Array<Record<string, unknown>> = []
   if (msg.role === 'assistant' && toolCalls && Array.isArray(toolCalls)) {
     for (const tc of toolCalls) {
-      const fn = (tc as Record<string, unknown>).function as
-        | Record<string, unknown>
-        | undefined
+      const record = tc as Record<string, unknown>
+      const fn = record.function as Record<string, unknown> | undefined
+      const toolCallId =
+        record.id || `tc-${Math.random().toString(36).slice(2, 8)}`
+      const toolName =
+        fn?.name || (record.name as string | undefined) || 'tool'
+      const toolArgs = fn?.arguments
       streamToolCallsArr.push({
-        id: (tc as Record<string, unknown>).id || `tc-${Math.random().toString(36).slice(2, 8)}`,
-        name: fn?.name || 'tool',
-        args: fn?.arguments,
+        id: toolCallId,
+        name: toolName,
+        args: toolArgs,
         phase: 'complete',
+      })
+      content.push({
+        type: 'toolCall',
+        id: toolCallId,
+        name: toolName,
+        arguments:
+          toolArgs && typeof toolArgs === 'object'
+            ? (toolArgs as Record<string, unknown>)
+            : undefined,
+        partialJson: typeof toolArgs === 'string' ? toolArgs : undefined,
       })
     }
   }
