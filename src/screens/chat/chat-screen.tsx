@@ -540,6 +540,7 @@ export function ChatScreen({
     realtimeLifecycleEvents,
     completedStreamingText,
     completedStreamingThinking,
+    clearCompletedStreaming,
     activeToolCalls,
   } = useRealtimeChatHistory({
       sessionKey: isPortableMode ? 'main' : (resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey || 'main'),
@@ -668,6 +669,11 @@ export function ChatScreen({
     const timer = window.setTimeout(() => setLiveToolActivity([]), 800)
     return () => window.clearTimeout(timer)
   }, [waitingForResponse])
+
+  useEffect(() => {
+    if (!waitingForResponse) return
+    clearCompletedStreaming()
+  }, [clearCompletedStreaming, waitingForResponse])
 
   useEffect(() => {
     function checkApprovals() {
@@ -1586,6 +1592,7 @@ export function ChatScreen({
       setPendingGeneration(true)
       setSending(true)
       setError(null)
+      clearCompletedStreaming()
       setWaitingForResponse(true)
       activeSendRef.current = {
         sessionKey,
@@ -1667,6 +1674,7 @@ export function ChatScreen({
     },
     [
       finalDisplayMessages,
+      clearCompletedStreaming,
       queryClient,
       setLocalActivity,
       startStreaming,

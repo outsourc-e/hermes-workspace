@@ -131,6 +131,10 @@ export function useRealtimeChatHistory({
   const completedStreamingThinkingRef = useRef<string>('')
   const lastCompactionSignalRef = useRef<string>('')
   const isBackfillingRef = useRef(false)
+  const clearCompletedStreaming = useCallback(() => {
+    completedStreamingTextRef.current = ''
+    completedStreamingThinkingRef.current = ''
+  }, [])
 
   const backfillHistory = useCallback(async () => {
     if (!effectiveSessionKey || effectiveSessionKey === 'new') return
@@ -184,6 +188,8 @@ export function useRealtimeChatHistory({
             return
           }
         }
+
+        clearCompletedStreaming()
 
         // When we receive a user message from an external channel,
         // append it to the query cache immediately for instant display
@@ -243,7 +249,13 @@ export function useRealtimeChatHistory({
         }
         onUserMessage?.(message, source)
       },
-      [effectiveFriendlyId, effectiveSessionKey, onUserMessage, queryClient],
+      [
+        clearCompletedStreaming,
+        effectiveFriendlyId,
+        effectiveSessionKey,
+        onUserMessage,
+        queryClient,
+      ],
     ),
     onDone: useCallback(
       (
@@ -275,8 +287,7 @@ export function useRealtimeChatHistory({
 
             // Refetch immediately — done event message is already in realtime store
             queryClient.invalidateQueries({ queryKey: key }).then(() => {
-              completedStreamingTextRef.current = ''
-              completedStreamingThinkingRef.current = ''
+              clearCompletedStreaming()
 
               // Check for compaction — significant message count drop
               const newData = queryClient.getQueryData<Record<string, unknown>>(key)
@@ -300,7 +311,13 @@ export function useRealtimeChatHistory({
           }
         }
       },
-      [effectiveFriendlyId, effectiveSessionKey, onCompactionEnd, queryClient],
+      [
+        clearCompletedStreaming,
+        effectiveFriendlyId,
+        effectiveSessionKey,
+        onCompactionEnd,
+        queryClient,
+      ],
     ),
     onCompaction: useCallback((event: CompactionEvent) => {
       if (!event.sessionKey || event.sessionKey !== effectiveSessionKey) return
@@ -339,6 +356,12 @@ export function useRealtimeChatHistory({
   useEffect(() => {
     const prev = streamingStateRef.current
     streamingStateRef.current = streamingState
+    const startedNewStream =
+      streamingState !== null &&
+      (prev === null || prev.runId !== streamingState.runId)
+    if (startedNewStream) {
+      clearCompletedStreaming()
+    }
     // Streaming just completed — capture final text so the message stays
     // visible during the handoff from streaming placeholder to history message.
     // The stub useChatStream never fires onDone, so this is the only path.
@@ -348,7 +371,7 @@ export function useRealtimeChatHistory({
         completedStreamingThinkingRef.current = prev.thinking
       }
     }
-  }, [streamingState])
+  }, [clearCompletedStreaming, streamingState])
 
   // Merge history with real-time messages
   // Re-merge when realtime events arrive (lastEventAt changes)
@@ -478,6 +501,7 @@ export function useRealtimeChatHistory({
     realtimeLifecycleEvents,
     completedStreamingText: completedStreamingTextRef,
     completedStreamingThinking: completedStreamingThinkingRef,
+    clearCompletedStreaming,
     streamingRunId: streamingState?.runId ?? null,
     activeToolCalls: streamingState?.toolCalls ?? EMPTY_TOOL_CALLS,
     lastCompletedRunAt, // Parent watches this to clear waitingForResponse

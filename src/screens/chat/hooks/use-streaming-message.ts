@@ -115,6 +115,33 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     }
   }, [unregisterSendStreamRun])
 
+  const resetActiveStreamState = useCallback(
+    (nextSessionKey?: string) => {
+      stopFrame()
+      clearHandoffTimer()
+      clearSendStreamRun()
+      clearStreamingSession(activeSessionKeyRef.current)
+      if (nextSessionKey) {
+        activeSessionKeyRef.current = nextSessionKey
+      }
+      fullTextRef.current = ''
+      renderedTextRef.current = ''
+      targetTextRef.current = ''
+      thinkingRef.current = ''
+      stepUsageRef.current = {}
+      lifecyclePhaseRef.current = 'idle'
+      acceptedAtRef.current = null
+      lastActivityAtRef.current = null
+      setState({
+        isStreaming: false,
+        streamingMessageId: null,
+        streamingText: '',
+        error: null,
+      })
+    },
+    [clearHandoffTimer, clearSendStreamRun, clearStreamingSession, stopFrame],
+  )
+
   const markActivity = useCallback(() => {
     lastActivityAtRef.current = Date.now()
     if (
@@ -217,12 +244,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           eventSourceRef.current = null
         }
         finishedRef.current = true
-        stopFrame()
-        clearHandoffTimer()
-        clearSendStreamRun()
+        resetActiveStreamState()
       }
     },
-    [clearHandoffTimer, clearSendStreamRun, stopFrame],
+    [resetActiveStreamState],
   )
 
   const pushTargetText = useCallback(
@@ -557,18 +582,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       const abortController = new AbortController()
       eventSourceRef.current = abortController
       finishedRef.current = false
-      stopFrame()
-      clearHandoffTimer()
-      fullTextRef.current = ''
-      renderedTextRef.current = ''
-      targetTextRef.current = ''
-      thinkingRef.current = ''
-      stepUsageRef.current = {}
-      clearSendStreamRun()
-      activeSessionKeyRef.current = params.sessionKey
+      resetActiveStreamState(params.sessionKey)
       lifecyclePhaseRef.current = 'requesting'
-      acceptedAtRef.current = null
-      lastActivityAtRef.current = null
 
       const messageId = `streaming-${Date.now()}`
 
@@ -682,16 +697,14 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
-      clearHandoffTimer,
-      clearSendStreamRun,
       finishStream,
       markAccepted,
       markFailed,
       onMessageAccepted,
       onSessionResolved,
       processEvent,
+      resetActiveStreamState,
       schedulePostAcceptanceTimeout,
-      stopFrame,
     ],
   )
 
@@ -701,25 +714,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       eventSourceRef.current = null
     }
     finishedRef.current = true
-    stopFrame()
-    clearHandoffTimer()
-    clearSendStreamRun()
-    clearStreamingSession(activeSessionKeyRef.current)
-    fullTextRef.current = ''
-    renderedTextRef.current = ''
-    targetTextRef.current = ''
-    thinkingRef.current = ''
-    stepUsageRef.current = {}
-    lifecyclePhaseRef.current = 'idle'
-    acceptedAtRef.current = null
-    lastActivityAtRef.current = null
-    setState({
-      isStreaming: false,
-      streamingMessageId: null,
-      streamingText: '',
-      error: null,
-    })
-  }, [clearHandoffTimer, clearSendStreamRun, clearStreamingSession, stopFrame])
+    resetActiveStreamState()
+  }, [resetActiveStreamState])
 
   const resetStreaming = useCallback(() => {
     cancelStreaming()
