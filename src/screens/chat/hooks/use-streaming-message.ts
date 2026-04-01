@@ -35,6 +35,11 @@ type StepUsagePayload = {
   model?: string
 }
 
+type PortableHistoryMessage = {
+  role: string
+  content: string
+}
+
 type UseStreamingMessageOptions = {
   onStarted?: (payload: { runId: string | null }) => void
   onChunk?: (text: string, fullText: string) => void
@@ -465,6 +470,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             type: 'done',
             state: doneState ?? 'final',
             errorMessage,
+            message: (payload as Record<string, unknown>).message as Record<string, unknown> | undefined,
             runId: activeRunIdRef.current ?? undefined,
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',
@@ -538,6 +544,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       sessionKey: string
       friendlyId: string
       message: string
+      history?: Array<PortableHistoryMessage>
       thinking?: string
       fastMode?: boolean
       attachments?: Array<ChatAttachment>
@@ -580,6 +587,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             sessionKey: params.sessionKey,
             friendlyId: params.friendlyId,
             message: params.message,
+            history: params.history,
             thinking: params.thinking,
             fastMode: params.fastMode,
             attachments: params.attachments,

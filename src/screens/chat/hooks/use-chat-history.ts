@@ -15,6 +15,9 @@ import type {PendingSendPayload} from '../pending-send';
 import type { QueryClient } from '@tanstack/react-query'
 import type { ChatMessage, HistoryResponse } from '../types'
 
+const PORTABLE_HISTORY_STORAGE_KEY = 'hermes_portable_chat_main'
+const PORTABLE_HISTORY_LIMIT = 100
+
 type UseChatHistoryInput = {
   activeFriendlyId: string
   activeSessionKey: string
@@ -25,6 +28,8 @@ type UseChatHistoryInput = {
   sessionsReady: boolean
   queryClient: QueryClient
   historyRefetchInterval?: number
+  /** When true, skip all server history fetching (portable mode). */
+  portableMode?: boolean
 }
 
 function normalizeSessionCandidate(value: string | undefined): string {
@@ -33,6 +38,25 @@ function normalizeSessionCandidate(value: string | undefined): string {
   if (!trimmed) return ''
   if (trimmed === 'new') return ''
   return trimmed
+}
+
+function readPortableHistory(): HistoryResponse {
+  if (typeof window === 'undefined') {
+    return { sessionKey: 'main', messages: [] }
+  }
+
+  try {
+    const raw = window.localStorage.getItem(PORTABLE_HISTORY_STORAGE_KEY)
+    if (!raw) return { sessionKey: 'main', messages: [] }
+    const parsed = JSON.parse(raw) as { messages?: Array<ChatMessage> } | null
+    const messages = Array.isArray(parsed?.messages) ? parsed.messages : []
+    return {
+      sessionKey: 'main',
+      messages: messages.slice(-PORTABLE_HISTORY_LIMIT),
+    }
+  } catch {
+    return { sessionKey: 'main', messages: [] }
+  }
 }
 
 type ExecNotification = {
@@ -200,6 +224,7 @@ export function useChatHistory({
   sessionsReady,
   queryClient,
   historyRefetchInterval,
+  portableMode = false,
 }: UseChatHistoryInput) {
   const explicitRouteSessionKey = useMemo(() => {
     const normalizedFriendlyId = normalizeSessionCandidate(activeFriendlyId)
@@ -238,19 +263,31 @@ export function useChatHistory({
     normalizedForcedSessionKey || explicitRouteSessionKey,
   )
   const shouldFetchHistory =
+    !portableMode &&
     !isNewChat &&
     Boolean(sessionKeyForHistory) &&
     (canFetchWithoutSessions ||
       (!isRedirecting &&
         (hasDirectSessionKey || !sessionsReady || activeExists)))
 
-  const historyKey = chatQueryKeys.history(
-    activeFriendlyId,
-    sessionKeyForHistory,
+  const effectiveFriendlyId = portableMode ? 'main' : activeFriendlyId
+  const effectiveSessionKeyForHistory = portableMode ? 'main' : sessionKeyForHistory
+  const portableHistory = useMemo(
+    () => (portableMode ? readPortableHistory() : undefined),
+    [portableMode],
   )
+  const historyKey = chatQueryKeys.history(
+    effectiveFriendlyId,
+    effectiveSessionKeyForHistory,
+  )
+
   const historyQuery = useQuery({
     queryKey: historyKey,
     queryFn: async function fetchHistoryForSession() {
+      if (portableMode) {
+        return readPortableHistory()
+      }
+
       const cached = queryClient.getQueryData(historyKey)
       const optimisticMessages = Array.isArray((cached as any)?.messages)
         ? (cached as any).messages.filter((message: any) => {
@@ -277,6 +314,15 @@ export function useChatHistory({
       }
     },
     enabled: shouldFetchHistory,
+    initialData: function useInitialHistory(): HistoryResponse | undefined {
+      if (portableMode) {
+        return portableHistory ?? {
+          sessionKey: 'main',
+          messages: [],
+        }
+      }
+      return queryClient.getQueryData<HistoryResponse>(historyKey)
+    },
     placeholderData: function useCachedHistory(): HistoryResponse | undefined {
       return queryClient.getQueryData(historyKey)
     },
@@ -307,8 +353,7 @@ export function useChatHistory({
     if (optimisticMessages.length === 0) return
 
     const latestOptimisticMessage =
-      optimisticMessages[optimisticMessages.length - 1] ?? null
-    if (!latestOptimisticMessage) return
+      optimisticMessages[optimisticMessages.length - 1]
 
     persistPendingMessage({
       sessionKey: sessionKeyForHistory,

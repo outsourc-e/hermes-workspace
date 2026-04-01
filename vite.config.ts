@@ -78,6 +78,13 @@ const config = defineConfig(({ mode, command }) => {
 
   const startHermesAgent = async () => {
     if (hermesAgentStarted) return
+    // Skip auto-start when HERMES_API_URL is explicitly set to a non-local endpoint
+    const explicitUrl = env.HERMES_API_URL || process.env.HERMES_API_URL || hermesApiUrl || ''
+    if (explicitUrl && explicitUrl !== 'http://127.0.0.1:8642' && explicitUrl !== 'http://localhost:8642') {
+      console.log(`[hermes-agent] Skipping auto-start — using external API: ${explicitUrl}`)
+      hermesAgentStarted = true
+      return
+    }
     if (await isHermesAgentHealthy()) {
       console.log('[hermes-agent] Already running — reusing existing process')
       hermesAgentStarted = true
@@ -446,6 +453,34 @@ const config = defineConfig(({ mode, command }) => {
               res.statusCode = 200
               res.setHeader('content-type', 'application/json')
               res.end(JSON.stringify({ ok: true }))
+              return
+            }
+
+            // Portable-aware health check — returns ok if any chat backend is available
+            if (req.method === 'GET' && requestPath === '/api/connection-status') {
+              try {
+                // Check if the configured backend has /v1/models (works for Ollama, OpenAI, etc.)
+                const modelsRes = await fetch(`${hermesApiUrl}/v1/models`, {
+                  signal: AbortSignal.timeout(3000),
+                })
+                if (modelsRes.ok) {
+                  res.statusCode = 200
+                  res.setHeader('content-type', 'application/json')
+                  res.end(JSON.stringify({ ok: true, mode: 'portable', backend: hermesApiUrl }))
+                  return
+                }
+                // Fall back to /health for full Hermes backends
+                const healthRes = await fetch(`${hermesApiUrl}/health`, {
+                  signal: AbortSignal.timeout(3000),
+                })
+                res.statusCode = healthRes.ok ? 200 : 502
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify({ ok: healthRes.ok, mode: 'enhanced', backend: hermesApiUrl }))
+              } catch {
+                res.statusCode = 502
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify({ ok: false, mode: 'disconnected', backend: hermesApiUrl }))
+              }
               return
             }
 

@@ -1,5 +1,34 @@
 import { HERMES_API } from './gateway-capabilities'
 
+/** Optional bearer token for authenticated OpenAI-compatible endpoints (e.g. Codex OAuth). */
+const BEARER_TOKEN = process.env.HERMES_API_TOKEN || ''
+
+/** Cached first available model from /v1/models — used as fallback when no model is specified. */
+let _cachedDefaultModel: string | null = null
+
+async function getDefaultModel(): Promise<string> {
+  if (_cachedDefaultModel) return _cachedDefaultModel
+  if (process.env.HERMES_DEFAULT_MODEL) {
+    _cachedDefaultModel = process.env.HERMES_DEFAULT_MODEL
+    return _cachedDefaultModel
+  }
+  try {
+    const headers: Record<string, string> = {}
+    if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
+    const res = await fetch(`${HERMES_API}/v1/models`, { headers, signal: AbortSignal.timeout(3_000) })
+    if (res.ok) {
+      const data = await res.json() as { data?: Array<{ id: string }> }
+      if (data.data && data.data.length > 0) {
+        // Prefer a known-good chat model over the first alphabetical one
+        const preferred = data.data.find((m) => /qwen|llama|mistral|gemma/i.test(m.id))
+        _cachedDefaultModel = preferred?.id ?? data.data[0].id
+        return _cachedDefaultModel
+      }
+    }
+  } catch { /* ignore */ }
+  return 'default'
+}
+
 export type OpenAICompatMessage = {
   role: string
   content: string
@@ -27,21 +56,26 @@ type OpenAIChatCompletionResponse = {
   }>
 }
 
-function buildRequestBody(
+async function buildRequestBody(
   messages: Array<OpenAICompatMessage>,
   options: OpenAIChatOptions,
-): OpenAIChatRequest {
+): Promise<OpenAIChatRequest> {
+  const model = options.model && options.model !== 'default'
+    ? options.model
+    : await getDefaultModel()
   return {
-    model: options.model || 'default',
+    model,
     messages,
     stream: options.stream === true,
     temperature: options.temperature,
   }
 }
 
+export type StreamChunkType = { type: 'content' | 'reasoning'; text: string }
+
 async function* parseOpenAIStream(
   response: Response,
-): AsyncGenerator<string, void, void> {
+): AsyncGenerator<StreamChunkType, void, void> {
   const reader = response.body?.getReader()
   if (!reader) {
     throw new Error('No response body')
@@ -73,11 +107,17 @@ async function* parseOpenAIStream(
             choices?: Array<{
               delta?: {
                 content?: string | null
+                reasoning?: string | null
+                reasoning_content?: string | null
               }
             }>
           }
-          const delta = parsed.choices?.[0]?.delta?.content
-          if (delta) yield delta
+          const d = parsed.choices?.[0]?.delta
+          const content = d?.content || ''
+          const reasoning = d?.reasoning || d?.reasoning_content || ''
+          // Yield content when available; fall back to reasoning only if no content yet
+          if (content) yield { type: 'content' as const, text: content }
+          else if (reasoning) yield { type: 'reasoning' as const, text: reasoning }
         } catch {
           // Ignore malformed chunks.
         }
@@ -91,7 +131,7 @@ async function* parseOpenAIStream(
 export function openaiChat(
   messages: Array<OpenAICompatMessage>,
   options: OpenAIChatOptions & { stream: true },
-): Promise<AsyncGenerator<string, void, void>>
+): Promise<AsyncGenerator<StreamChunkType, void, void>>
 export function openaiChat(
   messages: Array<OpenAICompatMessage>,
   options?: OpenAIChatOptions & { stream?: false },
@@ -99,11 +139,16 @@ export function openaiChat(
 export async function openaiChat(
   messages: Array<OpenAICompatMessage>,
   options: OpenAIChatOptions = {},
-): Promise<string | AsyncGenerator<string, void, void>> {
+): Promise<string | AsyncGenerator<StreamChunkType, void, void>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (BEARER_TOKEN) {
+    headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
+  }
+
   const response = await fetch(`${HERMES_API}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildRequestBody(messages, options)),
+    headers,
+    body: JSON.stringify(await buildRequestBody(messages, options)),
     signal: options.signal,
   })
 

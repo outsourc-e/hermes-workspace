@@ -721,6 +721,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
         persistStreamingState(sessionKey, next)
+        if (next.text.length <= 20) console.log('[chat-store:chunk] sessionKey=', sessionKey, 'text=', next.text)
         break
       }
 
@@ -809,6 +810,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const streamingMap = new Map(state.streamingState)
         const streaming = streamingMap.get(sessionKey)
 
+        // DEBUG: trace done handler
+        console.log('[chat-store:done] sessionKey=', sessionKey)
+        console.log('[chat-store:done] streaming=', streaming ? { text: streaming.text?.slice(0, 50), runId: streaming.runId } : null)
+        console.log('[chat-store:done] event.message=', event.message ? 'present' : 'missing')
+        console.log('[chat-store:done] streamingMap keys=', [...streamingMap.keys()])
+
         // Build the complete message — prefer authoritative final payload (bug #8 fix)
         let completeMessage: ChatMessage | null = null
 
@@ -816,7 +823,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // Prefer done event's message payload — it's the authoritative final response.
           // Strip <final>…</final> sentinel tags: the `done` message may still carry
           // them if the server serialises the final state from its streaming buffer.
-          const cleanedMessage = stripFinalTagsFromMessage(event.message)
+          const cleanedMessage = ensureAssistantTextContent(
+            stripFinalTagsFromMessage(event.message),
+          )
           // Preserve tool calls from streaming state on the final message so
           // ToolCallPill can render them even after streaming state is cleared.
           // Fast tool runs clear streaming state before React renders — embedding
@@ -871,6 +880,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         }
 
+        console.log('[chat-store:done] completeMessage=', completeMessage ? { role: completeMessage.role, contentLen: JSON.stringify(completeMessage.content).length } : null)
         if (completeMessage) {
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
@@ -1097,4 +1107,17 @@ function extractMessageText(msg: ChatMessage | null | undefined): string {
     if (typeof val === 'string' && val.trim().length > 0) return stripFinalTags(val.trim())
   }
   return ''
+}
+
+function ensureAssistantTextContent(msg: ChatMessage): ChatMessage {
+  if (msg.role !== 'assistant') return msg
+  if (Array.isArray(msg.content) && msg.content.length > 0) return msg
+
+  const text = extractMessageText(msg)
+  if (!text) return msg
+
+  return {
+    ...msg,
+    content: [{ type: 'text', text } as TextContent],
+  }
 }

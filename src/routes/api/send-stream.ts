@@ -106,6 +106,30 @@ function getChatMessage(
   return message
 }
 
+type PortableHistoryMessage = {
+  role: string
+  content: string
+}
+
+function normalizePortableHistory(
+  value: unknown,
+): Array<PortableHistoryMessage> {
+  if (!Array.isArray(value) || value.length === 0) return []
+
+  const normalized: Array<PortableHistoryMessage> = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const record = entry as Record<string, unknown>
+    const role = readString(record.role)
+    const content = readString(record.content)
+    if (!role || !content) continue
+    if (role !== 'user' && role !== 'assistant' && role !== 'system') continue
+    normalized.push({ role, content })
+  }
+
+  return normalized
+}
+
 function normalizeHermesErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   const message = raw.trim()
@@ -199,6 +223,7 @@ export const Route = createFileRoute('/api/send-stream')({
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
         const attachments = normalizeAttachments(body.attachments)
+        const history = normalizePortableHistory(body.history)
         if (!message.trim() && (!attachments || attachments.length === 0)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'message required' }),
@@ -279,10 +304,11 @@ export const Route = createFileRoute('/api/send-stream')({
             try {
               if (chatMode === 'portable') {
                 const runId = crypto.randomUUID()
-                const portableSessionKey =
-                  SESSION_BOOTSTRAP_KEYS.has(sessionKey) || !sessionKey
-                    ? `portable-${crypto.randomUUID()}`
-                    : sessionKey
+                // In portable mode, keep the original session key so the frontend
+                // streaming state map matches what the chat screen is watching.
+                // In portable mode there are no server-side sessions — always use
+                // 'main' so the store key matches what the UI subscribes to.
+                const portableSessionKey = 'main'
                 const portableFriendlyId =
                   requestedFriendlyId || rawSessionKey || portableSessionKey
                 let accumulated = ''
@@ -303,13 +329,15 @@ export const Route = createFileRoute('/api/send-stream')({
                 })
 
                 try {
+                  const portableMessages = [
+                    ...history,
+                    {
+                      role: 'user',
+                      content: getChatMessage(message, attachments),
+                    },
+                  ]
                   const stream = await openaiChat(
-                    [
-                      {
-                        role: 'user',
-                        content: getChatMessage(message, attachments),
-                      },
-                    ],
+                    portableMessages,
                     {
                       model: typeof body.model === 'string' ? body.model : undefined,
                       temperature:
@@ -321,21 +349,37 @@ export const Route = createFileRoute('/api/send-stream')({
                     },
                   )
 
-                  for await (const delta of stream) {
-                    accumulated += delta
-                    sendEvent('chunk', {
-                      delta,
-                      text: accumulated,
-                      fullReplace: true,
-                      sessionKey: portableSessionKey,
-                      runId,
-                    })
+                  let thinking = ''
+                  for await (const chunk of stream) {
+                    if (chunk.type === 'reasoning') {
+                      thinking += chunk.text
+                      sendEvent('thinking', {
+                        text: thinking,
+                        sessionKey: portableSessionKey,
+                        runId,
+                      })
+                    } else {
+                      accumulated += chunk.text
+                      sendEvent('chunk', {
+                        text: accumulated,
+                        fullReplace: true,
+                        sessionKey: portableSessionKey,
+                        runId,
+                      })
+                    }
                   }
 
                   sendEvent('done', {
                     state: 'complete',
                     sessionKey: portableSessionKey,
                     runId,
+                    message: {
+                      role: 'assistant',
+                      content: [
+                        ...(thinking ? [{ type: 'thinking', thinking }] : []),
+                        { type: 'text', text: accumulated },
+                      ],
+                    },
                   })
                   closeStream()
                 } catch (err) {

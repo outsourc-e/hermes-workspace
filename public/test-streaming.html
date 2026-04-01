@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head><title>Streaming Test</title></head>
+<body style="font-family: monospace; padding: 20px; background: #1a1a1a; color: #eee;">
+<h3>Direct Streaming Test</h3>
+<input id="msg" value="say hello" style="width: 300px; padding: 8px;">
+<button onclick="send()">Send</button>
+<div id="thinking" style="color: #888; margin-top: 10px;"></div>
+<div id="response" style="margin-top: 10px; white-space: pre-wrap;"></div>
+<div id="log" style="margin-top: 20px; font-size: 11px; color: #666;"></div>
+<script>
+async function send() {
+  const msg = document.getElementById('msg').value;
+  document.getElementById('response').textContent = '';
+  document.getElementById('thinking').textContent = 'Thinking...';
+  document.getElementById('log').textContent = '';
+  
+  const res = await fetch('/api/send-stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionKey: 'main', message: msg })
+  });
+  
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop();
+    
+    for (const block of events) {
+      if (!block.trim()) continue;
+      let event = '', data = '';
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event: ')) event = line.slice(7);
+        if (line.startsWith('data: ')) data += line.slice(6);
+      }
+      if (!event || !data) continue;
+      const parsed = JSON.parse(data);
+      document.getElementById('log').textContent += event + ': ' + JSON.stringify(parsed).slice(0,100) + '\n';
+      
+      if (event === 'thinking') {
+        document.getElementById('thinking').textContent = 'Thinking: ' + (parsed.text || '').slice(-80);
+      }
+      if (event === 'chunk') {
+        document.getElementById('thinking').textContent = '';
+        document.getElementById('response').textContent = parsed.text || '';
+      }
+      if (event === 'done') {
+        document.getElementById('thinking').textContent = '';
+        const msg = parsed.message;
+        if (msg && msg.content) {
+          const text = msg.content.filter(c => c.type === 'text').map(c => c.text).join('');
+          if (text) document.getElementById('response').textContent = text;
+        }
+      }
+    }
+  }
+}
+</script>
+</body>
+</html>

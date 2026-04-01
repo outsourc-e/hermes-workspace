@@ -118,12 +118,19 @@ export async function streamChatUnified(
   const backend = resolveChatBackend()
 
   if (backend === 'openai-compat') {
-    return openaiChat(messages, {
+    const rawStream = await openaiChat(messages, {
       model: options.model,
       temperature: options.temperature,
       signal: options.signal,
       stream: true,
     })
+    // Adapt StreamChunkType to plain string for legacy callers
+    async function* toStringStream() {
+      for await (const chunk of rawStream) {
+        yield chunk.text
+      }
+    }
+    return toStringStream()
   }
 
   if (backend === 'hermes-enhanced') {

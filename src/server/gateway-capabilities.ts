@@ -64,43 +64,62 @@ let probePromise: Promise<GatewayCapabilities> | null = null
 let lastProbeAt = 0
 let lastLoggedSummary = ''
 
+/** Optional bearer token for authenticated endpoints. */
+const BEARER_TOKEN = process.env.HERMES_API_TOKEN || ''
+
+function authHeaders(): Record<string, string> {
+  return BEARER_TOKEN ? { 'Authorization': `Bearer ${BEARER_TOKEN}` } : {}
+}
+
 // ── Probing ───────────────────────────────────────────────────────
 
 async function probe(path: string): Promise<boolean> {
   try {
     const res = await fetch(`${HERMES_API}${path}`, {
+      headers: authHeaders(),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
-    // 404 = endpoint doesn't exist. Anything else (200, 405, 400) = exists.
-    return res.status !== 404
+    // 404 = endpoint doesn't exist.
+    // 403 = likely a catch-all rejection (e.g. Codex endpoint rejects unknown paths).
+    // Only 2xx, 400, 405, 422 reliably indicate the endpoint exists.
+    if (res.status === 404 || res.status === 403) return false
+    return true
   } catch {
     return false
   }
 }
 
-/** Probe /v1/chat/completions with OPTIONS to avoid sending real chat */
+/** Probe /v1/chat/completions with a minimal real POST.
+ *  Some endpoints (e.g. Codex) reject OPTIONS and return 403 on unknown paths,
+ *  so we need to send a real request to confirm the endpoint works. */
 async function probeChatCompletions(): Promise<boolean> {
   try {
     const res = await fetch(`${HERMES_API}/v1/chat/completions`, {
-      method: 'OPTIONS',
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        model: 'test',
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 1,
+      }),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS + 5_000),
     })
-    // Any non-connection-error response means the endpoint exists
-    return res.status !== 404
-  } catch {
-    // OPTIONS might not be supported — try POST with empty body
-    try {
-      const res = await fetch(`${HERMES_API}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-      })
-      // 400/422 = endpoint exists but bad request. 404 = doesn't exist.
-      return res.status !== 404
-    } catch {
-      return false
+    // 200 = works. 400/422 = endpoint exists. 401 = exists, bad auth.
+    if (res.ok || res.status === 400 || res.status === 422 || res.status === 401) return true
+    // 404 could mean "endpoint doesn't exist" OR "model not found" (Ollama).
+    // Check if the response is a JSON API error — that means the endpoint exists.
+    if (res.status === 404) {
+      const text = await res.text().catch(() => '')
+      return text.includes('"error"') || text.includes('"message"')
     }
+    // 403 on completions specifically — check if it's a real API error vs catch-all
+    if (res.status === 403) {
+      const text = await res.text().catch(() => '')
+      return text.includes('error') || text.includes('unauthorized') || text.includes('forbidden')
+    }
+    return true
+  } catch {
+    return false
   }
 }
 

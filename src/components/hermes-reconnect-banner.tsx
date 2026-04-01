@@ -10,10 +10,23 @@ type HermesReconnectBannerProps = {
 type BannerState = 'hidden' | 'disconnected' | 'connected'
 
 async function probeHermesHealth(): Promise<boolean> {
-  const response = await fetch('/api/hermes-proxy/health', {
-    cache: 'no-store',
-  })
-  return response.ok
+  // Use the portable-aware connection status endpoint first,
+  // which works with both full Hermes and OpenAI-compatible backends.
+  try {
+    const response = await fetch('/api/connection-status', {
+      cache: 'no-store',
+    })
+    if (response.ok) return true
+  } catch { /* fall through */ }
+  // Fallback to direct health proxy
+  try {
+    const response = await fetch('/api/hermes-proxy/health', {
+      cache: 'no-store',
+    })
+    return response.ok
+  } catch {
+    return false
+  }
 }
 
 export function HermesReconnectBanner({
