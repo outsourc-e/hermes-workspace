@@ -1689,13 +1689,13 @@ function ChatComposerComponent({
                 ? [
                     // iMessage-style: edge-to-edge, docked to bottom
                     'left-0 right-0',
-                    'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl',
-                    'border-t border-primary-200/60 dark:border-neutral-800',
+                    'bg-surface/95 backdrop-blur-xl',
+                    'border-t border-primary-200/60',
                   ].join(' ')
                 : [
                     // scroll-hide / integrated: floating pill above tab bar
                     'left-4 right-4',
-                    'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl',
+                    'bg-surface/95 backdrop-blur-2xl',
                     'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
                     'rounded-[22px]',
                   ].join(' '),
