@@ -8,7 +8,7 @@ import {
   unregisterActiveSendRun,
 } from '../../server/send-run-tracker'
 import { getChatMode } from '../../server/gateway-capabilities'
-import { openaiChat } from '../../server/openai-compat-api'
+import { openaiChat, type OpenAICompatMessage, type OpenAICompatContentPart } from '../../server/openai-compat-api'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   createSession,
@@ -105,6 +105,49 @@ function getChatMessage(
   return message
 }
 
+/**
+ * Build OpenAI-compatible multimodal content for portable mode.
+ * If there are image attachments, returns an array of content parts;
+ * otherwise returns a plain string.
+ */
+function buildMultimodalContent(
+  message: string,
+  attachments?: Array<Record<string, unknown>>,
+): string | Array<OpenAICompatContentPart> {
+  const imageParts: Array<OpenAICompatContentPart> = []
+
+  if (attachments && attachments.length > 0) {
+    for (const att of attachments) {
+      const mime = (att.contentType || att.mimeType || att.mediaType || '') as string
+      if (!mime.toLowerCase().startsWith('image/')) continue
+
+      let b64 = (att.base64 || att.content || att.data || '') as string
+      if (!b64) {
+        const dataUrl = (att.dataUrl || '') as string
+        if (dataUrl.startsWith('data:') && dataUrl.includes(',')) {
+          b64 = dataUrl.split(',')[1]
+        }
+      }
+      if (!b64) continue
+
+      imageParts.push({
+        type: 'image_url',
+        image_url: { url: `data:${mime};base64,${b64}` },
+      })
+    }
+  }
+
+  if (imageParts.length === 0) {
+    return getChatMessage(message, attachments)
+  }
+
+  const parts: Array<OpenAICompatContentPart> = []
+  const text = message.trim() || 'Please review the attached content.'
+  parts.push({ type: 'text', text })
+  parts.push(...imageParts)
+  return parts
+}
+
 type PortableHistoryMessage = {
   role: string
   content: string
@@ -174,19 +217,40 @@ function getToolCallId(
   )
 }
 
+function parseJsonIfPossible(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  if (!trimmed) return value
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return value
+    }
+  }
+  return value
+}
+
 function getToolArgs(data: Record<string, unknown>): unknown {
   const toolCall = readRecord(data.tool_call)
   const toolFunction = readRecord(toolCall?.function)
-  return toolCall?.arguments ?? toolFunction?.arguments ?? data.args
+  return parseJsonIfPossible(
+    toolCall?.arguments ?? toolFunction?.arguments ?? data.args,
+  )
 }
 
 function getToolResultPreview(data: Record<string, unknown>): string {
-  return (
-    readString(data.result_preview) ||
-    readString(data.result) ||
-    readString(data.output) ||
-    readString(data.message)
-  )
+  const raw = data.result_preview ?? data.result ?? data.output ?? data.message
+  if (typeof raw === 'string') return raw
+  if (raw === undefined || raw === null) return ''
+  try {
+    return JSON.stringify(raw, null, 2)
+  } catch {
+    return String(raw)
+  }
 }
 
 export const Route = createFileRoute('/api/send-stream')({
@@ -328,11 +392,12 @@ export const Route = createFileRoute('/api/send-stream')({
                 })
 
                 try {
-                  const portableMessages = [
+                  const userContent = buildMultimodalContent(message, attachments)
+                  const portableMessages: Array<OpenAICompatMessage> = [
                     ...history,
                     {
                       role: 'user',
-                      content: getChatMessage(message, attachments),
+                      content: userContent,
                     },
                   ]
                   const stream = await openaiChat(
@@ -533,6 +598,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       event === 'tool.running'
                     ) {
                       const toolName = getToolName(data)
+                      const preview = typeof data.preview === 'string' ? data.preview : undefined
                       const translated = {
                         phase: event === 'tool.pending' || event === 'tool.started'
                           ? 'start'
@@ -540,6 +606,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         name: toolName,
                         toolCallId: getToolCallId(data, runId, toolName),
                         args: getToolArgs(data),
+                        preview,
                         sessionKey: sessionKeyFromEvent,
                         runId,
                       }
@@ -583,7 +650,8 @@ export const Route = createFileRoute('/api/send-stream')({
                         phase: 'complete',
                         name: toolName,
                         toolCallId: getToolCallId(data, runId, toolName),
-                        result: resultPreview.slice(0, 200),
+                        args: getToolArgs(data),
+                        result: resultPreview.slice(0, 4000),
                         sessionKey: sessionKeyFromEvent,
                         runId,
                       }
@@ -674,7 +742,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       const errorMessage =
                         readString(
                           (data.error as Record<string, unknown> | undefined)?.message,
-                        ) || 'Hermes stream error'
+                        ) || readString(data.message) || 'Hermes stream error'
                       sendEvent('error', {
                         message: errorMessage,
                         sessionKey: sessionKeyFromEvent,
@@ -724,7 +792,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
         return new Response(stream, {
           headers: {
-            'Content-Type': 'text/event-stream',
+            'Content-Type': 'text/event-stream; charset=utf-8',
             'Cache-Control': 'no-cache',
             Connection: 'keep-alive',
             'X-Hermes-Session-Key': sessionKey,

@@ -449,6 +449,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
                 ? payload.toolCallId
                 : undefined,
             args: payload.args,
+            preview:
+              typeof payload.preview === 'string' ? payload.preview : undefined,
+            result:
+              typeof payload.result === 'string' ? payload.result : undefined,
             runId: activeRunIdRef.current ?? undefined,
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',

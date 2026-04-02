@@ -29,9 +29,13 @@ async function getDefaultModel(): Promise<string> {
   return 'default'
 }
 
+export type OpenAICompatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export type OpenAICompatMessage = {
   role: string
-  content: string
+  content: string | Array<OpenAICompatContentPart>
 }
 
 export type OpenAIChatOptions = {
@@ -43,7 +47,7 @@ export type OpenAIChatOptions = {
 
 type OpenAIChatRequest = {
   model: string
-  messages: Array<OpenAICompatMessage>
+  messages: Array<{ role: string; content: string | Array<OpenAICompatContentPart> }>
   stream: boolean
   temperature?: number
 }

@@ -550,50 +550,67 @@ function mergeOptimisticHistoryMessages(
   if (!optimisticMessages.length) return serverMessages
 
   const merged = [...serverMessages]
+  const TEN_SECONDS = 10_000
 
   for (const optimisticMessage of optimisticMessages) {
-    // Check if this optimistic message has been confirmed by the server
-    const hasMatch = serverMessages.some((serverMessage) => {
-      // Primary match: clientId (most reliable)
-      if (
-        optimisticMessage.clientId &&
-        serverMessage.clientId &&
-        optimisticMessage.clientId === serverMessage.clientId
-      ) {
-        return true
-      }
+    const optimisticClientId = getMessageClientId(optimisticMessage)
+    const optimisticText = textFromMessage(optimisticMessage).trim()
+    const optimisticAttachments = getAttachmentSignature(optimisticMessage)
+    const optimisticTime = getMessageTimestamp(optimisticMessage)
 
-      // Secondary match: __optimisticId
-      if (
-        optimisticMessage.__optimisticId &&
-        serverMessage.__optimisticId &&
-        optimisticMessage.__optimisticId === serverMessage.__optimisticId
-      ) {
-        return true
-      }
-
-      // Fallback match: same text content + role + timestamp within 10s
+    const matchingServerIndex = merged.findIndex((serverMessage) => {
       if (optimisticMessage.role && serverMessage.role) {
         if (optimisticMessage.role !== serverMessage.role) return false
       }
-      const optimisticText = textFromMessage(optimisticMessage)
-      if (!optimisticText) return false
-      if (optimisticText !== textFromMessage(serverMessage)) return false
-      const optimisticTime = getMessageTimestamp(optimisticMessage)
+
+      const serverClientId = getMessageClientId(serverMessage)
+      if (optimisticClientId && serverClientId && optimisticClientId === serverClientId) {
+        return true
+      }
+
+      const serverText = textFromMessage(serverMessage).trim()
+      const serverAttachments = getAttachmentSignature(serverMessage)
       const serverTime = getMessageTimestamp(serverMessage)
-      return Math.abs(optimisticTime - serverTime) <= 10000
+      const withinWindow = Math.abs(optimisticTime - serverTime) <= TEN_SECONDS
+
+      if (optimisticText && serverText && optimisticText === serverText && withinWindow) {
+        return true
+      }
+
+      if (
+        !optimisticText &&
+        optimisticAttachments &&
+        serverAttachments &&
+        optimisticAttachments === serverAttachments &&
+        withinWindow
+      ) {
+        return true
+      }
+
+      return false
     })
 
-    if (!hasMatch) {
-      // Preserve unconfirmed optimistic messages regardless of age
-      // They will be shown with a "queued" indicator
-      const isSending =
-        optimisticMessage.status === 'sending' ||
-        Boolean(optimisticMessage.__optimisticId)
+    if (matchingServerIndex >= 0) {
+      const serverMessage = merged[matchingServerIndex]
+      const serverHasAttachments = Array.isArray(serverMessage.attachments) && serverMessage.attachments.length > 0
+      const optimisticHasAttachments = Array.isArray(optimisticMessage.attachments) && optimisticMessage.attachments.length > 0
 
-      if (isSending) {
-        merged.push(optimisticMessage)
+      if (!serverHasAttachments && optimisticHasAttachments) {
+        merged[matchingServerIndex] = {
+          ...serverMessage,
+          attachments: optimisticMessage.attachments,
+        }
       }
+      continue
+    }
+
+    // Preserve unconfirmed optimistic messages regardless of age.
+    const isSending =
+      optimisticMessage.status === 'sending' ||
+      Boolean(optimisticMessage.__optimisticId)
+
+    if (isSending) {
+      merged.push(optimisticMessage)
     }
   }
 

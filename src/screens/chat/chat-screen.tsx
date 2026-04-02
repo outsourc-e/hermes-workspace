@@ -384,20 +384,23 @@ function shouldCollapseTextDuplicate(
 
   if (candidate.role !== 'user') return false
 
-  const existingOptimistic = isOptimisticUserMessage(existing)
-  const candidateOptimistic = isOptimisticUserMessage(candidate)
-  if (existingOptimistic === candidateOptimistic) return false
-
   const existingTs = getMessageTimestampValue(existing)
   const candidateTs = getMessageTimestampValue(candidate)
   if (existingTs !== null && candidateTs !== null) {
     if (Math.abs(existingTs - candidateTs) > 15_000) return false
   }
 
-  return (
-    getMessageAttachmentSignature(existing) ===
-    getMessageAttachmentSignature(candidate)
-  )
+  // Collapse same-turn user duplicates even after the optimistic marker has been
+  // cleared. The send path can leave us with an optimistic local message plus a
+  // confirmed/history copy after completion; requiring one side to still look
+  // optimistic misses that handoff and leaves both visible.
+  const existingSig = getMessageAttachmentSignature(existing)
+  const candidateSig = getMessageAttachmentSignature(candidate)
+  if (existingSig && candidateSig) {
+    return existingSig === candidateSig
+  }
+
+  return true
 }
 
 function stripQueuedWrapperFromUserMessage(message: ChatMessage): ChatMessage {
@@ -945,7 +948,6 @@ export function ChatScreen({
         updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
           ...message,
           status: 'done',
-          __optimisticId: undefined,
         }))
       }
       activeSendRef.current = null

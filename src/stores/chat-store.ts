@@ -38,6 +38,8 @@ export type ChatStreamEvent =
       name: string
       toolCallId?: string
       args?: unknown
+      preview?: string
+      result?: string
       runId?: string
       sessionKey: string
       transport?: 'chat-events' | 'send-stream'
@@ -88,6 +90,7 @@ export type StreamingState = {
     name: string
     phase: string
     args?: unknown
+    preview?: string
     result?: string
   }>
 }
@@ -779,7 +782,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           nextToolCalls[existingToolIndex] = {
             ...nextToolCalls[existingToolIndex],
             phase: event.phase,
-            args: event.args,
+            args: event.args ?? nextToolCalls[existingToolIndex].args,
+            preview: (event as any).preview ?? nextToolCalls[existingToolIndex].preview,
             result: (event as any).result ?? nextToolCalls[existingToolIndex].result,
           }
         } else {
@@ -790,6 +794,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             name: event.name,
             phase: event.phase,
             args: event.args,
+            preview: (event as any).preview,
             result: (event as any).result,
           })
         }
@@ -1048,9 +1053,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const matchingRealtime = realtimeMessages.find((rtMsg) =>
         matchesRealtimeMessage(histMsg, rtMsg),
       )
-      return matchingRealtime
-        ? mergeRealtimeAssistantMetadata(histMsg, matchingRealtime)
-        : histMsg
+      if (!matchingRealtime) return histMsg
+      // Preserve attachments from the optimistic/realtime message when history doesn't have them
+      const merged = mergeRealtimeAssistantMetadata(histMsg, matchingRealtime)
+      const rtAttachments = (matchingRealtime as any).attachments
+      const histAttachments = (merged as any).attachments
+      if (Array.isArray(rtAttachments) && rtAttachments.length > 0 && (!Array.isArray(histAttachments) || histAttachments.length === 0)) {
+        return { ...merged, attachments: rtAttachments }
+      }
+      return merged
     })
 
     const newRealtimeMessages = realtimeMessages.filter(
