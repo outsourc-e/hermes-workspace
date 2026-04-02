@@ -34,6 +34,7 @@ import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
@@ -182,6 +183,11 @@ const ApiSendRoute = ApiSendRouteImport.update({
   path: '/api/send',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPingRoute = ApiPingRouteImport.update({
+  id: '/api/ping',
+  path: '/api/ping',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
@@ -317,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
+  '/api/ping': typeof ApiPingRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-status': typeof ApiSessionStatusRoute
@@ -365,6 +372,7 @@ export interface FileRoutesByTo {
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
+  '/api/ping': typeof ApiPingRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-status': typeof ApiSessionStatusRoute
@@ -415,6 +423,7 @@ export interface FileRoutesById {
   '/api/history': typeof ApiHistoryRoute
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
+  '/api/ping': typeof ApiPingRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-status': typeof ApiSessionStatusRoute
@@ -466,6 +475,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/models'
     | '/api/paths'
+    | '/api/ping'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-status'
@@ -514,6 +524,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/models'
     | '/api/paths'
+    | '/api/ping'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-status'
@@ -563,6 +574,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/models'
     | '/api/paths'
+    | '/api/ping'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-status'
@@ -613,6 +625,7 @@ export interface RootRouteChildren {
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelsRoute: typeof ApiModelsRoute
   ApiPathsRoute: typeof ApiPathsRoute
+  ApiPingRoute: typeof ApiPingRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
@@ -810,6 +823,13 @@ declare module '@tanstack/react-router' {
       path: '/api/send'
       fullPath: '/api/send'
       preLoaderRoute: typeof ApiSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ping': {
+      id: '/api/ping'
+      path: '/api/ping'
+      fullPath: '/api/ping'
+      preLoaderRoute: typeof ApiPingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/paths': {
@@ -1032,6 +1052,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelsRoute: ApiModelsRoute,
   ApiPathsRoute: ApiPathsRoute,
+  ApiPingRoute: ApiPingRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionStatusRoute: ApiSessionStatusRoute,
