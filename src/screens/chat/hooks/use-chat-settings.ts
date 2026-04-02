@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 
+import { writeTextToClipboard } from '@/lib/clipboard'
 import { readError } from '../utils'
 import type { PathsPayload } from '../types'
 
@@ -54,7 +55,7 @@ export function useChatSettings() {
   const copySessionsDir = useCallback(() => {
     if (!paths?.sessionsDir) return
     try {
-      void navigator.clipboard.writeText(paths.sessionsDir)
+      void writeTextToClipboard(paths.sessionsDir)
     } catch {
       // ignore
     }
@@ -63,7 +64,7 @@ export function useChatSettings() {
   const copyStorePath = useCallback(() => {
     if (!paths?.storePath) return
     try {
-      void navigator.clipboard.writeText(paths.storePath)
+      void writeTextToClipboard(paths.storePath)
     } catch {
       // ignore
     }

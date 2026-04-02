@@ -16,6 +16,7 @@ import {
   getAuthTypeLabel,
   getProviderInfo,
 } from '@/lib/provider-catalog'
+import { writeTextToClipboard } from '@/lib/clipboard'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -217,7 +218,7 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
     if (!configExample) return
 
     try {
-      await navigator.clipboard.writeText(configExample)
+      await writeTextToClipboard(configExample)
       setCopyState('copied')
     } catch {
       setCopyState('failed')

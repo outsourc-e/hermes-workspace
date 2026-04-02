@@ -5,6 +5,7 @@ import { createHighlighter } from 'shiki'
 import { formatLanguageName, normalizeLanguage, resolveLanguage } from './utils'
 import type { BundledLanguage, Highlighter } from 'shiki'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
+import { writeTextToClipboard } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -85,7 +86,7 @@ export function CodeBlock({
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(content)
+      await writeTextToClipboard(content)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1600)
     } catch {

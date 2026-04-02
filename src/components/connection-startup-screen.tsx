@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuthStatus } from '@/lib/hermes-auth'
+import { writeTextToClipboard } from '@/lib/clipboard'
 import { fetchHermesAuthStatus } from '@/lib/hermes-auth'
 
 const POLL_INTERVAL_MS = 2_000
@@ -120,7 +121,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
   const handleCopy = async (text: string, idx: number) => {
     try {
-      await navigator.clipboard.writeText(text)
+      await writeTextToClipboard(text)
       setCopiedIdx(idx)
     } catch {
       /* clipboard not available */
