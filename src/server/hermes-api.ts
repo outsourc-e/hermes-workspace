@@ -7,11 +7,15 @@
 
 import {
   HERMES_API,
+  BEARER_TOKEN,
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
   getCapabilities,
   probeGateway,
 } from './gateway-capabilities'
+
+const _authHeaders = (): Record<string, string> =>
+  BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 
 console.log(`[hermes-api] Configured API: ${HERMES_API}`)
 
@@ -56,7 +60,7 @@ export type HermesConfig = {
 // ── Helpers ───────────────────────────────────────────────────────
 
 async function hermesGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${HERMES_API}${path}`)
+  const res = await fetch(`${HERMES_API}${path}`, { headers: _authHeaders() })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(`Hermes API ${path}: ${res.status} ${body}`)
@@ -67,7 +71,7 @@ async function hermesGet<T>(path: string): Promise<T> {
 async function hermesPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${HERMES_API}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
@@ -80,7 +84,7 @@ async function hermesPost<T>(path: string, body?: unknown): Promise<T> {
 async function hermesPatch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${HERMES_API}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -91,7 +95,7 @@ async function hermesPatch<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function hermesDeleteReq(path: string): Promise<void> {
-  const res = await fetch(`${HERMES_API}${path}`, { method: 'DELETE' })
+  const res = await fetch(`${HERMES_API}${path}`, { method: 'DELETE', headers: _authHeaders() })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`Hermes API DELETE ${path}: ${res.status} ${text}`)
@@ -291,7 +295,7 @@ export async function streamChat(
 ): Promise<void> {
   const res = await fetch(`${HERMES_API}/api/sessions/${sessionId}/chat/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: opts.signal,
   })
