@@ -101,7 +101,7 @@ function UnavailableWidget({
   )
 }
 
-// ── System Glance (ClawSuite-style status bar) ───────────────────
+// ── System Glance (status bar) ───────────────────
 
 function SystemGlance({ sessions, connected, model, provider, tokens, cost }: {
   sessions: number; connected: boolean; model: string; provider: string; tokens: string; cost: string
@@ -318,16 +318,16 @@ function QuickAction({ label, icon, onClick, accentColor, disabled, badge }: {
 }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} className={cn(
-      'relative overflow-hidden flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all',
-      'border-[var(--theme-border)] bg-[var(--theme-card)]',
+      'relative overflow-hidden flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all',
+      'border-[var(--theme-border)] bg-[var(--theme-card)] text-left',
       disabled
         ? 'cursor-not-allowed opacity-60'
         : 'hover:border-neutral-300 dark:hover:border-neutral-700 hover:scale-[1.01] active:scale-[0.99]',
     )}>
-      <div className="flex size-7 items-center justify-center rounded-md text-sm" style={{ background: `${accentColor}18` }}>{icon}</div>
-      <span className="text-neutral-700 dark:text-neutral-200 text-xs font-medium">{label}</span>
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-md text-sm" style={{ background: `${accentColor}18` }}>{icon}</div>
+      <span className="min-w-0 flex-1 text-neutral-700 dark:text-neutral-100 text-xs font-semibold">{label}</span>
       {badge ? (
-        <span className="ml-auto rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+        <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-700">
           {badge}
         </span>
       ) : null}
@@ -419,7 +419,7 @@ export function DashboardScreen() {
           className="size-12 md:size-14 rounded-xl shadow-md shadow-indigo-500/10 border border-[var(--theme-border)]"
         />
         <h1 className="text-sm font-semibold text-ink tracking-wide">Hermes Workspace</h1>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="mt-1 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
           <QuickAction label="New Chat" icon="💬" accentColor="#6366f1" onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })} />
           <QuickAction label="Terminal" icon="💻" accentColor="#22c55e" onClick={() => navigate({ to: '/terminal' })} />
           <QuickAction

@@ -6,6 +6,7 @@ import {
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
+  DashboardSquare01Icon,
   File01Icon,
   Menu01Icon,
   PuzzleIcon,
@@ -21,11 +22,12 @@ import {
 } from '@/hooks/use-chat-settings'
 
 const NAV_ITEMS = [
-  { id: 'chat',     label: 'Chat',     icon: Chat01Icon,      to: '/chat/main',  match: (p: string) => p.startsWith('/chat') || p === '/new' || p === '/' },
-  { id: 'terminal', label: 'Terminal', icon: CommandLineIcon,  to: '/terminal',   match: (p: string) => p.startsWith('/terminal') },
-  { id: 'jobs',     label: 'Jobs',     icon: Clock01Icon,      to: '/jobs',       match: (p: string) => p.startsWith('/jobs') },
-  { id: 'memory',   label: 'Memory',   icon: BrainIcon,        to: '/memory',     match: (p: string) => p.startsWith('/memory') },
-  { id: 'skills',   label: 'Skills',   icon: PuzzleIcon,       to: '/skills',     match: (p: string) => p.startsWith('/skills') },
+  { id: 'chat',      label: 'Chat',      icon: Chat01Icon,            to: '/chat/main', match: (p: string) => p.startsWith('/chat') || p === '/new' || p === '/' },
+  { id: 'dashboard', label: 'Dashboard', icon: DashboardSquare01Icon, to: '/dashboard', match: (p: string) => p.startsWith('/dashboard') },
+  { id: 'terminal',  label: 'Terminal',  icon: CommandLineIcon,       to: '/terminal',  match: (p: string) => p.startsWith('/terminal') },
+  { id: 'jobs',      label: 'Jobs',      icon: Clock01Icon,           to: '/jobs',      match: (p: string) => p.startsWith('/jobs') },
+  { id: 'memory',    label: 'Memory',    icon: BrainIcon,             to: '/memory',    match: (p: string) => p.startsWith('/memory') },
+  { id: 'skills',    label: 'Skills',    icon: PuzzleIcon,            to: '/skills',    match: (p: string) => p.startsWith('/skills') },
 ]
 
 

@@ -100,8 +100,9 @@ function getWordBoundaryIndex(text: string, wordCount: number): number {
 type StreamToolCall = {
   id: string
   name: string
-  phase: 'calling' | 'running' | 'done' | 'error'
+  phase: 'calling' | 'running' | 'done' | 'complete' | 'completed' | 'result' | 'error'
   args?: unknown
+  preview?: string
   result?: string
 }
 
@@ -144,6 +145,7 @@ type InlineToolSection = {
   key: string
   type: string
   input?: Record<string, unknown>
+  preview?: string
   outputText: string
   errorText?: string
   state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error'
@@ -769,7 +771,7 @@ function useAnimatedDots(): string {
 }
 
 function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
-  const isDone = toolCall.phase === 'done'
+  const isDone = toolCall.phase === 'done' || toolCall.phase === 'complete' || toolCall.phase === 'completed' || toolCall.phase === 'result'
   const isError = toolCall.phase === 'error'
   const isRunning = !isDone && !isError
   const [expanded, setExpanded] = useState(false)
@@ -1194,128 +1196,159 @@ function InlineToolSectionItem({
     shouldTruncateOutput && !showFullOutput
       ? `${outputText.slice(0, 800)}…`
       : outputText
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!isRunning) return
+    setElapsed(0)
+    const id = window.setInterval(() => setElapsed((s) => s + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [isRunning, toolSection.key])
+  const [dots, setDots] = useState(0)
+  useEffect(() => {
+    if (!isRunning) return
+    const id = window.setInterval(() => setDots((d) => (d + 1) % 4), 400)
+    return () => window.clearInterval(id)
+  }, [isRunning, toolSection.key])
+  const elapsedLabel = elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`
+  const verb =
+    toolSection.type.includes('search') ? 'Searching' :
+    toolSection.type.includes('read') || toolSection.type.includes('Read') ? 'Reading' :
+    toolSection.type.includes('write') || toolSection.type.includes('Write') || toolSection.type.includes('edit') ? 'Writing' :
+    toolSection.type.includes('exec') || toolSection.type.includes('terminal') ? 'Executing' :
+    toolSection.type.includes('memory') ? 'Remembering' : 'Working'
+
+  const previewLabel = toolSection.preview || headerArgTruncated
+  const hasInputData = toolSection.input && Object.keys(toolSection.input).length > 0
+  const hasOutputData = !!(toolSection.outputText || toolSection.errorText)
+  // Always expandable — show args, output, or at minimum the tool name/state
+  const hasExpandableContent = true
 
   return (
-    <Collapsible
-      key={toolSection.key || `${toolSection.type}-${index}`}
-      open={open}
-      onOpenChange={setOpen}
-    >
-      {/* ── Collapsed row ── */}
-      <CollapsibleTrigger
-        className="w-full justify-start gap-1.5 rounded-md bg-transparent px-2 py-1 text-[11px] font-mono hover:opacity-80"
+    <div>
+      {/* ── Card — always clickable to expand ── */}
+      <div
+        className={cn(
+          'rounded-lg border border-primary-200 bg-primary-50 text-[11px] overflow-hidden',
+          'cursor-pointer hover:border-primary-300 transition-colors',
+        )}
         style={{
-          color: isError ? 'var(--theme-danger)' : 'var(--theme-muted)',
+          borderLeftWidth: '3px',
+          borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
+          boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.12)' : 'none',
         }}
+        onClick={() => setOpen((v) => !v)}
+        role="button"
+        tabIndex={0}
       >
-        {/* chevron */}
-        <span className="shrink-0 text-[9px] transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
-        {/* icon + name */}
-        <span className="shrink-0">{icon}</span>
-        <span className="shrink-0 font-semibold">{toolDisplayLabel}</span>
-        {/* summary arg */}
-        {headerArgTruncated && headerArgTruncated !== toolDisplayLabel ? (
-          <span className="truncate opacity-40 text-[10px]">{headerArgTruncated}</span>
-        ) : null}
-        {/* status badge */}
-        <span className="ml-auto shrink-0">
-          {isError && (
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-sans font-medium bg-red-950/40 text-red-400">
-              error
-            </span>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+          <span className="text-sm leading-none shrink-0">{icon}</span>
+          <span className="font-mono font-semibold text-ink">{toolDisplayLabel}</span>
+          {previewLabel && previewLabel !== toolDisplayLabel ? (
+            <span className="truncate opacity-40 text-[10px] font-mono min-w-0">{previewLabel}</span>
+          ) : null}
+          <span className="flex-1" />
+          {isRunning && <span className="text-[10px] tabular-nums text-primary-400">{elapsedLabel}</span>}
+          {isDone && !isRunning && <span className="text-xs text-green-500">✅</span>}
+          {isError && <span className="text-xs text-red-500">❌</span>}
+          {isRunning && <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />}
+          {hasExpandableContent && (
+            <span className="text-[8px] opacity-30 ml-0.5">{open ? '▾' : '▸'}</span>
           )}
-          {isRunning && (
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-sans font-medium bg-amber-950/30 text-amber-400 animate-pulse">
-              running
-            </span>
-          )}
-          {isDone && (
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-sans font-medium bg-emerald-950/30 text-emerald-500">
-              ✓ done
-            </span>
-          )}
-        </span>
-      </CollapsibleTrigger>
+        </div>
+        {isRunning && (
+          <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
+            {verb}{'.'.repeat(dots)}
+          </div>
+        )}
+      </div>
 
-      {/* ── Expanded section ── */}
-      <CollapsiblePanel>
-        <div className="mt-0.5 ml-3 flex flex-col gap-1.5 pb-1.5 border-l border-primary-200/60 pl-2">
-          {/* Args */}
-          {toolSection.input && Object.keys(toolSection.input).length > 0 && !showRawJson ? (
+      {/* ── Expanded detail — terminal-style args + output ── */}
+      {open && (
+        <div className="mt-1 ml-3 flex flex-col gap-1.5 pb-1 border-l-2 border-primary-200/40 pl-3 animate-in slide-in-from-top-1 duration-150">
+          {hasInputData && !showRawJson ? (
             <div>
-              <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Arguments</div>
+              <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Input</div>
               {toolSection.type === 'exec' && headerArg ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[11px] font-mono text-amber-600" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
+                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500" style={{ background: 'var(--code-bg, var(--theme-card))' }}>
                   $ {headerArg}
                 </pre>
               ) : (
-                <pre className="max-h-32 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[11px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
+                <pre className="max-h-32 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
                   {JSON.stringify(toolSection.input, null, 2)}
                 </pre>
               )}
             </div>
           ) : null}
 
-          {/* Output / error */}
           {!showRawJson ? (
             isError && toolSection.errorText ? (
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">Error</div>
-                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-xs font-mono text-red-500" style={{ background: 'var(--code-bg, var(--theme-card))' }}>
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400" style={{ background: 'var(--code-bg, var(--theme-card))' }}>
                   {displayedOutputText}
                 </pre>
               </div>
             ) : toolSection.outputText ? (
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Output</div>
-                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-xs font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
                   {displayedOutputText}
                 </pre>
               </div>
-            ) : isRunning ? (
-              <span className="text-xs italic text-primary-500">running…</span>
-            ) : (
-              <span className="text-xs italic text-primary-500">no output</span>
-            )
+            ) : null
           ) : (
-            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[11px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
+            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
               {rawJsonPayload}
             </pre>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            {shouldTruncateOutput ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowFullOutput((value) => !value)
-                }}
-                className="self-start text-[9px] font-sans text-primary-500 hover:text-primary-700 transition-colors"
-              >
-                {showFullOutput ? 'show less output' : 'show full output'}
+          {(shouldTruncateOutput || toolSection.outputText) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {shouldTruncateOutput && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); setShowFullOutput((v) => !v) }} className="text-[9px] text-primary-500 hover:text-primary-700">
+                  {showFullOutput ? 'less' : 'more'}
+                </button>
+              )}
+              <button type="button" onClick={(e) => { e.stopPropagation(); setShowRawJson((v) => !v) }} className="text-[9px] text-primary-500 hover:text-primary-700">
+                {showRawJson ? 'formatted' : 'raw'}
               </button>
-            ) : null}
-
-            {/* Raw JSON toggle */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowRawJson((v) => !v)
-              }}
-              className="self-start text-[9px] font-sans text-primary-500 hover:text-primary-700 transition-colors"
-            >
-              {showRawJson ? '← formatted' : 'raw JSON →'}
-            </button>
-          </div>
+            </div>
+          )}
+          {/* Fallback when no args or output available */}
+          {!hasInputData && !hasOutputData && !isRunning && (
+            <div className="text-[10px] text-primary-400 italic">
+              No detail available for this tool call
+            </div>
+          )}
         </div>
-      </CollapsiblePanel>
-    </Collapsible>
+      )}
+    </div>
   )
 }
 
 
+
+function ToolCallGroup({
+  toolSections,
+  expandAll,
+}: {
+  toolSections: Array<InlineToolSection>
+  expandAll?: boolean
+  isStreaming?: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 mt-0.5 mb-1 ml-8 md:ml-9">
+      {toolSections.map((toolSection, index) => (
+        <InlineToolSectionItem
+          key={toolSection.key || `${toolSection.type}-${index}`}
+          toolSection={toolSection}
+          index={index}
+          forceOpen={expandAll}
+        />
+      ))}
+    </div>
+  )
+}
 
 function MessageItemComponent({
   message,
@@ -1555,6 +1588,7 @@ function MessageItemComponent({
         name: typeof entry?.name === 'string' ? entry.name : 'tool',
         phase: normalizeStreamToolPhase(entry?.phase),
         args: entry?.args,
+        preview: typeof entry?.preview === 'string' ? entry.preview : undefined,
         result: typeof entry?.result === 'string' ? entry.result : undefined,
       }))
       .filter((entry: any) => entry.id.length > 0)
@@ -1638,23 +1672,28 @@ function MessageItemComponent({
   )
   const streamToolSections = useMemo<Array<InlineToolSection>>(
     () =>
-      effectiveStreamToolCalls.map((toolCall, index) => ({
-        key: toolCall.id || `${toolCall.name}-${index}`,
-        type: toolCall.name,
-        input:
-          toolCall.args && typeof toolCall.args === 'object'
-            ? (toolCall.args as Record<string, unknown>)
-            : undefined,
-        outputText: toolCall.result,
-        errorText: toolCall.phase === 'error' ? toolCall.result || 'Tool failed' : undefined,
-        state:
-          toolCall.phase === 'error'
+      effectiveStreamToolCalls.map((toolCall, index) => {
+        const outputText = typeof toolCall.result === 'string' ? toolCall.result : ''
+        const isError = toolCall.phase === 'error'
+        const isComplete = toolCall.phase === 'done' || toolCall.phase === 'complete' || toolCall.phase === 'completed' || toolCall.phase === 'result' || outputText.length > 0
+        return {
+          key: toolCall.id || `${toolCall.name}-${index}`,
+          type: toolCall.name,
+          input:
+            toolCall.args && typeof toolCall.args === 'object'
+              ? (toolCall.args as Record<string, unknown>)
+              : undefined,
+          preview: toolCall.preview,
+          outputText,
+          errorText: isError ? outputText || 'Tool failed' : undefined,
+          state: isError
             ? 'output-error'
-            : toolCall.phase === 'done'
+            : (isComplete || !effectiveIsStreaming)
               ? 'output-available'
               : 'input-available',
-      })),
-    [effectiveStreamToolCalls],
+        }
+      }),
+    [effectiveStreamToolCalls, effectiveIsStreaming],
   )
   const inlineToolSections = useMemo<Array<InlineToolSection>>(
     () => [
@@ -1683,7 +1722,23 @@ function MessageItemComponent({
     ],
     [attachedToolSections, streamToolSections, toolParts],
   )
-  const hasToolCalls = inlineToolSections.length > 0
+  // When streaming is done, force all tool sections to completed state
+  // Prevents stuck timers from race conditions where tool.completed SSE
+  // arrives after the done event or phase wasn't properly updated
+  const finalToolSections = useMemo(() => {
+    if (effectiveIsStreaming) return inlineToolSections
+    return inlineToolSections.map((section) =>
+      section.state === 'input-available' || section.state === 'input-streaming'
+        ? { ...section, state: 'output-available' as const }
+        : section,
+    )
+  }, [inlineToolSections, effectiveIsStreaming])
+  const hasToolCalls = finalToolSections.length > 0
+  const shouldRenderMessageBubble =
+    hasText ||
+    hasAttachments ||
+    hasInlineImages ||
+    (effectiveIsStreaming && hasRevealedText)
 
   // 'queued' = delivered to server, waiting for response (busy/backlogged)
   // 'sending' = still in flight to the server API (should clear in <1s)
@@ -1843,7 +1898,7 @@ function MessageItemComponent({
           </Collapsible>
         </div>
       )}
-      {effectiveIsStreaming && hasLifecycleEvents && (
+      {effectiveIsStreaming && hasLifecycleEvents && !hasToolCalls && (
         <div className="w-full max-w-[900px] flex flex-col gap-1">
           {effectiveLifecycleEvents.map((event, index) => (
             <LifecycleEventCard
@@ -1880,7 +1935,16 @@ function MessageItemComponent({
           </details>
         </div>
       )}
-      {(hasText || hasAttachments || hasInlineImages || effectiveIsStreaming) &&
+      {/* Render tool calls above the message bubble */}
+      {hasToolCalls && (
+        <ToolCallGroup
+          toolSections={finalToolSections}
+          expandAll={expandAllToolSections}
+          isStreaming={effectiveIsStreaming}
+        />
+      )}
+
+      {shouldRenderMessageBubble &&
         !(message as any).__isNarration && (
           <Message className={cn('gap-2 md:gap-3', isUser ? 'flex-row-reverse' : '')}>
             {isUser ? (
@@ -2049,20 +2113,6 @@ function MessageItemComponent({
             )}
           </div>
         ) : null}
-
-      {/* Render tool calls — one collapsible card per tool with independent open state */}
-      {hasToolCalls && (
-        <div className="w-full max-w-[900px] mt-1 flex flex-col gap-1">
-          {inlineToolSections.map((toolSection, index) => (
-            <InlineToolSectionItem
-              key={toolSection.key || `${toolSection.type}-${index}`}
-              toolSection={toolSection}
-              index={index}
-              forceOpen={expandAllToolSections}
-            />
-          ))}
-        </div>
-      )}
 
       {(!hasToolCalls || hasText) && (
         <MessageActionsBar
