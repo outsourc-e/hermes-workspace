@@ -40,7 +40,7 @@ function getSetupSteps(
     },
     {
       title: 'Start the gateway',
-      command: `cd hermes-agent && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && hermes gateway`,
+      command: `cd hermes-agent && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && hermes --gateway`,
       note: 'Or use Auto-Start below if hermes-agent is already installed locally',
     },
   ]

@@ -580,13 +580,13 @@ export function HermesOnboarding() {
                       className="mt-3 rounded-lg px-3 py-2 font-mono text-[11px]"
                       style={{ background: 'rgba(0,0,0,0.2)' }}
                     >
-                      HERMES_API_URL=http://127.0.0.1:8642 pnpm dev
+                      pnpm dev
                     </div>
                     <div
                       className="mt-2 rounded-lg px-3 py-2 font-mono text-[11px]"
                       style={{ background: 'rgba(0,0,0,0.2)' }}
                     >
-                      hermes gateway
+                      hermes --gateway
                     </div>
                   </div>
                 </div>

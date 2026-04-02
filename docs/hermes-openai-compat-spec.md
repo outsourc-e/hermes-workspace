@@ -10,7 +10,7 @@
 
 ## 1. Problem
 
-Hermes Workspace currently depends on a forked `hermes-agent` FastAPI bridge for core functionality:
+Hermes Workspace currently depends on a forked `hermes-agent` gateway for extended functionality:
 
 - session management
 - streaming chat

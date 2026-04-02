@@ -15,7 +15,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   signal: 'Signal',
   imessage: 'iMessage',
   webchat: 'Hermes',
-  'openclaw-control-ui': 'Hermes',
+  'hermes-workspace': 'Hermes',
   slack: 'Slack',
   irc: 'IRC',
   googlechat: 'Google Chat',

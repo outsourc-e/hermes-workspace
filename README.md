@@ -21,7 +21,7 @@
 
 ## ✨ Features
 
-- 🤖 **Hermes Agent Integration** — Direct FastAPI backend connection with real-time SSE streaming
+- 🤖 **Hermes Agent Integration** — Direct gateway connection with real-time SSE streaming
 - 🎨 **8-Theme System** — Official, Classic, Slate, Mono — each with light and dark variants
 - 🔒 **Security Hardened** — Auth middleware on all API routes, CSP headers, exec approval prompts
 - 📱 **Mobile-First PWA** — Full feature parity on any device via Tailscale
@@ -72,7 +72,7 @@ python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
 hermes setup
-hermes gateway
+hermes --gateway
 ```
 
 If you're using another OpenAI-compatible server, just note its base URL.
@@ -281,14 +281,14 @@ The workspace auto-detects your gateway's capabilities on startup. Check your te
 
 ```
 [gateway] http://127.0.0.1:8642 available: health, models; missing: sessions, skills, memory, config, jobs
-[gateway] Missing Hermes APIs detected. Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes gateway
+[gateway] Missing Hermes APIs detected. Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes --gateway
 ```
 
-**Fix:** You need the WebAPI backend. Use our fork:
+**Fix:** Use our fork which includes extended gateway endpoints:
 
 ```bash
 git clone https://github.com/outsourc-e/hermes-agent.git
-cd hermes-agent && pip install -e . && hermes webapi
+cd hermes-agent && pip install -e . && hermes --gateway
 ```
 
 ### "Connection refused" or workspace hangs on load
@@ -298,14 +298,14 @@ Your Hermes gateway isn't running. Start it:
 ```bash
 cd hermes-agent
 source .venv/bin/activate
-hermes webapi
+hermes --gateway
 ```
 
 Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
 ### "Using upstream NousResearch/hermes-agent"
 
-The upstream hermes-agent doesn't include the WebAPI server yet. The workspace will load but with limited functionality. For full features, switch to our fork (`outsourc-e/hermes-agent`).
+The upstream hermes-agent supports basic chat via `hermes --gateway`, but doesn't include extended endpoints (sessions, memory, skills, config) yet. The workspace will work in **portable mode** with basic chat. For full features, use our fork (`outsourc-e/hermes-agent`).
 
 ---
 

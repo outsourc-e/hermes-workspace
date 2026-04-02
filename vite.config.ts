@@ -31,10 +31,10 @@ function resolveHermesAgentDir(env: Record<string, string>): string | null {
     candidates.push(env.HERMES_AGENT_PATH.trim())
   }
 
-  // Resolve relative to the workspace root (parent of clawsuite/)
-  const workspaceRoot = dirname(resolve('.'))  // clawsuite/ → parent
+  // Resolve relative to the workspace root (parent of hermes-workspace/)
+  const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'),    // sibling of clawsuite/
+    resolve(workspaceRoot, 'hermes-agent'),    // sibling hermes-agent directory
     resolve(workspaceRoot, '..', 'hermes-agent'), // one level up
   )
 

@@ -10,7 +10,8 @@ export const Route = createFileRoute('/api/auth-check')({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const healthResponse = await fetch('http://localhost:8642/health', {
+          const apiUrl = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+          const healthResponse = await fetch(`${apiUrl}/health`, {
             signal: AbortSignal.timeout(4_000),
           })
 

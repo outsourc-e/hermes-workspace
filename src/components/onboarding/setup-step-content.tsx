@@ -114,7 +114,7 @@ export function ConnectionCheckStep({
             Example Hermes gateway command:
           </p>
           <code className="block overflow-x-auto rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900">
-            cd ~/.openclaw/workspace/hermes-agent && hermes gateway
+            cd hermes-agent && hermes --gateway
           </code>
           <p className="mt-3 text-xs text-red-700">
             Or point <code>HERMES_API_URL</code> at any OpenAI-compatible

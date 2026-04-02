@@ -8,11 +8,8 @@ RUN git clone https://github.com/outsourc-e/hermes-agent.git /app
 
 WORKDIR /app
 
-# Install uvicorn for the webapi server
-RUN pip install --no-cache-dir -e . uvicorn[standard] fastapi
+RUN pip install --no-cache-dir -e .
 
-ENV HERMES_WEBAPI_HOST=0.0.0.0
-ENV HERMES_WEBAPI_PORT=8642
 EXPOSE 8642
 
-CMD ["python", "-m", "webapi"]
+CMD ["hermes", "--gateway"]
