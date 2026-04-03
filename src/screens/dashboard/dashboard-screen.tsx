@@ -112,13 +112,13 @@ function SystemGlance({ sessions, connected, model, provider, tokens, cost }: {
       <span className={cn('size-2 shrink-0 rounded-full', connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500')} />
       <div className="flex flex-1 items-center gap-x-4 overflow-x-auto">
         <span className="text-xs font-medium text-ink">{model}</span>
-        <span className="text-neutral-300 dark:text-neutral-500">·</span>
+        <span className="text-muted">·</span>
         <span className="text-xs text-neutral-500">{provider}</span>
-        <span className="text-neutral-300 dark:text-neutral-500">·</span>
+        <span className="text-muted">·</span>
         <span className="text-xs text-neutral-500">{sessions} sessions</span>
-        <span className="text-neutral-300 dark:text-neutral-500">·</span>
+        <span className="text-muted">·</span>
         <span className="text-xs font-bold tabular-nums text-ink">{tokens} tokens</span>
-        <span className="text-neutral-300 dark:text-neutral-500">·</span>
+        <span className="text-muted">·</span>
         <span className="text-xs text-neutral-400">{cost}</span>
       </div>
     </div>
@@ -169,7 +169,7 @@ function ActivityChart({ sessions }: { sessions: HermesSession[] }) {
   }, [sessions])
 
   return (
-    <GlassCard title="Activity" titleRight={<span className="text-[10px] text-neutral-600 dark:text-neutral-400">14 days</span>} accentColor="#6366f1" className="h-full">
+    <GlassCard title="Activity" titleRight={<span className="text-[10px] text-muted">14 days</span>} accentColor="#6366f1" className="h-full">
       <div className="h-[200px] w-full -ml-2">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
@@ -294,13 +294,13 @@ function SkillsWidget() {
   }
 
   return (
-    <GlassCard title="Skills" titleRight={<span className="text-[10px] text-neutral-600 dark:text-neutral-400">{skills.length} installed</span>} accentColor="#f59e0b">
+    <GlassCard title="Skills" titleRight={<span className="text-[10px] text-muted">{skills.length} installed</span>} accentColor="#f59e0b">
       {skills.length === 0 ? (
         <div className="text-xs text-neutral-400 py-4 text-center">No skills installed</div>
       ) : (
         <div className="space-y-1.5">
           {skills.slice(0, 6).map((skill, i) => (
-            <div key={String(skill.name ?? i)} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
+            <div key={String(skill.name ?? i)} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-[var(--theme-card2)] transition-colors">
               <span className="text-xs">📦</span>
               <span className="text-xs font-medium text-ink truncate flex-1">{String(skill.name ?? 'Unnamed')}</span>
               {skill.enabled !== false && <span className="size-1.5 rounded-full bg-emerald-500/60" />}
@@ -323,10 +323,10 @@ function QuickAction({ label, icon, onClick, accentColor, disabled, badge }: {
       'border-[var(--theme-border)] bg-[var(--theme-card)] text-left',
       disabled
         ? 'cursor-not-allowed opacity-60'
-        : 'hover:border-neutral-300 dark:hover:border-neutral-700 hover:scale-[1.01] active:scale-[0.99]',
+        : 'hover:border-[var(--theme-accent-border)] hover:scale-[1.01] active:scale-[0.99]',
     )}>
       <div className="flex size-7 shrink-0 items-center justify-center rounded-md text-sm" style={{ background: `${accentColor}18` }}>{icon}</div>
-      <span className="min-w-0 flex-1 text-neutral-700 dark:text-neutral-100 text-xs font-semibold">{label}</span>
+      <span className="min-w-0 flex-1 text-xs font-semibold" style={{ color: 'var(--theme-text)' }}>{label}</span>
       {badge ? (
         <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-700">
           {badge}
@@ -350,10 +350,10 @@ function SessionRow({ session, maxTokens, onClick }: {
   return (
     <button type="button" onClick={onClick} className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-[var(--theme-card2)] transition-colors group">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[13px] font-medium text-ink truncate flex-1 group-hover:text-neutral-900 dark:group-hover:text-neutral-100">
+        <span className="text-[13px] font-medium text-ink truncate flex-1 group-hover:text-ink">
           {session.title || session.id}
         </span>
-        <span className="text-[10px] tabular-nums text-neutral-600 dark:text-neutral-400 shrink-0">
+        <span className="text-[10px] tabular-nums text-muted shrink-0">
           {session.started_at ? timeAgo(session.started_at) : ''}
         </span>
       </div>
@@ -476,7 +476,7 @@ export function DashboardScreen() {
         <GlassCard
           title="Recent Sessions"
           titleRight={
-            <button type="button" className="text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-300 transition-colors"
+            <button type="button" className="text-[10px] text-muted hover:text-neutral-300 transition-colors"
               onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}>
               View all →
             </button>
