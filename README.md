@@ -110,23 +110,46 @@ ANTHROPIC_API_KEY=your-key-here
 
 [![Open in GitHub Codespaces](https://img.shields.io/badge/GitHub%20Codespaces-Open-181717?logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=outsourc-e/hermes-workspace)
 
+The Docker setup runs both the **Hermes Agent gateway** and **Hermes Workspace** together.
+
 ### Prerequisites
 
 - **Docker**
 - **Docker Compose**
+- **Anthropic API Key** — [Get one here](https://console.anthropic.com/settings/keys) (required for the agent gateway)
+
+### Step 1: Configure Environment
 
 ```bash
 git clone https://github.com/outsourc-e/hermes-workspace.git
 cd hermes-workspace
-cp .env.example .env   # Edit with your API key
+cp .env.example .env
+```
+
+Edit `.env` and add your API key:
+
+```env
+ANTHROPIC_API_KEY=your-key-here
+```
+
+> **Important:** The `hermes-agent` container requires `ANTHROPIC_API_KEY` to function. Without it, the gateway will fail to authenticate.
+
+### Step 2: Start the Services
+
+```bash
 docker compose up
 ```
 
-Open `http://localhost:3000`.
+This starts two services:
 
-> **Supports any provider:** Anthropic, OpenAI, OpenRouter, or local models via Ollama (no key needed). Just set the right env var in `.env` — see `.env.example` for options.
+- **hermes-agent** — The AI agent gateway (port 8642)
+- **hermes-workspace** — The web UI (port 3000)
 
-> **Ollama users:** If you get a CORS error, start Ollama with `OLLAMA_ORIGINS=* ollama serve` and use `http://127.0.0.1:11434/v1` as your base URL (not `localhost`).
+### Step 3: Access the Workspace
+
+Open `http://localhost:3000` and complete the onboarding.
+
+> **Verify:** Check the Docker logs for `[gateway] Connected to Hermes` — this confirms the workspace successfully connected to the agent.
 
 ---
 
@@ -308,6 +331,55 @@ Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 ### "Using upstream NousResearch/hermes-agent"
 
 The upstream hermes-agent supports basic chat via `hermes --gateway`, but doesn't include extended endpoints (sessions, memory, skills, config) yet. The workspace will work in **portable mode** with basic chat. For full features, use our fork (`outsourc-e/hermes-agent`).
+
+### Docker: "Unauthorized" or "Connection refused" to hermes-agent
+
+If using Docker Compose and getting auth errors:
+
+1. **Check your API key is set:**
+
+   ```bash
+   cat .env | grep ANTHROPIC_API_KEY
+   # Should show: ANTHROPIC_API_KEY=sk-ant-...
+   ```
+
+2. **View the agent container logs:**
+
+   ```bash
+   docker compose logs hermes-agent
+   ```
+
+   Look for startup errors or missing API key warnings.
+
+3. **Verify the agent health endpoint:**
+
+   ```bash
+   curl http://localhost:8642/health
+   # Should return: {"status": "ok"}
+   ```
+
+4. **Restart with fresh containers:**
+
+   ```bash
+   docker compose down
+   docker compose up --build
+   ```
+
+5. **Check workspace logs for gateway status:**
+   ```bash
+   docker compose logs hermes-workspace
+   ```
+   Look for: `[gateway] http://hermes-agent:8642 mode=...` — if it shows `mode=disconnected`, the agent isn't running correctly.
+
+### Docker: "hermes webapi command not found"
+
+The `hermes webapi` command referenced in older docs doesn't exist. The correct command is:
+
+```bash
+hermes --gateway   # Starts the FastAPI gateway server
+```
+
+The Docker setup uses `hermes --gateway` automatically — no action needed if using `docker compose up`.
 
 ---
 

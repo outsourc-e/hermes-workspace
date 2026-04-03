@@ -1,4 +1,22 @@
+# Hermes Workspace + Agent — Docker Compose Setup
+#
+# Requirements:
+#   - Docker & Docker Compose
+#   - ANTHROPIC_API_KEY in .env file (required for the agent gateway)
+#
+# Quick Start:
+#   1. cp .env.example .env
+#   2. Add your ANTHROPIC_API_KEY to .env
+#   3. docker compose up
+#   4. Open http://localhost:3000
+#
+# Troubleshooting:
+#   - See README.md "Docker" troubleshooting section
+#   - Check logs: docker compose logs hermes-agent
+
 services:
+  # The Hermes AI Agent Gateway
+  # Provides the backend API that the workspace connects to
   hermes-agent:
     build:
       context: .
@@ -6,16 +24,19 @@ services:
     env_file:
       - .env
     environment:
+      # Pass through the API key from .env (required!)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8642/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8642/health']
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
     ports:
-      - "8642:8642"
+      - '8642:8642'
 
+  # The Hermes Workspace Web UI
+  # Connects to hermes-agent at http://hermes-agent:8642
   hermes-workspace:
     build:
       context: .
@@ -26,6 +47,7 @@ services:
     env_file:
       - .env
     environment:
+      # Internal Docker network URL (not localhost!)
       HERMES_API_URL: http://hermes-agent:8642
     ports:
-      - "3000:3000"
+      - '3000:3000'
