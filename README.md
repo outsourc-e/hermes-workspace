@@ -106,6 +106,59 @@ ANTHROPIC_API_KEY=your-key-here
 
 ---
 
+## 🧠 Local Models (Ollama, LM Studio, vLLM)
+
+Hermes Workspace supports two modes with local models:
+
+### Portable Mode (Easiest)
+
+Point the workspace directly at your local server — no Hermes gateway needed:
+
+```bash
+# Start Ollama
+OLLAMA_ORIGINS=* ollama serve
+
+# Start workspace pointed at Ollama
+HERMES_API_URL=http://127.0.0.1:11434 pnpm dev
+```
+
+Chat works immediately. Sessions, memory, and skills show "Not Available" — that's expected in portable mode.
+
+### Enhanced Mode (Full Features)
+
+Route through the Hermes gateway for sessions, memory, skills, jobs, and tools:
+
+**1. Configure your local model in `~/.hermes/config.yaml`:**
+
+```yaml
+provider: ollama
+model: qwen2.5:7b  # or any model you have pulled
+custom_providers:
+  - name: ollama
+    base_url: http://127.0.0.1:11434/v1
+    api_key: ollama
+    api_mode: chat_completions
+```
+
+**2. Enable the API server in `~/.hermes/.env`:**
+
+```env
+API_SERVER_ENABLED=true
+```
+
+**3. Start the gateway and workspace:**
+
+```bash
+hermes gateway run          # Starts on :8642
+HERMES_API_URL=http://127.0.0.1:8642 pnpm dev
+```
+
+All workspace features unlock automatically — sessions persist, memory saves across chats, skills are available, and the dashboard shows real usage data.
+
+> **Works with any OpenAI-compatible server** — Ollama, LM Studio, vLLM, llama.cpp, LocalAI, etc. Just change the `base_url` and `model` in the config above.
+
+---
+
 ## 🐳 Docker Quickstart
 
 [![Open in GitHub Codespaces](https://img.shields.io/badge/GitHub%20Codespaces-Open-181717?logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=outsourc-e/hermes-workspace)
@@ -323,8 +376,20 @@ Your Hermes gateway isn't running. Start it:
 ```bash
 cd hermes-agent
 source .venv/bin/activate
-hermes --gateway
+hermes gateway run
 ```
+
+### Ollama: chat returns empty or model shows "Offline"
+
+Make sure your `~/.hermes/config.yaml` has the `custom_providers` section and `API_SERVER_ENABLED=true` in `~/.hermes/.env`. See [Local Models](#-local-models-ollama-lm-studio-vllm) above.
+
+Also ensure Ollama is running with CORS enabled:
+
+```bash
+OLLAMA_ORIGINS=* ollama serve
+```
+
+Use `http://127.0.0.1:11434/v1` (not `localhost`) as the base URL.
 
 Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
