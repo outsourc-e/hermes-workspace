@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Editor } from '@monaco-editor/react'
 import {
   DialogClose,
   DialogContent,
@@ -146,20 +145,14 @@ export default function FilePreviewDialog({
             </div>
           ) : (
             <div className="h-[60vh]">
-              <Editor
+              <textarea
+                className="h-full w-full resize-none rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 font-mono text-xs leading-relaxed text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                 value={content}
-                language={language}
-                theme="vs-dark"
-                onChange={(value) => {
-                  setContent(value || '')
+                onChange={(e) => {
+                  setContent(e.target.value)
                   setDirty(true)
                 }}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 13,
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'on',
-                }}
+                spellCheck={false}
               />
             </div>
           )}

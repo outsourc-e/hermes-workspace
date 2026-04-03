@@ -960,7 +960,7 @@ export function FilesScreen() {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 5000)
     try {
-      const res = await fetch('/api/files?action=list&maxDepth=0', { signal: controller.signal })
+      const res = await fetch('/api/files?action=list&maxDepth=3', { signal: controller.signal })
       if (!res.ok) throw new Error(`HTTP ${res.status} — check that HERMES_WORKSPACE_DIR is set`)
       const data = (await res.json()) as FilesListResponse
       setEntries(Array.isArray(data.entries) ? data.entries : [])
