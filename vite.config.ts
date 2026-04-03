@@ -459,11 +459,20 @@ const config = defineConfig(({ mode, command }) => {
             // Portable-aware health check — returns ok if any chat backend is available
             if (req.method === 'GET' && requestPath === '/api/connection-status') {
               try {
-                // Check if the configured backend has /v1/models (works for Ollama, OpenAI, etc.)
-                const modelsRes = await fetch(`${hermesApiUrl}/v1/models`, {
-                  signal: AbortSignal.timeout(3000),
-                })
-                if (modelsRes.ok) {
+                // Check for enhanced Hermes gateway first (has /api/sessions)
+                const [modelsRes, sessionsRes] = await Promise.all([
+                  fetch(`${hermesApiUrl}/v1/models`, { signal: AbortSignal.timeout(3000) }).catch(() => null),
+                  fetch(`${hermesApiUrl}/api/sessions?limit=1`, { signal: AbortSignal.timeout(3000) }).catch(() => null),
+                ])
+                const hasModels = modelsRes?.ok ?? false
+                const hasSessions = sessionsRes?.ok ?? false
+                if (hasModels && hasSessions) {
+                  res.statusCode = 200
+                  res.setHeader('content-type', 'application/json')
+                  res.end(JSON.stringify({ ok: true, mode: 'enhanced', backend: hermesApiUrl }))
+                  return
+                }
+                if (hasModels) {
                   res.statusCode = 200
                   res.setHeader('content-type', 'application/json')
                   res.end(JSON.stringify({ ok: true, mode: 'portable', backend: hermesApiUrl }))

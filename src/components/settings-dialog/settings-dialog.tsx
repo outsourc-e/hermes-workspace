@@ -42,7 +42,8 @@ import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 import BackendUnavailableState from '@/components/backend-unavailable-state'
 import { applyAccentColor } from '@/lib/accent-colors'
-import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
+import { getUnavailableReason } from '@/lib/feature-gates'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { ProviderLogo } from '@/components/provider-logo'
 import {
   DialogClose,
@@ -148,7 +149,7 @@ const PROVIDER_CARDS: Array<{ id: string; name: string; logo: string; models: Ar
 ]
 
 function HermesContent() {
-  const configAvailable = isFeatureAvailable('config')
+  const configAvailable = useFeatureAvailable('config')
   const [activeProvider, setActiveProvider] = useState('')
   const [activeModel, setActiveModel] = useState('')
   const [availableModels, setAvailableModels] = useState<Array<string>>([])

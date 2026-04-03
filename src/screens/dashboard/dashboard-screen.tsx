@@ -15,7 +15,8 @@ import { listSessions, getConfig } from '@/server/hermes-api'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { getCapabilities } from '@/server/gateway-capabilities'
 import type { HermesSession } from '@/server/hermes-api'
-import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
+import { getUnavailableReason } from '@/lib/feature-gates'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -202,7 +203,7 @@ function ActivityChart({ sessions }: { sessions: HermesSession[] }) {
 // ── Model Card ───────────────────────────────────────────────────
 
 function ModelCard() {
-  const configAvailable = isFeatureAvailable('config')
+  const configAvailable = useFeatureAvailable('config')
   const configQuery = useQuery({
     queryKey: ['hermes-config'],
     queryFn: getConfig,
@@ -268,7 +269,7 @@ function ModelCard() {
 // ── Skills Widget ────────────────────────────────────────────────
 
 function SkillsWidget() {
-  const skillsAvailable = isFeatureAvailable('skills')
+  const skillsAvailable = useFeatureAvailable('skills')
   const skillsQuery = useQuery({
     queryKey: ['hermes-skills'],
     queryFn: async () => {
@@ -375,8 +376,8 @@ function SessionRow({ session, maxTokens, onClick }: {
 
 export function DashboardScreen() {
   const navigate = useNavigate()
-  const sessionsAvailable = isFeatureAvailable('sessions')
-  const skillsAvailable = isFeatureAvailable('skills')
+  const sessionsAvailable = useFeatureAvailable('sessions')
+  const skillsAvailable = useFeatureAvailable('skills')
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: () => listSessions(50, 0),

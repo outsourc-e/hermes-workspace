@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import {  useActivityStore } from './activity-store'
 import type {ActivityEvent} from './activity-store';
-import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
+import { getUnavailableReason } from '@/lib/feature-gates'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -323,8 +324,8 @@ function LogsTab() {
 
 export function InspectorPanel() {
   const isOpen = useInspectorStore((s) => s.isOpen)
-  const memoryAvailable = isFeatureAvailable('memory')
-  const skillsAvailable = isFeatureAvailable('skills')
+  const memoryAvailable = useFeatureAvailable('memory')
+  const skillsAvailable = useFeatureAvailable('skills')
   const [activeTab, setActiveTab] = useState<TabId>('activity')
 
   useEffect(() => {

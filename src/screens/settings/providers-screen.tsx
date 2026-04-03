@@ -45,7 +45,8 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
-import { getUnavailableReason, isFeatureAvailable } from '@/lib/feature-gates'
+import { getUnavailableReason } from '@/lib/feature-gates'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import {
   getProviderDisplayName,
   getProviderInfo,
@@ -1323,7 +1324,7 @@ function ProviderManagementSection(props: {
 
 export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
   const queryClient = useQueryClient()
-  const configAvailable = isFeatureAvailable('config')
+  const configAvailable = useFeatureAvailable('config')
   const [activeTab, setActiveTab] = useState<SettingsTabId>('providers')
   const [search, setSearch] = useState('')
   const [draftValues, setDraftValues] = useState<Record<string, string>>({})
