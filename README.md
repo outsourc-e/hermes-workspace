@@ -126,6 +126,8 @@ Open `http://localhost:3000`.
 
 > **Supports any provider:** Anthropic, OpenAI, OpenRouter, or local models via Ollama (no key needed). Just set the right env var in `.env` — see `.env.example` for options.
 
+> **Ollama users:** If you get a CORS error, start Ollama with `OLLAMA_ORIGINS=* ollama serve` and use `http://127.0.0.1:11434/v1` as your base URL (not `localhost`).
+
 ---
 
 ## 📱 Install as App (Recommended)
