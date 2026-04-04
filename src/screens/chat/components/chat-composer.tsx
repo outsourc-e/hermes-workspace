@@ -2065,11 +2065,42 @@ function ChatComposerComponent({
                       <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
                         Model
                       </div>
-                      <div className="pb-4">
-                        <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm bg-accent-50 text-accent-700 font-medium">
-                          <span className="flex-1 truncate">⚕ Hermes Agent</span>
-                          <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
-                        </div>
+                      <div className="pb-4 max-h-[50vh] overflow-y-auto">
+                        {(modelsQuery.data
+                          ? Object.values(modelsQuery.data).flat()
+                          : []
+                        ).length > 0 ? (
+                          Object.entries(modelsQuery.data ?? {}).map(([provider, models]) =>
+                            (models as Array<ModelCatalogEntry>).map((m) => {
+                              const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
+                              const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
+                              const modelKey = provider && provider !== 'default' ? `${provider}/${mId}` : mId
+                              const isActive = modelKey === currentModel || mId === currentModel
+                              return (
+                                <button
+                                  key={modelKey}
+                                  type="button"
+                                  onClick={() => {
+                                    handleModelSelect(mId, provider !== 'default' ? provider : undefined)
+                                  }}
+                                  className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${
+                                    isActive
+                                      ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-300'
+                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                                  }`}
+                                >
+                                  <span className="flex-1 truncate">{String(mName)}</span>
+                                  {isActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
+                                </button>
+                              )
+                            })
+                          )
+                        ) : (
+                          <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm bg-accent-50 text-accent-700 font-medium">
+                            <span className="flex-1 truncate">{currentModel || '⚕ Hermes Agent'}</span>
+                            <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>,
@@ -2140,15 +2171,58 @@ function ChatComposerComponent({
                   </span>
                 )}
 
-                <div className="ml-0.5 md:ml-1 flex min-w-0 items-center">
-                  <span
-                    className="inline-flex h-7 max-w-[8rem] items-center rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 text-[11px] font-medium text-primary-600"
+                <div className="ml-0.5 md:ml-1 flex min-w-0 items-center" ref={modelSelectorRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsModelMenuOpen((prev) => !prev)}
+                    disabled={isModelSwitcherDisabled}
+                    className="inline-flex h-7 max-w-[8rem] items-center rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 text-[11px] font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     title={modelButtonLabel}
                   >
                     <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
                       {modelButtonLabel}
                     </span>
-                  </span>
+                  </button>
+                  {isModelMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-[199]" onClick={() => setIsModelMenuOpen(false)} />
+                      <div className="absolute bottom-full left-0 mb-2 z-[200] w-72 max-h-80 overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <div className="px-3 py-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider">Models</div>
+                        {(modelsQuery.data
+                          ? Object.values(modelsQuery.data).flat()
+                          : []
+                        ).length > 0 ? (
+                          Object.entries(modelsQuery.data ?? {}).map(([provider, models]) =>
+                            (models as Array<ModelCatalogEntry>).map((m) => {
+                              const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
+                              const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
+                              const modelKey = provider && provider !== 'default' ? `${provider}/${mId}` : mId
+                              const isActive = modelKey === currentModel || mId === currentModel
+                              return (
+                                <button
+                                  key={modelKey}
+                                  type="button"
+                                  onClick={() => {
+                                    handleModelSelect(mId, provider !== 'default' ? provider : undefined)
+                                  }}
+                                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                    isActive
+                                      ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-300'
+                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                                  }`}
+                                >
+                                  <span className="flex-1 truncate">{String(mName)}</span>
+                                  {isActive && <span className="size-1.5 rounded-full bg-primary-500 shrink-0" />}
+                                </button>
+                              )
+                            })
+                          )
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-neutral-500">No models available</div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
               </div>
