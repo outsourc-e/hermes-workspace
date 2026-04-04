@@ -183,7 +183,7 @@ async function fetchModels(): Promise<{
       let models = (richData.models || []).map((model) => ({
         id: model.id,
         name: model.id,
-        provider: currentProvider || undefined,
+        provider: (model as Record<string, unknown>).provider as string || currentProvider || undefined,
       }))
 
       // If gateway returns no models, try /v1/models as fallback
@@ -2116,12 +2116,14 @@ function ChatComposerComponent({
                           return allModels.map((m) => {
                             const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
                             const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
+                            const mProvider = typeof m === 'string' ? provider : ((m as Record<string, unknown>).provider as string || provider)
+                            const isLocal = typeof m !== 'string' && (m as Record<string, unknown>).description === 'local'
                             const isActive = mId === currentModel || `${provider}/${mId}` === currentModel
                             return (
                               <button
                                 key={String(mId)}
                                 type="button"
-                                onClick={() => handleModelSelect(String(mId), provider || undefined)}
+                                onClick={() => handleModelSelect(String(mId), mProvider || undefined)}
                                 className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${
                                   isActive
                                     ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-300'
@@ -2129,6 +2131,7 @@ function ChatComposerComponent({
                                 }`}
                               >
                                 <span className="flex-1 truncate">{String(mName)}</span>
+                                {isLocal && <span className="text-[10px] text-neutral-400 ml-1">local</span>}
                                 {isActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
                               </button>
                             )
@@ -2230,12 +2233,14 @@ function ChatComposerComponent({
                           return allModels.map((m) => {
                             const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
                             const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
+                            const mProvider = typeof m === 'string' ? provider : ((m as Record<string, unknown>).provider as string || provider)
+                            const isLocal = typeof m !== 'string' && (m as Record<string, unknown>).description === 'local'
                             const isActive = mId === currentModel || `${provider}/${mId}` === currentModel
                             return (
                               <button
                                 key={String(mId)}
                                 type="button"
-                                onClick={() => handleModelSelect(String(mId), provider || undefined)}
+                                onClick={() => handleModelSelect(String(mId), mProvider || undefined)}
                                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
                                   isActive
                                     ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-300'
@@ -2243,6 +2248,7 @@ function ChatComposerComponent({
                                 }`}
                               >
                                 <span className="flex-1 truncate">{String(mName)}</span>
+                                {isLocal && <span className="text-[10px] text-neutral-400 ml-1">local</span>}
                                 {isActive && <span className="size-1.5 rounded-full bg-primary-500 shrink-0" />}
                               </button>
                             )
