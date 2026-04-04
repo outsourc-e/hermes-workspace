@@ -2066,41 +2066,38 @@ function ChatComposerComponent({
                         Model
                       </div>
                       <div className="pb-4 max-h-[50vh] overflow-y-auto">
-                        {(modelsQuery.data
-                          ? Object.values(modelsQuery.data).flat()
-                          : []
-                        ).length > 0 ? (
-                          Object.entries(modelsQuery.data ?? {}).map(([provider, models]) =>
-                            (models as Array<ModelCatalogEntry>).map((m) => {
-                              const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
-                              const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
-                              const modelKey = provider && provider !== 'default' ? `${provider}/${mId}` : mId
-                              const isActive = modelKey === currentModel || mId === currentModel
-                              return (
-                                <button
-                                  key={modelKey}
-                                  type="button"
-                                  onClick={() => {
-                                    handleModelSelect(mId, provider !== 'default' ? provider : undefined)
-                                  }}
-                                  className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${
-                                    isActive
-                                      ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-300'
-                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
-                                  }`}
-                                >
-                                  <span className="flex-1 truncate">{String(mName)}</span>
-                                  {isActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
-                                </button>
-                              )
-                            })
-                          )
-                        ) : (
-                          <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm bg-accent-50 text-accent-700 font-medium">
-                            <span className="flex-1 truncate">{currentModel || '⚕ Hermes Agent'}</span>
-                            <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
-                          </div>
-                        )}
+                        {(() => {
+                          const allModels = modelsQuery.data?.models ?? []
+                          const provider = modelsQuery.data?.currentProvider ?? ''
+                          if (allModels.length === 0) {
+                            return (
+                              <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm bg-accent-50 text-accent-700 font-medium">
+                                <span className="flex-1 truncate">{currentModel || '⚕ Hermes Agent'}</span>
+                                <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
+                              </div>
+                            )
+                          }
+                          return allModels.map((m) => {
+                            const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
+                            const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
+                            const isActive = mId === currentModel || `${provider}/${mId}` === currentModel
+                            return (
+                              <button
+                                key={String(mId)}
+                                type="button"
+                                onClick={() => handleModelSelect(String(mId), provider || undefined)}
+                                className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${
+                                  isActive
+                                    ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-300'
+                                    : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                                }`}
+                              >
+                                <span className="flex-1 truncate">{String(mName)}</span>
+                                {isActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
+                              </button>
+                            )
+                          })
+                        })()}
                       </div>
                     </div>
                   </>,
@@ -2188,38 +2185,33 @@ function ChatComposerComponent({
                       <div className="fixed inset-0 z-[199]" onClick={() => setIsModelMenuOpen(false)} />
                       <div className="absolute bottom-full left-0 mb-2 z-[200] w-72 max-h-80 overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
                         <div className="px-3 py-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider">Models</div>
-                        {(modelsQuery.data
-                          ? Object.values(modelsQuery.data).flat()
-                          : []
-                        ).length > 0 ? (
-                          Object.entries(modelsQuery.data ?? {}).map(([provider, models]) =>
-                            (models as Array<ModelCatalogEntry>).map((m) => {
-                              const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
-                              const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
-                              const modelKey = provider && provider !== 'default' ? `${provider}/${mId}` : mId
-                              const isActive = modelKey === currentModel || mId === currentModel
-                              return (
-                                <button
-                                  key={modelKey}
-                                  type="button"
-                                  onClick={() => {
-                                    handleModelSelect(mId, provider !== 'default' ? provider : undefined)
-                                  }}
-                                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                    isActive
-                                      ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-300'
-                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
-                                  }`}
-                                >
-                                  <span className="flex-1 truncate">{String(mName)}</span>
-                                  {isActive && <span className="size-1.5 rounded-full bg-primary-500 shrink-0" />}
-                                </button>
-                              )
-                            })
-                          )
-                        ) : (
-                          <div className="px-3 py-2 text-sm text-neutral-500">No models available</div>
-                        )}
+                        {(() => {
+                          const allModels = modelsQuery.data?.models ?? []
+                          const provider = modelsQuery.data?.currentProvider ?? ''
+                          if (allModels.length === 0) {
+                            return <div className="px-3 py-2 text-sm text-neutral-500">No models available</div>
+                          }
+                          return allModels.map((m) => {
+                            const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
+                            const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
+                            const isActive = mId === currentModel || `${provider}/${mId}` === currentModel
+                            return (
+                              <button
+                                key={String(mId)}
+                                type="button"
+                                onClick={() => handleModelSelect(String(mId), provider || undefined)}
+                                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                  isActive
+                                    ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-300'
+                                    : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                                }`}
+                              >
+                                <span className="flex-1 truncate">{String(mName)}</span>
+                                {isActive && <span className="size-1.5 rounded-full bg-primary-500 shrink-0" />}
+                              </button>
+                            )
+                          })
+                        })()}
                       </div>
                     </>
                   )}
