@@ -1993,8 +1993,8 @@ function ChatComposerComponent({
                       aria-label="Actions"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300" />
-                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
+                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
                         Actions
                       </div>
                       <div className="grid grid-cols-2 gap-2 px-4 pb-4">
@@ -2008,7 +2008,7 @@ function ChatComposerComponent({
                           }}
                           className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="rounded-lg bg-orange-100 p-1.5 text-orange-600">
+                          <span className="rounded-lg bg-orange-100 dark:bg-orange-900/30 p-1.5 text-orange-600 dark:text-orange-400">
                             <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />
                           </span>
                           <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
@@ -2029,7 +2029,7 @@ function ChatComposerComponent({
                           }}
                           className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="rounded-lg bg-indigo-100 p-1.5 text-indigo-600">
+                          <span className="rounded-lg bg-indigo-100 dark:bg-indigo-900/30 p-1.5 text-indigo-600 dark:text-indigo-400">
                             <HugeiconsIcon icon={ArrowDown01Icon} size={24} strokeWidth={1.5} />
                           </span>
                           <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100 truncate max-w-full">
@@ -2046,7 +2046,7 @@ function ChatComposerComponent({
                             }}
                             className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
                           >
-                            <span className="rounded-lg bg-red-100 p-1.5 text-red-600">
+                            <span className="rounded-lg bg-red-100 dark:bg-red-900/30 p-1.5 text-red-600 dark:text-red-400">
                               <HugeiconsIcon icon={Delete01Icon} size={24} strokeWidth={1.5} />
                             </span>
                             <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
@@ -2064,7 +2064,7 @@ function ChatComposerComponent({
                             }}
                             className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
                           >
-                            <span className="rounded-lg bg-green-100 p-1.5 text-green-600">
+                            <span className="rounded-lg bg-green-100 dark:bg-green-900/30 p-1.5 text-green-600 dark:text-green-400">
                               <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />
                             </span>
                             <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
@@ -2095,8 +2095,8 @@ function ChatComposerComponent({
                       aria-label="Select model"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300" />
-                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
+                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
                         Model
                       </div>
                       <div className="pb-4 max-h-[60dvh] overflow-y-auto overflow-x-hidden">
