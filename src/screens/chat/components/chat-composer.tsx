@@ -785,7 +785,7 @@ function ChatComposerComponent({
   const focusFrameRef = useRef<number | null>(null)
 
   // Phase 4.2: Pinned models (kept for future use)
-  const { pinned, isPinned } = usePinnedModels()
+  const { pinned, isPinned, togglePin } = usePinnedModels()
 
   const modelsQuery = useQuery({
     queryKey: ['hermes', 'models'],
@@ -830,8 +830,6 @@ function ChatComposerComponent({
   })
 
   // Phase 4.2: (pinned model tracking kept for future use)
-  void isPinned
-  void pinned
   void modelsQuery.data
 
   const modelSwitchMutation = useMutation({
@@ -2101,41 +2099,86 @@ function ChatComposerComponent({
                       <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
                         Model
                       </div>
-                      <div className="pb-4 max-h-[50vh] overflow-y-auto">
+                      <div className="pb-4 max-h-[60dvh] overflow-y-auto overflow-x-hidden">
                         {(() => {
                           const allModels = modelsQuery.data?.models ?? []
-                          const provider = modelsQuery.data?.currentProvider ?? ''
+                          const defaultProvider = modelsQuery.data?.currentProvider ?? ''
                           if (allModels.length === 0) {
                             return (
-                              <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm bg-accent-50 text-accent-700 font-medium">
-                                <span className="flex-1 truncate">{currentModel || '⚕ Hermes Agent'}</span>
-                                <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
+                              <div className="p-4 text-center text-sm text-neutral-500">
+                                <p className="font-medium text-neutral-700 dark:text-neutral-300 mb-1">No models available</p>
+                                <p className="text-xs">Check your Hermes provider configuration.</p>
                               </div>
                             )
                           }
-                          return allModels.map((m) => {
-                            const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
-                            const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
-                            const mProvider = typeof m === 'string' ? provider : ((m as Record<string, unknown>).provider as string || provider)
+                          // Parse models into typed entries
+                          const parsed = allModels.map((m) => {
+                            const mId = String(typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown'))
+                            const mName = String(typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m))
+                            const mProvider = typeof m === 'string' ? defaultProvider : ((m as Record<string, unknown>).provider as string || defaultProvider)
                             const isLocal = typeof m !== 'string' && (m as Record<string, unknown>).description === 'local'
-                            const isActive = mId === currentModel || `${provider}/${mId}` === currentModel
-                            return (
-                              <button
-                                key={String(mId)}
-                                type="button"
-                                onClick={() => handleModelSelect(String(mId), mProvider || undefined)}
-                                className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${
-                                  isActive
-                                    ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-300'
-                                    : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
-                                }`}
-                              >
-                                <span className="flex-1 truncate">{String(mName)}</span>
-                                {isLocal && <span className="text-[10px] text-neutral-400 ml-1">local</span>}
-                                {isActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
-                              </button>
-                            )
+                            return { id: mId, name: mName, provider: mProvider, isLocal }
                           })
+                          // Split pinned vs unpinned, group unpinned by provider
+                          const pinnedEntries = parsed.filter((e) => isPinned(e.id))
+                          const unpinnedGroups = new Map<string, typeof parsed>()
+                          for (const entry of parsed) {
+                            if (isPinned(entry.id)) continue
+                            const group = unpinnedGroups.get(entry.provider) ?? []
+                            group.push(entry)
+                            unpinnedGroups.set(entry.provider, group)
+                          }
+                          const renderEntry = (entry: typeof parsed[0]) => {
+                            const isActive = entry.id === currentModel || `${defaultProvider}/${entry.id}` === currentModel
+                            return (
+                              <div key={entry.id} className="group relative flex items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => { handleModelSelect(entry.id, entry.provider || undefined); setIsModelMenuOpen(false) }}
+                                  className={`flex flex-1 items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${
+                                    isActive
+                                      ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-300 border-l-2 border-accent-500'
+                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                                  }`}
+                                >
+                                  <span className="flex-1 truncate">{entry.name}</span>
+                                  {entry.isLocal && <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800">local</span>}
+                                  {isActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); togglePin(entry.id) }}
+                                  className={`absolute right-3 rounded p-1 transition-opacity ${
+                                    isPinned(entry.id)
+                                      ? 'text-accent-500 opacity-80 hover:opacity-100'
+                                      : 'text-neutral-400 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-accent-500'
+                                  }`}
+                                  aria-label={isPinned(entry.id) ? `Unpin ${entry.name}` : `Pin ${entry.name}`}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill={isPinned(entry.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+                                </button>
+                              </div>
+                            )
+                          }
+                          return (
+                            <>
+                              {pinnedEntries.length > 0 && (
+                                <div className="mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                                  <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="text-accent-500"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+                                    <span>Pinned</span>
+                                  </div>
+                                  {pinnedEntries.map(renderEntry)}
+                                </div>
+                              )}
+                              {Array.from(unpinnedGroups.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([provider, models]) => (
+                                <div key={provider}>
+                                  <div className="px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-400">{provider}</div>
+                                  {models.map(renderEntry)}
+                                </div>
+                              ))}
+                            </>
+                          )
                         })()}
                       </div>
                     </div>
@@ -2222,38 +2265,82 @@ function ChatComposerComponent({
                   {isModelMenuOpen && (
                     <>
                       <div className="fixed inset-0 z-[199]" onClick={() => setIsModelMenuOpen(false)} />
-                      <div className="absolute bottom-full left-0 mb-2 z-[200] w-72 max-h-80 overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                        <div className="px-3 py-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider">Models</div>
+                      <div className="absolute bottom-full left-0 mb-2 z-[200] min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
                         {(() => {
                           const allModels = modelsQuery.data?.models ?? []
-                          const provider = modelsQuery.data?.currentProvider ?? ''
+                          const defaultProvider = modelsQuery.data?.currentProvider ?? ''
                           if (allModels.length === 0) {
-                            return <div className="px-3 py-2 text-sm text-neutral-500">No models available</div>
+                            return <div className="p-4 text-center text-sm text-neutral-500">No models available</div>
                           }
-                          return allModels.map((m) => {
-                            const mId = typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown')
-                            const mName = typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m)
-                            const mProvider = typeof m === 'string' ? provider : ((m as Record<string, unknown>).provider as string || provider)
+                          const parsed = allModels.map((m) => {
+                            const mId = String(typeof m === 'string' ? m : (m.id || m.model || m.name || 'unknown'))
+                            const mName = String(typeof m === 'string' ? m : (m.name || m.displayName || m.label || m.id || m.model || m))
+                            const mProvider = typeof m === 'string' ? defaultProvider : ((m as Record<string, unknown>).provider as string || defaultProvider)
                             const isLocal = typeof m !== 'string' && (m as Record<string, unknown>).description === 'local'
-                            const isActive = mId === currentModel || `${provider}/${mId}` === currentModel
-                            return (
-                              <button
-                                key={String(mId)}
-                                type="button"
-                                onClick={() => handleModelSelect(String(mId), mProvider || undefined)}
-                                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                  isActive
-                                    ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-300'
-                                    : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
-                                }`}
-                              >
-                                <span className="flex-1 truncate">{String(mName)}</span>
-                                {isLocal && <span className="text-[10px] text-neutral-400 ml-1">local</span>}
-                                {isActive && <span className="size-1.5 rounded-full bg-primary-500 shrink-0" />}
-                              </button>
-                            )
+                            return { id: mId, name: mName, provider: mProvider, isLocal }
                           })
+                          const pinnedEntries = parsed.filter((e) => isPinned(e.id))
+                          const unpinnedGroups = new Map<string, typeof parsed>()
+                          for (const entry of parsed) {
+                            if (isPinned(entry.id)) continue
+                            const group = unpinnedGroups.get(entry.provider) ?? []
+                            group.push(entry)
+                            unpinnedGroups.set(entry.provider, group)
+                          }
+                          const renderEntry = (entry: typeof parsed[0]) => {
+                            const isActive = entry.id === currentModel || `${defaultProvider}/${entry.id}` === currentModel
+                            return (
+                              <div key={entry.id} className="group relative flex items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => { handleModelSelect(entry.id, entry.provider || undefined); setIsModelMenuOpen(false) }}
+                                  className={`flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
+                                    isActive
+                                      ? 'border-l-2 border-accent-500 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100'
+                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/50'
+                                  }`}
+                                >
+                                  <span className="flex-1 truncate">{entry.name}</span>
+                                  {entry.isLocal && <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700">local</span>}
+                                  {isActive && <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); togglePin(entry.id) }}
+                                  className={`absolute right-2 rounded p-1 transition-opacity ${
+                                    isPinned(entry.id)
+                                      ? 'text-accent-500 opacity-80 hover:opacity-100'
+                                      : 'text-neutral-400 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-accent-500'
+                                  }`}
+                                  aria-label={isPinned(entry.id) ? `Unpin ${entry.name}` : `Pin ${entry.name}`}
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill={isPinned(entry.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+                                </button>
+                              </div>
+                            )
+                          }
+                          return (
+                            <>
+                              {pinnedEntries.length > 0 && (
+                                <div className="mb-1 border-b border-neutral-200 dark:border-neutral-700 pb-1">
+                                  <div className="mb-1 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="text-accent-500"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+                                    <span>Pinned</span>
+                                  </div>
+                                  {pinnedEntries.map(renderEntry)}
+                                </div>
+                              )}
+                              {Array.from(unpinnedGroups.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([provider, models]) => (
+                                <div key={provider}>
+                                  <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400">{provider}</div>
+                                  {models.map(renderEntry)}
+                                </div>
+                              ))}
+                            </>
+                          )
                         })()}
+                        </div>
                       </div>
                     </>
                   )}
