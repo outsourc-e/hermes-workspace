@@ -180,11 +180,47 @@ async function fetchModels(): Promise<{
         {},
       )
       const currentProvider = readModelText(richData.provider)
-      const models = (richData.models || []).map((model) => ({
+      let models = (richData.models || []).map((model) => ({
         id: model.id,
         name: model.id,
         provider: currentProvider || undefined,
       }))
+
+      // If gateway returns no models, try /v1/models as fallback
+      if (models.length === 0) {
+        try {
+          const fallbackRes = await fetch('/api/hermes-proxy/v1/models')
+          if (fallbackRes.ok) {
+            const fallbackData = (await fallbackRes.json()) as
+              | { data?: Array<Record<string, unknown>>; models?: Array<Record<string, unknown>> }
+            const rawFallback = Array.isArray(fallbackData.data)
+              ? fallbackData.data
+              : Array.isArray(fallbackData.models)
+                ? fallbackData.models
+                : []
+            models = rawFallback.map((m) => ({
+              id: readModelText(m.id) || readModelText(m.model) || 'unknown',
+              name: readModelText(m.id) || readModelText(m.model) || 'unknown',
+              provider: currentProvider || undefined,
+            }))
+          }
+        } catch { /* ignore fallback failure */ }
+      }
+
+      // Always include current configured model so it appears in the list
+      if (currentProvider && models.length === 0) {
+        // Fetch current model from config
+        try {
+          const cfgRes = await fetch('/api/hermes-proxy/api/config')
+          if (cfgRes.ok) {
+            const cfg = (await cfgRes.json()) as Record<string, unknown>
+            const cfgModel = readModelText(cfg.model)
+            if (cfgModel) {
+              models = [{ id: cfgModel, name: cfgModel, provider: currentProvider }]
+            }
+          }
+        } catch { /* ignore */ }
+      }
 
       return {
         ok: true,
