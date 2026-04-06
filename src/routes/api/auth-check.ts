@@ -6,54 +6,19 @@ import {
 } from '../../server/auth-middleware'
 import { ensureGatewayProbed } from '../../server/gateway-capabilities'
 
-/**
- * Probe whether any usable backend is reachable.
- *
- * Priority order:
- *   1. /health (Hermes gateway)
- *   2. /v1/models (OpenAI-compat — Ollama, LiteLLM, vLLM, etc.)
- *   3. / root (Ollama returns "Ollama is running")
- *
- * Returns true if ANY of these indicate a live backend.
- */
-async function isBackendReachable(apiUrl: string): Promise<boolean> {
-  const timeout = 4_000
-
-  // Fast path: /health (Hermes gateway)
-  try {
-    const res = await fetch(`${apiUrl}/health`, {
-      signal: AbortSignal.timeout(timeout),
-    })
-    if (res.ok) return true
-  } catch { /* continue */ }
-
-  // Fallback: /v1/models (any OpenAI-compat backend including Ollama)
-  try {
-    const res = await fetch(`${apiUrl}/v1/models`, {
-      signal: AbortSignal.timeout(timeout),
-    })
-    if (res.ok || res.status === 401) return true
-  } catch { /* continue */ }
-
-  // Last resort: root endpoint (Ollama responds with 200 "Ollama is running")
-  try {
-    const res = await fetch(apiUrl, {
-      signal: AbortSignal.timeout(timeout),
-    })
-    if (res.ok) return true
-  } catch { /* continue */ }
-
-  return false
-}
-
 export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const apiUrl = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
-
         try {
-          const reachable = await isBackendReachable(apiUrl)
+          // Use ensureGatewayProbed() which handles auto-detection across
+          // multiple ports (8642, 8643) instead of checking a single
+          // hardcoded URL. This was previously a standalone
+          // isBackendReachable() that only tried port 8642 and never
+          // benefited from the gateway-capabilities auto-detection logic.
+          const caps = await ensureGatewayProbed()
+          const reachable = caps.health || caps.chatCompletions || caps.models
+
           if (!reachable) {
             return json(
               {
@@ -77,9 +42,6 @@ export const Route = createFileRoute('/api/auth-check')({
             { status: 503 },
           )
         }
-
-        // Backend is reachable — kick off capability detection in background
-        void ensureGatewayProbed()
 
         const authRequired = isPasswordProtectionEnabled()
         const authenticated = isAuthenticated(request)
