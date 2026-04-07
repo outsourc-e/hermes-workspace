@@ -27,7 +27,7 @@ function getSetupSteps(
     {
       title: 'Use any OpenAI-compatible backend',
       command: 'Set HERMES_API_URL to your backend base URL',
-      note: 'Portable chat works with any backend that exposes /v1/chat/completions',
+      note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
     },
     {
       title: 'Optional: run a Hermes gateway locally',
@@ -37,6 +37,11 @@ function getSetupSteps(
     {
       title: 'Install the gateway',
       command: `cd hermes-agent && ${python} -m venv .venv && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${pip} install -e .`,
+    },
+    {
+      title: 'Enable the HTTP API server',
+      command: 'echo "API_SERVER_ENABLED=true" >> ~/.hermes/.env',
+      note: 'The gateway HTTP API is opt-in. Without this, the gateway serves messaging platforms but does not expose port 8642 for the workspace.',
     },
     {
       title: 'Start the gateway',
