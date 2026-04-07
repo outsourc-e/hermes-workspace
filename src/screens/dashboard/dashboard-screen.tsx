@@ -211,6 +211,7 @@ function ActivityChart({ sessions }: { sessions: HermesSession[] }) {
 // ── Model Card ───────────────────────────────────────────────────
 
 function ModelCard() {
+  const sessionsAvailable = useFeatureAvailable('sessions')
   const configAvailable = useFeatureAvailable('config')
   const configQuery = useQuery({
     queryKey: ['hermes-config'],
