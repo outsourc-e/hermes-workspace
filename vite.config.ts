@@ -388,8 +388,8 @@ const config = defineConfig(({ mode, command }) => {
     server: {
       // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking connectivity
       host: '0.0.0.0',
-      port: 3000,
-      strictPort: false, // allow fallback if 3000 is taken, but log clearly
+      port: 3002,
+      strictPort: false, // allow fallback if 3002 is taken, but log clearly
       allowedHosts: true,
       watch: {
         // Exclude generated route tree — TanStack Router's file watcher

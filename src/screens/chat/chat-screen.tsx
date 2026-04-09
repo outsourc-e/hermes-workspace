@@ -2399,6 +2399,8 @@ export function ChatScreen({
             </div>
           )}
 
+          {hideUi ? null : <ContextBar sessionId={activeSession?.key || activeSessionKey || resolvedSessionKey} />}
+
           {hideUi ? null : (
             <ChatMessageList
               messages={finalDisplayMessages}

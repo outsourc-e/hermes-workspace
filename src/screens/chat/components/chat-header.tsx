@@ -229,7 +229,7 @@ function ChatHeaderComponent({
     return (
       <div
         ref={wrapperRef}
-        className="shrink-0 border-b border-primary-200 bg-surface transition-transform"
+        className="shrink-0 bg-surface transition-transform"
         style={pullOffset > 0 ? { transform: `translateY(${pullOffset}px)` } : undefined}
       >
         <div className="px-3 h-12 flex items-center gap-0">
@@ -271,7 +271,7 @@ function ChatHeaderComponent({
   return (
     <div
       ref={wrapperRef}
-      className="shrink-0 border-b border-primary-200 bg-surface"
+      className="shrink-0 bg-surface"
     >
       <div className="px-4 h-12 flex items-center">
         {showFileExplorerButton ? (
