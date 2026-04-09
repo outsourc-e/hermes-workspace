@@ -56,8 +56,13 @@ import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
 import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
 import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
+import { Route as ApiKnowledgeSearchRouteImport } from './routes/api/knowledge/search'
+import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/read'
+import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
+import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
+import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
@@ -294,6 +299,26 @@ const ApiMemoryListRoute = ApiMemoryListRouteImport.update({
   path: '/list',
   getParentRoute: () => ApiMemoryRoute,
 } as any)
+const ApiKnowledgeSearchRoute = ApiKnowledgeSearchRouteImport.update({
+  id: '/api/knowledge/search',
+  path: '/api/knowledge/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiKnowledgeReadRoute = ApiKnowledgeReadRouteImport.update({
+  id: '/api/knowledge/read',
+  path: '/api/knowledge/read',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiKnowledgeListRoute = ApiKnowledgeListRouteImport.update({
+  id: '/api/knowledge/list',
+  path: '/api/knowledge/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiKnowledgeGraphRoute = ApiKnowledgeGraphRouteImport.update({
+  id: '/api/knowledge/graph',
+  path: '/api/knowledge/graph',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   id: '/$jobId',
   path: '/$jobId',
@@ -303,6 +328,12 @@ const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
     path: '/$sessionKey/status',
+    getParentRoute: () => ApiSessionsRoute,
+  } as any)
+const ApiSessionsSessionKeyActiveRunRoute =
+  ApiSessionsSessionKeyActiveRunRouteImport.update({
+    id: '/$sessionKey/active-run',
+    path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
 
@@ -348,6 +379,10 @@ export interface FileRoutesByFullPath {
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
+  '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
+  '/api/knowledge/list': typeof ApiKnowledgeListRoute
+  '/api/knowledge/read': typeof ApiKnowledgeReadRoute
+  '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
@@ -355,6 +390,7 @@ export interface FileRoutesByFullPath {
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
 export interface FileRoutesByTo {
@@ -398,6 +434,10 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
+  '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
+  '/api/knowledge/list': typeof ApiKnowledgeListRoute
+  '/api/knowledge/read': typeof ApiKnowledgeReadRoute
+  '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
@@ -405,6 +445,7 @@ export interface FileRoutesByTo {
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
 export interface FileRoutesById {
@@ -450,6 +491,10 @@ export interface FileRoutesById {
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
+  '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
+  '/api/knowledge/list': typeof ApiKnowledgeListRoute
+  '/api/knowledge/read': typeof ApiKnowledgeReadRoute
+  '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
@@ -457,6 +502,7 @@ export interface FileRoutesById {
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
 export interface FileRouteTypes {
@@ -503,6 +549,10 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
+    | '/api/knowledge/graph'
+    | '/api/knowledge/list'
+    | '/api/knowledge/read'
+    | '/api/knowledge/search'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
@@ -510,6 +560,7 @@ export interface FileRouteTypes {
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/sessions/send'
+    | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -553,6 +604,10 @@ export interface FileRouteTypes {
     | '/chat'
     | '/settings'
     | '/api/hermes-jobs/$jobId'
+    | '/api/knowledge/graph'
+    | '/api/knowledge/list'
+    | '/api/knowledge/read'
+    | '/api/knowledge/search'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
@@ -560,6 +615,7 @@ export interface FileRouteTypes {
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/sessions/send'
+    | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   id:
     | '__root__'
@@ -604,6 +660,10 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
+    | '/api/knowledge/graph'
+    | '/api/knowledge/list'
+    | '/api/knowledge/read'
+    | '/api/knowledge/search'
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
@@ -611,6 +671,7 @@ export interface FileRouteTypes {
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/sessions/send'
+    | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   fileRoutesById: FileRoutesById
 }
@@ -653,6 +714,10 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
+  ApiKnowledgeListRoute: typeof ApiKnowledgeListRoute
+  ApiKnowledgeReadRoute: typeof ApiKnowledgeReadRoute
+  ApiKnowledgeSearchRoute: typeof ApiKnowledgeSearchRoute
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
   ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
 }
@@ -988,6 +1053,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMemoryListRouteImport
       parentRoute: typeof ApiMemoryRoute
     }
+    '/api/knowledge/search': {
+      id: '/api/knowledge/search'
+      path: '/api/knowledge/search'
+      fullPath: '/api/knowledge/search'
+      preLoaderRoute: typeof ApiKnowledgeSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/read': {
+      id: '/api/knowledge/read'
+      path: '/api/knowledge/read'
+      fullPath: '/api/knowledge/read'
+      preLoaderRoute: typeof ApiKnowledgeReadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/list': {
+      id: '/api/knowledge/list'
+      path: '/api/knowledge/list'
+      fullPath: '/api/knowledge/list'
+      preLoaderRoute: typeof ApiKnowledgeListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/graph': {
+      id: '/api/knowledge/graph'
+      path: '/api/knowledge/graph'
+      fullPath: '/api/knowledge/graph'
+      preLoaderRoute: typeof ApiKnowledgeGraphRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hermes-jobs/$jobId': {
       id: '/api/hermes-jobs/$jobId'
       path: '/$jobId'
@@ -1000,6 +1093,13 @@ declare module '@tanstack/react-router' {
       path: '/$sessionKey/status'
       fullPath: '/api/sessions/$sessionKey/status'
       preLoaderRoute: typeof ApiSessionsSessionKeyStatusRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/sessions/$sessionKey/active-run': {
+      id: '/api/sessions/$sessionKey/active-run'
+      path: '/$sessionKey/active-run'
+      fullPath: '/api/sessions/$sessionKey/active-run'
+      preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
   }
@@ -1051,11 +1151,13 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
 
 interface ApiSessionsRouteChildren {
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
+  ApiSessionsSessionKeyActiveRunRoute: typeof ApiSessionsSessionKeyActiveRunRoute
   ApiSessionsSessionKeyStatusRoute: typeof ApiSessionsSessionKeyStatusRoute
 }
 
 const ApiSessionsRouteChildren: ApiSessionsRouteChildren = {
   ApiSessionsSendRoute: ApiSessionsSendRoute,
+  ApiSessionsSessionKeyActiveRunRoute: ApiSessionsSessionKeyActiveRunRoute,
   ApiSessionsSessionKeyStatusRoute: ApiSessionsSessionKeyStatusRoute,
 }
 
@@ -1102,6 +1204,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
+  ApiKnowledgeListRoute: ApiKnowledgeListRoute,
+  ApiKnowledgeReadRoute: ApiKnowledgeReadRoute,
+  ApiKnowledgeSearchRoute: ApiKnowledgeSearchRoute,
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
   ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
 }
