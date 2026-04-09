@@ -11,6 +11,7 @@ import {
   Menu01Icon,
   PuzzleIcon,
   Settings01Icon,
+  UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { id: 'jobs',      label: 'Jobs',      icon: Clock01Icon,           to: '/jobs',      match: (p: string) => p.startsWith('/jobs') },
   { id: 'memory',    label: 'Memory',    icon: BrainIcon,             to: '/memory',    match: (p: string) => p.startsWith('/memory') },
   { id: 'skills',    label: 'Skills',    icon: PuzzleIcon,            to: '/skills',    match: (p: string) => p.startsWith('/skills') },
+  { id: 'profiles',  label: 'Profiles',  icon: UserGroupIcon,         to: '/profiles',  match: (p: string) => p.startsWith('/profiles') },
 ]
 
 

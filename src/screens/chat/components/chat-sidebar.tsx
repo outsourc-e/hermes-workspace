@@ -13,8 +13,10 @@ import {
   Moon02Icon,
   PencilEdit02Icon,
   PuzzleIcon,
-
-  Search01Icon, Settings01Icon, Sun02Icon 
+  Search01Icon,
+  Settings01Icon,
+  Sun02Icon,
+  UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
@@ -551,6 +553,7 @@ function ChatSidebarComponent({
     pathname === '/new' || pathname.startsWith('/chat/new')
   const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
+  const isProfilesActive = pathname === '/profiles'
   const isFilesActive = pathname === '/files'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
@@ -800,6 +803,13 @@ function ChatSidebarComponent({
       label: 'Skills',
       active: isSkillsActive,
       dataTour: 'skills',
+    },
+    {
+      kind: 'link',
+      to: '/profiles',
+      icon: UserGroupIcon,
+      label: 'Profiles',
+      active: isProfilesActive,
     },
   ]
 

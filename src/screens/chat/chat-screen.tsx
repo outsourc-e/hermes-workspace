@@ -85,7 +85,7 @@ import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
-import { ContextMeter } from '@/components/context-meter'
+// ContextMeter removed — ContextBar (PR #32) replaces it
 import { useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
@@ -2348,8 +2348,7 @@ export function ChatScreen({
             />
           )}
 
-          <div className="md:hidden"><ContextMeter variant="mobile" /></div>
-          <div className="hidden md:block px-4 py-1"><ContextMeter variant="desktop" /></div>
+
 
           {errorNotice && <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>}
           {pendingApprovals.length > 0 && (

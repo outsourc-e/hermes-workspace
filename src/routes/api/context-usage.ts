@@ -22,45 +22,61 @@ export const Route = createFileRoute('/api/context-usage')({
 
           // Known context window sizes for common models
           const MODEL_CONTEXT: Record<string, number> = {
-            'claude-opus-4-6': 200000,
-            'claude-sonnet-4-6': 200000,
+            'claude-opus-4-6': 1000000,
+            'claude-sonnet-4-6': 1000000,
+            'claude-opus-4-5': 1000000,
+            'claude-sonnet-4-5': 1000000,
             'claude-sonnet-4': 200000,
             'claude-opus-4': 200000,
             'claude-3-5-sonnet': 200000,
             'claude-3-opus': 200000,
-            'gpt-5.4': 128000,
+            'gpt-5.4': 1000000,
             'gpt-4o': 128000,
             'gpt-4-turbo': 128000,
+            'gpt-4.1': 1000000,
           }
+
+          // Try to find session data — first by exact ID, then by listing
+          let sessionData: Record<string, unknown> | null = null
 
           if (sessionId) {
             const res = await fetch(`${HERMES_API}/api/sessions/${sessionId}`, {
               signal: AbortSignal.timeout(3000),
             })
             if (res.ok) {
-              const data = (await res.json()) as { session?: {
-                input_tokens?: number
-                output_tokens?: number
-                cache_read_tokens?: number
-                cache_write_tokens?: number
-                model?: string
-              } }
-              const session = data.session
-              if (session) {
-                // Total context = all tokens in the window (cached + uncached)
-                usedTokens = (session.input_tokens || 0)
-                  + (session.output_tokens || 0)
-                  + (session.cache_read_tokens || 0)
-                  + (session.cache_write_tokens || 0)
-                model = session.model || ''
-
-                // Set max based on model
-                const modelKey = Object.keys(MODEL_CONTEXT).find(
-                  (k) => model.toLowerCase().includes(k.toLowerCase()),
-                )
-                if (modelKey) maxTokens = MODEL_CONTEXT[modelKey]
-              }
+              const data = (await res.json()) as { session?: Record<string, unknown> }
+              if (data.session) sessionData = data.session
             }
+          }
+
+          // Fallback: if no session found by ID, try the most recent active session
+          if (!sessionData) {
+            try {
+              const listRes = await fetch(`${HERMES_API}/api/sessions?limit=1`, {
+                signal: AbortSignal.timeout(3000),
+              })
+              if (listRes.ok) {
+                const listData = (await listRes.json()) as { items?: Array<Record<string, unknown>> }
+                if (listData.items && listData.items.length > 0) {
+                  sessionData = listData.items[0]
+                }
+              }
+            } catch { /* ignore */ }
+          }
+
+          if (sessionData) {
+            // Active context = input + output tokens (what's in the conversation window)
+            // Cache tokens are NOT additional context — they represent tokens served
+            // from cache instead of being reprocessed, so they don't add to window usage
+            usedTokens = (Number(sessionData.input_tokens) || 0)
+              + (Number(sessionData.output_tokens) || 0)
+            model = String(sessionData.model || '')
+
+            // Set max based on model
+            const modelKey = Object.keys(MODEL_CONTEXT).find(
+              (k) => model.toLowerCase().includes(k.toLowerCase()),
+            )
+            if (modelKey) maxTokens = MODEL_CONTEXT[modelKey]
           }
 
           // Fallback: try /v1/models for context_length

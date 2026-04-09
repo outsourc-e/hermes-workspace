@@ -101,7 +101,8 @@ export function WorkspaceShell() {
     if (path.startsWith('/jobs')) return 4
     if (path.startsWith('/memory')) return 5
     if (path.startsWith('/skills')) return 6
-    if (path.startsWith('/settings')) return 7
+    if (path.startsWith('/profiles')) return 7
+    if (path.startsWith('/settings')) return 8
     return -1
   }, [])
 
@@ -129,6 +130,7 @@ export function WorkspaceShell() {
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
+    if (pathname.startsWith('/profiles')) return 'Profiles'
     if (pathname.startsWith('/settings')) return 'Settings'
     if (pathname.startsWith('/debug')) return 'Debug'
     if (pathname.startsWith('/activity')) return 'Activity'

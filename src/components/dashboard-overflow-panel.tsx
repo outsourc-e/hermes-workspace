@@ -10,6 +10,7 @@ import {
   PuzzleIcon,
   Settings01Icon,
   Sun02Icon,
+  UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import type {SettingsThemeMode} from '@/hooks/use-settings';
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
 const HERMES_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: PuzzleIcon, label: 'Skills', to: '/skills' },
+  { icon: UserGroupIcon, label: 'Profiles', to: '/profiles' },
   { icon: Settings01Icon, label: 'Settings', to: '/settings' },
 ]
 

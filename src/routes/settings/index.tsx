@@ -9,7 +9,7 @@ import {
   SourceCodeSquareIcon,
   UserIcon,
 } from '@hugeicons/core-free-icons'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import type * as React from 'react'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
@@ -249,8 +249,9 @@ type SettingsSectionId =
   | 'advanced'
 
 type SettingsNavItem = {
-  id: SettingsSectionId
+  id: SettingsSectionId | 'mcp'
   label: string
+  to?: '/settings/mcp'
 }
 
 const SETTINGS_NAV_ITEMS: Array<SettingsNavItem> = [
@@ -258,6 +259,7 @@ const SETTINGS_NAV_ITEMS: Array<SettingsNavItem> = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'chat', label: 'Chat' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'mcp', label: 'MCP Servers', to: '/settings/mcp' },
 ]
 
 function SettingsRoute() {
@@ -310,21 +312,31 @@ function SettingsRoute() {
               Settings
             </h1>
             <div className="flex flex-col gap-0.5">
-              {SETTINGS_NAV_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveSection(item.id)}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                    activeSection === item.id
-                      ? 'bg-accent-500/10 text-accent-600 font-medium'
-                      : 'text-primary-600 hover:bg-primary-100 hover:text-primary-900',
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
+              {SETTINGS_NAV_ITEMS.map((item) =>
+                item.to ? (
+                  <Link
+                    key={item.id}
+                    to={item.to}
+                    className="rounded-lg px-3 py-2 text-left text-sm text-primary-600 transition-colors hover:bg-primary-100 hover:text-primary-900"
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveSection(item.id as SettingsSectionId)}
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                      activeSection === item.id
+                        ? 'bg-accent-500/10 text-accent-600 font-medium'
+                        : 'text-primary-600 hover:bg-primary-100 hover:text-primary-900',
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ),
+              )}
             </div>
           </div>
         </nav>
@@ -333,21 +345,31 @@ function SettingsRoute() {
 
         {/* Mobile section pills */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none md:hidden">
-          {SETTINGS_NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActiveSection(item.id)}
-              className={cn(
-                'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                activeSection === item.id
-                  ? 'bg-accent-500 text-white'
-                  : 'bg-primary-100 text-primary-600',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
+          {SETTINGS_NAV_ITEMS.map((item) =>
+            item.to ? (
+              <Link
+                key={item.id}
+                to={item.to}
+                className="shrink-0 rounded-full bg-primary-100 px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors"
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveSection(item.id as SettingsSectionId)}
+                className={cn(
+                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  activeSection === item.id
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-primary-100 text-primary-600',
+                )}
+              >
+                {item.label}
+              </button>
+            ),
+          )}
         </div>
 
         {/* Content area */}
