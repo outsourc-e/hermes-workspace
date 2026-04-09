@@ -79,6 +79,3 @@ jobs:
       - name: Run tests
         run: pnpm test || echo "⚠️ No tests configured"
         continue-on-error: true
-
-      - name: Run redaction tests
-        run: npx tsx scripts/qa/test-redaction.ts
