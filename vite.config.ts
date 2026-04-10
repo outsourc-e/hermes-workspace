@@ -424,7 +424,13 @@ const config = defineConfig(({ mode, command }) => {
           ws: true,
           rewrite: (path) => path.replace(/^\/ws-hermes/, ''),
         },
-        // REST API proxy: API proxy for Hermes backend
+        // Kanban tasks proxy: frontend /api/hermes-tasks → webapi /api/tasks
+        '/api/hermes-tasks': {
+          target: proxyTarget,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/hermes-tasks/, '/api/tasks'),
+        },
+// REST API proxy: API proxy for Hermes backend
         '/api/hermes-proxy': {
           target: proxyTarget,
           changeOrigin: true,
