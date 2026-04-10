@@ -9,7 +9,7 @@ export type LocalThread = {
   label: string
   createdAt: number
   updatedAt: number
-  messages: LocalThreadMessage[]
+  messages: Array<LocalThreadMessage>
 }
 
 const threads = new Map<string, LocalThread>()
@@ -24,7 +24,8 @@ function nextThreadLabel(): string {
 
 function createThread(id?: string): LocalThread {
   const timestamp = Date.now()
-  const threadId = id && id.trim() ? id.trim() : `portable-${crypto.randomUUID()}`
+  const threadId =
+    id && id.trim() ? id.trim() : `portable-${crypto.randomUUID()}`
   const thread: LocalThread = {
     id: threadId,
     label: nextThreadLabel(),
@@ -55,7 +56,7 @@ export function getThread(id: string): LocalThread | undefined {
   return threads.get(id)
 }
 
-export function listThreads(): LocalThread[] {
+export function listThreads(): Array<LocalThread> {
   return [...threads.values()].sort((a, b) => b.updatedAt - a.updatedAt)
 }
 

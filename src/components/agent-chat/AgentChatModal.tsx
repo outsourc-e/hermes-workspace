@@ -42,9 +42,7 @@ function readMessageText(message: ChatMessage): string {
   return ''
 }
 
-function toChatMessages(
-  messages: Array<ChatMessage>,
-): Array<AgentChatMessage> {
+function toChatMessages(messages: Array<ChatMessage>): Array<AgentChatMessage> {
   return messages
     .map(function mapMessage(message, index) {
       const text = readMessageText(message)

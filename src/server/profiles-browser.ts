@@ -42,8 +42,13 @@ function getActiveProfilePath(): string {
 function validateProfileName(name: string): string {
   const trimmed = name.trim()
   if (!trimmed) throw new Error('Profile name is required')
-  if (trimmed === 'default') throw new Error('Default profile cannot be modified here')
-  if (trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('..')) {
+  if (trimmed === 'default')
+    throw new Error('Default profile cannot be modified here')
+  if (
+    trimmed.includes('/') ||
+    trimmed.includes('\\') ||
+    trimmed.includes('..')
+  ) {
     throw new Error('Invalid profile name')
   }
   return trimmed
@@ -56,19 +61,24 @@ function safeReadText(filePath: string): string {
 function readYamlConfig(configPath: string): Record<string, unknown> {
   if (!fs.existsSync(configPath)) return {}
   try {
-    return (YAML.parse(safeReadText(configPath)) as Record<string, unknown>) || {}
+    return (
+      (YAML.parse(safeReadText(configPath)) as Record<string, unknown>) || {}
+    )
   } catch {
     return {}
   }
 }
 
-function countFilesRecursive(rootPath: string, predicate: (fullPath: string) => boolean): number {
+function countFilesRecursive(
+  rootPath: string,
+  predicate: (fullPath: string) => boolean,
+): number {
   if (!fs.existsSync(rootPath)) return 0
   let count = 0
   const stack = [rootPath]
   while (stack.length > 0) {
     const current = stack.pop() as string
-    let entries: fs.Dirent[] = []
+    let entries: Array<fs.Dirent> = []
     try {
       entries = fs.readdirSync(current, { withFileTypes: true })
     } catch {
@@ -86,7 +96,7 @@ function countFilesRecursive(rootPath: string, predicate: (fullPath: string) => 
   return count
 }
 
-function latestMtime(paths: string[]): string | undefined {
+function latestMtime(paths: Array<string>): string | undefined {
   let latest = 0
   for (const target of paths) {
     if (!fs.existsSync(target)) continue
@@ -117,7 +127,7 @@ export function listProfiles(): Array<ProfileSummary> {
   const results: Array<ProfileSummary> = []
 
   if (fs.existsSync(profilesRoot)) {
-    let entries: fs.Dirent[] = []
+    let entries: Array<fs.Dirent> = []
     try {
       entries = fs.readdirSync(profilesRoot, { withFileTypes: true })
     } catch {
@@ -133,19 +143,31 @@ export function listProfiles(): Array<ProfileSummary> {
       const skillsDir = path.join(profilePath, 'skills')
       const sessionsDir = path.join(profilePath, 'sessions')
       const config = readYamlConfig(configPath)
-      const skillCount = countFilesRecursive(skillsDir, (full) => path.basename(full) === 'SKILL.md')
-      const sessionCount = countFilesRecursive(sessionsDir, (full) => /\.(jsonl|json|sqlite|db)$/i.test(full))
+      const skillCount = countFilesRecursive(
+        skillsDir,
+        (full) => path.basename(full) === 'SKILL.md',
+      )
+      const sessionCount = countFilesRecursive(sessionsDir, (full) =>
+        /\.(jsonl|json|sqlite|db)$/i.test(full),
+      )
       results.push({
         name,
         path: profilePath,
         active: name === activeProfile,
         exists: true,
         model: typeof config.model === 'string' ? config.model : undefined,
-        provider: typeof config.provider === 'string' ? config.provider : undefined,
+        provider:
+          typeof config.provider === 'string' ? config.provider : undefined,
         skillCount,
         sessionCount,
         hasEnv: fs.existsSync(envPath),
-        updatedAt: latestMtime([profilePath, configPath, envPath, skillsDir, sessionsDir]),
+        updatedAt: latestMtime([
+          profilePath,
+          configPath,
+          envPath,
+          skillsDir,
+          sessionsDir,
+        ]),
       })
     }
   }
@@ -159,9 +181,15 @@ export function listProfiles(): Array<ProfileSummary> {
       active: true,
       exists: true,
       model: typeof config.model === 'string' ? config.model : undefined,
-      provider: typeof config.provider === 'string' ? config.provider : undefined,
-      skillCount: countFilesRecursive(path.join(root, 'skills'), (full) => path.basename(full) === 'SKILL.md'),
-      sessionCount: countFilesRecursive(path.join(root, 'sessions'), (full) => /\.(jsonl|json|sqlite|db)$/i.test(full)),
+      provider:
+        typeof config.provider === 'string' ? config.provider : undefined,
+      skillCount: countFilesRecursive(
+        path.join(root, 'skills'),
+        (full) => path.basename(full) === 'SKILL.md',
+      ),
+      sessionCount: countFilesRecursive(path.join(root, 'sessions'), (full) =>
+        /\.(jsonl|json|sqlite|db)$/i.test(full),
+      ),
       hasEnv: fs.existsSync(path.join(root, '.env')),
       updatedAt: latestMtime([root, path.join(root, 'config.yaml')]),
     })
@@ -178,7 +206,10 @@ export function listProfiles(): Array<ProfileSummary> {
 export function readProfile(name: string): ProfileDetail {
   const active = getActiveProfileName()
   const normalized = name.trim() || 'default'
-  const profilePath = normalized === 'default' ? getHermesRoot() : path.join(getProfilesRoot(), validateProfileName(normalized))
+  const profilePath =
+    normalized === 'default'
+      ? getHermesRoot()
+      : path.join(getProfilesRoot(), validateProfileName(normalized))
   if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
   const configPath = path.join(profilePath, 'config.yaml')
   const envPath = path.join(profilePath, '.env')
@@ -197,29 +228,82 @@ export function readProfile(name: string): ProfileDetail {
 }
 
 export function setActiveProfile(name: string): void {
-  const normalized = validateProfileName(name)
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Profile name is required')
+  // "default" means clear the active_profile file (revert to default)
+  if (trimmed === 'default') {
+    const activePath = getActiveProfilePath()
+    if (fs.existsSync(activePath)) fs.unlinkSync(activePath)
+    return
+  }
+  const normalized = validateProfileName(trimmed)
   const profilePath = path.join(getProfilesRoot(), normalized)
   if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
   fs.mkdirSync(getHermesRoot(), { recursive: true })
   fs.writeFileSync(getActiveProfilePath(), `${normalized}\n`, 'utf-8')
 }
 
-export function createProfile(name: string): ProfileDetail {
+export function createProfile(
+  name: string,
+  options?: { cloneFrom?: string; model?: string; provider?: string },
+): ProfileDetail {
   const normalized = validateProfileName(name)
   const profilePath = path.join(getProfilesRoot(), normalized)
   if (fs.existsSync(profilePath)) throw new Error('Profile already exists')
   fs.mkdirSync(profilePath, { recursive: true })
+
   const configPath = path.join(profilePath, 'config.yaml')
-  fs.writeFileSync(configPath, YAML.stringify({ model: '', provider: '' }), 'utf-8')
+
+  // Clone config from source profile if specified
+  if (options?.cloneFrom) {
+    const sourceName = validateProfileName(options.cloneFrom)
+    const sourceConfigPath = path.join(
+      getProfilesRoot(),
+      sourceName,
+      'config.yaml',
+    )
+    if (fs.existsSync(sourceConfigPath)) {
+      fs.copyFileSync(sourceConfigPath, configPath)
+    } else {
+      fs.writeFileSync(
+        configPath,
+        YAML.stringify({ model: '', provider: '' }),
+        'utf-8',
+      )
+    }
+  } else {
+    fs.writeFileSync(
+      configPath,
+      YAML.stringify({ model: '', provider: '' }),
+      'utf-8',
+    )
+  }
+
+  // Override model/provider if specified
+  if (options?.model || options?.provider) {
+    const config = readYamlConfig(configPath)
+    if (options.model) config.model = options.model
+    if (options.provider) config.provider = options.provider
+    fs.writeFileSync(configPath, YAML.stringify(config), 'utf-8')
+  }
+
+  // Create subdirectories
+  fs.mkdirSync(path.join(profilePath, 'skills'), { recursive: true })
+  fs.mkdirSync(path.join(profilePath, 'sessions'), { recursive: true })
+
   return readProfile(normalized)
 }
 
 export function deleteProfile(name: string): void {
   const normalized = validateProfileName(name)
-  if (normalized === getActiveProfileName()) throw new Error('Cannot delete the active profile')
+  if (normalized === getActiveProfileName())
+    throw new Error('Cannot delete the active profile')
   const profilePath = path.join(getProfilesRoot(), normalized)
   if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
-  fs.rmSync(profilePath, { recursive: true, force: false })
+  const trashDir = path.join(getHermesRoot(), 'trash')
+  fs.mkdirSync(trashDir, { recursive: true })
+  const trashName = `${normalized}-${Date.now()}`
+  fs.renameSync(profilePath, path.join(trashDir, trashName))
 }
 
 export function renameProfile(oldName: string, newName: string): ProfileDetail {

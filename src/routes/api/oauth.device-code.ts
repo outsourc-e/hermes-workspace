@@ -26,22 +26,38 @@ export const Route = createFileRoute('/api/oauth/device-code')({
 
         if (provider === 'nous') {
           try {
-            const res = await fetch('https://portal.nousresearch.com/api/oauth/device/code', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: 'client_id=hermes-cli',
-            })
+            const res = await fetch(
+              'https://portal.nousresearch.com/api/oauth/device/code',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'client_id=hermes-cli',
+              },
+            )
             const data = await res.json()
             if (!res.ok) {
-              return json({ error: data.error || 'Device code request failed' }, { status: res.status })
+              return json(
+                { error: data.error || 'Device code request failed' },
+                { status: res.status },
+              )
             }
             return json(data)
           } catch (err) {
-            return json({ error: err instanceof Error ? err.message : 'Network error' }, { status: 500 })
+            return json(
+              { error: err instanceof Error ? err.message : 'Network error' },
+              { status: 500 },
+            )
           }
         }
 
-        return json({ error: `OAuth device flow not supported for provider: ${provider}` }, { status: 400 })
+        return json(
+          {
+            error: `OAuth device flow not supported for provider: ${provider}`,
+          },
+          { status: 400 },
+        )
       },
     },
   },

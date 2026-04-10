@@ -5,6 +5,28 @@ import {
   Edit01Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { ProviderIcon } from './components/provider-icon'
+import { ProviderWizard } from './components/provider-wizard'
+import type { ModelCatalogEntry } from '@/lib/model-types'
+import type { ProviderSummaryForEdit } from './components/provider-wizard'
+import BackendUnavailableState from '@/components/backend-unavailable-state'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toast } from '@/components/ui/toast'
+import { getUnavailableReason } from '@/lib/feature-gates'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
+import {
+  getProviderDisplayName,
+  getProviderInfo,
+  normalizeProviderId,
+} from '@/lib/provider-catalog'
+import { getConfig, patchConfig } from '@/server/hermes-api'
+import { cn } from '@/lib/utils'
 
 /**
  * Strip the provider prefix that hermes-agent adds internally via litellm.
@@ -13,8 +35,16 @@ import {
  * Only strips the first path segment if it matches a known provider ID.
  */
 const KNOWN_PROVIDER_PREFIXES = [
-  'openrouter', 'anthropic', 'openai', 'openai-codex', 'nous',
-  'ollama', 'zai', 'kimi-coding', 'minimax', 'minimax-cn',
+  'openrouter',
+  'anthropic',
+  'openai',
+  'openai-codex',
+  'nous',
+  'ollama',
+  'zai',
+  'kimi-coding',
+  'minimax',
+  'minimax-cn',
 ]
 
 function stripProviderPrefix(model: string): string {
@@ -27,33 +57,6 @@ function stripProviderPrefix(model: string): string {
   }
   return model
 }
-import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
-import { ProviderIcon } from './components/provider-icon'
-import { ProviderWizard } from './components/provider-wizard'
-import BackendUnavailableState from '@/components/backend-unavailable-state'
-import type { ModelCatalogEntry } from '@/lib/model-types'
-import type { ProviderSummaryForEdit } from './components/provider-wizard'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs'
-import { toast } from '@/components/ui/toast'
-import { getUnavailableReason } from '@/lib/feature-gates'
-import { useFeatureAvailable } from '@/hooks/use-feature-available'
-import {
-  getProviderDisplayName,
-  getProviderInfo,
-  normalizeProviderId,
-} from '@/lib/provider-catalog'
-import { getConfig, patchConfig } from '@/server/hermes-api'
-import { cn } from '@/lib/utils'
 
 type ProviderStatus = 'active' | 'configured'
 type SettingsTabId = 'providers' | 'models' | 'agents' | 'session' | 'memory'
@@ -141,7 +144,10 @@ async function fetchModels(): Promise<{
 
   const payload = (await response.json()) as
     | Array<unknown>
-    | { data?: Array<Record<string, unknown>>; models?: Array<Record<string, unknown>> }
+    | {
+        data?: Array<Record<string, unknown>>
+        models?: Array<Record<string, unknown>>
+      }
   const rawModels = Array.isArray(payload)
     ? payload
     : Array.isArray(payload.data)
@@ -180,7 +186,8 @@ async function fetchModels(): Promise<{
         name:
           typeof record.name === 'string' && record.name.trim()
             ? record.name.trim()
-            : typeof record.display_name === 'string' && record.display_name.trim()
+            : typeof record.display_name === 'string' &&
+                record.display_name.trim()
               ? record.display_name.trim()
               : typeof record.label === 'string' && record.label.trim()
                 ? record.label.trim()
@@ -200,7 +207,11 @@ async function fetchModels(): Promise<{
     ),
   )
 
-  return { ok: true, models: models as Array<ModelCatalogEntry>, configuredProviders }
+  return {
+    ok: true,
+    models: models as Array<ModelCatalogEntry>,
+    configuredProviders,
+  }
 }
 
 const TAB_ORDER: Array<{ id: SettingsTabId; label: string }> = [
@@ -231,7 +242,8 @@ const SETTINGS: Array<SettingDefinition> = [
     tab: 'models',
     path: 'agents.defaults.model.primary',
     label: 'Default model',
-    description: 'Primary model used for new agents unless a specific agent overrides it.',
+    description:
+      'Primary model used for new agents unless a specific agent overrides it.',
     kind: 'text',
     placeholder: 'provider/model',
   },
@@ -240,7 +252,8 @@ const SETTINGS: Array<SettingDefinition> = [
     tab: 'models',
     path: 'agents.defaults.model.fallbacks',
     label: 'Fallback chain',
-    description: 'Ordered fallback models. Use one per line or separate with commas.',
+    description:
+      'Ordered fallback models. Use one per line or separate with commas.',
     kind: 'multiline',
     rows: 3,
     placeholder: 'anthropic-oauth/claude-sonnet-4-6',
@@ -252,7 +265,8 @@ const SETTINGS: Array<SettingDefinition> = [
     tab: 'models',
     path: 'agents.defaults.contextTokens',
     label: 'Context tokens',
-    description: 'Default token budget applied to agents when no narrower override is present.',
+    description:
+      'Default token budget applied to agents when no narrower override is present.',
     kind: 'number',
     min: 1,
     step: 1000,
@@ -265,7 +279,8 @@ const SETTINGS: Array<SettingDefinition> = [
     tab: 'session',
     path: 'agents.defaults.contextTokens',
     label: 'Session context tokens',
-    description: 'Same agent default context budget surfaced here for session setup workflows.',
+    description:
+      'Same agent default context budget surfaced here for session setup workflows.',
     kind: 'number',
     min: 1,
     step: 1000,
@@ -284,7 +299,8 @@ const SETTINGS: Array<SettingDefinition> = [
     tab: 'memory',
     path: 'agents.defaults.memorySearch.fallback',
     label: 'Memory fallback provider',
-    description: 'Fallback provider when the primary memory search provider is unavailable.',
+    description:
+      'Fallback provider when the primary memory search provider is unavailable.',
     kind: 'select',
     options: MEMORY_FALLBACK_OPTIONS,
   },
@@ -402,10 +418,15 @@ function coerceString(value: unknown): string {
 }
 
 function coerceNumber(value: unknown): string {
-  return typeof value === 'number' && Number.isFinite(value) ? String(value) : ''
+  return typeof value === 'number' && Number.isFinite(value)
+    ? String(value)
+    : ''
 }
 
-function defaultFormatValue(setting: SettingDefinition, value: unknown): string {
+function defaultFormatValue(
+  setting: SettingDefinition,
+  value: unknown,
+): string {
   if (setting.kind === 'number') return coerceNumber(value)
   if (setting.kind === 'boolean') return coerceBoolean(value) ? 'true' : 'false'
   return coerceString(value)
@@ -435,7 +456,9 @@ function parseNumberValue(rawValue: string): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function buildModelOptions(models: Array<ModelCatalogEntry>): Array<SelectOption> {
+function buildModelOptions(
+  models: Array<ModelCatalogEntry>,
+): Array<SelectOption> {
   const seen = new Set<string>()
   const options: Array<SelectOption> = []
 
@@ -475,7 +498,10 @@ function buildModelOptions(models: Array<ModelCatalogEntry>): Array<SelectOption
   return options
 }
 
-function searchMatchesSetting(setting: SettingDefinition, query: string): boolean {
+function searchMatchesSetting(
+  setting: SettingDefinition,
+  query: string,
+): boolean {
   const haystack = [
     setting.label,
     setting.description,
@@ -567,7 +593,9 @@ function SettingCard(props: {
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-primary-900">{setting.label}</h3>
+            <h3 className="text-sm font-semibold text-primary-900">
+              {setting.label}
+            </h3>
             {setting.unsupported ? (
               <span className="rounded-full border border-primary-300 bg-primary-100 px-2 py-0.5 text-[11px] font-medium text-primary-700">
                 Not available
@@ -633,7 +661,11 @@ function SettingCard(props: {
                 value={draftValue}
                 disabled={disabled}
                 placeholder={setting.placeholder}
-                list={setting.id === 'primary-model' ? 'settings-model-options' : undefined}
+                list={
+                  setting.id === 'primary-model'
+                    ? 'settings-model-options'
+                    : undefined
+                }
                 onChange={(event) => {
                   const nextValue = event.target.value
                   setDraftValues((prev) => ({
@@ -769,7 +801,9 @@ function parseModelProvider(value: unknown): ModelProviderOption {
     : 'custom'
 }
 
-function readPrimaryModelConfig(config: HermesConfig | undefined): ModelConfigDraft {
+function readPrimaryModelConfig(
+  config: HermesConfig | undefined,
+): ModelConfigDraft {
   const modelBlock = readRecord(config?.model)
   const flatModel = typeof config?.model === 'string' ? config.model : ''
 
@@ -780,7 +814,9 @@ function readPrimaryModelConfig(config: HermesConfig | undefined): ModelConfigDr
   }
 }
 
-function readFallbackModelConfig(config: HermesConfig | undefined): ModelConfigDraft {
+function readFallbackModelConfig(
+  config: HermesConfig | undefined,
+): ModelConfigDraft {
   const fallbackBlock = readRecord(config?.fallback_model)
 
   return {
@@ -790,7 +826,9 @@ function readFallbackModelConfig(config: HermesConfig | undefined): ModelConfigD
   }
 }
 
-function readPerformanceConfig(config: HermesConfig | undefined): PerformanceDraft {
+function readPerformanceConfig(
+  config: HermesConfig | undefined,
+): PerformanceDraft {
   const performanceBlock = readRecord(config?.performance)
   const staleTimeout =
     performanceBlock?.stream_stale_timeout ?? config?.stream_stale_timeout
@@ -937,7 +975,11 @@ function ModelConfigSection(props: {
   )
 }
 
-function ActiveModelCard({ modelOptions }: { modelOptions: Array<SelectOption> }) {
+function ActiveModelCard({
+  modelOptions,
+}: {
+  modelOptions: Array<SelectOption>
+}) {
   const queryClient = useQueryClient()
   const [primaryConfig, setPrimaryConfig] = useState<ModelConfigDraft>({
     provider: 'custom',
@@ -962,8 +1004,12 @@ function ActiveModelCard({ modelOptions }: { modelOptions: Array<SelectOption> }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const normalizedPrimaryModel = stripProviderPrefix(primaryConfig.model.trim())
-      const normalizedFallbackModel = stripProviderPrefix(fallbackConfig.model.trim())
+      const normalizedPrimaryModel = stripProviderPrefix(
+        primaryConfig.model.trim(),
+      )
+      const normalizedFallbackModel = stripProviderPrefix(
+        fallbackConfig.model.trim(),
+      )
       const streamStaleTimeout = parseTimeoutInput(
         performanceConfig.streamStaleTimeout,
         DEFAULT_STREAM_STALE_TIMEOUT_SECONDS,
@@ -997,7 +1043,9 @@ function ActiveModelCard({ modelOptions }: { modelOptions: Array<SelectOption> }
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['hermes', 'active-config'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['hermes', 'active-config'],
+        }),
         queryClient.invalidateQueries({ queryKey: ['hermes', 'config'] }),
         queryClient.invalidateQueries({ queryKey: ['hermes-config'] }),
       ])
@@ -1029,7 +1077,8 @@ function ActiveModelCard({ modelOptions }: { modelOptions: Array<SelectOption> }
           </h3>
           <p className="text-sm text-primary-600">
             Update the primary model, optional fallback, and stream timeout
-            settings saved in <code className="font-mono">~/.hermes/config.yaml</code>.
+            settings saved in{' '}
+            <code className="font-mono">~/.hermes/config.yaml</code>.
           </p>
         </div>
         <Button
@@ -1042,7 +1091,9 @@ function ActiveModelCard({ modelOptions }: { modelOptions: Array<SelectOption> }
       </div>
 
       {configQuery.isPending ? (
-        <p className="mt-4 text-sm text-primary-500">Loading configuration...</p>
+        <p className="mt-4 text-sm text-primary-500">
+          Loading configuration...
+        </p>
       ) : configQuery.error ? (
         <p className="mt-4 text-sm text-red-500">
           Could not load config — is Hermes Agent running?
@@ -1162,7 +1213,13 @@ function ActiveModelCard({ modelOptions }: { modelOptions: Array<SelectOption> }
 function ProviderManagementSection(props: {
   embedded: boolean
   providerSummaries: Array<ProviderSummary>
-  modelsQuery: ReturnType<typeof useQuery<{ ok?: boolean; models?: Array<ModelCatalogEntry>; configuredProviders?: Array<string> }>>
+  modelsQuery: ReturnType<
+    typeof useQuery<{
+      ok?: boolean
+      models?: Array<ModelCatalogEntry>
+      configuredProviders?: Array<string>
+    }>
+  >
   deletingId: string | null
   onAddProvider: () => void
   onEdit: (provider: ProviderSummary) => void
@@ -1203,7 +1260,8 @@ function ProviderManagementSection(props: {
               Configured Providers
             </h3>
             <p className="mt-1 text-xs text-primary-600">
-              API keys stay in your local Hermes config and are never sent to Studio.
+              API keys stay in your local Hermes config and are never sent to
+              Studio.
             </p>
           </div>
           <p className="text-xs text-primary-600 tabular-nums">
@@ -1223,7 +1281,11 @@ function ProviderManagementSection(props: {
             <p className="mb-2 text-sm text-primary-700">
               Unable to load providers right now. Check your Hermes connection.
             </p>
-            <Button variant="outline" size="sm" onClick={() => modelsQuery.refetch()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => modelsQuery.refetch()}
+            >
               Retry
             </Button>
           </div>
@@ -1345,11 +1407,13 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
     queryKey: ['hermes', 'config'],
     queryFn: async () => {
       const response = await fetch('/api/config-get')
-      const payload = (await response.json().catch(() => ({}))) as ConfigQueryResponse
+      const payload = (await response
+        .json()
+        .catch(() => ({}))) as ConfigQueryResponse
       if (!response.ok || payload.ok === false) {
         throw new Error(payload.error || `HTTP ${response.status}`)
       }
-      return (payload.payload ?? {})
+      return payload.payload ?? {}
     },
     retry: 1,
     enabled: configAvailable,
@@ -1362,7 +1426,9 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path, value }),
       })
-      const payload = (await response.json().catch(() => ({}))) as ConfigPatchResponse
+      const payload = (await response
+        .json()
+        .catch(() => ({}))) as ConfigPatchResponse
       if (!response.ok || payload.ok === false) {
         throw new Error(payload.error || `HTTP ${response.status}`)
       }
@@ -1408,7 +1474,9 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
   const filteredSettings = useMemo(
     function filterSettings() {
       if (!searchQuery) return SETTINGS
-      return SETTINGS.filter((setting) => searchMatchesSetting(setting, searchQuery))
+      return SETTINGS.filter((setting) =>
+        searchMatchesSetting(setting, searchQuery),
+      )
     },
     [searchQuery],
   )
@@ -1488,7 +1556,11 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
 
   if (!configAvailable) {
     return (
-      <div className={cn(embedded ? 'h-full bg-primary-50' : 'min-h-full bg-surface')}>
+      <div
+        className={cn(
+          embedded ? 'h-full bg-primary-50' : 'min-h-full bg-surface',
+        )}
+      >
         <BackendUnavailableState
           feature="Provider Setup"
           description={getUnavailableReason('config')}
@@ -1498,7 +1570,11 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
   }
 
   return (
-    <div className={cn(embedded ? 'h-full bg-primary-50' : 'min-h-full bg-surface')}>
+    <div
+      className={cn(
+        embedded ? 'h-full bg-primary-50' : 'min-h-full bg-surface',
+      )}
+    >
       <main
         className={cn(
           'min-h-full px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8',
@@ -1519,7 +1595,11 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <label className="relative w-full md:max-w-md">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary-500">
-                  <HugeiconsIcon icon={Search01Icon} size={18} strokeWidth={1.8} />
+                  <HugeiconsIcon
+                    icon={Search01Icon}
+                    size={18}
+                    strokeWidth={1.8}
+                  />
                 </span>
                 <Input
                   value={search}
@@ -1540,7 +1620,10 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
             </div>
           </header>
 
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTabId)}>
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as SettingsTabId)}
+          >
             <TabsList
               variant="underline"
               className="w-full flex-nowrap overflow-x-auto justify-start gap-2 rounded-xl border border-primary-200 bg-white px-3 py-2"
@@ -1609,7 +1692,9 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
                     </div>
                   ) : null}
 
-                  {!configQuery.isPending && !configQuery.error && items.length === 0 ? (
+                  {!configQuery.isPending &&
+                  !configQuery.error &&
+                  items.length === 0 ? (
                     <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-4 text-sm text-primary-600">
                       No settings in this tab match your current search.
                     </div>

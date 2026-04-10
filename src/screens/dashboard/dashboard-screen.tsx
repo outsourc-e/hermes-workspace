@@ -1,16 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
-import type { ReactNode } from 'react'
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
 } from 'recharts'
+import type { ReactNode } from 'react'
 import type { HermesSession } from '@/server/hermes-api'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { getCapabilities } from '@/server/gateway-capabilities'
@@ -52,22 +52,36 @@ function GlassCard({
   children: ReactNode
 }) {
   return (
-    <div className={cn(
-      'relative flex flex-col overflow-hidden rounded-xl border transition-colors',
-      className,
-    )} style={{ background: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
+    <div
+      className={cn(
+        'relative flex flex-col overflow-hidden rounded-xl border transition-colors',
+        className,
+      )}
+      style={{
+        background: 'var(--theme-card)',
+        borderColor: 'var(--theme-border)',
+      }}
+    >
       {accentColor && (
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
-          style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}50, transparent)` }}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
+          style={{
+            background: `linear-gradient(90deg, ${accentColor}, ${accentColor}50, transparent)`,
+          }}
         />
       )}
       {title && (
         <div className="flex items-center justify-between px-5 pt-4 pb-0">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">{title}</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">
+            {title}
+          </h3>
           {titleRight}
         </div>
       )}
-      <div className={cn('flex-1', noPadding ? '' : 'px-5 pb-4 pt-3')}>{children}</div>
+      <div className={cn('flex-1', noPadding ? '' : 'px-5 pb-4 pt-3')}>
+        {children}
+      </div>
     </div>
   )
 }
@@ -103,12 +117,29 @@ function UnavailableWidget({
 
 // ── System Glance (status bar) ───────────────────
 
-function SystemGlance({ sessions, connected, model, provider, tokens, cost }: {
-  sessions: number; connected: boolean; model: string; provider: string; tokens: string; cost: string
+function SystemGlance({
+  sessions,
+  connected,
+  model,
+  provider,
+  tokens,
+  cost,
+}: {
+  sessions: number
+  connected: boolean
+  model: string
+  provider: string
+  tokens: string
+  cost: string
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-2.5 backdrop-blur-sm">
-      <span className={cn('size-2 shrink-0 rounded-full', connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500')} />
+      <span
+        className={cn(
+          'size-2 shrink-0 rounded-full',
+          connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500',
+        )}
+      />
       <div className="flex flex-1 items-center gap-x-4 overflow-x-auto">
         <span className="text-xs font-medium text-ink">{model}</span>
         <span className="text-muted">·</span>
@@ -116,7 +147,9 @@ function SystemGlance({ sessions, connected, model, provider, tokens, cost }: {
         <span className="text-muted">·</span>
         <span className="text-xs text-neutral-500">{sessions} sessions</span>
         <span className="text-muted">·</span>
-        <span className="text-xs font-bold tabular-nums text-ink">{tokens} tokens</span>
+        <span className="text-xs font-bold tabular-nums text-ink">
+          {tokens} tokens
+        </span>
         <span className="text-muted">·</span>
         <span className="text-xs text-neutral-400">{cost}</span>
       </div>
@@ -126,18 +159,37 @@ function SystemGlance({ sessions, connected, model, provider, tokens, cost }: {
 
 // ── Metric Tile ──────────────────────────────────────────────────
 
-function MetricTile({ label, value, sub, icon, accentColor }: {
-  label: string; value: string; sub?: string; icon: string; accentColor: string
+function MetricTile({
+  label,
+  value,
+  sub,
+  icon,
+  accentColor,
+}: {
+  label: string
+  value: string
+  sub?: string
+  icon: string
+  accentColor: string
 }) {
   return (
     <GlassCard accentColor={accentColor}>
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">{label}</div>
-          <div className="text-2xl font-bold tabular-nums text-ink">{value}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">
+            {label}
+          </div>
+          <div className="text-2xl font-bold tabular-nums text-ink">
+            {value}
+          </div>
           {sub && <div className="text-[11px] text-muted">{sub}</div>}
         </div>
-        <div className="flex size-8 items-center justify-center rounded-lg text-base" style={{ background: `${accentColor}15` }}>{icon}</div>
+        <div
+          className="flex size-8 items-center justify-center rounded-lg text-base"
+          style={{ background: `${accentColor}15` }}
+        >
+          {icon}
+        </div>
       </div>
     </GlassCard>
   )
@@ -145,19 +197,25 @@ function MetricTile({ label, value, sub, icon, accentColor }: {
 
 // ── Activity Chart ───────────────────────────────────────────────
 
-function ActivityChart({ sessions }: { sessions: HermesSession[] }) {
+function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
   const chartData = useMemo(() => {
     const dayMap = new Map<string, { sessions: number; messages: number }>()
     const now = Date.now() / 1000
     for (let i = 13; i >= 0; i--) {
       const d = new Date((now - i * 86400) * 1000)
-      const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const key = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
       dayMap.set(key, { sessions: 0, messages: 0 })
     }
     for (const s of sessions) {
       if (!s.started_at) continue
       const d = new Date(s.started_at * 1000)
-      const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const key = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
       const entry = dayMap.get(key)
       if (entry) {
         entry.sessions += 1
@@ -166,20 +224,31 @@ function ActivityChart({ sessions }: { sessions: HermesSession[] }) {
     }
     // Trim leading empty days so active days fill the chart rather than
     // showing a long flat line at the start of the window.
-    const all = Array.from(dayMap.entries()).map(([date, data]) => ({ date, ...data }))
-    let firstActive = all.findIndex(d => d.sessions > 0 || d.messages > 0)
+    const all = Array.from(dayMap.entries()).map(([date, data]) => ({
+      date,
+      ...data,
+    }))
+    let firstActive = all.findIndex((d) => d.sessions > 0 || d.messages > 0)
     if (firstActive > 0) firstActive = Math.max(0, firstActive - 1) // keep 1 buffer day
     return firstActive > 0 ? all.slice(firstActive) : all
   }, [sessions])
 
   return (
-    <GlassCard title="Activity" titleRight={<span className="text-[10px] text-muted">14 days</span>} accentColor="#6366f1" className="h-full">
+    <GlassCard
+      title="Activity"
+      titleRight={<span className="text-[10px] text-muted">14 days</span>}
+      accentColor="#6366f1"
+      className="h-full"
+    >
       <div className="h-[200px] w-full -ml-2">
         <ResponsiveContainer width="100%" height="100%">
           {/* Dual Y-axis: messages (left, larger values) + sessions (right, smaller values).
               Without this, sessions flatlines at zero because message counts dominate
               the shared scale. */}
-          <AreaChart data={chartData} margin={{ top: 8, right: 32, left: -16, bottom: 0 }}>
+          <AreaChart
+            data={chartData}
+            margin={{ top: 8, right: 32, left: -16, bottom: 0 }}
+          >
             <defs>
               <linearGradient id="g-sessions" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
@@ -191,18 +260,68 @@ function ActivityChart({ sessions }: { sessions: HermesSession[] }) {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#666' }} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#22c55e' }} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#6366f1' }} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
-            <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid #333', borderRadius: '8px', fontSize: '11px' }} labelStyle={{ color: '#888', fontSize: '10px' }} />
-            <Area yAxisId="left" type="monotone" dataKey="messages" stroke="#22c55e" fill="url(#g-messages)" strokeWidth={1.5} dot={false} />
-            <Area yAxisId="right" type="monotone" dataKey="sessions" stroke="#6366f1" fill="url(#g-sessions)" strokeWidth={2} dot={false} />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 10, fill: '#666' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              yAxisId="left"
+              tick={{ fontSize: 10, fill: '#22c55e' }}
+              axisLine={false}
+              tickLine={false}
+              allowDecimals={false}
+              width={28}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 10, fill: '#6366f1' }}
+              axisLine={false}
+              tickLine={false}
+              allowDecimals={false}
+              width={28}
+            />
+            <Tooltip
+              contentStyle={{
+                background: '#1a1a2e',
+                border: '1px solid #333',
+                borderRadius: '8px',
+                fontSize: '11px',
+              }}
+              labelStyle={{ color: '#888', fontSize: '10px' }}
+            />
+            <Area
+              yAxisId="left"
+              type="monotone"
+              dataKey="messages"
+              stroke="#22c55e"
+              fill="url(#g-messages)"
+              strokeWidth={1.5}
+              dot={false}
+            />
+            <Area
+              yAxisId="right"
+              type="monotone"
+              dataKey="sessions"
+              stroke="#6366f1"
+              fill="url(#g-sessions)"
+              strokeWidth={2}
+              dot={false}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
       <div className="flex items-center gap-5 mt-2 text-[10px] text-neutral-500">
-        <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#6366f1]" />Sessions</span>
-        <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#22c55e]" />Messages</span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-[#6366f1]" />
+          Sessions
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-[#22c55e]" />
+          Messages
+        </span>
       </div>
     </GlassCard>
   )
@@ -228,9 +347,13 @@ function ModelCard() {
   const provider = (config?.activeProvider ?? '—') as string
   const configBlock = config?.config as Record<string, unknown> | undefined
   const modelBlock = configBlock?.model as Record<string, unknown> | undefined
-  const baseUrl = (modelBlock?.base_url ?? configBlock?.base_url ?? '') as string
+  const baseUrl = (modelBlock?.base_url ??
+    configBlock?.base_url ??
+    '') as string
   const connected = sessionsAvailable
-  const fallbackBlock = config?.fallback_model as Record<string, unknown> | undefined
+  const fallbackBlock = config?.fallback_model as
+    | Record<string, unknown>
+    | undefined
   const fallbackModel = fallbackBlock?.model as string | undefined
 
   if (!configAvailable) {
@@ -246,11 +369,20 @@ function ModelCard() {
     <GlassCard
       title="Model"
       titleRight={
-        <span className={cn(
-          'inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full',
-          connected ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10',
-        )}>
-          <span className={cn('size-1.5 rounded-full', connected ? 'bg-emerald-500' : 'bg-red-500')} />
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full',
+            connected
+              ? 'text-emerald-400 bg-emerald-500/10'
+              : 'text-red-400 bg-red-500/10',
+          )}
+        >
+          <span
+            className={cn(
+              'size-1.5 rounded-full',
+              connected ? 'bg-emerald-500' : 'bg-red-500',
+            )}
+          />
           {connected ? 'Online' : 'Offline'}
         </span>
       }
@@ -259,18 +391,31 @@ function ModelCard() {
     >
       <div className="space-y-2">
         <div className="flex items-center gap-3 rounded-lg p-2.5 bg-[var(--theme-card2)] border border-[var(--theme-border)]">
-          <div className="flex size-7 items-center justify-center rounded-md bg-indigo-500/10 text-sm">🤖</div>
+          <div className="flex size-7 items-center justify-center rounded-md bg-indigo-500/10 text-sm">
+            🤖
+          </div>
           <div className="min-w-0 flex-1">
-            <div className="font-mono text-[13px] font-bold text-ink truncate">{typeof modelName === 'string' ? modelName : '—'}</div>
-            <div className="text-[10px] text-muted font-mono truncate">{provider}{baseUrl ? ` · ${baseUrl}` : ''}</div>
+            <div className="font-mono text-[13px] font-bold text-ink truncate">
+              {typeof modelName === 'string' ? modelName : '—'}
+            </div>
+            <div className="text-[10px] text-muted font-mono truncate">
+              {provider}
+              {baseUrl ? ` · ${baseUrl}` : ''}
+            </div>
           </div>
         </div>
         {fallbackModel && (
           <div className="flex items-center gap-3 rounded-lg p-2.5 bg-[var(--theme-card2)] border border-[var(--theme-border)]">
-            <div className="flex size-7 items-center justify-center rounded-md bg-amber-500/10 text-sm">🔄</div>
+            <div className="flex size-7 items-center justify-center rounded-md bg-amber-500/10 text-sm">
+              🔄
+            </div>
             <div className="min-w-0 flex-1">
-              <div className="font-mono text-[13px] text-ink truncate">{fallbackModel}</div>
-              <div className="text-[10px] text-muted font-mono truncate">{(fallbackBlock?.provider as string) ?? ''}</div>
+              <div className="font-mono text-[13px] text-ink truncate">
+                {fallbackModel}
+              </div>
+              <div className="text-[10px] text-muted font-mono truncate">
+                {(fallbackBlock?.provider as string) ?? ''}
+              </div>
             </div>
           </div>
         )}
@@ -286,7 +431,9 @@ function SkillsWidget() {
   const skillsQuery = useQuery({
     queryKey: ['hermes-skills'],
     queryFn: async () => {
-      const res = await fetch('/api/skills?tab=installed&limit=8&summary=search')
+      const res = await fetch(
+        '/api/skills?tab=installed&limit=8&summary=search',
+      )
       if (!res.ok) return []
       const data = await res.json()
       return (data?.skills ?? []) as Array<Record<string, unknown>>
@@ -307,16 +454,33 @@ function SkillsWidget() {
   }
 
   return (
-    <GlassCard title="Skills" titleRight={<span className="text-[10px] text-muted">{skills.length} installed</span>} accentColor="#f59e0b">
+    <GlassCard
+      title="Skills"
+      titleRight={
+        <span className="text-[10px] text-muted">
+          {skills.length} installed
+        </span>
+      }
+      accentColor="#f59e0b"
+    >
       {skills.length === 0 ? (
-        <div className="text-xs text-neutral-400 py-4 text-center">No skills installed</div>
+        <div className="text-xs text-neutral-400 py-4 text-center">
+          No skills installed
+        </div>
       ) : (
         <div className="space-y-1.5">
           {skills.slice(0, 6).map((skill, i) => (
-            <div key={String(skill.name ?? i)} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-[var(--theme-card2)] transition-colors">
+            <div
+              key={String(skill.name ?? i)}
+              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-[var(--theme-card2)] transition-colors"
+            >
               <span className="text-xs">📦</span>
-              <span className="text-xs font-medium text-ink truncate flex-1">{String(skill.name ?? 'Unnamed')}</span>
-              {skill.enabled !== false && <span className="size-1.5 rounded-full bg-emerald-500/60" />}
+              <span className="text-xs font-medium text-ink truncate flex-1">
+                {String(skill.name ?? 'Unnamed')}
+              </span>
+              {skill.enabled !== false && (
+                <span className="size-1.5 rounded-full bg-emerald-500/60" />
+              )}
             </div>
           ))}
         </div>
@@ -327,33 +491,71 @@ function SkillsWidget() {
 
 // ── Quick Action ─────────────────────────────────────────────────
 
-function QuickAction({ label, icon, onClick, accentColor, disabled, badge }: {
-  label: string; icon: string; onClick: () => void; accentColor: string; disabled?: boolean; badge?: string
+function QuickAction({
+  label,
+  icon,
+  onClick,
+  accentColor,
+  disabled,
+  badge,
+}: {
+  label: string
+  icon: string
+  onClick: () => void
+  accentColor: string
+  disabled?: boolean
+  badge?: string
 }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={cn(
-      'relative overflow-hidden flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all',
-      'border-[var(--theme-border)] bg-[var(--theme-card)] text-left',
-      disabled
-        ? 'cursor-not-allowed opacity-60'
-        : 'hover:border-[var(--theme-accent-border)] hover:scale-[1.01] active:scale-[0.99]',
-    )}>
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-md text-sm" style={{ background: `${accentColor}18` }}>{icon}</div>
-      <span className="min-w-0 flex-1 text-xs font-semibold" style={{ color: 'var(--theme-text)' }}>{label}</span>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'relative overflow-hidden flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all',
+        'border-[var(--theme-border)] bg-[var(--theme-card)] text-left',
+        disabled
+          ? 'cursor-not-allowed opacity-60'
+          : 'hover:border-[var(--theme-accent-border)] hover:scale-[1.01] active:scale-[0.99]',
+      )}
+    >
+      <div
+        className="flex size-7 shrink-0 items-center justify-center rounded-md text-sm"
+        style={{ background: `${accentColor}18` }}
+      >
+        {icon}
+      </div>
+      <span
+        className="min-w-0 flex-1 text-xs font-semibold"
+        style={{ color: 'var(--theme-text)' }}
+      >
+        {label}
+      </span>
       {badge ? (
         <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-700">
           {badge}
         </span>
       ) : null}
-      <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[2px]"
+        style={{
+          background: `linear-gradient(90deg, ${accentColor}, transparent)`,
+        }}
+      />
     </button>
   )
 }
 
 // ── Session Row (minimal) ────────────────────────────────────────
 
-function SessionRow({ session, maxTokens, onClick }: {
-  session: HermesSession; maxTokens: number; onClick: () => void
+function SessionRow({
+  session,
+  maxTokens,
+  onClick,
+}: {
+  session: HermesSession
+  maxTokens: number
+  onClick: () => void
 }) {
   const tokens = (session.input_tokens ?? 0) + (session.output_tokens ?? 0)
   const msgs = session.message_count ?? 0
@@ -361,7 +563,11 @@ function SessionRow({ session, maxTokens, onClick }: {
   const barWidth = maxTokens > 0 ? Math.max(1, (tokens / maxTokens) * 100) : 0
 
   return (
-    <button type="button" onClick={onClick} className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-[var(--theme-card2)] transition-colors group">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-[var(--theme-card2)] transition-colors group"
+    >
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[13px] font-medium text-ink truncate flex-1 group-hover:text-ink">
           {session.title || session.id}
@@ -372,14 +578,22 @@ function SessionRow({ session, maxTokens, onClick }: {
       </div>
       <div className="flex items-center gap-2 text-[10px] text-neutral-500 mb-1.5">
         {session.model && (
-          <span className="font-mono px-1.5 py-0.5 rounded text-[9px] bg-indigo-500/10 text-indigo-400 font-medium">{session.model}</span>
+          <span className="font-mono px-1.5 py-0.5 rounded text-[9px] bg-indigo-500/10 text-indigo-400 font-medium">
+            {session.model}
+          </span>
         )}
         <span>{msgs} msgs</span>
         {tools > 0 && <span>{tools} tools</span>}
         {tokens > 0 && <span>{formatNumber(tokens)} tok</span>}
       </div>
       <div className="h-[3px] rounded-full w-full bg-[var(--theme-border)] overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${barWidth}%`, background: 'linear-gradient(90deg, #6366f1, #a855f7)' }} />
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${barWidth}%`,
+            background: 'linear-gradient(90deg, #6366f1, #a855f7)',
+          }}
+        />
       </div>
     </button>
   )
@@ -402,41 +616,61 @@ export function DashboardScreen() {
     queryFn: async () => {
       const res = await fetch('/api/sessions?limit=200&offset=0')
       if (!res.ok) return []
-      const data = await res.json() as { sessions?: Array<Record<string, unknown>> }
-      return (data.sessions ?? []).map(s => ({
+      const data = (await res.json()) as {
+        sessions?: Array<Record<string, unknown>>
+      }
+      return (data.sessions ?? []).map((s) => ({
         id: (s.key ?? s.id) as string,
         started_at: s.startedAt ? (s.startedAt as number) / 1000 : undefined,
         message_count: (s.message_count as number | undefined) ?? 0,
         tool_call_count: (s.tool_call_count as number | undefined) ?? 0,
         input_tokens: (s.tokenCount as number | undefined) ?? 0,
         output_tokens: 0,
-      })) as HermesSession[]
+      })) as Array<HermesSession>
     },
     staleTime: 10_000,
     refetchInterval: 30_000,
     enabled: sessionsAvailable,
   })
 
-  const sessions = (sessionsQuery.data ?? []) as HermesSession[]
-  const caps = { ...getCapabilities(), sessions: sessionsAvailable, skills: skillsAvailable }
+  const sessions = (sessionsQuery.data ?? [])
+  const caps = {
+    ...getCapabilities(),
+    sessions: sessionsAvailable,
+    skills: skillsAvailable,
+  }
 
   const stats = useMemo(() => {
-    let totalMessages = 0, totalToolCalls = 0, totalTokens = 0
+    let totalMessages = 0,
+      totalToolCalls = 0,
+      totalTokens = 0
     for (const s of sessions) {
       totalMessages += s.message_count ?? 0
       totalToolCalls += s.tool_call_count ?? 0
       totalTokens += (s.input_tokens ?? 0) + (s.output_tokens ?? 0)
     }
-    return { totalSessions: sessions.length, totalMessages, totalToolCalls, totalTokens }
+    return {
+      totalSessions: sessions.length,
+      totalMessages,
+      totalToolCalls,
+      totalTokens,
+    }
   }, [sessions])
 
-  const recentSessions = useMemo(() =>
-    [...sessions].sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0)).slice(0, 6),
-  [sessions])
+  const recentSessions = useMemo(
+    () =>
+      [...sessions]
+        .sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0))
+        .slice(0, 6),
+    [sessions],
+  )
 
   const maxTokens = useMemo(() => {
     let max = 0
-    for (const s of recentSessions) { const t = (s.input_tokens ?? 0) + (s.output_tokens ?? 0); if (t > max) max = t }
+    for (const s of recentSessions) {
+      const t = (s.input_tokens ?? 0) + (s.output_tokens ?? 0)
+      if (t > max) max = t
+    }
     return max
   }, [recentSessions])
 
@@ -451,10 +685,27 @@ export function DashboardScreen() {
           alt="Hermes"
           className="size-12 md:size-14 rounded-xl shadow-md shadow-indigo-500/10 border border-[var(--theme-border)]"
         />
-        <h1 className="text-sm font-semibold text-ink tracking-wide">Hermes Workspace</h1>
+        <h1 className="text-sm font-semibold text-ink tracking-wide">
+          Hermes Workspace
+        </h1>
         <div className="mt-1 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
-          <QuickAction label="New Chat" icon="💬" accentColor="#6366f1" onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })} />
-          <QuickAction label="Terminal" icon="💻" accentColor="#22c55e" onClick={() => navigate({ to: '/terminal' })} />
+          <QuickAction
+            label="New Chat"
+            icon="💬"
+            accentColor="#6366f1"
+            onClick={() =>
+              navigate({
+                to: '/chat/$sessionKey',
+                params: { sessionKey: 'new' },
+              })
+            }
+          />
+          <QuickAction
+            label="Terminal"
+            icon="💻"
+            accentColor="#22c55e"
+            onClick={() => navigate({ to: '/terminal' })}
+          />
           <QuickAction
             label="Skills"
             icon="🧩"
@@ -463,17 +714,43 @@ export function DashboardScreen() {
             disabled={!skillsAvailable}
             badge={!skillsAvailable ? 'Enhanced' : undefined}
           />
-          <QuickAction label="Settings" icon="⚙️" accentColor="#a855f7" onClick={() => navigate({ to: '/settings' })} />
+          <QuickAction
+            label="Settings"
+            icon="⚙️"
+            accentColor="#a855f7"
+            onClick={() => navigate({ to: '/settings' })}
+          />
         </div>
       </div>
 
       {/* ── Metrics Row ── */}
       {sessionsAvailable ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <MetricTile label="Sessions" value={formatNumber(stats.totalSessions)} icon="💬" accentColor="#6366f1" />
-          <MetricTile label="Messages" value={formatNumber(stats.totalMessages)} icon="✉️" accentColor="#22c55e" />
-          <MetricTile label="Tool Calls" value={formatNumber(stats.totalToolCalls)} icon="🔧" accentColor="#f59e0b" />
-          <MetricTile label="Tokens" value={formatNumber(stats.totalTokens)} sub={costEstimate} icon="⚡" accentColor="#a855f7" />
+          <MetricTile
+            label="Sessions"
+            value={formatNumber(stats.totalSessions)}
+            icon="💬"
+            accentColor="#6366f1"
+          />
+          <MetricTile
+            label="Messages"
+            value={formatNumber(stats.totalMessages)}
+            icon="✉️"
+            accentColor="#22c55e"
+          />
+          <MetricTile
+            label="Tool Calls"
+            value={formatNumber(stats.totalToolCalls)}
+            icon="🔧"
+            accentColor="#f59e0b"
+          />
+          <MetricTile
+            label="Tokens"
+            value={formatNumber(stats.totalTokens)}
+            sub={costEstimate}
+            icon="⚡"
+            accentColor="#a855f7"
+          />
         </div>
       ) : (
         <UnavailableWidget
@@ -507,8 +784,16 @@ export function DashboardScreen() {
         <GlassCard
           title="Recent Sessions"
           titleRight={
-            <button type="button" className="text-[10px] text-muted hover:text-neutral-300 transition-colors"
-              onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}>
+            <button
+              type="button"
+              className="text-[10px] text-muted hover:text-neutral-300 transition-colors"
+              onClick={() =>
+                navigate({
+                  to: '/chat/$sessionKey',
+                  params: { sessionKey: 'main' },
+                })
+              }
+            >
               View all →
             </button>
           }
@@ -517,11 +802,22 @@ export function DashboardScreen() {
         >
           <div className="py-1">
             {recentSessions.length === 0 ? (
-              <div className="text-xs text-neutral-400 py-8 text-center">No sessions yet — start a chat!</div>
+              <div className="text-xs text-neutral-400 py-8 text-center">
+                No sessions yet — start a chat!
+              </div>
             ) : (
               recentSessions.map((s) => (
-                <SessionRow key={s.id} session={s} maxTokens={maxTokens}
-                  onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: s.id } })} />
+                <SessionRow
+                  key={s.id}
+                  session={s}
+                  maxTokens={maxTokens}
+                  onClick={() =>
+                    navigate({
+                      to: '/chat/$sessionKey',
+                      params: { sessionKey: s.id },
+                    })
+                  }
+                />
               ))
             )}
           </div>

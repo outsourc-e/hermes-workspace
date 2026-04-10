@@ -38,7 +38,10 @@ function broadcast(event: string, data: Record<string, unknown>): void {
   }
 }
 
-export function publishChatEvent(event: string, data: Record<string, unknown>): void {
+export function publishChatEvent(
+  event: string,
+  data: Record<string, unknown>,
+): void {
   const runId = typeof data.runId === 'string' ? data.runId : undefined
   if (hasActiveSendRun(runId)) return
   broadcast(event, data)
@@ -61,12 +64,14 @@ export function subscribeToChatEvents(
     ? (event) => {
         const eventSessionKey = event.data.sessionKey as string | undefined
         if (eventSessionKey && eventSessionKey !== sessionKeyFilter) return
-        const runId = typeof event.data.runId === 'string' ? event.data.runId : undefined
+        const runId =
+          typeof event.data.runId === 'string' ? event.data.runId : undefined
         if (hasActiveSendRun(runId)) return
         subscriber(event)
       }
     : (event) => {
-        const runId = typeof event.data.runId === 'string' ? event.data.runId : undefined
+        const runId =
+          typeof event.data.runId === 'string' ? event.data.runId : undefined
         if (hasActiveSendRun(runId)) return
         subscriber(event)
       }

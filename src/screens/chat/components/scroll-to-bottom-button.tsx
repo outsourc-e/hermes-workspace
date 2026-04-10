@@ -33,7 +33,8 @@ function ScrollToBottomButton({
           )}
           style={{
             background: 'var(--theme-accent)',
-            boxShadow: '0 4px 12px color-mix(in srgb, var(--theme-accent) 35%, transparent)',
+            boxShadow:
+              '0 4px 12px color-mix(in srgb, var(--theme-accent) 35%, transparent)',
           }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

@@ -67,13 +67,19 @@ export const THEMES: Array<{
 const STORAGE_KEY = 'hermes-theme'
 const DEFAULT_THEME: ThemeId = 'hermes-official'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
-const LIGHT_THEME_MAP: Record<Exclude<ThemeId, `${string}-light`>, Extract<ThemeId, `${string}-light`>> = {
+const LIGHT_THEME_MAP: Record<
+  Exclude<ThemeId, `${string}-light`>,
+  Extract<ThemeId, `${string}-light`>
+> = {
   'hermes-official': 'hermes-official-light',
   'hermes-classic': 'hermes-classic-light',
   'hermes-slate': 'hermes-slate-light',
   'hermes-mono': 'hermes-mono-light',
 }
-const DARK_THEME_MAP: Record<Extract<ThemeId, `${string}-light`>, Exclude<ThemeId, `${string}-light`>> = {
+const DARK_THEME_MAP: Record<
+  Extract<ThemeId, `${string}-light`>,
+  Exclude<ThemeId, `${string}-light`>
+> = {
   'hermes-official-light': 'hermes-official',
   'hermes-classic-light': 'hermes-classic',
   'hermes-slate-light': 'hermes-slate',
@@ -87,7 +93,9 @@ const LIGHT_THEMES = new Set<ThemeId>([
   'hermes-mono-light',
 ])
 
-export function isValidTheme(value: string | null | undefined): value is ThemeId {
+export function isValidTheme(
+  value: string | null | undefined,
+): value is ThemeId {
   return typeof value === 'string' && THEME_SET.has(value as ThemeId)
 }
 
@@ -95,7 +103,10 @@ export function isDarkTheme(theme: ThemeId): boolean {
   return !LIGHT_THEMES.has(theme)
 }
 
-export function getThemeVariant(theme: ThemeId, mode: 'light' | 'dark'): ThemeId {
+export function getThemeVariant(
+  theme: ThemeId,
+  mode: 'light' | 'dark',
+): ThemeId {
   if (mode === 'light') {
     return isDarkTheme(theme)
       ? LIGHT_THEME_MAP[theme as keyof typeof LIGHT_THEME_MAP]

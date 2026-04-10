@@ -18,7 +18,12 @@ export const Route = createFileRoute('/api/knowledge/search')({
           return json({ results: searchKnowledgePages(query) })
         } catch (error) {
           return json(
-            { error: error instanceof Error ? error.message : 'Failed to search knowledge pages' },
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to search knowledge pages',
+            },
             { status: 500 },
           )
         }

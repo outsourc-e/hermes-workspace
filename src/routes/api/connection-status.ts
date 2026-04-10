@@ -2,17 +2,17 @@
  * Connection status endpoint — returns a summary of portable chat readiness
  * plus whether Hermes gateway enhancements are available.
  */
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
-import { isAuthenticated } from '../../server/auth-middleware'
+import YAML from 'yaml'
 import {
   HERMES_API,
   ensureGatewayProbed,
   getChatMode,
 } from '../../server/gateway-capabilities'
-import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
-import YAML from 'yaml'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 const CONFIG_PATH = path.join(os.homedir(), '.hermes', 'config.yaml')
 

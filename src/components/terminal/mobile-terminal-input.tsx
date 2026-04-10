@@ -64,8 +64,14 @@ export function MobileTerminalInput() {
         type="text"
         defaultValue=""
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); send() }
-          if (e.key === 'Tab') { e.preventDefault(); void sendToActiveTab('\t') }
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            send()
+          }
+          if (e.key === 'Tab') {
+            e.preventDefault()
+            void sendToActiveTab('\t')
+          }
         }}
         placeholder="Type command…"
         autoCapitalize="none"

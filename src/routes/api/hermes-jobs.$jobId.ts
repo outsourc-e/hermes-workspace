@@ -15,7 +15,9 @@ export const Route = createFileRoute('/api/hermes-jobs/$jobId')({
     handlers: {
       GET: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+          })
         }
         await ensureGatewayProbed()
         if (!getCapabilities().jobs) {
@@ -33,11 +35,16 @@ export const Route = createFileRoute('/api/hermes-jobs/$jobId')({
           ? `${HERMES_API}/api/jobs/${params.jobId}/${subPath}${url.search}`
           : `${HERMES_API}/api/jobs/${params.jobId}`
         const res = await fetch(target)
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+        return new Response(await res.text(), {
+          status: res.status,
+          headers: { 'Content-Type': 'application/json' },
+        })
       },
       POST: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+          })
         }
         await ensureGatewayProbed()
         if (!getCapabilities().jobs) {
@@ -59,11 +66,16 @@ export const Route = createFileRoute('/api/hermes-jobs/$jobId')({
           headers: { 'Content-Type': 'application/json' },
           body: body || undefined,
         })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+        return new Response(await res.text(), {
+          status: res.status,
+          headers: { 'Content-Type': 'application/json' },
+        })
       },
       PATCH: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+          })
         }
         await ensureGatewayProbed()
         if (!getCapabilities().jobs) {
@@ -80,11 +92,16 @@ export const Route = createFileRoute('/api/hermes-jobs/$jobId')({
           headers: { 'Content-Type': 'application/json' },
           body,
         })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+        return new Response(await res.text(), {
+          status: res.status,
+          headers: { 'Content-Type': 'application/json' },
+        })
       },
       DELETE: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+          })
         }
         await ensureGatewayProbed()
         if (!getCapabilities().jobs) {
@@ -95,8 +112,13 @@ export const Route = createFileRoute('/api/hermes-jobs/$jobId')({
             { status: 404, headers: { 'Content-Type': 'application/json' } },
           )
         }
-        const res = await fetch(`${HERMES_API}/api/jobs/${params.jobId}`, { method: 'DELETE' })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+        const res = await fetch(`${HERMES_API}/api/jobs/${params.jobId}`, {
+          method: 'DELETE',
+        })
+        return new Response(await res.text(), {
+          status: res.status,
+          headers: { 'Content-Type': 'application/json' },
+        })
       },
     },
   },

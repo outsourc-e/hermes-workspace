@@ -76,10 +76,11 @@ export const Route = createFileRoute('/api/terminal-stream')({
                 rows,
               })
             } catch (error) {
-              if (import.meta.env.DEV) console.error(
-                '[terminal-stream] Failed to create session:',
-                error,
-              )
+              if (import.meta.env.DEV)
+                console.error(
+                  '[terminal-stream] Failed to create session:',
+                  error,
+                )
               send('error', { message: String(error) })
               try {
                 controller.close()

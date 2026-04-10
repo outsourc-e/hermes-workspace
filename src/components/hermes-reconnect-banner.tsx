@@ -17,7 +17,9 @@ async function probeHermesHealth(): Promise<boolean> {
       cache: 'no-store',
     })
     if (response.ok) return true
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
   // Fallback to direct health proxy
   try {
     const response = await fetch('/api/hermes-proxy/health', {
@@ -39,7 +41,9 @@ export function HermesReconnectBanner({
 
   const mountedRef = useRef(true)
   const inFlightProbeRef = useRef<Promise<boolean> | null>(null)
-  const probeNowRef = useRef<((showSpinner: boolean) => Promise<boolean>) | null>(null)
+  const probeNowRef = useRef<
+    ((showSpinner: boolean) => Promise<boolean>) | null
+  >(null)
   const wasDisconnectedRef = useRef(false)
   const flashTimerRef = useRef<number | null>(null)
 
@@ -111,7 +115,9 @@ export function HermesReconnectBanner({
           if (!cancelled && mountedRef.current) {
             wasDisconnectedRef.current = true
             setBannerState('disconnected')
-            setMessage(error instanceof Error ? error.message : 'Connection failed')
+            setMessage(
+              error instanceof Error ? error.message : 'Connection failed',
+            )
           }
           return false
         })
@@ -173,7 +179,9 @@ export function HermesReconnectBanner({
           : 'Starting Hermes agent…',
       )
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Failed to start Hermes agent')
+      setMessage(
+        error instanceof Error ? error.message : 'Failed to start Hermes agent',
+      )
     } finally {
       setIsStarting(false)
       await probeNowRef.current?.(true)

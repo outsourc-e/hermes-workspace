@@ -11,7 +11,9 @@ type ResolveSessionResult = {
 
 const SYNTHETIC_SESSION_KEYS = new Set(['main', 'new'])
 
-export function isSyntheticSessionKey(value: string | null | undefined): boolean {
+export function isSyntheticSessionKey(
+  value: string | null | undefined,
+): boolean {
   if (!value) return false
   return SYNTHETIC_SESSION_KEYS.has(value.trim())
 }

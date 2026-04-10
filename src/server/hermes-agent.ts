@@ -80,7 +80,9 @@ export function resolveHermesPython(agentDir: string): string {
   return 'python3'
 }
 
-export async function isHermesAgentHealthy(port = HERMES_START_PORT): Promise<boolean> {
+export async function isHermesAgentHealthy(
+  port = HERMES_START_PORT,
+): Promise<boolean> {
   try {
     const response = await fetch(`http://127.0.0.1:${port}/health`, {
       signal: AbortSignal.timeout(HERMES_HEALTH_TIMEOUT_MS),
@@ -116,7 +118,15 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
 
       const child = spawn(
         python,
-        ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', String(HERMES_START_PORT)],
+        [
+          '-m',
+          'uvicorn',
+          'webapi.app:app',
+          '--host',
+          '0.0.0.0',
+          '--port',
+          String(HERMES_START_PORT),
+        ],
         {
           cwd: agentDir,
           detached: true,

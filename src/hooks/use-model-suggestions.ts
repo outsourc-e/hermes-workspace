@@ -174,7 +174,7 @@ export function useModelSuggestions(_opts: {
 }
 
 // -ignore -- disabled, will re-enable after fixing deps
- 
+
 function _useModelSuggestionsDisabled({
   currentModel,
   sessionKey,
@@ -293,7 +293,7 @@ function _useModelSuggestionsDisabled({
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- messages.length as stable proxy
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- messages.length as stable proxy
   }, [
     currentModel,
     sessionKey,

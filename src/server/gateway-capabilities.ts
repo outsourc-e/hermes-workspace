@@ -8,17 +8,15 @@
  *   - Enhanced: Hermes-native extras (sessions, skills, memory, config, jobs)
  */
 
-export let HERMES_API =
-  process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+export let HERMES_API = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
 export const HERMES_UPGRADE_INSTRUCTIONS =
   'Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes --gateway'
 
-export const SESSIONS_API_UNAVAILABLE_MESSAGE =
-  `Your Hermes gateway does not support the sessions API. ${HERMES_UPGRADE_INSTRUCTIONS}`
+export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes gateway does not support the sessions API. ${HERMES_UPGRADE_INSTRUCTIONS}`
 
 const PROBE_TIMEOUT_MS = 3_000
-const PROBE_TTL_MS = 30_000
+const PROBE_TTL_MS = 120_000
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -32,6 +30,7 @@ export type CoreCapabilities = {
 
 export type EnhancedCapabilities = {
   sessions: boolean
+  enhancedChat: boolean
   skills: boolean
   memory: boolean
   config: boolean
@@ -43,7 +42,11 @@ export type GatewayCapabilities = CoreCapabilities & EnhancedCapabilities
 
 export type ChatMode = 'enhanced-hermes' | 'portable' | 'disconnected'
 
-export type ConnectionStatus = 'connected' | 'enhanced' | 'partial' | 'disconnected'
+export type ConnectionStatus =
+  | 'connected'
+  | 'enhanced'
+  | 'partial'
+  | 'disconnected'
 
 // ── State ─────────────────────────────────────────────────────────
 
@@ -53,6 +56,7 @@ let capabilities: GatewayCapabilities = {
   models: false,
   streaming: false,
   sessions: false,
+  enhancedChat: false,
   skills: false,
   memory: false,
   config: false,
@@ -68,7 +72,7 @@ let lastLoggedSummary = ''
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || ''
 
 function authHeaders(): Record<string, string> {
-  return BEARER_TOKEN ? { 'Authorization': `Bearer ${BEARER_TOKEN}` } : {}
+  return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 }
 
 // ── Probing ───────────────────────────────────────────────────────
@@ -89,34 +93,26 @@ async function probe(path: string): Promise<boolean> {
   }
 }
 
-/** Probe /v1/chat/completions with a minimal real POST.
- *  Some endpoints (e.g. Codex) reject OPTIONS and return 403 on unknown paths,
- *  so we need to send a real request to confirm the endpoint works. */
+/** Probe /v1/chat/completions to check if the endpoint exists.
+ *  First tries a lightweight GET (405 = endpoint exists, just wrong method).
+ *  This avoids creating real sessions on the gateway. */
 async function probeChatCompletions(): Promise<boolean> {
   try {
-    const res = await fetch(`${HERMES_API}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({
-        model: 'test',
-        messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 1,
-      }),
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS + 5_000),
+    // Fast path: GET returns 405 Method Not Allowed = endpoint exists
+    const getRes = await fetch(`${HERMES_API}/v1/chat/completions`, {
+      method: 'GET',
+      headers: authHeaders(),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
-    // 200 = works. 400/422 = endpoint exists. 401 = exists, bad auth.
-    if (res.ok || res.status === 400 || res.status === 422 || res.status === 401) return true
-    // 404 could mean "endpoint doesn't exist" OR "model not found" (Ollama).
-    // Check if the response is a JSON API error — that means the endpoint exists.
-    if (res.status === 404) {
-      const text = await res.text().catch(() => '')
-      return text.includes('"error"') || text.includes('"message"')
-    }
-    // 403 on completions specifically — check if it's a real API error vs catch-all
-    if (res.status === 403) {
-      const text = await res.text().catch(() => '')
-      return text.includes('error') || text.includes('unauthorized') || text.includes('forbidden')
-    }
+    // 405 = endpoint exists but wrong method (expected for POST-only routes)
+    if (getRes.status === 405) return true
+    // 200 would be unusual but means it exists
+    if (getRes.ok) return true
+    // 400/422 = endpoint exists, just rejected the request shape
+    if (getRes.status === 400 || getRes.status === 422) return true
+    // 404 = endpoint doesn't exist on this server
+    if (getRes.status === 404) return false
+    // For other status codes, assume it exists
     return true
   } catch {
     return false
@@ -131,8 +127,20 @@ function logCapabilities(next: GatewayCapabilities): void {
   const enhanced: Array<string> = []
   const missing: Array<string> = []
 
-  const coreKeys: Array<keyof CoreCapabilities> = ['health', 'chatCompletions', 'models', 'streaming']
-  const enhancedKeys: Array<keyof EnhancedCapabilities> = ['sessions', 'skills', 'memory', 'config', 'jobs']
+  const coreKeys: Array<keyof CoreCapabilities> = [
+    'health',
+    'chatCompletions',
+    'models',
+    'streaming',
+  ]
+  const enhancedKeys: Array<keyof EnhancedCapabilities> = [
+    'sessions',
+    'enhancedChat',
+    'skills',
+    'memory',
+    'config',
+    'jobs',
+  ]
 
   for (const key of coreKeys) {
     if (key === 'probed') continue
@@ -143,8 +151,7 @@ function logCapabilities(next: GatewayCapabilities): void {
   }
 
   const mode = getChatMode()
-  const summary =
-    `[gateway] ${HERMES_API} mode=${mode} core=[${core.join(', ')}] enhanced=[${enhanced.join(', ')}] missing=[${missing.join(', ')}]`
+  const summary = `[gateway] ${HERMES_API} mode=${mode} core=[${core.join(', ')}] enhanced=[${enhanced.join(', ')}] missing=[${missing.join(', ')}]`
   if (summary === lastLoggedSummary) return
   lastLoggedSummary = summary
   console.log(summary)
@@ -177,7 +184,9 @@ export async function probeGateway(options?: {
         const fallback = 'http://127.0.0.1:8643'
         const healthOn8643 = await fetch(`${fallback}/health`, {
           signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-        }).then(r => r.ok).catch(() => false)
+        })
+          .then((r) => r.ok)
+          .catch(() => false)
         if (healthOn8643) {
           HERMES_API = fallback
           console.log(`[gateway] Connected to Hermes at ${HERMES_API}`)
@@ -189,17 +198,27 @@ export async function probeGateway(options?: {
       }
     }
 
-    const [health, chatCompletions, models, sessions, skills, memory, config, jobs] =
-      await Promise.all([
-        probe('/health'),
-        probeChatCompletions(),
-        probe('/v1/models'),
-        probe('/api/sessions'),
-        probe('/api/skills'),
-        probe('/api/memory'),
-        probe('/api/config'),
-        probe('/api/jobs'),
-      ])
+    const [
+      health,
+      chatCompletions,
+      models,
+      sessions,
+      enhancedChat,
+      skills,
+      memory,
+      config,
+      jobs,
+    ] = await Promise.all([
+      probe('/health'),
+      probeChatCompletions(),
+      probe('/v1/models'),
+      probe('/api/sessions'),
+      probe('/api/sessions/__probe__/chat/stream'),
+      probe('/api/skills'),
+      probe('/api/memory'),
+      probe('/api/config'),
+      probe('/api/jobs'),
+    ])
 
     capabilities = {
       // Core
@@ -210,6 +229,7 @@ export async function probeGateway(options?: {
       probed: true,
       // Enhanced
       sessions,
+      enhancedChat,
       skills,
       memory,
       config,
@@ -257,6 +277,7 @@ export function getCoreCapabilities(): CoreCapabilities {
 export function getEnhancedCapabilities(): EnhancedCapabilities {
   return {
     sessions: capabilities.sessions,
+    enhancedChat: capabilities.enhancedChat,
     skills: capabilities.skills,
     memory: capabilities.memory,
     config: capabilities.config,
@@ -271,7 +292,8 @@ export function getEnhancedCapabilities(): EnhancedCapabilities {
  * - 'disconnected': no usable chat backend
  */
 export function getChatMode(): ChatMode {
-  if (capabilities.sessions) return 'enhanced-hermes'
+  if (capabilities.sessions && capabilities.enhancedChat)
+    return 'enhanced-hermes'
   if (capabilities.chatCompletions || capabilities.health) return 'portable'
   return 'disconnected'
 }
@@ -284,8 +306,14 @@ export function getChatMode(): ChatMode {
  * - 'disconnected': no backend
  */
 export function getConnectionStatus(): ConnectionStatus {
-  if (!capabilities.health && !capabilities.chatCompletions) return 'disconnected'
-  const enhanced = capabilities.sessions && capabilities.skills && capabilities.memory && capabilities.config
+  if (!capabilities.health && !capabilities.chatCompletions)
+    return 'disconnected'
+  const enhanced =
+    capabilities.sessions &&
+    capabilities.enhancedChat &&
+    capabilities.skills &&
+    capabilities.memory &&
+    capabilities.config
   if (enhanced) return 'enhanced'
   if (capabilities.chatCompletions || capabilities.sessions) return 'partial'
   return 'connected'

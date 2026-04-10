@@ -56,9 +56,7 @@ export function HermesHealthBanner({
       }}
     >
       <span className="inline-block h-2 w-2 rounded-full bg-white/60 animate-pulse" />
-      <span>
-        Hermes Agent unreachable{lastError ? ` — ${lastError}` : ''}
-      </span>
+      <span>Hermes Agent unreachable{lastError ? ` — ${lastError}` : ''}</span>
       <button
         type="button"
         onClick={() => {
@@ -70,7 +68,9 @@ export function HermesHealthBanner({
             })
             .catch((err) => {
               setStatus('error')
-              setLastError(err instanceof Error ? err.message : 'Connection failed')
+              setLastError(
+                err instanceof Error ? err.message : 'Connection failed',
+              )
             })
         }}
         className="ml-2 rounded px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80"

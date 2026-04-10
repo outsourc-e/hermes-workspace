@@ -116,7 +116,9 @@ export function WorkspaceSkillsScreen() {
   const [memoryFilter, setMemoryFilter] = useState<MemoryFilter>('All')
   const [memorySearch, setMemorySearch] = useState('')
   const deferredSearch = useDeferredValue(memorySearch)
-  const [selectedMemoryPath, setSelectedMemoryPath] = useState<string | null>(null)
+  const [selectedMemoryPath, setSelectedMemoryPath] = useState<string | null>(
+    null,
+  )
 
   const skillsQuery = useQuery({
     queryKey: ['workspace', 'skills'],
@@ -184,7 +186,9 @@ export function WorkspaceSkillsScreen() {
   const projectFiles = filteredMemoryFiles.filter(
     (file) => file.section === 'project',
   )
-  const agentFiles = filteredMemoryFiles.filter((file) => file.section === 'agent')
+  const agentFiles = filteredMemoryFiles.filter(
+    (file) => file.section === 'agent',
+  )
 
   const selectedSkill =
     visibleSkills.find((skill) => skill.id === selectedSkillId) ??
@@ -192,7 +196,10 @@ export function WorkspaceSkillsScreen() {
     null
 
   useEffect(() => {
-    if (selectedSkillId && visibleSkills.some((skill) => skill.id === selectedSkillId)) {
+    if (
+      selectedSkillId &&
+      visibleSkills.some((skill) => skill.id === selectedSkillId)
+    ) {
       return
     }
 
@@ -231,7 +238,9 @@ export function WorkspaceSkillsScreen() {
               <HugeiconsIcon icon={SparklesIcon} size={24} strokeWidth={1.6} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-primary-900">Skills</h1>
+              <h1 className="text-base font-semibold text-primary-900">
+                Skills
+              </h1>
               <p className="mt-1 text-sm text-primary-500">
                 Installed skills and workspace memory sources
               </p>
@@ -354,7 +363,10 @@ export function WorkspaceSkillsScreen() {
                                     className="mt-0.5 shrink-0 text-accent-300"
                                   />
                                   <div className="space-y-1">
-                                    <p>Installed and ready to use in the workspace.</p>
+                                    <p>
+                                      Installed and ready to use in the
+                                      workspace.
+                                    </p>
                                     <p className="break-all text-xs text-primary-500">
                                       {skill.path}
                                     </p>
@@ -407,7 +419,12 @@ export function WorkspaceSkillsScreen() {
                       </div>
                     ) : (
                       <div className="max-h-96 overflow-y-auto rounded-lg border border-primary-200 bg-white p-4 text-sm text-primary-800 prose prose-sm prose-primary max-w-none">
-                        <SkillMarkdown content={skillContentQuery.data?.trim() || 'No content available.'} />
+                        <SkillMarkdown
+                          content={
+                            skillContentQuery.data?.trim() ||
+                            'No content available.'
+                          }
+                        />
                       </div>
                     )}
                   </div>

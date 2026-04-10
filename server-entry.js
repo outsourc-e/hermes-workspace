@@ -34,7 +34,10 @@ const MIME_TYPES = {
 }
 
 async function tryServeStatic(req, res) {
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+  const url = new URL(
+    req.url || '/',
+    `http://${req.headers.host || 'localhost'}`,
+  )
   const pathname = decodeURIComponent(url.pathname)
 
   // Prevent directory traversal
@@ -141,4 +144,3 @@ const httpServer = createServer(async (req, res) => {
 httpServer.listen(port, host, () => {
   console.log(`Hermes Workspace running at http://${host}:${port}`)
 })
-

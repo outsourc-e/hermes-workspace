@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -e .
 
 EXPOSE 8642
 
-CMD ["hermes", "--gateway"]
+CMD ["hermes", "gateway", "run"]

@@ -26,9 +26,16 @@ export const Route = createFileRoute('/memory')({
 
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <Tabs value={tab} onValueChange={(value) => setTab(value as 'memory' | 'knowledge')} className="h-full min-h-0 gap-0">
+        <Tabs
+          value={tab}
+          onValueChange={(value) => setTab(value as 'memory' | 'knowledge')}
+          className="h-full min-h-0 gap-0"
+        >
           <div className="border-b border-primary-200 px-3 pt-3 dark:border-neutral-800 md:px-4 md:pt-4">
-            <TabsList variant="underline" className="w-full justify-start gap-1">
+            <TabsList
+              variant="underline"
+              className="w-full justify-start gap-1"
+            >
               <TabsTab value="memory">Memory</TabsTab>
               <TabsTab value="knowledge">Knowledge</TabsTab>
             </TabsList>
@@ -36,7 +43,11 @@ export const Route = createFileRoute('/memory')({
 
           <TabsPanel value="memory" className="min-h-0 flex-1">
             {tab === 'memory' ? (
-              <Suspense fallback={<RouteLoadingState label="Loading memory browser..." />}>
+              <Suspense
+                fallback={
+                  <RouteLoadingState label="Loading memory browser..." />
+                }
+              >
                 {memoryAvailable ? (
                   <MemoryBrowserScreen />
                 ) : (
@@ -51,7 +62,11 @@ export const Route = createFileRoute('/memory')({
 
           <TabsPanel value="knowledge" className="min-h-0 flex-1">
             {tab === 'knowledge' ? (
-              <Suspense fallback={<RouteLoadingState label="Loading knowledge browser..." />}>
+              <Suspense
+                fallback={
+                  <RouteLoadingState label="Loading knowledge browser..." />
+                }
+              >
                 <KnowledgeBrowserScreen />
               </Suspense>
             ) : null}

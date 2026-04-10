@@ -125,7 +125,8 @@ export function SkillsScreen() {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<SkillsTab>('installed')
   const [searchInput, setSearchInput] = useState('')
-  const [debouncedMarketplaceSearch, setDebouncedMarketplaceSearch] = useState('')
+  const [debouncedMarketplaceSearch, setDebouncedMarketplaceSearch] =
+    useState('')
   const [category, setCategory] = useState('All')
   const [sort, setSort] = useState<SkillsSort>('name')
   const [page, setPage] = useState(1)
@@ -176,7 +177,9 @@ export function SkillsScreen() {
       params.set('source', 'all')
       params.set('limit', '20')
 
-      const response = await fetch(`/api/skills/hub-search?${params.toString()}`)
+      const response = await fetch(
+        `/api/skills/hub-search?${params.toString()}`,
+      )
       const payload = (await response.json()) as HubSearchResponse
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to search skills hub')
@@ -247,10 +250,9 @@ export function SkillsScreen() {
               : skill.source === 'official'
                 ? '✅'
                 : '🧩',
-          content:
-            [skill.description, skill.installCommand]
-              .filter(Boolean)
-              .join('\n\n'),
+          content: [skill.description, skill.installCommand]
+            .filter(Boolean)
+            .join('\n\n'),
           fileCount: 0,
           sourcePath: skill.installCommand || skill.homepage || skill.source,
           installed: skill.installed,
@@ -313,14 +315,24 @@ export function SkillsScreen() {
         }),
       })
 
-      const data = (await response.json()) as { error?: string; command?: string; ok?: boolean }
+      const data = (await response.json()) as {
+        error?: string
+        command?: string
+        ok?: boolean
+      }
       if (!response.ok) {
         throw new Error(data.error || 'Action failed')
       }
 
-      if ((action === 'install' || action === 'uninstall') && data.ok === false) {
+      if (
+        (action === 'install' || action === 'uninstall') &&
+        data.ok === false
+      ) {
         if (data.command) {
-          await copyCommandAndToast(data.command, data.error || 'Gateway action unavailable.')
+          await copyCommandAndToast(
+            data.command,
+            data.error || 'Gateway action unavailable.',
+          )
           return
         }
         throw new Error(data.error || 'Action failed')
@@ -421,7 +433,10 @@ export function SkillsScreen() {
                 <TabsTab value="installed" className="flex-1 sm:min-w-[132px]">
                   Installed
                 </TabsTab>
-                <TabsTab value="marketplace" className="flex-1 sm:min-w-[168px]">
+                <TabsTab
+                  value="marketplace"
+                  className="flex-1 sm:min-w-[168px]"
+                >
                   Marketplace
                 </TabsTab>
                 <TabsTab value="featured" className="flex-1 sm:min-w-[120px]">
@@ -459,7 +474,9 @@ export function SkillsScreen() {
                       value={sort}
                       onChange={(event) =>
                         handleSortChange(
-                          event.target.value === 'category' ? 'category' : 'name',
+                          event.target.value === 'category'
+                            ? 'category'
+                            : 'name',
                         )
                       }
                       className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
@@ -500,13 +517,35 @@ export function SkillsScreen() {
                 <input
                   value={searchInput}
                   onChange={(event) => handleSearchChange(event.target.value)}
-                  placeholder="Search Skills Hub, ClawHub, GitHub, and local fallback"
+                  placeholder="Search Skills Hub, GitHub, and local fallback"
                   className="h-10 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
                 />
                 <div className="text-xs text-primary-500 sm:text-right">
                   Source: {hubQuery.data?.source || 'hub'}
                 </div>
               </div>
+
+              {hubQuery.error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {hubQuery.error instanceof Error
+                    ? hubQuery.error.message
+                    : 'Failed to load marketplace skills.'}
+                </div>
+              ) : hubQuery.data &&
+                (hubQuery.data.source === 'installed-fallback' ||
+                  hubQuery.data.source === 'error') ? (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Skill marketplace unavailable — showing installed skills
+                  instead. Install{' '}
+                  <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs">
+                    clawhub
+                  </code>{' '}
+                  CLI to browse the marketplace:{' '}
+                  <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs">
+                    pip install skillhub
+                  </code>
+                </div>
+              ) : null}
 
               <SkillsGrid
                 skills={marketplaceSkills}
@@ -518,12 +557,14 @@ export function SkillsScreen() {
                     ? 'No hub skills found'
                     : 'Search the Skills Hub',
                   description: searchInput.trim()
-                    ? 'Try a different search term. If ClawHub is unavailable, local installed skills are used as fallback.'
-                    : 'Start typing to search ClawHub and other skill sources.',
+                    ? 'Try a different search term. If Skills Hub is unavailable, local installed skills are used as fallback.'
+                    : 'Start typing to search Skills Hub and other skill sources.',
                 }}
                 onOpenDetails={setSelectedSkill}
                 onInstall={(skillId) => {
-                  const skill = hubQuery.data?.results.find((entry) => entry.id === skillId)
+                  const skill = hubQuery.data?.results.find(
+                    (entry) => entry.id === skillId,
+                  )
                   runSkillAction('install', {
                     skillId,
                     source: skill?.source,
@@ -898,7 +939,8 @@ function SkillsGrid({
           {emptyState?.title || 'No skills found'}
         </p>
         <p className="mt-1 text-xs text-primary-500 text-pretty max-w-sm mx-auto">
-          {emptyState?.description || 'Try adjusting your filters or search term'}
+          {emptyState?.description ||
+            'Try adjusting your filters or search term'}
         </p>
       </div>
     )

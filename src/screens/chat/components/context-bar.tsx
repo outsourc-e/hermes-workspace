@@ -30,7 +30,13 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
-function ContextBarComponent({ compact: _compact, sessionId }: { compact?: boolean; sessionId?: string }) {
+function ContextBarComponent({
+  compact: _compact,
+  sessionId,
+}: {
+  compact?: boolean
+  sessionId?: string
+}) {
   const [ctx, setCtx] = useState<ContextData>(EMPTY)
   const [showLabel, setShowLabel] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -45,7 +51,9 @@ function ContextBarComponent({ compact: _compact, sessionId }: { compact?: boole
 
   const refresh = useCallback(async () => {
     try {
-      const params = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ''
+      const params = sessionId
+        ? `?sessionId=${encodeURIComponent(sessionId)}`
+        : ''
       const res = await fetch(`/api/context-usage${params}`)
       if (!res.ok) return
       const data = await res.json()
@@ -120,7 +128,10 @@ function ContextBarComponent({ compact: _compact, sessionId }: { compact?: boole
         {/* Bar — always 3px, never moves */}
         <div className={cn('w-full h-[3px]', barBg)}>
           <div
-            className={cn('h-full transition-all duration-700 ease-out', barColor)}
+            className={cn(
+              'h-full transition-all duration-700 ease-out',
+              barColor,
+            )}
             style={{ width: `${clampedPct}%` }}
           />
         </div>

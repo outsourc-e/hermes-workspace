@@ -69,7 +69,12 @@ function UserAvatarComponent({
         fill="#E6EAF2"
       />
       {/* Collar detail */}
-      <path d="M 44 55 L 50 62 L 56 55" stroke="#1A2340" strokeWidth="1.5" fill="none" />
+      <path
+        d="M 44 55 L 50 62 L 56 55"
+        stroke="#1A2340"
+        strokeWidth="1.5"
+        fill="none"
+      />
     </svg>
   )
 }

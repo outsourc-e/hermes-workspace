@@ -15,7 +15,15 @@ export const Route = createFileRoute('/api/profiles/read')({
           const name = (url.searchParams.get('name') || '').trim() || 'default'
           return json({ profile: readProfile(name) })
         } catch (error) {
-          return json({ error: error instanceof Error ? error.message : 'Failed to read profile' }, { status: 500 })
+          return json(
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to read profile',
+            },
+            { status: 500 },
+          )
         }
       },
     },

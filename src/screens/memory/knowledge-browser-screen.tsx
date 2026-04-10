@@ -110,7 +110,10 @@ function formatDate(value?: string): string | null {
   }).format(parsed)
 }
 
-function highlightMatch(text: string, query: string): Array<{ text: string; hit: boolean }> {
+function highlightMatch(
+  text: string,
+  query: string,
+): Array<{ text: string; hit: boolean }> {
   const needle = query.trim()
   if (!needle) return [{ text, hit: false }]
   const lower = text.toLowerCase()
@@ -133,11 +136,7 @@ function highlightMatch(text: string, query: string): Array<{ text: string; hit:
 }
 
 function normalizeWikiToken(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\\/g, '/')
-    .replace(/\.md$/i, '')
+  return value.trim().toLowerCase().replace(/\\/g, '/').replace(/\.md$/i, '')
 }
 
 function preprocessWikiMarkdown(content: string): string {
@@ -271,7 +270,8 @@ export function KnowledgeBrowserScreen() {
   const [searchInput, setSearchInput] = useState('')
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [focusLine, setFocusLine] = useState<number | null>(null)
-  const [focusedResult, setFocusedResult] = useState<KnowledgeSearchResult | null>(null)
+  const [focusedResult, setFocusedResult] =
+    useState<KnowledgeSearchResult | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(true)
   const [graphOpen, setGraphOpen] = useState(false)
   const deferredSearch = useDeferredValue(searchInput)
@@ -351,7 +351,10 @@ export function KnowledgeBrowserScreen() {
   const page = readQuery.data?.page ?? null
   const content = readQuery.data?.content ?? ''
   const backlinks = readQuery.data?.backlinks ?? []
-  const processedContent = useMemo(() => preprocessWikiMarkdown(content), [content])
+  const processedContent = useMemo(
+    () => preprocessWikiMarkdown(content),
+    [content],
+  )
   const askUrl = `/chat?message=${encodeURIComponent(
     `Tell me about: ${page?.title || selectedPath || 'this page'}\n\nContext:\n${content.slice(0, 500)}`,
   )}`
@@ -362,7 +365,11 @@ export function KnowledgeBrowserScreen() {
     return pageLookup.get(normalizeWikiToken(decoded)) ?? null
   }
 
-  function handleSelectPath(pathValue: string, nextLine?: number, result?: KnowledgeSearchResult) {
+  function handleSelectPath(
+    pathValue: string,
+    nextLine?: number,
+    result?: KnowledgeSearchResult,
+  ) {
     setSelectedPath(pathValue)
     setFocusLine(nextLine ?? null)
     setFocusedResult(result ?? null)
@@ -469,21 +476,29 @@ export function KnowledgeBrowserScreen() {
                     <button
                       key={`${result.path}:${result.line}:${index}`}
                       type="button"
-                      onClick={() => handleSelectPath(result.path, result.line, result)}
+                      onClick={() =>
+                        handleSelectPath(result.path, result.line, result)
+                      }
                       className="w-full rounded-lg border border-primary-200 bg-primary-50/80 px-2.5 py-2 text-left hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-800 dark:bg-neutral-900/60 dark:hover:border-neutral-700 dark:hover:bg-neutral-900"
                     >
                       <div className="truncate text-[11px] text-primary-500 dark:text-neutral-400">
                         {result.title || result.path}:{result.line}
                       </div>
                       <div className="mt-0.5 line-clamp-3 text-xs text-primary-700 dark:text-neutral-200">
-                        {highlightMatch(result.text, searchTerm).map((part, partIndex) => (
-                          <span
-                            key={partIndex}
-                            className={part.hit ? 'rounded bg-yellow-300/30 px-0.5 text-yellow-200' : undefined}
-                          >
-                            {part.text || ' '}
-                          </span>
-                        ))}
+                        {highlightMatch(result.text, searchTerm).map(
+                          (part, partIndex) => (
+                            <span
+                              key={partIndex}
+                              className={
+                                part.hit
+                                  ? 'rounded bg-yellow-300/30 px-0.5 text-yellow-200'
+                                  : undefined
+                              }
+                            >
+                              {part.text || ' '}
+                            </span>
+                          ),
+                        )}
                       </div>
                     </button>
                   ))
@@ -491,7 +506,12 @@ export function KnowledgeBrowserScreen() {
               </div>
             </div>
           ) : (
-            <div className={cn('min-h-0 flex-1 px-2 pb-2', !mobileTreeOpen && 'hidden md:block')}>
+            <div
+              className={cn(
+                'min-h-0 flex-1 px-2 pb-2',
+                !mobileTreeOpen && 'hidden md:block',
+              )}
+            >
               <div className="space-y-3 overflow-y-auto pr-1 md:h-full">
                 <section className="rounded-xl border border-primary-200 bg-primary-50/80 p-2 dark:border-neutral-800 dark:bg-neutral-900/60">
                   <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
@@ -522,7 +542,13 @@ export function KnowledgeBrowserScreen() {
                   ) : listQuery.error instanceof Error ? (
                     <StateBox label={listQuery.error.message} error />
                   ) : filteredPages.length === 0 ? (
-                    <StateBox label={selectedTag ? 'No pages match this tag' : 'No markdown pages found'} />
+                    <StateBox
+                      label={
+                        selectedTag
+                          ? 'No pages match this tag'
+                          : 'No markdown pages found'
+                      }
+                    />
                   ) : (
                     <TreeSection
                       node={tree}
@@ -544,7 +570,8 @@ export function KnowledgeBrowserScreen() {
               </div>
               {page ? (
                 <div className="text-xs text-primary-400 dark:text-neutral-500">
-                  {page.path} · {formatBytes(page.size)} · {formatDate(page.updated || page.modified)}
+                  {page.path} · {formatBytes(page.size)} ·{' '}
+                  {formatDate(page.updated || page.modified)}
                 </div>
               ) : null}
             </div>
@@ -553,7 +580,11 @@ export function KnowledgeBrowserScreen() {
                 href={askUrl}
                 className="inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
               >
-                <HugeiconsIcon icon={Message01Icon} size={14} strokeWidth={1.7} />
+                <HugeiconsIcon
+                  icon={Message01Icon}
+                  size={14}
+                  strokeWidth={1.7}
+                />
                 Ask agent about this
               </a>
             ) : null}
@@ -586,8 +617,12 @@ export function KnowledgeBrowserScreen() {
                   <div className="min-w-0 space-y-4">
                     {focusedResult && focusedResult.path === page.path ? (
                       <div className="rounded-xl border border-yellow-300/40 bg-yellow-300/10 px-3 py-2 text-sm text-primary-900 dark:text-yellow-50">
-                        <div className="font-medium">Search hit at line {focusLine}</div>
-                        <div className="mt-1 text-xs opacity-80">{focusedResult.text}</div>
+                        <div className="font-medium">
+                          Search hit at line {focusLine}
+                        </div>
+                        <div className="mt-1 text-xs opacity-80">
+                          {focusedResult.text}
+                        </div>
                       </div>
                     ) : null}
 
@@ -602,16 +637,23 @@ export function KnowledgeBrowserScreen() {
                       components={{
                         a: function KnowledgeLink({ children, href }) {
                           if (href?.startsWith('wiki:')) {
-                            const resolvedPath = resolveWikiPath(href.slice('wiki:'.length))
+                            const resolvedPath = resolveWikiPath(
+                              href.slice('wiki:'.length),
+                            )
                             return (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (resolvedPath) handleSelectPath(resolvedPath)
+                                  if (resolvedPath)
+                                    handleSelectPath(resolvedPath)
                                 }}
                                 className="inline-flex items-center gap-1 text-primary-950 underline decoration-primary-300 underline-offset-4 transition-colors hover:text-primary-950 hover:decoration-primary-500 dark:text-neutral-100"
                               >
-                                <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={1.7} />
+                                <HugeiconsIcon
+                                  icon={Link01Icon}
+                                  size={14}
+                                  strokeWidth={1.7}
+                                />
                                 <span>{children}</span>
                               </button>
                             )
@@ -635,7 +677,11 @@ export function KnowledgeBrowserScreen() {
 
                     <section className="rounded-xl border border-primary-200 bg-primary-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/60">
                       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                        <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={1.7} />
+                        <HugeiconsIcon
+                          icon={Link01Icon}
+                          size={16}
+                          strokeWidth={1.7}
+                        />
                         Backlinks
                       </div>
                       {backlinks.length === 0 ? (
@@ -645,7 +691,8 @@ export function KnowledgeBrowserScreen() {
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {backlinks.map((backlink) => {
-                            const backlinkPath = resolveWikiPath(backlink) || backlink
+                            const backlinkPath =
+                              resolveWikiPath(backlink) || backlink
                             return (
                               <button
                                 key={backlink}
@@ -666,8 +713,14 @@ export function KnowledgeBrowserScreen() {
                     <MetadataCard label="Type" value={page.type} />
                     <MetadataCard label="Domain" value={page.domain} />
                     <MetadataCard label="Status" value={page.status} />
-                    <MetadataCard label="Created" value={formatDate(page.created)} />
-                    <MetadataCard label="Updated" value={formatDate(page.updated || page.modified)} />
+                    <MetadataCard
+                      label="Created"
+                      value={formatDate(page.created)}
+                    />
+                    <MetadataCard
+                      label="Updated"
+                      value={formatDate(page.updated || page.modified)}
+                    />
                     <MetadataCard label="Size" value={formatBytes(page.size)} />
                     <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/60">
                       <div className="text-xs font-semibold uppercase tracking-wide text-primary-500 dark:text-neutral-400">
@@ -675,7 +728,9 @@ export function KnowledgeBrowserScreen() {
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {page.tags.length === 0 ? (
-                          <span className="text-sm text-primary-500 dark:text-neutral-400">No tags</span>
+                          <span className="text-sm text-primary-500 dark:text-neutral-400">
+                            No tags
+                          </span>
                         ) : (
                           page.tags.map((tag) => (
                             <button
@@ -692,11 +747,17 @@ export function KnowledgeBrowserScreen() {
                     </div>
                     <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/60">
                       <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary-500 dark:text-neutral-400">
-                        <HugeiconsIcon icon={CodeIcon} size={14} strokeWidth={1.7} />
+                        <HugeiconsIcon
+                          icon={CodeIcon}
+                          size={14}
+                          strokeWidth={1.7}
+                        />
                         Wikilinks
                       </div>
                       {page.wikilinks.length === 0 ? (
-                        <div className="text-sm text-primary-500 dark:text-neutral-400">No outbound links</div>
+                        <div className="text-sm text-primary-500 dark:text-neutral-400">
+                          No outbound links
+                        </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {page.wikilinks.map((link) => {
@@ -728,7 +789,8 @@ export function KnowledgeBrowserScreen() {
           <div className="border-b border-primary-200 px-5 py-4 dark:border-neutral-800">
             <DialogTitle>Knowledge graph</DialogTitle>
             <DialogDescription>
-              Page relationships from wiki links. Click any node to open that page.
+              Page relationships from wiki links. Click any node to open that
+              page.
             </DialogDescription>
           </div>
           <div className="p-5">
@@ -792,7 +854,12 @@ function TreeSection({
           style={{ marginLeft: depth > 0 ? depth * 12 : 0 }}
         >
           <div className="flex items-start gap-2">
-            <HugeiconsIcon icon={File01Icon} size={16} strokeWidth={1.7} className="mt-0.5 shrink-0" />
+            <HugeiconsIcon
+              icon={File01Icon}
+              size={16}
+              strokeWidth={1.7}
+              className="mt-0.5 shrink-0"
+            />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                 {page.title}
@@ -854,14 +921,22 @@ function TagPill({
   )
 }
 
-function MetadataCard({ label, value }: { label: string; value?: string | null }) {
+function MetadataCard({
+  label,
+  value,
+}: {
+  label: string
+  value?: string | null
+}) {
   if (!value) return null
   return (
     <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/60">
       <div className="text-xs font-semibold uppercase tracking-wide text-primary-500 dark:text-neutral-400">
         {label}
       </div>
-      <div className="mt-1 text-sm text-primary-900 dark:text-neutral-100">{value}</div>
+      <div className="mt-1 text-sm text-primary-900 dark:text-neutral-100">
+        {value}
+      </div>
     </div>
   )
 }

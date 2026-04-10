@@ -76,19 +76,25 @@ export async function deleteJob(jobId: string): Promise<void> {
 }
 
 export async function pauseJob(jobId: string): Promise<HermesJob> {
-  const res = await fetch(`${HERMES_API}/${jobId}?action=pause`, { method: 'POST' })
+  const res = await fetch(`${HERMES_API}/${jobId}?action=pause`, {
+    method: 'POST',
+  })
   if (!res.ok) throw new Error(`Failed to pause job: ${res.status}`)
   return (await res.json()).job
 }
 
 export async function resumeJob(jobId: string): Promise<HermesJob> {
-  const res = await fetch(`${HERMES_API}/${jobId}?action=resume`, { method: 'POST' })
+  const res = await fetch(`${HERMES_API}/${jobId}?action=resume`, {
+    method: 'POST',
+  })
   if (!res.ok) throw new Error(`Failed to resume job: ${res.status}`)
   return (await res.json()).job
 }
 
 export async function triggerJob(jobId: string): Promise<HermesJob> {
-  const res = await fetch(`${HERMES_API}/${jobId}?action=run`, { method: 'POST' })
+  const res = await fetch(`${HERMES_API}/${jobId}?action=run`, {
+    method: 'POST',
+  })
   if (!res.ok) throw new Error(`Failed to trigger job: ${res.status}`)
   return (await res.json()).job
 }

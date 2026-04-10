@@ -6,7 +6,7 @@
 
 **Your AI agent's command center — chat, files, memory, skills, and terminal in one place.**
 
-[![Version](https://img.shields.io/badge/version-0.1.0-6366F1.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.0-6366F1.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6366F1.svg)](CONTRIBUTING.md)
@@ -132,7 +132,7 @@ Route through the Hermes gateway for sessions, memory, skills, jobs, and tools:
 
 ```yaml
 provider: ollama
-model: qwen2.5:7b  # or any model you have pulled
+model: qwen2.5:7b # or any model you have pulled
 custom_providers:
   - name: ollama
     base_url: http://127.0.0.1:11434/v1

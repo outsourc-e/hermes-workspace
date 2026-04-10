@@ -8,10 +8,13 @@ export const Route = createFileRoute('/api/terminal-resize')({
     handlers: {
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          })
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Unauthorized' }),
+            {
+              status: 401,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
@@ -27,10 +30,13 @@ export const Route = createFileRoute('/api/terminal-resize')({
         const cols = Math.max(20, Math.min(500, Math.floor(colsRaw)))
         const rows = Math.max(5, Math.min(300, Math.floor(rowsRaw)))
         if (!sessionId) {
-          return new Response(JSON.stringify({ ok: false, error: 'sessionId required' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' },
-          })
+          return new Response(
+            JSON.stringify({ ok: false, error: 'sessionId required' }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
         }
         const session = getTerminalSession(sessionId)
         if (!session) {

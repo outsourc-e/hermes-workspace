@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
@@ -14,6 +13,7 @@ import {
   toSessionSummary,
   updateSession,
 } from '../../server/hermes-api'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -54,15 +54,13 @@ export const Route = createFileRoute('/api/sessions')({
         await ensureGatewayProbed()
         if (!getGatewayCapabilities().sessions) {
           const friendlyId = randomUUID()
-          return json(
-            {
-              ...createCapabilityUnavailablePayload('sessions'),
-              ok: true,
-              sessionKey: friendlyId,
-              friendlyId,
-              persisted: false,
-            },
-          )
+          return json({
+            ...createCapabilityUnavailablePayload('sessions'),
+            ok: true,
+            sessionKey: friendlyId,
+            friendlyId,
+            persisted: false,
+          })
         }
         try {
           const body = (await request.json().catch(() => ({}))) as Record<

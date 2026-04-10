@@ -54,8 +54,12 @@ function extractUserMessageText(message: ChatMessage): string {
  * base64 content is stripped before storage.
  */
 function attachmentSignature(message: ChatMessage): string {
-  const attachments = Array.isArray((message as Record<string, unknown>).attachments)
-    ? ((message as Record<string, unknown>).attachments as Array<Record<string, unknown>>)
+  const attachments = Array.isArray(
+    (message as Record<string, unknown>).attachments,
+  )
+    ? ((message as Record<string, unknown>).attachments as Array<
+        Record<string, unknown>
+      >)
     : []
   if (attachments.length === 0) return ''
   return attachments
@@ -85,7 +89,12 @@ function persistPortableHistory(messages: Array<ChatMessage>) {
 }
 
 const EMPTY_MESSAGES: Array<ChatMessage> = []
-const EMPTY_TOOL_CALLS: Array<{ id: string; name: string; phase: string; args?: unknown }> = []
+const EMPTY_TOOL_CALLS: Array<{
+  id: string
+  name: string
+  phase: string
+  args?: unknown
+}> = []
 const EMPTY_LIFECYCLE_EVENTS: StreamingState['lifecycleEvents'] = []
 
 type UseRealtimeChatHistoryOptions = {
@@ -142,9 +151,16 @@ export function useRealtimeChatHistory({
 
     isBackfillingRef.current = true
     try {
-      const key = chatQueryKeys.history(effectiveFriendlyId, effectiveSessionKey)
+      const key = chatQueryKeys.history(
+        effectiveFriendlyId,
+        effectiveSessionKey,
+      )
       await queryClient.invalidateQueries({ queryKey: key, exact: true })
-      await queryClient.refetchQueries({ queryKey: key, exact: true, type: 'active' })
+      await queryClient.refetchQueries({
+        queryKey: key,
+        exact: true,
+        type: 'active',
+      })
     } finally {
       isBackfillingRef.current = false
     }
@@ -162,9 +178,12 @@ export function useRealtimeChatHistory({
     onReconnect: useCallback(() => {
       void backfillHistory()
     }, [backfillHistory]),
-    onSilentTimeout: useCallback((_silentForMs: number) => {
-      void backfillHistory()
-    }, [backfillHistory]),
+    onSilentTimeout: useCallback(
+      (_silentForMs: number) => {
+        void backfillHistory()
+      },
+      [backfillHistory],
+    ),
     onUserMessage: useCallback(
       (message: ChatMessage, source?: string) => {
         // Filter internal system messages (pre-compaction flushes, heartbeat
@@ -182,7 +201,8 @@ export function useRealtimeChatHistory({
             msgText.startsWith('A subagent task') ||
             msgText.startsWith('[Queued announce messages') ||
             msgText.includes('Summarize this naturally for the user') ||
-            (msgText.includes('Stats: runtime') && msgText.includes('sessionKey agent:'))
+            (msgText.includes('Stats: runtime') &&
+              msgText.includes('sessionKey agent:'))
           ) {
             onUserMessage?.(message, source)
             return
@@ -215,8 +235,12 @@ export function useRealtimeChatHistory({
             const echoAttachSig = attachmentSignature(message)
             const hasContent = echoText.length > 0 || echoAttachSig.length > 0
             if (hasContent) {
-              const key = chatQueryKeys.history(effectiveFriendlyId, effectiveSessionKey)
-              const cached = queryClient.getQueryData<Record<string, unknown>>(key)
+              const key = chatQueryKeys.history(
+                effectiveFriendlyId,
+                effectiveSessionKey,
+              )
+              const cached =
+                queryClient.getQueryData<Record<string, unknown>>(key)
               const existing = (cached?.messages ?? []) as Array<any>
               const hasOptimistic = existing.some((m: any) => {
                 if (m.role !== 'user') return false
@@ -225,11 +249,17 @@ export function useRealtimeChatHistory({
                   m.__optimisticId.length > 0
                 if (!isOptimistic) return false
                 // Text match (plain-text messages)
-                if (echoText.length > 0 && extractUserMessageText(m).trim() === echoText) {
+                if (
+                  echoText.length > 0 &&
+                  extractUserMessageText(m).trim() === echoText
+                ) {
                   return true
                 }
                 // Attachment signature match (image-only messages)
-                if (echoAttachSig.length > 0 && attachmentSignature(m) === echoAttachSig) {
+                if (
+                  echoAttachSig.length > 0 &&
+                  attachmentSignature(m) === echoAttachSig
+                ) {
                   return true
                 }
                 return false
@@ -242,10 +272,15 @@ export function useRealtimeChatHistory({
             }
           }
 
-          appendHistoryMessage(queryClient, effectiveFriendlyId, effectiveSessionKey, {
-            ...message,
-            __realtimeSource: source,
-          })
+          appendHistoryMessage(
+            queryClient,
+            effectiveFriendlyId,
+            effectiveSessionKey,
+            {
+              ...message,
+              __realtimeSource: source,
+            },
+          )
         }
         onUserMessage?.(message, source)
       },
@@ -281,17 +316,24 @@ export function useRealtimeChatHistory({
           setLastCompletedRunAt(Date.now())
           // Refetch history after generation completes — keeps chat in sync
           if (effectiveSessionKey && effectiveSessionKey !== 'new') {
-            const key = chatQueryKeys.history(effectiveFriendlyId, effectiveSessionKey)
-            const prevData = queryClient.getQueryData<Record<string, unknown>>(key)
-            const prevCount = (prevData?.messages as Array<unknown> | undefined)?.length ?? 0
+            const key = chatQueryKeys.history(
+              effectiveFriendlyId,
+              effectiveSessionKey,
+            )
+            const prevData =
+              queryClient.getQueryData<Record<string, unknown>>(key)
+            const prevCount =
+              (prevData?.messages as Array<unknown> | undefined)?.length ?? 0
 
             // Refetch immediately — done event message is already in realtime store
             queryClient.invalidateQueries({ queryKey: key }).then(() => {
               clearCompletedStreaming()
 
               // Check for compaction — significant message count drop
-              const newData = queryClient.getQueryData<Record<string, unknown>>(key)
-              const newCount = (newData?.messages as Array<unknown> | undefined)?.length ?? 0
+              const newData =
+                queryClient.getQueryData<Record<string, unknown>>(key)
+              const newCount =
+                (newData?.messages as Array<unknown> | undefined)?.length ?? 0
               if (
                 prevCount > 10 &&
                 newCount > 0 &&
@@ -319,20 +361,24 @@ export function useRealtimeChatHistory({
         queryClient,
       ],
     ),
-    onCompaction: useCallback((event: CompactionEvent) => {
-      if (!event.sessionKey || event.sessionKey !== effectiveSessionKey) return
+    onCompaction: useCallback(
+      (event: CompactionEvent) => {
+        if (!event.sessionKey || event.sessionKey !== effectiveSessionKey)
+          return
 
-      if (event.phase === 'start') {
-        lastCompactionSignalRef.current = `compaction:${event.sessionKey}:start`
-        onCompactionStart?.()
-        return
-      }
+        if (event.phase === 'start') {
+          lastCompactionSignalRef.current = `compaction:${event.sessionKey}:start`
+          onCompactionStart?.()
+          return
+        }
 
-      if (event.phase === 'end') {
-        lastCompactionSignalRef.current = ''
-        onCompactionEnd?.()
-      }
-    }, [effectiveSessionKey, onCompactionEnd, onCompactionStart]),
+        if (event.phase === 'end') {
+          lastCompactionSignalRef.current = ''
+          onCompactionEnd?.()
+        }
+      },
+      [effectiveSessionKey, onCompactionEnd, onCompactionStart],
+    ),
     onApprovalRequest,
   })
 
@@ -345,10 +391,14 @@ export function useRealtimeChatHistory({
   )
 
   // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
-  const streamingState = useChatStore((s) => s.streamingState.get(effectiveSessionKey) ?? null)
+  const streamingState = useChatStore(
+    (s) => s.streamingState.get(effectiveSessionKey) ?? null,
+  )
   const streamingStateRef = useRef(streamingState)
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const delayedClearSessionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const delayedClearSessionTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null)
   const activeSessionKeyRef = useRef(effectiveSessionKey)
   const isUnmountingRef = useRef(false)
   activeSessionKeyRef.current = effectiveSessionKey
@@ -413,11 +463,11 @@ export function useRealtimeChatHistory({
 
     const textCandidates = [
       textFromMessage(latest),
-      ...((Array.isArray(latest.content) ? latest.content : []).map((part) => {
+      ...(Array.isArray(latest.content) ? latest.content : []).map((part) => {
         if (part.type === 'text') return String(part.text ?? '')
         if (part.type === 'thinking') return String(part.thinking ?? '')
         return ''
-      })),
+      }),
     ]
       .join('\n')
       .toLowerCase()
@@ -436,11 +486,15 @@ export function useRealtimeChatHistory({
   // Periodic history sync — catch missed messages every 30s
   // Skip during active streaming to prevent race conditions
   useEffect(() => {
-    if (!effectiveSessionKey || effectiveSessionKey === 'new' || !enabled) return
+    if (!effectiveSessionKey || effectiveSessionKey === 'new' || !enabled)
+      return
     syncIntervalRef.current = setInterval(() => {
       // Don't poll during active streaming — causes flicker/overwrites
       if (streamingStateRef.current !== null) return
-      const key = chatQueryKeys.history(effectiveFriendlyId, effectiveSessionKey)
+      const key = chatQueryKeys.history(
+        effectiveFriendlyId,
+        effectiveSessionKey,
+      )
       queryClient.invalidateQueries({ queryKey: key })
     }, 30000)
     return () => {

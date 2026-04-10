@@ -281,7 +281,11 @@ export function appendHistoryMessage(
       // image-only sends) was added in the last 10 seconds. This prevents
       // duplicates without dropping legitimately repeated messages sent at
       // longer intervals.
-      if (message.role === 'user' && !incomingClientId && !incomingOptimisticId) {
+      if (
+        message.role === 'user' &&
+        !incomingClientId &&
+        !incomingOptimisticId
+      ) {
         const incomingText = normalizeMessageText(message)
         const incomingAttachSig = normalizeAttachmentSignature(message)
         // Only apply dedup if there is SOME identity to match against
@@ -297,14 +301,17 @@ export function appendHistoryMessage(
             // • Mixed (text + image): text takes priority; attachment sig is a
             //   secondary signal used only when text also matches
             const textMatch =
-              incomingText.length > 0 && normalizeMessageText(m) === incomingText
+              incomingText.length > 0 &&
+              normalizeMessageText(m) === incomingText
             const attachMatch =
               incomingAttachSig.length > 0 &&
               normalizeAttachmentSignature(m) === incomingAttachSig
 
             const isContentMatch =
               (incomingText.length > 0 && textMatch) ||
-              (incomingText.length === 0 && incomingAttachSig.length > 0 && attachMatch)
+              (incomingText.length === 0 &&
+                incomingAttachSig.length > 0 &&
+                attachMatch)
 
             if (!isContentMatch) return false
 
@@ -330,16 +337,17 @@ export function appendHistoryMessage(
       // being appended to the bottom of the list.
       const incomingTs =
         typeof (message as Record<string, unknown>).timestamp === 'number'
-          ? (message as Record<string, unknown>).timestamp as number
+          ? ((message as Record<string, unknown>).timestamp as number)
           : null
 
       if (incomingTs !== null) {
         // Find the first existing message whose timestamp is strictly greater
         // than the incoming message — insert before it.
         const insertIdx = messages.findIndex((m) => {
-          const ts = typeof (m as Record<string, unknown>).timestamp === 'number'
-            ? (m as Record<string, unknown>).timestamp as number
-            : null
+          const ts =
+            typeof (m as Record<string, unknown>).timestamp === 'number'
+              ? ((m as Record<string, unknown>).timestamp as number)
+              : null
           return ts !== null && ts > incomingTs
         })
         if (insertIdx >= 0) {

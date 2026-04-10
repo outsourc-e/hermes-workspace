@@ -1,11 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  BrainIcon,
-  CodeIcon,
-  PuzzleIcon,
-} from '@hugeicons/core-free-icons'
+import { BrainIcon, CodeIcon, PuzzleIcon } from '@hugeicons/core-free-icons'
 import { motion } from 'motion/react'
-
 
 type SuggestionChip = {
   label: string
@@ -16,12 +11,14 @@ type SuggestionChip = {
 const SUGGESTIONS: Array<SuggestionChip> = [
   {
     label: 'Analyze workspace',
-    prompt: 'Analyze this workspace structure and give me 3 engineering risks. Use tools and keep it concise.',
+    prompt:
+      'Analyze this workspace structure and give me 3 engineering risks. Use tools and keep it concise.',
     icon: CodeIcon,
   },
   {
     label: 'Save a preference',
-    prompt: 'Save this to memory exactly: "For demos, respond in 3 bullets max and put risk first." Then confirm saved.',
+    prompt:
+      'Save this to memory exactly: "For demos, respond in 3 bullets max and put risk first." Then confirm saved.',
     icon: BrainIcon,
   },
   {
@@ -52,13 +49,19 @@ export function ChatEmptyState({
         <div className="relative mb-5">
           <div
             className="absolute inset-0 rounded-2xl blur-2xl opacity-35"
-            style={{ background: 'var(--theme-accent)', transform: 'scale(1.6)' }}
+            style={{
+              background: 'var(--theme-accent)',
+              transform: 'scale(1.6)',
+            }}
           />
           <img
             src="/hermes-avatar.webp"
             alt="Hermes"
             className="relative size-20 rounded-2xl"
-            style={{ boxShadow: '0 8px 32px color-mix(in srgb, var(--theme-accent) 30%, transparent)' }}
+            style={{
+              boxShadow:
+                '0 8px 32px color-mix(in srgb, var(--theme-accent) 30%, transparent)',
+            }}
           />
         </div>
 
@@ -75,8 +78,6 @@ export function ChatEmptyState({
             <p className="mt-2 text-sm" style={{ color: 'var(--theme-muted)' }}>
               Agent chat · live tools · memory · full observability
             </p>
-
-
           </>
         )}
 

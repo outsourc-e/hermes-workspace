@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Joyride, { ACTIONS, STATUS } from 'react-joyride'
 import { tourSteps } from './tour-steps'
-import type { CallBackProps, Styles } from 'react-joyride';
+import type { CallBackProps, Styles } from 'react-joyride'
 import { useSettingsStore } from '@/hooks/use-settings'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
 
@@ -47,7 +47,8 @@ export function OnboardingTour() {
       // Wait for setup wizard to finish before starting tour
       const HERMES_SETUP_KEY = 'hermes-configured'
       const checkAndStart = () => {
-        const hermesConfigured = localStorage.getItem(HERMES_SETUP_KEY) === 'true'
+        const hermesConfigured =
+          localStorage.getItem(HERMES_SETUP_KEY) === 'true'
         if (hermesConfigured) {
           setRun(true)
           return true

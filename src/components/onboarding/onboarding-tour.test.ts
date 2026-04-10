@@ -15,4 +15,3 @@ describe('onboarding tour completion logic', () => {
     expect(shouldCompleteOnboardingTour('next', 'running')).toBe(false)
   })
 })
-

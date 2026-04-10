@@ -1,8 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  ArrowDown01Icon,
-  Idea01Icon,
-} from '@hugeicons/core-free-icons'
+import { ArrowDown01Icon, Idea01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   getMessageTimestamp,
@@ -10,11 +7,7 @@ import {
   textFromMessage,
 } from '../utils'
 import { MessageActionsBar } from './message-actions-bar'
-import type {
-  ChatAttachment,
-  ChatMessage,
-  ToolCallContent,
-} from '../types'
+import type { ChatAttachment, ChatMessage, ToolCallContent } from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
 import { CodeBlock } from '@/components/prompt-kit/code-block'
@@ -32,7 +25,6 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
-
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -100,7 +92,14 @@ function getWordBoundaryIndex(text: string, wordCount: number): number {
 type StreamToolCall = {
   id: string
   name: string
-  phase: 'calling' | 'running' | 'done' | 'complete' | 'completed' | 'result' | 'error'
+  phase:
+    | 'calling'
+    | 'running'
+    | 'done'
+    | 'complete'
+    | 'completed'
+    | 'result'
+    | 'error'
   args?: unknown
   preview?: string
   result?: string
@@ -148,7 +147,11 @@ type InlineToolSection = {
   preview?: string
   outputText: string
   errorText?: string
-  state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error'
+  state:
+    | 'input-streaming'
+    | 'input-available'
+    | 'output-available'
+    | 'output-error'
 }
 
 function extractToolResultText(msg: ChatMessage | undefined): string {
@@ -287,9 +290,16 @@ function thinkingFromMessage(msg: ChatMessage): string | null {
 function normalizeStreamToolPhase(
   phase: unknown,
 ): 'calling' | 'running' | 'done' | 'error' {
-  if (phase === 'calling' || phase === 'start' || phase === 'started') return 'calling'
+  if (phase === 'calling' || phase === 'start' || phase === 'started')
+    return 'calling'
   if (phase === 'running') return 'running'
-  if (phase === 'done' || phase === 'result' || phase === 'complete' || phase === 'completed') return 'done'
+  if (
+    phase === 'done' ||
+    phase === 'result' ||
+    phase === 'complete' ||
+    phase === 'completed'
+  )
+    return 'done'
   if (phase === 'error' || phase === 'failed' || phase === 'failure') {
     return 'error'
   }
@@ -389,7 +399,11 @@ function formatToolDisplayLabel(
     return filePath ? `edit ${fileNameFromPath(filePath)}` : 'edit file'
   }
 
-  if (lowerName === 'write' || lowerName === 'write_file' || lowerName === 'create_file') {
+  if (
+    lowerName === 'write' ||
+    lowerName === 'write_file' ||
+    lowerName === 'create_file'
+  ) {
     const filePath = readStringArg(args, 'file_path', 'path', 'target_file')
     return filePath ? `write ${fileNameFromPath(filePath)}` : 'write file'
   }
@@ -406,7 +420,9 @@ function formatToolDisplayLabel(
 
   if (lowerName === 'terminal' || lowerName === 'exec') {
     const cmd = readStringArg(args, 'command', 'cmd')
-    return cmd ? `exec ${cmd.length > 30 ? cmd.slice(0, 27) + '…' : cmd}` : 'exec'
+    return cmd
+      ? `exec ${cmd.length > 30 ? cmd.slice(0, 27) + '…' : cmd}`
+      : 'exec'
   }
 
   if (lowerName === 'memory_search') return 'memory search'
@@ -491,11 +507,9 @@ function messageMetadataSignature(message: ChatMessage): string {
       root.cacheReadTokens ??
       root.cache_read_tokens ??
       null,
-    contextPercent: root.contextPercent ?? root.context_percent ?? root.context ?? null,
-    usage:
-      root.usage && typeof root.usage === 'object'
-        ? root.usage
-        : null,
+    contextPercent:
+      root.contextPercent ?? root.context_percent ?? root.context ?? null,
+    usage: root.usage && typeof root.usage === 'object' ? root.usage : null,
   })
 }
 
@@ -627,7 +641,11 @@ function readToolArgs(
     details.parameters,
   ]
   for (const candidate of candidates) {
-    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+    if (
+      candidate &&
+      typeof candidate === 'object' &&
+      !Array.isArray(candidate)
+    ) {
       return candidate as Record<string, unknown>
     }
   }
@@ -635,9 +653,13 @@ function readToolArgs(
 }
 
 /** Extract the most useful single argument to display in a tool pill */
-function keyArgLabel(name: string, args?: Record<string, unknown>): string | null {
+function keyArgLabel(
+  name: string,
+  args?: Record<string, unknown>,
+): string | null {
   if (!args) return null
-  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+  const str = (v: unknown) =>
+    typeof v === 'string' && v.trim() ? v.trim() : null
   switch (name) {
     case 'exec':
       return str(args.command)
@@ -648,7 +670,11 @@ function keyArgLabel(name: string, args?: Record<string, unknown>): string | nul
     case 'write':
     case 'Edit':
     case 'edit':
-      return str(args.file_path) ?? str(args.path) ?? str(args.old_string ? args.file_path : null)
+      return (
+        str(args.file_path) ??
+        str(args.path) ??
+        str(args.old_string ? args.file_path : null)
+      )
     case 'web_search':
       return str(args.query)
     case 'memory_search':
@@ -661,7 +687,9 @@ function keyArgLabel(name: string, args?: Record<string, unknown>): string | nul
       return str(args.prompt)
     default: {
       // generic: first string value
-      const first = Object.values(args).find((v) => typeof v === 'string' && (v).trim())
+      const first = Object.values(args).find(
+        (v) => typeof v === 'string' && v.trim(),
+      )
       return str(first)
     }
   }
@@ -771,37 +799,73 @@ function useAnimatedDots(): string {
 }
 
 function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
-  const isDone = toolCall.phase === 'done' || toolCall.phase === 'complete' || toolCall.phase === 'completed' || toolCall.phase === 'result'
+  const isDone =
+    toolCall.phase === 'done' ||
+    toolCall.phase === 'complete' ||
+    toolCall.phase === 'completed' ||
+    toolCall.phase === 'result'
   const isError = toolCall.phase === 'error'
   const isRunning = !isDone && !isError
   const [expanded, setExpanded] = useState(false)
   const [showMore, setShowMore] = useState(false)
 
-  const emoji = TOOL_EMOJI_ICONS[toolCall.name]
-    ?? (toolCall.name.includes('search') ? '🔍'
-      : toolCall.name.includes('read') || toolCall.name.includes('Read') ? '📖'
-      : toolCall.name.includes('write') || toolCall.name.includes('Write') || toolCall.name.includes('edit') || toolCall.name.includes('Edit') ? '✏️'
-      : toolCall.name.includes('exec') || toolCall.name.includes('terminal') || toolCall.name.includes('shell') ? '💻'
-      : toolCall.name.includes('memory') ? '🧠'
-      : toolCall.name.includes('browser') || toolCall.name.includes('navigate') ? '🌐'
-      : toolCall.name.includes('image') || toolCall.name.includes('vision') ? '🖼️'
-      : toolCall.name.includes('skill') ? '📦'
-      : toolCall.name.includes('delegate') || toolCall.name.includes('spawn') ? '🤖'
-      : '⚡')
-  const verb = TOOL_VERBS[toolCall.name]
-    ?? (toolCall.name.includes('search') ? 'Searching'
-      : toolCall.name.includes('read') || toolCall.name.includes('Read') ? 'Reading'
-      : toolCall.name.includes('write') || toolCall.name.includes('Write') || toolCall.name.includes('edit') || toolCall.name.includes('Edit') ? 'Writing'
-      : toolCall.name.includes('exec') || toolCall.name.includes('terminal') ? 'Executing'
-      : toolCall.name.includes('memory') ? 'Remembering'
-      : toolCall.name.includes('browser') ? 'Browsing'
-      : 'Working')
+  const emoji =
+    TOOL_EMOJI_ICONS[toolCall.name] ??
+    (toolCall.name.includes('search')
+      ? '🔍'
+      : toolCall.name.includes('read') || toolCall.name.includes('Read')
+        ? '📖'
+        : toolCall.name.includes('write') ||
+            toolCall.name.includes('Write') ||
+            toolCall.name.includes('edit') ||
+            toolCall.name.includes('Edit')
+          ? '✏️'
+          : toolCall.name.includes('exec') ||
+              toolCall.name.includes('terminal') ||
+              toolCall.name.includes('shell')
+            ? '💻'
+            : toolCall.name.includes('memory')
+              ? '🧠'
+              : toolCall.name.includes('browser') ||
+                  toolCall.name.includes('navigate')
+                ? '🌐'
+                : toolCall.name.includes('image') ||
+                    toolCall.name.includes('vision')
+                  ? '🖼️'
+                  : toolCall.name.includes('skill')
+                    ? '📦'
+                    : toolCall.name.includes('delegate') ||
+                        toolCall.name.includes('spawn')
+                      ? '🤖'
+                      : '⚡')
+  const verb =
+    TOOL_VERBS[toolCall.name] ??
+    (toolCall.name.includes('search')
+      ? 'Searching'
+      : toolCall.name.includes('read') || toolCall.name.includes('Read')
+        ? 'Reading'
+        : toolCall.name.includes('write') ||
+            toolCall.name.includes('Write') ||
+            toolCall.name.includes('edit') ||
+            toolCall.name.includes('Edit')
+          ? 'Writing'
+          : toolCall.name.includes('exec') || toolCall.name.includes('terminal')
+            ? 'Executing'
+            : toolCall.name.includes('memory')
+              ? 'Remembering'
+              : toolCall.name.includes('browser')
+                ? 'Browsing'
+                : 'Working')
   const displayName = formatToolDisplayLabel(
     toolCall.name,
     toolCall.args as Record<string, unknown> | undefined,
   )
-  const label = keyArgLabel(toolCall.name, toolCall.args as Record<string, unknown> | undefined)
-  const truncated = label && label.length > 50 ? `${label.slice(0, 47)}…` : label
+  const label = keyArgLabel(
+    toolCall.name,
+    toolCall.args as Record<string, unknown> | undefined,
+  )
+  const truncated =
+    label && label.length > 50 ? `${label.slice(0, 47)}…` : label
 
   const elapsed = useElapsedTime(isRunning)
   const dots = useAnimatedDots()
@@ -817,7 +881,11 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       ? 'color-mix(in srgb, var(--theme-danger) 35%, var(--theme-border))'
       : 'color-mix(in srgb, var(--theme-accent) 50%, var(--theme-border))'
 
-  const leftAccent = isRunning ? 'var(--theme-accent)' : isDone ? 'var(--theme-success)' : 'var(--theme-danger)'
+  const leftAccent = isRunning
+    ? 'var(--theme-accent)'
+    : isDone
+      ? 'var(--theme-success)'
+      : 'var(--theme-danger)'
 
   return (
     <div
@@ -835,48 +903,77 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         className="w-full flex items-center gap-1.5 px-2.5 py-1.5 hover:opacity-80 text-left"
         onClick={() => setExpanded((v) => !v)}
       >
-        <span className="shrink-0 text-[10px] opacity-50">{expanded ? '▾' : '▸'}</span>
+        <span className="shrink-0 text-[10px] opacity-50">
+          {expanded ? '▾' : '▸'}
+        </span>
         <span className="shrink-0 text-sm leading-none">{emoji}</span>
-        <span className="shrink-0 font-mono font-semibold text-ink">{displayName}</span>
+        <span className="shrink-0 font-mono font-semibold text-ink">
+          {displayName}
+        </span>
         {truncated && truncated !== displayName && (
-          <span className="truncate opacity-40 text-[10px] font-mono min-w-0">{truncated}</span>
+          <span className="truncate opacity-40 text-[10px] font-mono min-w-0">
+            {truncated}
+          </span>
         )}
         <span className="flex-1" />
         {elapsed && (
-          <span className="shrink-0 text-[10px] tabular-nums text-primary-400">{elapsed}</span>
+          <span className="shrink-0 text-[10px] tabular-nums text-primary-400">
+            {elapsed}
+          </span>
         )}
         {isDone && <span className="shrink-0 text-xs text-green-500">✅</span>}
         {isError && <span className="shrink-0 text-xs text-red-500">❌</span>}
-        {isRunning && <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-indigo-500" />}
+        {isRunning && (
+          <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-indigo-500" />
+        )}
       </button>
       {isRunning && !expanded && (
         <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
-          <span>{verb}{dots}</span>
+          <span>
+            {verb}
+            {dots}
+          </span>
         </div>
       )}
       {/* Expanded content — args while running, result when done */}
       {expanded && (
-        <div className="border-t" style={{ borderColor: 'var(--theme-border)' }}>
+        <div
+          className="border-t"
+          style={{ borderColor: 'var(--theme-border)' }}
+        >
           {/* Show args (input) */}
-          {toolCall.args != null && typeof toolCall.args === 'object' && Object.keys(toolCall.args as Record<string, unknown>).length > 0 && (
-            <div className="px-2.5 py-1.5">
-              <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">Input</div>
-              <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto text-ink opacity-70">
-                {JSON.stringify(toolCall.args, null, 2)}
-              </pre>
-            </div>
-          )}
+          {toolCall.args != null &&
+            typeof toolCall.args === 'object' &&
+            Object.keys(toolCall.args as Record<string, unknown>).length >
+              0 && (
+              <div className="px-2.5 py-1.5">
+                <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">
+                  Input
+                </div>
+                <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto text-ink opacity-70">
+                  {JSON.stringify(toolCall.args, null, 2)}
+                </pre>
+              </div>
+            )}
           {/* Show result when done */}
           {isDone && result && (
-            <div className="px-2.5 py-1.5 border-t" style={{ borderColor: 'var(--theme-border)' }}>
-              <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">Output</div>
+            <div
+              className="px-2.5 py-1.5 border-t"
+              style={{ borderColor: 'var(--theme-border)' }}
+            >
+              <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">
+                Output
+              </div>
               <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-ink opacity-80">
                 {showMore ? result : detail}
                 {hasMore && !showMore && (
                   <button
                     type="button"
                     className="block mt-1 text-[10px] underline text-accent-500"
-                    onClick={(e) => { e.stopPropagation(); setShowMore(true) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowMore(true)
+                    }}
                   >
                     Show more
                   </button>
@@ -887,7 +984,9 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           {/* Show error */}
           {isError && result && (
             <div className="px-2.5 py-1.5">
-              <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5">Error</div>
+              <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5">
+                Error
+              </div>
               <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-red-500">
                 {result}
               </pre>
@@ -895,8 +994,14 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           )}
           {/* Running indicator when expanded */}
           {isRunning && (
-            <div className="px-2.5 py-1.5 text-[10px] text-primary-400 border-t" style={{ borderColor: 'var(--theme-border)' }}>
-              <span>{verb}{dots}</span>
+            <div
+              className="px-2.5 py-1.5 text-[10px] text-primary-400 border-t"
+              style={{ borderColor: 'var(--theme-border)' }}
+            >
+              <span>
+                {verb}
+                {dots}
+              </span>
             </div>
           )}
         </div>
@@ -967,7 +1072,9 @@ function isImageAttachment(attachment: ChatAttachment): boolean {
   if (contentType.startsWith('image/')) return true
 
   const ext = attachmentExtension(attachment)
-  return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)
+  return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(
+    ext,
+  )
 }
 
 function isMarkdownAttachment(attachment: ChatAttachment): boolean {
@@ -1034,7 +1141,9 @@ function MarkdownDocumentCard({
     >
       <div className="flex items-start justify-between gap-3 border-b border-primary-200 px-3 py-2.5">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-primary-900">{title}</div>
+          <div className="truncate text-sm font-medium text-primary-900">
+            {title}
+          </div>
           <div className="text-[11px] text-primary-600">Markdown document</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -1098,7 +1207,11 @@ function MarkdownDocumentCard({
   )
 }
 
-function MarkdownAttachmentCard({ attachment }: { attachment: ChatAttachment }) {
+function MarkdownAttachmentCard({
+  attachment,
+}: {
+  attachment: ChatAttachment
+}) {
   const source = attachmentSource(attachment)
   const content = useMemo(() => decodeAttachmentText(attachment), [attachment])
   const ext = attachmentExtension(attachment)
@@ -1169,14 +1282,21 @@ function InlineToolSectionItem({
 
   const icon = TOOL_ICONS[toolSection.type] ?? '🔧'
   const isError = toolSection.state === 'output-error'
-  const isRunning = toolSection.state === 'input-available' || toolSection.state === 'input-streaming'
+  const isRunning =
+    toolSection.state === 'input-available' ||
+    toolSection.state === 'input-streaming'
   const isDone = toolSection.state === 'output-available'
   const headerArg = toolSection.input
     ? keyArgLabel(toolSection.type, toolSection.input)
     : null
-  const toolDisplayLabel = formatToolDisplayLabel(toolSection.type, toolSection.input)
+  const toolDisplayLabel = formatToolDisplayLabel(
+    toolSection.type,
+    toolSection.input,
+  )
   const headerArgTruncated =
-    headerArg && headerArg.length > 60 ? `${headerArg.slice(0, 57)}…` : headerArg
+    headerArg && headerArg.length > 60
+      ? `${headerArg.slice(0, 57)}…`
+      : headerArg
 
   const rawJsonPayload = useMemo(() => {
     if (!showRawJson) return ''
@@ -1189,7 +1309,13 @@ function InlineToolSectionItem({
       null,
       2,
     )
-  }, [showRawJson, toolSection.type, toolSection.input, toolSection.outputText, toolSection.errorText])
+  }, [
+    showRawJson,
+    toolSection.type,
+    toolSection.input,
+    toolSection.outputText,
+    toolSection.errorText,
+  ])
   const outputText = toolSection.outputText || toolSection.errorText || ''
   const shouldTruncateOutput = outputText.length > 800
   const displayedOutputText =
@@ -1209,16 +1335,28 @@ function InlineToolSectionItem({
     const id = window.setInterval(() => setDots((d) => (d + 1) % 4), 400)
     return () => window.clearInterval(id)
   }, [isRunning, toolSection.key])
-  const elapsedLabel = elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`
-  const verb =
-    toolSection.type.includes('search') ? 'Searching' :
-    toolSection.type.includes('read') || toolSection.type.includes('Read') ? 'Reading' :
-    toolSection.type.includes('write') || toolSection.type.includes('Write') || toolSection.type.includes('edit') ? 'Writing' :
-    toolSection.type.includes('exec') || toolSection.type.includes('terminal') ? 'Executing' :
-    toolSection.type.includes('memory') ? 'Remembering' : 'Working'
+  const elapsedLabel =
+    elapsed >= 60
+      ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+      : `${elapsed}s`
+  const verb = toolSection.type.includes('search')
+    ? 'Searching'
+    : toolSection.type.includes('read') || toolSection.type.includes('Read')
+      ? 'Reading'
+      : toolSection.type.includes('write') ||
+          toolSection.type.includes('Write') ||
+          toolSection.type.includes('edit')
+        ? 'Writing'
+        : toolSection.type.includes('exec') ||
+            toolSection.type.includes('terminal')
+          ? 'Executing'
+          : toolSection.type.includes('memory')
+            ? 'Remembering'
+            : 'Working'
 
   const previewLabel = toolSection.preview || headerArgTruncated
-  const hasInputData = toolSection.input && Object.keys(toolSection.input).length > 0
+  const hasInputData =
+    toolSection.input && Object.keys(toolSection.input).length > 0
   const hasOutputData = !!(toolSection.outputText || toolSection.errorText)
   // Always expandable — show args, output, or at minimum the tool name/state
   const hasExpandableContent = true
@@ -1228,36 +1366,56 @@ function InlineToolSectionItem({
       {/* ── Card — always clickable to expand ── */}
       <div
         className={cn(
-          'rounded-lg border border-primary-200 bg-primary-50 text-[11px] overflow-hidden',
-          'cursor-pointer hover:border-primary-300 transition-colors',
+          'rounded-xl border border-primary-200 bg-primary-50 text-[12px] overflow-hidden',
+          'cursor-pointer hover:border-primary-300 hover:shadow-md transition-all',
+          'shadow-sm',
         )}
         style={{
-          borderLeftWidth: '3px',
-          borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
-          boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.12)' : 'none',
+          borderLeftWidth: '4px',
+          borderLeftColor: isRunning
+            ? '#6366f1'
+            : isDone
+              ? '#22c55e'
+              : '#ef4444',
+          boxShadow: isRunning ? '0 2px 12px rgba(99,102,241,0.15)' : undefined,
         }}
         onClick={() => setOpen((v) => !v)}
         role="button"
         tabIndex={0}
       >
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5">
-          <span className="text-sm leading-none shrink-0">{icon}</span>
-          <span className="font-mono font-semibold text-ink">{toolDisplayLabel}</span>
+        <div className="flex items-center gap-2 px-3 py-2">
+          <span className="text-base leading-none shrink-0">{icon}</span>
+          <span className="font-mono font-semibold text-ink text-[13px]">
+            {toolDisplayLabel}
+          </span>
           {previewLabel && previewLabel !== toolDisplayLabel ? (
-            <span className="truncate opacity-40 text-[10px] font-mono min-w-0">{previewLabel}</span>
+            <span className="truncate opacity-40 text-[10px] font-mono min-w-0">
+              {previewLabel}
+            </span>
           ) : null}
           <span className="flex-1" />
-          {isRunning && <span className="text-[10px] tabular-nums text-primary-400">{elapsedLabel}</span>}
-          {isDone && !isRunning && <span className="text-xs text-green-500">✅</span>}
+          {isRunning && (
+            <span className="text-[10px] tabular-nums text-primary-400">
+              {elapsedLabel}
+            </span>
+          )}
+          {isDone && !isRunning && (
+            <span className="text-xs text-green-500">✅</span>
+          )}
           {isError && <span className="text-xs text-red-500">❌</span>}
-          {isRunning && <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />}
+          {isRunning && (
+            <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />
+          )}
           {hasExpandableContent && (
-            <span className="text-[8px] opacity-30 ml-0.5">{open ? '▾' : '▸'}</span>
+            <span className="text-[8px] opacity-30 ml-0.5">
+              {open ? '▾' : '▸'}
+            </span>
           )}
         </div>
         {isRunning && (
           <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
-            {verb}{'.'.repeat(dots)}
+            {verb}
+            {'.'.repeat(dots)}
           </div>
         )}
       </div>
@@ -1267,13 +1425,24 @@ function InlineToolSectionItem({
         <div className="mt-1 ml-3 flex flex-col gap-1.5 pb-1 border-l-2 border-primary-200/40 pl-3 animate-in slide-in-from-top-1 duration-150">
           {hasInputData && !showRawJson ? (
             <div>
-              <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Input</div>
+              <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">
+                Input
+              </div>
               {toolSection.type === 'exec' && headerArg ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500" style={{ background: 'var(--code-bg, var(--theme-card))' }}>
+                <pre
+                  className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500"
+                  style={{ background: 'var(--code-bg, var(--theme-card))' }}
+                >
                   $ {headerArg}
                 </pre>
               ) : (
-                <pre className="max-h-32 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
+                <pre
+                  className="max-h-32 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono"
+                  style={{
+                    background: 'var(--code-bg, var(--theme-card))',
+                    color: 'var(--code-foreground)',
+                  }}
+                >
                   {JSON.stringify(toolSection.input, null, 2)}
                 </pre>
               )}
@@ -1283,21 +1452,40 @@ function InlineToolSectionItem({
           {!showRawJson ? (
             isError && toolSection.errorText ? (
               <div>
-                <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">Error</div>
-                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400" style={{ background: 'var(--code-bg, var(--theme-card))' }}>
+                <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">
+                  Error
+                </div>
+                <pre
+                  className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400"
+                  style={{ background: 'var(--code-bg, var(--theme-card))' }}
+                >
                   {displayedOutputText}
                 </pre>
               </div>
             ) : toolSection.outputText ? (
               <div>
-                <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">Output</div>
-                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
+                <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">
+                  Output
+                </div>
+                <pre
+                  className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono"
+                  style={{
+                    background: 'var(--code-bg, var(--theme-card))',
+                    color: 'var(--code-foreground)',
+                  }}
+                >
                   {displayedOutputText}
                 </pre>
               </div>
             ) : null
           ) : (
-            <pre className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono" style={{ background: 'var(--code-bg, var(--theme-card))', color: 'var(--code-foreground)' }}>
+            <pre
+              className="max-h-64 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono"
+              style={{
+                background: 'var(--code-bg, var(--theme-card))',
+                color: 'var(--code-foreground)',
+              }}
+            >
               {rawJsonPayload}
             </pre>
           )}
@@ -1305,11 +1493,25 @@ function InlineToolSectionItem({
           {(shouldTruncateOutput || toolSection.outputText) && (
             <div className="flex flex-wrap items-center gap-2">
               {shouldTruncateOutput && (
-                <button type="button" onClick={(e) => { e.stopPropagation(); setShowFullOutput((v) => !v) }} className="text-[9px] text-primary-500 hover:text-primary-700">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowFullOutput((v) => !v)
+                  }}
+                  className="text-[9px] text-primary-500 hover:text-primary-700"
+                >
                   {showFullOutput ? 'less' : 'more'}
                 </button>
               )}
-              <button type="button" onClick={(e) => { e.stopPropagation(); setShowRawJson((v) => !v) }} className="text-[9px] text-primary-500 hover:text-primary-700">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowRawJson((v) => !v)
+                }}
+                className="text-[9px] text-primary-500 hover:text-primary-700"
+              >
                 {showRawJson ? 'formatted' : 'raw'}
               </button>
             </div>
@@ -1326,8 +1528,6 @@ function InlineToolSectionItem({
   )
 }
 
-
-
 function ToolCallGroup({
   toolSections,
   expandAll,
@@ -1337,7 +1537,7 @@ function ToolCallGroup({
   isStreaming?: boolean
 }) {
   return (
-    <div className="flex flex-col gap-1.5 mt-0.5 mb-1 ml-8 md:ml-9">
+    <div className="flex flex-col gap-2.5 my-3 w-full max-w-[min(100%,700px)]">
       {toolSections.map((toolSection, index) => (
         <InlineToolSectionItem
           key={toolSection.key || `${toolSection.type}-${index}`}
@@ -1574,8 +1774,11 @@ function MessageItemComponent({
   const hasInlineImages = inlineImages.length > 0
 
   const hasText = displayText.length > 0
-  const hasRevealedText = effectiveIsStreaming ? assistantDisplayText.length > 0 : hasText
-  const canRetryMessage = isUser && (hasText || hasAttachments || hasInlineImages)
+  const hasRevealedText = effectiveIsStreaming
+    ? assistantDisplayText.length > 0
+    : hasText
+  const canRetryMessage =
+    isUser && (hasText || hasAttachments || hasInlineImages)
 
   // Get tool calls from this message (for assistant messages)
   const toolCalls = role === 'assistant' ? getToolCallsFromMessage(message) : []
@@ -1652,14 +1855,19 @@ function MessageItemComponent({
       attachedToolMessages.map((toolMessage, index) => {
         const messageText = textFromMessage(toolMessage)
         const outputText = extractToolResultText(toolMessage) || messageText
-        const errorText = toolMessage.isError ? outputText || 'Unknown error' : undefined
+        const errorText = toolMessage.isError
+          ? outputText || 'Unknown error'
+          : undefined
         const toolType =
-          (typeof toolMessage.toolName === 'string' && toolMessage.toolName.trim()) ||
+          (typeof toolMessage.toolName === 'string' &&
+            toolMessage.toolName.trim()) ||
           parseToolNameFromMessageText(messageText)
         return {
           key:
-            (typeof (toolMessage as any).id === 'string' && (toolMessage as any).id) ||
-            (typeof toolMessage.toolCallId === 'string' && toolMessage.toolCallId) ||
+            (typeof (toolMessage as any).id === 'string' &&
+              (toolMessage as any).id) ||
+            (typeof toolMessage.toolCallId === 'string' &&
+              toolMessage.toolCallId) ||
             `${toolType}-${index}`,
           type: toolType,
           input: readToolArgs(toolMessage.details),
@@ -1673,9 +1881,15 @@ function MessageItemComponent({
   const streamToolSections = useMemo<Array<InlineToolSection>>(
     () =>
       effectiveStreamToolCalls.map((toolCall, index) => {
-        const outputText = typeof toolCall.result === 'string' ? toolCall.result : ''
+        const outputText =
+          typeof toolCall.result === 'string' ? toolCall.result : ''
         const isError = toolCall.phase === 'error'
-        const isComplete = toolCall.phase === 'done' || toolCall.phase === 'complete' || toolCall.phase === 'completed' || toolCall.phase === 'result' || outputText.length > 0
+        const isComplete =
+          toolCall.phase === 'done' ||
+          toolCall.phase === 'complete' ||
+          toolCall.phase === 'completed' ||
+          toolCall.phase === 'result' ||
+          outputText.length > 0
         return {
           key: toolCall.id || `${toolCall.name}-${index}`,
           type: toolCall.name,
@@ -1688,7 +1902,7 @@ function MessageItemComponent({
           errorText: isError ? outputText || 'Tool failed' : undefined,
           state: isError
             ? 'output-error'
-            : (isComplete || !effectiveIsStreaming)
+            : isComplete || !effectiveIsStreaming
               ? 'output-available'
               : 'input-available',
         }
@@ -1780,8 +1994,7 @@ function MessageItemComponent({
   }, [isUser, message, message.status])
 
   if (execNotification) {
-    const isSuccess =
-      execNotification.ok ?? (execNotification.exitCode === 0)
+    const isSuccess = execNotification.ok ?? execNotification.exitCode === 0
     const statusIcon = isSuccess ? '✓' : '✗'
     const exitLabel = `exit ${execNotification.exitCode ?? '—'}`
     return (
@@ -1846,7 +2059,6 @@ function MessageItemComponent({
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
       )}
     >
-
       {/* Bridge gap: thinking done but first text token not yet arrived (no tool calls active) */}
       {effectiveIsStreaming && !thinking && !hasText && !hasStreamToolCalls && (
         <div className="flex items-center gap-1.5 px-1 py-1">
@@ -1944,175 +2156,190 @@ function MessageItemComponent({
         />
       )}
 
-      {shouldRenderMessageBubble &&
-        !(message as any).__isNarration && (
-          <Message className={cn('gap-2 md:gap-3', isUser ? 'flex-row-reverse' : '')}>
-            {isUser ? (
-              <UserAvatar
-                size={24}
-                className="mt-0.5"
-                src={profileAvatarDataUrl}
-                alt={profileDisplayName}
-              />
-            ) : (
-              <AssistantAvatar size={24} className="mt-0.5" />
+      {shouldRenderMessageBubble && !(message as any).__isNarration && (
+        <Message
+          className={cn('gap-2 md:gap-3', isUser ? 'flex-row-reverse' : '')}
+        >
+          {isUser ? (
+            <UserAvatar
+              size={24}
+              className="mt-0.5"
+              src={profileAvatarDataUrl}
+              alt={profileDisplayName}
+            />
+          ) : (
+            <AssistantAvatar size={24} className="mt-0.5" />
+          )}
+          <div
+            data-chat-message-bubble={isUser ? 'true' : undefined}
+            className={cn(
+              'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
+              '',
+              !isUser
+                ? 'border rounded-2xl rounded-tl-sm'
+                : 'text-white rounded-2xl rounded-tr-sm',
+              isQueued && isUser && !isFailed && 'opacity-70',
+              isFailed && isUser && 'bg-red-50/50 border border-red-300',
+              bubbleClassName,
             )}
-            <div
-              data-chat-message-bubble={isUser ? 'true' : undefined}
-              className={cn(
-                'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
-                '',
-                !isUser
-                  ? 'border rounded-2xl rounded-tl-sm'
-                  : 'text-white rounded-2xl rounded-tr-sm',
-                isQueued && isUser && !isFailed && 'opacity-70',
-                isFailed && isUser && 'bg-red-50/50 border border-red-300',
-                bubbleClassName,
-              )}
-              style={
-                !isUser
-                  ? { background: 'var(--chat-assistant-bg)', borderColor: 'var(--chat-assistant-border)', color: 'var(--chat-assistant-foreground)' }
-                  : { background: 'var(--chat-user-bg)', borderColor: 'var(--chat-user-border)', color: 'var(--chat-user-foreground)' }
-              }
-            >
-              {hasAttachments && (
-                <div className="flex flex-wrap gap-2">
-                  {attachments.map((attachment) => {
-                    const source = attachmentSource(attachment)
-                    const ext = attachmentExtension(attachment)
-                    const imageAttachment = isImageAttachment(attachment)
-                    const markdownAttachment = isMarkdownAttachment(attachment)
+            style={
+              !isUser
+                ? {
+                    background: 'var(--chat-assistant-bg)',
+                    borderColor: 'var(--chat-assistant-border)',
+                    color: 'var(--chat-assistant-foreground)',
+                  }
+                : {
+                    background: 'var(--chat-user-bg)',
+                    borderColor: 'var(--chat-user-border)',
+                    color: 'var(--chat-user-foreground)',
+                  }
+            }
+          >
+            {hasAttachments && (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((attachment) => {
+                  const source = attachmentSource(attachment)
+                  const ext = attachmentExtension(attachment)
+                  const imageAttachment = isImageAttachment(attachment)
+                  const markdownAttachment = isMarkdownAttachment(attachment)
 
-                    if (imageAttachment) {
-                      return (
-                        <a
-                          key={attachment.id}
-                          href={source}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
-                        >
-                          <img
-                            src={source}
-                            alt={attachment.name || 'Attached image'}
-                            className="max-h-64 w-auto max-w-full object-contain"
-                            loading="lazy"
-                          />
-                        </a>
-                      )
-                    }
-
-                    if (markdownAttachment) {
-                      const mdContent = decodeAttachmentText(attachment)
-                      // Only render preview if actual content exists (base64 is stripped on history reload)
-                      if (mdContent.trim().length > 0) {
-                        return (
-                          <MarkdownAttachmentCard
-                            key={attachment.id || attachment.name || source}
-                            attachment={attachment}
-                          />
-                        )
-                      }
-                      // Fall through to generic attachment link
-                    }
-
+                  if (imageAttachment) {
                     return (
                       <a
                         key={attachment.id}
                         href={source}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex max-w-full items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700 hover:border-primary-400"
+                        className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
                       >
-                        <span>📄</span>
-                        <span className="truncate">{attachment.name || 'Attachment'}</span>
-                        <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] uppercase text-primary-600">
-                          {ext || 'file'}
-                        </span>
+                        <img
+                          src={source}
+                          alt={attachment.name || 'Attached image'}
+                          className="max-h-64 w-auto max-w-full object-contain"
+                          loading="lazy"
+                        />
                       </a>
                     )
-                  })}
-                </div>
-              )}
-              {hasInlineImages && (
-                <div className="flex flex-wrap gap-2">
-                  {inlineImages.map((img) => (
+                  }
+
+                  if (markdownAttachment) {
+                    const mdContent = decodeAttachmentText(attachment)
+                    // Only render preview if actual content exists (base64 is stripped on history reload)
+                    if (mdContent.trim().length > 0) {
+                      return (
+                        <MarkdownAttachmentCard
+                          key={attachment.id || attachment.name || source}
+                          attachment={attachment}
+                        />
+                      )
+                    }
+                    // Fall through to generic attachment link
+                  }
+
+                  return (
                     <a
-                      key={img.id}
-                      href={img.src}
+                      key={attachment.id}
+                      href={source}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
+                      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700 hover:border-primary-400"
                     >
-                      <img
-                        src={img.src}
-                        alt="Shared image"
-                        className="max-h-64 w-auto max-w-full object-contain"
-                        loading="lazy"
-                      />
+                      <span>📄</span>
+                      <span className="truncate">
+                        {attachment.name || 'Attachment'}
+                      </span>
+                      <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] uppercase text-primary-600">
+                        {ext || 'file'}
+                      </span>
                     </a>
-                  ))}
+                  )
+                })}
+              </div>
+            )}
+            {hasInlineImages && (
+              <div className="flex flex-wrap gap-2">
+                {inlineImages.map((img) => (
+                  <a
+                    key={img.id}
+                    href={img.src}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
+                  >
+                    <img
+                      src={img.src}
+                      alt="Shared image"
+                      className="max-h-64 w-auto max-w-full object-contain"
+                      loading="lazy"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
+            {hasText &&
+              (isUser ? (
+                <span className="text-pretty">{displayText}</span>
+              ) : hasRevealedText ? (
+                <div className="relative">
+                  {standaloneMarkdownDocument ? (
+                    <MarkdownMessageCard content={standaloneMarkdownDocument} />
+                  ) : (
+                    <MessageContent
+                      markdown
+                      className={cn(
+                        'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
+                        effectiveIsStreaming && 'chat-streaming-content',
+                        isUser && 'text-white',
+                      )}
+                    >
+                      {assistantDisplayText}
+                    </MessageContent>
+                  )}
+                  {effectiveIsStreaming && (
+                    <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent-500 align-text-bottom" />
+                  )}
                 </div>
-              )}
-              {hasText &&
-                (isUser ? (
-                  <span className="text-pretty">
-                    {displayText}
-                  </span>
-                ) : hasRevealedText ? (
-                  <div className="relative">
-                    {standaloneMarkdownDocument ? (
-                      <MarkdownMessageCard content={standaloneMarkdownDocument} />
-                    ) : (
-                      <MessageContent
-                        markdown
-                        className={cn(
-                          'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
-                          effectiveIsStreaming && 'chat-streaming-content',
-                          isUser && 'text-white',
-                        )}
-                      >
-                        {assistantDisplayText}
-                      </MessageContent>
-                    )}
-                    {effectiveIsStreaming && (
-                      <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent-500 align-text-bottom" />
-                    )}
-                  </div>
-                ) : null)}
-              {/* Sent indicator — message delivered, waiting for response */}
-              {isUser && isQueued && (
-                <span className="text-[10px] text-white/60 self-end">Sent</span>
-              )}
-            </div>
-          </Message>
-        )}
-        {/* Fallback working indicator when streaming with no text and no tool calls */}
-        {effectiveIsStreaming && !hasRevealedText && !hasStreamToolCalls ? (
-          <div className="flex items-center gap-2 pl-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
-            <span className="size-1.5 rounded-full animate-pulse" style={{ background: 'var(--theme-accent)' }} />
-            <span>Working&hellip;</span>
-          </div>
-        ) : null}
-        {hasAssistantMetadata ? (
-          <div className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-primary-400 leading-relaxed">
-            {usageMetadata.inputTokens !== null && (
-              <span>↑{formatCompactNumber(usageMetadata.inputTokens)}</span>
-            )}
-            {usageMetadata.outputTokens !== null && (
-              <span>↓{formatCompactNumber(usageMetadata.outputTokens)}</span>
-            )}
-            {usageMetadata.cacheReadTokens !== null && (
-              <span>R{formatCompactNumber(usageMetadata.cacheReadTokens)}</span>
-            )}
-            {usageMetadata.cacheWriteTokens !== null && (
-              <span>W{formatCompactNumber(usageMetadata.cacheWriteTokens)}</span>
-            )}
-            {usageMetadata.modelLabel && (
-              <span className="opacity-60">{usageMetadata.modelLabel}</span>
+              ) : null)}
+            {/* Sent indicator — message delivered, waiting for response */}
+            {isUser && isQueued && (
+              <span className="text-[10px] text-white/60 self-end">Sent</span>
             )}
           </div>
-        ) : null}
+        </Message>
+      )}
+      {/* Fallback working indicator when streaming with no text and no tool calls */}
+      {effectiveIsStreaming && !hasRevealedText && !hasStreamToolCalls ? (
+        <div
+          className="flex items-center gap-2 pl-1 text-xs"
+          style={{ color: 'var(--theme-muted)' }}
+        >
+          <span
+            className="size-1.5 rounded-full animate-pulse"
+            style={{ background: 'var(--theme-accent)' }}
+          />
+          <span>Working&hellip;</span>
+        </div>
+      ) : null}
+      {hasAssistantMetadata ? (
+        <div className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-primary-400 leading-relaxed">
+          {usageMetadata.inputTokens !== null && (
+            <span>↑{formatCompactNumber(usageMetadata.inputTokens)}</span>
+          )}
+          {usageMetadata.outputTokens !== null && (
+            <span>↓{formatCompactNumber(usageMetadata.outputTokens)}</span>
+          )}
+          {usageMetadata.cacheReadTokens !== null && (
+            <span>R{formatCompactNumber(usageMetadata.cacheReadTokens)}</span>
+          )}
+          {usageMetadata.cacheWriteTokens !== null && (
+            <span>W{formatCompactNumber(usageMetadata.cacheWriteTokens)}</span>
+          )}
+          {usageMetadata.modelLabel && (
+            <span className="opacity-60">{usageMetadata.modelLabel}</span>
+          )}
+        </div>
+      ) : null}
 
       {(!hasToolCalls || hasText) && (
         <MessageActionsBar

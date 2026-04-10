@@ -46,7 +46,9 @@ type CommandAction = {
   label: string
   keywords: string
   shortcut?: string
-  icon: React.ComponentProps<typeof import('@hugeicons/react').HugeiconsIcon>['icon']
+  icon: React.ComponentProps<
+    typeof import('@hugeicons/react').HugeiconsIcon
+  >['icon']
   onSelect: () => void
 }
 
@@ -54,7 +56,11 @@ type ScoredAction = CommandAction & {
   score: number
 }
 
-const SCREEN_GROUP_ORDER = ['Screens', 'Recent Sessions', 'Slash Commands'] as const
+const SCREEN_GROUP_ORDER = [
+  'Screens',
+  'Recent Sessions',
+  'Slash Commands',
+] as const
 
 function getSessionLabel(session: SessionMeta) {
   return (
@@ -73,14 +79,20 @@ function scoreCommandAction(action: CommandAction, query: string) {
   const haystack = `${action.label} ${action.keywords}`.toLowerCase()
   const directIndex = haystack.indexOf(normalizedQuery)
   if (directIndex >= 0) {
-    return 400 - directIndex - Math.max(0, haystack.length - normalizedQuery.length)
+    return (
+      400 - directIndex - Math.max(0, haystack.length - normalizedQuery.length)
+    )
   }
 
   let queryIndex = 0
   let gaps = 0
   let lastMatch = -1
 
-  for (let i = 0; i < haystack.length && queryIndex < normalizedQuery.length; i += 1) {
+  for (
+    let i = 0;
+    i < haystack.length && queryIndex < normalizedQuery.length;
+    i += 1
+  ) {
     if (haystack[i] !== normalizedQuery[queryIndex]) continue
     if (lastMatch >= 0) gaps += Math.max(0, i - lastMatch - 1)
     lastMatch = i
@@ -91,10 +103,7 @@ function scoreCommandAction(action: CommandAction, query: string) {
   return 180 - gaps - Math.max(0, haystack.length - normalizedQuery.length)
 }
 
-export function CommandPalette({
-  pathname,
-  sessions,
-}: CommandPaletteProps) {
+export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -301,9 +310,15 @@ export function CommandPalette({
     }
 
     return actions
-      .map((action) => ({ ...action, score: scoreCommandAction(action, normalizedQuery) }))
+      .map((action) => ({
+        ...action,
+        score: scoreCommandAction(action, normalizedQuery),
+      }))
       .filter((action) => action.score > 0)
-      .sort((left, right) => right.score - left.score || left.label.localeCompare(right.label))
+      .sort(
+        (left, right) =>
+          right.score - left.score || left.label.localeCompare(right.label),
+      )
   }, [actions, query])
 
   const groupedActions = useMemo(
@@ -372,7 +387,8 @@ export function CommandPalette({
         event.preventDefault()
         if (filteredActions.length === 0) return
         setSelectedIndex(
-          (current) => (current - 1 + filteredActions.length) % filteredActions.length,
+          (current) =>
+            (current - 1 + filteredActions.length) % filteredActions.length,
         )
         return
       }
@@ -438,7 +454,11 @@ export function CommandPalette({
                               isSelected && 'bg-primary-100 text-primary-900',
                             )}
                           >
-                            <HugeiconsIcon icon={action.icon} size={18} strokeWidth={1.6} />
+                            <HugeiconsIcon
+                              icon={action.icon}
+                              size={18}
+                              strokeWidth={1.6}
+                            />
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-sm font-medium">
                                 {action.label}
@@ -453,7 +473,9 @@ export function CommandPalette({
                         )
                       })}
                     </CommandGroup>
-                    {groupIndex < groupedActions.length - 1 ? <CommandSeparator /> : null}
+                    {groupIndex < groupedActions.length - 1 ? (
+                      <CommandSeparator />
+                    ) : null}
                   </Fragment>
                 ))}
               </CommandList>
@@ -463,8 +485,16 @@ export function CommandPalette({
             <div className="flex items-center gap-4 text-primary-700">
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 rounded-md border border-primary-200 bg-surface px-2 py-1 text-[11px] font-medium text-primary-700">
-                  <HugeiconsIcon icon={ArrowUp01Icon} size={14} strokeWidth={1.5} />
-                  <HugeiconsIcon icon={ArrowDown01Icon} size={14} strokeWidth={1.5} />
+                  <HugeiconsIcon
+                    icon={ArrowUp01Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
+                  <HugeiconsIcon
+                    icon={ArrowDown01Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
                 </span>
                 <span>Navigate</span>
               </div>

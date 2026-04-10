@@ -1,24 +1,12 @@
+import { execFile } from 'node:child_process'
+import os from 'node:os'
+import path from 'node:path'
+import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import {
-  BEARER_TOKEN,
-  HERMES_API,
-  ensureGatewayProbed,
-} from '../../../server/gateway-capabilities'
-import { requireJsonContentType } from '../../../server/rate-limit'
 
-function authHeaders(): Record<string, string> {
-  return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
-}
-
-function fallbackPayload(skillId: string, message?: string) {
-  return {
-    ok: false,
-    error: message || `Install via CLI: hermes skills install ${skillId}`,
-    command: `hermes skills install ${skillId}`,
-  }
-}
+const execFileAsync = promisify(execFile)
 
 export const Route = createFileRoute('/api/skills/install')({
   server: {
@@ -27,60 +15,47 @@ export const Route = createFileRoute('/api/skills/install')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-
-        const csrfCheck = requireJsonContentType(request)
-        if (csrfCheck) return csrfCheck
-
-        let body: { skillId?: string; source?: string } = {}
-
         try {
-          body = (await request.json()) as { skillId?: string; source?: string }
-        } catch {
-          return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
-        }
+          const body = (await request.json()) as { skillId?: string }
+          const skillId = (body.skillId || '').trim()
+          if (!skillId)
+            return json(
+              { ok: false, error: 'skillId required' },
+              { status: 400 },
+            )
 
-        const skillId = typeof body.skillId === 'string' ? body.skillId.trim() : ''
-        if (!skillId) {
-          return json({ ok: false, error: 'skillId is required' }, { status: 400 })
-        }
-
-        try {
-          await ensureGatewayProbed()
-
-          const response = await fetch(`${HERMES_API}/api/skills`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...authHeaders(),
+          const hermesHome = path.join(os.homedir(), '.hermes')
+          await execFileAsync(
+            'clawhub',
+            ['install', skillId, '--workdir', hermesHome, '--dir', 'skills'],
+            {
+              cwd: os.homedir(),
+              timeout: 120000,
+              maxBuffer: 1024 * 1024 * 4,
             },
-            body: JSON.stringify({
-              action: 'install',
-              id: skillId,
-              skillId,
-              source: body.source,
-            }),
-            signal: AbortSignal.timeout(10_000),
-          })
+          )
 
-          const text = await response.text().catch(() => '')
-          let payload: Record<string, unknown> = {}
-
-          try {
-            payload = text ? (JSON.parse(text) as Record<string, unknown>) : {}
-          } catch {
-            payload = {}
-          }
-
-          if (response.ok && payload.ok !== false) {
-            return json({
-              ok: true,
-              ...payload,
-            })
-          }
-
-          return json(fallbackPayload(skillId, typeof payload.error === 'string' ? payload.error : undefined))
-        } catch {
-          return json(fallbackPayload(skillId))
+          return json({ ok: true, installed: true, skillId })
+        } catch (error) {
+          const command = `clawhub install ${
+            (
+              (await request
+                .clone()
+                .json()
+                .catch(() => ({ skillId: '' }))) as { skillId?: string }
+            ).skillId || '<slug>'
+          } --workdir ~/.hermes --dir skills`
+          return json(
+            {
+              ok: false,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to install skill',
+              command,
+            },
+            { status: 500 },
+          )
         }
       },
     },

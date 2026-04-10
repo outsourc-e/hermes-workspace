@@ -37,7 +37,7 @@ We want to reverse that.
 This is the decision to lock in:
 
 > **Hermes Workspace must work standalone against any OpenAI-compatible backend.**
-> 
+>
 > Hermes-specific workspace features may enhance the experience when the full Hermes API is available, but the product must remain usable without those endpoints.
 
 Non-negotiable implication:
@@ -365,9 +365,9 @@ This is not the detailed task plan, but the engineering direction should be:
 Lock this in:
 
 > Hermes Workspace is a standalone frontend for OpenAI-compatible chat backends.
-> 
+>
 > Hermes-native APIs are an enhancement layer, not a requirement.
-> 
+>
 > Step 1 is portable compatibility now.
-> 
+>
 > Step 2 is upstreaming the enhanced Hermes APIs so no fork is needed ever again.

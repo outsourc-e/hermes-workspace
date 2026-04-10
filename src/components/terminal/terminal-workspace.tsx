@@ -136,7 +136,6 @@ export function TerminalWorkspace({
   const [debugLoading, setDebugLoading] = useState(false)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
 
-
   const containerMapRef = useRef(new Map<string, HTMLDivElement>())
   const terminalMapRef = useRef(new Map<string, Terminal>())
   const fitMapRef = useRef(new Map<string, FitAddon>())
@@ -277,8 +276,6 @@ export function TerminalWorkspace({
     [activeTab],
   )
 
-
-
   const closeTabResources = useCallback(async function closeTabResources(
     tabId: string,
     sessionId: string | null,
@@ -400,7 +397,8 @@ export function TerminalWorkspace({
 
         for (let _bi = 0; _bi < blocks.length; _bi++) {
           // Yield every 10 blocks to let input events through
-          if (_bi > 0 && _bi % 10 === 0) await new Promise((r) => setTimeout(r, 0))
+          if (_bi > 0 && _bi % 10 === 0)
+            await new Promise((r) => setTimeout(r, 0))
           const block = blocks[_bi]
           if (!block.trim()) continue
           const lines = block.split('\n')
@@ -596,7 +594,11 @@ export function TerminalWorkspace({
       // Refit all terminals when becoming visible (e.g. navigating back to terminal route)
       window.setTimeout(() => {
         for (const fitAddon of fitMapRef.current.values()) {
-          try { fitAddon.fit() } catch { /* ignore */ }
+          try {
+            fitAddon.fit()
+          } catch {
+            /* ignore */
+          }
         }
         const snapshot = useTerminalPanelStore.getState().tabs
         for (const tab of snapshot) {
@@ -613,7 +615,11 @@ export function TerminalWorkspace({
     function fitOnResize() {
       function refitAll() {
         for (const fitAddon of fitMapRef.current.values()) {
-          try { fitAddon.fit() } catch { /* */ }
+          try {
+            fitAddon.fit()
+          } catch {
+            /* */
+          }
         }
         const snapshot = useTerminalPanelStore.getState().tabs
         for (const tab of snapshot) {
@@ -668,7 +674,11 @@ export function TerminalWorkspace({
   return (
     <div
       className="relative flex min-h-0 flex-col bg-primary-50"
-      style={termHeight ? { height: termHeight, maxHeight: termHeight } : { height: '100%' }}
+      style={
+        termHeight
+          ? { height: termHeight, maxHeight: termHeight }
+          : { height: '100%' }
+      }
     >
       {/* fullscreen header removed — tab bar handles everything */}
 
@@ -776,14 +786,41 @@ export function TerminalWorkspace({
           </Button>
           {mode === 'panel' ? (
             <>
-              <Button size="icon-sm" variant="ghost" onClick={onMinimizePanel} aria-label="Minimize">
-                <HugeiconsIcon icon={SidebarLeft01Icon} size={20} strokeWidth={1.5} />
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={onMinimizePanel}
+                aria-label="Minimize"
+              >
+                <HugeiconsIcon
+                  icon={SidebarLeft01Icon}
+                  size={20}
+                  strokeWidth={1.5}
+                />
               </Button>
-              <Button size="icon-sm" variant="ghost" onClick={onMaximizePanel} aria-label="Maximize">
-                <HugeiconsIcon icon={ArrowRight01Icon} size={20} strokeWidth={1.5} />
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={onMaximizePanel}
+                aria-label="Maximize"
+              >
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  size={20}
+                  strokeWidth={1.5}
+                />
               </Button>
-              <Button size="icon-sm" variant="ghost" onClick={handleClosePanel} aria-label="Close">
-                <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.5} />
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={handleClosePanel}
+                aria-label="Close"
+              >
+                <HugeiconsIcon
+                  icon={Cancel01Icon}
+                  size={20}
+                  strokeWidth={1.5}
+                />
               </Button>
             </>
           ) : null}

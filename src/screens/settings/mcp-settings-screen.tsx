@@ -1,4 +1,11 @@
-import { Add01Icon, ArrowLeft01Icon, Copy01Icon, Delete02Icon, Edit01Icon, RefreshIcon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  ArrowLeft01Icon,
+  Copy01Icon,
+  Delete02Icon,
+  Edit01Icon,
+  RefreshIcon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
@@ -12,12 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
@@ -114,7 +116,10 @@ function buildDraft(server?: McpServer | null): ServerDraft {
 function formatServerSummary(server: McpServer): string {
   if (server.transport === 'http') return server.url || 'No URL configured'
   const args = server.args?.join(' ') || ''
-  return [server.command, args].filter(Boolean).join(' ').trim() || 'No command configured'
+  return (
+    [server.command, args].filter(Boolean).join(' ').trim() ||
+    'No command configured'
+  )
 }
 
 function yamlScalar(value: string): string {
@@ -127,7 +132,9 @@ function yamlArray(values: Array<string>): string {
 }
 
 function yamlMap(value: Record<string, string>, indent: string): Array<string> {
-  return Object.entries(value).map(([key, entry]) => `${indent}${key}: ${yamlScalar(entry)}`)
+  return Object.entries(value).map(
+    ([key, entry]) => `${indent}${key}: ${yamlScalar(entry)}`,
+  )
 }
 
 function buildYamlSnippet(servers: Array<McpServer>): string {
@@ -143,7 +150,8 @@ function buildYamlSnippet(servers: Array<McpServer>): string {
         lines.push(...yamlMap(server.headers, '      '))
       }
     } else {
-      if (server.command) lines.push(`    command: ${yamlScalar(server.command)}`)
+      if (server.command)
+        lines.push(`    command: ${yamlScalar(server.command)}`)
       if (server.args && server.args.length > 0) {
         lines.push(`    args: ${yamlArray(server.args)}`)
       }
@@ -152,11 +160,16 @@ function buildYamlSnippet(servers: Array<McpServer>): string {
         lines.push(...yamlMap(server.env, '      '))
       }
     }
-    if (typeof server.timeout === 'number') lines.push(`    timeout: ${server.timeout}`)
+    if (typeof server.timeout === 'number')
+      lines.push(`    timeout: ${server.timeout}`)
     if (typeof server.connectTimeout === 'number') {
       lines.push(`    connect_timeout: ${server.connectTimeout}`)
     }
-    if (server.auth && typeof server.auth === 'object' && !Array.isArray(server.auth)) {
+    if (
+      server.auth &&
+      typeof server.auth === 'object' &&
+      !Array.isArray(server.auth)
+    ) {
       lines.push('    auth:')
       lines.push(
         ...Object.entries(server.auth as Record<string, unknown>).map(
@@ -169,7 +182,11 @@ function buildYamlSnippet(servers: Array<McpServer>): string {
   return lines.join('\n')
 }
 
-function validateDraft(draft: ServerDraft, existingNames: Array<string>, originalName?: string): string | null {
+function validateDraft(
+  draft: ServerDraft,
+  existingNames: Array<string>,
+  originalName?: string,
+): string | null {
   const name = draft.name.trim()
   if (!name) return 'Server name is required.'
   if (!/^[A-Za-z0-9_-]+$/.test(name)) {
@@ -208,9 +225,12 @@ function ServerDialog(props: {
       <DialogContent className="w-[min(720px,96vw)]">
         <div className="space-y-5 p-5 md:p-6">
           <div className="space-y-1">
-            <DialogTitle>{editingName ? 'Edit MCP Server' : 'Add MCP Server'}</DialogTitle>
+            <DialogTitle>
+              {editingName ? 'Edit MCP Server' : 'Add MCP Server'}
+            </DialogTitle>
             <DialogDescription>
-              Configure the server details, then generate an updated YAML snippet.
+              Configure the server details, then generate an updated YAML
+              snippet.
             </DialogDescription>
           </div>
 
@@ -222,14 +242,24 @@ function ServerDialog(props: {
               <Input
                 value={draft.name}
                 placeholder="filesystem"
-                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
               />
             </label>
 
             <div className="md:col-span-2">
               <Tabs
                 value={draft.transport}
-                onValueChange={(value) => setDraft((current) => ({ ...current, transport: value as Transport }))}
+                onValueChange={(value) =>
+                  setDraft((current) => ({
+                    ...current,
+                    transport: value as Transport,
+                  }))
+                }
               >
                 <TabsList className="rounded-xl border border-primary-200 bg-primary-50 p-1">
                   <TabsTrigger value="stdio">Stdio</TabsTrigger>
@@ -243,7 +273,12 @@ function ServerDialog(props: {
                     <Input
                       value={draft.command}
                       placeholder="npx"
-                      onChange={(event) => setDraft((current) => ({ ...current, command: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          command: event.target.value,
+                        }))
+                      }
                     />
                   </label>
                   <label className="space-y-1.5">
@@ -253,7 +288,12 @@ function ServerDialog(props: {
                     <Input
                       value={draft.args}
                       placeholder="-y, @modelcontextprotocol/server-filesystem, /tmp"
-                      onChange={(event) => setDraft((current) => ({ ...current, args: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          args: event.target.value,
+                        }))
+                      }
                     />
                   </label>
                   <label className="space-y-1.5">
@@ -265,7 +305,12 @@ function ServerDialog(props: {
                       rows={4}
                       placeholder={'API_KEY=${MCP_API_KEY}\nLOG_LEVEL=debug'}
                       className="min-h-[108px] w-full rounded-lg border border-primary-200 bg-surface px-3 py-2 text-sm text-primary-900 outline-none placeholder:text-primary-500"
-                      onChange={(event) => setDraft((current) => ({ ...current, envText: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          envText: event.target.value,
+                        }))
+                      }
                     />
                   </label>
                 </TabsContent>
@@ -277,7 +322,12 @@ function ServerDialog(props: {
                     <Input
                       value={draft.url}
                       placeholder="https://api.github.com/mcp"
-                      onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          url: event.target.value,
+                        }))
+                      }
                     />
                   </label>
                   <label className="space-y-1.5">
@@ -287,9 +337,16 @@ function ServerDialog(props: {
                     <textarea
                       value={draft.headersText}
                       rows={4}
-                      placeholder={'Authorization=Bearer ${GITHUB_TOKEN}\nX-Workspace=hermes'}
+                      placeholder={
+                        'Authorization=Bearer ${GITHUB_TOKEN}\nX-Workspace=hermes'
+                      }
                       className="min-h-[108px] w-full rounded-lg border border-primary-200 bg-surface px-3 py-2 text-sm text-primary-900 outline-none placeholder:text-primary-500"
-                      onChange={(event) => setDraft((current) => ({ ...current, headersText: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          headersText: event.target.value,
+                        }))
+                      }
                     />
                   </label>
                 </TabsContent>
@@ -305,14 +362,21 @@ function ServerDialog(props: {
                 min={1}
                 value={draft.timeout}
                 placeholder="30"
-                onChange={(event) => setDraft((current) => ({ ...current, timeout: event.target.value }))}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    timeout: event.target.value,
+                  }))
+                }
               />
             </label>
           </div>
 
           <div className="flex items-center justify-end gap-2">
             <DialogClose>Cancel</DialogClose>
-            <Button onClick={onSave}>{editingName ? 'Save Changes' : 'Add Server'}</Button>
+            <Button onClick={onSave}>
+              {editingName ? 'Save Changes' : 'Add Server'}
+            </Button>
           </div>
         </div>
       </DialogContent>
@@ -322,8 +386,10 @@ function ServerDialog(props: {
 
 export function McpSettingsScreen() {
   const [servers, setServers] = useState<Array<McpServer>>([])
+  const [originalServers, setOriginalServers] = useState<Array<McpServer>>([])
   const [loading, setLoading] = useState(true)
   const [reloadPending, setReloadPending] = useState(false)
+  const [reloadAvailable, setReloadAvailable] = useState(true)
   const [notice, setNotice] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingName, setEditingName] = useState<string | undefined>()
@@ -334,11 +400,20 @@ export function McpSettingsScreen() {
       setLoading(true)
       try {
         const response = await fetch('/api/mcp/servers')
-        const payload = (await response.json().catch(() => ({}))) as McpServersResponse
-        setServers(Array.isArray(payload.servers) ? payload.servers : [])
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as McpServersResponse
+        const loadedServers = Array.isArray(payload.servers)
+          ? payload.servers
+          : []
+        setServers(loadedServers)
+        setOriginalServers(loadedServers)
+        if (payload.ok === false) setReloadAvailable(false)
         setNotice(payload.message ?? null)
       } catch {
-        setNotice('Could not load MCP config from Hermes. You can still draft servers here.')
+        setNotice(
+          'Could not load MCP config from Hermes. You can still draft servers here.',
+        )
       } finally {
         setLoading(false)
       }
@@ -348,6 +423,10 @@ export function McpSettingsScreen() {
   }, [])
 
   const yamlSnippet = useMemo(() => buildYamlSnippet(servers), [servers])
+
+  const isDirty = useMemo(() => {
+    return JSON.stringify(servers) !== JSON.stringify(originalServers)
+  }, [servers, originalServers])
 
   function openAddDialog() {
     setEditingName(undefined)
@@ -379,26 +458,39 @@ export function McpSettingsScreen() {
       transport: draft.transport,
       command: draft.transport === 'stdio' ? draft.command.trim() : undefined,
       args: draft.transport === 'stdio' ? parseArgs(draft.args) : undefined,
-      env: draft.transport === 'stdio' ? parseKeyValueLines(draft.envText) : undefined,
+      env:
+        draft.transport === 'stdio'
+          ? parseKeyValueLines(draft.envText)
+          : undefined,
       url: draft.transport === 'http' ? draft.url.trim() : undefined,
       headers:
-        draft.transport === 'http' ? parseKeyValueLines(draft.headersText) : undefined,
+        draft.transport === 'http'
+          ? parseKeyValueLines(draft.headersText)
+          : undefined,
       timeout: draft.timeout.trim() ? Number(draft.timeout) : undefined,
     }
 
     setServers((current) => {
       const remaining = current.filter((server) => server.name !== editingName)
-      return [...remaining, nextServer].sort((a, b) => a.name.localeCompare(b.name))
+      return [...remaining, nextServer].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      )
     })
     setDialogOpen(false)
-    toast(editingName ? 'MCP server updated in local draft.' : 'MCP server added to local draft.', {
-      type: 'success',
-    })
+    toast(
+      editingName
+        ? 'MCP server updated in local draft.'
+        : 'MCP server added to local draft.',
+      {
+        type: 'success',
+      },
+    )
   }
 
   async function handleCopySnippet() {
     try {
       await writeTextToClipboard(yamlSnippet)
+      setOriginalServers(servers)
       toast('YAML snippet copied.', { type: 'success' })
     } catch {
       toast('Clipboard unavailable.', { type: 'error' })
@@ -413,9 +505,13 @@ export function McpSettingsScreen() {
         ok?: boolean
         message?: string
       }
-      toast(payload.message || (payload.ok ? 'Reload requested.' : 'Reload unavailable.'), {
-        type: payload.ok ? 'success' : 'info',
-      })
+      toast(
+        payload.message ||
+          (payload.ok ? 'Reload requested.' : 'Reload unavailable.'),
+        {
+          type: payload.ok ? 'success' : 'info',
+        },
+      )
     } catch {
       toast('Could not reach reload endpoint.', { type: 'error' })
     } finally {
@@ -436,16 +532,25 @@ export function McpSettingsScreen() {
                   className="-ml-2 w-fit"
                   render={
                     <Link to="/settings">
-                      <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.8} />
+                      <HugeiconsIcon
+                        icon={ArrowLeft01Icon}
+                        size={16}
+                        strokeWidth={1.8}
+                      />
                       Back to Settings
                     </Link>
                   }
                 />
                 <div>
-                  <h1 className="text-lg font-semibold text-primary-900">MCP Servers</h1>
+                  <h1 className="text-lg font-semibold text-primary-900">
+                    MCP Servers
+                  </h1>
                   <p className="mt-1 text-sm text-primary-600">
-                    Review configured MCP servers, draft changes locally, and copy the YAML into
-                    <code className="mx-1 rounded bg-white px-1.5 py-0.5 font-mono text-xs">config.yaml</code>
+                    Review configured MCP servers, draft changes locally, and
+                    copy the YAML into
+                    <code className="mx-1 rounded bg-white px-1.5 py-0.5 font-mono text-xs">
+                      config.yaml
+                    </code>
                     until gateway config writes land.
                   </p>
                 </div>
@@ -463,18 +568,50 @@ export function McpSettingsScreen() {
             </div>
           ) : null}
 
+          {isDirty ? (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+              You have unsaved changes. Copy the YAML below and paste it into
+              your{' '}
+              <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs">
+                config.yaml
+              </code>
+              .
+            </div>
+          ) : null}
+
           <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 shadow-sm md:p-5">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-base font-medium text-primary-900">Configured Servers</h2>
+                <h2 className="text-base font-medium text-primary-900">
+                  Configured Servers
+                </h2>
                 <p className="mt-1 text-xs text-primary-600">
-                  {servers.length} server{servers.length === 1 ? '' : 's'} in the current local draft.
+                  {servers.length} server{servers.length === 1 ? '' : 's'} in
+                  the current local draft.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleReload} disabled={reloadPending}>
-                <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.8} />
-                {reloadPending ? 'Reloading...' : 'Reload MCP Servers'}
-              </Button>
+              {reloadAvailable ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReload}
+                  disabled={reloadPending}
+                >
+                  <HugeiconsIcon
+                    icon={RefreshIcon}
+                    size={16}
+                    strokeWidth={1.8}
+                  />
+                  {reloadPending ? 'Reloading...' : 'Reload MCP Servers'}
+                </Button>
+              ) : (
+                <span
+                  className="text-xs text-primary-400"
+                  title="MCP reload not available on this gateway"
+                >
+                  Reload unavailable
+                </span>
+              )}
             </div>
 
             {loading ? (
@@ -485,7 +622,8 @@ export function McpSettingsScreen() {
 
             {!loading && servers.length === 0 ? (
               <div className="rounded-xl border border-dashed border-primary-300 bg-white px-4 py-8 text-center text-sm text-primary-600">
-                No MCP servers found yet. Add one to generate a starter config snippet.
+                No MCP servers found yet. Add one to generate a starter config
+                snippet.
               </div>
             ) : null}
 
@@ -499,35 +637,66 @@ export function McpSettingsScreen() {
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-lg">{server.transport === 'http' ? '🌐' : '📡'}</span>
-                          <h3 className="text-sm font-semibold text-primary-900">{server.name}</h3>
+                          <span className="text-lg">
+                            {server.transport === 'http' ? '🌐' : '📡'}
+                          </span>
+                          <h3 className="text-sm font-semibold text-primary-900">
+                            {server.name}
+                          </h3>
                           <span className="rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-primary-700">
                             {server.transport}
                           </span>
                         </div>
-                        <p className="truncate text-sm text-primary-700">{formatServerSummary(server)}</p>
+                        <p className="truncate text-sm text-primary-700">
+                          {formatServerSummary(server)}
+                        </p>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-primary-500">
-                          <span>timeout: {server.timeout ? `${server.timeout}s` : 'default'}</span>
-                          {server.connectTimeout ? <span>connect: {server.connectTimeout}s</span> : null}
+                          <span>
+                            timeout:{' '}
+                            {server.timeout ? `${server.timeout}s` : 'default'}
+                          </span>
+                          {server.connectTimeout ? (
+                            <span>connect: {server.connectTimeout}s</span>
+                          ) : null}
                           {server.auth ? <span>auth configured</span> : null}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEditDialog(server)}>
-                          <HugeiconsIcon icon={Edit01Icon} size={14} strokeWidth={1.8} />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(server)}
+                        >
+                          <HugeiconsIcon
+                            icon={Edit01Icon}
+                            size={14}
+                            strokeWidth={1.8}
+                          />
                           Edit
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className={cn('text-red-600 hover:bg-red-50 hover:text-red-700')}
+                          className={cn(
+                            'text-red-600 hover:bg-red-50 hover:text-red-700',
+                          )}
                           onClick={() => {
-                            setServers((current) => current.filter((entry) => entry.name !== server.name))
-                            toast(`Removed ${server.name} from local draft.`, { type: 'success' })
+                            setServers((current) =>
+                              current.filter(
+                                (entry) => entry.name !== server.name,
+                              ),
+                            )
+                            toast(`Removed ${server.name} from local draft.`, {
+                              type: 'success',
+                            })
                           }}
                         >
-                          <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.8} />
+                          <HugeiconsIcon
+                            icon={Delete02Icon}
+                            size={14}
+                            strokeWidth={1.8}
+                          />
                           Delete
                         </Button>
                       </div>
@@ -541,9 +710,19 @@ export function McpSettingsScreen() {
           <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 shadow-sm md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
-                <h2 className="text-base font-medium text-primary-900">Generated YAML</h2>
+                <h2 className="text-base font-medium text-primary-900">
+                  Generated YAML
+                </h2>
                 <p className="mt-1 text-sm text-primary-600">
-                  Add this to your <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">config.yaml</code> under <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">mcp_servers</code>.
+                  Add this to your{' '}
+                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">
+                    config.yaml
+                  </code>{' '}
+                  under{' '}
+                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">
+                    mcp_servers
+                  </code>
+                  .
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={handleCopySnippet}>

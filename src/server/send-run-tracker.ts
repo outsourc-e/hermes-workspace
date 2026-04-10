@@ -7,7 +7,7 @@ function getActiveRuns(): Set<string> {
   if (!globalValue[ACTIVE_RUNS_KEY]) {
     globalValue[ACTIVE_RUNS_KEY] = new Set<string>()
   }
-  return globalValue[ACTIVE_RUNS_KEY]!
+  return globalValue[ACTIVE_RUNS_KEY]
 }
 
 export function registerActiveSendRun(runId: string): void {

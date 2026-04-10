@@ -1,9 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import {
-  BEARER_TOKEN,
-  HERMES_API,
-} from '../../../server/gateway-capabilities'
+import { BEARER_TOKEN, HERMES_API } from '../../../server/gateway-capabilities'
 
 type AuthResult = Response | true
 

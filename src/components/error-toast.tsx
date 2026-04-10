@@ -13,13 +13,26 @@ type ErrorEntry = {
 
 function classifyError(raw: string): string {
   const lower = raw.toLowerCase()
-  if (lower.includes('429') || lower.includes('rate limit') || lower.includes('too many')) {
+  if (
+    lower.includes('429') ||
+    lower.includes('rate limit') ||
+    lower.includes('too many')
+  ) {
     return 'Rate limited — try again in a moment'
   }
-  if (lower.includes('401') || lower.includes('403') || lower.includes('unauthorized') || lower.includes('auth')) {
+  if (
+    lower.includes('401') ||
+    lower.includes('403') ||
+    lower.includes('unauthorized') ||
+    lower.includes('auth')
+  ) {
     return 'Authentication error — check your API key in Settings'
   }
-  if (lower.includes('500') || lower.includes('server error') || lower.includes('model error')) {
+  if (
+    lower.includes('500') ||
+    lower.includes('server error') ||
+    lower.includes('model error')
+  ) {
     return 'Model error — the provider is having issues'
   }
   if (
@@ -67,7 +80,9 @@ function ToastItem({ entry, onDismiss }: ToastItemProps) {
       role="alert"
     >
       <span className="text-red-500 text-base shrink-0 mt-0.5">⚠</span>
-      <span className="flex-1 text-[13px] text-ink leading-snug">{entry.message}</span>
+      <span className="flex-1 text-[13px] text-ink leading-snug">
+        {entry.message}
+      </span>
       <button
         type="button"
         onClick={() => onDismiss(entry.id)}

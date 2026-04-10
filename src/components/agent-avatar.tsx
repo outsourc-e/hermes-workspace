@@ -141,7 +141,15 @@ function AgentAvatar({
               🦞
             </span>
           ) : (
-            <img src="/hermes-avatar.webp" alt="Hermes" className={cn(getLogoSizeClassName(size), iconClassName, 'rounded-xl')} />
+            <img
+              src="/hermes-avatar.webp"
+              alt="Hermes"
+              className={cn(
+                getLogoSizeClassName(size),
+                iconClassName,
+                'rounded-xl',
+              )}
+            />
           )}
         </TooltipTrigger>
         <TooltipContent side="top">Click to switch avatar</TooltipContent>

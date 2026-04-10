@@ -18,12 +18,18 @@ export const Route = createFileRoute('/api/knowledge/read')({
           const { meta, content, backlinks } = readKnowledgePage(pathParam)
           return json({ page: meta, content, backlinks })
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Failed to read knowledge page'
-          const status = /not allowed|outside knowledge root|required|traversal/i.test(message)
-            ? 400
-            : /ENOENT/.test(message)
-              ? 404
-              : 500
+          const message =
+            error instanceof Error
+              ? error.message
+              : 'Failed to read knowledge page'
+          const status =
+            /not allowed|outside knowledge root|required|traversal/i.test(
+              message,
+            )
+              ? 400
+              : /ENOENT/.test(message)
+                ? 404
+                : 500
           return json({ error: message }, { status })
         }
       },

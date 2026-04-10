@@ -34,13 +34,19 @@ export function getMemoryWorkspaceRoot(): string {
 function normalizeRelativeMemoryPath(input: string): string {
   const normalized = input.replace(/\\/g, '/').trim()
   if (!normalized) throw new Error('Path is required')
-  if (normalized.startsWith('/')) throw new Error('Absolute paths are not allowed')
-  if (normalized.includes('..')) throw new Error('Path traversal is not allowed')
-  if (!normalized.toLowerCase().endsWith('.md')) throw new Error('Only Markdown files are allowed')
+  if (normalized.startsWith('/'))
+    throw new Error('Absolute paths are not allowed')
+  if (normalized.includes('..'))
+    throw new Error('Path traversal is not allowed')
+  if (!normalized.toLowerCase().endsWith('.md'))
+    throw new Error('Only Markdown files are allowed')
   return normalized
 }
 
-export function resolveMemoryFilePath(relativePath: string): { fullPath: string; relativePath: string } {
+export function resolveMemoryFilePath(relativePath: string): {
+  fullPath: string
+  relativePath: string
+} {
   const safeRelativePath = normalizeRelativeMemoryPath(relativePath)
   const workspaceRoot = getMemoryWorkspaceRoot()
   const fullPath = path.resolve(workspaceRoot, safeRelativePath)
@@ -50,7 +56,11 @@ export function resolveMemoryFilePath(relativePath: string): { fullPath: string;
   return { fullPath, relativePath: safeRelativePath }
 }
 
-function pushIfMarkdownFile(entries: Array<MemoryFileMeta>, workspaceRoot: string, fullPath: string) {
+function pushIfMarkdownFile(
+  entries: Array<MemoryFileMeta>,
+  workspaceRoot: string,
+  fullPath: string,
+) {
   if (!fullPath.toLowerCase().endsWith('.md')) return
   let stats: fs.Stats
   try {
@@ -60,7 +70,9 @@ function pushIfMarkdownFile(entries: Array<MemoryFileMeta>, workspaceRoot: strin
   }
   if (!stats.isFile()) return
 
-  const relativePath = path.relative(workspaceRoot, fullPath).replace(/\\/g, '/')
+  const relativePath = path
+    .relative(workspaceRoot, fullPath)
+    .replace(/\\/g, '/')
   if (!isBrowserMemoryPath(relativePath)) return
 
   entries.push({
@@ -75,7 +87,11 @@ function shouldSkipDirectory(name: string): boolean {
   return name === '.git' || name === 'node_modules'
 }
 
-function walkWorkspaceDir(entries: Array<MemoryFileMeta>, workspaceRoot: string, dirPath: string) {
+function walkWorkspaceDir(
+  entries: Array<MemoryFileMeta>,
+  workspaceRoot: string,
+  dirPath: string,
+) {
   let dirEntries: Array<string>
   try {
     dirEntries = fs.readdirSync(dirPath)

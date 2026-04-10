@@ -64,7 +64,8 @@ export function useSmoothStreamingText(
 
       // Adaptive step: bigger jumps when far behind, 1-char when close
       const remaining = next.length - current.length
-      const step = remaining > 60 ? Math.ceil(remaining / 8) : remaining > 20 ? 3 : 1
+      const step =
+        remaining > 60 ? Math.ceil(remaining / 8) : remaining > 20 ? 3 : 1
       const nextLength = Math.min(next.length, current.length + step)
       const nextText = next.slice(0, nextLength)
 

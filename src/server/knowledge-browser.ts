@@ -10,13 +10,13 @@ export type WikiPageMeta = {
   type?: string
   domain?: string
   status?: string
-  tags: string[]
+  tags: Array<string>
   summary?: string
   created?: string
   updated?: string
   size: number
   modified: string
-  wikilinks: string[]
+  wikilinks: Array<string>
 }
 
 export type WikiLink = {
@@ -25,7 +25,7 @@ export type WikiLink = {
 }
 
 export type KnowledgeGraph = {
-  nodes: Array<{ id: string; title: string; type?: string; tags: string[] }>
+  nodes: Array<{ id: string; title: string; type?: string; tags: Array<string> }>
   edges: Array<{ source: string; target: string }>
 }
 
@@ -54,11 +54,9 @@ function normalizeTitle(name: string): string {
   return name.replace(/\.md$/i, '')
 }
 
-function normalizeTagList(input: unknown): string[] {
+function normalizeTagList(input: unknown): Array<string> {
   if (Array.isArray(input)) {
-    return input
-      .map((value) => String(value).trim())
-      .filter(Boolean)
+    return input.map((value) => String(value).trim()).filter(Boolean)
   }
   if (typeof input === 'string') {
     return input
@@ -75,7 +73,10 @@ function normalizeFrontmatterValue(input: unknown): string | undefined {
   return value || undefined
 }
 
-function parseFrontmatter(raw: string): { data: FrontmatterData; content: string } {
+function parseFrontmatter(raw: string): {
+  data: FrontmatterData
+  content: string
+} {
   if (!raw.startsWith('---')) {
     return { data: {}, content: raw }
   }
@@ -88,7 +89,8 @@ function parseFrontmatter(raw: string): { data: FrontmatterData; content: string
   try {
     const parsed = YAML.parse(match[1])
     return {
-      data: parsed && typeof parsed === 'object' ? (parsed as FrontmatterData) : {},
+      data:
+        parsed && typeof parsed === 'object' ? (parsed as FrontmatterData) : {},
       content: match[2] || '',
     }
   } catch {
@@ -100,7 +102,7 @@ function cleanWikilinkTarget(input: string): string {
   return input.split('|')[0]?.split('#')[0]?.trim() || ''
 }
 
-function extractWikilinks(content: string): string[] {
+function extractWikilinks(content: string): Array<string> {
   const links = new Set<string>()
   const regex = /\[\[([^\]]+)\]\]/g
   let match: RegExpExecArray | null = null
@@ -132,13 +134,19 @@ export function knowledgeRootExists(): boolean {
 function normalizeRelativeKnowledgePath(input: string): string {
   const normalized = input.replace(/\\/g, '/').trim()
   if (!normalized) throw new Error('Path is required')
-  if (normalized.startsWith('/')) throw new Error('Absolute paths are not allowed')
-  if (normalized.includes('..')) throw new Error('Path traversal is not allowed')
-  if (!normalized.toLowerCase().endsWith('.md')) throw new Error('Only Markdown files are allowed')
+  if (normalized.startsWith('/'))
+    throw new Error('Absolute paths are not allowed')
+  if (normalized.includes('..'))
+    throw new Error('Path traversal is not allowed')
+  if (!normalized.toLowerCase().endsWith('.md'))
+    throw new Error('Only Markdown files are allowed')
   return normalized
 }
 
-function resolveKnowledgeFilePath(relativePath: string): { fullPath: string; relativePath: string } {
+function resolveKnowledgeFilePath(relativePath: string): {
+  fullPath: string
+  relativePath: string
+} {
   const safeRelativePath = normalizeRelativeKnowledgePath(relativePath)
   const knowledgeRoot = path.resolve(getKnowledgeRoot())
   const fullPath = path.resolve(knowledgeRoot, safeRelativePath)
@@ -149,7 +157,11 @@ function resolveKnowledgeFilePath(relativePath: string): { fullPath: string; rel
   return { fullPath, relativePath: safeRelativePath }
 }
 
-function buildPageMeta(relativePath: string, stats: fs.Stats, raw: string): ParsedKnowledgePage {
+function buildPageMeta(
+  relativePath: string,
+  stats: fs.Stats,
+  raw: string,
+): ParsedKnowledgePage {
   const { data, content } = parseFrontmatter(raw)
   const modified = stats.mtime.toISOString()
   const name = path.basename(relativePath)
@@ -177,7 +189,10 @@ function buildPageMeta(relativePath: string, stats: fs.Stats, raw: string): Pars
   }
 }
 
-function readParsedKnowledgeFile(fullPath: string, relativePath: string): ParsedKnowledgePage | null {
+function readParsedKnowledgeFile(
+  fullPath: string,
+  relativePath: string,
+): ParsedKnowledgePage | null {
   try {
     const stats = fs.statSync(fullPath)
     if (!stats.isFile()) return null
@@ -188,8 +203,12 @@ function readParsedKnowledgeFile(fullPath: string, relativePath: string): Parsed
   }
 }
 
-function walkKnowledgeDir(results: ParsedKnowledgePage[], knowledgeRoot: string, dirPath: string) {
-  let dirEntries: string[]
+function walkKnowledgeDir(
+  results: Array<ParsedKnowledgePage>,
+  knowledgeRoot: string,
+  dirPath: string,
+) {
+  let dirEntries: Array<string>
   try {
     dirEntries = fs.readdirSync(dirPath)
   } catch {
@@ -213,49 +232,70 @@ function walkKnowledgeDir(results: ParsedKnowledgePage[], knowledgeRoot: string,
 
     if (!name.toLowerCase().endsWith('.md')) continue
 
-    const relativePath = path.relative(knowledgeRoot, fullPath).replace(/\\/g, '/')
-    if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) continue
+    const relativePath = path
+      .relative(knowledgeRoot, fullPath)
+      .replace(/\\/g, '/')
+    if (
+      !relativePath ||
+      relativePath.startsWith('..') ||
+      path.isAbsolute(relativePath)
+    )
+      continue
 
     const parsed = readParsedKnowledgeFile(fullPath, relativePath)
     if (parsed) results.push(parsed)
   }
 }
 
-function getParsedKnowledgePages(): ParsedKnowledgePage[] {
+function getParsedKnowledgePages(): Array<ParsedKnowledgePage> {
   const knowledgeRoot = path.resolve(getKnowledgeRoot())
   if (!fs.existsSync(knowledgeRoot)) return []
 
-  const results: ParsedKnowledgePage[] = []
+  const results: Array<ParsedKnowledgePage> = []
   walkKnowledgeDir(results, knowledgeRoot, knowledgeRoot)
   results.sort((a, b) => {
-    const updatedDiff = Date.parse(b.meta.updated || b.meta.modified) - Date.parse(a.meta.updated || a.meta.modified)
+    const updatedDiff =
+      Date.parse(b.meta.updated || b.meta.modified) -
+      Date.parse(a.meta.updated || a.meta.modified)
     if (updatedDiff !== 0) return updatedDiff
     return a.meta.path.localeCompare(b.meta.path)
   })
   return results
 }
 
-function createWikilinkResolver(pages: ParsedKnowledgePage[]): (linkText: string) => string | null {
+function createWikilinkResolver(
+  pages: Array<ParsedKnowledgePage>,
+): (linkText: string) => string | null {
   const byPath = new Map<string, string>()
   const byName = new Map<string, string>()
 
   for (const page of pages) {
-    byPath.set(page.meta.path.replace(/\.md$/i, '').toLowerCase(), page.meta.path)
-    byName.set(path.basename(page.meta.path, '.md').toLowerCase(), page.meta.path)
+    byPath.set(
+      page.meta.path.replace(/\.md$/i, '').toLowerCase(),
+      page.meta.path,
+    )
+    byName.set(
+      path.basename(page.meta.path, '.md').toLowerCase(),
+      page.meta.path,
+    )
   }
 
   return (linkText: string) => {
     const cleaned = cleanWikilinkTarget(linkText)
     if (!cleaned) return null
 
-    const normalized = cleaned.replace(/\\/g, '/').trim().replace(/\.md$/i, '').toLowerCase()
+    const normalized = cleaned
+      .replace(/\\/g, '/')
+      .trim()
+      .replace(/\.md$/i, '')
+      .toLowerCase()
     if (!normalized) return null
 
     return byPath.get(normalized) || byName.get(normalized) || null
   }
 }
 
-export function listKnowledgePages(): WikiPageMeta[] {
+export function listKnowledgePages(): Array<WikiPageMeta> {
   return getParsedKnowledgePages().map((page) => page.meta)
 }
 
@@ -263,8 +303,13 @@ export function resolveWikilink(linkText: string): string | null {
   return createWikilinkResolver(getParsedKnowledgePages())(linkText)
 }
 
-export function readKnowledgePage(relativePath: string): { meta: WikiPageMeta; content: string; backlinks: string[] } {
-  const { fullPath, relativePath: safeRelativePath } = resolveKnowledgeFilePath(relativePath)
+export function readKnowledgePage(relativePath: string): {
+  meta: WikiPageMeta
+  content: string
+  backlinks: Array<string>
+} {
+  const { fullPath, relativePath: safeRelativePath } =
+    resolveKnowledgeFilePath(relativePath)
   const parsed = readParsedKnowledgeFile(fullPath, safeRelativePath)
   if (!parsed) {
     throw new Error(`ENOENT: Knowledge page not found: ${safeRelativePath}`)
@@ -274,7 +319,11 @@ export function readKnowledgePage(relativePath: string): { meta: WikiPageMeta; c
   const resolveLink = createWikilinkResolver(pages)
   const backlinks = pages
     .filter((page) => page.meta.path !== safeRelativePath)
-    .filter((page) => page.meta.wikilinks.some((link) => resolveLink(link) === safeRelativePath))
+    .filter((page) =>
+      page.meta.wikilinks.some(
+        (link) => resolveLink(link) === safeRelativePath,
+      ),
+    )
     .map((page) => page.meta.path)
 
   return {
@@ -284,18 +333,30 @@ export function readKnowledgePage(relativePath: string): { meta: WikiPageMeta; c
   }
 }
 
-export function searchKnowledgePages(query: string): Array<{ path: string; title: string; line: number; text: string }> {
-  const needle = query.trim().toLowerCase()
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function searchKnowledgePages(
+  query: string,
+): Array<{ path: string; title: string; line: number; text: string }> {
+  const needle = query.trim()
   if (!needle) return []
 
-  const matches: Array<{ path: string; title: string; line: number; text: string }> = []
+  const regex = new RegExp(`\\b${escapeRegex(needle)}`, 'i')
+  const matches: Array<{
+    path: string
+    title: string
+    line: number
+    text: string
+  }> = []
   const pages = getParsedKnowledgePages()
 
   for (const page of pages) {
     const lines = page.raw.split(/\r?\n/)
     for (let index = 0; index < lines.length; index += 1) {
       const text = lines[index] || ''
-      if (!text.toLowerCase().includes(needle)) continue
+      if (!regex.test(text)) continue
       matches.push({
         path: page.meta.path,
         title: page.meta.title,

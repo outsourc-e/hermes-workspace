@@ -1,12 +1,14 @@
 import { useCallback, useState } from 'react'
 
-import { writeTextToClipboard } from '@/lib/clipboard'
 import { readError } from '../utils'
 import type { PathsPayload } from '../types'
+import { writeTextToClipboard } from '@/lib/clipboard'
 
 export function useChatSettings() {
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsSection, setSettingsSection] = useState<'hermes' | 'appearance'>('hermes')
+  const [settingsSection, setSettingsSection] = useState<
+    'hermes' | 'appearance'
+  >('hermes')
   const [pathsLoading, setPathsLoading] = useState(false)
   const [pathsError, setPathsError] = useState<string | null>(null)
   const [paths, setPaths] = useState<PathsPayload | null>(null)

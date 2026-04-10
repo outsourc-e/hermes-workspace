@@ -15,7 +15,12 @@ export const Route = createFileRoute('/api/knowledge/graph')({
           return json(buildKnowledgeGraph())
         } catch (error) {
           return json(
-            { error: error instanceof Error ? error.message : 'Failed to build knowledge graph' },
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to build knowledge graph',
+            },
             { status: 500 },
           )
         }

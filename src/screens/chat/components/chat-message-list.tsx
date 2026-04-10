@@ -1,11 +1,4 @@
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowExpand01Icon,
   ArrowUp01Icon,
@@ -72,21 +65,55 @@ function getToolStatusLabel(toolName: string): string {
 }
 
 const TOOL_EMOJIS: Record<string, string> = {
-  web_search: '🔍', search: '🔍', search_files: '🔍', session_search: '🔍',
+  web_search: '🔍',
+  search: '🔍',
+  search_files: '🔍',
+  session_search: '🔍',
   web_fetch: '🌐',
-  terminal: '💻', exec: '💻', shell: '💻', bash: '💻',
-  Read: '📖', read: '📖', read_file: '📖', file_read: '📖',
+  terminal: '💻',
+  exec: '💻',
+  shell: '💻',
+  bash: '💻',
+  Read: '📖',
+  read: '📖',
+  read_file: '📖',
+  file_read: '📖',
   pdf: '📄',
-  Write: '✏️', write: '✏️', write_file: '✏️', edit: '✏️', Edit: '✏️',
-  memory: '🧠', memory_search: '🧠', memory_get: '🧠', save_memory: '🧠',
-  browser: '🌐', browser_navigate: '🌐', navigate: '🌐',
-  image: '🖼️', vision: '🖼️',
-  skill: '📦', skill_view: '📦', skill_load: '📦',
-  delegate: '🤖', spawn: '🤖', subagents: '🤖', agents_list: '🤖',
-  todo: '✅', cron: '⏰', message: '💬',
-  voice_call: '📞', canvas: '🎨', nodes: '📱', gateway: '⚙️',
-  lcm_grep: '🔍', lcm_expand: '🔍', lcm_describe: '🔍', lcm_expand_query: '🔍',
-  sessions_send: '📤', session_status: '📊', sessions_yield: '⏸️',
+  Write: '✏️',
+  write: '✏️',
+  write_file: '✏️',
+  edit: '✏️',
+  Edit: '✏️',
+  memory: '🧠',
+  memory_search: '🧠',
+  memory_get: '🧠',
+  save_memory: '🧠',
+  browser: '🌐',
+  browser_navigate: '🌐',
+  navigate: '🌐',
+  image: '🖼️',
+  vision: '🖼️',
+  skill: '📦',
+  skill_view: '📦',
+  skill_load: '📦',
+  delegate: '🤖',
+  spawn: '🤖',
+  subagents: '🤖',
+  agents_list: '🤖',
+  todo: '✅',
+  cron: '⏰',
+  message: '💬',
+  voice_call: '📞',
+  canvas: '🎨',
+  nodes: '📱',
+  gateway: '⚙️',
+  lcm_grep: '🔍',
+  lcm_expand: '🔍',
+  lcm_describe: '🔍',
+  lcm_expand_query: '🔍',
+  sessions_send: '📤',
+  session_status: '📊',
+  sessions_yield: '⏸️',
   tts: '🗣️',
 }
 
@@ -94,7 +121,8 @@ function getToolEmoji(name: string): string {
   if (TOOL_EMOJIS[name]) return TOOL_EMOJIS[name]
   if (name.includes('search')) return '🔍'
   if (name.includes('read') || name.includes('Read')) return '📖'
-  if (name.includes('write') || name.includes('Write') || name.includes('edit')) return '✏️'
+  if (name.includes('write') || name.includes('Write') || name.includes('edit'))
+    return '✏️'
   if (name.includes('exec') || name.includes('terminal')) return '💻'
   if (name.includes('memory')) return '🧠'
   if (name.includes('browser')) return '🌐'
@@ -105,7 +133,8 @@ function getToolEmoji(name: string): string {
 function getToolVerb(name: string): string {
   if (name.includes('search')) return 'Searching'
   if (name.includes('read') || name.includes('Read')) return 'Reading'
-  if (name.includes('write') || name.includes('Write') || name.includes('edit')) return 'Writing'
+  if (name.includes('write') || name.includes('Write') || name.includes('edit'))
+    return 'Writing'
   if (name.includes('exec') || name.includes('terminal')) return 'Executing'
   if (name.includes('memory')) return 'Remembering'
   if (name.includes('browser')) return 'Browsing'
@@ -114,7 +143,8 @@ function getToolVerb(name: string): string {
 }
 
 function ToolCallCard({ name, phase }: { name: string; phase: string }) {
-  const isDone = phase === 'done' || phase === 'complete' || phase === 'completed'
+  const isDone =
+    phase === 'done' || phase === 'complete' || phase === 'completed'
   const isError = phase === 'error' || phase === 'failed'
   const isRunning = !isDone && !isError
 
@@ -133,7 +163,10 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
     return () => window.clearInterval(id)
   }, [isRunning])
 
-  const elapsedLabel = elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`
+  const elapsedLabel =
+    elapsed >= 60
+      ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+      : `${elapsed}s`
   const emoji = getToolEmoji(name)
   const verb = getToolVerb(name)
   const displayName = name.replace(/_/g, ' ')
@@ -151,14 +184,21 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
         <span className="text-sm leading-none">{emoji}</span>
         <span className="font-mono font-semibold text-ink">{displayName}</span>
         <span className="flex-1" />
-        {isRunning && <span className="text-[10px] tabular-nums text-primary-400">{elapsedLabel}</span>}
+        {isRunning && (
+          <span className="text-[10px] tabular-nums text-primary-400">
+            {elapsedLabel}
+          </span>
+        )}
         {isDone && <span className="text-xs text-green-500">✅</span>}
         {isError && <span className="text-xs text-red-500">❌</span>}
-        {isRunning && <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />}
+        {isRunning && (
+          <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />
+        )}
       </div>
       {isRunning && (
         <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
-          {verb}{'.'.repeat(dots)}
+          {verb}
+          {'.'.repeat(dots)}
         </div>
       )}
     </div>
@@ -186,7 +226,10 @@ function ThinkingBubble({
   const allTools = useMemo(
     () =>
       liveToolActivity.length > 0
-        ? liveToolActivity.map((t) => ({ name: t.name, phase: 'calling' as const }))
+        ? liveToolActivity.map((t) => ({
+            name: t.name,
+            phase: 'calling' as const,
+          }))
         : activeToolCalls.map((t) => ({ name: t.name, phase: t.phase })),
     [activeToolCalls, liveToolActivity],
   )
@@ -200,7 +243,8 @@ function ThinkingBubble({
       (tc) => tc.phase === 'calling' || tc.phase === 'start',
     )
     if (calling) return calling.name
-    if (activeToolCalls.length > 0) return activeToolCalls[activeToolCalls.length - 1].name
+    if (activeToolCalls.length > 0)
+      return activeToolCalls[activeToolCalls.length - 1].name
     return null
   }, [activeToolCalls, liveToolActivity])
 
@@ -218,13 +262,16 @@ function ThinkingBubble({
     return () => window.clearInterval(interval)
   }, [statusLabel])
 
-  const elapsedLabel = elapsed >= 60
-    ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
-    : `${elapsed}s`
+  const elapsedLabel =
+    elapsed >= 60
+      ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+      : `${elapsed}s`
 
   const isStale = elapsed >= 30
   const isVeryStale = elapsed >= 60
-  const canExpandResearch = Boolean(researchCard && researchCard.steps.length > 0)
+  const canExpandResearch = Boolean(
+    researchCard && researchCard.steps.length > 0,
+  )
   const expandedResearchCard = canExpandResearch ? researchCard : null
   const completedResearchSteps = researchCard
     ? researchCard.steps.filter((step) => step.status === 'done').length
@@ -263,7 +310,10 @@ function ThinkingBubble({
       {/* Chat bubble */}
       <div className="relative overflow-hidden rounded-2xl rounded-bl-sm border border-primary-200 dark:border-primary-200/20 bg-primary-100 dark:bg-primary-100 thinking-shimmer-bubble">
         {/* Shimmer overlay */}
-        <div className="thinking-shimmer-sweep pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div
+          className="thinking-shimmer-sweep pointer-events-none absolute inset-0"
+          aria-hidden="true"
+        />
 
         <div className="relative flex flex-col gap-1 px-4 py-3">
           <div className="flex items-start justify-between gap-3">
@@ -292,28 +342,55 @@ function ThinkingBubble({
                 >
                   {displayedLabel}{' '}
                   {elapsed >= 3 ? (
-                    <span className="text-[10px] opacity-60">{elapsedLabel}</span>
+                    <span className="text-[10px] opacity-60">
+                      {elapsedLabel}
+                    </span>
                   ) : null}
                 </span>
               </div>
               {canExpandResearch ? (
                 <div className="mt-1 flex items-center gap-2 text-[11px] text-primary-500 dark:text-primary-400">
-                  <span>{completedResearchSteps}/{expandedResearchCard?.steps.length ?? 0} tools</span>
-                  <span aria-hidden="true" className="opacity-40">•</span>
-                  <span>{expandedResearchCard?.isActive ? 'Live timeline' : 'Timeline ready'}</span>
+                  <span>
+                    {completedResearchSteps}/
+                    {expandedResearchCard?.steps.length ?? 0} tools
+                  </span>
+                  <span aria-hidden="true" className="opacity-40">
+                    •
+                  </span>
+                  <span>
+                    {expandedResearchCard?.isActive
+                      ? 'Live timeline'
+                      : 'Timeline ready'}
+                  </span>
                 </div>
               ) : null}
             </div>
             {canExpandResearch ? (
               <button
                 type="button"
-                onClick={() => expandedResearchCard?.setCollapsed(!expandedResearchCard.collapsed)}
+                onClick={() =>
+                  expandedResearchCard?.setCollapsed(
+                    !expandedResearchCard.collapsed,
+                  )
+                }
                 className="relative z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-primary-200/80 bg-primary-50/90 text-primary-500 transition-colors hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/80 dark:text-primary-300 dark:hover:bg-primary-800"
-                aria-label={expandedResearchCard?.collapsed ? 'Expand research timeline' : 'Collapse research timeline'}
-                title={expandedResearchCard?.collapsed ? 'Expand research timeline' : 'Collapse research timeline'}
+                aria-label={
+                  expandedResearchCard?.collapsed
+                    ? 'Expand research timeline'
+                    : 'Collapse research timeline'
+                }
+                title={
+                  expandedResearchCard?.collapsed
+                    ? 'Expand research timeline'
+                    : 'Collapse research timeline'
+                }
               >
                 <HugeiconsIcon
-                  icon={expandedResearchCard?.collapsed ? ArrowExpand01Icon : ArrowUp01Icon}
+                  icon={
+                    expandedResearchCard?.collapsed
+                      ? ArrowExpand01Icon
+                      : ArrowUp01Icon
+                  }
                   size={14}
                   strokeWidth={1.8}
                 />
@@ -323,7 +400,9 @@ function ThinkingBubble({
 
           {isStale ? (
             <span className="text-[11px] text-amber-500 dark:text-amber-400 animate-pulse">
-              {isVeryStale ? 'Still working… this is taking a while' : 'Taking longer than usual…'}
+              {isVeryStale
+                ? 'Still working… this is taking a while'
+                : 'Taking longer than usual…'}
             </span>
           ) : null}
 
@@ -376,7 +455,9 @@ const HIDDEN_SYSTEM_USER_PREFIXES = [
 function shouldHideSystemInjectedUserMessage(text: string): boolean {
   const trimmed = text.trim()
   if (!trimmed) return false
-  if (HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) {
+  if (
+    HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
+  ) {
     return true
   }
   return HIDDEN_SYSTEM_USER_SUBSTRINGS.some((substring) =>
@@ -385,7 +466,8 @@ function shouldHideSystemInjectedUserMessage(text: string): boolean {
 }
 
 function getChronologyRank(message: ChatMessage): number {
-  const role = typeof message.role === 'string' ? message.role.toLowerCase() : ''
+  const role =
+    typeof message.role === 'string' ? message.role.toLowerCase() : ''
   const content = Array.isArray(message.content) ? message.content : []
   const hasToolCalls =
     content.some((part) => part.type === 'toolCall') ||
@@ -396,7 +478,8 @@ function getChronologyRank(message: ChatMessage): number {
 
   if (role === 'user') return 0
   if (role === 'assistant' && hasToolCalls) return 1
-  if (role === 'tool' || role === 'toolresult' || role === 'tool_result') return 2
+  if (role === 'tool' || role === 'toolresult' || role === 'tool_result')
+    return 2
   if (role === 'assistant') return 3
   return 4
 }
@@ -409,7 +492,8 @@ function sortMessagesChronologically(
     .sort((left, right) => {
       const leftTimestamp = getMessageTimestamp(left.message)
       const rightTimestamp = getMessageTimestamp(right.message)
-      if (leftTimestamp !== rightTimestamp) return leftTimestamp - rightTimestamp
+      if (leftTimestamp !== rightTimestamp)
+        return leftTimestamp - rightTimestamp
 
       const leftRank = getChronologyRank(left.message)
       const rightRank = getChronologyRank(right.message)
@@ -556,7 +640,9 @@ function ChatMessageListComponent({
   // Bug 2 fix: grace period — keep thinking indicator alive briefly after
   // waitingForResponse clears so the response message has time to render.
   const [thinkingGrace, setThinkingGrace] = useState(false)
-  const thinkingGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const thinkingGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false)
   const [messageSearchValue, setMessageSearchValue] = useState('')
   const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
@@ -587,7 +673,7 @@ function ChatMessageListComponent({
 
   // Pull-to-refresh handlers removed
 
-    // contentContainerStyle removed with pull-to-refresh
+  // contentContainerStyle removed with pull-to-refresh
 
   const chatContentStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (!isMobileViewport) return contentStyle
@@ -626,9 +712,7 @@ function ChatMessageListComponent({
   ) {
     const anchor = anchorRef.current
     if (!anchor) return
-    const viewport = anchor.closest(
-      '[data-chat-scroll-viewport]',
-    )
+    const viewport = anchor.closest('[data-chat-scroll-viewport]')
     if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior })
     }
@@ -657,9 +741,11 @@ function ChatMessageListComponent({
           .join('')
           .trim()
         const hasAttachments =
-          Array.isArray((msg as any).attachments) && (msg as any).attachments.length > 0
+          Array.isArray((msg as any).attachments) &&
+          (msg as any).attachments.length > 0
         const hasInlineImages =
-          Array.isArray((msg as any).inlineImages) && (msg as any).inlineImages.length > 0
+          Array.isArray((msg as any).inlineImages) &&
+          (msg as any).inlineImages.length > 0
         const isPendingOptimisticUserMessage =
           typeof (msg as any).__optimisticId === 'string' ||
           msg.status === 'sending' ||
@@ -673,7 +759,10 @@ function ChatMessageListComponent({
 
         const isSystemPrefixed = /^System:/i.test(rawText)
         if (hideSystemMessages && isSystemPrefixed) return false
-        if (hideSystemMessages && shouldHideSystemInjectedUserMessage(cleanedText)) {
+        if (
+          hideSystemMessages &&
+          shouldHideSystemInjectedUserMessage(cleanedText)
+        ) {
           return false
         }
         if (!isSystemPrefixed) return true
@@ -758,7 +847,10 @@ function ChatMessageListComponent({
     ).length
 
     // Cancel grace period early when a new assistant message appears
-    if (thinkingGrace && currentAssistantCount > assistantMessageCountRef.current) {
+    if (
+      thinkingGrace &&
+      currentAssistantCount > assistantMessageCountRef.current
+    ) {
       if (thinkingGraceTimerRef.current) {
         clearTimeout(thinkingGraceTimerRef.current)
         thinkingGraceTimerRef.current = null
@@ -779,7 +871,8 @@ function ChatMessageListComponent({
         ({ message }) => message.role === 'assistant',
       ).length
       setThinkingGrace(true)
-      if (thinkingGraceTimerRef.current) clearTimeout(thinkingGraceTimerRef.current)
+      if (thinkingGraceTimerRef.current)
+        clearTimeout(thinkingGraceTimerRef.current)
       thinkingGraceTimerRef.current = setTimeout(() => {
         thinkingGraceTimerRef.current = null
         setThinkingGrace(false)
@@ -887,9 +980,7 @@ function ChatMessageListComponent({
     const anchor = anchorRef.current
     if (!anchor) return
 
-    const viewport = anchor.closest(
-      '[data-chat-scroll-viewport]',
-    )
+    const viewport = anchor.closest('[data-chat-scroll-viewport]')
     if (!viewport) return
 
     const escapedMessageId = escapeAttributeSelector(messageId)
@@ -997,7 +1088,10 @@ function ChatMessageListComponent({
     // Typewriter disabled — messages just fade in via CSS animation
     // toStream stays empty, no streaming targets
 
-    return { streamingTargets: new Set<string>(), signatureById: nextSignatures }
+    return {
+      streamingTargets: new Set<string>(),
+      signatureById: nextSignatures,
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEntries, streamingCleared])
 
@@ -1025,11 +1119,9 @@ function ChatMessageListComponent({
     const effectivelyWaiting = waitingForResponse || thinkingGrace || sending
     const hasInThreadStreamingActivity =
       isStreaming &&
-      (
-        activeToolCalls.length > 0 ||
+      (activeToolCalls.length > 0 ||
         lifecycleEvents.length > 0 ||
-        Boolean(streamingThinking && streamingThinking.trim().length > 0)
-      )
+        Boolean(streamingThinking && streamingThinking.trim().length > 0))
     // Streaming-but-empty only needs the detached thinking bubble when the
     // in-thread streaming row has nothing to show yet.
     const streamingButEmpty =
@@ -1060,8 +1152,7 @@ function ChatMessageListComponent({
   })()
 
   const showResearchCard = Boolean(
-    researchCard &&
-      researchCard.steps.length > 0,
+    researchCard && researchCard.steps.length > 0,
   )
 
   const shouldBottomPin =
@@ -1074,7 +1165,11 @@ function ChatMessageListComponent({
     (isStreaming && activeToolCalls.length > 0)
 
   const normalizedStreamingToolCalls = useMemo<
-    Array<{ id: string; name: string; phase: 'calling' | 'running' | 'done' | 'error' }>
+    Array<{
+      id: string
+      name: string
+      phase: 'calling' | 'running' | 'done' | 'error'
+    }>
   >(
     () =>
       activeToolCalls.map((toolCall) => ({
@@ -1156,10 +1251,8 @@ function ChatMessageListComponent({
       typeof lastAssistantIndex === 'number' && realIndex === lastAssistantIndex
     const hasToolCalls =
       chatMessage.role === 'assistant' &&
-      (
-        getToolCallsFromMessage(chatMessage).length > 0 ||
-        entry.attachedToolMessages.length > 0
-      )
+      (getToolCallsFromMessage(chatMessage).length > 0 ||
+        entry.attachedToolMessages.length > 0)
 
     const searchMatchIndex = messageSearchMatchIndexById.get(stableId)
     const isSearchMatch = typeof searchMatchIndex === 'number'
@@ -1186,7 +1279,8 @@ function ChatMessageListComponent({
         lifecycleEvents.length > 0 ||
         Boolean(streamingThinking && streamingThinking.trim().length > 0)
       const isEmptyPlaceholder =
-        (!streamingText || streamingText.trim().length === 0) && !hasStreamingActivity
+        (!streamingText || streamingText.trim().length === 0) &&
+        !hasStreamingActivity
       return (
         <div
           key={stableId}
@@ -1213,10 +1307,14 @@ function ChatMessageListComponent({
                   ? 'bg-amber-50/30'
                   : undefined
             }
-            toolCalls={messageIsStreaming ? normalizedStreamingToolCalls : undefined}
+            toolCalls={
+              messageIsStreaming ? normalizedStreamingToolCalls : undefined
+            }
             isStreaming={messageIsStreaming}
             streamingText={streamingText}
-            streamingThinking={messageIsStreaming ? streamingThinking : undefined}
+            streamingThinking={
+              messageIsStreaming ? streamingThinking : undefined
+            }
             lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
             simulateStreaming={simulateStreaming}
             streamingKey={signature}
@@ -1243,7 +1341,9 @@ function ChatMessageListComponent({
               ? 'bg-amber-50/30'
               : undefined
         }
-        toolCalls={messageIsStreaming ? normalizedStreamingToolCalls : undefined}
+        toolCalls={
+          messageIsStreaming ? normalizedStreamingToolCalls : undefined
+        }
         isStreaming={messageIsStreaming}
         streamingText={messageIsStreaming ? streamingText : undefined}
         streamingThinking={messageIsStreaming ? streamingThinking : undefined}
@@ -1286,7 +1386,8 @@ function ChatMessageListComponent({
     if (isNearBottomRef.current) {
       // Use smooth scroll only when user is near bottom (<200px) and new messages arrive;
       // use instant scroll during streaming to avoid choppiness.
-      const behavior: ScrollBehavior = isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
+      const behavior: ScrollBehavior =
+        isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
       frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
     }
 
@@ -1475,168 +1576,172 @@ function ChatMessageListComponent({
   return (
     // mt-2 is to fix the prompt-input cut off
     <>
-    <ChatContainerRoot
-      className="h-full flex-1 min-h-0"
-      stickToBottom={stickToBottomRef.current}
-      onUserScroll={handleUserScroll}
-      overlay={scrollToBottomOverlay}
-    >
-      <div className="w-full">
-        {isMessageSearchOpen && (
-          <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-primary-200 bg-primary-50/95 px-3 py-2 backdrop-blur-sm">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={messageSearchValue}
-              onChange={(e) => setMessageSearchValue(e.target.value)}
-              placeholder="Search messages..."
-              className="min-w-0 flex-1 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none placeholder:text-primary-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
-            />
-            {isMessageSearchActive && (
-              <span className="shrink-0 text-xs text-primary-500 dark:text-neutral-400">
-                {messageSearchMatches.length > 0
-                  ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
-                  : 'No matches'}
-              </span>
-            )}
-            <div className="flex shrink-0 items-center gap-0.5">
-              <button
-                type="button"
-                onClick={jumpToPreviousMatch}
-                disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
-                aria-label="Previous match"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M4 10l4-4 4 4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={jumpToNextMatch}
-                disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
-                aria-label="Next match"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M4 6l4 4 4-4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={closeMessageSearch}
-                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
-                aria-label="Close search"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M4 4l8 8M12 4l-8 8"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
-        <ChatContainerContent
-          className="pt-2.5 md:pt-6 flex min-h-full flex-col"
-          style={chatContentStyle}
-        >
-          {notice && noticePosition === 'start' ? notice : null}
-          {shouldBottomPin ? <div className="flex-1" aria-hidden="true" /> : null}
-          {showToolOnlyNotice ? (
-            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-2.5">
-                  <HugeiconsIcon
-                    icon={Robot01Icon}
-                    size={20}
-                    strokeWidth={1.5}
-                    className="mt-0.5 shrink-0 text-amber-600"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-amber-800 text-balance">
-                      This session contains{' '}
-                      <span className="tabular-nums">{toolInteractionCount}</span>{' '}
-                      tool interactions
-                    </p>
-                    <p className="mt-1 text-sm text-amber-700 text-pretty">
-                      Most content is AI agent tool usage (file reads, code
-                      execution, etc.)
-                    </p>
-                  </div>
-                </div>
+      <ChatContainerRoot
+        className="h-full flex-1 min-h-0"
+        stickToBottom={stickToBottomRef.current}
+        onUserScroll={handleUserScroll}
+        overlay={scrollToBottomOverlay}
+      >
+        <div className="w-full">
+          {isMessageSearchOpen && (
+            <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-primary-200 bg-primary-50/95 px-3 py-2 backdrop-blur-sm">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={messageSearchValue}
+                onChange={(e) => setMessageSearchValue(e.target.value)}
+                placeholder="Search messages..."
+                className="min-w-0 flex-1 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none placeholder:text-primary-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
+              />
+              {isMessageSearchActive && (
+                <span className="shrink-0 text-xs text-primary-500 dark:text-neutral-400">
+                  {messageSearchMatches.length > 0
+                    ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
+                    : 'No matches'}
+                </span>
+              )}
+              <div className="flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
-                  onClick={() => setExpandAllToolSections(true)}
-                  disabled={expandAllToolSections}
-                  className={cn(
-                    'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-                    expandAllToolSections
-                      ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
-                      : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900/30 hover:border-amber-400',
-                  )}
-                  aria-label={
-                    expandAllToolSections
-                      ? 'All tool sections expanded'
-                      : 'Expand all tool sections'
-                  }
+                  onClick={jumpToPreviousMatch}
+                  disabled={messageSearchMatches.length === 0}
+                  className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                  aria-label="Previous match"
                 >
-                  {expandAllToolSections ? '✓ Expanded' : 'Show All'}
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M4 10l4-4 4 4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={jumpToNextMatch}
+                  disabled={messageSearchMatches.length === 0}
+                  className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                  aria-label="Next match"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M4 6l4 4 4-4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={closeMessageSearch}
+                  className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
+                  aria-label="Close search"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M4 4l8 8M12 4l-8 8"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
             </div>
-          ) : null}
-          {loading && displayEntries.length === 0 ? (
-            <div className="flex flex-col gap-4 animate-pulse">
-              <div className="flex gap-3">
-                <div className="size-6 rounded-full bg-primary-200" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-primary-200 rounded w-3/4" />
-                  <div className="h-4 bg-primary-200 rounded w-1/2" />
+          )}
+          <ChatContainerContent
+            className="pt-2.5 md:pt-6 flex min-h-full flex-col"
+            style={chatContentStyle}
+          >
+            {notice && noticePosition === 'start' ? notice : null}
+            {shouldBottomPin ? (
+              <div className="flex-1" aria-hidden="true" />
+            ) : null}
+            {showToolOnlyNotice ? (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <HugeiconsIcon
+                      icon={Robot01Icon}
+                      size={20}
+                      strokeWidth={1.5}
+                      className="mt-0.5 shrink-0 text-amber-600"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-amber-800 text-balance">
+                        This session contains{' '}
+                        <span className="tabular-nums">
+                          {toolInteractionCount}
+                        </span>{' '}
+                        tool interactions
+                      </p>
+                      <p className="mt-1 text-sm text-amber-700 text-pretty">
+                        Most content is AI agent tool usage (file reads, code
+                        execution, etc.)
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandAllToolSections(true)}
+                    disabled={expandAllToolSections}
+                    className={cn(
+                      'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                      expandAllToolSections
+                        ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
+                        : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900/30 hover:border-amber-400',
+                    )}
+                    aria-label={
+                      expandAllToolSections
+                        ? 'All tool sections expanded'
+                        : 'Expand all tool sections'
+                    }
+                  >
+                    {expandAllToolSections ? '✓ Expanded' : 'Show All'}
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-3">
-                <div className="size-6 rounded-full bg-primary-200" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-primary-200 rounded w-2/3" />
-                  <div className="h-4 bg-primary-200 rounded w-5/6" />
-                  <div className="h-4 bg-primary-200 rounded w-1/3" />
+            ) : null}
+            {loading && displayEntries.length === 0 ? (
+              <div className="flex flex-col gap-4 animate-pulse">
+                <div className="flex gap-3">
+                  <div className="size-6 rounded-full bg-primary-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-primary-200 rounded w-3/4" />
+                    <div className="h-4 bg-primary-200 rounded w-1/2" />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="size-6 rounded-full bg-primary-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-primary-200 rounded w-2/3" />
+                    <div className="h-4 bg-primary-200 rounded w-5/6" />
+                    <div className="h-4 bg-primary-200 rounded w-1/3" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : empty && !notice && !isMessageSearchActive ? (
-            (emptyState ?? <div aria-hidden></div>)
-          ) : isMessageSearchActive && visibleEntries.length === 0 ? (
-            <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-6 text-sm text-primary-600">
-              No messages match “{messageSearchValue.trim()}”.
-            </div>
-          ) : hasGroup ? (
-            <>
-              {visibleEntries.slice(0, groupStartIndex).map(renderMessage)}
-              {/* // Keep the last exchange pinned without extra tail gap. // Account
+            ) : empty && !notice && !isMessageSearchActive ? (
+              (emptyState ?? <div aria-hidden></div>)
+            ) : isMessageSearchActive && visibleEntries.length === 0 ? (
+              <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-6 text-sm text-primary-600">
+                No messages match “{messageSearchValue.trim()}”.
+              </div>
+            ) : hasGroup ? (
+              <>
+                {visibleEntries.slice(0, groupStartIndex).map(renderMessage)}
+                {/* // Keep the last exchange pinned without extra tail gap. // Account
               for space-y-6 (24px) when pinning. */}
-              <div
-                className="my-2 flex flex-col gap-2 md:my-3 md:gap-3"
-                style={{ minHeight: `${Math.max(0, pinGroupMinHeight - 12)}px` }}
-              >
-                {visibleEntries
-                  .slice(groupStartIndex)
-                  .map((entry, index) => {
+                <div
+                  className="my-2 flex flex-col gap-2 md:my-3 md:gap-3"
+                  style={{
+                    minHeight: `${Math.max(0, pinGroupMinHeight - 12)}px`,
+                  }}
+                >
+                  {visibleEntries.slice(groupStartIndex).map((entry, index) => {
                     const chatMessage = entry.message
                     const realIndex = entry.sourceIndex
                     const entryIndex = groupStartIndex + index
@@ -1663,10 +1768,8 @@ function ChatMessageListComponent({
                       entryIndex === lastUserIndex ? headerHeight : undefined
                     const hasToolCalls =
                       chatMessage.role === 'assistant' &&
-                      (
-                        getToolCallsFromMessage(chatMessage).length > 0 ||
-                        entry.attachedToolMessages.length > 0
-                      )
+                      (getToolCallsFromMessage(chatMessage).length > 0 ||
+                        entry.attachedToolMessages.length > 0)
                     return (
                       <MessageItem
                         key={stableId}
@@ -1697,53 +1800,53 @@ function ChatMessageListComponent({
                       />
                     )
                   })}
+                </div>
+              </>
+            ) : (
+              <>
+                {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
+                  <div
+                    aria-hidden="true"
+                    style={{ height: `${virtualRange.topSpacerHeight}px` }}
+                  />
+                ) : null}
+                {visibleEntries
+                  .slice(virtualRange.startIndex, virtualRange.endIndex)
+                  .map((entry, index) =>
+                    renderMessage(entry, virtualRange.startIndex + index),
+                  )}
+                {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
+                  <div
+                    aria-hidden="true"
+                    style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
+                  />
+                ) : null}
+              </>
+            )}
+            {showTypingIndicator ||
+            showResearchCard ||
+            isCompacting ||
+            liveToolActivity.length > 0 ||
+            (isStreaming && !streamingText) ||
+            (isStreaming && activeToolCalls.length > 0) ? (
+              <div
+                className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
+                role="status"
+                aria-live="polite"
+              >
+                <ThinkingBubble
+                  activeToolCalls={activeToolCalls}
+                  liveToolActivity={liveToolActivity}
+                  researchCard={researchCard}
+                  isCompacting={isCompacting}
+                />
               </div>
-            </>
-          ) : (
-            <>
-              {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
-                <div
-                  aria-hidden="true"
-                  style={{ height: `${virtualRange.topSpacerHeight}px` }}
-                />
-              ) : null}
-              {visibleEntries
-                .slice(virtualRange.startIndex, virtualRange.endIndex)
-                .map((entry, index) =>
-                  renderMessage(entry, virtualRange.startIndex + index),
-                )}
-              {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
-                <div
-                  aria-hidden="true"
-                  style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
-                />
-              ) : null}
-            </>
-          )}
-          {showTypingIndicator ||
-          showResearchCard ||
-          isCompacting ||
-          liveToolActivity.length > 0 ||
-          (isStreaming && !streamingText) ||
-          (isStreaming && activeToolCalls.length > 0) ? (
-            <div
-              className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
-              role="status"
-              aria-live="polite"
-            >
-              <ThinkingBubble
-                activeToolCalls={activeToolCalls}
-                liveToolActivity={liveToolActivity}
-                researchCard={researchCard}
-                isCompacting={isCompacting}
-              />
-            </div>
-          ) : null}
-          {notice && noticePosition === 'end' ? notice : null}
-          <ChatContainerScrollAnchor ref={anchorRef} />
-        </ChatContainerContent>
-      </div>
-    </ChatContainerRoot>
+            ) : null}
+            {notice && noticePosition === 'end' ? notice : null}
+            <ChatContainerScrollAnchor ref={anchorRef} />
+          </ChatContainerContent>
+        </div>
+      </ChatContainerRoot>
     </>
   )
 }

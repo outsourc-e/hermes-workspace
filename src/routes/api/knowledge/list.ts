@@ -25,7 +25,12 @@ export const Route = createFileRoute('/api/knowledge/list')({
           })
         } catch (error) {
           return json(
-            { error: error instanceof Error ? error.message : 'Failed to list knowledge pages' },
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to list knowledge pages',
+            },
             { status: 500 },
           )
         }

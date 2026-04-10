@@ -45,7 +45,11 @@ export const Route = createFileRoute('/api/history')({
               if (sessions.length > 0) {
                 sessionKey = sessions[0].id
               } else {
-                return json({ sessionKey: 'new', sessionId: 'new', messages: [] })
+                return json({
+                  sessionKey: 'new',
+                  sessionId: 'new',
+                  messages: [],
+                })
               }
             } catch {
               return json({ sessionKey: 'new', sessionId: 'new', messages: [] })

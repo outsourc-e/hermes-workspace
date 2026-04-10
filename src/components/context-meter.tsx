@@ -27,7 +27,10 @@ type ContextMeterProps = {
   className?: string
 }
 
-export function ContextMeter({ variant = 'mobile', className }: ContextMeterProps) {
+export function ContextMeter({
+  variant = 'mobile',
+  className,
+}: ContextMeterProps) {
   const [pct, setPct] = useState(0)
   const [warning, setWarning] = useState<string | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -40,7 +43,10 @@ export function ContextMeter({ variant = 'mobile', className }: ContextMeterProp
       try {
         const res = await fetch('/api/context-usage')
         if (!res.ok || cancelled) return
-        const data = (await res.json()) as { ok?: boolean; contextPercent?: unknown }
+        const data = (await res.json()) as {
+          ok?: boolean
+          contextPercent?: unknown
+        }
         if (!data?.ok || cancelled) return
         const next = readPercent(data.contextPercent)
         prevPctRef.current = next
@@ -73,18 +79,28 @@ export function ContextMeter({ variant = 'mobile', className }: ContextMeterProp
     return (
       <div className={cn('w-full flex flex-col', className)}>
         {/* Thin progress bar */}
-        <div className="w-full h-[3px]" style={{ background: 'var(--color-border, rgba(0,0,0,0.1))' }}>
+        <div
+          className="w-full h-[3px]"
+          style={{ background: 'var(--color-border, rgba(0,0,0,0.1))' }}
+        >
           <div
-            className={cn('h-full transition-all duration-700', getBarColor(pct))}
+            className={cn(
+              'h-full transition-all duration-700',
+              getBarColor(pct),
+            )}
             style={{ width: `${Math.min(pct, 100)}%` }}
           />
         </div>
         {/* Warning banner at 75%+ */}
         {warning && pct >= 75 && (
-          <div className={cn(
-            'w-full text-[11px] px-3 py-0.5 text-center',
-            pct >= 90 ? 'bg-red-500/10 text-red-600' : 'bg-orange-500/10 text-orange-600'
-          )}>
+          <div
+            className={cn(
+              'w-full text-[11px] px-3 py-0.5 text-center',
+              pct >= 90
+                ? 'bg-red-500/10 text-red-600'
+                : 'bg-orange-500/10 text-orange-600',
+            )}
+          >
             ⚠ {warning}
           </div>
         )}
@@ -100,13 +116,22 @@ export function ContextMeter({ variant = 'mobile', className }: ContextMeterProp
           {pct >= 90 ? '⚠ Context full' : '⚠ Context high'}
         </span>
       )}
-      <div className="w-20 h-1.5 rounded-full overflow-hidden shrink-0" style={{ background: 'var(--color-border, rgba(0,0,0,0.1))' }}>
+      <div
+        className="w-20 h-1.5 rounded-full overflow-hidden shrink-0"
+        style={{ background: 'var(--color-border, rgba(0,0,0,0.1))' }}
+      >
         <div
-          className={cn('h-full rounded-full transition-all duration-700', getBarColor(pct))}
+          className={cn(
+            'h-full rounded-full transition-all duration-700',
+            getBarColor(pct),
+          )}
           style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </div>
-      <span className="text-[10px] shrink-0 tabular-nums" style={{ color: 'var(--color-muted, #888)' }}>
+      <span
+        className="text-[10px] shrink-0 tabular-nums"
+        style={{ color: 'var(--color-muted, #888)' }}
+      >
         {Math.round(pct)}%
       </span>
     </div>

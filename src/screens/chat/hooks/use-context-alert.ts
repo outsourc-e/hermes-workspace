@@ -31,7 +31,8 @@ function loadStoredState(): StoredState {
     const raw = window.sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return { date: today, sent: emptySent() }
     const parsed = JSON.parse(raw) as Partial<StoredState> | null
-    if (!parsed || parsed.date !== today) return { date: today, sent: emptySent() }
+    if (!parsed || parsed.date !== today)
+      return { date: today, sent: emptySent() }
     return {
       date: today,
       sent: {
@@ -131,4 +132,3 @@ export function useContextAlert(): {
 
   return { alertOpen, alertThreshold, alertPercent, dismissAlert }
 }
-

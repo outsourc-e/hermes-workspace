@@ -46,7 +46,7 @@ function NotFoundPage() {
             Go Back
           </button>
           <Link
-            to={"/chat" as string}
+            to={'/chat' as string}
             className={buttonVariants({ variant: 'default', size: 'default' })}
           >
             <HugeiconsIcon icon={Home01Icon} size={18} strokeWidth={1.5} />

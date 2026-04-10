@@ -73,6 +73,7 @@ import { Route as ApiKnowledgeSearchRouteImport } from './routes/api/knowledge/s
 import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/read'
 import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
 import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
+import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
@@ -397,6 +398,11 @@ const ApiKnowledgeGraphRoute = ApiKnowledgeGraphRouteImport.update({
   path: '/api/knowledge/graph',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHermesProxySplatRoute = ApiHermesProxySplatRouteImport.update({
+  id: '/api/hermes-proxy/$',
+  path: '/api/hermes-proxy/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   id: '/$jobId',
   path: '/$jobId',
@@ -459,6 +465,7 @@ export interface FileRoutesByFullPath {
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
+  '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
@@ -527,6 +534,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
+  '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
@@ -597,6 +605,7 @@ export interface FileRoutesById {
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
+  '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
@@ -668,6 +677,7 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
+    | '/api/hermes-proxy/$'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
@@ -736,6 +746,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/settings'
     | '/api/hermes-jobs/$jobId'
+    | '/api/hermes-proxy/$'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
@@ -805,6 +816,7 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
+    | '/api/hermes-proxy/$'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
@@ -871,6 +883,7 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiHermesProxySplatRoute: typeof ApiHermesProxySplatRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
   ApiKnowledgeListRoute: typeof ApiKnowledgeListRoute
   ApiKnowledgeReadRoute: typeof ApiKnowledgeReadRoute
@@ -1337,6 +1350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKnowledgeGraphRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hermes-proxy/$': {
+      id: '/api/hermes-proxy/$'
+      path: '/api/hermes-proxy/$'
+      fullPath: '/api/hermes-proxy/$'
+      preLoaderRoute: typeof ApiHermesProxySplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hermes-jobs/$jobId': {
       id: '/api/hermes-jobs/$jobId'
       path: '/$jobId'
@@ -1479,6 +1499,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiHermesProxySplatRoute: ApiHermesProxySplatRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
   ApiKnowledgeListRoute: ApiKnowledgeListRoute,
   ApiKnowledgeReadRoute: ApiKnowledgeReadRoute,

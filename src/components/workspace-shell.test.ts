@@ -7,4 +7,3 @@ describe('workspace shell sidebar backdrop', () => {
     expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).not.toContain('inset-0')
   })
 })
-

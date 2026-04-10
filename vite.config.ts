@@ -34,7 +34,7 @@ function resolveHermesAgentDir(env: Record<string, string>): string | null {
   // Resolve relative to the workspace root (parent of hermes-workspace/)
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'),    // sibling hermes-agent directory
+    resolve(workspaceRoot, 'hermes-agent'), // sibling hermes-agent directory
     resolve(workspaceRoot, '..', 'hermes-agent'), // one level up
   )
 
@@ -79,9 +79,16 @@ const config = defineConfig(({ mode, command }) => {
   const startHermesAgent = async () => {
     if (hermesAgentStarted) return
     // Skip auto-start when HERMES_API_URL is explicitly set to a non-local endpoint
-    const explicitUrl = env.HERMES_API_URL || process.env.HERMES_API_URL || hermesApiUrl || ''
-    if (explicitUrl && explicitUrl !== 'http://127.0.0.1:8642' && explicitUrl !== 'http://localhost:8642') {
-      console.log(`[hermes-agent] Skipping auto-start — using external API: ${explicitUrl}`)
+    const explicitUrl =
+      env.HERMES_API_URL || process.env.HERMES_API_URL || hermesApiUrl || ''
+    if (
+      explicitUrl &&
+      explicitUrl !== 'http://127.0.0.1:8642' &&
+      explicitUrl !== 'http://localhost:8642'
+    ) {
+      console.log(
+        `[hermes-agent] Skipping auto-start — using external API: ${explicitUrl}`,
+      )
       hermesAgentStarted = true
       return
     }
@@ -95,8 +102,8 @@ const config = defineConfig(({ mode, command }) => {
     if (!agentDir) {
       console.warn(
         '[hermes-agent] Could not find hermes-agent directory.\n' +
-        '  Set HERMES_AGENT_PATH in .env or clone hermes-agent as a sibling:\n' +
-        '    git clone https://github.com/outsourc-e/hermes-agent.git ../hermes-agent',
+          '  Set HERMES_AGENT_PATH in .env or clone hermes-agent as a sibling:\n' +
+          '    git clone https://github.com/outsourc-e/hermes-agent.git ../hermes-agent',
       )
       return
     }
@@ -106,10 +113,18 @@ const config = defineConfig(({ mode, command }) => {
 
     const child = spawn(
       python,
-      ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', '8642'],
+      [
+        '-m',
+        'uvicorn',
+        'webapi.app:app',
+        '--host',
+        '0.0.0.0',
+        '--port',
+        '8642',
+      ],
       {
         cwd: agentDir,
-        detached: false,   // keep tied to vite process — stops when dev server stops
+        detached: false, // keep tied to vite process — stops when dev server stops
         stdio: 'pipe',
         env: {
           ...process.env,
@@ -146,7 +161,9 @@ const config = defineConfig(({ mode, command }) => {
         return
       }
     }
-    console.warn('[hermes-agent] Started but health check timed out — may still be loading')
+    console.warn(
+      '[hermes-agent] Started but health check timed out — may still be loading',
+    )
   }
 
   let workspaceDaemonStarted = false
@@ -341,11 +358,12 @@ const config = defineConfig(({ mode, command }) => {
 
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. HERMES_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
-  const _allowedHosts: string[] | true = (env.HERMES_ALLOWED_HOSTS)?.trim()
-    ? (env.HERMES_ALLOWED_HOSTS)!.split(',')
+  const _allowedHosts: string[] | true = env.HERMES_ALLOWED_HOSTS?.trim()
+    ? env
+        .HERMES_ALLOWED_HOSTS!.split(',')
         .map((h) => h.trim())
         .filter(Boolean)
-    : ['.ts.net']  // allow all Tailscale hostnames by default
+    : ['.ts.net'] // allow all Tailscale hostnames by default
   let proxyTarget = 'http://127.0.0.1:18789'
 
   try {
@@ -457,25 +475,44 @@ const config = defineConfig(({ mode, command }) => {
             }
 
             // Portable-aware health check — returns ok if any chat backend is available
-            if (req.method === 'GET' && requestPath === '/api/connection-status') {
+            if (
+              req.method === 'GET' &&
+              requestPath === '/api/connection-status'
+            ) {
               try {
                 // Check for enhanced Hermes gateway first (has /api/sessions)
                 const [modelsRes, sessionsRes] = await Promise.all([
-                  fetch(`${hermesApiUrl}/v1/models`, { signal: AbortSignal.timeout(3000) }).catch(() => null),
-                  fetch(`${hermesApiUrl}/api/sessions?limit=1`, { signal: AbortSignal.timeout(3000) }).catch(() => null),
+                  fetch(`${hermesApiUrl}/v1/models`, {
+                    signal: AbortSignal.timeout(3000),
+                  }).catch(() => null),
+                  fetch(`${hermesApiUrl}/api/sessions?limit=1`, {
+                    signal: AbortSignal.timeout(3000),
+                  }).catch(() => null),
                 ])
                 const hasModels = modelsRes?.ok ?? false
                 const hasSessions = sessionsRes?.ok ?? false
                 if (hasModels && hasSessions) {
                   res.statusCode = 200
                   res.setHeader('content-type', 'application/json')
-                  res.end(JSON.stringify({ ok: true, mode: 'enhanced', backend: hermesApiUrl }))
+                  res.end(
+                    JSON.stringify({
+                      ok: true,
+                      mode: 'enhanced',
+                      backend: hermesApiUrl,
+                    }),
+                  )
                   return
                 }
                 if (hasModels) {
                   res.statusCode = 200
                   res.setHeader('content-type', 'application/json')
-                  res.end(JSON.stringify({ ok: true, mode: 'portable', backend: hermesApiUrl }))
+                  res.end(
+                    JSON.stringify({
+                      ok: true,
+                      mode: 'portable',
+                      backend: hermesApiUrl,
+                    }),
+                  )
                   return
                 }
                 // Fall back to /health for full Hermes backends
@@ -484,11 +521,23 @@ const config = defineConfig(({ mode, command }) => {
                 })
                 res.statusCode = healthRes.ok ? 200 : 502
                 res.setHeader('content-type', 'application/json')
-                res.end(JSON.stringify({ ok: healthRes.ok, mode: 'enhanced', backend: hermesApiUrl }))
+                res.end(
+                  JSON.stringify({
+                    ok: healthRes.ok,
+                    mode: 'enhanced',
+                    backend: hermesApiUrl,
+                  }),
+                )
               } catch {
                 res.statusCode = 502
                 res.setHeader('content-type', 'application/json')
-                res.end(JSON.stringify({ ok: false, mode: 'disconnected', backend: hermesApiUrl }))
+                res.end(
+                  JSON.stringify({
+                    ok: false,
+                    mode: 'disconnected',
+                    backend: hermesApiUrl,
+                  }),
+                )
               }
               return
             }
@@ -543,7 +592,12 @@ const config = defineConfig(({ mode, command }) => {
             }
           })
 
-          if (command !== 'serve' || workspaceDaemonStarted || workspaceDaemonStarting) return
+          if (
+            command !== 'serve' ||
+            workspaceDaemonStarted ||
+            workspaceDaemonStarting
+          )
+            return
 
           workspaceDaemonStarting = true
           void (async () => {
@@ -582,13 +636,26 @@ const config = defineConfig(({ mode, command }) => {
         transform(code, _id) {
           const envName = this.environment?.name
           if (envName !== 'client') return null
-          if (!code.includes('process.env') && !code.includes('process.platform')) return null
+          if (
+            !code.includes('process.env') &&
+            !code.includes('process.platform')
+          )
+            return null
 
           // Replace specific env vars first, then the generic fallback
           let result = code
-          result = result.replace(/process\.env\.HERMES_API_URL/g, JSON.stringify(hermesApiUrl))
-          result = result.replace(/process\.env\.HERMES_API_TOKEN/g, JSON.stringify(env.HERMES_API_TOKEN || ''))
-          result = result.replace(/process\.env\.NODE_ENV/g, JSON.stringify(mode))
+          result = result.replace(
+            /process\.env\.HERMES_API_URL/g,
+            JSON.stringify(hermesApiUrl),
+          )
+          result = result.replace(
+            /process\.env\.HERMES_API_TOKEN/g,
+            JSON.stringify(env.HERMES_API_TOKEN || ''),
+          )
+          result = result.replace(
+            /process\.env\.NODE_ENV/g,
+            JSON.stringify(mode),
+          )
           result = result.replace(/process\.env/g, '{}')
           result = result.replace(/process\.platform/g, '"browser"')
           return result
@@ -612,4 +679,3 @@ const config = defineConfig(({ mode, command }) => {
 })
 
 export default config
-

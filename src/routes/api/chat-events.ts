@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { ensureBusStarted, subscribeToChatEvents } from '../../server/chat-event-bus'
+import {
+  ensureBusStarted,
+  subscribeToChatEvents,
+} from '../../server/chat-event-bus'
 
 /**
  * SSE endpoint for chat events.
@@ -21,7 +24,8 @@ export const Route = createFileRoute('/api/chat-events')({
         }
 
         const url = new URL(request.url)
-        const sessionKeyParam = url.searchParams.get('sessionKey')?.trim() || undefined
+        const sessionKeyParam =
+          url.searchParams.get('sessionKey')?.trim() || undefined
 
         const encoder = new TextEncoder()
         let streamClosed = false

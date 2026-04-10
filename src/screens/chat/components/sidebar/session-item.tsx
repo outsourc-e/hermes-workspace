@@ -128,7 +128,9 @@ function SessionItemComponent({
       to="/chat/$sessionKey"
       params={{ sessionKey: session.friendlyId }}
       onClick={() => {
-        try { localStorage.setItem('hermes-last-session', session.friendlyId) } catch {}
+        try {
+          localStorage.setItem('hermes-last-session', session.friendlyId)
+        } catch {}
         onSelect?.()
       }}
       className={cn(

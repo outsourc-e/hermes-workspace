@@ -1,5 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { subscribeToChatEvents, ensureBusStarted } from '../../server/chat-event-bus'
+import {
+  ensureBusStarted,
+  subscribeToChatEvents,
+} from '../../server/chat-event-bus'
 
 export const Route = createFileRoute('/api/events')({
   server: {
@@ -15,14 +18,18 @@ export const Route = createFileRoute('/api/events')({
           start(controller) {
             // Send connected event immediately
             controller.enqueue(
-              encoder.encode(`event: connected\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`),
+              encoder.encode(
+                `event: connected\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`,
+              ),
             )
 
             // Subscribe to chat event bus
             unsubscribe = subscribeToChatEvents((event) => {
               try {
                 controller.enqueue(
-                  encoder.encode(`event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`),
+                  encoder.encode(
+                    `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`,
+                  ),
                 )
               } catch {
                 // Stream closed
@@ -49,7 +56,7 @@ export const Route = createFileRoute('/api/events')({
           headers: {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache, no-store',
-            'Connection': 'keep-alive',
+            Connection: 'keep-alive',
             'X-Accel-Buffering': 'no',
           },
         })

@@ -16,7 +16,9 @@ export interface ApprovalRequest {
   resolvedAt?: number
 }
 
-export function addApproval(_approval: Record<string, unknown>): ApprovalRequest | null {
+export function addApproval(
+  _approval: Record<string, unknown>,
+): ApprovalRequest | null {
   return null
 }
 
@@ -26,4 +28,7 @@ export function loadApprovals(): Array<ApprovalRequest> {
 
 export function saveApprovals(_approvals?: Array<ApprovalRequest>): void {}
 
-export function respondToApproval(_id: string, _status: 'approved' | 'denied'): void {}
+export function respondToApproval(
+  _id: string,
+  _status: 'approved' | 'denied',
+): void {}

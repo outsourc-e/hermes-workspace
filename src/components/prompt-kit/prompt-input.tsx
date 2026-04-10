@@ -249,7 +249,6 @@ function PromptInputTextarea({
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-
     const hasFiles = Array.from(e.clipboardData.items).some(
       (item) => item.kind === 'file',
     )
