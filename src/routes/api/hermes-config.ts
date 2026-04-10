@@ -7,12 +7,12 @@ import path from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import YAML from 'yaml'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../server/gateway-capabilities'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
 
@@ -24,14 +24,49 @@ const ENV_PATH = path.join(HERMES_HOME, '.env')
 const PROVIDERS = [
   { id: 'nous', name: 'Nous Portal', authType: 'oauth', envKeys: [] },
   { id: 'openai-codex', name: 'OpenAI Codex', authType: 'oauth', envKeys: [] },
-  { id: 'anthropic', name: 'Anthropic', authType: 'api_key', envKeys: ['ANTHROPIC_API_KEY'] },
-  { id: 'openrouter', name: 'OpenRouter', authType: 'api_key', envKeys: ['OPENROUTER_API_KEY'] },
-  { id: 'zai', name: 'Z.AI / GLM', authType: 'api_key', envKeys: ['GLM_API_KEY'] },
-  { id: 'kimi-coding', name: 'Kimi / Moonshot', authType: 'api_key', envKeys: ['KIMI_API_KEY'] },
-  { id: 'minimax', name: 'MiniMax', authType: 'api_key', envKeys: ['MINIMAX_API_KEY'] },
-  { id: 'minimax-cn', name: 'MiniMax (China)', authType: 'api_key', envKeys: ['MINIMAX_CN_API_KEY'] },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    authType: 'api_key',
+    envKeys: ['ANTHROPIC_API_KEY'],
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    authType: 'api_key',
+    envKeys: ['OPENROUTER_API_KEY'],
+  },
+  {
+    id: 'zai',
+    name: 'Z.AI / GLM',
+    authType: 'api_key',
+    envKeys: ['GLM_API_KEY'],
+  },
+  {
+    id: 'kimi-coding',
+    name: 'Kimi / Moonshot',
+    authType: 'api_key',
+    envKeys: ['KIMI_API_KEY'],
+  },
+  {
+    id: 'minimax',
+    name: 'MiniMax',
+    authType: 'api_key',
+    envKeys: ['MINIMAX_API_KEY'],
+  },
+  {
+    id: 'minimax-cn',
+    name: 'MiniMax (China)',
+    authType: 'api_key',
+    envKeys: ['MINIMAX_CN_API_KEY'],
+  },
   { id: 'ollama', name: 'Ollama (Local)', authType: 'none', envKeys: [] },
-  { id: 'custom', name: 'Custom OpenAI-compatible', authType: 'api_key', envKeys: [] },
+  {
+    id: 'custom',
+    name: 'Custom OpenAI-compatible',
+    authType: 'api_key',
+    envKeys: [],
+  },
 ]
 
 function readConfig(): Record<string, unknown> {
@@ -60,7 +95,10 @@ function readEnv(): Record<string, string> {
         const key = trimmed.slice(0, eqIdx).trim()
         let value = trimmed.slice(eqIdx + 1).trim()
         // Strip quotes
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
           value = value.slice(1, -1)
         }
         env[key] = value
@@ -83,11 +121,22 @@ function maskKey(key: string): string {
   return key.slice(0, 4) + '...' + key.slice(-4)
 }
 
-function checkAuthStore(providerId: string): { hasToken: boolean; source: string; maskedKey?: string } {
+function checkAuthStore(providerId: string): {
+  hasToken: boolean
+  source: string
+  maskedKey?: string
+} {
   // Check Hermes auth store
   for (const storePath of [
     path.join(os.homedir(), '.hermes', 'auth-profiles.json'),
-    path.join(os.homedir(), '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json'),
+    path.join(
+      os.homedir(),
+      '.openclaw',
+      'agents',
+      'main',
+      'agent',
+      'auth-profiles.json',
+    ),
   ]) {
     try {
       if (!fs.existsSync(storePath)) continue
@@ -99,7 +148,9 @@ function checkAuthStore(providerId: string): { hasToken: boolean; source: string
         const p = value as Record<string, unknown>
         const token = String(p.token || p.key || p.access || '').trim()
         if (token) {
-          const source = storePath.includes('.hermes') ? 'hermes-auth-store' : 'openclaw-auth-store'
+          const source = storePath.includes('.hermes')
+            ? 'hermes-auth-store'
+            : 'openclaw-auth-store'
           return { hasToken: true, source, maskedKey: maskKey(token) }
         }
       }
@@ -131,9 +182,11 @@ export const Route = createFileRoute('/api/hermes-config')({
 
         // Build provider status
         const providerStatus = PROVIDERS.map((p) => {
-          const hasEnvKey = p.envKeys.length === 0 || p.envKeys.some((k) => !!env[k])
+          const hasEnvKey =
+            p.envKeys.length === 0 || p.envKeys.some((k) => !!env[k])
           const authStoreCheck = checkAuthStore(p.id)
-          const hasKey = hasEnvKey || authStoreCheck.hasToken || p.authType === 'none'
+          const hasKey =
+            hasEnvKey || authStoreCheck.hasToken || p.authType === 'none'
           const maskedKeys: Record<string, string> = {}
           for (const k of p.envKeys) {
             if (env[k]) maskedKeys[k] = maskKey(env[k])
@@ -144,7 +197,11 @@ export const Route = createFileRoute('/api/hermes-config')({
           return {
             ...p,
             configured: hasKey,
-            authSource: authStoreCheck.hasToken ? authStoreCheck.source : (hasEnvKey ? 'env' : 'none'),
+            authSource: authStoreCheck.hasToken
+              ? authStoreCheck.source
+              : hasEnvKey
+                ? 'env'
+                : 'none',
             maskedKeys,
           }
         })
@@ -161,7 +218,8 @@ export const Route = createFileRoute('/api/hermes-config')({
         } else if (modelField && typeof modelField === 'object') {
           const modelObj = modelField as Record<string, unknown>
           activeModel = (modelObj.default as string) || ''
-          activeProvider = (modelObj.provider as string) || (config.provider as string) || ''
+          activeProvider =
+            (modelObj.provider as string) || (config.provider as string) || ''
         }
 
         return Response.json({
@@ -196,10 +254,22 @@ export const Route = createFileRoute('/api/hermes-config')({
           const updates = body.config as Record<string, unknown>
 
           // Deep merge
-          function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>) {
+          function deepMerge(
+            target: Record<string, unknown>,
+            source: Record<string, unknown>,
+          ) {
             for (const [key, value] of Object.entries(source)) {
-              if (value && typeof value === 'object' && !Array.isArray(value) && target[key] && typeof target[key] === 'object') {
-                deepMerge(target[key] as Record<string, unknown>, value as Record<string, unknown>)
+              if (
+                value &&
+                typeof value === 'object' &&
+                !Array.isArray(value) &&
+                target[key] &&
+                typeof target[key] === 'object'
+              ) {
+                deepMerge(
+                  target[key] as Record<string, unknown>,
+                  value as Record<string, unknown>,
+                )
               } else {
                 target[key] = value
               }
@@ -231,7 +301,10 @@ export const Route = createFileRoute('/api/hermes-config')({
           writeEnv(currentEnv)
         }
 
-        return Response.json({ ok: true, message: 'Config updated. Restart Hermes to apply changes.' })
+        return Response.json({
+          ok: true,
+          message: 'Config updated. Restart Hermes to apply changes.',
+        })
       },
     },
   },

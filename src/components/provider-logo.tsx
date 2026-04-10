@@ -17,7 +17,10 @@ function useIsLightTheme(): boolean {
     }
     check()
     const observer = new MutationObserver(check)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
     return () => observer.disconnect()
   }, [])
   return light
@@ -54,7 +57,10 @@ export function ProviderLogo({
   if (!file) {
     return (
       <div
-        className={cn('flex items-center justify-center rounded-lg bg-neutral-600 text-white text-xs font-bold', className)}
+        className={cn(
+          'flex items-center justify-center rounded-lg bg-neutral-600 text-white text-xs font-bold',
+          className,
+        )}
         style={{ width: size, height: size }}
       >
         {(provider || 'C')[0].toUpperCase()}

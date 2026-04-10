@@ -63,7 +63,11 @@ export const Route = createFileRoute('/api/sessions/send')({
             message,
           })
 
-          return json({ ok: true, sessionKey, runId: result.run_id ?? idempotencyKey })
+          return json({
+            ok: true,
+            sessionKey,
+            runId: result.run_id ?? idempotencyKey,
+          })
         } catch (error) {
           return json(
             {

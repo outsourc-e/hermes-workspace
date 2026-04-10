@@ -14,22 +14,33 @@ const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 // Well-known models for providers available via auth store
 const AUTH_STORE_MODELS: Record<string, Array<ModelEntry>> = {
   anthropic: [
-    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
-    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
+    {
+      id: 'claude-sonnet-4-20250514',
+      name: 'Claude Sonnet 4',
+      provider: 'anthropic-billing-proxy',
+    },
+    {
+      id: 'claude-opus-4-20250514',
+      name: 'Claude Opus 4',
+      provider: 'anthropic-billing-proxy',
+    },
   ],
-  openai: [
-    { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
-  ],
-  xai: [
-    { id: 'grok-3', name: 'Grok 3', provider: 'xai' },
-  ],
+  openai: [{ id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' }],
+  xai: [{ id: 'grok-3', name: 'Grok 3', provider: 'xai' }],
 }
 
 function getAuthStoreModels(): Array<ModelEntry> {
   const extra: Array<ModelEntry> = []
   for (const storePath of [
     path.join(os.homedir(), '.hermes', 'auth-profiles.json'),
-    path.join(os.homedir(), '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json'),
+    path.join(
+      os.homedir(),
+      '.openclaw',
+      'agents',
+      'main',
+      'agent',
+      'auth-profiles.json',
+    ),
   ]) {
     try {
       if (!fs.existsSync(storePath)) continue
@@ -60,7 +71,8 @@ type ModelEntry = {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>
+  if (value && typeof value === 'object' && !Array.isArray(value))
+    return value as Record<string, unknown>
   return {}
 }
 
@@ -72,25 +84,44 @@ function normalizeHermesModel(entry: unknown): ModelEntry | null {
   if (typeof entry === 'string') {
     const id = entry.trim()
     if (!id) return null
-    return { id, name: id, provider: id.includes('/') ? id.split('/')[0] : 'hermes-agent' }
+    return {
+      id,
+      name: id,
+      provider: id.includes('/') ? id.split('/')[0] : 'hermes-agent',
+    }
   }
   const record = asRecord(entry)
-  const id = readString(record.id) || readString(record.name) || readString(record.model)
+  const id =
+    readString(record.id) || readString(record.name) || readString(record.model)
   if (!id) return null
   return {
     ...record,
     id,
-    name: readString(record.name) || readString(record.display_name) || readString(record.label) || id,
-    provider: readString(record.provider) || readString(record.owned_by) || (id.includes('/') ? id.split('/')[0] : 'hermes-agent'),
+    name:
+      readString(record.name) ||
+      readString(record.display_name) ||
+      readString(record.label) ||
+      id,
+    provider:
+      readString(record.provider) ||
+      readString(record.owned_by) ||
+      (id.includes('/') ? id.split('/')[0] : 'hermes-agent'),
   }
 }
 
 async function fetchHermesModels(): Promise<Array<ModelEntry>> {
   const response = await fetch(`${HERMES_API_URL}/v1/models`)
-  if (!response.ok) throw new Error(`Hermes models request failed (${response.status})`)
+  if (!response.ok)
+    throw new Error(`Hermes models request failed (${response.status})`)
   const payload = asRecord(await response.json())
-  const rawModels = Array.isArray(payload.data) ? payload.data : Array.isArray(payload.models) ? payload.models : []
-  return rawModels.map(normalizeHermesModel).filter((e): e is ModelEntry => e !== null)
+  const rawModels = Array.isArray(payload.data)
+    ? payload.data
+    : Array.isArray(payload.models)
+      ? payload.models
+      : []
+  return rawModels
+    .map(normalizeHermesModel)
+    .filter((e): e is ModelEntry => e !== null)
 }
 
 export const Route = createFileRoute('/api/models')({
@@ -139,7 +170,13 @@ export const Route = createFileRoute('/api/models')({
             configuredProviders,
           })
         } catch (err) {
-          return json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 503 })
+          return json(
+            {
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            { status: 503 },
+          )
         }
       },
     },

@@ -3,23 +3,26 @@ import {
   CheckmarkCircle02Icon,
   CloudIcon,
   MessageMultiple01Icon,
+  Mic01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Settings02Icon,
   SourceCodeSquareIcon,
+  SparklesIcon,
   UserIcon,
+  VolumeHighIcon,
 } from '@hugeicons/core-free-icons'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import type * as React from 'react'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
-import type {ThemeId} from '@/lib/theme';
+import type { ThemeId } from '@/lib/theme'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useSettings } from '@/hooks/use-settings'
-import { THEMES,  getTheme, isDarkTheme, setTheme } from '@/lib/theme'
+import { THEMES, getTheme, isDarkTheme, setTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -245,19 +248,29 @@ type SettingsSectionId =
   | 'appearance'
   | 'chat'
   | 'hermes'
+  | 'agent'
+  | 'routing'
+  | 'voice'
+  | 'display'
   | 'notifications'
   | 'advanced'
 
 type SettingsNavItem = {
-  id: SettingsSectionId
+  id: SettingsSectionId | 'mcp'
   label: string
+  to?: '/settings/mcp'
 }
 
 const SETTINGS_NAV_ITEMS: Array<SettingsNavItem> = [
-  { id: 'hermes', label: 'Hermes Agent' },
+  { id: 'hermes', label: 'Model & Provider' },
+  { id: 'agent', label: 'Agent Behavior' },
+  { id: 'routing', label: 'Smart Routing' },
+  { id: 'voice', label: 'Voice' },
+  { id: 'display', label: 'Display' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'chat', label: 'Chat' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'mcp', label: 'MCP Servers', to: '/settings/mcp' },
 ]
 
 function SettingsRoute() {
@@ -310,21 +323,33 @@ function SettingsRoute() {
               Settings
             </h1>
             <div className="flex flex-col gap-0.5">
-              {SETTINGS_NAV_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveSection(item.id)}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                    activeSection === item.id
-                      ? 'bg-accent-500/10 text-accent-600 font-medium'
-                      : 'text-primary-600 hover:bg-primary-100 hover:text-primary-900',
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
+              {SETTINGS_NAV_ITEMS.map((item) =>
+                item.to ? (
+                  <Link
+                    key={item.id}
+                    to={item.to}
+                    className="rounded-lg px-3 py-2 text-left text-sm text-primary-600 transition-colors hover:bg-primary-100 hover:text-primary-900"
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() =>
+                      setActiveSection(item.id as SettingsSectionId)
+                    }
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                      activeSection === item.id
+                        ? 'bg-accent-500/10 text-accent-600 font-medium'
+                        : 'text-primary-600 hover:bg-primary-100 hover:text-primary-900',
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ),
+              )}
             </div>
           </div>
         </nav>
@@ -333,27 +358,51 @@ function SettingsRoute() {
 
         {/* Mobile section pills */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none md:hidden">
-          {SETTINGS_NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActiveSection(item.id)}
-              className={cn(
-                'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                activeSection === item.id
-                  ? 'bg-accent-500 text-white'
-                  : 'bg-primary-100 text-primary-600',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
+          {SETTINGS_NAV_ITEMS.map((item) =>
+            item.to ? (
+              <Link
+                key={item.id}
+                to={item.to}
+                className="shrink-0 rounded-full bg-primary-100 px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors"
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveSection(item.id as SettingsSectionId)}
+                className={cn(
+                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  activeSection === item.id
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-primary-100 text-primary-600',
+                )}
+              >
+                {item.label}
+              </button>
+            ),
+          )}
         </div>
 
         {/* Content area */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* ── Hermes Agent ──────────────────────────────────── */}
-          {activeSection === 'hermes' && <HermesConfigSection />}
+          {activeSection === 'hermes' && (
+            <HermesConfigSection activeView="hermes" />
+          )}
+          {activeSection === 'agent' && (
+            <HermesConfigSection activeView="agent" />
+          )}
+          {activeSection === 'routing' && (
+            <HermesConfigSection activeView="routing" />
+          )}
+          {activeSection === 'voice' && (
+            <HermesConfigSection activeView="voice" />
+          )}
+          {activeSection === 'display' && (
+            <HermesConfigSection activeView="display" />
+          )}
 
           {/* ── Appearance ──────────────────────────────────────── */}
           {activeSection === 'appearance' && (
@@ -373,7 +422,6 @@ function SettingsRoute() {
                 </SettingsRow>
 
                 {/* Accent color removed — themes control accent */}
-
               </SettingsSection>
               {/* LoaderStyleSection removed — not relevant for Hermes */}
             </>
@@ -471,7 +519,9 @@ function SettingsRoute() {
                       max={100}
                       value={settings.usageThreshold}
                       onChange={(e) =>
-                        updateSettings({ usageThreshold: Number(e.target.value) })
+                        updateSettings({
+                          usageThreshold: Number(e.target.value),
+                        })
                       }
                       className="w-full accent-primary-900 dark:accent-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={!settings.notificationsEnabled}
@@ -737,37 +787,37 @@ function ChatDisplaySection() {
 
   return (
     <>
-    <SettingsSection
-      title="Chat Display"
-      description="Control what's visible in chat messages."
-      icon={MessageMultiple01Icon}
-    >
-      <SettingsRow
-        label="Show tool messages"
-        description="Display tool call details when the agent uses tools."
+      <SettingsSection
+        title="Chat Display"
+        description="Control what's visible in chat messages."
+        icon={MessageMultiple01Icon}
       >
-        <Switch
-          checked={chatSettings.showToolMessages}
-          onCheckedChange={(checked) =>
-            updateChatSettings({ showToolMessages: checked })
-          }
-          aria-label="Show tool messages"
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Show reasoning blocks"
-        description="Display model thinking and reasoning process."
-      >
-        <Switch
-          checked={chatSettings.showReasoningBlocks}
-          onCheckedChange={(checked) =>
-            updateChatSettings({ showReasoningBlocks: checked })
-          }
-          aria-label="Show reasoning blocks"
-        />
-      </SettingsRow>
-    </SettingsSection>
-    {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
+        <SettingsRow
+          label="Show tool messages"
+          description="Display tool call details when the agent uses tools."
+        >
+          <Switch
+            checked={chatSettings.showToolMessages}
+            onCheckedChange={(checked) =>
+              updateChatSettings({ showToolMessages: checked })
+            }
+            aria-label="Show tool messages"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Show reasoning blocks"
+          description="Display model thinking and reasoning process."
+        >
+          <Switch
+            checked={chatSettings.showReasoningBlocks}
+            onCheckedChange={(checked) =>
+              updateChatSettings({ showReasoningBlocks: checked })
+            }
+            aria-label="Show reasoning blocks"
+          />
+        </SettingsRow>
+      </SettingsSection>
+      {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>
   )
 }
@@ -883,7 +933,11 @@ type AvailableModelsResponse = {
   providers: Array<{ id: string; label: string; authenticated: boolean }>
 }
 
-function HermesConfigSection() {
+function HermesConfigSection({
+  activeView = 'hermes',
+}: {
+  activeView?: 'hermes' | 'agent' | 'routing' | 'voice' | 'display'
+}) {
   const [data, setData] = useState<HermesConfigData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -894,42 +948,64 @@ function HermesConfigSection() {
   const [providerInput, setProviderInput] = useState('')
   const [baseUrlInput, setBaseUrlInput] = useState('')
 
-  // Available providers + models from hermes-agent
-  const [availableProviders, setAvailableProviders] = useState<Array<{ id: string; label: string; authenticated: boolean }>>([])
-  const [availableModels, setAvailableModels] = useState<Array<{ id: string; description: string }>>([])
+  const [availableProviders, setAvailableProviders] = useState<
+    Array<{ id: string; label: string; authenticated: boolean }>
+  >([])
+  const [availableModels, setAvailableModels] = useState<
+    Array<{ id: string; description: string }>
+  >([])
   const [loadingModels, setLoadingModels] = useState(false)
 
+  const syncInputsFromData = useCallback((configData: HermesConfigData) => {
+    setModelInput(configData.activeModel || '')
+    setProviderInput(configData.activeProvider || '')
+    setBaseUrlInput((configData.config?.base_url as string) || '')
+  }, [])
+
+  const fetchConfig = useCallback(async () => {
+    const res = await fetch('/api/hermes-config')
+    const configData = (await res.json()) as HermesConfigData
+    setData(configData)
+    syncInputsFromData(configData)
+    return configData
+  }, [syncInputsFromData])
+
   const fetchModelsForProvider = useCallback(async (provider: string) => {
+    if (!provider) {
+      setAvailableModels([])
+      return
+    }
     setLoadingModels(true)
     try {
-      const res = await fetch(`/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(provider)}`)
+      const res = await fetch(
+        `/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(provider)}`,
+      )
       if (res.ok) {
-        const result = await res.json() as AvailableModelsResponse
+        const result = (await res.json()) as AvailableModelsResponse
         setAvailableModels(result.models || [])
         if (result.providers?.length) setAvailableProviders(result.providers)
       }
-    } catch { /* ignore */ }
+    } catch {
+      // ignore
+    }
     setLoadingModels(false)
   }, [])
 
   useEffect(() => {
-    fetch('/api/hermes-config')
-      .then((r) => r.json())
-      .then((d: HermesConfigData) => {
-        setData(d)
-        setModelInput((d.activeModel) || '')
-        setProviderInput((d.activeProvider) || '')
-        setBaseUrlInput((d.config?.base_url as string) || '')
+    fetchConfig()
+      .then((configData) => {
         setLoading(false)
-        // Fetch available models for current provider
-        if (d.activeProvider) {
-          void fetchModelsForProvider(d.activeProvider)
+        if (configData.activeProvider) {
+          void fetchModelsForProvider(configData.activeProvider)
         }
       })
       .catch(() => setLoading(false))
-  }, [fetchModelsForProvider])
+  }, [fetchConfig, fetchModelsForProvider])
 
-  const saveConfig = async (updates: { config?: Record<string, unknown>; env?: Record<string, string> }) => {
+  const saveConfig = async (updates: {
+    config?: Record<string, unknown>
+    env?: Record<string, string>
+  }) => {
     setSaving(true)
     setSaveMessage(null)
     try {
@@ -938,12 +1014,12 @@ function HermesConfigSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       })
-      const result = await res.json() as { message?: string }
+      const result = (await res.json()) as { message?: string }
       setSaveMessage(result.message || 'Saved')
-      // Refresh data
-      const refreshRes = await fetch('/api/hermes-config')
-      const refreshData = await refreshRes.json() as HermesConfigData
-      setData(refreshData)
+      const refreshData = await fetchConfig()
+      if (refreshData.activeProvider) {
+        void fetchModelsForProvider(refreshData.activeProvider)
+      }
       setTimeout(() => setSaveMessage(null), 3000)
     } catch {
       setSaveMessage('Failed to save')
@@ -951,17 +1027,54 @@ function HermesConfigSection() {
     setSaving(false)
   }
 
+  const selectClassName =
+    'h-9 w-full rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 md:max-w-sm'
+
+  const readNumber = (value: unknown, fallback: number) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+
+  const readBoolean = (value: unknown, fallback: boolean) => {
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'string') return value === 'true'
+    return fallback
+  }
+
+  const saveNumberField = (
+    section: string,
+    field: string,
+    rawValue: string,
+    fallback: number,
+  ) => {
+    const value = rawValue === '' ? fallback : Number(rawValue)
+    if (!Number.isFinite(value)) return
+    void saveConfig({ config: { [section]: { [field]: value } } })
+  }
+
   if (loading) {
     return (
-      <SettingsSection title="Hermes Agent" description="Loading configuration..." icon={Settings02Icon}>
-        <div className="animate-pulse h-20 rounded-lg" style={{ backgroundColor: 'var(--theme-panel)' }} />
+      <SettingsSection
+        title="Hermes Agent"
+        description="Loading configuration..."
+        icon={Settings02Icon}
+      >
+        <div
+          className="h-20 animate-pulse rounded-lg"
+          style={{ backgroundColor: 'var(--theme-panel)' }}
+        />
       </SettingsSection>
     )
   }
 
   if (!data) {
     return (
-      <SettingsSection title="Hermes Agent" description="Could not load Hermes configuration." icon={Settings02Icon}>
+      <SettingsSection
+        title="Hermes Agent"
+        description="Could not load Hermes configuration."
+        icon={Settings02Icon}
+      >
         <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
           Make sure Hermes Agent is running on localhost:8642
         </p>
@@ -972,26 +1085,34 @@ function HermesConfigSection() {
   const memoryConfig = (data.config.memory as Record<string, unknown>) || {}
   const terminalConfig = (data.config.terminal as Record<string, unknown>) || {}
   const displayConfig = (data.config.display as Record<string, unknown>) || {}
+  const agentConfig = (data.config.agent as Record<string, unknown>) || {}
+  const smartRouting =
+    (data.config.smart_model_routing as Record<string, unknown>) || {}
+  const ttsConfig = (data.config.tts as Record<string, unknown>) || {}
+  const sttConfig = (data.config.stt as Record<string, unknown>) || {}
+  const customProviders = Array.isArray(data.config.custom_providers)
+    ? (data.config.custom_providers as Array<Record<string, unknown>>)
+    : []
 
-  return (
+  const ttsProvider = (ttsConfig.provider as string) || 'edge'
+  const ttsEdge = (ttsConfig.edge as Record<string, unknown>) || {}
+  const ttsElevenLabs = (ttsConfig.elevenlabs as Record<string, unknown>) || {}
+  const ttsOpenAi = (ttsConfig.openai as Record<string, unknown>) || {}
+  const sttProvider = (sttConfig.provider as string) || 'local'
+  const sttLocal = (sttConfig.local as Record<string, unknown>) || {}
+
+  const renderHermesOverview = () => (
     <>
-      {saveMessage && (
-        <div className="rounded-lg px-3 py-2 text-sm font-medium" style={{
-          backgroundColor: saveMessage.includes('Failed') ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
-          color: saveMessage.includes('Failed') ? '#ef4444' : '#22c55e',
-        }}>
-          {saveMessage}
-        </div>
-      )}
-
-      {/* Model & Provider */}
       <SettingsSection
         title="Model & Provider"
         description="Configure the default AI model for Hermes Agent."
         icon={SourceCodeSquareIcon}
       >
-        <SettingsRow label="Provider" description="Select the inference provider.">
-          <div className="flex gap-2 w-full max-w-sm">
+        <SettingsRow
+          label="Provider"
+          description="Select the inference provider."
+        >
+          <div className="flex w-full max-w-sm gap-2">
             {availableProviders.length > 0 ? (
               <select
                 value={providerInput}
@@ -1001,56 +1122,73 @@ function HermesConfigSection() {
                   setModelInput('')
                   void fetchModelsForProvider(newProvider)
                 }}
-                className="flex-1 rounded-md border border-primary-300 bg-white dark:bg-primary-800 px-3 py-2 text-sm text-primary-900 dark:text-primary-100 dark:border-primary-600 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className={selectClassName}
               >
                 {availableProviders.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.label}{p.authenticated ? ' ✓' : ''}
+                    {p.label}
+                    {p.authenticated ? ' ✓' : ''}
                   </option>
                 ))}
               </select>
             ) : (
               <Input
                 value={providerInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProviderInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setProviderInput(e.target.value)
+                }
                 placeholder="e.g. ollama, anthropic, openai-codex"
                 className="flex-1"
               />
             )}
           </div>
         </SettingsRow>
-        <SettingsRow label="Model" description="The model Hermes uses for conversations.">
-          <div className="flex gap-2 w-full max-w-sm">
+        <SettingsRow
+          label="Model"
+          description="The model Hermes uses for conversations."
+        >
+          <div className="flex w-full max-w-sm gap-2">
             {availableModels.length > 0 ? (
               <select
                 value={modelInput}
                 onChange={(e) => setModelInput(e.target.value)}
-                className="flex-1 rounded-md border border-primary-300 bg-white dark:bg-primary-800 px-3 py-2 text-sm font-mono text-primary-900 dark:text-primary-100 dark:border-primary-600 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className={`${selectClassName} font-mono`}
               >
-                {!availableModels.some(m => m.id === modelInput) && modelInput && (
-                  <option value={modelInput}>{modelInput} (current)</option>
-                )}
+                {!availableModels.some((m) => m.id === modelInput) &&
+                  modelInput && (
+                    <option value={modelInput}>{modelInput} (current)</option>
+                  )}
                 {availableModels.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.id}{m.description ? ` — ${m.description}` : ''}
+                    {m.id}
+                    {m.description ? ` — ${m.description}` : ''}
                   </option>
                 ))}
               </select>
             ) : (
               <Input
                 value={modelInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setModelInput(e.target.value)}
-                placeholder={loadingModels ? 'Loading models...' : 'e.g. qwen3.5:35b'}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setModelInput(e.target.value)
+                }
+                placeholder={
+                  loadingModels ? 'Loading models...' : 'e.g. qwen3.5:35b'
+                }
                 className="flex-1 font-mono"
               />
             )}
           </div>
         </SettingsRow>
-        <SettingsRow label="Base URL" description="For local providers (Ollama, LM Studio, MLX). Leave blank for cloud.">
-          <div className="flex gap-2 w-full max-w-sm">
+        <SettingsRow
+          label="Base URL"
+          description="For local providers (Ollama, LM Studio, MLX). Leave blank for cloud."
+        >
+          <div className="flex w-full max-w-sm gap-2">
             <Input
               value={baseUrlInput}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBaseUrlInput(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setBaseUrlInput(e.target.value)
+              }
               placeholder="e.g. http://localhost:11434/v1"
               className="flex-1 font-mono text-sm"
             />
@@ -1074,7 +1212,6 @@ function HermesConfigSection() {
         </div>
       </SettingsSection>
 
-      {/* API Keys */}
       <SettingsSection
         title="API Keys"
         description="Manage provider API keys stored in ~/.hermes/.env"
@@ -1086,9 +1223,11 @@ function HermesConfigSection() {
             <SettingsRow
               key={provider.id}
               label={provider.name}
-              description={provider.configured ? '✅ Configured' : '❌ Not configured'}
+              description={
+                provider.configured ? '✅ Configured' : '❌ Not configured'
+              }
             >
-              <div className="flex items-center gap-2 w-full max-w-sm">
+              <div className="flex w-full max-w-sm items-center gap-2">
                 {provider.envKeys.map((envKey) => (
                   <div key={envKey} className="flex-1">
                     {editingKey === envKey ? (
@@ -1096,14 +1235,16 @@ function HermesConfigSection() {
                         <Input
                           type="password"
                           value={keyInput}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKeyInput(e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setKeyInput(e.target.value)
+                          }
                           placeholder={`Enter ${envKey}`}
                           className="flex-1"
                         />
                         <Button
                           size="sm"
                           onClick={() => {
-                            saveConfig({ env: { [envKey]: keyInput } })
+                            void saveConfig({ env: { [envKey]: keyInput } })
                             setEditingKey(null)
                             setKeyInput('')
                           }}
@@ -1113,20 +1254,29 @@ function HermesConfigSection() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => { setEditingKey(null); setKeyInput('') }}
+                          onClick={() => {
+                            setEditingKey(null)
+                            setKeyInput('')
+                          }}
                         >
                           ✕
                         </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono" style={{ color: 'var(--theme-muted)' }}>
+                        <span
+                          className="text-xs font-mono"
+                          style={{ color: 'var(--theme-muted)' }}
+                        >
                           {provider.maskedKeys[envKey] || 'Not set'}
                         </span>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => { setEditingKey(envKey); setKeyInput('') }}
+                          onClick={() => {
+                            setEditingKey(envKey)
+                            setKeyInput('')
+                          }}
                         >
                           {provider.configured ? 'Change' : 'Add'}
                         </Button>
@@ -1139,83 +1289,561 @@ function HermesConfigSection() {
           ))}
       </SettingsSection>
 
-      {/* Memory */}
       <SettingsSection
         title="Memory"
         description="Configure Hermes Agent memory and user profiles."
         icon={UserIcon}
       >
-        <SettingsRow label="Memory enabled" description="Store and recall memories across sessions.">
+        <SettingsRow
+          label="Memory enabled"
+          description="Store and recall memories across sessions."
+        >
           <Switch
             checked={memoryConfig.memory_enabled !== false}
             onCheckedChange={(checked: boolean) =>
-              saveConfig({ config: { memory: { memory_enabled: checked } } })
+              void saveConfig({
+                config: { memory: { memory_enabled: checked } },
+              })
             }
           />
         </SettingsRow>
-        <SettingsRow label="User profile" description="Remember user preferences and context.">
+        <SettingsRow
+          label="User profile"
+          description="Remember user preferences and context."
+        >
           <Switch
             checked={memoryConfig.user_profile_enabled !== false}
             onCheckedChange={(checked: boolean) =>
-              saveConfig({ config: { memory: { user_profile_enabled: checked } } })
+              void saveConfig({
+                config: { memory: { user_profile_enabled: checked } },
+              })
             }
           />
         </SettingsRow>
       </SettingsSection>
 
-      {/* Terminal */}
       <SettingsSection
         title="Terminal"
         description="Shell execution settings."
         icon={SourceCodeSquareIcon}
       >
         <SettingsRow label="Backend" description="Terminal execution backend.">
-          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
+          <span
+            className="text-sm font-mono"
+            style={{ color: 'var(--theme-muted)' }}
+          >
             {(terminalConfig.backend as string) || 'local'}
           </span>
         </SettingsRow>
-        <SettingsRow label="Timeout" description="Max seconds for terminal commands.">
-          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
-            {(terminalConfig.timeout as number) || 180}s
-          </span>
+        <SettingsRow
+          label="Timeout"
+          description="Max seconds for terminal commands."
+        >
+          <Input
+            type="number"
+            min={10}
+            value={readNumber(terminalConfig.timeout, 180)}
+            onChange={(e) =>
+              saveNumberField('terminal', 'timeout', e.target.value, 180)
+            }
+            className="md:w-28"
+          />
         </SettingsRow>
       </SettingsSection>
 
-      {/* Display */}
       <SettingsSection
-        title="Display"
-        description="CLI display preferences (reflected in agent behavior)."
-        icon={PaintBoardIcon}
+        title="Custom Providers"
+        description="Read-only provider details loaded from config.yaml."
+        icon={CloudIcon}
       >
-        <SettingsRow label="Personality" description="Agent response style.">
-          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
-            {(displayConfig.personality as string) || 'default'}
-          </span>
-        </SettingsRow>
-        <SettingsRow label="Skin" description="CLI theme skin.">
-          <span className="text-sm font-mono" style={{ color: 'var(--theme-muted)' }}>
-            {(displayConfig.skin as string) || 'default'}
-          </span>
-        </SettingsRow>
+        <div className="space-y-3">
+          {customProviders.length === 0 ? (
+            <div className="rounded-xl border border-primary-200 bg-primary-100/40 p-3 text-sm text-primary-600">
+              No custom providers configured.
+            </div>
+          ) : (
+            customProviders.map((provider, index) => (
+              <div
+                key={`${String(provider.name || provider.base_url || index)}`}
+                className="rounded-xl border border-primary-200 bg-primary-100/40 p-3"
+              >
+                <div className="grid gap-2 text-sm md:grid-cols-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-primary-500">
+                      Name
+                    </p>
+                    <p className="font-medium text-primary-900">
+                      {String(provider.name || 'Unnamed')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-primary-500">
+                      Base URL
+                    </p>
+                    <p className="font-mono text-xs text-primary-700 break-all">
+                      {String(provider.base_url || 'Not set')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-primary-500">
+                      Type
+                    </p>
+                    <p className="text-primary-700">
+                      {String(provider.type || provider.auth_type || 'Unknown')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+          <div className="flex flex-col gap-3 rounded-xl border border-primary-200 bg-primary-100/40 p-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-primary-600">
+              Edit custom providers in config.yaml for security.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                void navigator.clipboard?.writeText(data.hermesHome)
+              }
+            >
+              Copy config path
+            </Button>
+          </div>
+        </div>
       </SettingsSection>
 
-      {/* Info */}
       <SettingsSection
         title="About"
         description="Hermes Agent runtime information."
         icon={Notification03Icon}
       >
-        <SettingsRow label="Config location" description="Where Hermes stores its configuration.">
-          <span className="text-xs font-mono" style={{ color: 'var(--theme-muted)' }}>
+        <SettingsRow
+          label="Config location"
+          description="Where Hermes stores its configuration."
+        >
+          <span
+            className="text-xs font-mono"
+            style={{ color: 'var(--theme-muted)' }}
+          >
             {data.hermesHome}
           </span>
         </SettingsRow>
-        <SettingsRow label="Active provider" description="Current inference provider.">
-          <span className="text-sm font-medium" style={{ color: 'var(--theme-accent)' }}>
-            {data.providers.find((p) => p.id === data.activeProvider)?.name || data.activeProvider}
+        <SettingsRow
+          label="Active provider"
+          description="Current inference provider."
+        >
+          <span
+            className="text-sm font-medium"
+            style={{ color: 'var(--theme-accent)' }}
+          >
+            {data.providers.find((p) => p.id === data.activeProvider)?.name ||
+              data.activeProvider}
           </span>
         </SettingsRow>
       </SettingsSection>
+    </>
+  )
+
+  const renderAgentBehavior = () => (
+    <SettingsSection
+      title="Agent Behavior"
+      description="Control agent execution limits and tool access."
+      icon={Settings02Icon}
+    >
+      <SettingsRow
+        label="Max turns"
+        description="Maximum agent turns per request (1-100)."
+      >
+        <Input
+          type="number"
+          min={1}
+          max={100}
+          value={readNumber(agentConfig.max_turns, 50)}
+          onChange={(e) =>
+            saveNumberField('agent', 'max_turns', e.target.value, 50)
+          }
+          className="md:w-28"
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Gateway timeout"
+        description="Seconds before gateway times out a request."
+      >
+        <Input
+          type="number"
+          min={10}
+          max={600}
+          value={readNumber(agentConfig.gateway_timeout, 120)}
+          onChange={(e) =>
+            saveNumberField('agent', 'gateway_timeout', e.target.value, 120)
+          }
+          className="md:w-28"
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Tool use enforcement"
+        description="Whether the agent must use tools when available."
+      >
+        <select
+          value={(agentConfig.tool_use_enforcement as string) || 'auto'}
+          onChange={(e) =>
+            void saveConfig({
+              config: { agent: { tool_use_enforcement: e.target.value } },
+            })
+          }
+          className={selectClassName}
+        >
+          <option value="auto">auto</option>
+          <option value="required">required</option>
+          <option value="none">none</option>
+        </select>
+      </SettingsRow>
+    </SettingsSection>
+  )
+
+  const renderSmartRouting = () => (
+    <SettingsSection
+      title="Smart Model Routing"
+      description="Automatically route simple queries to cheaper models."
+      icon={SparklesIcon}
+    >
+      <SettingsRow
+        label="Enable smart routing"
+        description="Route simple queries to a cheaper model automatically."
+      >
+        <Switch
+          checked={readBoolean(smartRouting.enabled, false)}
+          onCheckedChange={(checked) =>
+            void saveConfig({
+              config: { smart_model_routing: { enabled: checked } },
+            })
+          }
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Cheap model"
+        description="Model to use for simple queries."
+      >
+        <select
+          value={(smartRouting.cheap_model as string) || ''}
+          onChange={(e) =>
+            void saveConfig({
+              config: { smart_model_routing: { cheap_model: e.target.value } },
+            })
+          }
+          className={selectClassName}
+        >
+          <option value="">Select model</option>
+          {availableModels.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.id}
+            </option>
+          ))}
+        </select>
+      </SettingsRow>
+      <SettingsRow
+        label="Max simple chars"
+        description="Messages shorter than this use the cheap model."
+      >
+        <Input
+          type="number"
+          min={1}
+          value={readNumber(smartRouting.max_simple_chars, 500)}
+          onChange={(e) =>
+            saveNumberField(
+              'smart_model_routing',
+              'max_simple_chars',
+              e.target.value,
+              500,
+            )
+          }
+          className="md:w-32"
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Max simple words"
+        description="Messages with fewer words use the cheap model."
+      >
+        <Input
+          type="number"
+          min={1}
+          value={readNumber(smartRouting.max_simple_words, 80)}
+          onChange={(e) =>
+            saveNumberField(
+              'smart_model_routing',
+              'max_simple_words',
+              e.target.value,
+              80,
+            )
+          }
+          className="md:w-32"
+        />
+      </SettingsRow>
+    </SettingsSection>
+  )
+
+  const renderVoice = () => (
+    <div className="space-y-4">
+      <SettingsSection
+        title="Text-to-Speech"
+        description="Configure voice output for agent responses."
+        icon={VolumeHighIcon}
+      >
+        <SettingsRow
+          label="TTS provider"
+          description="Which TTS engine to use."
+        >
+          <select
+            value={ttsProvider}
+            onChange={(e) =>
+              void saveConfig({ config: { tts: { provider: e.target.value } } })
+            }
+            className={selectClassName}
+          >
+            <option value="edge">Edge TTS (free)</option>
+            <option value="elevenlabs">ElevenLabs</option>
+            <option value="openai">OpenAI TTS</option>
+            <option value="neutts">NeuTTS</option>
+          </select>
+        </SettingsRow>
+
+        {ttsProvider === 'edge' && (
+          <SettingsRow label="Voice" description="Edge voice name.">
+            <Input
+              value={(ttsEdge.voice as string) || ''}
+              onChange={(e) =>
+                void saveConfig({
+                  config: { tts: { edge: { voice: e.target.value } } },
+                })
+              }
+              placeholder="en-US-AriaNeural"
+              className="md:w-64"
+            />
+          </SettingsRow>
+        )}
+
+        {ttsProvider === 'elevenlabs' && (
+          <>
+            <SettingsRow label="Voice ID" description="ElevenLabs voice_id.">
+              <Input
+                value={(ttsElevenLabs.voice_id as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: {
+                      tts: { elevenlabs: { voice_id: e.target.value } },
+                    },
+                  })
+                }
+                className="md:w-64"
+              />
+            </SettingsRow>
+            <SettingsRow label="Model" description="ElevenLabs model name.">
+              <Input
+                value={(ttsElevenLabs.model as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: { tts: { elevenlabs: { model: e.target.value } } },
+                  })
+                }
+                className="md:w-64"
+              />
+            </SettingsRow>
+          </>
+        )}
+
+        {ttsProvider === 'openai' && (
+          <>
+            <SettingsRow
+              label="Voice"
+              description="alloy, echo, fable, onyx, nova, shimmer"
+            >
+              <select
+                value={(ttsOpenAi.voice as string) || 'alloy'}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: { tts: { openai: { voice: e.target.value } } },
+                  })
+                }
+                className={selectClassName}
+              >
+                {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map(
+                  (voice) => (
+                    <option key={voice} value={voice}>
+                      {voice}
+                    </option>
+                  ),
+                )}
+              </select>
+            </SettingsRow>
+            <SettingsRow label="Model" description="OpenAI TTS model.">
+              <Input
+                value={(ttsOpenAi.model as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: { tts: { openai: { model: e.target.value } } },
+                  })
+                }
+                placeholder="tts-1"
+                className="md:w-64"
+              />
+            </SettingsRow>
+          </>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Speech-to-Text"
+        description="Configure voice input recognition."
+        icon={Mic01Icon}
+      >
+        <SettingsRow label="Enable STT" description="Turn on voice input.">
+          <Switch
+            checked={readBoolean(sttConfig.enabled, false)}
+            onCheckedChange={(checked) =>
+              void saveConfig({ config: { stt: { enabled: checked } } })
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="STT provider"
+          description="Which speech engine to use."
+        >
+          <select
+            value={sttProvider}
+            onChange={(e) =>
+              void saveConfig({ config: { stt: { provider: e.target.value } } })
+            }
+            className={selectClassName}
+          >
+            <option value="local">Local (Whisper)</option>
+            <option value="openai">OpenAI Whisper API</option>
+          </select>
+        </SettingsRow>
+        {sttProvider === 'local' && (
+          <SettingsRow
+            label="Model size"
+            description="tiny, base, small, medium, large"
+          >
+            <select
+              value={(sttLocal.model_size as string) || 'base'}
+              onChange={(e) =>
+                void saveConfig({
+                  config: { stt: { local: { model_size: e.target.value } } },
+                })
+              }
+              className={selectClassName}
+            >
+              {['tiny', 'base', 'small', 'medium', 'large'].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </SettingsRow>
+        )}
+      </SettingsSection>
+    </div>
+  )
+
+  const renderDisplay = () => (
+    <SettingsSection
+      title="Display"
+      description="CLI display preferences reflected in the agent UI."
+      icon={PaintBoardIcon}
+    >
+      <SettingsRow label="Personality" description="Agent response style.">
+        <select
+          value={(displayConfig.personality as string) || 'default'}
+          onChange={(e) =>
+            void saveConfig({
+              config: { display: { personality: e.target.value } },
+            })
+          }
+          className={selectClassName}
+        >
+          {['default', 'concise', 'verbose', 'creative'].map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </SettingsRow>
+      <SettingsRow
+        label="Streaming"
+        description="Stream tokens as they arrive."
+      >
+        <Switch
+          checked={readBoolean(displayConfig.streaming, true)}
+          onCheckedChange={(checked) =>
+            void saveConfig({ config: { display: { streaming: checked } } })
+          }
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Show reasoning"
+        description="Expose model reasoning blocks in the UI."
+      >
+        <Switch
+          checked={readBoolean(displayConfig.show_reasoning, false)}
+          onCheckedChange={(checked) =>
+            void saveConfig({
+              config: { display: { show_reasoning: checked } },
+            })
+          }
+        />
+      </SettingsRow>
+      <SettingsRow label="Show cost" description="Display usage cost metadata.">
+        <Switch
+          checked={readBoolean(displayConfig.show_cost, false)}
+          onCheckedChange={(checked) =>
+            void saveConfig({ config: { display: { show_cost: checked } } })
+          }
+        />
+      </SettingsRow>
+      <SettingsRow label="Compact" description="Use a denser display layout.">
+        <Switch
+          checked={readBoolean(displayConfig.compact, false)}
+          onCheckedChange={(checked) =>
+            void saveConfig({ config: { display: { compact: checked } } })
+          }
+        />
+      </SettingsRow>
+      <SettingsRow label="Skin" description="CLI theme skin.">
+        <span
+          className="text-sm font-mono"
+          style={{ color: 'var(--theme-muted)' }}
+        >
+          {(displayConfig.skin as string) || 'default'}
+        </span>
+      </SettingsRow>
+    </SettingsSection>
+  )
+
+  const sectionContent = {
+    hermes: renderHermesOverview(),
+    agent: renderAgentBehavior(),
+    routing: renderSmartRouting(),
+    voice: renderVoice(),
+    display: renderDisplay(),
+  } as const
+
+  return (
+    <>
+      {saveMessage && (
+        <div
+          className="rounded-lg px-3 py-2 text-sm font-medium"
+          style={{
+            backgroundColor: saveMessage.includes('Failed')
+              ? 'rgba(239,68,68,0.15)'
+              : 'rgba(34,197,94,0.15)',
+            color: saveMessage.includes('Failed') ? '#ef4444' : '#22c55e',
+          }}
+        >
+          {saveMessage}
+        </div>
+      )}
+      {sectionContent[activeView]}
     </>
   )
 }

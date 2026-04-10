@@ -47,7 +47,6 @@ export const defaultStudioSettings: StudioSettings = {
   mobileChatNavMode: 'dock',
 }
 
-
 export const useSettingsStore = create<SettingsState>()(
   persist(
     function createSettingsStore(set) {

@@ -54,7 +54,9 @@ export function Toaster() {
   const addToast = useCallback((item: ToastItem) => {
     setToasts((prev) => {
       // Dedupe: skip if same message + type already visible
-      if (prev.some((t) => t.message === item.message && t.type === item.type)) {
+      if (
+        prev.some((t) => t.message === item.message && t.type === item.type)
+      ) {
         return prev
       }
       return [...prev.slice(-4), item] // max 5

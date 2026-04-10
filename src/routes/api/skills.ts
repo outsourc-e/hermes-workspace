@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   HERMES_UPGRADE_INSTRUCTIONS,
@@ -8,6 +7,7 @@ import {
   getCapabilities,
 } from '../../server/gateway-capabilities'
 import { requireJsonContentType } from '../../server/rate-limit'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type SkillsTab = 'installed' | 'marketplace' | 'featured'
 type SkillsSort = 'name' | 'category'
@@ -87,9 +87,7 @@ function readString(value: unknown): string {
 
 function readStringArray(value: unknown): Array<string> {
   if (!Array.isArray(value)) return []
-  return value
-    .map((entry) => readString(entry))
-    .filter(Boolean)
+  return value.map((entry) => readString(entry)).filter(Boolean)
 }
 
 function slugify(input: string): string {
@@ -145,9 +143,7 @@ function guessCategory(record: Record<string, unknown>): string {
 function normalizeSkill(value: unknown): SkillSummary | null {
   const record = asRecord(value)
   const id =
-    readString(record.id) ||
-    readString(record.slug) ||
-    readString(record.name)
+    readString(record.id) || readString(record.slug) || readString(record.name)
   if (!id) return null
 
   const name = readString(record.name) || id
@@ -280,7 +276,9 @@ export const Route = createFileRoute('/api/skills')({
 
           const sourceItems = await fetchHermesSkills()
           const installedLookup = new Set(
-            sourceItems.filter((skill) => skill.installed).map((skill) => skill.id),
+            sourceItems
+              .filter((skill) => skill.installed)
+              .map((skill) => skill.id),
           )
 
           const filteredByTab = sourceItems.filter((skill) => {
@@ -349,7 +347,8 @@ export const Route = createFileRoute('/api/skills')({
         return json(
           {
             ok: false,
-            error: 'Skill installation is not available in the Hermes Workspace fork.',
+            error:
+              'Skill installation is not available in the Hermes Workspace fork.',
           },
           { status: 501 },
         )

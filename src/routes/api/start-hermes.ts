@@ -16,7 +16,10 @@ export const Route = createFileRoute('/api/start-hermes')({
           return json(result, { status: result.ok ? 200 : 500 })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            {
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            },
             { status: 500 },
           )
         }

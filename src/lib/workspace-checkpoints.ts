@@ -61,7 +61,11 @@ export type WorkspaceCheckpointVerificationItem = {
   checked_at: string | null
 }
 
-export type WorkspaceCheckpointVerificationKey = 'tsc' | 'tests' | 'lint' | 'e2e'
+export type WorkspaceCheckpointVerificationKey =
+  | 'tsc'
+  | 'tests'
+  | 'lint'
+  | 'e2e'
 
 export type WorkspaceCheckpointVerificationMap = Record<
   WorkspaceCheckpointVerificationKey,
@@ -172,7 +176,9 @@ function normalizeRunEvent(value: unknown): WorkspaceCheckpointRunEvent {
   }
 }
 
-function normalizeVerificationItem(value: unknown): WorkspaceCheckpointVerificationItem {
+function normalizeVerificationItem(
+  value: unknown,
+): WorkspaceCheckpointVerificationItem {
   const record = asRecord(value)
   const status = asString(record?.status)
   return {
@@ -295,7 +301,8 @@ export async function getWorkspaceCheckpointDetail(
 
   const detailRecord = asRecord(record.checkpoint) ?? record
   const parsedDiffStat = asRecord(record.parsed_diff_stat)
-  const verificationRecord = asRecord(record.verification) ?? asRecord(detailRecord.verification)
+  const verificationRecord =
+    asRecord(record.verification) ?? asRecord(detailRecord.verification)
   const fileDiffs = Array.isArray(record.file_diffs)
     ? record.file_diffs.map((entry) => {
         const item = asRecord(entry)
@@ -304,7 +311,7 @@ export async function getWorkspaceCheckpointDetail(
           patch:
             typeof item?.diff === 'string'
               ? item.diff
-              : asString(item?.patch) ?? '',
+              : (asString(item?.patch) ?? ''),
         }
       })
     : Array.isArray(detailRecord.diff_files)
@@ -317,7 +324,8 @@ export async function getWorkspaceCheckpointDetail(
         })
       : []
 
-  const rawDiffStat = typeof parsedDiffStat?.raw === 'string' ? parsedDiffStat.raw : ''
+  const rawDiffStat =
+    typeof parsedDiffStat?.raw === 'string' ? parsedDiffStat.raw : ''
   const checkpoint = normalizeCheckpoint(detailRecord)
   return {
     ...checkpoint,
@@ -331,7 +339,8 @@ export async function getWorkspaceCheckpointDetail(
       typeof detailRecord.task_run_attempt === 'number'
         ? detailRecord.task_run_attempt
         : null,
-    task_run_workspace_path: asString(detailRecord.task_run_workspace_path) ?? null,
+    task_run_workspace_path:
+      asString(detailRecord.task_run_workspace_path) ?? null,
     task_run_started_at: asString(detailRecord.task_run_started_at) ?? null,
     task_run_completed_at: asString(detailRecord.task_run_completed_at) ?? null,
     task_run_error: asString(detailRecord.task_run_error) ?? null,
@@ -394,7 +403,11 @@ function parseDiffLineTotals(
   const line = raw
     .split('\n')
     .map((entry) => entry.trimEnd())
-    .find((entry) => entry.trimStart().startsWith(filePath) || entry.includes(` ${filePath} `))
+    .find(
+      (entry) =>
+        entry.trimStart().startsWith(filePath) ||
+        entry.includes(` ${filePath} `),
+    )
 
   if (!line) return null
   const match = line.match(/^(.*?)\s+\|\s+(\d+)\s+([+\-]+)$/)
@@ -510,9 +523,10 @@ export function getCheckpointActionButtonClass(
 
 /** SQLite timestamps come as "2026-03-10 21:40:00" (no tz) — treat as UTC */
 export function parseUtcTimestamp(value: string): Date {
-  const normalized = value.includes('T') || value.endsWith('Z')
-    ? value
-    : value.replace(' ', 'T') + 'Z'
+  const normalized =
+    value.includes('T') || value.endsWith('Z')
+      ? value
+      : value.replace(' ', 'T') + 'Z'
   return new Date(normalized)
 }
 
@@ -534,13 +548,18 @@ export function matchesCheckpointProject(
   return checkpoint.project_name === projectName
 }
 
-export function getCheckpointSummary(checkpoint: WorkspaceCheckpoint, maxLength = 200): string {
+export function getCheckpointSummary(
+  checkpoint: WorkspaceCheckpoint,
+  maxLength = 200,
+): string {
   const raw = checkpoint.summary?.trim() || 'No checkpoint summary provided.'
   if (raw.length <= maxLength) return raw
   return raw.slice(0, maxLength).trimEnd() + '…'
 }
 
-export function getCheckpointFullSummary(checkpoint: WorkspaceCheckpoint): string {
+export function getCheckpointFullSummary(
+  checkpoint: WorkspaceCheckpoint,
+): string {
   return checkpoint.summary?.trim() || 'No checkpoint summary provided.'
 }
 
@@ -550,14 +569,19 @@ export interface ParsedDiffStat {
   filesChanged: number
 }
 
-export function getCheckpointDiffStatParsed(checkpoint: WorkspaceCheckpoint): ParsedDiffStat | null {
+export function getCheckpointDiffStatParsed(
+  checkpoint: WorkspaceCheckpoint,
+): ParsedDiffStat | null {
   if (!checkpoint.diff_stat) return null
   try {
     const parsed = JSON.parse(checkpoint.diff_stat) as Record<string, unknown>
     return {
       raw: typeof parsed.raw === 'string' ? parsed.raw : '',
-      changedFiles: Array.isArray(parsed.changed_files) ? (parsed.changed_files as Array<string>) : [],
-      filesChanged: typeof parsed.files_changed === 'number' ? parsed.files_changed : 0,
+      changedFiles: Array.isArray(parsed.changed_files)
+        ? (parsed.changed_files as Array<string>)
+        : [],
+      filesChanged:
+        typeof parsed.files_changed === 'number' ? parsed.files_changed : 0,
     }
   } catch {
     return null
@@ -583,7 +607,8 @@ export function getCheckpointReviewSuccessMessage(
   action: CheckpointReviewAction,
 ): string {
   if (action === 'approve') return 'Checkpoint approved'
-  if (action === 'approve-and-commit') return 'Checkpoint approved and committed'
+  if (action === 'approve-and-commit')
+    return 'Checkpoint approved and committed'
   if (action === 'approve-and-pr') return 'Checkpoint approved and PR opened'
   if (action === 'approve-and-merge') return 'Checkpoint approved and merged'
   if (action === 'revise') return 'Checkpoint sent back for revision'

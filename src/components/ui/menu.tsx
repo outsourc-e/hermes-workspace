@@ -66,8 +66,13 @@ function MenuItem({ className, ...props }: MenuItemProps) {
       style={{
         color: 'var(--theme-text)',
       }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--theme-card2)' }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+      onMouseEnter={(e) => {
+        ;(e.currentTarget as HTMLElement).style.background =
+          'var(--theme-card2)'
+      }}
+      onMouseLeave={(e) => {
+        ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+      }}
       {...props}
     />
   )

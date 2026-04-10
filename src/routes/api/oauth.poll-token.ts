@@ -51,7 +51,10 @@ export const Route = createFileRoute('/api/oauth/poll-token')({
 
         const parsed = BodySchema.safeParse(body)
         if (!parsed.success) {
-          return json({ error: 'Missing provider or deviceCode' }, { status: 400 })
+          return json(
+            { error: 'Missing provider or deviceCode' },
+            { status: 400 },
+          )
         }
 
         const { provider, deviceCode } = parsed.data
@@ -64,34 +67,60 @@ export const Route = createFileRoute('/api/oauth/poll-token')({
               device_code: deviceCode,
             })
 
-            const res = await fetch('https://portal.nousresearch.com/api/oauth/token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: params.toString(),
-            })
+            const res = await fetch(
+              'https://portal.nousresearch.com/api/oauth/token',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: params.toString(),
+              },
+            )
 
-            const data = await res.json() as Record<string, unknown>
+            const data = (await res.json()) as Record<string, unknown>
 
-            if (data.error === 'authorization_pending' || data.error === 'slow_down') {
+            if (
+              data.error === 'authorization_pending' ||
+              data.error === 'slow_down'
+            ) {
               return json({ status: 'pending' })
             }
 
             if (data.error) {
-              return json({ status: 'error', message: String(data.error_description || data.error) })
+              return json({
+                status: 'error',
+                message: String(data.error_description || data.error),
+              })
             }
 
             if (data.access_token) {
-              saveNousTokens(String(data.access_token), data.refresh_token ? String(data.refresh_token) : undefined)
-              return json({ status: 'success', accessToken: String(data.access_token) })
+              saveNousTokens(
+                String(data.access_token),
+                data.refresh_token ? String(data.refresh_token) : undefined,
+              )
+              return json({
+                status: 'success',
+                accessToken: String(data.access_token),
+              })
             }
 
-            return json({ status: 'error', message: 'Unexpected response from token endpoint' })
+            return json({
+              status: 'error',
+              message: 'Unexpected response from token endpoint',
+            })
           } catch (err) {
-            return json({ status: 'error', message: err instanceof Error ? err.message : 'Network error' })
+            return json({
+              status: 'error',
+              message: err instanceof Error ? err.message : 'Network error',
+            })
           }
         }
 
-        return json({ status: 'error', message: `OAuth device flow not supported for provider: ${provider}` })
+        return json({
+          status: 'error',
+          message: `OAuth device flow not supported for provider: ${provider}`,
+        })
       },
     },
   },

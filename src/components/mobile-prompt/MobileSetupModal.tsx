@@ -123,7 +123,9 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       action: (
         <button
           type="button"
-          onClick={() => networkUrl && writeTextToClipboard(networkUrl.url).catch(() => {})}
+          onClick={() =>
+            networkUrl && writeTextToClipboard(networkUrl.url).catch(() => {})
+          }
           className="group flex w-full items-center justify-between rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 transition-colors hover:border-accent-500/50"
         >
           <span className="break-all font-mono text-sm text-accent-300">

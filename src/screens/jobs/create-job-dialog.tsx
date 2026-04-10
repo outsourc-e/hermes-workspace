@@ -139,10 +139,16 @@ export function CreateJobDialog({
               color: 'var(--theme-text)',
             }}
           >
-            <div className="flex items-start justify-between gap-4 border-b px-5 py-4" style={{ borderColor: 'var(--theme-border)' }}>
+            <div
+              className="flex items-start justify-between gap-4 border-b px-5 py-4"
+              style={{ borderColor: 'var(--theme-border)' }}
+            >
               <div>
                 <h2 className="text-lg font-semibold">Create Job</h2>
-                <p className="mt-1 text-sm" style={{ color: 'var(--theme-muted)' }}>
+                <p
+                  className="mt-1 text-sm"
+                  style={{ color: 'var(--theme-muted)' }}
+                >
                   Build a scheduled Hermes task with preset timing options.
                 </p>
               </div>
@@ -163,7 +169,10 @@ export function CreateJobDialog({
                 <input
                   value={form.name}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, name: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
                   }
                   placeholder="Daily research summary"
                   required
@@ -180,7 +189,10 @@ export function CreateJobDialog({
               <section className="space-y-3">
                 <div>
                   <h3 className="text-sm font-medium">Schedule</h3>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+                  <p
+                    className="mt-1 text-xs"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
                     Choose a preset or enter a custom schedule string below.
                   </p>
                 </div>
@@ -192,12 +204,19 @@ export function CreateJobDialog({
                         key={preset.label}
                         type="button"
                         onClick={() =>
-                          setForm((current) => ({ ...current, schedule: preset.value }))
+                          setForm((current) => ({
+                            ...current,
+                            schedule: preset.value,
+                          }))
                         }
                         className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
                         style={{
-                          background: isActive ? 'var(--theme-accent)' : 'var(--theme-card)',
-                          borderColor: isActive ? 'var(--theme-accent)' : 'var(--theme-border)',
+                          background: isActive
+                            ? 'var(--theme-accent)'
+                            : 'var(--theme-card)',
+                          borderColor: isActive
+                            ? 'var(--theme-accent)'
+                            : 'var(--theme-border)',
                           color: isActive ? '#fff' : 'var(--theme-text)',
                         }}
                       >
@@ -211,7 +230,10 @@ export function CreateJobDialog({
                   <input
                     value={form.schedule}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, schedule: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        schedule: event.target.value,
+                      }))
                     }
                     placeholder="every 30m or 0 9 * * *"
                     required
@@ -222,7 +244,10 @@ export function CreateJobDialog({
                       color: 'var(--theme-text)',
                     }}
                   />
-                  <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+                  <p
+                    className="text-xs"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
                     Advanced users can enter cron expressions directly.
                   </p>
                 </div>
@@ -233,7 +258,10 @@ export function CreateJobDialog({
                 <textarea
                   value={form.prompt}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, prompt: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      prompt: event.target.value,
+                    }))
                   }
                   placeholder="What should Hermes do?"
                   required
@@ -250,7 +278,10 @@ export function CreateJobDialog({
               <section className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium">Options</h3>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+                  <p
+                    className="mt-1 text-xs"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
                     Optional routing and repeat controls.
                   </p>
                 </div>
@@ -260,7 +291,10 @@ export function CreateJobDialog({
                   <input
                     value={form.skillsInput}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, skillsInput: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        skillsInput: event.target.value,
+                      }))
                     }
                     placeholder="research, writing, synthesis"
                     className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
@@ -270,7 +304,10 @@ export function CreateJobDialog({
                       color: 'var(--theme-text)',
                     }}
                   />
-                  <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+                  <p
+                    className="text-xs"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
                     Comma-separated for now.
                   </p>
                 </div>
@@ -280,21 +317,35 @@ export function CreateJobDialog({
                   <div className="flex flex-wrap gap-2">
                     {DELIVERY_OPTIONS.map((option) => {
                       const isActive = form.deliver.includes(option)
-                      const needsGateway = option === 'telegram' || option === 'discord'
+                      const needsGateway =
+                        option === 'telegram' || option === 'discord'
                       return (
                         <button
                           key={option}
                           type="button"
                           onClick={() => toggleDelivery(option)}
-                          title={needsGateway ? `Requires Hermes Gateway with ${option} configured` : undefined}
+                          title={
+                            needsGateway
+                              ? `Requires Hermes Gateway with ${option} configured`
+                              : undefined
+                          }
                           className="rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors"
                           style={{
-                            background: isActive ? 'var(--theme-accent)' : 'var(--theme-card)',
-                            borderColor: isActive ? 'var(--theme-accent)' : 'var(--theme-border)',
-                            color: isActive ? '#fff' : needsGateway ? 'var(--theme-muted)' : 'var(--theme-text)',
+                            background: isActive
+                              ? 'var(--theme-accent)'
+                              : 'var(--theme-card)',
+                            borderColor: isActive
+                              ? 'var(--theme-accent)'
+                              : 'var(--theme-border)',
+                            color: isActive
+                              ? '#fff'
+                              : needsGateway
+                                ? 'var(--theme-muted)'
+                                : 'var(--theme-text)',
                           }}
                         >
-                          {option}{needsGateway ? ' ⚡' : ''}
+                          {option}
+                          {needsGateway ? ' ⚡' : ''}
                         </button>
                       )
                     })}
@@ -307,7 +358,10 @@ export function CreateJobDialog({
                     <button
                       type="button"
                       onClick={() =>
-                        setForm((current) => ({ ...current, repeatMode: 'unlimited' }))
+                        setForm((current) => ({
+                          ...current,
+                          repeatMode: 'unlimited',
+                        }))
                       }
                       className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
                       style={{
@@ -319,7 +373,10 @@ export function CreateJobDialog({
                           form.repeatMode === 'unlimited'
                             ? 'var(--theme-accent)'
                             : 'var(--theme-border)',
-                        color: form.repeatMode === 'unlimited' ? '#fff' : 'var(--theme-text)',
+                        color:
+                          form.repeatMode === 'unlimited'
+                            ? '#fff'
+                            : 'var(--theme-text)',
                       }}
                     >
                       Unlimited
@@ -327,7 +384,10 @@ export function CreateJobDialog({
                     <button
                       type="button"
                       onClick={() =>
-                        setForm((current) => ({ ...current, repeatMode: 'limited' }))
+                        setForm((current) => ({
+                          ...current,
+                          repeatMode: 'limited',
+                        }))
                       }
                       className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
                       style={{
@@ -339,7 +399,10 @@ export function CreateJobDialog({
                           form.repeatMode === 'limited'
                             ? 'var(--theme-accent)'
                             : 'var(--theme-border)',
-                        color: form.repeatMode === 'limited' ? '#fff' : 'var(--theme-text)',
+                        color:
+                          form.repeatMode === 'limited'
+                            ? '#fff'
+                            : 'var(--theme-text)',
                       }}
                     >
                       Set count
@@ -369,7 +432,10 @@ export function CreateJobDialog({
               </section>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t px-5 py-4" style={{ borderColor: 'var(--theme-border)' }}>
+            <div
+              className="flex items-center justify-end gap-2 border-t px-5 py-4"
+              style={{ borderColor: 'var(--theme-border)' }}
+            >
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
@@ -383,7 +449,12 @@ export function CreateJobDialog({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !form.name.trim() || !form.schedule.trim() || !form.prompt.trim()}
+                disabled={
+                  isSubmitting ||
+                  !form.name.trim() ||
+                  !form.schedule.trim() ||
+                  !form.prompt.trim()
+                }
                 className="rounded-xl px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50"
                 style={{ background: 'var(--theme-accent)' }}
               >

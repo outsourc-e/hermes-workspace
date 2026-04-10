@@ -101,7 +101,8 @@ export function WorkspaceShell() {
     if (path.startsWith('/jobs')) return 4
     if (path.startsWith('/memory')) return 5
     if (path.startsWith('/skills')) return 6
-    if (path.startsWith('/settings')) return 7
+    if (path.startsWith('/profiles')) return 7
+    if (path.startsWith('/settings')) return 8
     return -1
   }, [])
 
@@ -129,6 +130,7 @@ export function WorkspaceShell() {
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
+    if (pathname.startsWith('/profiles')) return 'Profiles'
     if (pathname.startsWith('/settings')) return 'Settings'
     if (pathname.startsWith('/debug')) return 'Debug'
     if (pathname.startsWith('/activity')) return 'Activity'
@@ -215,7 +217,8 @@ export function WorkspaceShell() {
 
     if (prevIdx !== -1 && currentIdx !== -1 && currentIdx !== prevIdx) {
       // Navigate right (higher index) = slide left; left = slide right
-      const direction = currentIdx > prevIdx ? 'slide-enter-left' : 'slide-enter-right'
+      const direction =
+        currentIdx > prevIdx ? 'slide-enter-left' : 'slide-enter-right'
       setSlideClass(direction)
       // Remove class after animation completes
       const timer = setTimeout(() => setSlideClass(''), 250)
@@ -263,13 +266,23 @@ export function WorkspaceShell() {
         {isElectron && (
           <div
             className="absolute inset-x-0 top-0 flex h-10 items-center border-b border-primary-200 z-40"
-            style={{ WebkitAppRegion: 'drag', background: 'var(--theme-sidebar)' } as React.CSSProperties}
+            style={
+              {
+                WebkitAppRegion: 'drag',
+                background: 'var(--theme-sidebar)',
+              } as React.CSSProperties
+            }
           >
             {/* Traffic light spacer (left ~78px for macOS buttons) */}
             <div className="w-[78px] shrink-0" />
             {/* Centered title */}
             <div className="flex-1 text-center">
-              <span className="text-[13px] font-medium select-none" style={{ color: 'var(--theme-accent, #B98A44)' }}>Hermes</span>
+              <span
+                className="text-[13px] font-medium select-none"
+                style={{ color: 'var(--theme-accent, #B98A44)' }}
+              >
+                Hermes
+              </span>
             </div>
             {/* Right spacer to balance */}
             <div className="w-[78px] shrink-0" />
@@ -336,17 +349,29 @@ export function WorkspaceShell() {
               )}
               <div className="flex-1 min-h-0 overflow-hidden">
                 <Suspense fallback={null}>
-                  <TerminalWorkspace mode="fullscreen" panelVisible={isOnTerminalRoute} />
+                  <TerminalWorkspace
+                    mode="fullscreen"
+                    panelVisible={isOnTerminalRoute}
+                  />
                 </Suspense>
               </div>
               {/* Mobile input bar — sibling to terminal, NOT a child, so SSE re-renders don't freeze it */}
               {isMobile && <MobileTerminalInput />}
             </div>
 
-            <div className={['page-transition h-full flex flex-col', slideClass, isOnTerminalRoute ? 'hidden' : ''].filter(Boolean).join(' ')}>
-              {isMobile && !isOnChatRoute && !isOnTerminalRoute && mobilePageTitle && (
-                <MobilePageHeader title={mobilePageTitle} />
-              )}
+            <div
+              className={[
+                'page-transition h-full flex flex-col',
+                slideClass,
+                isOnTerminalRoute ? 'hidden' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {isMobile &&
+                !isOnChatRoute &&
+                !isOnTerminalRoute &&
+                mobilePageTitle && <MobilePageHeader title={mobilePageTitle} />}
               <ErrorBoundary
                 className="h-full min-h-0 flex-1"
                 title="Something went wrong"

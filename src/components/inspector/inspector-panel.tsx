@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
-import {  useActivityStore } from './activity-store'
-import type {ActivityEvent} from './activity-store';
+import { useActivityStore } from './activity-store'
+import type { ActivityEvent } from './activity-store'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
@@ -43,9 +43,14 @@ function LoadingState({ text }: { text: string }) {
     <div className="flex items-center gap-2 p-4">
       <div
         className="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
-        style={{ borderColor: 'var(--theme-accent)', borderTopColor: 'transparent' }}
+        style={{
+          borderColor: 'var(--theme-accent)',
+          borderTopColor: 'transparent',
+        }}
       />
-      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>{text}</span>
+      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {text}
+      </span>
     </div>
   )
 }
@@ -53,7 +58,9 @@ function LoadingState({ text }: { text: string }) {
 function ErrorState({ text }: { text: string }) {
   return (
     <div className="p-4">
-      <span className="text-xs" style={{ color: 'var(--theme-danger)' }}>{text}</span>
+      <span className="text-xs" style={{ color: 'var(--theme-danger)' }}>
+        {text}
+      </span>
     </div>
   )
 }
@@ -61,7 +68,9 @@ function ErrorState({ text }: { text: string }) {
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="p-4">
-      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>{text}</span>
+      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {text}
+      </span>
     </div>
   )
 }
@@ -81,18 +90,26 @@ function ActivityTab() {
   }
 
   return (
-    <div ref={scrollRef} className="space-y-1 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+    <div
+      ref={scrollRef}
+      className="space-y-1 p-3 overflow-auto max-h-[calc(100vh-140px)]"
+    >
       {events.map((event: ActivityEvent, i: number) => (
         <div
           key={i}
           className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs"
           style={{ background: 'var(--theme-card2)' }}
         >
-          <span style={{ color: 'var(--theme-accent)', fontFamily: 'monospace' }}>
+          <span
+            style={{ color: 'var(--theme-accent)', fontFamily: 'monospace' }}
+          >
             {event.time}
           </span>
           <span style={{ color: 'var(--theme-muted)' }}>{event.type}</span>
-          <span className="ml-auto truncate" style={{ color: 'var(--theme-text)' }}>
+          <span
+            className="ml-auto truncate"
+            style={{ color: 'var(--theme-text)' }}
+          >
             {event.text}
           </span>
         </div>
@@ -110,14 +127,21 @@ function FilesTab() {
   const files = Array.from(
     new Set(
       events
-        .filter((e: ActivityEvent) => e.type === 'tool_call' || e.type === 'file_read' || e.type === 'file_write')
+        .filter(
+          (e: ActivityEvent) =>
+            e.type === 'tool_call' ||
+            e.type === 'file_read' ||
+            e.type === 'file_write',
+        )
         .map((e: ActivityEvent) => e.text)
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   )
 
   if (files.length === 0) {
-    return <EmptyState text="No files touched yet — activity will appear during chat" />
+    return (
+      <EmptyState text="No files touched yet — activity will appear during chat" />
+    )
   }
 
   return (
@@ -129,7 +153,10 @@ function FilesTab() {
         <div
           key={i}
           className="rounded px-2 py-1 text-xs font-mono truncate"
-          style={{ color: 'var(--theme-text)', background: 'var(--theme-card2)' }}
+          style={{
+            color: 'var(--theme-text)',
+            background: 'var(--theme-card2)',
+          }}
         >
           {file}
         </div>
@@ -141,7 +168,10 @@ function FilesTab() {
 // ── Memory Tab ────────────────────────────────────────────────────────────────
 
 function MemoryTab() {
-  const [files, setFiles] = useState<Array<{ path: string; name: string }> | null>(null)
+  const [files, setFiles] = useState<Array<{
+    path: string
+    name: string
+  }> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -170,12 +200,15 @@ function MemoryTab() {
           setLoading(false)
         }
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (loading) return <LoadingState text="Loading memory…" />
   if (error) return <ErrorState text={`Memory: ${error}`} />
-  if (!files || files.length === 0) return <EmptyState text="No memory files available" />
+  if (!files || files.length === 0)
+    return <EmptyState text="No memory files available" />
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
@@ -186,7 +219,11 @@ function MemoryTab() {
         <div
           key={`${file.path}-${index}`}
           className="rounded-lg px-3 py-2 text-xs leading-relaxed"
-          style={{ backgroundColor: 'var(--theme-card)', border: '1px solid var(--theme-border)', color: 'var(--theme-text)' }}
+          style={{
+            backgroundColor: 'var(--theme-card)',
+            border: '1px solid var(--theme-border)',
+            color: 'var(--theme-text)',
+          }}
         >
           <div className="font-medium">{file.name}</div>
           <div style={{ color: 'var(--theme-muted)' }}>{file.path}</div>
@@ -220,7 +257,9 @@ function SkillsTab() {
       .then((json) => {
         if (!cancelled) {
           // Handle array of skills or object with skills property
-          const list = Array.isArray(json) ? json : (json.skills || json.data || [])
+          const list = Array.isArray(json)
+            ? json
+            : json.skills || json.data || []
           setSkills(list)
           setLoading(false)
         }
@@ -231,7 +270,9 @@ function SkillsTab() {
           setLoading(false)
         }
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (loading) return <LoadingState text="Loading skills…" />
@@ -253,17 +294,25 @@ function SkillsTab() {
       </p>
       {Object.entries(grouped).map(([category, items]) => (
         <div key={category}>
-          <p className="text-[10px] uppercase tracking-wider mb-1 font-semibold" style={{ color: 'var(--theme-accent)' }}>
+          <p
+            className="text-[10px] uppercase tracking-wider mb-1 font-semibold"
+            style={{ color: 'var(--theme-accent)' }}
+          >
             {category}
           </p>
           {items.map((skill) => (
             <button
               key={skill.name}
               type="button"
-              onClick={() => setExpanded(expanded === skill.name ? null : skill.name)}
+              onClick={() =>
+                setExpanded(expanded === skill.name ? null : skill.name)
+              }
               className="w-full text-left rounded px-2 py-1.5 text-xs mb-0.5 transition-colors"
               style={{
-                background: expanded === skill.name ? 'var(--theme-card2)' : 'transparent',
+                background:
+                  expanded === skill.name
+                    ? 'var(--theme-card2)'
+                    : 'transparent',
                 color: 'var(--theme-text)',
               }}
             >
@@ -272,7 +321,10 @@ function SkillsTab() {
                 <span>{skill.name}</span>
               </div>
               {expanded === skill.name && skill.description && (
-                <p className="mt-1 pl-5 text-[11px]" style={{ color: 'var(--theme-muted)' }}>
+                <p
+                  className="mt-1 pl-5 text-[11px]"
+                  style={{ color: 'var(--theme-muted)' }}
+                >
                   {skill.description}
                 </p>
               )}
@@ -312,7 +364,10 @@ function LogsTab() {
       <pre
         ref={scrollRef}
         className="text-xs rounded p-2 overflow-auto max-h-[400px] font-mono"
-        style={{ background: 'var(--theme-card2)', color: 'var(--theme-muted)' }}
+        style={{
+          background: 'var(--theme-card2)',
+          color: 'var(--theme-muted)',
+        }}
       >
         {events.map((e: ActivityEvent) => JSON.stringify(e)).join('\n')}
       </pre>
@@ -356,7 +411,10 @@ export function InspectorPanel() {
             className="flex items-center justify-between px-4 py-3 shrink-0"
             style={{ borderBottom: '1px solid var(--theme-border)' }}
           >
-            <span className="text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
+            <span
+              className="text-sm font-semibold"
+              style={{ color: 'var(--theme-text)' }}
+            >
               Inspector
             </span>
             <button
@@ -375,7 +433,7 @@ export function InspectorPanel() {
             className="flex shrink-0 overflow-x-auto"
             style={{ borderBottom: '1px solid var(--theme-border)' }}
           >
-            {TABS.map((tab) => (
+            {TABS.map((tab) =>
               (() => {
                 const available =
                   tab.feature === 'memory'
@@ -394,14 +452,18 @@ export function InspectorPanel() {
                     disabled={!available}
                     className={cn(
                       'px-3 py-2 text-xs font-medium shrink-0 transition-colors',
-                      activeTab === tab.id
-                        ? 'border-b-2'
-                        : 'hover:opacity-80',
+                      activeTab === tab.id ? 'border-b-2' : 'hover:opacity-80',
                       !available && 'cursor-not-allowed opacity-50',
                     )}
                     style={{
-                      color: activeTab === tab.id ? 'var(--theme-accent)' : 'var(--theme-muted)',
-                      borderBottomColor: activeTab === tab.id ? 'var(--theme-accent)' : 'transparent',
+                      color:
+                        activeTab === tab.id
+                          ? 'var(--theme-accent)'
+                          : 'var(--theme-muted)',
+                      borderBottomColor:
+                        activeTab === tab.id
+                          ? 'var(--theme-accent)'
+                          : 'transparent',
                     }}
                     title={
                       !available && tab.feature
@@ -417,8 +479,8 @@ export function InspectorPanel() {
                     ) : null}
                   </button>
                 )
-              })()
-            ))}
+              })(),
+            )}
           </div>
 
           {/* Content */}

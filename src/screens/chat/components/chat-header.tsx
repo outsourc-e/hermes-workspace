@@ -1,8 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Folder01Icon,
-} from '@hugeicons/core-free-icons'
+import { Folder01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -32,7 +30,10 @@ function formatMobileSessionTitle(rawTitle: string): string {
   if (normalized === 'agent:main:main' || normalized === 'agent:main') {
     return 'Main Chat'
   }
-  const parts = title.split(':').map((part) => part.trim()).filter(Boolean)
+  const parts = title
+    .split(':')
+    .map((part) => part.trim())
+    .filter(Boolean)
   if (
     parts.length >= 2 &&
     parts[0].toLowerCase() === 'agent' &&
@@ -64,7 +65,6 @@ function formatMobileSessionTitle(rawTitle: string): string {
   return title
 }
 
-
 type ThinkingLevel = 'off' | 'low' | 'adaptive'
 
 type ChatHeaderProps = {
@@ -73,7 +73,13 @@ type ChatHeaderProps = {
   renamingTitle?: boolean
   wrapperRef?: React.Ref<HTMLDivElement>
   onOpenSessions?: () => void
-  sessions?: Array<{ key?: string; friendlyId?: string; label?: string; derivedTitle?: string; title?: string }>
+  sessions?: Array<{
+    key?: string
+    friendlyId?: string
+    label?: string
+    derivedTitle?: string
+    title?: string
+  }>
   activeFriendlyId?: string
   onSelectSession?: (key: string) => void
   showFileExplorerButton?: boolean
@@ -138,7 +144,8 @@ function ChatHeaderComponent({
     if (!sessionPopoverOpen) return
     const handler = (e: MouseEvent) => {
       if (sessionPopoverRef.current?.contains(e.target as Node)) return
-      setSessionPopoverOpen(false); setSessionSearch('')
+      setSessionPopoverOpen(false)
+      setSessionSearch('')
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -157,7 +164,12 @@ function ChatHeaderComponent({
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
   const mobileTitle = formatMobileSessionTitle(activeTitle)
-  void _agentModel; void agentConnected; void statusMode; void activeToolName; void isFocusMode; void onToggleFocusMode // kept for prop compat
+  void _agentModel
+  void agentConnected
+  void statusMode
+  void activeToolName
+  void isFocusMode
+  void onToggleFocusMode // kept for prop compat
   const showThinkingIndicator = thinkingLevel === 'adaptive'
 
   const handleRefresh = useCallback(() => {
@@ -230,7 +242,11 @@ function ChatHeaderComponent({
       <div
         ref={wrapperRef}
         className="shrink-0 bg-surface transition-transform"
-        style={pullOffset > 0 ? { transform: `translateY(${pullOffset}px)` } : undefined}
+        style={
+          pullOffset > 0
+            ? { transform: `translateY(${pullOffset}px)` }
+            : undefined
+        }
       >
         <div className="px-3 h-12 flex items-center gap-0">
           {/* Hamburger lines — ChatGPT style, large tap target */}
@@ -240,8 +256,19 @@ function ChatHeaderComponent({
             className="shrink-0 flex items-center justify-center w-11 h-11 -ml-1 rounded-xl active:bg-white/10 transition-colors z-10"
             aria-label="Open navigation menu"
           >
-            <svg width="20" height="16" viewBox="0 0 20 16" fill="none" className="text-ink opacity-70">
-              <path d="M1 1.5H19M1 8H19M1 14.5H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            <svg
+              width="20"
+              height="16"
+              viewBox="0 0 20 16"
+              fill="none"
+              className="text-ink opacity-70"
+            >
+              <path
+                d="M1 1.5H19M1 8H19M1 14.5H13"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
 
@@ -252,9 +279,23 @@ function ChatHeaderComponent({
             className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-white/5 hover:bg-primary-100 active:bg-primary-150 transition-colors"
             aria-label="Switch session"
           >
-            <span className="truncate text-[13px] font-medium text-ink">{mobileTitle === 'new' ? 'New Chat' : mobileTitle}</span>
-            <svg width="8" height="5" viewBox="0 0 8 5" fill="none" className="shrink-0 opacity-40">
-              <path d="M1 1L4 4L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <span className="truncate text-[13px] font-medium text-ink">
+              {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
+            </span>
+            <svg
+              width="8"
+              height="5"
+              viewBox="0 0 8 5"
+              fill="none"
+              className="shrink-0 opacity-40"
+            >
+              <path
+                d="M1 1L4 4L7 1"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
 
@@ -269,10 +310,7 @@ function ChatHeaderComponent({
   }
 
   return (
-    <div
-      ref={wrapperRef}
-      className="shrink-0 bg-surface"
-    >
+    <div ref={wrapperRef} className="shrink-0 bg-surface">
       <div className="px-4 h-12 flex items-center">
         {showFileExplorerButton ? (
           <TooltipProvider>
@@ -303,101 +341,163 @@ function ChatHeaderComponent({
           </TooltipProvider>
         ) : null}
         <div className="group min-w-0 flex-1">
-        {isEditingTitle ? (
-          <input
-            ref={titleInputRef}
-            value={titleDraft}
-            disabled={renamingTitle}
-            onChange={(event) => setTitleDraft(event.target.value)}
-            onBlur={() => {
-              void saveTitleEdit()
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              disabled={renamingTitle}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              onBlur={() => {
                 void saveTitleEdit()
-                return
-              }
-              if (event.key === 'Escape') {
-                event.preventDefault()
-                cancelTitleEdit()
-              }
-            }}
-            className="h-7 w-full min-w-0 border-b border-transparent bg-transparent px-0 text-sm font-medium text-balance text-ink outline-none transition-colors focus:border-primary-300"
-            aria-label="Session name"
-          />
-        ) : (
-          <div className="relative flex items-center gap-1" ref={sessionPopoverRef}>
-            <button type="button" onClick={() => setSessionPopoverOpen((p) => !p)}
-              className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
-              title="Click to switch session">
-              {activeTitle}
-            </button>
-            {canRenameTitle && !renamingTitle && (
-              <button type="button" onClick={startTitleEdit}
-                className="text-xs text-primary-400 opacity-0 group-hover:opacity-100 hover:text-primary-600 transition-opacity shrink-0"
-                title="Rename session">✏️</button>
-            )}
-            {sessionPopoverOpen && (
-              <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 rounded-xl border border-primary-200 bg-surface shadow-lg overflow-hidden">
-                <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-neutral-400 shrink-0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                  <input autoFocus type="text" placeholder="Search sessions..." value={sessionSearch}
-                    onChange={(e) => setSessionSearch(e.target.value)}
-                    className="flex-1 bg-transparent text-sm outline-none text-neutral-700 placeholder-neutral-400 dark:text-neutral-200" />
-                </div>
-                <div className="max-h-60 overflow-y-auto p-1">
-                  {sessions.filter((s) => {
-                    if (!sessionSearch.trim()) return true
-                    const q = sessionSearch.toLowerCase()
-                    return (s.label || s.derivedTitle || s.title || '').toLowerCase().includes(q) || s.friendlyId?.toLowerCase().includes(q)
-                  }).slice(0, 20).map((s) => {
-                    const label = s.label || s.derivedTitle || s.title || s.friendlyId?.slice(0, 8) || 'Session'
-                    const isActive = Boolean(activeFriendlyId) && (s.friendlyId === activeFriendlyId || s.key?.endsWith(`:${activeFriendlyId}`))
-                    return (
-                      <button key={s.key || s.friendlyId} type="button"
-                        onClick={() => { setSessionPopoverOpen(false); setSessionSearch(''); onSelectSession?.(s.key || s.friendlyId || '') }}
-                        className={cn('flex w-full items-center gap-2 px-3 py-2 text-sm text-left border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:hover:bg-white/10 transition-colors', isActive && 'bg-neutral-50 font-medium text-neutral-900')}>
-                        <span className="flex-1 min-w-0 truncate text-neutral-700 dark:text-neutral-200">{label}</span>
-                        {isActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
-                      </button>
-                    )
-                  })}
-                  {sessions.length === 0 && <p className="px-3 py-4 text-sm text-neutral-400">No sessions</p>}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      {renamingTitle ? (
-        <span
-          className="mr-1 inline-flex size-3 animate-spin rounded-full border border-primary-300 border-t-primary-700"
-          aria-label="Saving session name"
-        />
-      ) : null}
-      {showThinkingIndicator ? (
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger
-              render={
-                <span
-                  className="mr-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                  aria-label="Thinking: Adaptive"
-                  role="status"
-                  style={{ boxShadow: '0 0 6px 1px rgba(251,191,36,0.4)' }}
-                >
-                  🧠
-                </span>
-              }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void saveTitleEdit()
+                  return
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  cancelTitleEdit()
+                }
+              }}
+              className="h-7 w-full min-w-0 border-b border-transparent bg-transparent px-0 text-sm font-medium text-balance text-ink outline-none transition-colors focus:border-primary-300"
+              aria-label="Session name"
             />
-            <TooltipContent side="bottom">
-              Thinking: Adaptive — Claude reasons before responding
-            </TooltipContent>
-          </TooltipRoot>
-        </TooltipProvider>
-      ) : null}
-      {dataUpdatedAt > 0 ? (
+          ) : (
+            <div
+              className="relative flex items-center gap-1"
+              ref={sessionPopoverRef}
+            >
+              <button
+                type="button"
+                onClick={() => setSessionPopoverOpen((p) => !p)}
+                className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
+                title="Click to switch session"
+              >
+                {activeTitle}
+              </button>
+              {canRenameTitle && !renamingTitle && (
+                <button
+                  type="button"
+                  onClick={startTitleEdit}
+                  className="text-xs text-primary-400 opacity-0 group-hover:opacity-100 hover:text-primary-600 transition-opacity shrink-0"
+                  title="Rename session"
+                >
+                  ✏️
+                </button>
+              )}
+              {sessionPopoverOpen && (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 rounded-xl border border-primary-200 bg-surface shadow-lg overflow-hidden">
+                  <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="text-neutral-400 shrink-0"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.35-4.35" />
+                    </svg>
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Search sessions..."
+                      value={sessionSearch}
+                      onChange={(e) => setSessionSearch(e.target.value)}
+                      className="flex-1 bg-transparent text-sm outline-none text-neutral-700 placeholder-neutral-400 dark:text-neutral-200"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto p-1">
+                    {sessions
+                      .filter((s) => {
+                        if (!sessionSearch.trim()) return true
+                        const q = sessionSearch.toLowerCase()
+                        return (
+                          (s.label || s.derivedTitle || s.title || '')
+                            .toLowerCase()
+                            .includes(q) ||
+                          s.friendlyId?.toLowerCase().includes(q)
+                        )
+                      })
+                      .slice(0, 20)
+                      .map((s) => {
+                        const label =
+                          s.label ||
+                          s.derivedTitle ||
+                          s.title ||
+                          s.friendlyId?.slice(0, 8) ||
+                          'Session'
+                        const isActive =
+                          Boolean(activeFriendlyId) &&
+                          (s.friendlyId === activeFriendlyId ||
+                            s.key?.endsWith(`:${activeFriendlyId}`))
+                        return (
+                          <button
+                            key={s.key || s.friendlyId}
+                            type="button"
+                            onClick={() => {
+                              setSessionPopoverOpen(false)
+                              setSessionSearch('')
+                              onSelectSession?.(s.key || s.friendlyId || '')
+                            }}
+                            className={cn(
+                              'flex w-full items-center gap-2 px-3 py-2 text-sm text-left border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:hover:bg-white/10 transition-colors',
+                              isActive &&
+                                'bg-neutral-50 font-medium text-neutral-900',
+                            )}
+                          >
+                            <span className="flex-1 min-w-0 truncate text-neutral-700 dark:text-neutral-200">
+                              {label}
+                            </span>
+                            {isActive && (
+                              <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
+                            )}
+                          </button>
+                        )
+                      })}
+                    {sessions.length === 0 && (
+                      <p className="px-3 py-4 text-sm text-neutral-400">
+                        No sessions
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {renamingTitle ? (
+          <span
+            className="mr-1 inline-flex size-3 animate-spin rounded-full border border-primary-300 border-t-primary-700"
+            aria-label="Saving session name"
+          />
+        ) : null}
+        {showThinkingIndicator ? (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                render={
+                  <span
+                    className="mr-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    aria-label="Thinking: Adaptive"
+                    role="status"
+                    style={{ boxShadow: '0 0 6px 1px rgba(251,191,36,0.4)' }}
+                  >
+                    🧠
+                  </span>
+                }
+              />
+              <TooltipContent side="bottom">
+                Thinking: Adaptive — Claude reasons before responding
+              </TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        ) : null}
+        {dataUpdatedAt > 0 ? (
           <TooltipProvider>
             <TooltipRoot>
               <TooltipTrigger
@@ -409,7 +509,9 @@ function ChatHeaderComponent({
                     className={cn(
                       'mr-2 inline-flex items-center justify-center rounded-full transition-colors',
                       isRefreshing && 'animate-pulse',
-                      onRefresh ? 'cursor-pointer hover:opacity-70' : 'cursor-default',
+                      onRefresh
+                        ? 'cursor-pointer hover:opacity-70'
+                        : 'cursor-default',
                     )}
                   >
                     <span
@@ -434,7 +536,12 @@ function ChatHeaderComponent({
               <TooltipTrigger
                 onClick={onUndo}
                 render={
-                  <Button size="icon-sm" variant="ghost" className="text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800" aria-label="Undo last message">
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800"
+                    aria-label="Undo last message"
+                  >
                     <span className="text-sm">↩️</span>
                   </Button>
                 }
@@ -464,13 +571,19 @@ function ChatHeaderComponent({
                       'hover:bg-primary-100 dark:hover:bg-primary-800',
                       clearConfirm ? 'text-red-500' : 'text-primary-500',
                     )}
-                    aria-label={clearConfirm ? 'Confirm clear' : 'Clear session'}
+                    aria-label={
+                      clearConfirm ? 'Confirm clear' : 'Clear session'
+                    }
                   >
-                    <span className="text-sm">{clearConfirm ? '⚠️' : '🗑️'}</span>
+                    <span className="text-sm">
+                      {clearConfirm ? '⚠️' : '🗑️'}
+                    </span>
                   </Button>
                 }
               />
-              <TooltipContent side="bottom">{clearConfirm ? 'Click again to confirm' : 'Clear session'}</TooltipContent>
+              <TooltipContent side="bottom">
+                {clearConfirm ? 'Click again to confirm' : 'Clear session'}
+              </TooltipContent>
             </TooltipRoot>
           </TooltipProvider>
         )}

@@ -236,7 +236,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta httpEquiv="Content-Security-Policy" content={APP_CSP} />
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
           // Polyfill crypto.randomUUID for non-secure contexts (HTTP access via LAN IP)
           if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
             crypto.randomUUID = function() {
@@ -245,13 +247,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               });
             };
           }
-        ` }} />
+        `,
+          }}
+        />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: themeColorScript }} />
       </head>
       <body>
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
           (function(){
             if (document.getElementById('splash-screen')) return;
             var bg = '#0A0E1A', txt = '#E6EAF2', muted = '#9AA5BD', accent = '#6366F1';
@@ -335,10 +341,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               }
             } catch(e) {}
           })()
-        `}} />
+        `,
+          }}
+        />
         <div className="root">{children}</div>
         <Scripts />
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
           (function(){
             var start = Date.now();
             function check() {
@@ -349,7 +359,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             }
             setTimeout(check, 2500);
           })()
-        `}} />
+        `,
+          }}
+        />
       </body>
     </html>
   )

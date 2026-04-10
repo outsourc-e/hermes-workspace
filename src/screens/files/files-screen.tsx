@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { usePageTitle } from '@/hooks/use-page-title'
 import {
@@ -77,8 +71,18 @@ const IGNORED_DIRS = new Set([
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
 const CODE_EXTS = new Set([
-  'ts', 'tsx', 'js', 'jsx', 'json', 'css', 'html',
-  'yml', 'yaml', 'sh', 'py', 'env',
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'json',
+  'css',
+  'html',
+  'yml',
+  'yaml',
+  'sh',
+  'py',
+  'env',
 ])
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -112,7 +116,8 @@ function getFileIcon(entry: FileEntry): string {
   const ext = getExt(entry.name)
   if (ext === 'md' || ext === 'mdx') return '📄'
   if (ext === 'json') return '📋'
-  if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') return '📜'
+  if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx')
+    return '📜'
   if (IMAGE_EXTS.has(ext)) return '🖼'
   return '📃'
 }
@@ -180,11 +185,17 @@ function markdownToHtml(md: string): string {
   html = html.replace(/^---+$/gm, '<hr class="md-hr" />')
 
   // Blockquotes (re-escaped)
-  html = html.replace(/^&gt;\s+(.+)$/gm, '<blockquote class="md-blockquote">$1</blockquote>')
+  html = html.replace(
+    /^&gt;\s+(.+)$/gm,
+    '<blockquote class="md-blockquote">$1</blockquote>',
+  )
 
   // Unordered lists
   html = html.replace(/^[-*+]\s+(.+)$/gm, '<li class="md-li">$1</li>')
-  html = html.replace(/(<li[^>]*>.*<\/li>\n?)+/g, (m) => `<ul class="md-ul">${m}</ul>`)
+  html = html.replace(
+    /(<li[^>]*>.*<\/li>\n?)+/g,
+    (m) => `<ul class="md-ul">${m}</ul>`,
+  )
 
   // Links
   html = html.replace(
@@ -223,8 +234,8 @@ type DiffLineKind = 'unchanged' | 'added' | 'removed'
 type DiffLine = {
   kind: DiffLineKind
   text: string
-  leftNum: number | null   // original line number
-  rightNum: number | null  // new line number
+  leftNum: number | null // original line number
+  rightNum: number | null // new line number
 }
 
 /**
@@ -238,7 +249,9 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
   const n = bLines.length
 
   // Build LCS table
-  const dp: Array<Array<number>> = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  const dp: Array<Array<number>> = Array.from({ length: m + 1 }, () =>
+    new Array(n + 1).fill(0),
+  )
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       if (aLines[i - 1] === bLines[j - 1]) {
@@ -255,14 +268,29 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
   let j = n
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && aLines[i - 1] === bLines[j - 1]) {
-      result.push({ kind: 'unchanged', text: aLines[i - 1], leftNum: i, rightNum: j })
+      result.push({
+        kind: 'unchanged',
+        text: aLines[i - 1],
+        leftNum: i,
+        rightNum: j,
+      })
       i--
       j--
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.push({ kind: 'added', text: bLines[j - 1], leftNum: null, rightNum: j })
+      result.push({
+        kind: 'added',
+        text: bLines[j - 1],
+        leftNum: null,
+        rightNum: j,
+      })
       j--
     } else {
-      result.push({ kind: 'removed', text: aLines[i - 1], leftNum: i, rightNum: null })
+      result.push({
+        kind: 'removed',
+        text: aLines[i - 1],
+        leftNum: i,
+        rightNum: null,
+      })
       i--
     }
   }
@@ -274,17 +302,52 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
 // ──────────────────────────────────────────────────────────────────────────────
 
 const KEYWORDS = new Set([
-  'import', 'export', 'default', 'from', 'const', 'let', 'var', 'function',
-  'return', 'if', 'else', 'for', 'while', 'class', 'extends', 'new', 'this',
-  'type', 'interface', 'async', 'await', 'try', 'catch', 'throw', 'null',
-  'undefined', 'true', 'false', 'typeof', 'instanceof', 'void', 'in', 'of',
-  'break', 'continue', 'switch', 'case', 'delete',
+  'import',
+  'export',
+  'default',
+  'from',
+  'const',
+  'let',
+  'var',
+  'function',
+  'return',
+  'if',
+  'else',
+  'for',
+  'while',
+  'class',
+  'extends',
+  'new',
+  'this',
+  'type',
+  'interface',
+  'async',
+  'await',
+  'try',
+  'catch',
+  'throw',
+  'null',
+  'undefined',
+  'true',
+  'false',
+  'typeof',
+  'instanceof',
+  'void',
+  'in',
+  'of',
+  'break',
+  'continue',
+  'switch',
+  'case',
+  'delete',
 ])
 
 function highlightCode(code: string, ext: string): string {
   if (ext === 'json') {
     return code
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
       .replace(/("(?:[^"\\]|\\.)*")(\s*:)/g, '<span class="hl-key">$1</span>$2')
       .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="hl-str">$1</span>')
       .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="hl-num">$1</span>')
@@ -337,7 +400,14 @@ type DiffModalProps = {
   onCancel: () => void
 }
 
-function DiffModal({ open, fileName, original, updated, onSave, onCancel }: DiffModalProps) {
+function DiffModal({
+  open,
+  fileName,
+  original,
+  updated,
+  onSave,
+  onCancel,
+}: DiffModalProps) {
   const diffLines = useMemo(
     () => (open ? computeDiff(original, updated) : []),
     [open, original, updated],
@@ -353,7 +423,12 @@ function DiffModal({ open, fileName, original, updated, onSave, onCancel }: Diff
   if (!open) return null
 
   return (
-    <DialogRoot open={open} onOpenChange={(isOpen) => { if (!isOpen) onCancel() }}>
+    <DialogRoot
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onCancel()
+      }}
+    >
       <DialogContent className="max-w-5xl w-full">
         <div className="flex flex-col max-h-[85vh]">
           {/* Header */}
@@ -363,9 +438,13 @@ function DiffModal({ open, fileName, original, updated, onSave, onCancel }: Diff
                 Review changes — {fileName}
               </DialogTitle>
               <DialogDescription className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">
-                <span className="text-emerald-600 font-medium">+{addedCount} added</span>
+                <span className="text-emerald-600 font-medium">
+                  +{addedCount} added
+                </span>
                 {' · '}
-                <span className="text-red-600 font-medium">−{removedCount} removed</span>
+                <span className="text-red-600 font-medium">
+                  −{removedCount} removed
+                </span>
               </DialogDescription>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -403,7 +482,9 @@ function DiffModal({ open, fileName, original, updated, onSave, onCancel }: Diff
                       <span
                         className={cn(
                           'shrink-0 w-5 select-none text-center leading-relaxed',
-                          line.kind === 'removed' ? 'text-red-500' : 'text-transparent',
+                          line.kind === 'removed'
+                            ? 'text-red-500'
+                            : 'text-transparent',
                         )}
                       >
                         {line.kind === 'removed' ? '−' : ' '}
@@ -447,7 +528,9 @@ function DiffModal({ open, fileName, original, updated, onSave, onCancel }: Diff
                       <span
                         className={cn(
                           'shrink-0 w-5 select-none text-center leading-relaxed',
-                          line.kind === 'added' ? 'text-emerald-600' : 'text-transparent',
+                          line.kind === 'added'
+                            ? 'text-emerald-600'
+                            : 'text-transparent',
                         )}
                       >
                         {line.kind === 'added' ? '+' : ' '}
@@ -573,7 +656,9 @@ function Breadcrumb({ path }: { path: string }) {
       <span className="shrink-0">workspace</span>
       {parts.map((part, i) => (
         <span key={i} className="flex items-center gap-1 min-w-0">
-          <span className="shrink-0 text-primary-300 dark:text-neutral-600">/</span>
+          <span className="shrink-0 text-primary-300 dark:text-neutral-600">
+            /
+          </span>
           <span
             className={cn(
               'truncate',
@@ -736,7 +821,9 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
           <div>
             <div className="text-5xl mb-3 opacity-40">📁</div>
             <p className="text-sm font-medium">{selectedEntry.name}</p>
-            <p className="text-xs mt-1 opacity-70">Select a file inside to preview</p>
+            <p className="text-xs mt-1 opacity-70">
+              Select a file inside to preview
+            </p>
           </div>
         </div>
       </>
@@ -960,13 +1047,20 @@ export function FilesScreen() {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 5000)
     try {
-      const res = await fetch('/api/files?action=list&maxDepth=3', { signal: controller.signal })
-      if (!res.ok) throw new Error(`HTTP ${res.status} — check that HERMES_WORKSPACE_DIR is set`)
+      const res = await fetch('/api/files?action=list&maxDepth=3', {
+        signal: controller.signal,
+      })
+      if (!res.ok)
+        throw new Error(
+          `HTTP ${res.status} — check that HERMES_WORKSPACE_DIR is set`,
+        )
       const data = (await res.json()) as FilesListResponse
       setEntries(Array.isArray(data.entries) ? data.entries : [])
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        setTreeError('Could not load files — request timed out. Check that HERMES_WORKSPACE_DIR is set.')
+        setTreeError(
+          'Could not load files — request timed out. Check that HERMES_WORKSPACE_DIR is set.',
+        )
       } else {
         setTreeError(err instanceof Error ? err.message : String(err))
       }
@@ -1049,7 +1143,11 @@ export function FilesScreen() {
   }, [])
 
   const openRenamePrompt = useCallback((entry: FileEntry) => {
-    setPromptState({ mode: 'rename', targetPath: entry.path, defaultValue: entry.name })
+    setPromptState({
+      mode: 'rename',
+      targetPath: entry.path,
+      defaultValue: entry.name,
+    })
     setPromptValue(entry.name)
   }, [])
 
@@ -1197,7 +1295,10 @@ export function FilesScreen() {
             <button
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-primary-100 dark:hover:bg-neutral-800"
               onClick={() => {
-                setPromptState({ mode: 'new-folder', targetPath: contextMenu.entry.path })
+                setPromptState({
+                  mode: 'new-folder',
+                  targetPath: contextMenu.entry.path,
+                })
                 setPromptValue('')
                 setContextMenu(null)
               }}
@@ -1270,12 +1371,15 @@ export function FilesScreen() {
       >
         <DialogContent>
           <div className="p-5 space-y-3">
-            <DialogTitle>Delete {deleteConfirm?.type === 'folder' ? 'Folder' : 'File'}</DialogTitle>
+            <DialogTitle>
+              Delete {deleteConfirm?.type === 'folder' ? 'Folder' : 'File'}
+            </DialogTitle>
             <DialogDescription>
               Are you sure you want to delete{' '}
               <strong>{deleteConfirm?.name}</strong>?
-              {deleteConfirm?.type === 'folder' && ' This will delete all contents inside.'}
-              {' '}This action cannot be undone.
+              {deleteConfirm?.type === 'folder' &&
+                ' This will delete all contents inside.'}{' '}
+              This action cannot be undone.
             </DialogDescription>
             <div className="flex justify-end gap-2 pt-2">
               <DialogClose render={<Button variant="outline">Cancel</Button>} />

@@ -1,6 +1,12 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from 'react'
 import type { Ref } from 'react'
 
 import { useAutocompleteFilter } from '@/components/ui/autocomplete'
@@ -95,7 +101,12 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
 
   return (
     <div className="pointer-events-none absolute inset-x-2 bottom-[calc(100%+0.5rem)] z-[70]">
-      <div className="pointer-events-auto overflow-hidden rounded-xl border border-primary-200 shadow-lg" style={{ background: 'var(--color-surface, var(--theme-card, #1a1f2e))' }}>
+      <div
+        className="pointer-events-auto overflow-hidden rounded-xl border border-primary-200 shadow-lg"
+        style={{
+          background: 'var(--color-surface, var(--theme-card, #1a1f2e))',
+        }}
+      >
         <Command
           items={filteredCommands}
           value={query}

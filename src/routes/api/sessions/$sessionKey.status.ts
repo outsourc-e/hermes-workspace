@@ -27,7 +27,10 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/status')({
         const { sessionKey } = params
 
         if (!sessionKey || sessionKey.trim().length === 0) {
-          return json({ ok: false, error: 'sessionKey required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'sessionKey required' },
+            { status: 400 },
+          )
         }
 
         try {

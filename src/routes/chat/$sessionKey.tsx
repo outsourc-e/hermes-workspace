@@ -35,7 +35,8 @@ export const Route = createFileRoute('/chat/$sessionKey')({
             </button>
             <button
               onClick={() => {
-                if (typeof window !== 'undefined') window.location.href = '/chat'
+                if (typeof window !== 'undefined')
+                  window.location.href = '/chat'
               }}
               className="px-4 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors"
             >
@@ -97,7 +98,9 @@ function ChatRoute() {
         sessionKey: payload.sessionKey,
       })
       // Persist last session for refresh recovery
-      try { localStorage.setItem('hermes-last-session', payload.friendlyId) } catch {}
+      try {
+        localStorage.setItem('hermes-last-session', payload.friendlyId)
+      } catch {}
       navigate({
         to: '/chat/$sessionKey',
         params: { sessionKey: payload.friendlyId },

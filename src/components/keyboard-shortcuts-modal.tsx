@@ -50,7 +50,7 @@ export function KeyboardShortcutsModal() {
       ) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
         const tag = (event.target as HTMLElement)?.tagName?.toLowerCase()
-         
+
         if (
           tag === 'input' ||
           tag === 'textarea' ||

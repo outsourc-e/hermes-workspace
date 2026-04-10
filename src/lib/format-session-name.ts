@@ -57,7 +57,9 @@ export function formatSessionKey(key: string): string {
   }
 
   // Fallback: last meaningful segment
-  const lastMeaningful = parts.filter((p) => p.length > 8 ? false : true).pop()
+  const lastMeaningful = parts
+    .filter((p) => (p.length > 8 ? false : true))
+    .pop()
   return lastMeaningful ? titleCase(lastMeaningful) : key
 }
 

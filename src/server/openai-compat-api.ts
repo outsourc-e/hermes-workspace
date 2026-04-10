@@ -15,17 +15,24 @@ async function getDefaultModel(): Promise<string> {
   try {
     const headers: Record<string, string> = {}
     if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
-    const res = await fetch(`${HERMES_API}/v1/models`, { headers, signal: AbortSignal.timeout(3_000) })
+    const res = await fetch(`${HERMES_API}/v1/models`, {
+      headers,
+      signal: AbortSignal.timeout(3_000),
+    })
     if (res.ok) {
-      const data = await res.json() as { data?: Array<{ id: string }> }
+      const data = (await res.json()) as { data?: Array<{ id: string }> }
       if (data.data && data.data.length > 0) {
         // Prefer a known-good chat model over the first alphabetical one
-        const preferred = data.data.find((m) => /qwen|llama|mistral|gemma/i.test(m.id))
+        const preferred = data.data.find((m) =>
+          /qwen|llama|mistral|gemma/i.test(m.id),
+        )
         _cachedDefaultModel = preferred?.id ?? data.data[0].id
         return _cachedDefaultModel
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return 'default'
 }
 
@@ -43,11 +50,15 @@ export type OpenAIChatOptions = {
   stream?: boolean
   temperature?: number
   signal?: AbortSignal
+  sessionId?: string
 }
 
 type OpenAIChatRequest = {
   model: string
-  messages: Array<{ role: string; content: string | Array<OpenAICompatContentPart> }>
+  messages: Array<{
+    role: string
+    content: string | Array<OpenAICompatContentPart>
+  }>
   stream: boolean
   temperature?: number
 }
@@ -60,13 +71,14 @@ type OpenAIChatCompletionResponse = {
   }>
 }
 
-async function buildRequestBody(
+export async function buildRequestBody(
   messages: Array<OpenAICompatMessage>,
   options: OpenAIChatOptions,
 ): Promise<OpenAIChatRequest> {
-  const model = options.model && options.model !== 'default'
-    ? options.model
-    : await getDefaultModel()
+  const model =
+    options.model && options.model !== 'default'
+      ? options.model
+      : await getDefaultModel()
   return {
     model,
     messages,
@@ -77,7 +89,7 @@ async function buildRequestBody(
 
 export type StreamChunkType = { type: 'content' | 'reasoning'; text: string }
 
-async function* parseOpenAIStream(
+export async function* parseOpenAIStream(
   response: Response,
 ): AsyncGenerator<StreamChunkType, void, void> {
   const reader = response.body?.getReader()
@@ -121,7 +133,8 @@ async function* parseOpenAIStream(
           const reasoning = d?.reasoning || d?.reasoning_content || ''
           // Yield content when available; fall back to reasoning only if no content yet
           if (content) yield { type: 'content' as const, text: content }
-          else if (reasoning) yield { type: 'reasoning' as const, text: reasoning }
+          else if (reasoning)
+            yield { type: 'reasoning' as const, text: reasoning }
         } catch {
           // Ignore malformed chunks.
         }
@@ -148,6 +161,9 @@ export async function openaiChat(
   if (BEARER_TOKEN) {
     headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
   }
+  if (options.sessionId) {
+    headers['X-Hermes-Session-Id'] = options.sessionId
+  }
 
   const response = await fetch(`${HERMES_API}/v1/chat/completions`, {
     method: 'POST',
@@ -165,6 +181,6 @@ export async function openaiChat(
     return parseOpenAIStream(response)
   }
 
-  const data = await response.json() as OpenAIChatCompletionResponse
+  const data = (await response.json()) as OpenAIChatCompletionResponse
   return data.choices?.[0]?.message?.content ?? ''
 }

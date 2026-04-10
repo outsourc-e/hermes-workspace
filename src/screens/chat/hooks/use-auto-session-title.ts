@@ -84,8 +84,10 @@ export function useAutoSessionTitle({
     if (!sessionKey || sessionKey === 'new') return false
     if (!proposedTitle) return false
     if (!hasAssistantResponse(messages)) return false
-    if (activeSession?.label && !isGenericTitle(activeSession.label)) return false
-    if (activeSession?.title && !isGenericTitle(activeSession.title)) return false
+    if (activeSession?.label && !isGenericTitle(activeSession.label))
+      return false
+    if (activeSession?.title && !isGenericTitle(activeSession.title))
+      return false
     if (
       activeSession?.derivedTitle &&
       !isGenericTitle(activeSession.derivedTitle)
@@ -195,12 +197,5 @@ export function useAutoSessionTitle({
       sessionKey: sessionKey ?? friendlyId,
       title: proposedTitle,
     })
-  }, [
-    friendlyId,
-    isPending,
-    mutate,
-    proposedTitle,
-    sessionKey,
-    shouldGenerate,
-  ])
+  }, [friendlyId, isPending, mutate, proposedTitle, sessionKey, shouldGenerate])
 }

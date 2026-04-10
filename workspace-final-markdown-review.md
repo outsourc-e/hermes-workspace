@@ -29,10 +29,10 @@ export function markdownReviewStatus() {
 
 ## Table
 
-| Area | Expected |
-|---|---|
-| Message rendering | Cleaner |
-| Markdown attachment | Preview-first |
-| Source mode | Still available |
+| Area                | Expected        |
+| ------------------- | --------------- |
+| Message rendering   | Cleaner         |
+| Markdown attachment | Preview-first   |
+| Source mode         | Still available |
 
 [Hermes Agent Repo](https://github.com/NousResearch/hermes-agent)

@@ -1,6 +1,6 @@
 {
   "name": "hermes-workspace",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
@@ -67,6 +67,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^10.2.0",
     "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
     "tsx": "^4.21.0",
@@ -76,4 +77,3 @@
     "web-vitals": "^5.1.0"
   }
 }
-

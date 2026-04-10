@@ -38,10 +38,7 @@ function TooltipContent({
     <Tooltip.Portal>
       <Tooltip.Positioner side={side}>
         <Tooltip.Popup
-          className={cn(
-            'rounded-md px-2 py-1 text-xs shadow-sm',
-            className,
-          )}
+          className={cn('rounded-md px-2 py-1 text-xs shadow-sm', className)}
           style={{
             background: 'var(--theme-card)',
             color: 'var(--theme-text)',

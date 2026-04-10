@@ -18,11 +18,10 @@ import {
 } from '@hugeicons/core-free-icons'
 import { CreateJobDialog } from './create-job-dialog'
 import { EditJobDialog } from './edit-job-dialog'
-import type {HermesJob} from '@/lib/jobs-api';
+import type { HermesJob } from '@/lib/jobs-api'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import {
-  
   createJob,
   deleteJob,
   fetchJobOutput,
@@ -30,7 +29,7 @@ import {
   pauseJob,
   resumeJob,
   triggerJob,
-  updateJob
+  updateJob,
 } from '@/lib/jobs-api'
 
 const QUERY_KEY = ['hermes', 'jobs'] as const
@@ -161,7 +160,9 @@ function JobCard({
             {job.skills && job.skills.length > 0 && (
               <>
                 <span>·</span>
-                <span>{job.skills.length} skill{job.skills.length !== 1 ? 's' : ''}</span>
+                <span>
+                  {job.skills.length} skill{job.skills.length !== 1 ? 's' : ''}
+                </span>
               </>
             )}
           </div>
@@ -270,7 +271,8 @@ function JobCard({
                         <span className="truncate">{output.filename}</span>
                       </div>
                       <p className="text-xs leading-5 text-[var(--theme-text)]">
-                        {getOutputPreview(output.content) || 'No output content'}
+                        {getOutputPreview(output.content) ||
+                          'No output content'}
                       </p>
                     </div>
                   ))}
@@ -370,7 +372,9 @@ export function JobsScreen() {
     if (!search.trim()) return jobs
     const q = search.toLowerCase()
     return jobs.filter(
-      (j) => j.name?.toLowerCase().includes(q) || j.prompt?.toLowerCase().includes(q),
+      (j) =>
+        j.name?.toLowerCase().includes(q) ||
+        j.prompt?.toLowerCase().includes(q),
     )
   }, [jobsQuery.data, search])
 
@@ -397,7 +401,9 @@ export function JobsScreen() {
             size={18}
             className="text-[var(--theme-accent)]"
           />
-          <h1 className="text-base font-semibold text-[var(--theme-text)]">Jobs</h1>
+          <h1 className="text-base font-semibold text-[var(--theme-text)]">
+            Jobs
+          </h1>
           {jobsQuery.data && (
             <span className="ml-1 text-xs text-[var(--theme-muted)]">
               ({jobsQuery.data.length})
@@ -406,7 +412,9 @@ export function JobsScreen() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => void queryClient.invalidateQueries({ queryKey: QUERY_KEY })}
+            onClick={() =>
+              void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+            }
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title="Refresh"
           >
@@ -455,11 +463,17 @@ export function JobsScreen() {
             style={{ color: 'var(--theme-danger)' }}
           >
             Failed to load jobs:{' '}
-            {jobsQuery.error instanceof Error ? jobsQuery.error.message : 'Unknown error'}
+            {jobsQuery.error instanceof Error
+              ? jobsQuery.error.message
+              : 'Unknown error'}
           </div>
         ) : filteredJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-[var(--theme-muted)]">
-            <HugeiconsIcon icon={Clock01Icon} size={32} className="mb-3 opacity-40" />
+            <HugeiconsIcon
+              icon={Clock01Icon}
+              size={32}
+              className="mb-3 opacity-40"
+            />
             <p className="text-sm font-medium">No scheduled jobs</p>
             <p className="mt-1 text-xs">Create one to get started</p>
           </div>

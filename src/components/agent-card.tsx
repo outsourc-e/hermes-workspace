@@ -74,7 +74,11 @@ function StatusIndicator({ status }: { status: AgentCardStatus }) {
   if (status === 'completed') {
     return (
       <span className="inline-flex items-center gap-1 text-emerald-300">
-        <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={1.8} />
+        <HugeiconsIcon
+          icon={CheckmarkCircle01Icon}
+          size={14}
+          strokeWidth={1.8}
+        />
         <span className="text-[11px] font-medium text-emerald-300">Done</span>
       </span>
     )
@@ -112,8 +116,14 @@ export function AgentCard({
 }: AgentCardProps) {
   const avatar = detectProviderAvatar(model)
   const resolvedRuntime =
-    runtimeLabel ?? (typeof runtimeSeconds === 'number' ? formatRuntimeCompact(runtimeSeconds) : '')
-  const hasTokens = typeof tokenCount === 'number' && Number.isFinite(tokenCount) && tokenCount > 0
+    runtimeLabel ??
+    (typeof runtimeSeconds === 'number'
+      ? formatRuntimeCompact(runtimeSeconds)
+      : '')
+  const hasTokens =
+    typeof tokenCount === 'number' &&
+    Number.isFinite(tokenCount) &&
+    tokenCount > 0
 
   return (
     <div

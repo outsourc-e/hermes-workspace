@@ -125,7 +125,7 @@ export function useTapDebug(
         eventTarget instanceof Element
           ? eventTarget
           : eventTarget instanceof Node
-            ? (eventTarget).parentElement
+            ? eventTarget.parentElement
             : null
 
       console.debug(`[tap-debug:${label}]`, {
@@ -142,11 +142,7 @@ export function useTapDebug(
     function handleTouchStart(event: TouchEvent) {
       const touch = event.touches[0]
       if (!touch) return
-      logTap(
-        { x: touch.clientX, y: touch.clientY },
-        'touchstart',
-        event.target,
-      )
+      logTap({ x: touch.clientX, y: touch.clientY }, 'touchstart', event.target)
     }
 
     function handlePointerDown(event: PointerEvent) {

@@ -163,7 +163,6 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
 
       window.addEventListener('mousemove', handleMove)
       window.addEventListener('mouseup', handleUp)
-       
     },
     [activeTab?.id, height],
   )
@@ -377,7 +376,6 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
           />
 
           <div className="flex h-full flex-col">
-
             <div className="flex items-center gap-2 border-b border-primary-200 px-3 py-2">
               <div className="flex items-center gap-2 overflow-x-auto">
                 {tabs.map((tab) => (
@@ -425,7 +423,6 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
                   placeholder="Search output"
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
-                       
                       handleSearch(
                         activeTab?.id ?? '',
                         event.currentTarget.value,

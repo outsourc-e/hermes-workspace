@@ -1,12 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../../server/gateway-capabilities'
 import { searchMemoryFiles } from '../../../server/memory-browser'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/memory/search')({
   server: {
@@ -29,7 +29,12 @@ export const Route = createFileRoute('/api/memory/search')({
           return json({ results: searchMemoryFiles(query) })
         } catch (error) {
           return json(
-            { error: error instanceof Error ? error.message : 'Failed to search memory files' },
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to search memory files',
+            },
             { status: 500 },
           )
         }

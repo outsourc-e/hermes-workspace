@@ -124,7 +124,9 @@ async function pollForProvider(
         const configured = Array.isArray(data.configuredProviders)
           ? data.configuredProviders
           : []
-        if (configured.some((p) => p.toLowerCase() === providerId.toLowerCase())) {
+        if (
+          configured.some((p) => p.toLowerCase() === providerId.toLowerCase())
+        ) {
           return true
         }
       }
@@ -134,13 +136,19 @@ async function pollForProvider(
 
     const remaining = deadline - Date.now()
     if (remaining <= 0) break
-    await new Promise((r) => globalThis.setTimeout(r, Math.min(interval, remaining)))
+    await new Promise((r) =>
+      globalThis.setTimeout(r, Math.min(interval, remaining)),
+    )
   }
 
   return false
 }
 
-export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWizardProps) {
+export function ProviderWizard({
+  open,
+  onOpenChange,
+  editProvider,
+}: ProviderWizardProps) {
   const { triggerRestart } = useConnectionRestart()
 
   const [step, setStep] = useState<WizardStep>('provider')
@@ -268,7 +276,9 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
       // Move to verify step, then trigger the restart flow
       setSaveState('saved')
       setVerifyState('checking')
-      setVerificationMessage(`${providerName} API key saved. Hermes is restarting…`)
+      setVerificationMessage(
+        `${providerName} API key saved. Hermes is restarting…`,
+      )
       setStep('verify')
 
       // Shows confirm dialog: user can click "Restart & Apply" or "Cancel"
@@ -277,13 +287,17 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
       // After restart, poll /api/models to confirm provider is visible
       if (!pollingRef.current) {
         pollingRef.current = true
-        setVerificationMessage(`Checking if ${providerName} models are available…`)
+        setVerificationMessage(
+          `Checking if ${providerName} models are available…`,
+        )
 
         const found = await pollForProvider(providerId)
 
         if (found) {
           setVerifyState('success')
-          setVerificationMessage(`${providerName} is connected and models are available.`)
+          setVerificationMessage(
+            `${providerName} is connected and models are available.`,
+          )
         } else {
           setVerifyState('warning')
           setVerificationMessage(
@@ -333,7 +347,9 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
                 <DialogTitle className="text-balance">
-                  {editProvider ? `Edit Provider: ${editProvider.name}` : 'Provider Setup Wizard'}
+                  {editProvider
+                    ? `Edit Provider: ${editProvider.name}`
+                    : 'Provider Setup Wizard'}
                 </DialogTitle>
                 <DialogDescription className="text-pretty">
                   Add provider credentials safely. API keys stay local in your
@@ -729,10 +745,8 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                     <div className="mt-4 rounded-xl border border-primary-200 bg-primary-100/70 px-3 py-2">
                       <p className="text-xs text-primary-700 text-pretty">
                         API keys are stored locally in{' '}
-                        <code className="font-mono">
-                          {HERMES_CONFIG_PATH}
-                        </code>
-                        , never sent to Studio.
+                        <code className="font-mono">{HERMES_CONFIG_PATH}</code>,
+                        never sent to Studio.
                       </p>
                     </div>
 
@@ -827,13 +841,22 @@ export function ProviderWizard({ open, onOpenChange, editProvider }: ProviderWiz
                 <h3 className="text-base font-medium text-primary-900 text-balance">
                   Step 4: Verify
                 </h3>
-                <div className={cn('mt-3 rounded-2xl border p-4', verifyBorderColor)}>
-                  <p className={cn('text-sm font-medium text-balance', verifyIconColor)}>
+                <div
+                  className={cn(
+                    'mt-3 rounded-2xl border p-4',
+                    verifyBorderColor,
+                  )}
+                >
+                  <p
+                    className={cn(
+                      'text-sm font-medium text-balance',
+                      verifyIconColor,
+                    )}
+                  >
                     {verifyTitle}
                   </p>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
-                    {verificationMessage ||
-                      'Waiting for Hermes to respond…'}
+                    {verificationMessage || 'Waiting for Hermes to respond…'}
                   </p>
                 </div>
 

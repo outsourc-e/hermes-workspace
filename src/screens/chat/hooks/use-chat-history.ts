@@ -4,14 +4,13 @@ import { useQuery } from '@tanstack/react-query'
 import { chatQueryKeys, fetchHistory } from '../chat-queries'
 import { getMessageTimestamp, textFromMessage } from '../utils'
 import {
-  
   cleanupExpiredPendingSends,
   clearPendingMessage,
   persistPendingMessage,
-  readPendingMessage
+  readPendingMessage,
 } from '../pending-send'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
-import type {PendingSendPayload} from '../pending-send';
+import type { PendingSendPayload } from '../pending-send'
 import type { QueryClient } from '@tanstack/react-query'
 import type { ChatMessage, HistoryResponse } from '../types'
 
@@ -110,8 +109,10 @@ function parseExecNotification(text: string): ExecNotification | null {
 
       if (exitCode === null && typeof rawExit === 'string') {
         const normalized = rawExit.toLowerCase()
-        if (normalized.includes('success') || normalized.includes('ok')) ok = true
-        if (normalized.includes('fail') || normalized.includes('error')) ok = false
+        if (normalized.includes('success') || normalized.includes('ok'))
+          ok = true
+        if (normalized.includes('fail') || normalized.includes('error'))
+          ok = false
       }
     } catch {
       // Fall through to regex parsing.
@@ -161,7 +162,8 @@ function getAttachmentSignature(message: ChatMessage): string {
   return message.attachments
     .map((attachment) => {
       const name = typeof attachment?.name === 'string' ? attachment.name : ''
-      const size = typeof attachment?.size === 'number' ? String(attachment.size) : ''
+      const size =
+        typeof attachment?.size === 'number' ? String(attachment.size) : ''
       const type =
         typeof attachment?.contentType === 'string'
           ? attachment.contentType
@@ -256,8 +258,8 @@ export function useChatHistory({
   ])
   const hasDirectSessionKey = Boolean(
     normalizedForcedSessionKey ||
-      normalizedActiveSessionKey ||
-      explicitRouteSessionKey,
+    normalizedActiveSessionKey ||
+    explicitRouteSessionKey,
   )
   const canFetchWithoutSessions = Boolean(
     normalizedForcedSessionKey || explicitRouteSessionKey,
@@ -271,7 +273,9 @@ export function useChatHistory({
         (hasDirectSessionKey || !sessionsReady || activeExists)))
 
   const effectiveFriendlyId = portableMode ? 'main' : activeFriendlyId
-  const effectiveSessionKeyForHistory = portableMode ? 'main' : sessionKeyForHistory
+  const effectiveSessionKeyForHistory = portableMode
+    ? 'main'
+    : sessionKeyForHistory
   const portableHistory = useMemo(
     () => (portableMode ? readPortableHistory() : undefined),
     [portableMode],
@@ -316,10 +320,12 @@ export function useChatHistory({
     enabled: shouldFetchHistory,
     initialData: function useInitialHistory(): HistoryResponse | undefined {
       if (portableMode) {
-        return portableHistory ?? {
-          sessionKey: 'main',
-          messages: [],
-        }
+        return (
+          portableHistory ?? {
+            sessionKey: 'main',
+            messages: [],
+          }
+        )
       }
       return queryClient.getQueryData<HistoryResponse>(historyKey)
     },
@@ -339,17 +345,23 @@ export function useChatHistory({
 
   useEffect(() => {
     cleanupExpiredPendingSends()
-    setPersistedPending(readPendingMessage(sessionKeyForHistory, activeFriendlyId))
+    setPersistedPending(
+      readPendingMessage(sessionKeyForHistory, activeFriendlyId),
+    )
   }, [activeFriendlyId, sessionKeyForHistory])
 
   const rawHistoryMessages = useMemo(() => {
-    return Array.isArray(historyQuery.data?.messages) ? historyQuery.data.messages : []
+    return Array.isArray(historyQuery.data?.messages)
+      ? historyQuery.data.messages
+      : []
   }, [historyQuery.data?.messages])
 
   useEffect(() => {
     if (!sessionKeyForHistory || sessionKeyForHistory === 'new') return
 
-    const optimisticMessages = rawHistoryMessages.filter(isOptimisticUserMessage)
+    const optimisticMessages = rawHistoryMessages.filter(
+      isOptimisticUserMessage,
+    )
     if (optimisticMessages.length === 0) return
 
     const latestOptimisticMessage =
@@ -369,7 +381,10 @@ export function useChatHistory({
   useEffect(() => {
     if (!persistedPending) return
     if (
-      hasConfirmedPendingMessage(rawHistoryMessages, persistedPending.optimisticMessage)
+      hasConfirmedPendingMessage(
+        rawHistoryMessages,
+        persistedPending.optimisticMessage,
+      )
     ) {
       clearPendingMessage(persistedPending.sessionKey)
       setPersistedPending(null)
@@ -564,7 +579,11 @@ function mergeOptimisticHistoryMessages(
       }
 
       const serverClientId = getMessageClientId(serverMessage)
-      if (optimisticClientId && serverClientId && optimisticClientId === serverClientId) {
+      if (
+        optimisticClientId &&
+        serverClientId &&
+        optimisticClientId === serverClientId
+      ) {
         return true
       }
 
@@ -573,7 +592,12 @@ function mergeOptimisticHistoryMessages(
       const serverTime = getMessageTimestamp(serverMessage)
       const withinWindow = Math.abs(optimisticTime - serverTime) <= TEN_SECONDS
 
-      if (optimisticText && serverText && optimisticText === serverText && withinWindow) {
+      if (
+        optimisticText &&
+        serverText &&
+        optimisticText === serverText &&
+        withinWindow
+      ) {
         return true
       }
 
@@ -592,8 +616,12 @@ function mergeOptimisticHistoryMessages(
 
     if (matchingServerIndex >= 0) {
       const serverMessage = merged[matchingServerIndex]
-      const serverHasAttachments = Array.isArray(serverMessage.attachments) && serverMessage.attachments.length > 0
-      const optimisticHasAttachments = Array.isArray(optimisticMessage.attachments) && optimisticMessage.attachments.length > 0
+      const serverHasAttachments =
+        Array.isArray(serverMessage.attachments) &&
+        serverMessage.attachments.length > 0
+      const optimisticHasAttachments =
+        Array.isArray(optimisticMessage.attachments) &&
+        optimisticMessage.attachments.length > 0
 
       if (!serverHasAttachments && optimisticHasAttachments) {
         merged[matchingServerIndex] = {

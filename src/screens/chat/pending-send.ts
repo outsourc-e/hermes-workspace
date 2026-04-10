@@ -20,7 +20,9 @@ type PersistedPendingSendPayload = PendingSendPayload & {
 }
 
 function canUseLocalStorage() {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+  return (
+    typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+  )
 }
 
 function getPendingStorageKey(sessionKey: string) {
@@ -28,7 +30,10 @@ function getPendingStorageKey(sessionKey: string) {
 }
 
 function isExpiredPendingPayload(payload: { storedAt?: unknown }) {
-  if (typeof payload.storedAt !== 'number' || !Number.isFinite(payload.storedAt)) {
+  if (
+    typeof payload.storedAt !== 'number' ||
+    !Number.isFinite(payload.storedAt)
+  ) {
     return true
   }
   return Date.now() - payload.storedAt > PENDING_MESSAGE_MAX_AGE_MS

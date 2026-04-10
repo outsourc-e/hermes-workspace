@@ -3,12 +3,12 @@
  * Gives us real PTY (echo, colors, resize) without node-pty native addon.
  */
 import { randomUUID } from 'node:crypto'
-import {  spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 import EventEmitter from 'node:events'
-import type {ChildProcess} from 'node:child_process';
+import type { ChildProcess } from 'node:child_process'
 
 export type TerminalSessionEvent = {
   event: string

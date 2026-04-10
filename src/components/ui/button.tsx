@@ -32,8 +32,7 @@ const buttonVariants = cva(
           'bg-primary-50 text-primary-950 hover:bg-primary-200 outline outline-primary-900/10 shadow-2xs',
         outline:
           'border-primary-200 bg-transparent text-primary-900 hover:bg-primary-50 shadow-2xs outline outline-primary-900/10',
-        ghost:
-          'text-primary-900 hover:bg-primary-200 hover:text-primary-950',
+        ghost: 'text-primary-900 hover:bg-primary-200 hover:text-primary-950',
         destructive: 'bg-red-600 text-primary-50 hover:bg-red-700 shadow-sm',
       },
     },

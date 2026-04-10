@@ -103,7 +103,8 @@ export function ConnectionStatusMessage({
       setTimeout(() => setVisible(false), 300)
     }
     window.addEventListener('hermes:health-restored', handleRestored)
-    return () => window.removeEventListener('hermes:health-restored', handleRestored)
+    return () =>
+      window.removeEventListener('hermes:health-restored', handleRestored)
   }, [])
 
   if (!visible) return null
@@ -137,7 +138,9 @@ export function ConnectionStatusMessage({
           {!isChecking ? (
             <>
               <p className="mt-0.5 text-amber-700">{errorInfo.description}</p>
-              <p className="mt-1 font-medium text-amber-800">{errorInfo.action}</p>
+              <p className="mt-1 font-medium text-amber-800">
+                {errorInfo.action}
+              </p>
             </>
           ) : null}
         </div>

@@ -58,7 +58,10 @@ function asBoolean(value: unknown): boolean {
 
 function asStringArray(value: unknown): Array<string> {
   return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    ? value.filter(
+        (item): item is string =>
+          typeof item === 'string' && item.trim().length > 0,
+      )
     : []
 }
 
@@ -97,7 +100,8 @@ function normalizeAgent(value: unknown): WorkspaceAgentDirectory | null {
         : 'primary',
     description: asString(record?.description) ?? '',
     system_prompt: asString(record?.system_prompt) ?? '',
-    prompt_updated_at: asString(record?.prompt_updated_at) ?? new Date().toISOString(),
+    prompt_updated_at:
+      asString(record?.prompt_updated_at) ?? new Date().toISOString(),
     limits: {
       max_tokens: asNumber(limits?.max_tokens),
       cost_label: asString(limits?.cost_label) ?? 'Unknown',
@@ -116,9 +120,13 @@ function normalizeAgent(value: unknown): WorkspaceAgentDirectory | null {
   }
 }
 
-export function extractWorkspaceAgents(payload: unknown): Array<WorkspaceAgentDirectory> {
+export function extractWorkspaceAgents(
+  payload: unknown,
+): Array<WorkspaceAgentDirectory> {
   if (Array.isArray(payload)) {
-    return payload.map(normalizeAgent).filter((value): value is WorkspaceAgentDirectory => Boolean(value))
+    return payload
+      .map(normalizeAgent)
+      .filter((value): value is WorkspaceAgentDirectory => Boolean(value))
   }
 
   const record = asRecord(payload)
@@ -133,7 +141,9 @@ export function extractWorkspaceAgents(payload: unknown): Array<WorkspaceAgentDi
   return []
 }
 
-export function normalizeWorkspaceAgentStats(payload: unknown): WorkspaceAgentStats {
+export function normalizeWorkspaceAgentStats(
+  payload: unknown,
+): WorkspaceAgentStats {
   const record = asRecord(payload)
   const stats = asRecord(record?.stats) ?? record
   return {
@@ -143,13 +153,16 @@ export function normalizeWorkspaceAgentStats(payload: unknown): WorkspaceAgentSt
     cost_cents_today: asNumber(stats?.cost_cents_today),
     success_rate: asNumber(stats?.success_rate),
     avg_response_ms:
-      typeof stats?.avg_response_ms === 'number' && Number.isFinite(stats.avg_response_ms)
+      typeof stats?.avg_response_ms === 'number' &&
+      Number.isFinite(stats.avg_response_ms)
         ? stats.avg_response_ms
         : null,
   }
 }
 
-export async function listWorkspaceAgents(): Promise<Array<WorkspaceAgentDirectory>> {
+export async function listWorkspaceAgents(): Promise<
+  Array<WorkspaceAgentDirectory>
+> {
   const payload = await workspaceRequestJson('/api/workspace/agents')
   return extractWorkspaceAgents(payload)
 }

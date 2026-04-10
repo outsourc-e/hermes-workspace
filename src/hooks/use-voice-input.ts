@@ -28,13 +28,13 @@ type UseVoiceInputReturn = {
 }
 
 // Web Speech API types (not available in all TS configs)
- 
+
 type SpeechRecognitionInstance = any
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance
 
 function getSpeechRecognition(): SpeechRecognitionConstructor | null {
   if (typeof window === 'undefined') return null
-   
+
   const win = window as any
   return win.SpeechRecognition ?? win.webkitSpeechRecognition ?? null
 }

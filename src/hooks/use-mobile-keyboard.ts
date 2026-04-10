@@ -7,7 +7,9 @@ const CLOSE_THRESHOLD = 12
 const CLOSE_DEBOUNCE_MS = 200
 
 export function useMobileKeyboard() {
-  const setMobileKeyboardInset = useWorkspaceStore((s) => s.setMobileKeyboardInset)
+  const setMobileKeyboardInset = useWorkspaceStore(
+    (s) => s.setMobileKeyboardInset,
+  )
   const setMobileKeyboardOpen = useWorkspaceStore(
     (s) => s.setMobileKeyboardOpen,
   )

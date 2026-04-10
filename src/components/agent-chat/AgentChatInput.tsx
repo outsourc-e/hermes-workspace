@@ -1,7 +1,7 @@
-import {   useState } from 'react'
+import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowUp01Icon } from '@hugeicons/core-free-icons'
-import type {FormEvent, KeyboardEvent} from 'react';
+import type { FormEvent, KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 

@@ -50,4 +50,3 @@ See `.env.example` for all options. Key ones:
 - **Describe what you changed** — clear PR title + description
 - **No secrets** — never commit API keys, tokens, or passwords
 - **Follow existing patterns** — match the code style you see
-

@@ -6,10 +6,7 @@
   "display": "standalone",
   "background_color": "#0A0E1A",
   "theme_color": "#6366F1",
-  "categories": [
-    "productivity",
-    "utilities"
-  ],
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "/hermes-icon-192.png",

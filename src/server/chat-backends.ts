@@ -24,7 +24,9 @@ async function* streamHermesChat(
     throw new Error('Hermes enhanced chat requires sessionId')
   }
 
-  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user')
   if (!lastUserMessage) {
     throw new Error('Hermes enhanced chat requires a user message')
   }
@@ -45,12 +47,21 @@ async function* streamHermesChat(
     {
       signal: options.signal,
       onEvent({ event, data }) {
-        if (event === 'assistant.delta' && typeof data.delta === 'string' && data.delta) {
+        if (
+          event === 'assistant.delta' &&
+          typeof data.delta === 'string' &&
+          data.delta
+        ) {
           queue.push(data.delta)
           notify?.()
           notify = null
         }
-        if (event === 'assistant.completed' && typeof data.content === 'string' && data.content && queue.length === 0) {
+        if (
+          event === 'assistant.completed' &&
+          typeof data.content === 'string' &&
+          data.content &&
+          queue.length === 0
+        ) {
           queue.push(data.content)
           notify?.()
           notify = null

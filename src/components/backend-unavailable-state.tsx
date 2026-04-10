@@ -6,10 +6,7 @@ type Props = {
   description?: string
 }
 
-export function BackendUnavailableState({
-  feature,
-  description,
-}: Props) {
+export function BackendUnavailableState({ feature, description }: Props) {
   return (
     <div className="flex h-full min-h-[320px] items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-primary-200 bg-primary-50/70 p-8 text-center shadow-sm backdrop-blur-sm">
@@ -19,8 +16,8 @@ export function BackendUnavailableState({
         <div className="mt-4 space-y-2">
           <h2 className="text-lg font-semibold text-primary-900">{feature}</h2>
           <p className="text-sm leading-6 text-primary-600">
-            Not available on this backend. Connect to a Hermes gateway to
-            unlock {feature}.
+            Not available on this backend. Connect to a Hermes gateway to unlock{' '}
+            {feature}.
           </p>
           {description ? (
             <p className="text-xs leading-5 text-primary-500">{description}</p>

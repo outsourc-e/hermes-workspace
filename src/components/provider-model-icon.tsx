@@ -6,7 +6,7 @@
  * Uses @lobehub/icons for real provider logos.
  */
 
-import type {CSSProperties} from 'react';
+import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
 
 type ProviderModelIconProps = {
@@ -22,18 +22,38 @@ type ProviderModelIconProps = {
 function detectProvider(model: string): string {
   const m = model.toLowerCase()
   if (m.includes('anthropic') || m.includes('claude')) return 'anthropic'
-  if (m.includes('openai') || m.includes('gpt') || m.includes('codex') || m.includes('o1') || m.includes('o3')) return 'openai'
-  if (m.includes('google') || m.includes('gemini') || m.includes('antigravity')) return 'google'
+  if (
+    m.includes('openai') ||
+    m.includes('gpt') ||
+    m.includes('codex') ||
+    m.includes('o1') ||
+    m.includes('o3')
+  )
+    return 'openai'
+  if (m.includes('google') || m.includes('gemini') || m.includes('antigravity'))
+    return 'google'
   if (m.includes('minimax')) return 'minimax'
   if (m.includes('mistral') || m.includes('devstral')) return 'mistral'
   if (m.includes('deepseek')) return 'deepseek'
-  if (m.includes('ollama') || m.includes('qwen') || m.includes('llama') || m.includes('pc1') || m.includes('pc2')) return 'ollama'
+  if (
+    m.includes('ollama') ||
+    m.includes('qwen') ||
+    m.includes('llama') ||
+    m.includes('pc1') ||
+    m.includes('pc2')
+  )
+    return 'ollama'
   if (m.includes('openrouter')) return 'openrouter'
   if (m.includes('nvidia') || m.includes('nemotron')) return 'nvidia'
   return 'unknown'
 }
 
-export function ProviderModelIcon({ model, size = 12, className, style }: ProviderModelIconProps) {
+export function ProviderModelIcon({
+  model,
+  size = 12,
+  className,
+  style,
+}: ProviderModelIconProps) {
   const provider = detectProvider(model)
 
   // Use light variant (dark logos on transparent) for light mode
@@ -58,7 +78,10 @@ export function ProviderModelIcon({ model, size = 12, className, style }: Provid
     // Fallback: first letter of provider
     return (
       <span
-        className={cn('inline-flex items-center justify-center rounded-sm bg-primary-200 text-primary-600 font-mono font-bold', className)}
+        className={cn(
+          'inline-flex items-center justify-center rounded-sm bg-primary-200 text-primary-600 font-mono font-bold',
+          className,
+        )}
         style={{ width: size, height: size, fontSize: size * 0.6, ...style }}
       >
         {provider[0]?.toUpperCase() ?? '?'}
