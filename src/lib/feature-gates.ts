@@ -1,4 +1,6 @@
-import { getCapabilities } from '../server/gateway-capabilities'
+// FIX: removed import of getCapabilities from server/gateway-capabilities — that module
+// transitively imports node:sqlite (local-db.ts) which cannot be bundled for the browser.
+// isFeatureAvailable was the only consumer and had no callers, so it is removed below.
 
 export type EnhancedFeature =
   | 'sessions'
@@ -30,11 +32,6 @@ function normalizeFeature(
   }
 
   return null
-}
-
-export function isFeatureAvailable(feature: EnhancedFeature): boolean {
-  const caps = getCapabilities()
-  return caps[feature] === true
 }
 
 export function getFeatureLabel(feature: EnhancedFeature | string): string {

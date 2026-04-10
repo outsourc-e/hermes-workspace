@@ -13,7 +13,6 @@ import {
 import type { ReactNode } from 'react'
 import type { HermesSession } from '@/server/hermes-api'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
-import { getCapabilities } from '@/server/gateway-capabilities'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
@@ -633,12 +632,7 @@ export function DashboardScreen() {
     enabled: sessionsAvailable,
   })
 
-  const sessions = (sessionsQuery.data ?? [])
-  const caps = {
-    ...getCapabilities(),
-    sessions: sessionsAvailable,
-    skills: skillsAvailable,
-  }
+  const sessions = (sessionsQuery.data ?? []) as HermesSession[]
 
   const stats = useMemo(() => {
     let totalMessages = 0,
