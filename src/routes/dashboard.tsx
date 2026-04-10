@@ -3,6 +3,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { DashboardScreen } from '@/screens/dashboard/dashboard-screen'
 
 export const Route = createFileRoute('/dashboard')({
+  ssr: false,
   component: DashboardRoute,
 })
 

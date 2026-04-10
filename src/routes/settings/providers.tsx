@@ -3,6 +3,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { ProvidersScreen } from '@/screens/settings/providers-screen'
 
 export const Route = createFileRoute('/settings/providers')({
+  ssr: false,
   component: function SettingsProvidersRoute() {
     usePageTitle('Provider Setup')
     return <ProvidersScreen />

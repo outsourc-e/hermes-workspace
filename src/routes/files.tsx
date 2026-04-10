@@ -15,6 +15,7 @@ function note() {
 `
 
 export const Route = createFileRoute('/files')({
+  ssr: false,
   component: FilesRoute,
   errorComponent: function FilesError({ error }) {
     return (

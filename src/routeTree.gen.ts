@@ -69,10 +69,12 @@ import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
 import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
 import { Route as ApiMcpServersRouteImport } from './routes/api/mcp/servers'
 import { Route as ApiMcpReloadRouteImport } from './routes/api/mcp/reload'
+import { Route as ApiKnowledgeSyncRouteImport } from './routes/api/knowledge/sync'
 import { Route as ApiKnowledgeSearchRouteImport } from './routes/api/knowledge/search'
 import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/read'
 import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
 import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
+import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
@@ -378,6 +380,11 @@ const ApiMcpReloadRoute = ApiMcpReloadRouteImport.update({
   path: '/api/mcp/reload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiKnowledgeSyncRoute = ApiKnowledgeSyncRouteImport.update({
+  id: '/api/knowledge/sync',
+  path: '/api/knowledge/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiKnowledgeSearchRoute = ApiKnowledgeSearchRouteImport.update({
   id: '/api/knowledge/search',
   path: '/api/knowledge/search',
@@ -396,6 +403,11 @@ const ApiKnowledgeListRoute = ApiKnowledgeListRouteImport.update({
 const ApiKnowledgeGraphRoute = ApiKnowledgeGraphRouteImport.update({
   id: '/api/knowledge/graph',
   path: '/api/knowledge/graph',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiKnowledgeConfigRoute = ApiKnowledgeConfigRouteImport.update({
+  id: '/api/knowledge/config',
+  path: '/api/knowledge/config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHermesProxySplatRoute = ApiHermesProxySplatRouteImport.update({
@@ -466,10 +478,12 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
+  '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
   '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
+  '/api/knowledge/sync': typeof ApiKnowledgeSyncRoute
   '/api/mcp/reload': typeof ApiMcpReloadRoute
   '/api/mcp/servers': typeof ApiMcpServersRoute
   '/api/memory/list': typeof ApiMemoryListRoute
@@ -535,10 +549,12 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
+  '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
   '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
+  '/api/knowledge/sync': typeof ApiKnowledgeSyncRoute
   '/api/mcp/reload': typeof ApiMcpReloadRoute
   '/api/mcp/servers': typeof ApiMcpServersRoute
   '/api/memory/list': typeof ApiMemoryListRoute
@@ -606,10 +622,12 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
+  '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
   '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
+  '/api/knowledge/sync': typeof ApiKnowledgeSyncRoute
   '/api/mcp/reload': typeof ApiMcpReloadRoute
   '/api/mcp/servers': typeof ApiMcpServersRoute
   '/api/memory/list': typeof ApiMemoryListRoute
@@ -678,10 +696,12 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
+    | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
     | '/api/knowledge/search'
+    | '/api/knowledge/sync'
     | '/api/mcp/reload'
     | '/api/mcp/servers'
     | '/api/memory/list'
@@ -747,10 +767,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
+    | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
     | '/api/knowledge/search'
+    | '/api/knowledge/sync'
     | '/api/mcp/reload'
     | '/api/mcp/servers'
     | '/api/memory/list'
@@ -817,10 +839,12 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
+    | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
     | '/api/knowledge/search'
+    | '/api/knowledge/sync'
     | '/api/mcp/reload'
     | '/api/mcp/servers'
     | '/api/memory/list'
@@ -884,10 +908,12 @@ export interface RootRouteChildren {
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiHermesProxySplatRoute: typeof ApiHermesProxySplatRoute
+  ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
   ApiKnowledgeListRoute: typeof ApiKnowledgeListRoute
   ApiKnowledgeReadRoute: typeof ApiKnowledgeReadRoute
   ApiKnowledgeSearchRoute: typeof ApiKnowledgeSearchRoute
+  ApiKnowledgeSyncRoute: typeof ApiKnowledgeSyncRoute
   ApiMcpReloadRoute: typeof ApiMcpReloadRoute
   ApiMcpServersRoute: typeof ApiMcpServersRoute
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
@@ -1322,6 +1348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMcpReloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/knowledge/sync': {
+      id: '/api/knowledge/sync'
+      path: '/api/knowledge/sync'
+      fullPath: '/api/knowledge/sync'
+      preLoaderRoute: typeof ApiKnowledgeSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/knowledge/search': {
       id: '/api/knowledge/search'
       path: '/api/knowledge/search'
@@ -1348,6 +1381,13 @@ declare module '@tanstack/react-router' {
       path: '/api/knowledge/graph'
       fullPath: '/api/knowledge/graph'
       preLoaderRoute: typeof ApiKnowledgeGraphRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/config': {
+      id: '/api/knowledge/config'
+      path: '/api/knowledge/config'
+      fullPath: '/api/knowledge/config'
+      preLoaderRoute: typeof ApiKnowledgeConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/hermes-proxy/$': {
@@ -1500,10 +1540,12 @@ const rootRouteChildren: RootRouteChildren = {
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiHermesProxySplatRoute: ApiHermesProxySplatRoute,
+  ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
   ApiKnowledgeListRoute: ApiKnowledgeListRoute,
   ApiKnowledgeReadRoute: ApiKnowledgeReadRoute,
   ApiKnowledgeSearchRoute: ApiKnowledgeSearchRoute,
+  ApiKnowledgeSyncRoute: ApiKnowledgeSyncRoute,
   ApiMcpReloadRoute: ApiMcpReloadRoute,
   ApiMcpServersRoute: ApiMcpServersRoute,
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,

@@ -9,6 +9,7 @@ const TerminalWorkspace = lazy(() =>
 )
 
 export const Route = createFileRoute('/terminal')({
+  ssr: false,
   component: TerminalRoute,
   errorComponent: function TerminalError({ error }) {
     return (

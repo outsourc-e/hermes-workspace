@@ -9,8 +9,9 @@ import {
   Link01Icon,
   Message01Icon,
   Search01Icon,
+  Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import {
@@ -18,6 +19,7 @@ import {
   DialogDescription,
   DialogRoot,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
@@ -37,10 +39,15 @@ type WikiPageMeta = {
   wikilinks: Array<string>
 }
 
+type KnowledgeSource =
+  | { type: 'local'; path: string }
+  | { type: 'github'; repo: string; branch: string; path: string }
+
 type KnowledgeListResponse = {
   pages?: Array<WikiPageMeta>
   knowledgeRoot?: string
   exists?: boolean
+  source?: KnowledgeSource
 }
 
 type KnowledgeReadResponse = {
@@ -274,6 +281,24 @@ export function KnowledgeBrowserScreen() {
     useState<KnowledgeSearchResult | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(true)
   const [graphOpen, setGraphOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsSource, setSettingsSource] = useState<KnowledgeSource | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!settingsOpen) return
+    fetch('/api/knowledge/config')
+      .then((r) => r.json())
+      .then((data: { config?: { source: KnowledgeSource } }) => {
+        if (data.config?.source) {
+          setSettingsSource(data.config.source)
+        }
+      })
+      .catch(() => {})
+  }, [settingsOpen])
+
   const deferredSearch = useDeferredValue(searchInput)
   const searchTerm = deferredSearch.trim()
 
@@ -435,6 +460,278 @@ export function KnowledgeBrowserScreen() {
             <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={1.7} />
             Graph view
           </button>
+
+          <DialogRoot open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-primary-100 dark:hover:bg-neutral-900"
+                style={{
+                  border: '1px solid var(--theme-border)',
+                  backgroundColor: 'var(--theme-card)',
+                  color: 'var(--theme-text)',
+                }}
+                title="Knowledge base settings"
+              >
+                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.7} />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+            </DialogTrigger>
+            <DialogContent
+              className="sm:max-w-md"
+              style={{
+                backgroundColor: 'var(--theme-bg)',
+                color: 'var(--theme-text)',
+                border: '1px solid var(--theme-border)',
+              }}
+            >
+              <div className="space-y-4">
+                <div>
+                  <DialogTitle className="text-base font-semibold">
+                    Knowledge Base Settings
+                  </DialogTitle>
+                  <DialogDescription className="mt-1 text-sm" style={{ color: 'var(--theme-muted)' }}>
+                    Choose where your knowledge base is located. Changes take effect immediately.
+                  </DialogDescription>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Source type</label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSettingsSource((prev) => ({
+                          type: 'local',
+                          path: prev?.type === 'local' ? prev.path : '',
+                        }))
+                      }
+                      className="flex flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
+                      style={{
+                        borderColor:
+                          settingsSource?.type === 'local'
+                            ? 'var(--accent-color, #f97316)'
+                            : 'var(--theme-border)',
+                        backgroundColor:
+                          settingsSource?.type === 'local'
+                            ? 'var(--theme-card)'
+                            : 'transparent',
+                        color: 'var(--theme-text)',
+                      }}
+                    >
+                      <HugeiconsIcon icon={Folder01Icon} size={16} strokeWidth={1.7} />
+                      Local folder
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSettingsSource((prev) => ({
+                          type: 'github',
+                          repo: prev?.type === 'github' ? prev.repo : '',
+                          branch: prev?.type === 'github' ? prev.branch : 'main',
+                          path: prev?.type === 'github' ? prev.path : '',
+                        }))
+                      }
+                      className="flex flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
+                      style={{
+                        borderColor:
+                          settingsSource?.type === 'github'
+                            ? 'var(--accent-color, #f97316)'
+                            : 'var(--theme-border)',
+                        backgroundColor:
+                          settingsSource?.type === 'github'
+                            ? 'var(--theme-card)'
+                            : 'transparent',
+                        color: 'var(--theme-text)',
+                      }}
+                    >
+                      <HugeiconsIcon icon={CodeIcon} size={16} strokeWidth={1.7} />
+                      GitHub repo
+                    </button>
+                  </div>
+                </div>
+
+                {settingsSource?.type === 'local' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="kb-local-path">
+                      Folder path
+                    </label>
+                    <input
+                      id="kb-local-path"
+                      type="text"
+                      value={settingsSource.path}
+                      onChange={(e) =>
+                        setSettingsSource((prev) =>
+                          prev?.type === 'local'
+                            ? { ...prev, path: e.target.value }
+                            : prev,
+                        )
+                      }
+                      placeholder="~/my-wiki or /absolute/path"
+                      className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                      style={{
+                        borderColor: 'var(--theme-border)',
+                        backgroundColor: 'var(--theme-card)',
+                        color: 'var(--theme-text)',
+                      }}
+                    />
+                  </div>
+                )}
+
+                {settingsSource?.type === 'github' && (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium" htmlFor="kb-gh-repo">
+                        Repository
+                      </label>
+                      <input
+                        id="kb-gh-repo"
+                        type="text"
+                        value={settingsSource.repo}
+                        onChange={(e) =>
+                          setSettingsSource((prev) =>
+                            prev?.type === 'github'
+                              ? { ...prev, repo: e.target.value }
+                              : prev,
+                          )
+                        }
+                        placeholder="owner/repo (e.g. dontcallmejames/my-wiki)"
+                        className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                        style={{
+                          borderColor: 'var(--theme-border)',
+                          backgroundColor: 'var(--theme-card)',
+                          color: 'var(--theme-text)',
+                        }}
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-sm font-medium" htmlFor="kb-gh-branch">
+                          Branch
+                        </label>
+                        <input
+                          id="kb-gh-branch"
+                          type="text"
+                          value={settingsSource.branch}
+                          onChange={(e) =>
+                            setSettingsSource((prev) =>
+                              prev?.type === 'github'
+                                ? { ...prev, branch: e.target.value }
+                                : prev,
+                            )
+                          }
+                          placeholder="main"
+                          className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                          style={{
+                            borderColor: 'var(--theme-border)',
+                            backgroundColor: 'var(--theme-card)',
+                            color: 'var(--theme-text)',
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-sm font-medium" htmlFor="kb-gh-path">
+                          Sub-folder
+                        </label>
+                        <input
+                          id="kb-gh-path"
+                          type="text"
+                          value={settingsSource.path}
+                          onChange={(e) =>
+                            setSettingsSource((prev) =>
+                              prev?.type === 'github'
+                                ? { ...prev, path: e.target.value }
+                                : prev,
+                            )
+                          }
+                          placeholder="wiki (optional)"
+                          className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                          style={{
+                            borderColor: 'var(--theme-border)',
+                            backgroundColor: 'var(--theme-card)',
+                            color: 'var(--theme-text)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {syncError && (
+                      <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                        {syncError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  {settingsSource?.type === 'github' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!settingsSource || settingsSource.type !== 'github') return
+                        setSyncing(true)
+                        setSyncError(null)
+                        try {
+                          const res = await fetch('/api/knowledge/sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              source: settingsSource,
+                            }),
+                          })
+                          const data = (await res.json()) as { error?: string }
+                          if (data.error) {
+                            setSyncError(data.error)
+                          } else {
+                            queryClient.invalidateQueries({ queryKey: ['knowledge', 'list'] })
+                          }
+                        } catch (err) {
+                          setSyncError(
+                            err instanceof Error ? err.message : 'Sync failed',
+                          )
+                        } finally {
+                          setSyncing(false)
+                        }
+                      }}
+                      disabled={syncing || !settingsSource.repo}
+                      className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors hover:bg-primary-100 disabled:opacity-50 dark:hover:bg-neutral-900"
+                      style={{
+                        borderColor: 'var(--theme-border)',
+                        color: 'var(--theme-text)',
+                      }}
+                    >
+                      {syncing ? 'Syncing…' : 'Sync now'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!settingsSource) return
+                      const source =
+                        settingsSource.type === 'local'
+                          ? { type: 'local' as const, path: settingsSource.path }
+                          : {
+                              type: 'github' as const,
+                              repo: settingsSource.repo,
+                              branch: settingsSource.branch || 'main',
+                              path: settingsSource.path || '',
+                            }
+                      await fetch('/api/knowledge/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source }),
+                      })
+                      queryClient.invalidateQueries({ queryKey: ['knowledge', 'list'] })
+                      setSettingsOpen(false)
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </DialogContent>
+          </DialogRoot>
         </div>
       </div>
 
