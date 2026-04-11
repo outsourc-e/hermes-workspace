@@ -25,8 +25,26 @@ import {
   getProviderInfo,
   normalizeProviderId,
 } from '@/lib/provider-catalog'
-import { getConfig, patchConfig } from '@/server/hermes-api'
 import { cn } from '@/lib/utils'
+
+// FIX: replaced direct server module imports with workspace API calls to avoid
+// bundling Node.js-only modules (node:sqlite, node:fs) into the client bundle.
+async function getConfig(): Promise<Record<string, unknown>> {
+  const res = await fetch('/api/hermes-config')
+  if (!res.ok) throw new Error(`Failed to load config: HTTP ${res.status}`)
+  const data = await res.json() as { config?: Record<string, unknown> }
+  return data.config ?? {}
+}
+
+async function patchConfig(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const res = await fetch('/api/hermes-config', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config: patch }),
+  })
+  if (!res.ok) throw new Error(`Failed to save config: HTTP ${res.status}`)
+  return res.json() as Promise<Record<string, unknown>>
+}
 
 /**
  * Strip the provider prefix that hermes-agent adds internally via litellm.
