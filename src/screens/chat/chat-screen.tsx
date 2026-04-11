@@ -1441,6 +1441,18 @@ export function ChatScreen({
       document.removeEventListener('visibilitychange', handleVisibility)
   }, [historyQuery])
 
+  // Re-mount catch-up: when navigating back to chat from another tab (Skills,
+  // Memory, etc.), the component re-mounts. If a response finished while we
+  // were away, the initial refetch may hit stale data. A delayed re-refetch
+  // ensures we pick up responses that were persisted shortly after the first
+  // fetch. See: https://github.com/outsourc-e/hermes-workspace/issues/43
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void historyQuery.refetch()
+    }, 2000)
+    return () => window.clearTimeout(timer)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+
   useEffect(() => {
     function handleSSEDrop() {
       void historyQuery.refetch()

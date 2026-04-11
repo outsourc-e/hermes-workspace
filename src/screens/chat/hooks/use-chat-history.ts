@@ -335,6 +335,7 @@ export function useChatHistory({
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval: historyRefetchInterval,
+    staleTime: 0, // Always refetch on mount — prevents stale data after tab navigation
     gcTime: 1000 * 60 * 10,
     structuralSharing: true,
     notifyOnChangeProps: ['data', 'error', 'isError'],
