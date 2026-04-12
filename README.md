@@ -306,6 +306,7 @@ Features pending cloud infrastructure:
 ### 💬 Chat
 
 - Real-time SSE streaming with tool call rendering
+- Agent-authored artifact events surfaced in the inspector
 - Multi-session management with full history
 - Markdown + syntax highlighting
 - Chronological message ordering with merge dedup

@@ -689,19 +689,22 @@ export const Route = createFileRoute('/api/send-stream')({
                           ? (data.artifact as Record<string, unknown>)
                           : {}
                       const translated = {
-                        phase: 'complete',
                         name: readString(data.tool_name) || 'artifact',
-                        toolCallId: readString(data.tool_call_id) || undefined,
-                        result:
+                        title:
                           readString(artifact.title) ||
-                          readString(artifact.path) ||
-                          readString(data.path) ||
+                          readString(data.title) ||
                           'Artifact created',
+                        kind:
+                          readString(artifact.kind) ||
+                          readString(data.kind) ||
+                          'artifact',
+                        path:
+                          readString(artifact.path) || readString(data.path) || '',
                         sessionKey: sessionKeyFromEvent,
                         runId,
                       }
-                      sendEvent('tool', translated)
-                      skipPublish || publishChatEvent('tool', translated)
+                      sendEvent('artifact', translated)
+                      skipPublish || publishChatEvent('artifact', translated)
                       return
                     }
 
