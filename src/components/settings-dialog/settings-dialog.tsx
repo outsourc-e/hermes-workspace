@@ -1796,7 +1796,7 @@ function LanguageContent() {
         title="Language"
         description="Choose the display language for the workspace UI."
       />
-      <SettingRow label="Interface Language" description="Translates navigation, labels, and buttons.">
+      <Row label="Interface Language" description="Translates navigation, labels, and buttons.">
         <select
           value={getLocale()}
           onChange={(e) => {
@@ -1809,7 +1809,7 @@ function LanguageContent() {
             <option key={id} value={id}>{label}</option>
           ))}
         </select>
-      </SettingRow>
+      </Row>
     </div>
   )
 }
