@@ -170,11 +170,13 @@ export function TasksScreen() {
   const visibleColumns = showDone ? COLUMN_ORDER : COLUMN_ORDER.filter(c => c !== 'done')
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="min-h-full overflow-y-auto bg-surface text-ink">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3 shrink-0">
+      <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-base font-semibold text-[var(--theme-text)] shrink-0">Tasks</h1>
+          <h1 className="text-2xl font-medium text-ink">Tasks</h1>
           {assigneeFilter && (
             <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
               <span>Filtered by: <span className="capitalize" style={{ color: '#f59e0b' }}>{assigneeFilter}</span></span>
@@ -232,8 +234,9 @@ export function TasksScreen() {
           </button>
         </div>
       </div>
+      </header>
 
-      {/* Board */}
+      {/* Board */
       <div
         className="flex flex-1 gap-3 overflow-x-auto overflow-y-hidden p-4 min-h-0"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
@@ -351,6 +354,7 @@ export function TasksScreen() {
           await updateMutation.mutateAsync({ id: editingTask.id, input })
         }}
       />
+    </div>
     </div>
   )
 }
