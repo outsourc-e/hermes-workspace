@@ -176,8 +176,10 @@ function normalizeSkill(value: unknown): SkillSummary | null {
         ? record.fileCount
         : 0,
     sourcePath,
-    installed: Boolean(record.installed ?? false),
-    enabled: Boolean(record.enabled ?? record.installed ?? false),
+    // Hermes /api/skills returns the installed skill inventory. Older payloads
+    // omit explicit installed/enabled flags, so default to installed=true.
+    installed: Boolean(record.installed ?? true),
+    enabled: Boolean(record.enabled ?? record.installed ?? true),
     builtin: Boolean(record.builtin),
     featuredGroup: undefined,
     security: normalizeSecurity(record.security),
