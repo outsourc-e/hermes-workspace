@@ -18,7 +18,6 @@ import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as CrewRouteImport } from './routes/crew'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
@@ -130,11 +129,6 @@ const FilesRoute = FilesRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CrewRoute = CrewRouteImport.update({
-  id: '/crew',
-  path: '/crew',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -478,7 +472,6 @@ const ApiSessionsSessionKeyActiveRunRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/crew': typeof CrewRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
@@ -557,7 +550,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/crew': typeof CrewRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
@@ -636,7 +628,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/crew': typeof CrewRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
@@ -717,7 +708,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
-    | '/crew'
     | '/dashboard'
     | '/files'
     | '/jobs'
@@ -796,7 +786,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
-    | '/crew'
     | '/dashboard'
     | '/files'
     | '/jobs'
@@ -874,7 +863,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$'
-    | '/crew'
     | '/dashboard'
     | '/files'
     | '/jobs'
@@ -954,7 +942,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
-  CrewRoute: typeof CrewRoute
   DashboardRoute: typeof DashboardRoute
   FilesRoute: typeof FilesRoute
   JobsRoute: typeof JobsRoute
@@ -1078,13 +1065,6 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/crew': {
-      id: '/crew'
-      path: '/crew'
-      fullPath: '/crew'
-      preLoaderRoute: typeof CrewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -1654,7 +1634,6 @@ const ApiSkillsRouteWithChildren = ApiSkillsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
-  CrewRoute: CrewRoute,
   DashboardRoute: DashboardRoute,
   FilesRoute: FilesRoute,
   JobsRoute: JobsRoute,

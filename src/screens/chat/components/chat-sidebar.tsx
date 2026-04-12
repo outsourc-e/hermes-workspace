@@ -817,13 +817,6 @@ function ChatSidebarComponent({
       label: 'Profiles',
       active: pathname === '/profiles',
     },
-    {
-      kind: 'link',
-      to: '/crew',
-      icon: UserGroupIcon,
-      label: 'Crew',
-      active: pathname === '/crew',
-    },
   ]
 
   const systemItems: Array<NavItemDef> = []
