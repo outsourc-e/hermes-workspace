@@ -67,6 +67,7 @@ type SectionId =
   | 'appearance'
   | 'chat'
   | 'notifications'
+  | 'language'
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
   { id: 'hermes', label: 'Model & Provider', icon: CloudIcon },
@@ -77,6 +78,7 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
   { id: 'appearance', label: 'Theme', icon: PaintBoardIcon },
   { id: 'chat', label: 'Chat', icon: MessageMultiple01Icon },
   { id: 'notifications', label: 'Alerts', icon: Notification03Icon },
+  { id: 'language', label: 'Language', icon: MessageMultiple01Icon },
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
@@ -1783,6 +1785,35 @@ function DisplayContent() {
   )
 }
 
+// ── Language ────────────────────────────────────────────────────────────
+
+import { getLocale, setLocale, LOCALE_LABELS, type LocaleId } from '@/lib/i18n'
+
+function LanguageContent() {
+  return (
+    <div className="space-y-4">
+      <SectionHeader
+        title="Language"
+        description="Choose the display language for the workspace UI."
+      />
+      <SettingRow label="Interface Language" description="Translates navigation, labels, and buttons.">
+        <select
+          value={getLocale()}
+          onChange={(e) => {
+            setLocale(e.target.value as LocaleId)
+            window.location.reload()
+          }}
+          className="h-9 w-full rounded-lg border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-800 px-3 text-sm text-primary-900 dark:text-neutral-100 outline-none md:max-w-xs"
+        >
+          {(Object.entries(LOCALE_LABELS) as Array<[LocaleId, string]>).map(([id, label]) => (
+            <option key={id} value={id}>{label}</option>
+          ))}
+        </select>
+      </SettingRow>
+    </div>
+  )
+}
+
 // ── Main Dialog ─────────────────────────────────────────────────────────
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
@@ -1794,6 +1825,7 @@ const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
   appearance: AppearanceContent,
   chat: ChatContent,
   notifications: NotificationsContent,
+  language: LanguageContent,
 }
 
 type SettingsDialogProps = {
