@@ -15,7 +15,7 @@ import {
   PencilEdit02Icon,
   PuzzleIcon,
 
-  Search01Icon, Settings01Icon, Sun02Icon
+  Search01Icon, Settings01Icon, Sun02Icon, UserMultipleIcon
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
@@ -809,6 +809,20 @@ function ChatSidebarComponent({
       label: 'Skills',
       active: isSkillsActive,
       dataTour: 'skills',
+    },
+    {
+      kind: 'link',
+      to: '/profiles',
+      icon: UserMultipleIcon,
+      label: 'Profiles',
+      active: pathname === '/profiles',
+    },
+    {
+      kind: 'link',
+      to: '/settings',
+      icon: Settings01Icon,
+      label: 'Settings',
+      active: pathname.startsWith('/settings'),
     },
   ]
 
