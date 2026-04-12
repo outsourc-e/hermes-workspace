@@ -567,7 +567,9 @@ export function ChatScreen({
   } = useRealtimeChatHistory({
     sessionKey: isPortableMode
       ? 'main'
-      : resolvedSessionKey ||
+      : isNewChat
+        ? 'new'
+        : resolvedSessionKey ||
         sessionKeyForHistory ||
         activeCanonicalKey ||
         'main',
@@ -577,10 +579,11 @@ export function ChatScreen({
     enabled:
       // Always enable for new chats in portable mode (no sessions API to resolve).
       // In enhanced mode, wait for session resolution before subscribing.
-      (isNewChat ||
-        Boolean(
-          resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey,
-        )) &&
+      ((isPortableMode && isNewChat) ||
+        (!isNewChat &&
+          Boolean(
+            resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey,
+          ))) &&
       !isRedirecting,
     onUserMessage: useCallback(() => {
       // External message arrived (e.g. from Telegram) — show thinking indicator

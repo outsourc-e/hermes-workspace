@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { toast } from '@/components/ui/toast'
 
-type SkillsTab = 'installed' | 'marketplace' | 'featured'
+type SkillsTab = 'installed' | 'marketplace'
 type SkillsSort = 'name' | 'category'
 
 type SecurityRisk = {
@@ -441,9 +441,7 @@ export function SkillsScreen() {
                 >
                   Marketplace
                 </TabsTab>
-                <TabsTab value="featured" className="flex-1 sm:min-w-[120px]">
-                  Featured
-                </TabsTab>
+
               </TabsList>
 
               {tab !== 'marketplace' ? (
@@ -580,23 +578,10 @@ export function SkillsScreen() {
                 }
               />
             </TabsPanel>
-
-            <TabsPanel value="featured" className="pt-2">
-              <FeaturedGrid
-                skills={skills}
-                loading={skillsQuery.isPending}
-                actionSkillId={actionSkillId}
-                onOpenDetails={setSelectedSkill}
-                onInstall={(skillId) => runSkillAction('install', { skillId })}
-                onUninstall={(skillId) =>
-                  runSkillAction('uninstall', { skillId })
-                }
-              />
-            </TabsPanel>
           </Tabs>
         </section>
 
-        {tab !== 'featured' && tab !== 'marketplace' ? (
+        {tab !== 'marketplace' ? (
           <footer className="flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-sm text-primary-500 tabular-nums">
             <span>
               {(skillsQuery.data?.total || 0).toLocaleString()} total skills
