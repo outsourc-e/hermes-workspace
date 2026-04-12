@@ -1,14 +1,11 @@
+import { execFile } from 'node:child_process'
+import path from 'node:path'
+import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import {
-  BEARER_TOKEN,
-  HERMES_API,
-} from '../../../server/gateway-capabilities'
 
-function authHeaders(): Record<string, string> {
-  return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
-}
+const execFileAsync = promisify(execFile)
 
 export const Route = createFileRoute('/api/skills/hub-search')({
   server: {
@@ -32,35 +29,24 @@ export const Route = createFileRoute('/api/skills/hub-search')({
             return json({ results: [], source: 'idle' })
           }
 
-          const params = new URLSearchParams({
-            q: query,
-            limit: String(limit),
-            source,
-          })
+          // Call the Python skills-search wrapper which uses hermes-agent's
+          // unified_search across all registries (official, skills.sh,
+          // well-known GitHub, LobeHub, etc.)
+          const scriptPath = path.join(
+            import.meta.dirname || process.cwd(),
+            '../../../scripts/skills-search.py',
+          )
 
-          const response = await fetch(
-            `${HERMES_API}/api/skills/hub/search?${params}`,
+          const { stdout } = await execFileAsync(
+            'python3',
+            [scriptPath, query, String(limit), source],
             {
-              headers: authHeaders(),
-              signal: AbortSignal.timeout(30_000),
+              timeout: 30_000,
+              maxBuffer: 1024 * 1024 * 2,
             },
           )
 
-          if (!response.ok) {
-            const errorBody = await response.text().catch(() => '')
-            return json(
-              {
-                results: [],
-                source: 'error',
-                error:
-                  errorBody ||
-                  `Gateway returned ${response.status}`,
-              },
-              { status: response.status },
-            )
-          }
-
-          const result = await response.json()
+          const result = JSON.parse(stdout.trim())
           return json(result)
         } catch (error) {
           return json(
