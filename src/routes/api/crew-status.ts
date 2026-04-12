@@ -1,0 +1,290 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import yaml from 'yaml'
+import { HERMES_API, ensureGatewayProbed } from '../../server/gateway-capabilities'
+
+type CrewDefinition = {
+  id: string
+  displayName: string
+  role: string
+  profilePath: string | null
+}
+
+type DbStats = {
+  sessionCount: number
+  messageCount: number
+  toolCallCount: number
+  totalTokens: number
+  estimatedCostUsd: number | null
+  lastSessionTitle: string | null
+  lastSessionAt: number | null
+}
+
+function titleCase(value: string): string {
+  return value
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function buildCrewDefinitions(): CrewDefinition[] {
+  const base = join(homedir(), '.hermes')
+  const profilesDir = join(base, 'profiles')
+  const dynamicProfiles = existsSync(profilesDir)
+    ? readdirSync(profilesDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort()
+    : []
+
+  return [
+    { id: 'workspace', displayName: 'Workspace', role: 'Primary profile', profilePath: null },
+    ...dynamicProfiles.map((profile) => ({
+      id: profile,
+      displayName: titleCase(profile),
+      role: 'Profile',
+      profilePath: profile,
+    })),
+  ]
+}
+
+function getHermesHome(profilePath: string | null): string {
+  const base = join(homedir(), '.hermes')
+  return profilePath ? join(base, 'profiles', profilePath) : base
+}
+
+function readGatewayState(hermesHome: string) {
+  const path = join(hermesHome, 'gateway_state.json')
+  if (!existsSync(path)) return { pid: null, gatewayState: 'unknown', platforms: {}, updatedAt: null }
+  try {
+    const raw = JSON.parse(readFileSync(path, 'utf-8'))
+    return {
+      pid: raw.pid ?? null,
+      gatewayState: raw.gateway_state ?? 'unknown',
+      platforms: raw.platforms ?? {},
+      updatedAt: raw.updated_at ?? null,
+    }
+  } catch {
+    return { pid: null, gatewayState: 'unknown', platforms: {}, updatedAt: null }
+  }
+}
+
+function checkProcessAlive(pid: number | null): boolean {
+  if (!pid) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function readDbStats(hermesHome: string): DbStats {
+  const dbPath = join(hermesHome, 'state.db')
+  if (!existsSync(dbPath)) {
+    return {
+      sessionCount: 0,
+      messageCount: 0,
+      toolCallCount: 0,
+      totalTokens: 0,
+      estimatedCostUsd: null,
+      lastSessionTitle: null,
+      lastSessionAt: null,
+    }
+  }
+
+  try {
+    const script = `
+import json, sqlite3, sys
+path = sys.argv[1]
+out = {
+  "sessionCount": 0,
+  "messageCount": 0,
+  "toolCallCount": 0,
+  "totalTokens": 0,
+  "estimatedCostUsd": None,
+  "lastSessionTitle": None,
+  "lastSessionAt": None,
+}
+conn = sqlite3.connect(path)
+conn.row_factory = sqlite3.Row
+cur = conn.cursor()
+agg = cur.execute("""
+SELECT
+  COUNT(*) as session_count,
+  COALESCE(SUM(message_count), 0) as total_messages,
+  COALESCE(SUM(tool_call_count), 0) as total_tool_calls,
+  COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) as total_tokens,
+  SUM(estimated_cost_usd) as estimated_cost,
+  MAX(started_at) as last_session_at
+FROM sessions
+""").fetchone()
+if agg is not None:
+  out["sessionCount"] = agg["session_count"] or 0
+  out["messageCount"] = agg["total_messages"] or 0
+  out["toolCallCount"] = agg["total_tool_calls"] or 0
+  out["totalTokens"] = agg["total_tokens"] or 0
+  out["estimatedCostUsd"] = agg["estimated_cost"]
+last_row = cur.execute("SELECT title, started_at FROM sessions ORDER BY started_at DESC LIMIT 1").fetchone()
+if last_row is not None:
+  out["lastSessionTitle"] = last_row["title"]
+  out["lastSessionAt"] = last_row["started_at"]
+conn.close()
+print(json.dumps(out))
+`
+    const raw = execFileSync('python3', ['-c', script, dbPath], {
+      encoding: 'utf-8',
+      timeout: 3_000,
+    })
+    return JSON.parse(raw) as DbStats
+  } catch {
+    return {
+      sessionCount: 0,
+      messageCount: 0,
+      toolCallCount: 0,
+      totalTokens: 0,
+      estimatedCostUsd: null,
+      lastSessionTitle: null,
+      lastSessionAt: null,
+    }
+  }
+}
+
+function readConfig(hermesHome: string): { model: string; provider: string } {
+  const configPath = join(hermesHome, 'config.yaml')
+  if (!existsSync(configPath)) return { model: 'unknown', provider: 'unknown' }
+  try {
+    const raw = yaml.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
+    const modelVal = raw.model
+    const providerVal = raw.provider
+
+    if (typeof modelVal === 'object' && modelVal !== null) {
+      const modelObj = modelVal as Record<string, unknown>
+      return {
+        model: String(modelObj.default ?? modelObj.name ?? 'unknown'),
+        provider: String(modelObj.provider ?? providerVal ?? 'unknown'),
+      }
+    }
+
+    return {
+      model: String(modelVal ?? 'unknown'),
+      provider: String(providerVal ?? 'unknown'),
+    }
+  } catch {
+    return { model: 'unknown', provider: 'unknown' }
+  }
+}
+
+function readCronJobCount(hermesHome: string): number {
+  const cronPath = join(hermesHome, 'cron', 'jobs.json')
+  if (!existsSync(cronPath)) return 0
+  try {
+    const jobs = JSON.parse(readFileSync(cronPath, 'utf-8'))
+    return Array.isArray(jobs)
+      ? jobs.length
+      : typeof jobs === 'object' && jobs !== null
+        ? Object.keys(jobs).length
+        : 0
+  } catch {
+    return 0
+  }
+}
+
+async function fetchAssignedTaskCounts(): Promise<Record<string, number>> {
+  try {
+    const res = await fetch(`${HERMES_API}/api/tasks?include_done=false`, {
+      signal: AbortSignal.timeout(3_000),
+    })
+    if (!res.ok) return {}
+
+    const data = await res.json() as {
+      tasks?: Array<{ assignee?: string | null; column?: string | null }>
+    }
+
+    const counts: Record<string, number> = {}
+    for (const task of data.tasks ?? []) {
+      if (!task.assignee || task.column === 'done') continue
+      counts[task.assignee] = (counts[task.assignee] ?? 0) + 1
+    }
+    return counts
+  } catch {
+    return {}
+  }
+}
+
+export const Route = createFileRoute('/api/crew-status')({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        await ensureGatewayProbed()
+        const taskCounts = await fetchAssignedTaskCounts()
+        const crewDefinitions = buildCrewDefinitions()
+
+        const crew = crewDefinitions.map((member) => {
+          const hermesHome = getHermesHome(member.profilePath)
+          const profileFound = existsSync(hermesHome)
+
+          if (!profileFound) {
+            return {
+              id: member.id,
+              displayName: member.displayName,
+              role: member.role,
+              profileFound: false,
+              gatewayState: 'unknown',
+              processAlive: false,
+              platforms: {},
+              model: 'unknown',
+              provider: 'unknown',
+              lastSessionTitle: null,
+              lastSessionAt: null,
+              sessionCount: 0,
+              messageCount: 0,
+              toolCallCount: 0,
+              totalTokens: 0,
+              estimatedCostUsd: null,
+              cronJobCount: 0,
+              assignedTaskCount: taskCounts[member.id] ?? 0,
+            }
+          }
+
+          const gatewayInfo = readGatewayState(hermesHome)
+          const dbStats = readDbStats(hermesHome)
+          const config = readConfig(hermesHome)
+
+          return {
+            id: member.id,
+            displayName: member.displayName,
+            role: member.role,
+            profileFound: true,
+            gatewayState: gatewayInfo.gatewayState,
+            processAlive: checkProcessAlive(gatewayInfo.pid),
+            platforms: gatewayInfo.platforms,
+            model: config.model,
+            provider: config.provider,
+            lastSessionTitle: dbStats.lastSessionTitle,
+            lastSessionAt: dbStats.lastSessionAt,
+            sessionCount: dbStats.sessionCount,
+            messageCount: dbStats.messageCount,
+            toolCallCount: dbStats.toolCallCount,
+            totalTokens: dbStats.totalTokens,
+            estimatedCostUsd: dbStats.estimatedCostUsd,
+            cronJobCount: readCronJobCount(hermesHome),
+            assignedTaskCount: taskCounts[member.id] ?? 0,
+          }
+        })
+
+        return json({ crew, fetchedAt: Date.now() })
+      },
+    },
+  },
+})

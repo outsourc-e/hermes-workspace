@@ -15,7 +15,7 @@ import {
   PencilEdit02Icon,
   PuzzleIcon,
 
-  Search01Icon, Settings01Icon, Sun02Icon, UserMultipleIcon
+  Search01Icon, Settings01Icon, Sun02Icon, UserGroupIcon, UserMultipleIcon
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
@@ -816,6 +816,13 @@ function ChatSidebarComponent({
       icon: UserMultipleIcon,
       label: 'Profiles',
       active: pathname === '/profiles',
+    },
+    {
+      kind: 'link',
+      to: '/crew',
+      icon: UserGroupIcon,
+      label: 'Crew',
+      active: pathname === '/crew',
     },
   ]
 
