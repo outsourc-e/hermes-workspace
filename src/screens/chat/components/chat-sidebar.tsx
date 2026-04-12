@@ -817,13 +817,6 @@ function ChatSidebarComponent({
       label: 'Profiles',
       active: pathname === '/profiles',
     },
-    {
-      kind: 'link',
-      to: '/settings',
-      icon: Settings01Icon,
-      label: 'Settings',
-      active: pathname.startsWith('/settings'),
-    },
   ]
 
   const systemItems: Array<NavItemDef> = []
