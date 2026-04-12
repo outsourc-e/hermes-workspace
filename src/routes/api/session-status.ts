@@ -40,6 +40,23 @@ export const Route = createFileRoute('/api/session-status')({
           const requestedKey = url.searchParams.get('sessionKey')?.trim() || ''
           let sessionKey = requestedKey || 'new'
 
+          if (sessionKey === 'new') {
+            return json({
+              ok: true,
+              payload: {
+                status: 'idle',
+                sessionKey: 'new',
+                sessionLabel: '',
+                model: '',
+                modelProvider: '',
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                sessions: [],
+              },
+            })
+          }
+
           if (isSyntheticSessionKey(sessionKey)) {
             const sessions = await listSessions(1, 0)
             if (sessions.length === 0) {

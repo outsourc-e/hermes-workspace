@@ -10,9 +10,15 @@
 #   3. docker compose up
 #   4. Open http://localhost:3000
 #
+# Enhanced Mode (sessions, skills, memory, config):
+#   The bundled agent Dockerfile builds from outsourc-e/hermes-agent which
+#   includes the enhanced gateway APIs. Vanilla NousResearch/hermes-agent
+#   will work in "portable" mode (chat only, no sessions/skills/memory).
+#
 # Troubleshooting:
 #   - See README.md "Docker" troubleshooting section
 #   - Check logs: docker compose logs hermes-agent
+#   - Agent must expose port 8642 with: hermes gateway run
 
 services:
   # The Hermes AI Agent Gateway

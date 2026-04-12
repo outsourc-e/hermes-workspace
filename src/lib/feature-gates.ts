@@ -43,7 +43,7 @@ export function getFeatureLabel(feature: EnhancedFeature | string): string {
 export function getUnavailableReason(
   feature: EnhancedFeature | string,
 ): string {
-  return `${getFeatureLabel(feature)} requires a Hermes gateway with enhanced API support.`
+  return `${getFeatureLabel(feature)} requires the enhanced Hermes gateway (outsourc-e/hermes-agent). Vanilla hermes-agent runs in portable mode without ${getFeatureLabel(feature).toLowerCase()}.`
 }
 
 export function createCapabilityUnavailablePayload(

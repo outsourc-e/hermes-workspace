@@ -10,7 +10,7 @@ function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 }
 
-export const Route = createFileRoute('/api/skills/install')({
+export const Route = createFileRoute('/api/skills/toggle')({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -20,21 +20,25 @@ export const Route = createFileRoute('/api/skills/install')({
         try {
           const body = (await request.json()) as {
             skillId?: string
-            identifier?: string
-            category?: string
-            force?: boolean
+            name?: string
+            enabled?: boolean
           }
-          const identifier =
-            (body.identifier || body.skillId || '').trim()
-          if (!identifier) {
+          const name = (body.name || body.skillId || '').trim()
+          if (!name) {
             return json(
-              { ok: false, error: 'identifier or skillId required' },
+              { ok: false, error: 'name or skillId required' },
+              { status: 400 },
+            )
+          }
+          if (typeof body.enabled !== 'boolean') {
+            return json(
+              { ok: false, error: 'enabled (boolean) required' },
               { status: 400 },
             )
           }
 
           const response = await fetch(
-            `${HERMES_API}/api/skills/install`,
+            `${HERMES_API}/api/skills/toggle`,
             {
               method: 'POST',
               headers: {
@@ -42,11 +46,10 @@ export const Route = createFileRoute('/api/skills/install')({
                 ...authHeaders(),
               },
               body: JSON.stringify({
-                identifier,
-                category: body.category || '',
-                force: Boolean(body.force),
+                name,
+                enabled: body.enabled,
               }),
-              signal: AbortSignal.timeout(120_000),
+              signal: AbortSignal.timeout(15_000),
             },
           )
 
@@ -59,7 +62,7 @@ export const Route = createFileRoute('/api/skills/install')({
               error:
                 error instanceof Error
                   ? error.message
-                  : 'Failed to install skill',
+                  : 'Failed to toggle skill',
             },
             { status: 500 },
           )

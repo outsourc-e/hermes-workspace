@@ -117,7 +117,9 @@ type ModelSwitchNotice = {
   retryProvider?: string
 }
 
-const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
+// Models are fetched through the workspace API proxy (/api/models, /api/hermes-proxy)
+// to support Docker and reverse-proxy deployments where the browser cannot reach
+// the Hermes gateway directly.
 
 function readModelText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -240,9 +242,9 @@ async function fetchModels(): Promise<{
     // Fall back to /v1/models
   }
 
-  const response = await fetch(`${HERMES_API_URL}/v1/models`)
+  const response = await fetch('/api/models')
   if (!response.ok) {
-    throw new Error(`Hermes models request failed (${response.status})`)
+    throw new Error(`Models request failed (${response.status})`)
   }
 
   const payload = (await response.json()) as

@@ -11,7 +11,7 @@
 export let HERMES_API = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
 export const HERMES_UPGRADE_INSTRUCTIONS =
-  'Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes --gateway'
+  'For full features, use the enhanced fork: git clone https://github.com/outsourc-e/hermes-agent && cd hermes-agent && pip install -e . && hermes gateway run'
 
 export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes gateway does not support the sessions API. ${HERMES_UPGRADE_INSTRUCTIONS}`
 
