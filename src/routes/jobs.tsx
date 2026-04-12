@@ -6,6 +6,7 @@ import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { JobsScreen } from '@/screens/jobs/jobs-screen'
 
 export const Route = createFileRoute('/jobs')({
+  ssr: false,
   component: function JobsRoute() {
     usePageTitle('Jobs')
     if (!useFeatureAvailable('jobs')) {

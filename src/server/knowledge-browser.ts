@@ -2,6 +2,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
+import {
+  readKnowledgeBaseConfig,
+  type KnowledgeBaseSource,
+} from './knowledge-config'
 
 export type WikiPageMeta = {
   path: string
@@ -113,7 +117,9 @@ function extractWikilinks(content: string): Array<string> {
   return Array.from(links)
 }
 
-export function getKnowledgeRoot(): string {
+// ─── Legacy env-var fallback ──────────────────────────────────────────────────
+
+function getLegacyKnowledgeRoot(): string {
   if (process.env.KNOWLEDGE_DIR) return path.resolve(process.env.KNOWLEDGE_DIR)
   const hermesHome = path.join(os.homedir(), '.hermes')
   const hermesKnowledge = path.join(hermesHome, 'knowledge')
@@ -123,16 +129,172 @@ export function getKnowledgeRoot(): string {
   return hermesKnowledge
 }
 
+// ─── GitHub Knowledge Provider ─────────────────────────────────────────────────
+
+type GitHubEntry =
+  | { type: 'file'; name: string; path: string; sha: string; content?: string }
+  | { type: 'dir'; name: string; path: string; sha: string }
+
+class GitHubKnowledgeProvider {
+  private readonly cacheDir: string
+  private readonly branch: string
+
+  constructor(
+    private readonly repo: string,
+    branch: string,
+    private readonly repoPath: string,
+  ) {
+    const safeRepo = repo.replace('/', '_')
+    const safePath = repoPath.replace(/^\//, '').replace(/\//g, '_')
+    this.branch = branch
+    const base = path.join(os.homedir(), '.hermes', 'knowledge-cache', 'github', safeRepo, branch, safePath)
+    this.cacheDir = base
+  }
+
+  private get cacheRoot(): string {
+    return path.join(os.homedir(), '.hermes', 'knowledge-cache', 'github', this.repo.replace('/', '_'), this.branch)
+  }
+
+  /** Fetch + decode the GitHub repo into the local cache directory. */
+  async sync(): Promise<void> {
+    try {
+      await this.fetchDir(this.repoPath)
+    } catch (err) {
+      throw new Error(
+        `GitHub sync failed for ${this.repo} (branch ${this.branch}): ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+  }
+
+  /** Check whether the local cache is present and non-empty. */
+  isCached(): boolean {
+    try {
+      return fs.existsSync(this.cacheDir) && fs.readdirSync(this.cacheDir).length > 0
+    } catch {
+      return false
+    }
+  }
+
+  get root(): string {
+    return this.cacheDir
+  }
+
+  private async fetchDir(dirPath: string): Promise<void> {
+    const url = `https://api.github.com/repos/${this.repo}/contents/${dirPath}?ref=${this.branch}`
+    const res = await fetch(url, {
+      headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'hermes-workspace' },
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`GitHub API ${res.status}: ${body}`)
+    }
+    const entries = (await res.json()) as Array<GitHubEntry>
+
+    for (const entry of entries) {
+      if (entry.name === '.git') continue
+
+      const fullPath = path.join(this.cacheDir, entry.name)
+      const parentDir = path.dirname(fullPath)
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true })
+      }
+
+      if (entry.type === 'dir') {
+        fs.mkdirSync(fullPath, { recursive: true })
+        await this.fetchDir(entry.path)
+      } else if (entry.name.toLowerCase().endsWith('.md')) {
+        const content = await this.fetchFile(entry)
+        fs.writeFileSync(fullPath, content, 'utf-8')
+      }
+    }
+  }
+
+  private async fetchFile(entry: { path: string; sha: string }): Promise<string> {
+    const url = `https://api.github.com/repos/${this.repo}/contents/${entry.path}?ref=${this.branch}`
+    const res = await fetch(url, {
+      headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'hermes-workspace' },
+    })
+    if (!res.ok) {
+      throw new Error(`GitHub API ${res.status} for ${entry.path}`)
+    }
+    const data = (await res.json()) as { content?: string; encoding?: string }
+    if (!data.content) throw new Error(`No content in GitHub response for ${entry.path}`)
+    if (data.encoding === 'base64') {
+      return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8')
+    }
+    return data.content.replace(/\n/g, '')
+  }
+}
+
+// ─── Config-aware root resolution ──────────────────────────────────────────────
+
+function getKnowledgeRoot(): string {
+  const config = readKnowledgeBaseConfig()
+  const source = config.source
+
+  if (source.type === 'github') {
+    const provider = new GitHubKnowledgeProvider(source.repo, source.branch, source.path)
+    return provider.root
+  }
+
+  // local
+  const p = source.path.trim()
+  if (p) {
+    return path.resolve(p.replace(/^~\//, `${os.homedir()}/`))
+  }
+  return getLegacyKnowledgeRoot()
+}
+
 export function knowledgeRootExists(): boolean {
   try {
-    return fs.existsSync(getKnowledgeRoot())
+    const root = getKnowledgeRoot()
+    if (!root) return false
+    // For GitHub, check cache; for local, check filesystem
+    const config = readKnowledgeBaseConfig()
+    if (config.source.type === 'github') {
+      const provider = new GitHubKnowledgeProvider(
+        config.source.repo,
+        config.source.branch,
+        config.source.path,
+      )
+      return provider.isCached()
+    }
+    return fs.existsSync(root)
   } catch {
     return false
   }
 }
 
+function getKnowledgeSource(): KnowledgeBaseSource {
+  return readKnowledgeBaseConfig().source
+}
+
+export async function syncKnowledgeSource(): Promise<{
+  source: KnowledgeBaseSource
+  success: boolean
+  error?: string
+}> {
+  const source = getKnowledgeSource()
+  if (source.type !== 'github') {
+    return { source, success: true }
+  }
+  try {
+    const provider = new GitHubKnowledgeProvider(source.repo, source.branch, source.path)
+    await provider.sync()
+    return { source, success: true }
+  } catch (err) {
+    return {
+      source,
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+// ─── Path helpers ─────────────────────────────────────────────────────────────
+
 function normalizeRelativeKnowledgePath(input: string): string {
-  const normalized = input.replace(/\\/g, '/').trim()
+  const normalized = input.replace(/\\\\/g, '/').trim()
   if (!normalized) throw new Error('Path is required')
   if (normalized.startsWith('/'))
     throw new Error('Absolute paths are not allowed')
@@ -156,6 +318,8 @@ function resolveKnowledgeFilePath(relativePath: string): {
   }
   return { fullPath, relativePath: safeRelativePath }
 }
+
+// ─── Page parsing ─────────────────────────────────────────────────────────────
 
 function buildPageMeta(
   relativePath: string,
@@ -234,7 +398,7 @@ function walkKnowledgeDir(
 
     const relativePath = path
       .relative(knowledgeRoot, fullPath)
-      .replace(/\\/g, '/')
+      .replace(/\\\\/g, '/')
     if (
       !relativePath ||
       relativePath.startsWith('..') ||
@@ -285,7 +449,7 @@ function createWikilinkResolver(
     if (!cleaned) return null
 
     const normalized = cleaned
-      .replace(/\\/g, '/')
+      .replace(/\\\\/g, '/')
       .trim()
       .replace(/\.md$/i, '')
       .toLowerCase()

@@ -6,6 +6,7 @@ import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { SkillsScreen } from '@/screens/skills/skills-screen'
 
 export const Route = createFileRoute('/skills')({
+  ssr: false,
   component: SkillsRoute,
 })
 

@@ -36,6 +36,7 @@ import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 // useWorkspaceStore removed — hamburger eliminated on mobile
 
 export const Route = createFileRoute('/settings/')({
+  ssr: false,
   component: SettingsRoute,
 })
 
