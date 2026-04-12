@@ -393,8 +393,10 @@ export function JobsScreen() {
   )
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
+    <div className="min-h-full overflow-y-auto bg-surface text-ink">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+      <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <HugeiconsIcon
             icon={Clock01Icon}
@@ -434,8 +436,9 @@ export function JobsScreen() {
           </button>
         </div>
       </div>
+      </header>
 
-      <div className="border-b border-[var(--theme-border)] px-4 py-2">
+      <div className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
         <div className="relative">
           <HugeiconsIcon
             icon={Search01Icon}
@@ -519,6 +522,7 @@ export function JobsScreen() {
         }}
         isSubmitting={updateMutation.isPending}
       />
+    </div>
     </div>
   )
 }

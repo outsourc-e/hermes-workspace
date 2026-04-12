@@ -402,9 +402,9 @@ export function KnowledgeBrowserScreen() {
   }
 
   return (
+    <div className="min-h-full overflow-y-auto bg-surface text-ink">
     <div
-      className="flex h-full min-h-0 flex-col"
-      style={{ backgroundColor: 'var(--theme-bg)', color: 'var(--theme-text)' }}
+      className="mx-auto flex w-full max-w-[1200px] min-h-0 flex-col px-4 py-6 sm:px-6 lg:px-8"
     >
       <div
         className="px-3 py-3 md:px-4"
@@ -1110,6 +1110,7 @@ export function KnowledgeBrowserScreen() {
           </div>
         </DialogContent>
       </DialogRoot>
+    </div>
     </div>
   )
 }
