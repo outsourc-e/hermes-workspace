@@ -68,15 +68,20 @@ type HubSkill = {
   tags: Array<string>
   downloads?: number
   stars?: number
-  source: 'clawhub' | 'official' | 'github'
+  source: string
+  identifier?: string
+  trust_level?: string
+  repo?: string | null
   installCommand?: string
-  homepage?: string
+  homepage?: string | null
   installed: boolean
+  extra?: Record<string, unknown>
 }
 
 type HubSearchResponse = {
   results: Array<HubSkill>
   source: string
+  total?: number
   error?: string
 }
 
@@ -234,32 +239,66 @@ export function SkillsScreen() {
   const marketplaceSkills = useMemo<Array<SkillSummary>>(
     function resolveMarketplaceSkills() {
       return (hubQuery.data?.results || []).map(function mapHubSkill(skill) {
+        // Gateway returns: name, description, source, identifier, trust_level, repo, path, tags, extra, installed
+        const skillId = skill.id || skill.name
+        const author =
+          skill.author ||
+          (skill.repo ? skill.repo.split('/')[0] : null) ||
+          (skill.extra as Record<string, unknown>)?.author ||
+          skill.source ||
+          'Community'
+        const homepage =
+          skill.homepage ||
+          skill.repo ||
+          (skill.extra as Record<string, unknown>)?.homepage ||
+          null
+        const category =
+          skill.category ||
+          (skill.extra as Record<string, unknown>)?.category ||
+          'Productivity'
+
         return {
-          id: skill.id,
-          slug: skill.id,
-          name: skill.name,
+          id: skillId,
+          slug: skillId,
+          name: skill.name || skillId,
           description: skill.description,
-          author: skill.author,
+          author: String(author),
           triggers: skill.tags,
           tags: skill.tags,
-          homepage: skill.homepage || null,
-          category: skill.category || 'Productivity',
+          homepage: typeof homepage === 'string' ? homepage : null,
+          category: String(category),
           icon:
             skill.source === 'github'
               ? '🐙'
-              : skill.source === 'official'
+              : skill.source === 'official' ||
+                  skill.trust_level === 'builtin'
                 ? '✅'
-                : '🧩',
-          content: [skill.description, skill.installCommand]
+                : skill.source === 'skills-sh'
+                  ? '📦'
+                  : skill.source === 'lobehub'
+                    ? '🧊'
+                    : skill.source === 'claude-marketplace'
+                      ? '🤖'
+                      : '🧩',
+          content: [
+            skill.description,
+            skill.identifier ? `Identifier: ${skill.identifier}` : '',
+            skill.trust_level ? `Trust: ${skill.trust_level}` : '',
+          ]
             .filter(Boolean)
             .join('\n\n'),
           fileCount: 0,
-          sourcePath: skill.installCommand || skill.homepage || skill.source,
+          sourcePath: skill.identifier || (typeof homepage === 'string' ? homepage : '') || skill.source,
           installed: skill.installed,
           enabled: skill.installed,
           featuredGroup: undefined,
           security: {
-            level: 'safe',
+            level:
+              skill.trust_level === 'builtin'
+                ? 'safe'
+                : skill.trust_level === 'trusted'
+                  ? 'safe'
+                  : 'review',
             flags: [],
             score: 0,
           },
@@ -534,16 +573,9 @@ export function SkillsScreen() {
               ) : hubQuery.data &&
                 (hubQuery.data.source === 'installed-fallback' ||
                   hubQuery.data.source === 'error') ? (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Skill marketplace unavailable — showing installed skills
-                  instead. Install{' '}
-                  <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs">
-                    clawhub
-                  </code>{' '}
-                  CLI to browse the marketplace:{' '}
-                  <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs">
-                    pip install skillhub
-                  </code>
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                  Skills Hub search unavailable — showing installed skills
+                  instead. Ensure the Hermes gateway is running.
                 </div>
               ) : null}
 

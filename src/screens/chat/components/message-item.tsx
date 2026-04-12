@@ -1135,7 +1135,7 @@ function MarkdownDocumentCard({
   return (
     <div
       className={cn(
-        'w-full max-w-[42rem] overflow-hidden rounded-2xl border border-primary-200 bg-primary-50/70',
+        'w-full max-w-[36rem] overflow-hidden rounded-2xl border border-primary-200 bg-primary-50/70',
         className,
       )}
     >

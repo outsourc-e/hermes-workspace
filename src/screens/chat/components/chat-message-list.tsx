@@ -294,11 +294,9 @@ function ThinkingBubble({
     return () => window.clearTimeout(swapTimer)
   }, [statusLabel])
 
-  // Tool calls are rendered by InlineToolSectionItem on the message itself —
-  // skip the duplicate ToolCallCard rendering in the thinking bubble.
-  if (allTools.length > 0 && !isCompacting) {
-    return null
-  }
+  // Keep the thinking bubble visible even when tools are active.
+  // If inline tool cards fail to render for a streaming message, this still
+  // gives the user a live indication of what tool is running.
 
   return (
     <div className="flex items-end gap-2">
@@ -308,14 +306,14 @@ function ThinkingBubble({
       </div>
 
       {/* Chat bubble */}
-      <div className="relative overflow-hidden rounded-2xl rounded-bl-sm border border-primary-200 dark:border-primary-200/20 bg-primary-100 dark:bg-primary-100 thinking-shimmer-bubble">
+      <div className="relative max-w-[36rem] overflow-hidden rounded-2xl rounded-bl-sm border border-primary-200 dark:border-primary-200/20 bg-primary-100 dark:bg-primary-100 thinking-shimmer-bubble">
         {/* Shimmer overlay */}
         <div
           className="thinking-shimmer-sweep pointer-events-none absolute inset-0"
           aria-hidden="true"
         />
 
-        <div className="relative flex flex-col gap-1 px-4 py-3">
+        <div className="relative flex flex-col gap-2 px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
@@ -412,10 +410,21 @@ function ThinkingBubble({
                 opacity: visible ? 1 : 0,
                 transition: 'opacity 300ms ease',
               }}
+              className="flex flex-wrap gap-1.5"
             >
-              <span className="inline-flex items-center rounded-full bg-primary-200/60 dark:bg-primary-800/30 px-2 py-0.5 text-[10px] font-mono text-primary-400 dark:text-primary-500 select-none">
-                {activeToolName}
-              </span>
+              {allTools.slice(0, 4).map((tool) => (
+                <span
+                  key={tool.id}
+                  className="inline-flex items-center rounded-full bg-primary-200/60 dark:bg-primary-800/30 px-2 py-0.5 text-[10px] font-mono text-primary-500 dark:text-primary-400 select-none"
+                >
+                  {tool.name}
+                </span>
+              ))}
+              {allTools.length > 4 ? (
+                <span className="inline-flex items-center rounded-full bg-primary-200/40 dark:bg-primary-800/20 px-2 py-0.5 text-[10px] text-primary-400 dark:text-primary-500 select-none">
+                  +{allTools.length - 4} more
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>
