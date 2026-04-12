@@ -33,8 +33,8 @@ export const Route = createFileRoute('/api/skills/hub-search')({
           // unified_search across all registries (official, skills.sh,
           // well-known GitHub, LobeHub, etc.)
           const scriptPath = path.join(
-            import.meta.dirname || process.cwd(),
-            '../../../scripts/skills-search.py',
+            process.cwd(),
+            'scripts/skills-search.py',
           )
 
           const { stdout } = await execFileAsync(
