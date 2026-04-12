@@ -52,6 +52,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
+import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
 import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
@@ -293,6 +294,11 @@ const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
   path: '/uninstall',
   getParentRoute: () => ApiSkillsRoute,
 } as any)
+const ApiSkillsToggleRoute = ApiSkillsToggleRouteImport.update({
+  id: '/toggle',
+  path: '/toggle',
+  getParentRoute: () => ApiSkillsRoute,
+} as any)
 const ApiSkillsInstallRoute = ApiSkillsInstallRouteImport.update({
   id: '/install',
   path: '/install',
@@ -487,6 +493,7 @@ export interface FileRoutesByFullPath {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
+  '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
@@ -556,6 +563,7 @@ export interface FileRoutesByTo {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
+  '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
@@ -627,6 +635,7 @@ export interface FileRoutesById {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
+  '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
@@ -699,6 +708,7 @@ export interface FileRouteTypes {
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
+    | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
@@ -768,6 +778,7 @@ export interface FileRouteTypes {
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
+    | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
@@ -838,6 +849,7 @@ export interface FileRouteTypes {
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
+    | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
@@ -1203,6 +1215,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSkillsUninstallRouteImport
       parentRoute: typeof ApiSkillsRoute
     }
+    '/api/skills/toggle': {
+      id: '/api/skills/toggle'
+      path: '/toggle'
+      fullPath: '/api/skills/toggle'
+      preLoaderRoute: typeof ApiSkillsToggleRouteImport
+      parentRoute: typeof ApiSkillsRoute
+    }
     '/api/skills/install': {
       id: '/api/skills/install'
       path: '/install'
@@ -1446,12 +1465,14 @@ const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
 interface ApiSkillsRouteChildren {
   ApiSkillsHubSearchRoute: typeof ApiSkillsHubSearchRoute
   ApiSkillsInstallRoute: typeof ApiSkillsInstallRoute
+  ApiSkillsToggleRoute: typeof ApiSkillsToggleRoute
   ApiSkillsUninstallRoute: typeof ApiSkillsUninstallRoute
 }
 
 const ApiSkillsRouteChildren: ApiSkillsRouteChildren = {
   ApiSkillsHubSearchRoute: ApiSkillsHubSearchRoute,
   ApiSkillsInstallRoute: ApiSkillsInstallRoute,
+  ApiSkillsToggleRoute: ApiSkillsToggleRoute,
   ApiSkillsUninstallRoute: ApiSkillsUninstallRoute,
 }
 
