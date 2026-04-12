@@ -505,6 +505,36 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           onTool?.(payload)
           break
         }
+        case 'artifact': {
+          markActivity()
+          const title =
+            typeof payload.title === 'string' && payload.title.trim()
+              ? payload.title.trim()
+              : 'Artifact created'
+          const kind =
+            typeof payload.kind === 'string' && payload.kind.trim()
+              ? payload.kind.trim()
+              : 'artifact'
+          const path =
+            typeof payload.path === 'string' && payload.path.trim()
+              ? payload.path.trim()
+              : ''
+          pushActivity({
+            type: 'artifact',
+            time: new Date().toLocaleTimeString(),
+            text: path ? `${title} — ${path}` : title,
+          })
+          processStoreEvent({
+            type: 'tool',
+            phase: 'complete',
+            name: `artifact:${kind}`,
+            result: path ? `${title} — ${path}` : title,
+            runId: activeRunIdRef.current ?? undefined,
+            sessionKey: activeSessionKeyRef.current,
+            transport: 'send-stream',
+          })
+          break
+        }
         case 'step': {
           const nextUsage: StepUsagePayload = {
             inputTokens:

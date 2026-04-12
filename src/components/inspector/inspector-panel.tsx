@@ -22,7 +22,7 @@ export const useInspectorStore = create<InspectorStore>((set) => ({
 
 // ── Tab types ─────────────────────────────────────────────────────────────────
 
-type TabId = 'activity' | 'files' | 'memory' | 'skills' | 'logs'
+type TabId = 'activity' | 'artifacts' | 'files' | 'memory' | 'skills' | 'logs'
 
 const TABS: Array<{
   id: TabId
@@ -30,6 +30,7 @@ const TABS: Array<{
   feature?: 'memory' | 'skills'
 }> = [
   { id: 'activity', label: 'Activity' },
+  { id: 'artifacts', label: 'Artifacts' },
   { id: 'files', label: 'Files' },
   { id: 'memory', label: 'Memory', feature: 'memory' },
   { id: 'skills', label: 'Skills', feature: 'skills' },
@@ -51,6 +52,39 @@ function LoadingState({ text }: { text: string }) {
       <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>
         {text}
       </span>
+    </div>
+  )
+}
+
+function ArtifactsTab() {
+  const events = useActivityStore((s) => s.events)
+  const artifacts = events.filter((e) => e.type === 'artifact')
+
+  if (artifacts.length === 0) {
+    return <EmptyState text="No agent-authored artifacts yet" />
+  }
+
+  return (
+    <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {artifacts.length} artifacts emitted by the agent
+      </p>
+      {artifacts.map((artifact, index) => (
+        <div
+          key={`${artifact.time}-${index}`}
+          className="rounded-lg px-3 py-2 text-xs leading-relaxed"
+          style={{
+            backgroundColor: 'var(--theme-card)',
+            border: '1px solid var(--theme-border)',
+            color: 'var(--theme-text)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">{artifact.text}</span>
+            <span style={{ color: 'var(--theme-accent)' }}>{artifact.time}</span>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -486,6 +520,7 @@ export function InspectorPanel() {
           {/* Content */}
           <div className="flex-1 overflow-auto">
             {activeTab === 'activity' && <ActivityTab />}
+            {activeTab === 'artifacts' && <ArtifactsTab />}
             {activeTab === 'files' && <FilesTab />}
             {activeTab === 'memory' && <MemoryTab />}
             {activeTab === 'skills' && <SkillsTab />}
