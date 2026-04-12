@@ -236,7 +236,7 @@ export function TasksScreen() {
       </div>
       </header>
 
-      {/* Board */
+      {/* Board */}
       <div
         className="flex flex-1 gap-3 overflow-x-auto overflow-y-hidden p-4 min-h-0"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
