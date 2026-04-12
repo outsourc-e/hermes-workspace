@@ -697,6 +697,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             fastMode: params.fastMode,
             attachments: params.attachments,
             idempotencyKey: params.idempotencyKey ?? crypto.randomUUID(),
+            locale: typeof window !== 'undefined' ? localStorage.getItem('hermes-workspace-locale') || 'en' : 'en',
           }),
           signal: abortController.signal,
         })
