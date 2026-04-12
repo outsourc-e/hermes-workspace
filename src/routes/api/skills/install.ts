@@ -1,12 +1,14 @@
-import { execFile } from 'node:child_process'
-import os from 'node:os'
-import path from 'node:path'
-import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import {
+  BEARER_TOKEN,
+  HERMES_API,
+} from '../../../server/gateway-capabilities'
 
-const execFileAsync = promisify(execFile)
+function authHeaders(): Record<string, string> {
+  return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
+}
 
 export const Route = createFileRoute('/api/skills/install')({
   server: {
@@ -16,35 +18,41 @@ export const Route = createFileRoute('/api/skills/install')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          const body = (await request.json()) as { skillId?: string }
-          const skillId = (body.skillId || '').trim()
-          if (!skillId)
+          const body = (await request.json()) as {
+            skillId?: string
+            identifier?: string
+            category?: string
+            force?: boolean
+          }
+          const identifier =
+            (body.identifier || body.skillId || '').trim()
+          if (!identifier) {
             return json(
-              { ok: false, error: 'skillId required' },
+              { ok: false, error: 'identifier or skillId required' },
               { status: 400 },
             )
+          }
 
-          const hermesHome = path.join(os.homedir(), '.hermes')
-          await execFileAsync(
-            'clawhub',
-            ['install', skillId, '--workdir', hermesHome, '--dir', 'skills'],
+          const response = await fetch(
+            `${HERMES_API}/api/skills/install`,
             {
-              cwd: os.homedir(),
-              timeout: 120000,
-              maxBuffer: 1024 * 1024 * 4,
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...authHeaders(),
+              },
+              body: JSON.stringify({
+                identifier,
+                category: body.category || '',
+                force: Boolean(body.force),
+              }),
+              signal: AbortSignal.timeout(120_000),
             },
           )
 
-          return json({ ok: true, installed: true, skillId })
+          const result = await response.json()
+          return json(result, { status: response.status })
         } catch (error) {
-          const command = `clawhub install ${
-            (
-              (await request
-                .clone()
-                .json()
-                .catch(() => ({ skillId: '' }))) as { skillId?: string }
-            ).skillId || '<slug>'
-          } --workdir ~/.hermes --dir skills`
           return json(
             {
               ok: false,
@@ -52,7 +60,6 @@ export const Route = createFileRoute('/api/skills/install')({
                 error instanceof Error
                   ? error.message
                   : 'Failed to install skill',
-              command,
             },
             { status: 500 },
           )

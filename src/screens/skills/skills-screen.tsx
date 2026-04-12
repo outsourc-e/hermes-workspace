@@ -302,7 +302,7 @@ export function SkillsScreen() {
           ? '/api/skills/install'
           : action === 'uninstall'
             ? '/api/skills/uninstall'
-            : '/api/skills'
+            : '/api/skills/toggle'
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -310,6 +310,8 @@ export function SkillsScreen() {
         body: JSON.stringify({
           action,
           skillId: payload.skillId,
+          name: payload.skillId,
+          identifier: payload.skillId,
           enabled: payload.enabled,
           source: payload.source,
         }),
