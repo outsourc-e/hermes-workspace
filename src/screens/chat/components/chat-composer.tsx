@@ -165,11 +165,23 @@ async function fetchModels(): Promise<{
     const richRes = await fetch('/api/hermes-proxy/api/available-models')
     if (richRes.ok) {
       const richData = (await richRes.json()) as HermesAvailableModelsResponse
-      const authenticatedProviders = (richData.providers || []).filter(
+      const allProviders = richData.providers || []
+      const authenticatedProviders = allProviders.filter(
         (p) => p.authenticated,
       )
-      const configuredProviders = authenticatedProviders.map((p) => p.id)
-      const providerLabels = authenticatedProviders.reduce<
+      // Always include key providers (Nous Portal offers free models)
+      // so users can discover and select them even before authenticating.
+      const ALWAYS_SHOW_PROVIDERS = ['nous']
+      const visibleProviders = [
+        ...authenticatedProviders,
+        ...allProviders.filter(
+          (p) =>
+            !p.authenticated &&
+            ALWAYS_SHOW_PROVIDERS.includes(p.id),
+        ),
+      ]
+      const configuredProviders = visibleProviders.map((p) => p.id)
+      const providerLabels = visibleProviders.reduce<
         Record<string, string>
       >((acc, provider) => {
         acc[provider.id] = provider.label || provider.id
@@ -229,13 +241,40 @@ async function fetchModels(): Promise<{
         }
       }
 
+      // Fetch models from all visible providers (authenticated + always-shown)
+      // so the picker shows everything the user can select or discover.
+      const otherVisible = visibleProviders.filter(
+        (p) => p.id !== currentProvider,
+      )
+      if (otherVisible.length > 0) {
+        const otherResults = await Promise.allSettled(
+          otherVisible.map(async (provider) => {
+            const res = await fetch(
+              `/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(provider.id)}`,
+            )
+            if (!res.ok) return []
+            const data = (await res.json()) as HermesAvailableModelsResponse
+            return (data.models || []).map((m) => ({
+              id: m.id,
+              name: m.id,
+              provider: provider.id,
+            }))
+          }),
+        )
+        for (const result of otherResults) {
+          if (result.status === 'fulfilled' && result.value.length > 0) {
+            models.push(...result.value)
+          }
+        }
+      }
+
       return {
         ok: true,
         models,
         configuredProviders,
         currentProvider,
         providerLabels,
-        providers: authenticatedProviders,
+        providers: visibleProviders,
       }
     }
   } catch {

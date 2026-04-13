@@ -161,7 +161,7 @@ const PROVIDER_CARDS: Array<{
     id: 'nous',
     name: 'Nous Portal',
     logo: '/providers/nous.png',
-    models: ['hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'],
+    models: ['xiaomi/mimo-v2-pro', 'xiaomi/mimo-v2-omni', 'hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'],
     authType: 'oauth',
   },
   {
@@ -210,6 +210,14 @@ const PROVIDER_CARDS: Array<{
     models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'],
     authType: 'api_key',
     envKey: 'MINIMAX_API_KEY',
+  },
+  {
+    id: 'xiaomi',
+    name: 'Xiaomi MiMo',
+    logo: '/providers/xiaomi.png',
+    models: ['mimo-v2-pro', 'mimo-v2-omni', 'mimo-v2-flash'],
+    authType: 'api_key',
+    envKey: 'XIAOMI_API_KEY',
   },
   {
     id: 'ollama',

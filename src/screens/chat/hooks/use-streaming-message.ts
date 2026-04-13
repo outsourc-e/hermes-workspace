@@ -664,6 +664,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       fastMode?: boolean
       attachments?: Array<ChatAttachment>
       idempotencyKey?: string
+      model?: string
     }) => {
       if (eventSourceRef.current) {
         eventSourceRef.current.abort()
@@ -697,6 +698,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             fastMode: params.fastMode,
             attachments: params.attachments,
             idempotencyKey: params.idempotencyKey ?? crypto.randomUUID(),
+            model: params.model || undefined,
             locale: typeof window !== 'undefined' ? localStorage.getItem('hermes-workspace-locale') || 'en' : 'en',
           }),
           signal: abortController.signal,

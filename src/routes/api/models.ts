@@ -25,6 +25,16 @@ const AUTH_STORE_MODELS: Record<string, Array<ModelEntry>> = {
       provider: 'anthropic-billing-proxy',
     },
   ],
+  nous: [
+    { id: 'hermes-3-llama-3.1-405b', name: 'Hermes 3 405B', provider: 'nous' },
+    { id: 'hermes-3-llama-3.1-70b', name: 'Hermes 3 70B', provider: 'nous' },
+    { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', provider: 'nous' },
+  ],
+  xiaomi: [
+    { id: 'mimo-v2-pro', name: 'MiMo v2 Pro', provider: 'xiaomi' },
+    { id: 'mimo-v2-omni', name: 'MiMo v2 Omni', provider: 'xiaomi' },
+    { id: 'mimo-v2-flash', name: 'MiMo v2 Flash', provider: 'xiaomi' },
+  ],
   openai: [{ id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' }],
   xai: [{ id: 'grok-3', name: 'Grok 3', provider: 'xai' }],
 }

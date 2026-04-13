@@ -60,6 +60,12 @@ const PROVIDERS = [
     authType: 'api_key',
     envKeys: ['MINIMAX_CN_API_KEY'],
   },
+  {
+    id: 'xiaomi',
+    name: 'Xiaomi MiMo',
+    authType: 'api_key',
+    envKeys: ['XIAOMI_API_KEY'],
+  },
   { id: 'ollama', name: 'Ollama (Local)', authType: 'none', envKeys: [] },
   {
     id: 'custom',

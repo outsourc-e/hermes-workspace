@@ -1786,6 +1786,7 @@ export function ChatScreen({
         thinking:
           currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
         fastMode,
+        model: currentModel || undefined,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
       }).catch((err: unknown) => {
         const messageText = err instanceof Error ? err.message : String(err)
@@ -1802,6 +1803,7 @@ export function ChatScreen({
       startStreaming,
       streamFinish,
       streamStart,
+      currentModel,
     ],
   )
 
