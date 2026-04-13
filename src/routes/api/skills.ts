@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  BEARER_TOKEN,
+  HERMES_API,
   HERMES_UPGRADE_INSTRUCTIONS,
   ensureGatewayProbed,
   getCapabilities,
@@ -38,8 +40,6 @@ type SkillSummary = {
   featuredGroup?: string
   security: SecurityRisk
 }
-
-const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
 
 const KNOWN_CATEGORIES = [
   'All',
@@ -187,7 +187,10 @@ function normalizeSkill(value: unknown): SkillSummary | null {
 }
 
 async function fetchHermesSkills(): Promise<Array<SkillSummary>> {
-  const response = await fetch(`${HERMES_API_URL}/api/skills`)
+  const headers: Record<string, string> = {}
+  if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
+
+  const response = await fetch(`${HERMES_API}/api/skills`, { headers })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
     throw new Error(body || `Hermes skills request failed (${response.status})`)
@@ -378,16 +381,12 @@ export const Route = createFileRoute('/api/skills')({
             }
           }
 
-          const BEARER_TOKEN =
-            (await import('../../server/gateway-capabilities')).BEARER_TOKEN
-          const HERMES_API_BASE =
-            (await import('../../server/gateway-capabilities')).HERMES_API
           const headers: Record<string, string> = {
             'Content-Type': 'application/json',
           }
           if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
 
-          const response = await fetch(`${HERMES_API_BASE}${endpoint}`, {
+          const response = await fetch(`${HERMES_API}${endpoint}`, {
             method: 'POST',
             headers,
             body: JSON.stringify(payload),
