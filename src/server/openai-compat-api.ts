@@ -161,7 +161,9 @@ export async function openaiChat(
   if (BEARER_TOKEN) {
     headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
   }
-  if (options.sessionId) {
+  // Only send session header when authenticated — gateways without
+  // API_SERVER_KEY reject this header with an auth error.
+  if (options.sessionId && BEARER_TOKEN) {
     headers['X-Hermes-Session-Id'] = options.sessionId
   }
 

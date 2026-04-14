@@ -24,7 +24,8 @@ function classifyError(raw: string): string {
     lower.includes('401') ||
     lower.includes('403') ||
     lower.includes('unauthorized') ||
-    lower.includes('auth')
+    lower.includes('invalid api key') ||
+    lower.includes('api key')
   ) {
     return 'Authentication error — check your API key in Settings'
   }
