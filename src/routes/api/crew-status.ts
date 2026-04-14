@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import yaml from 'yaml'
-import { HERMES_API, ensureGatewayProbed } from '../../server/gateway-capabilities'
+import { BEARER_TOKEN, HERMES_API, ensureGatewayProbed } from '../../server/gateway-capabilities'
 
 type CrewDefinition = {
   id: string
@@ -200,6 +200,7 @@ async function fetchAssignedTaskCounts(): Promise<Record<string, number>> {
   try {
     const res = await fetch(`${HERMES_API}/api/tasks?include_done=false`, {
       signal: AbortSignal.timeout(3_000),
+      headers: BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {},
     })
     if (!res.ok) return {}
 

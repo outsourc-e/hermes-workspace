@@ -7,7 +7,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { HERMES_API } from '../../server/gateway-capabilities'
+import { BEARER_TOKEN, HERMES_API } from '../../server/gateway-capabilities'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -39,6 +39,10 @@ function getProfileNames(): string[] {
   }
 }
 
+function authHeaders(): Record<string, string> {
+  return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
+}
+
 export const Route = createFileRoute('/api/hermes-tasks-assignees')({
   server: {
     handlers: {
@@ -51,6 +55,7 @@ export const Route = createFileRoute('/api/hermes-tasks-assignees')({
         try {
           const res = await fetch(`${HERMES_API}/api/tasks/assignees`, {
             signal: AbortSignal.timeout(2000),
+            headers: authHeaders(),
           })
           if (res.ok) {
             return new Response(await res.text(), {
