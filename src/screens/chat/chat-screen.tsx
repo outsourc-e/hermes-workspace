@@ -43,6 +43,7 @@ import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useStreamingMessage } from './hooks/use-streaming-message'
+import { useActiveRunCheck } from './hooks/use-active-run-check'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
@@ -457,9 +458,29 @@ export function ChatScreen({
   const chatMode = useChatMode()
   const isPortableMode = chatMode === 'portable'
   const portableChatFriendlyId = isPortableMode ? 'main' : activeFriendlyId
-  const [waitingForResponse, setWaitingForResponse] = useState(
-    () => hasPendingSend() || hasPendingGeneration(),
-  )
+  // --- Issue #43 fix: lift waitingForResponse into persistent Zustand store ---
+  // The store survives component unmount, so navigating away mid-stream
+  // doesn't lose the "waiting" flag. sessionStorage backup handles reloads.
+  const storeWaiting = useChatStore((s) => s.waitingSessionKeys)
+  // resolvedSessionKey isn't available yet (defined below), so we track it via
+  // a ref that's updated once it resolves. The memo/callback read the ref.
+  const sessionKeyForWaiting = useRef<string | undefined>(undefined)
+  const waitingForResponse = useMemo(() => {
+    const key = sessionKeyForWaiting.current
+    if (!key) return hasPendingSend() || hasPendingGeneration()
+    return storeWaiting.has(key)
+  }, [storeWaiting])
+
+  const setWaitingForResponse = useCallback((waiting: boolean) => {
+    const store = useChatStore.getState()
+    const key = sessionKeyForWaiting.current
+    if (!key) return
+    if (waiting) {
+      store.setSessionWaiting(key)
+    } else {
+      store.clearSessionWaiting(key)
+    }
+  }, [])
   const [liveToolActivity, setLiveToolActivity] = useState<
     Array<{ name: string; timestamp: number }>
   >([])
@@ -549,6 +570,16 @@ export function ChatScreen({
     queryClient,
     historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
     portableMode: isPortableMode,
+  })
+
+  // Keep the waiting-state ref in sync with the resolved session key
+  sessionKeyForWaiting.current = resolvedSessionKey
+
+  // On remount, check if the server still has an active run for this session.
+  // If so, re-set waitingForResponse in the store so the UI shows the spinner.
+  useActiveRunCheck({
+    sessionKey: resolvedSessionKey ?? '',
+    enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
 
   // Wire SSE realtime stream for instant message delivery
@@ -846,6 +877,29 @@ export function ChatScreen({
     }, 5000)
     return () => window.clearTimeout(fallback)
   }, [waitingForResponse])
+
+  // Issue #43 polling fallback: when waiting but SSE hasn't reconnected,
+  // poll the active-run endpoint every 5s to detect completion.
+  useEffect(() => {
+    if (!waitingForResponse || !resolvedSessionKey) return
+    if (sseConnectionState === 'connected') return // SSE will deliver the event
+    const interval = window.setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/sessions/${encodeURIComponent(resolvedSessionKey)}/active-run`,
+        )
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.ok || !data.run || !['accepted', 'active', 'handoff'].includes(data.run.status)) {
+          streamFinish()
+          refreshHistoryRef.current()
+        }
+      } catch {
+        // ignore network errors
+      }
+    }, 5000)
+    return () => window.clearInterval(interval)
+  }, [waitingForResponse, resolvedSessionKey, sseConnectionState, streamFinish])
 
   useAutoSessionTitle({
     friendlyId: activeFriendlyId,

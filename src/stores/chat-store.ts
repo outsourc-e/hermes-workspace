@@ -130,6 +130,19 @@ type ChatState = {
   unregisterSendStreamRun: (runId: string) => void
   /** Check if a runId is being handled by send-stream */
   isSendStreamRun: (runId: string | undefined) => boolean
+
+  /** Sessions currently waiting for a response — survives component unmount */
+  waitingSessionKeys: Set<string>
+  waitingSessionMeta: Record<
+    string,
+    { since: number; runId: string | null }
+  >
+  /** Mark a session as waiting for a response */
+  setSessionWaiting: (sessionKey: string, runId?: string | null) => void
+  /** Clear waiting state for a session */
+  clearSessionWaiting: (sessionKey: string) => void
+  /** Check if a session is waiting for a response */
+  isSessionWaiting: (sessionKey: string) => boolean
 }
 
 const createEmptyStreamingState = (): StreamingState => ({
@@ -181,6 +194,59 @@ export function restoreStreamingState(
     sessionStorage.removeItem(storageKey)
     return null
   }
+}
+
+const WAITING_TTL_MS = 120_000
+const WAITING_STORAGE_PREFIX = 'hermes_waiting_'
+
+function persistWaitingState(
+  sessionKey: string,
+  meta: { since: number; runId: string | null },
+): void {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.setItem(
+    `${WAITING_STORAGE_PREFIX}${sessionKey}`,
+    JSON.stringify(meta),
+  )
+}
+
+function removeWaitingState(sessionKey: string): void {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.removeItem(`${WAITING_STORAGE_PREFIX}${sessionKey}`)
+}
+
+function restoreWaitingSessions(): {
+  keys: Set<string>
+  meta: Record<string, { since: number; runId: string | null }>
+} {
+  const keys = new Set<string>()
+  const meta: Record<string, { since: number; runId: string | null }> = {}
+  if (typeof sessionStorage === 'undefined') return { keys, meta }
+
+  const now = Date.now()
+  for (let i = sessionStorage.length - 1; i >= 0; i--) {
+    const storageKey = sessionStorage.key(i)
+    if (!storageKey || !storageKey.startsWith(WAITING_STORAGE_PREFIX)) continue
+    const sessionKey = storageKey.slice(WAITING_STORAGE_PREFIX.length)
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(storageKey) ?? '')
+      if (
+        typeof parsed.since === 'number' &&
+        now - parsed.since < WAITING_TTL_MS
+      ) {
+        keys.add(sessionKey)
+        meta[sessionKey] = {
+          since: parsed.since,
+          runId: typeof parsed.runId === 'string' ? parsed.runId : null,
+        }
+      } else {
+        sessionStorage.removeItem(storageKey)
+      }
+    } catch {
+      sessionStorage.removeItem(storageKey)
+    }
+  }
+  return { keys, meta }
 }
 
 let realtimeMessageSequence = 0
@@ -518,6 +584,8 @@ function messageMultipartSignature(
   return `${msg.role ?? 'unknown'}:${content}:${attachments}`
 }
 
+const _restoredWaiting = restoreWaitingSessions()
+
 export const useChatStore = create<ChatState>((set, get) => ({
   connectionState: 'disconnected',
   lastError: null,
@@ -525,6 +593,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamingState: new Map(),
   lastEventAt: 0,
   sendStreamRunIds: new Set(),
+  waitingSessionKeys: _restoredWaiting.keys,
+  waitingSessionMeta: _restoredWaiting.meta,
 
   setConnectionState: (connectionState, error) => {
     set({ connectionState, lastError: error ?? null })
@@ -545,6 +615,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isSendStreamRun: (runId) => {
     if (!runId) return false
     return get().sendStreamRunIds.has(runId)
+  },
+
+  setSessionWaiting: (sessionKey, runId) => {
+    const meta = {
+      since: get().waitingSessionMeta[sessionKey]?.since ?? Date.now(),
+      runId: runId ?? null,
+    }
+    const nextKeys = new Set(get().waitingSessionKeys)
+    nextKeys.add(sessionKey)
+    const nextMeta = { ...get().waitingSessionMeta, [sessionKey]: meta }
+    persistWaitingState(sessionKey, meta)
+    set({ waitingSessionKeys: nextKeys, waitingSessionMeta: nextMeta })
+  },
+
+  clearSessionWaiting: (sessionKey) => {
+    const nextKeys = new Set(get().waitingSessionKeys)
+    nextKeys.delete(sessionKey)
+    const { [sessionKey]: _, ...nextMeta } = get().waitingSessionMeta
+    removeWaitingState(sessionKey)
+    set({ waitingSessionKeys: nextKeys, waitingSessionMeta: nextMeta })
+  },
+
+  isSessionWaiting: (sessionKey) => {
+    return get().waitingSessionKeys.has(sessionKey)
   },
 
   processEvent: (event) => {
