@@ -1,9 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { BEARER_TOKEN, HERMES_API, ensureGatewayProbed, getCapabilities } from '../../server/gateway-capabilities'
+import { deleteTask, getTask, moveTask, updateTask } from '../../server/tasks-store'
+import type { TaskColumn } from '../../server/tasks-store'
 
-function authHeaders(): Record<string, string> {
-  return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
+function jsonResponse(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
@@ -11,44 +15,71 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
     handlers: {
       GET: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return jsonResponse({ error: 'Unauthorized' }, 401)
         }
-        await ensureGatewayProbed()
-        const res = await fetch(`${HERMES_API}/api/tasks/${params.taskId}`, { headers: authHeaders() })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+
+        const task = getTask(params.taskId)
+        if (!task) return jsonResponse({ error: 'Task not found' }, 404)
+        return jsonResponse({ task })
       },
+
       PATCH: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return jsonResponse({ error: 'Unauthorized' }, 401)
         }
-        const body = await request.text()
-        const res = await fetch(`${HERMES_API}/api/tasks/${params.taskId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body,
-        })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+
+        try {
+          const body = (await request.json()) as Record<string, unknown>
+          const task = updateTask(params.taskId, {
+            title: typeof body.title === 'string' ? body.title : undefined,
+            description: typeof body.description === 'string' ? body.description : undefined,
+            column: typeof body.column === 'string' ? body.column : undefined,
+            priority: typeof body.priority === 'string' ? body.priority : undefined,
+            assignee: body.assignee === null || typeof body.assignee === 'string' ? body.assignee : undefined,
+            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
+            due_date: body.due_date === null || typeof body.due_date === 'string' ? body.due_date : undefined,
+            position: typeof body.position === 'number' ? body.position : undefined,
+          })
+
+          if (!task) return jsonResponse({ error: 'Task not found' }, 404)
+          return jsonResponse({ task })
+        } catch {
+          return jsonResponse({ error: 'Invalid request body' }, 400)
+        }
       },
+
       DELETE: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return jsonResponse({ error: 'Unauthorized' }, 401)
         }
-        const res = await fetch(`${HERMES_API}/api/tasks/${params.taskId}`, { method: 'DELETE', headers: authHeaders() })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+
+        const deleted = deleteTask(params.taskId)
+        if (!deleted) return jsonResponse({ error: 'Task not found' }, 404)
+        return jsonResponse({ ok: true })
       },
+
       POST: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return jsonResponse({ error: 'Unauthorized' }, 401)
         }
+
         const url = new URL(request.url)
         const action = url.searchParams.get('action') || 'move'
-        const body = await request.text()
-        const res = await fetch(`${HERMES_API}/api/tasks/${params.taskId}/${action}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body,
-        })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+        if (action !== 'move') {
+          return jsonResponse({ error: `Unsupported action: ${action}` }, 400)
+        }
+
+        try {
+          const body = (await request.json()) as Record<string, unknown>
+          if (typeof body.column !== 'string') {
+            return jsonResponse({ error: 'column is required' }, 400)
+          }
+          const task = moveTask(params.taskId, body.column as TaskColumn)
+          if (!task) return jsonResponse({ error: 'Task not found' }, 404)
+          return jsonResponse({ task })
+        } catch {
+          return jsonResponse({ error: 'Invalid request body' }, 400)
+        }
       },
     },
   },

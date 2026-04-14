@@ -1,9 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { BEARER_TOKEN, HERMES_API } from '../../server/gateway-capabilities'
+import { createTask, listTasks } from '../../server/tasks-store'
 
-function authHeaders(): Record<string, string> {
-  return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
+function jsonResponse(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 export const Route = createFileRoute('/api/hermes-tasks')({
@@ -11,25 +14,48 @@ export const Route = createFileRoute('/api/hermes-tasks')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return jsonResponse({ error: 'Unauthorized' }, 401)
         }
+
         const url = new URL(request.url)
-        const params = url.searchParams.toString()
-        const target = `${HERMES_API}/api/tasks${params ? `?${params}` : ''}`
-        const res = await fetch(target, { headers: authHeaders() })
-        return new Response(res.body, { status: res.status, headers: { 'Content-Type': 'application/json' } })
+        const tasks = listTasks({
+          column: url.searchParams.get('column'),
+          assignee: url.searchParams.get('assignee'),
+          priority: url.searchParams.get('priority'),
+          includeDone: url.searchParams.get('include_done') === 'true',
+        })
+
+        return jsonResponse({ tasks })
       },
+
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return jsonResponse({ error: 'Unauthorized' }, 401)
         }
-        const body = await request.text()
-        const res = await fetch(`${HERMES_API}/api/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body,
-        })
-        return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } })
+
+        try {
+          const body = (await request.json()) as Record<string, unknown>
+          if (!body.title || typeof body.title !== 'string') {
+            return jsonResponse({ error: 'title is required' }, 400)
+          }
+
+          const task = createTask({
+            id: typeof body.id === 'string' ? body.id : undefined,
+            title: body.title,
+            description: typeof body.description === 'string' ? body.description : '',
+            column: typeof body.column === 'string' ? body.column : undefined,
+            priority: typeof body.priority === 'string' ? body.priority : undefined,
+            assignee: typeof body.assignee === 'string' ? body.assignee : null,
+            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+            due_date: typeof body.due_date === 'string' ? body.due_date : null,
+            position: typeof body.position === 'number' ? body.position : 0,
+            created_by: typeof body.created_by === 'string' ? body.created_by : 'user',
+          })
+
+          return jsonResponse({ task }, 201)
+        } catch {
+          return jsonResponse({ error: 'Invalid request body' }, 400)
+        }
       },
     },
   },
