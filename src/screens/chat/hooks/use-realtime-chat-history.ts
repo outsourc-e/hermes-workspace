@@ -395,6 +395,7 @@ export function useRealtimeChatHistory({
     (s) => s.streamingState.get(effectiveSessionKey) ?? null,
   )
   const streamingStateRef = useRef(streamingState)
+  const lastStreamClearTimeRef = useRef<number>(0)
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const delayedClearSessionTimeoutRef = useRef<ReturnType<
     typeof setTimeout
@@ -420,6 +421,7 @@ export function useRealtimeChatHistory({
       if (prev.thinking) {
         completedStreamingThinkingRef.current = prev.thinking
       }
+      lastStreamClearTimeRef.current = Date.now()
     }
   }, [clearCompletedStreaming, streamingState])
 
@@ -491,6 +493,9 @@ export function useRealtimeChatHistory({
     syncIntervalRef.current = setInterval(() => {
       // Don't poll during active streaming — causes flicker/overwrites
       if (streamingStateRef.current !== null) return
+      // Guard window: don't poll right after streaming clears — new stream
+      // may be starting and history API may return stale/incomplete data
+      if (Date.now() - lastStreamClearTimeRef.current < 3000) return
       const key = chatQueryKeys.history(
         effectiveFriendlyId,
         effectiveSessionKey,

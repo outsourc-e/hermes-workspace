@@ -325,7 +325,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       stopFrame()
       lifecyclePhaseRef.current = 'complete'
       clearHandoffTimer()
-      clearSendStreamRun()
+      // Delay runId unregistration so chat-events dedup continues filtering
+      // for a few seconds after completion — prevents late duplicate messages
+      const completedRunId = activeRunIdRef.current
+      if (completedRunId) {
+        activeRunIdRef.current = null
+        setTimeout(() => unregisterSendStreamRun(completedRunId), 5000)
+      }
 
       const finalText = fullTextRef.current
       const thinking = thinkingRef.current
@@ -352,7 +358,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       onComplete?.(message)
     },
-    [clearHandoffTimer, clearSendStreamRun, onComplete, stopFrame],
+    [clearHandoffTimer, onComplete, stopFrame, unregisterSendStreamRun],
   )
 
   const processEvent = useCallback(
@@ -667,6 +673,26 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       model?: string
     }) => {
       if (eventSourceRef.current) {
+        // Preserve in-progress response as a partial message before aborting
+        // so it doesn't vanish from the UI when the user interrupts
+        if (fullTextRef.current && !finishedRef.current) {
+          processStoreEvent({
+            type: 'done',
+            state: 'interrupted',
+            sessionKey: activeSessionKeyRef.current,
+            transport: 'send-stream',
+            message: {
+              role: 'assistant',
+              content: [
+                ...(thinkingRef.current
+                  ? [{ type: 'thinking' as const, thinking: thinkingRef.current }]
+                  : []),
+                { type: 'text' as const, text: fullTextRef.current },
+              ],
+              __streamingStatus: 'interrupted',
+            } as any,
+          })
+        }
         eventSourceRef.current.abort()
       }
 
