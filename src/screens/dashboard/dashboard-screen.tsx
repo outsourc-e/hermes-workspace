@@ -16,7 +16,8 @@ import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
-import { MobilePageHeader } from '@/components/mobile-page-header'
+import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { useSettings } from '@/hooks/use-settings'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -671,10 +672,33 @@ export function DashboardScreen() {
 
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
 
+    const { theme, setTheme } = useSettings()
+  const isDark = !theme.includes('light')
+
   return (
     <div className="min-h-full">
-      <MobilePageHeader title="Dashboard" />
-      <div className="px-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
+      {/* Floating mobile nav: hamburger left, theme toggle right */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <button
+          type="button"
+          aria-label="Open navigation menu"
+          onClick={openHamburgerMenu}
+          className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
+        >
+          <svg width="20" height="16" viewBox="0 0 20 16" fill="none" className="opacity-70" style={{ color: 'var(--color-ink, #111)' }}>
+            <path d="M1 1.5H19M1 8H19M1 14.5H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          aria-label="Toggle theme"
+          onClick={() => setTheme(isDark ? theme.replace('-light', '').concat('-light') as any : theme.replace('-light', '') as any)}
+          className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
+        >
+          <span className="text-lg">{isDark ? '☀️' : '🌙'}</span>
+        </button>
+      </div>
+      <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
       {/* ── Header: Hermes Logo + Quick Actions ── */}
       <div className="flex flex-col items-center gap-3 py-3">
         <img

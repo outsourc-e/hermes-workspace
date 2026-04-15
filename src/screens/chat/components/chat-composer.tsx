@@ -268,6 +268,34 @@ async function fetchModels(): Promise<{
         }
       }
 
+      // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)
+      try {
+        const localRes = await fetch('/api/local-providers')
+        if (localRes.ok) {
+          const localData = (await localRes.json()) as {
+            ok?: boolean
+            providers?: Array<{ id: string; name: string; online: boolean }>
+            models?: Array<{ id: string; name: string; provider: string }>
+          }
+          if (localData.ok && localData.models && localData.models.length > 0) {
+            const existingIds = new Set(models.map((m) => m.id))
+            for (const m of localData.models) {
+              if (!existingIds.has(m.id)) {
+                models.push({ id: m.id, name: m.name, provider: m.provider })
+                existingIds.add(m.id)
+              }
+            }
+            // Add local providers to configured list
+            for (const p of localData.providers || []) {
+              if (p.online && !configuredProviders.includes(p.id)) {
+                configuredProviders.push(p.id)
+                providerLabels[p.id] = p.name
+              }
+            }
+          }
+        }
+      } catch { /* ignore local discovery failure */ }
+
       return {
         ok: true,
         models,
