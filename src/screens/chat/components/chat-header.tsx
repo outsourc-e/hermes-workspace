@@ -276,10 +276,10 @@ function ChatHeaderComponent({
           <button
             type="button"
             onClick={onOpenSessions}
-            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-white/5 hover:bg-primary-100 active:bg-primary-150 transition-colors"
+            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 dark:bg-primary-900/50 dark:hover:bg-primary-800/60 transition-colors"
             aria-label="Switch session"
           >
-            <span className="truncate text-[13px] font-medium text-ink">
+            <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
               {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
             </span>
             <svg
