@@ -17,7 +17,9 @@ import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
-import { useSettings, resolveTheme } from '@/hooks/use-settings'
+import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Moon02Icon, Sun02Icon } from '@hugeicons/core-free-icons'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -672,8 +674,13 @@ export function DashboardScreen() {
 
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
 
-    const { settings, updateSettings } = useSettings()
-  const isDark = resolveTheme(settings.theme) === 'dark'
+    const _theme = useSettingsStore((state) => state.settings.theme)
+  const updateSettings = useSettingsStore((state) => state.updateSettings)
+  void _theme
+  const currentDataTheme = typeof document !== 'undefined'
+    ? document.documentElement.getAttribute('data-theme') || 'hermes-official'
+    : 'hermes-official'
+  const isDark = !currentDataTheme.endsWith('-light')
 
   return (
     <div className="min-h-full">
@@ -692,10 +699,27 @@ export function DashboardScreen() {
         <button
           type="button"
           aria-label="Toggle theme"
-          onClick={() => updateSettings({ theme: isDark ? 'light' : 'dark' })}
+          onClick={() => {
+            const LIGHT_DARK_PAIRS: Record<string, string> = {
+              'hermes-official': 'hermes-official-light',
+              'hermes-official-light': 'hermes-official',
+              'hermes-classic': 'hermes-classic-light',
+              'hermes-classic-light': 'hermes-classic',
+              'hermes-slate': 'hermes-slate-light',
+              'hermes-slate-light': 'hermes-slate',
+              'hermes-mono': 'hermes-mono-light',
+              'hermes-mono-light': 'hermes-mono',
+            }
+            const nextDataTheme = LIGHT_DARK_PAIRS[currentDataTheme] || (isDark ? 'hermes-official-light' : 'hermes-official')
+            import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
+            const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
+            applyTheme(nextMode)
+            updateSettings({ theme: nextMode })
+          }}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
+          style={{ color: 'var(--theme-muted)' }}
         >
-          <span className="text-lg">{isDark ? '☀️' : '🌙'}</span>
+          <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={20} strokeWidth={1.5} />
         </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
