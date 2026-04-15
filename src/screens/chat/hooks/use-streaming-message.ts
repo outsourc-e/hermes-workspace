@@ -85,6 +85,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const finishedRef = useRef(false)
   const thinkingRef = useRef<string>('')
   const activeRunIdRef = useRef<string | null>(null)
+  const delayedUnregisterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeSessionKeyRef = useRef<string>('main')
   const lifecyclePhaseRef = useRef<StreamLifecyclePhase>('idle')
   const acceptedAtRef = useRef<number | null>(null)
@@ -127,6 +128,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       stopFrame()
       clearHandoffTimer()
       clearSendStreamRun()
+      // Cancel any delayed unregister from a previous run
+      if (delayedUnregisterTimerRef.current) {
+        clearTimeout(delayedUnregisterTimerRef.current)
+        delayedUnregisterTimerRef.current = null
+      }
       clearStreamingSession(activeSessionKeyRef.current)
       if (nextSessionKey) {
         activeSessionKeyRef.current = nextSessionKey
@@ -327,10 +333,17 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       clearHandoffTimer()
       // Delay runId unregistration so chat-events dedup continues filtering
       // for a few seconds after completion — prevents late duplicate messages
+      if (delayedUnregisterTimerRef.current) {
+        clearTimeout(delayedUnregisterTimerRef.current)
+        delayedUnregisterTimerRef.current = null
+      }
       const completedRunId = activeRunIdRef.current
       if (completedRunId) {
         activeRunIdRef.current = null
-        setTimeout(() => unregisterSendStreamRun(completedRunId), 5000)
+        delayedUnregisterTimerRef.current = setTimeout(() => {
+          delayedUnregisterTimerRef.current = null
+          unregisterSendStreamRun(completedRunId)
+        }, 5000)
       }
 
       const finalText = fullTextRef.current
