@@ -250,6 +250,10 @@ function HermesContent() {
   )
   const [memEnabled, setMemEnabled] = useState(true)
   const [userProfileEnabled, setUserProfileEnabled] = useState(true)
+  const [localDiscovery, setLocalDiscovery] = useState<{
+    providers: Array<{ id: string; name: string; online: boolean; modelCount: number; configured: boolean; needsRestart: boolean }>
+    models: Array<{ id: string; name: string; provider: string }>
+  } | null>(null)
 
   const fetchModelsForProvider = useCallback((providerId: string) => {
     fetch(
@@ -264,6 +268,13 @@ function HermesContent() {
         const card = PROVIDER_CARDS.find((p) => p.id === providerId)
         setAvailableModels(card?.models || [])
       })
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/local-providers')
+      .then((r) => r.json())
+      .then((d: any) => { if (d.ok) setLocalDiscovery(d) })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -409,13 +420,13 @@ function HermesContent() {
                 </div>
                 <span className="text-xs font-semibold mt-1">{p.name}</span>
                 <span className="text-[9px]" style={mutedStyle}>
-                  {p.authType === 'oauth'
-                    ? 'OAuth'
-                    : p.authType === 'none'
-                      ? 'Local'
-                      : hasKey
-                        ? 'Key set'
-                        : 'Key required'}
+                  {(() => {
+                    const disc = localDiscovery?.providers.find((lp) => lp.id === p.id)
+                    if (disc?.online) return '🟢 Detected'
+                    if (p.authType === 'oauth') return 'OAuth'
+                    if (p.authType === 'none') return 'Local'
+                    return hasKey ? 'Key set' : 'Key required'
+                  })()}
                 </span>
               </button>
             )
@@ -433,11 +444,15 @@ function HermesContent() {
             Model
           </p>
           <div className="flex flex-wrap gap-2">
-            {(availableModels.length > 0
-              ? availableModels
-              : PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models ||
-                []
-            ).map((model) => (
+            {(() => {
+              if (availableModels.length > 0) return availableModels
+              // Use auto-discovered models for local providers
+              const discovered = localDiscovery?.models
+                .filter((m) => m.provider === activeProvider)
+                .map((m) => m.id)
+              if (discovered && discovered.length > 0) return discovered
+              return PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models || []
+            })().map((model) => (
               <button
                 key={model}
                 type="button"
@@ -456,6 +471,16 @@ function HermesContent() {
           </div>
         </div>
       )}
+
+      {(() => {
+        const disc = localDiscovery?.providers.find((lp) => lp.id === activeProvider)
+        if (!disc || !disc.needsRestart) return null
+        return (
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+            ⚠️ Gateway restart needed to use {disc.name}. Run <code className="rounded bg-black/30 px-1">hermes gateway restart</code> in your terminal.
+          </div>
+        )
+      })()}
 
       {/* API Keys */}
       <div>
