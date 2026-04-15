@@ -8,6 +8,7 @@ import {
   unregisterActiveSendRun,
 } from '../../server/send-run-tracker'
 import { getChatMode } from '../../server/gateway-capabilities'
+import { ensureLocalSession, appendLocalMessage, getLocalMessages, touchLocalSession } from '../../server/local-session-store'
 import { getLocalProviderDef, getDiscoveredModels } from '../../server/local-provider-discovery'
 import {
   
@@ -396,6 +397,15 @@ export const Route = createFileRoute('/api/send-stream')({
               if (chatMode === 'portable') {
                 const runId = crypto.randomUUID()
                 const portableSessionKey = sessionKey
+
+                // Persist user message to local session store
+                ensureLocalSession(portableSessionKey, typeof body.model === 'string' ? body.model : undefined)
+                appendLocalMessage(portableSessionKey, {
+                  id: crypto.randomUUID(),
+                  role: 'user',
+                  content: typeof body.message === 'string' ? body.message : '',
+                  timestamp: Date.now(),
+                })
                 const portableFriendlyId =
                   resolvedFriendlyId ||
                   requestedFriendlyId ||
@@ -428,9 +438,17 @@ export const Route = createFileRoute('/api/send-stream')({
                   const localeSystemMsg: Array<OpenAICompatMessage> = locale && locale !== 'en'
                     ? [{ role: 'system', content: `Respond in ${locale === 'es' ? 'Spanish' : locale === 'fr' ? 'French' : locale === 'zh' ? 'Chinese' : locale === 'de' ? 'German' : locale === 'ja' ? 'Japanese' : locale === 'ko' ? 'Korean' : locale === 'pt' ? 'Portuguese' : locale === 'ru' ? 'Russian' : locale === 'ar' ? 'Arabic' : 'English'}. The user's interface is set to this language.` }]
                     : []
+                  // Load persisted history for this session
+                  const persistedMessages = getLocalMessages(portableSessionKey)
+                  const persistedHistory = persistedMessages.map(m => ({
+                    role: m.role as 'user' | 'assistant' | 'system',
+                    content: m.content,
+                  }))
+                  // Use persisted history if available, otherwise fall back to client-sent history
+                  const effectiveHistory = persistedHistory.length > 0 ? persistedHistory : history
                   const portableMessages: Array<OpenAICompatMessage> = [
                     ...localeSystemMsg,
-                    ...history,
+                    ...effectiveHistory,
                     {
                       role: 'user',
                       content: userContent,
@@ -467,6 +485,15 @@ export const Route = createFileRoute('/api/send-stream')({
                       })
                     }
                   }
+
+                  // Persist assistant response to local session store
+                  appendLocalMessage(portableSessionKey, {
+                    id: crypto.randomUUID(),
+                    role: 'assistant',
+                    content: accumulated,
+                    timestamp: Date.now(),
+                  })
+                  touchLocalSession(portableSessionKey)
 
                   sendEvent('done', {
                     state: 'complete',
