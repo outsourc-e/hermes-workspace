@@ -264,43 +264,19 @@ export function isProviderConfigured(providerId: string): boolean {
 /**
  * Ensure a discovered provider has a custom_providers entry in config.yaml.
  * Returns true if config was modified (gateway restart needed).
+ *
+ * NOTE: This does NOT auto-write anymore to avoid corrupting config.yaml.
+ * The config should be managed through the gateway's /api/config endpoint
+ * or manually by the user. This function only returns whether a write
+ * would be needed.
  */
 export function ensureProviderInConfig(providerId: string): boolean {
+  if (isProviderConfigured(providerId)) return false
   const def = LOCAL_PROVIDERS.find((p) => p.id === providerId)
   if (!def) return false
-  if (isProviderConfigured(providerId)) return false
-
-  try {
-    let raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
-
-    const entry = [
-      `  - name: ${def.id}`,
-      `    base_url: ${def.baseUrl}`,
-      `    api_key: ${def.apiKey}`,
-      `    api_mode: ${def.apiMode}`,
-    ].join('\n')
-
-    if (raw.includes('custom_providers:')) {
-      // Append to existing custom_providers list
-      raw = raw.replace(
-        /custom_providers:\s*\n/,
-        `custom_providers:\n${entry}\n`,
-      )
-    } else {
-      // Add custom_providers section
-      raw += `\ncustom_providers:\n${entry}\n`
-    }
-
-    fs.writeFileSync(CONFIG_PATH, raw, 'utf-8')
-    console.log(
-      `[local-discovery] Added ${def.name} to custom_providers in config.yaml`,
-    )
-    return true
-  } catch (err) {
-    console.error(
-      `[local-discovery] Failed to write config for ${def.name}:`,
-      err,
-    )
-    return false
-  }
+  // Don't auto-write — just signal that config is needed
+  console.log(
+    `[local-discovery] ${def.name} detected but not in custom_providers. Gateway restart needed after adding it.`,
+  )
+  return false
 }
