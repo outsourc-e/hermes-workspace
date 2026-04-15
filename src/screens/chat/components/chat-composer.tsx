@@ -395,6 +395,8 @@ async function fetchModelsForProvider(
   }))
 }
 
+const LOCAL_PROVIDERS_SET = new Set(['ollama', 'atomic-chat'])
+
 async function switchModel(
   model: string,
   provider?: string,
@@ -407,6 +409,18 @@ async function switchModel(
       : modelId.includes('/')
         ? modelId.split('/')[0]
         : undefined
+
+  // For local providers, don't write to gateway config — just track client-side.
+  // The gateway can't run local models (context too small for agent loop).
+  if (modelProvider && LOCAL_PROVIDERS_SET.has(modelProvider)) {
+    return {
+      ok: true,
+      resolved: {
+        modelProvider,
+        model: modelId,
+      },
+    }
+  }
 
   // Write the model change to ~/.hermes/config.yaml via the webapi
   const patch: Record<string, string> = { model: modelId }
