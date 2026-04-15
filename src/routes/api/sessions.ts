@@ -14,6 +14,7 @@ import {
   updateSession,
 } from '../../server/hermes-api'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
+import { listLocalSessions } from '../../server/local-session-store'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -35,7 +36,27 @@ export const Route = createFileRoute('/api/sessions')({
 
         try {
           const sessions = await listSessions(50, 0)
-          return json({ sessions: sessions.map(toSessionSummary) })
+          const gatewaySessions = sessions.map(toSessionSummary)
+
+          // Merge local portable sessions (Ollama, Atomic Chat, etc.)
+          const localSessions = listLocalSessions()
+          const gatewayIds = new Set(gatewaySessions.map((s: any) => s.key || s.id))
+          for (const ls of localSessions) {
+            if (!gatewayIds.has(ls.id)) {
+              gatewaySessions.push({
+                key: ls.id,
+                id: ls.id,
+                title: ls.title || 'Local Chat',
+                startedAt: ls.createdAt,
+                updatedAt: ls.updatedAt,
+                message_count: ls.messageCount,
+                model: ls.model,
+                source: 'local',
+              } as any)
+            }
+          }
+
+          return json({ sessions: gatewaySessions })
         } catch (err) {
           return json(
             {
