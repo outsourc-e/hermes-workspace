@@ -2278,10 +2278,11 @@ function ChatComposerComponent({
                                 ? defaultProvider
                                 : ((m as Record<string, unknown>)
                                     .provider as string) || defaultProvider
+                            const LOCAL_PROVIDER_IDS = ['ollama', 'atomic-chat']
                             const isLocal =
-                              typeof m !== 'string' &&
+                              (typeof m !== 'string' &&
                               (m as Record<string, unknown>).description ===
-                                'local'
+                                'local') || LOCAL_PROVIDER_IDS.includes(mProvider)
                             return {
                               id: mId,
                               name: mName,
