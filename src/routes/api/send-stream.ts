@@ -8,6 +8,7 @@ import {
   unregisterActiveSendRun,
 } from '../../server/send-run-tracker'
 import { getChatMode } from '../../server/gateway-capabilities'
+import { getLocalProviderDef, getDiscoveredModels } from '../../server/local-provider-discovery'
 import {
   
   
@@ -333,7 +334,21 @@ export const Route = createFileRoute('/api/send-stream')({
           })
         }
 
-        const chatMode = getChatMode()
+        // Check if the selected model is a local provider model — force portable + direct routing
+        let chatMode = getChatMode()
+        let localBaseUrl: string | undefined
+        const requestModel = typeof body.model === 'string' ? body.model : ''
+        if (requestModel) {
+          const discoveredModels = getDiscoveredModels()
+          const localMatch = discoveredModels.find((m) => m.id === requestModel)
+          if (localMatch) {
+            const providerDef = getLocalProviderDef(localMatch.provider)
+            if (providerDef) {
+              chatMode = 'portable'
+              localBaseUrl = providerDef.baseUrl
+            }
+          }
+        }
         if (chatMode === 'portable' && sessionKey === 'new') {
           sessionKey = crypto.randomUUID()
           resolvedFriendlyId = sessionKey
@@ -430,6 +445,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     signal: abortController.signal,
                     stream: true,
                     sessionId: portableSessionKey,
+                    baseUrl: localBaseUrl,
                   })
 
                   let thinking = ''

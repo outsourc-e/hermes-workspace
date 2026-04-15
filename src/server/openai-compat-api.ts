@@ -51,6 +51,8 @@ export type OpenAIChatOptions = {
   temperature?: number
   signal?: AbortSignal
   sessionId?: string
+  /** Override the base URL (e.g. for local providers). Bypasses gateway. */
+  baseUrl?: string
 }
 
 type OpenAIChatRequest = {
@@ -167,7 +169,10 @@ export async function openaiChat(
     headers['X-Hermes-Session-Id'] = options.sessionId
   }
 
-  const response = await fetch(`${HERMES_API}/v1/chat/completions`, {
+  const endpoint = options.baseUrl
+    ? `${options.baseUrl.replace(/\/+$/, '')}/chat/completions`
+    : `${HERMES_API}/v1/chat/completions`
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers,
     body: JSON.stringify(await buildRequestBody(messages, options)),
