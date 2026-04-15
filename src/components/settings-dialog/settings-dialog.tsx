@@ -157,6 +157,30 @@ const PROVIDER_CARDS: Array<{
   authType: 'oauth' | 'api_key' | 'none'
   envKey?: string
 }> = [
+  // Local providers first — zero setup
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    logo: '/providers/ollama.png',
+    models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'],
+    authType: 'none',
+  },
+  {
+    id: 'atomic-chat',
+    name: 'Atomic Chat',
+    logo: '/providers/atomic-chat.png',
+    models: ['llama-3.2-3b', 'qwen2.5-7b', 'gemma-3-4b'],
+    authType: 'none',
+  },
+  // Cloud providers
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    logo: '/providers/anthropic.png',
+    models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'],
+    authType: 'api_key',
+    envKey: 'ANTHROPIC_API_KEY',
+  },
   {
     id: 'nous',
     name: 'Nous Portal',
@@ -170,14 +194,6 @@ const PROVIDER_CARDS: Array<{
     logo: '/providers/openai.png',
     models: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'],
     authType: 'oauth',
-  },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    logo: '/providers/anthropic.png',
-    models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'],
-    authType: 'api_key',
-    envKey: 'ANTHROPIC_API_KEY',
   },
   {
     id: 'openrouter',
@@ -219,20 +235,6 @@ const PROVIDER_CARDS: Array<{
     authType: 'api_key',
     envKey: 'XIAOMI_API_KEY',
   },
-  {
-    id: 'ollama',
-    name: 'Ollama',
-    logo: '/providers/ollama.png',
-    models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'],
-    authType: 'none',
-  },
-  {
-    id: 'atomic-chat',
-    name: 'Atomic Chat',
-    logo: '/providers/atomic-chat.png',
-    models: ['llama-3.2-3b', 'qwen2.5-7b', 'gemma-3-4b'],
-    authType: 'none',
-  },
   { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
 ]
 
@@ -256,6 +258,16 @@ function HermesContent() {
   } | null>(null)
 
   const fetchModelsForProvider = useCallback((providerId: string) => {
+    // For local providers, prefer auto-discovered models first
+    if (localDiscovery) {
+      const discovered = localDiscovery.models
+        .filter((m) => m.provider === providerId)
+        .map((m) => m.id)
+      if (discovered.length > 0) {
+        setAvailableModels(discovered)
+        return
+      }
+    }
     fetch(
       `/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`,
     )
@@ -268,7 +280,7 @@ function HermesContent() {
         const card = PROVIDER_CARDS.find((p) => p.id === providerId)
         setAvailableModels(card?.models || [])
       })
-  }, [])
+  }, [localDiscovery])
 
   useEffect(() => {
     fetch('/api/local-providers')
