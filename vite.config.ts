@@ -44,7 +44,7 @@ function resolveHermesAgentDir(env: Record<string, string>): string | null {
   return null
 }
 
-/** Resolve the Python executable to use for uvicorn.
+/** Resolve the Python executable to use for Hermes backend startup.
  *  Prefers .venv/bin/python inside agentDir, falls back to system python3.
  */
 function resolveHermesPython(agentDir: string): string {
@@ -109,19 +109,18 @@ const config = defineConfig(({ mode, command }) => {
     }
 
     const python = resolveHermesPython(agentDir)
-    console.log(`[hermes-agent] Starting from ${agentDir} using ${python}`)
+    const useGatewayRun = existsSync(resolve(agentDir, 'gateway', 'run.py'))
+    const commandArgs = useGatewayRun
+      ? ['-m', 'gateway.run']
+      : ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', '8642']
+
+    console.log(
+      `[hermes-agent] Starting from ${agentDir} using ${python} (${useGatewayRun ? 'gateway.run' : 'uvicorn'})`,
+    )
 
     const child = spawn(
       python,
-      [
-        '-m',
-        'uvicorn',
-        'webapi.app:app',
-        '--host',
-        '0.0.0.0',
-        '--port',
-        '8642',
-      ],
+      commandArgs,
       {
         cwd: agentDir,
         detached: false, // keep tied to vite process — stops when dev server stops

@@ -9,20 +9,25 @@ import {
   getGatewayCapabilities,
 } from '../../server/hermes-api'
 import { BEARER_TOKEN, HERMES_API } from '../../server/gateway-capabilities'
+import {
+  ensureDiscovery,
+  getDiscoveredModels,
+  ensureProviderInConfig,
+} from '../../server/local-provider-discovery'
 
 
 // Well-known models for providers available via auth store
 const AUTH_STORE_MODELS: Record<string, Array<ModelEntry>> = {
   anthropic: [
     {
-      id: 'claude-sonnet-4-20250514',
-      name: 'Claude Sonnet 4',
-      provider: 'anthropic-billing-proxy',
+      id: 'claude-opus-4-6',
+      name: 'Claude Opus 4.6',
+      provider: 'anthropic',
     },
     {
-      id: 'claude-opus-4-20250514',
-      name: 'Claude Opus 4',
-      provider: 'anthropic-billing-proxy',
+      id: 'claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6',
+      provider: 'anthropic',
     },
   ],
   nous: [
@@ -35,7 +40,16 @@ const AUTH_STORE_MODELS: Record<string, Array<ModelEntry>> = {
     { id: 'mimo-v2-omni', name: 'MiMo v2 Omni', provider: 'xiaomi' },
     { id: 'mimo-v2-flash', name: 'MiMo v2 Flash', provider: 'xiaomi' },
   ],
-  openai: [{ id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' }],
+  openai: [
+    { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai' },
+    { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
+    { id: 'o3-mini', name: 'o3 Mini', provider: 'openai' },
+  ],
+  openrouter: [
+    { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro', provider: 'openrouter' },
+    { id: 'qwen/qwen3-235b-a22b', name: 'Qwen3 235B', provider: 'openrouter' },
+    { id: 'meta-llama/llama-4-maverick', name: 'Llama 4 Maverick', provider: 'openrouter' },
+  ],
   xai: [{ id: 'grok-3', name: 'Grok 3', provider: 'xai' }],
 }
 
@@ -163,6 +177,18 @@ export const Route = createFileRoute('/api/models')({
           for (const m of authModels) {
             if (!existingIds.has(m.id)) {
               models.push(m)
+            }
+          }
+
+          // Auto-discover local providers (Ollama, Atomic Chat, etc.)
+          await ensureDiscovery()
+          const localModels = getDiscoveredModels()
+          for (const m of localModels) {
+            if (!existingIds.has(m.id)) {
+              models.push(m)
+              existingIds.add(m.id)
+              // Auto-register provider in config if not already there
+              ensureProviderInConfig(m.provider)
             }
           }
           const configuredProviders = Array.from(
