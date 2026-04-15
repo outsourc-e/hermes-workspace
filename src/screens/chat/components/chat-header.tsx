@@ -276,7 +276,7 @@ function ChatHeaderComponent({
           <button
             type="button"
             onClick={onOpenSessions}
-            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 dark:bg-white/10 dark:hover:bg-white/15 transition-colors"
+            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 dark:bg-neutral-700/80 dark:hover:bg-neutral-600/80 transition-colors"
             aria-label="Switch session"
           >
             <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
