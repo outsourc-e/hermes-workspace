@@ -74,7 +74,7 @@ export type DiscoveredProvider = {
 // -------------------------------------------------------------------
 
 const PROBE_TTL_MS = 30_000 // re-probe every 30s
-const PROBE_TIMEOUT_MS = 2_000 // 2s timeout per probe
+const PROBE_TIMEOUT_MS = 800 // 800ms timeout per probe — local servers respond fast
 
 let discoveryState: Map<string, DiscoveredProvider> = new Map()
 let lastProbeAll = 0
@@ -235,6 +235,9 @@ export function getLocalProviderDef(
  * List of all well-known local provider IDs.
  */
 export const LOCAL_PROVIDER_IDS = LOCAL_PROVIDERS.map((p) => p.id)
+
+// Kick off first probe immediately at import time
+void ensureDiscovery()
 
 // -------------------------------------------------------------------
 // Config auto-writer
