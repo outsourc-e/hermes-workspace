@@ -672,8 +672,8 @@ export function DashboardScreen() {
 
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
 
-    const { theme, setTheme } = useSettings()
-  const isDark = resolveTheme(theme) === 'dark'
+    const { settings, updateSettings } = useSettings()
+  const isDark = resolveTheme(settings.theme) === 'dark'
 
   return (
     <div className="min-h-full">
@@ -692,7 +692,7 @@ export function DashboardScreen() {
         <button
           type="button"
           aria-label="Toggle theme"
-          onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          onClick={() => updateSettings({ theme: isDark ? 'light' : 'dark' })}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
         >
           <span className="text-lg">{isDark ? '☀️' : '🌙'}</span>
