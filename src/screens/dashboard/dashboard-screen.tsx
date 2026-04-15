@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -674,13 +674,12 @@ export function DashboardScreen() {
 
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
 
-    const _theme = useSettingsStore((state) => state.settings.theme)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
-  void _theme
-  const currentDataTheme = typeof document !== 'undefined'
-    ? document.documentElement.getAttribute('data-theme') || 'hermes-official'
-    : 'hermes-official'
-  const isDark = !currentDataTheme.endsWith('-light')
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document === 'undefined') return true
+    const dt = document.documentElement.getAttribute('data-theme') || ''
+    return !dt.endsWith('-light')
+  })
 
   return (
     <div className="min-h-full">
@@ -710,11 +709,13 @@ export function DashboardScreen() {
               'hermes-mono': 'hermes-mono-light',
               'hermes-mono-light': 'hermes-mono',
             }
-            const nextDataTheme = LIGHT_DARK_PAIRS[currentDataTheme] || (isDark ? 'hermes-official-light' : 'hermes-official')
+            const cur = document.documentElement.getAttribute('data-theme') || 'hermes-official'
+            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'hermes-official-light' : 'hermes-official')
             import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
             const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
             applyTheme(nextMode)
             updateSettings({ theme: nextMode })
+            setIsDark(nextMode === 'dark')
           }}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
           style={{ color: 'var(--theme-muted)' }}
