@@ -16,6 +16,7 @@ import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
+import { MobilePageHeader } from '@/components/mobile-page-header'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -671,7 +672,9 @@ export function DashboardScreen() {
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
 
   return (
-    <div className="min-h-full px-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
+    <div className="min-h-full">
+      <MobilePageHeader title="Dashboard" />
+      <div className="px-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
       {/* ── Header: Hermes Logo + Quick Actions ── */}
       <div className="flex flex-col items-center gap-3 py-3">
         <img
@@ -822,6 +825,7 @@ export function DashboardScreen() {
           description={getUnavailableReason('sessions')}
         />
       )}
+      </div>
     </div>
   )
 }
