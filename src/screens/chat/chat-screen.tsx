@@ -1,3 +1,8 @@
+// Module-level local model override — set by composer when user picks a local model
+// Avoids prop threading. Reset when switching back to cloud models.
+export let _localModelOverride = ''
+export function setLocalModelOverride(model: string) { _localModelOverride = model }
+
 import {
   useCallback,
   useEffect,
@@ -952,7 +957,8 @@ export function ChatScreen({
     return models.map((m: any) => m.id).filter((id: string) => id)
   }, [modelsQuery.data])
 
-  const currentModel = currentModelQuery.data || ''
+  const gatewayModel = currentModelQuery.data || ''
+  const currentModel = _localModelOverride || gatewayModel
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)
