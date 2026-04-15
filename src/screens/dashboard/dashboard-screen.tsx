@@ -17,7 +17,7 @@ import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
-import { useSettings } from '@/hooks/use-settings'
+import { useSettings, resolveTheme } from '@/hooks/use-settings'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -673,7 +673,7 @@ export function DashboardScreen() {
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
 
     const { theme, setTheme } = useSettings()
-  const isDark = !theme.includes('light')
+  const isDark = resolveTheme(theme) === 'dark'
 
   return (
     <div className="min-h-full">
@@ -692,7 +692,7 @@ export function DashboardScreen() {
         <button
           type="button"
           aria-label="Toggle theme"
-          onClick={() => setTheme(isDark ? theme.replace('-light', '').concat('-light') as any : theme.replace('-light', '') as any)}
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
         >
           <span className="text-lg">{isDark ? '☀️' : '🌙'}</span>
