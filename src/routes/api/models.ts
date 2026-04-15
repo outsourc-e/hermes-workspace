@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -59,31 +62,49 @@ function normalizeModel(entry: unknown): ModelEntry | null {
 }
 
 /**
- * Fetch models from OCPlatform gateway HTTP API (Clawsuite).
- * This is the authoritative model list — same as what Clawsuite shows.
- * Default port 3000; override via OCPLATFORM_UI_URL env var.
+ * Read user-configured models from ~/.hermes/models.json.
+ * This is the curated list the user manages via the Hermes CLI or UI.
+ * Each entry has: { id, name, provider, model, baseUrl, createdAt }
  */
-async function fetchOpenClawModels(): Promise<{
-  models: Array<ModelEntry>
-  configuredProviders: Array<string>
-} | null> {
-  const baseUrl =
-    process.env.OCPLATFORM_UI_URL?.trim() || 'http://127.0.0.1:3000'
+function readHermesModelsJson(): Array<ModelEntry> {
+  const modelsPath = path.join(os.homedir(), '.hermes', 'models.json')
   try {
-    const res = await fetch(`${baseUrl}/api/models`, {
-      signal: AbortSignal.timeout(3000),
-    })
-    if (!res.ok) return null
-    const data = asRecord(await res.json())
-    if (!data.ok) return null
-    const rawModels = Array.isArray(data.models) ? data.models : []
-    const models = rawModels
-      .map(normalizeModel)
-      .filter((e): e is ModelEntry => e !== null)
-    const configuredProviders = Array.isArray(data.configuredProviders)
-      ? (data.configuredProviders as Array<string>)
-      : []
-    return { models, configuredProviders }
+    if (!fs.existsSync(modelsPath)) return []
+    const raw = fs.readFileSync(modelsPath, 'utf-8')
+    const entries = JSON.parse(raw)
+    if (!Array.isArray(entries)) return []
+    return entries
+      .map((entry: Record<string, unknown>) => {
+        // models.json uses "model" field for the model ID
+        const modelId = readString(entry.model) || readString(entry.id)
+        if (!modelId) return null
+        return {
+          id: modelId,
+          name: readString(entry.name) || modelId,
+          provider: readString(entry.provider) || 'unknown',
+        }
+      })
+      .filter((e: ModelEntry | null): e is ModelEntry => e !== null)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Read the default model from ~/.hermes/config.yaml without a YAML parser.
+ * Looks for "default: <model-id>" under the "model:" section.
+ */
+function readHermesDefaultModel(): ModelEntry | null {
+  const configPath = path.join(os.homedir(), '.hermes', 'config.yaml')
+  try {
+    if (!fs.existsSync(configPath)) return null
+    const raw = fs.readFileSync(configPath, 'utf-8')
+    const defaultMatch = raw.match(/^\s*default:\s*(.+)$/m)
+    const providerMatch = raw.match(/^\s*provider:\s*(.+)$/m)
+    if (!defaultMatch) return null
+    const modelId = defaultMatch[1].trim()
+    const provider = providerMatch ? providerMatch[1].trim() : 'unknown'
+    return { id: modelId, name: modelId, provider }
   } catch {
     return null
   }
@@ -91,7 +112,6 @@ async function fetchOpenClawModels(): Promise<{
 
 /**
  * Fallback: fetch models from the hermes-agent /v1/models endpoint.
- * Returns a minimal list (usually just "hermes-agent").
  */
 async function fetchHermesModels(): Promise<Array<ModelEntry>> {
   const headers: Record<string, string> = {}
@@ -120,51 +140,26 @@ export const Route = createFileRoute('/api/models')({
         await ensureGatewayProbed()
 
         try {
-          // Primary: fetch from OCPlatform gateway (same list as Clawsuite)
-          const ocpResult = await fetchOpenClawModels()
-          if (ocpResult && ocpResult.models.length > 0) {
-            // Merge in auto-discovered local models
-            await ensureDiscovery()
-            const localModels = getDiscoveredModels()
-            const existingIds = new Set(ocpResult.models.map((m) => m.id))
-            for (const m of localModels) {
-              if (!existingIds.has(m.id)) {
-                ocpResult.models.push(m)
-                existingIds.add(m.id)
-                ensureProviderInConfig(m.provider)
-              }
+          // Primary: read user-configured models from ~/.hermes/models.json
+          let models = readHermesModelsJson()
+          let source = 'models.json'
+
+          // Ensure the default model from config.yaml is always included
+          const defaultModel = readHermesDefaultModel()
+          if (defaultModel) {
+            const hasDefault = models.some((m) => m.id === defaultModel.id)
+            if (!hasDefault) {
+              models.unshift(defaultModel)
             }
-            const configuredProviders = Array.from(
-              new Set([
-                ...ocpResult.configuredProviders,
-                ...localModels.map((m) => m.provider),
-              ].filter(Boolean)),
-            )
-            return json({
-              ok: true,
-              object: 'list',
-              data: ocpResult.models,
-              models: ocpResult.models,
-              configuredProviders,
-              source: 'openclaw',
-            })
           }
 
-          // Fallback: hermes-agent /v1/models
-          if (!getGatewayCapabilities().models) {
-            return json({
-              ok: true,
-              object: 'list',
-              data: [],
-              models: [],
-              configuredProviders: [],
-              source: 'unavailable',
-            })
+          // Fallback: if no models.json, fetch from hermes-agent /v1/models
+          if (models.length === 0 && getGatewayCapabilities().models) {
+            models = await fetchHermesModels()
+            source = 'hermes-agent'
           }
 
-          const models = await fetchHermesModels()
-
-          // Merge local models
+          // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)
           await ensureDiscovery()
           const localModels = getDiscoveredModels()
           const existingIds = new Set(models.map((m) => m.id))
@@ -185,13 +180,14 @@ export const Route = createFileRoute('/api/models')({
                 .filter(Boolean),
             ),
           )
+
           return json({
             ok: true,
             object: 'list',
             data: models,
             models,
             configuredProviders,
-            source: 'hermes-agent',
+            source,
           })
         } catch (err) {
           return json(
