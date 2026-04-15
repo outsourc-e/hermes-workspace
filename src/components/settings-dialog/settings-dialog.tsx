@@ -226,6 +226,13 @@ const PROVIDER_CARDS: Array<{
     models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'],
     authType: 'none',
   },
+  {
+    id: 'atomic-chat',
+    name: 'Atomic Chat',
+    logo: '/providers/atomic-chat.png',
+    models: ['llama-3.2-3b', 'qwen2.5-7b', 'gemma-3-4b'],
+    authType: 'none',
+  },
   { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
 ]
 

@@ -46,6 +46,7 @@ export function ProviderLogo({
     anthropic: 'anthropic.png',
     openrouter: 'openrouter.png',
     ollama: 'ollama.png',
+    'atomic-chat': 'atomic-chat.png',
     kimi: 'kimi.png',
     'kimi-coding': 'kimi.png',
     minimax: 'minimax.png',

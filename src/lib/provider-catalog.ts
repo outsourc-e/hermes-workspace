@@ -137,6 +137,26 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
       2,
     ),
   },
+  {
+    id: 'atomic-chat',
+    name: 'Atomic Chat',
+    description: 'Local LLMs via Atomic Chat — run Llama, Gemma, Qwen and more on your machine.',
+    authTypes: ['local'],
+    docsUrl: 'https://atomic.chat',
+    configExample: JSON.stringify(
+      {
+        auth: {
+          profiles: {
+            'atomic-chat:local': {
+              provider: 'atomic-chat',
+            },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+  },
 ]
 
 export function normalizeProviderId(value: string): string {

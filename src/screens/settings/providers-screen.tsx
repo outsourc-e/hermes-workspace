@@ -59,6 +59,7 @@ const KNOWN_PROVIDER_PREFIXES = [
   'openai-codex',
   'nous',
   'ollama',
+  'atomic-chat',
   'zai',
   'kimi-coding',
   'minimax',
@@ -787,6 +788,12 @@ const MODEL_PROVIDER_OPTIONS: Array<SelectOption> = [
 ]
 
 const MODEL_PRESETS = [
+  {
+    id: 'atomic-chat',
+    label: 'Atomic Chat',
+    provider: 'custom' as const,
+    baseUrl: 'http://127.0.0.1:1337/v1',
+  },
   {
     id: 'ollama',
     label: 'Ollama',

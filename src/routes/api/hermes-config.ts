@@ -68,6 +68,12 @@ const PROVIDERS = [
   },
   { id: 'ollama', name: 'Ollama (Local)', authType: 'none', envKeys: [] },
   {
+    id: 'atomic-chat',
+    name: 'Atomic Chat (Local)',
+    authType: 'none',
+    envKeys: [],
+  },
+  {
     id: 'custom',
     name: 'Custom OpenAI-compatible',
     authType: 'api_key',
@@ -78,7 +84,10 @@ const PROVIDERS = [
 function readConfig(): Record<string, unknown> {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
-    return (YAML.parse(raw) as Record<string, unknown>) || {}
+    const parsed = YAML.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {}
   } catch {
     return {}
   }
@@ -296,7 +305,7 @@ export const Route = createFileRoute('/api/hermes-config')({
         // Handle env var updates
         if (body.env && typeof body.env === 'object') {
           const currentEnv = readEnv()
-          const envUpdates = body.env as Record<string, string>
+          const envUpdates = body.env as Record<string, string | null>
           for (const [key, value] of Object.entries(envUpdates)) {
             if (value === '' || value === null) {
               delete currentEnv[key]

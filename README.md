@@ -106,13 +106,24 @@ ANTHROPIC_API_KEY=your-key-here
 
 ---
 
-## 🧠 Local Models (Ollama, LM Studio, vLLM)
+## 🧠 Local Models (Ollama, Atomic Chat, LM Studio, vLLM)
 
 Hermes Workspace supports two modes with local models:
 
 ### Portable Mode (Easiest)
 
-Point the workspace directly at your local server — no Hermes gateway needed:
+Point the workspace directly at your local server — no Hermes gateway needed.
+
+### Atomic Chat
+
+```bash
+# Start workspace pointed at Atomic Chat
+HERMES_API_URL=http://127.0.0.1:1337/v1 pnpm dev
+```
+
+Download [Atomic Chat](https://atomic.chat/), launch the desktop app, and make sure a model is loaded before starting Hermes Workspace.
+
+### Ollama
 
 ```bash
 # Start Ollama
@@ -126,19 +137,35 @@ Chat works immediately. Sessions, memory, and skills show "Not Available" — th
 
 ### Enhanced Mode (Full Features)
 
-Route through the Hermes gateway for sessions, memory, skills, jobs, and tools:
+Route through the Hermes gateway for sessions, memory, skills, jobs, and tools.
 
-**1. Configure your local model in `~/.hermes/config.yaml`:**
+Here are two explicit `~/.hermes/config.yaml` examples for the local providers we support directly in the workspace:
+
+**Atomic Chat**
+
+```yaml
+provider: atomic-chat
+model: your-model-name
+custom_providers:
+  - name: atomic-chat
+    base_url: http://127.0.0.1:1337/v1
+    api_key: atomic-chat
+    api_mode: chat_completions
+```
+
+**Ollama**
 
 ```yaml
 provider: ollama
-model: qwen2.5:7b # or any model you have pulled
+model: qwen3:32b
 custom_providers:
   - name: ollama
     base_url: http://127.0.0.1:11434/v1
     api_key: ollama
     api_mode: chat_completions
 ```
+
+You can adapt the same shape for other OpenAI-compatible local runners, but `Atomic Chat` and `Ollama` are the two built-in local paths documented in the workspace UI.
 
 **2. Enable the API server in `~/.hermes/.env`:**
 
@@ -155,7 +182,7 @@ HERMES_API_URL=http://127.0.0.1:8642 pnpm dev
 
 All workspace features unlock automatically — sessions persist, memory saves across chats, skills are available, and the dashboard shows real usage data.
 
-> **Works with any OpenAI-compatible server** — Ollama, LM Studio, vLLM, llama.cpp, LocalAI, etc. Just change the `base_url` and `model` in the config above.
+> **Works with any OpenAI-compatible server** — Atomic Chat, Ollama, LM Studio, vLLM, llama.cpp, LocalAI, etc. Just change the `base_url` and `model` in the config above.
 
 ---
 

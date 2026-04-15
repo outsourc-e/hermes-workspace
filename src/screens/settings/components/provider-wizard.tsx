@@ -93,7 +93,7 @@ function getAuthTypeMeta(authType: ProviderAuthType): AuthTypeMeta {
 
   return {
     title: 'Local',
-    description: 'No auth needed (Ollama)',
+    description: 'No auth needed for local backends like Ollama or Atomic Chat',
   }
 }
 
