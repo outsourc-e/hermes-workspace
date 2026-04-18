@@ -20,7 +20,10 @@ import {
   readError,
   textFromMessage,
 } from './utils'
-import { createOptimisticMessage } from './chat-screen-utils'
+import {
+  advanceStickyStreamingText,
+  createOptimisticMessage,
+} from './chat-screen-utils'
 import {
   appendHistoryMessage,
   chatQueryKeys,
@@ -599,6 +602,7 @@ export function ChatScreen({
     completedStreamingText,
     completedStreamingThinking,
     clearCompletedStreaming,
+    streamingRunId,
     activeToolCalls,
   } = useRealtimeChatHistory({
     sessionKey: isPortableMode
@@ -1149,6 +1153,22 @@ export function ChatScreen({
     activeRealtimeStreamingText,
     activeIsRealtimeStreaming,
   )
+  const stickyStreamingTextRef = useRef<{ runId: string | null; text: string }>({
+    runId: null,
+    text: '',
+  })
+  stickyStreamingTextRef.current = advanceStickyStreamingText({
+    isStreaming: activeIsRealtimeStreaming,
+    runId: streamingRunId ?? null,
+    rawText: activeRealtimeStreamingText,
+    smoothedText: smoothActiveStreamingText,
+    previousState: stickyStreamingTextRef.current,
+  })
+  const stableActiveStreamingText = activeIsRealtimeStreaming
+    ? smoothActiveStreamingText ||
+      activeRealtimeStreamingText ||
+      stickyStreamingTextRef.current.text
+    : ''
 
   // Use realtime-merged messages for display (SSE + history)
   // Re-apply display filter to realtime messages
@@ -1256,7 +1276,7 @@ export function ChatScreen({
       content: [],
       __optimisticId: 'streaming-current',
       __streamingStatus: 'streaming',
-      __streamingText: activeRealtimeStreamingText,
+      __streamingText: stableActiveStreamingText,
       __streamingThinking: realtimeStreamingThinking,
       __streamToolCalls: streamToolCalls,
     } as ChatMessage
@@ -2655,7 +2675,7 @@ export function ChatScreen({
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
               streamingText={
-                smoothActiveStreamingText ||
+                stableActiveStreamingText ||
                 completedStreamingText.current ||
                 undefined
               }

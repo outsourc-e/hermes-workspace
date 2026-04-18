@@ -1,5 +1,38 @@
 import type { ChatAttachment, ChatMessage } from './types'
 
+export type StickyStreamingTextState = {
+  runId: string | null
+  text: string
+}
+
+export function advanceStickyStreamingText(params: {
+  isStreaming: boolean
+  runId: string | null
+  rawText: string
+  smoothedText: string
+  previousState: StickyStreamingTextState
+}): StickyStreamingTextState {
+  const { isStreaming, runId, rawText, smoothedText, previousState } = params
+
+  if (!isStreaming) {
+    return { runId: null, text: '' }
+  }
+
+  const nextRunId = runId ?? previousState.runId ?? 'streaming'
+  const isNewRun = nextRunId !== previousState.runId
+  const candidateText = smoothedText || rawText
+  const nextText = candidateText.length > 0
+    ? candidateText
+    : isNewRun
+      ? ''
+      : previousState.text
+
+  return {
+    runId: nextRunId,
+    text: nextText,
+  }
+}
+
 type OptimisticMessagePayload = {
   clientId: string
   optimisticId: string
