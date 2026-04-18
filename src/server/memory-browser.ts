@@ -24,6 +24,10 @@ function isBrowserMemoryPath(relativePath: string): boolean {
 }
 
 function normalizeWorkspaceRoot(): string {
+  // Honor HERMES_HOME when set (e.g. ~/.hermes-vanilla for running alongside prod).
+  // Fall back to ~/.hermes for the default install location.
+  const envHome = process.env.HERMES_HOME?.trim()
+  if (envHome) return envHome
   return path.join(os.homedir(), '.hermes')
 }
 

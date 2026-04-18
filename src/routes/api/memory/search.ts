@@ -1,12 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import {
-  ensureGatewayProbed,
-  getCapabilities,
-} from '../../../server/gateway-capabilities'
 import { searchMemoryFiles } from '../../../server/memory-browser'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/memory/search')({
   server: {
@@ -15,14 +10,7 @@ export const Route = createFileRoute('/api/memory/search')({
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
-        await ensureGatewayProbed()
-        if (!getCapabilities().memory) {
-          return json({
-            ...createCapabilityUnavailablePayload('memory'),
-            results: [],
-          })
-        }
-
+        // Memory is local-fs only. No remote gateway check needed.
         const url = new URL(request.url)
         const query = url.searchParams.get('q') || ''
         try {
