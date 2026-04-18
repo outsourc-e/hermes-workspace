@@ -37,9 +37,9 @@ All tests pass: **25/25** (`pnpm test`).
   2. **Model switch guard:** expected toast starting `Model switching requires the enhanced fork...` and no displayed model change. **Observed:** partial fail — selecting `Claude Opus 4.6` left the displayed model at `claude-opus-4-5` as expected, but no toast appeared in DOM or visually. **Console:** no JS errors.
   3. **Tool-call pill:** expected inline tool-call pill in assistant message after `fetch https://example.com`. **Observed:** partial pass — assistant completed with fetched Example Domain content and a visible `Snapshot` tool pill, but the pill rendered above the assistant response rather than clearly inline inside message text. **Console:** no JS errors.
 
-- [ ] **README v2 rewrite** — merge draft from `/Users/aurora/.ocplatform/workspace/content/workspace-v2-launch/readme-rewrite.md` into `README.md` at repo root. Commit.
+- [x] **README v2 updates** — shipped (`9ec12a6`) — zero-fork banner + pip install upstream path everywhere fork was referenced
 
-- [ ] **Tag and ship** — `git tag v2.0.0 && git push origin v2-zero-fork --tags` — only when QA + README done.
+- [ ] **Tag and ship** — `git tag v2.0.0 && git push origin v2-zero-fork --tags` — only when browser QA is checked off.
 
 ### 🧊 Cold storage (do not touch unless explicitly asked)
 
