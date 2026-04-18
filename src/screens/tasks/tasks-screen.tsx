@@ -27,6 +27,9 @@ import type { HermesTask, TaskColumn, CreateTaskInput, TaskAssignee } from '@/li
 const QUERY_KEY = ['hermes', 'tasks'] as const
 const ASSIGNEES_KEY = ['hermes', 'tasks', 'assignees'] as const
 
+export const TASKS_BOARD_HELP_TEXT =
+  'Drag cards to change status. Open a card to set assignee and due date.'
+
 function SkeletonCard() {
   return (
     <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 animate-pulse">
@@ -236,6 +239,9 @@ export function TasksScreen() {
           </button>
         </div>
       </div>
+        <p className="mt-3 text-xs text-[var(--theme-muted)]">
+          {TASKS_BOARD_HELP_TEXT}
+        </p>
       </header>
 
       {/* Board */}

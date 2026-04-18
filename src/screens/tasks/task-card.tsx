@@ -10,14 +10,20 @@ type Props = {
   isDragging?: boolean
 }
 
+export function formatTaskAssigneeLabel(
+  assignee: string | null,
+  assigneeLabels: Record<string, string>,
+): string {
+  const resolvedLabel = assignee ? (assigneeLabels[assignee] ?? assignee) : 'Unassigned'
+  return `Assignee: ${resolvedLabel}`
+}
+
 export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDragging }: Props) {
   const overdue = isOverdue(task)
   const priorityColor = PRIORITY_COLORS[task.priority]
   const visibleTags = task.tags.slice(0, 2)
   const extraTagCount = task.tags.length - 2
-  const assigneeLabel = task.assignee
-    ? (assigneeLabels[task.assignee] ?? task.assignee)
-    : null
+  const assigneeLabel = formatTaskAssigneeLabel(task.assignee, assigneeLabels)
 
   return (
     <div
@@ -51,11 +57,9 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
 
       <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {assigneeLabel && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
-              {assigneeLabel}
-            </span>
-          )}
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
+            {assigneeLabel}
+          </span>
           {visibleTags.map((tag) => (
             <span
               key={tag}

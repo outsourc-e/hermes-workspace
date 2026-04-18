@@ -155,6 +155,9 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                     <option key={id} value={id}>{label}</option>
                   ))}
                 </select>
+                <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                  Assignee is separate from status. Dragging a card changes its column only.
+                </p>
               </div>
               <div>
                 <label className={labelClass}>Due Date</label>
