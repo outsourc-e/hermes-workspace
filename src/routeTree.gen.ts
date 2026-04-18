@@ -69,6 +69,7 @@ import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/cre
 import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
 import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
 import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
+import { Route as ApiModelInfoRouteImport } from './routes/api/model/info'
 import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
 import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
@@ -387,6 +388,11 @@ const ApiOauthDeviceCodeRoute = ApiOauthDeviceCodeRouteImport.update({
   path: '/api/oauth/device-code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiModelInfoRoute = ApiModelInfoRouteImport.update({
+  id: '/api/model/info',
+  path: '/api/model/info',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMemoryWriteRoute = ApiMemoryWriteRouteImport.update({
   id: '/write',
   path: '/write',
@@ -538,6 +544,7 @@ export interface FileRoutesByFullPath {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
@@ -616,6 +623,7 @@ export interface FileRoutesByTo {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
@@ -696,6 +704,7 @@ export interface FileRoutesById {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
@@ -777,6 +786,7 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/profiles/activate'
@@ -855,6 +865,7 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/profiles/activate'
@@ -934,6 +945,7 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/profiles/activate'
@@ -1005,6 +1017,7 @@ export interface RootRouteChildren {
   ApiKnowledgeSyncRoute: typeof ApiKnowledgeSyncRoute
   ApiMcpReloadRoute: typeof ApiMcpReloadRoute
   ApiMcpServersRoute: typeof ApiMcpServersRoute
+  ApiModelInfoRoute: typeof ApiModelInfoRoute
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
   ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
   ApiProfilesActivateRoute: typeof ApiProfilesActivateRoute
@@ -1437,6 +1450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOauthDeviceCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/model/info': {
+      id: '/api/model/info'
+      path: '/api/model/info'
+      fullPath: '/api/model/info'
+      preLoaderRoute: typeof ApiModelInfoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/memory/write': {
       id: '/api/memory/write'
       path: '/write'
@@ -1705,6 +1725,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiKnowledgeSyncRoute: ApiKnowledgeSyncRoute,
   ApiMcpReloadRoute: ApiMcpReloadRoute,
   ApiMcpServersRoute: ApiMcpServersRoute,
+  ApiModelInfoRoute: ApiModelInfoRoute,
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
   ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
   ApiProfilesActivateRoute: ApiProfilesActivateRoute,
