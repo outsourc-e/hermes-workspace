@@ -266,7 +266,6 @@ async function fetchModelsForProvider(
 }
 
 import { setLocalModelOverride } from '../chat-screen'
-import { MODEL_SWITCH_BLOCKED_TOAST, shouldBlockZeroForkModelSwitch } from './chat-composer-model-switch'
 
 const LOCAL_PROVIDERS_SET = new Set(['ollama', 'atomic-chat'])
 
