@@ -351,7 +351,6 @@ export async function probeGateway(options?: {
       legacySessions,
       enhancedChat,
       legacySkills,
-      memory,
       legacyConfig,
       legacyJobs,
       dashboard,
@@ -362,7 +361,6 @@ export async function probeGateway(options?: {
       probe('/api/sessions'),
       probe('/api/sessions/__probe__/chat/stream'),
       probe('/api/skills'),
-      probe('/api/memory'),
       probe('/api/config'),
       probe('/api/jobs'),
       probeDashboard(),
@@ -377,7 +375,10 @@ export async function probeGateway(options?: {
       sessions: dashboard.available || legacySessions,
       enhancedChat,
       skills: dashboard.available || legacySkills,
-      memory,
+      // Memory is always available: workspace reads $HERMES_HOME/MEMORY.md +
+      // memory/*.md + memories/*.md directly from the local filesystem.
+      // No remote gateway endpoint is required.
+      memory: true,
       config: dashboard.available || legacyConfig,
       jobs: dashboard.available || legacyJobs,
       dashboard,
