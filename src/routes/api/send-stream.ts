@@ -473,11 +473,22 @@ export const Route = createFileRoute('/api/send-stream')({
                   })
 
                   let thinking = ''
+                  let toolEventCount = 0
                   for await (const chunk of stream) {
                     if (chunk.type === 'reasoning') {
                       thinking += chunk.text
                       sendEvent('thinking', {
                         text: thinking,
+                        sessionKey: portableSessionKey,
+                        runId,
+                      })
+                    } else if (chunk.type === 'tool') {
+                      toolEventCount += 1
+                      sendEvent('tool', {
+                        phase: 'start',
+                        name: chunk.name,
+                        toolCallId: `${runId}:${chunk.name}:${toolEventCount}`,
+                        preview: chunk.label,
                         sessionKey: portableSessionKey,
                         runId,
                       })
