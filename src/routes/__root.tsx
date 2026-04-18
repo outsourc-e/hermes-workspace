@@ -1,6 +1,11 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRoute,
+} from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
@@ -12,6 +17,7 @@ import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 const APP_CSP = [
   "default-src 'self'",
@@ -193,11 +199,57 @@ export const Route = createRootRoute({
 
 const queryClient = new QueryClient()
 
+const ONBOARDING_STORAGE_KEY = 'hermes-onboarding-complete'
+
+export function getRootLayoutMode(onboardingComplete: string | null): 'onboarding' | 'workspace' {
+  return onboardingComplete && onboardingComplete.trim().length > 0
+    ? 'workspace'
+    : 'onboarding'
+}
+
 function RootLayout() {
+  const [layoutMode, setLayoutMode] = useState<'onboarding' | 'workspace'>(
+    'workspace',
+  )
+
   // Unregister any existing service workers — they cause stale asset issues
   // after Docker image updates and behind reverse proxies (Pangolin, Cloudflare, etc.)
   useEffect(() => {
     initializeSettingsAppearance()
+
+    let cleanupLayoutListeners: (() => void) | undefined
+
+    if (typeof window !== 'undefined') {
+      try {
+        setLayoutMode(
+          getRootLayoutMode(localStorage.getItem(ONBOARDING_STORAGE_KEY)),
+        )
+      } catch {
+        setLayoutMode('workspace')
+      }
+
+      const syncLayoutMode = () => {
+        try {
+          setLayoutMode(
+            getRootLayoutMode(localStorage.getItem(ONBOARDING_STORAGE_KEY)),
+          )
+        } catch {
+          setLayoutMode('workspace')
+        }
+      }
+
+      const handleStorage = (event: StorageEvent) => {
+        if (event.key && event.key !== ONBOARDING_STORAGE_KEY) return
+        syncLayoutMode()
+      }
+
+      window.addEventListener('storage', handleStorage)
+      window.addEventListener('focus', syncLayoutMode)
+      cleanupLayoutListeners = () => {
+        window.removeEventListener('storage', handleStorage)
+        window.removeEventListener('focus', syncLayoutMode)
+      }
+    }
 
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -214,19 +266,36 @@ function RootLayout() {
         })
       }
     }
+
+    return () => {
+      cleanupLayoutListeners?.()
+    }
   }, [])
 
   return (
     <QueryClientProvider client={queryClient}>
-      <HermesOnboarding />
-      <GlobalShortcutListener />
-      <TerminalShortcutListener />
-      <MobilePromptTrigger />
       <Toaster />
-      <WorkspaceShell />
-      <SearchModal />
-      <OnboardingTour />
-      <KeyboardShortcutsModal />
+      {layoutMode === 'onboarding' ? (
+        <HermesOnboarding />
+      ) : (
+        <>
+          <GlobalShortcutListener />
+          <TerminalShortcutListener />
+          <MobilePromptTrigger />
+          <WorkspaceShell>
+            <ErrorBoundary
+              className="h-full min-h-0 flex-1"
+              title="Something went wrong"
+              description="This page failed to render. Reload to try again."
+            >
+              <Outlet />
+            </ErrorBoundary>
+          </WorkspaceShell>
+          <SearchModal />
+          <OnboardingTour />
+          <KeyboardShortcutsModal />
+        </>
+      )}
     </QueryClientProvider>
   )
 }
