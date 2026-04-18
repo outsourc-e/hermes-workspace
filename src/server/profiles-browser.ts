@@ -172,28 +172,26 @@ export function listProfiles(): Array<ProfileSummary> {
     }
   }
 
-  if (activeProfile === 'default') {
-    const root = getHermesRoot()
-    const config = readYamlConfig(path.join(root, 'config.yaml'))
-    results.unshift({
-      name: 'default',
-      path: root,
-      active: true,
-      exists: true,
-      model: typeof config.model === 'string' ? config.model : undefined,
-      provider:
-        typeof config.provider === 'string' ? config.provider : undefined,
-      skillCount: countFilesRecursive(
-        path.join(root, 'skills'),
-        (full) => path.basename(full) === 'SKILL.md',
-      ),
-      sessionCount: countFilesRecursive(path.join(root, 'sessions'), (full) =>
-        /\.(jsonl|json|sqlite|db)$/i.test(full),
-      ),
-      hasEnv: fs.existsSync(path.join(root, '.env')),
-      updatedAt: latestMtime([root, path.join(root, 'config.yaml')]),
-    })
-  }
+  const root = getHermesRoot()
+  const config = readYamlConfig(path.join(root, 'config.yaml'))
+  results.unshift({
+    name: 'default',
+    path: root,
+    active: activeProfile === 'default',
+    exists: true,
+    model: typeof config.model === 'string' ? config.model : undefined,
+    provider:
+      typeof config.provider === 'string' ? config.provider : undefined,
+    skillCount: countFilesRecursive(
+      path.join(root, 'skills'),
+      (full) => path.basename(full) === 'SKILL.md',
+    ),
+    sessionCount: countFilesRecursive(path.join(root, 'sessions'), (full) =>
+      /\.(jsonl|json|sqlite|db)$/i.test(full),
+    ),
+    hasEnv: fs.existsSync(path.join(root, '.env')),
+    updatedAt: latestMtime([root, path.join(root, 'config.yaml')]),
+  })
 
   results.sort((a, b) => {
     if (a.active && !b.active) return -1
