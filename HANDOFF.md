@@ -32,10 +32,10 @@ All tests pass: **25/25** (`pnpm test`).
 
 ### ⏳ Next up — in this order
 
-- [x] **Browser QA on :3005** — hard-refresh, cleared localStorage, verified flows on 2026-04-18 18:25 EDT:
-  1. **Onboarding:** expected standalone onboarding with no WorkspaceShell behind it, then shell after completion. **Observed:** pass — fresh load showed onboarding alone on a blank dark background; after `Skip setup`, normal shell/chat UI loaded. **Console:** no JS errors.
-  2. **Model switch guard:** expected toast starting `Model switching requires the enhanced fork...` and no displayed model change. **Observed:** partial fail — selecting `Claude Opus 4.6` left the displayed model at `claude-opus-4-5` as expected, but no toast appeared in DOM or visually. **Console:** no JS errors.
-  3. **Tool-call pill:** expected inline tool-call pill in assistant message after `fetch https://example.com`. **Observed:** partial pass — assistant completed with fetched Example Domain content and a visible `Snapshot` tool pill, but the pill rendered above the assistant response rather than clearly inline inside message text. **Console:** no JS errors.
+- [x] **Browser QA on :3005** — hard-refresh, cleared localStorage, verified flows on 2026-04-18 18:30 EDT:
+  1. **Onboarding:** expected standalone onboarding with no WorkspaceShell behind it, then shell after completion. **Observed:** pass — fresh load showed onboarding alone on a blank dark background with no WorkspaceShell/chat/sidebar behind it; after `Skip setup`, normal shell/chat UI loaded. **Console:** no JS errors.
+  2. **Model switch guard:** expected toast starting `Model switching requires the enhanced fork...` and no displayed model change. **Observed:** fail — selecting `Claude Opus 4.6` left the displayed model at `claude-opus-4-5` as expected, but no matching toast appeared visually, in the DOM, or in detected toast containers. **Console:** no JS errors.
+  3. **Tool-call pill:** expected inline tool-call pill in the assistant message after `fetch https://example.com`. **Observed:** fail — first attempt showed only the user message plus a red `Retry`; after retry, the assistant rendered the Example Domain result, but `Snapshot` / `Vision Capture` appeared as separate tool/status rows above the assistant message rather than an inline pill inside the assistant message. **Console:** React warning only after retry — `Received an empty string for a boolean attribute inert`.
 
 - [x] **README v2 updates** — shipped (`9ec12a6`) — zero-fork banner + pip install upstream path everywhere fork was referenced
 
