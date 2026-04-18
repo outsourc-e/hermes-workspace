@@ -9,10 +9,18 @@ import {
   BEARER_TOKEN,
   HERMES_API,
   SESSIONS_API_UNAVAILABLE_MESSAGE,
+  dashboardFetch,
   ensureGatewayProbed,
   getCapabilities,
   probeGateway,
 } from './gateway-capabilities'
+import {
+  deleteSession as deleteDashboardSession,
+  getSession as getDashboardSession,
+  getSessionMessages as getDashboardSessionMessages,
+  listSessions as listDashboardSessions,
+  searchSessions as searchDashboardSessions,
+} from './hermes-dashboard-api'
 
 const _authHeaders = (): Record<string, string> =>
   BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
@@ -117,6 +125,10 @@ export async function listSessions(
   limit = 50,
   offset = 0,
 ): Promise<Array<HermesSession>> {
+  if (getCapabilities().dashboard.available) {
+    const resp = await listDashboardSessions(limit, offset)
+    return resp.sessions as Array<HermesSession>
+  }
   const resp = await hermesGet<{ items: Array<HermesSession>; total: number }>(
     `/api/sessions?limit=${limit}&offset=${offset}`,
   )
@@ -124,6 +136,9 @@ export async function listSessions(
 }
 
 export async function getSession(sessionId: string): Promise<HermesSession> {
+  if (getCapabilities().dashboard.available) {
+    return getDashboardSession(sessionId) as Promise<HermesSession>
+  }
   const resp = await hermesGet<{ session: HermesSession }>(
     `/api/sessions/${sessionId}`,
   )
@@ -154,12 +169,20 @@ export async function updateSession(
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
+  if (getCapabilities().dashboard.available) {
+    await deleteDashboardSession(sessionId)
+    return
+  }
   return hermesDeleteReq(`/api/sessions/${sessionId}`)
 }
 
 export async function getMessages(
   sessionId: string,
 ): Promise<Array<HermesMessage>> {
+  if (getCapabilities().dashboard.available) {
+    const resp = await getDashboardSessionMessages(sessionId)
+    return resp.messages as Array<HermesMessage>
+  }
   const resp = await hermesGet<{ items: Array<HermesMessage>; total: number }>(
     `/api/sessions/${sessionId}/messages`,
   )
@@ -169,7 +192,10 @@ export async function getMessages(
 export async function searchSessions(
   query: string,
   limit = 20,
-): Promise<{ query: string; count: number; results: Array<unknown> }> {
+): Promise<{ query?: string; count?: number; results: Array<unknown> }> {
+  if (getCapabilities().dashboard.available) {
+    return searchDashboardSessions(query)
+  }
   return hermesGet(
     `/api/sessions/search?q=${encodeURIComponent(query)}&limit=${limit}`,
   )

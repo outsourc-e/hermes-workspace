@@ -1,7 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '@/server/auth-middleware'
-import { BEARER_TOKEN, HERMES_API } from '@/server/gateway-capabilities'
+import {
+  BEARER_TOKEN,
+  HERMES_API,
+  dashboardFetch,
+  ensureGatewayProbed,
+  getCapabilities,
+} from '@/server/gateway-capabilities'
 
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'claude-opus-4-6': 200_000,
@@ -58,20 +64,31 @@ export const Route = createFileRoute('/api/context-usage')({
           // Step 1: Get session data from Hermes
           let sessionData: Record<string, unknown> | null = null
 
+          const capabilities = await ensureGatewayProbed()
+
           if (sessionId) {
             try {
-              const res = await fetch(
-                `${HERMES_API}/api/sessions/${encodeURIComponent(sessionId)}`,
-                {
-                  headers: authHeaders(),
-                  signal: AbortSignal.timeout(3000),
-                },
-              )
+              const res = capabilities.dashboard.available
+                ? await dashboardFetch(
+                    `/api/sessions/${encodeURIComponent(sessionId)}`,
+                    {
+                      signal: AbortSignal.timeout(3000),
+                    },
+                  )
+                : await fetch(
+                    `${HERMES_API}/api/sessions/${encodeURIComponent(sessionId)}`,
+                    {
+                      headers: authHeaders(),
+                      signal: AbortSignal.timeout(3000),
+                    },
+                  )
               if (res.ok) {
                 const data = (await res.json()) as {
                   session?: Record<string, unknown>
-                }
-                if (data.session) sessionData = data.session
+                } & Record<string, unknown>
+                sessionData = capabilities.dashboard.available
+                  ? data
+                  : (data.session ?? null)
               }
             } catch {
               /* ignore */
@@ -81,19 +98,24 @@ export const Route = createFileRoute('/api/context-usage')({
           // Fallback: most recent active session
           if (!sessionData) {
             try {
-              const listRes = await fetch(
-                `${HERMES_API}/api/sessions?limit=1`,
-                {
-                  headers: authHeaders(),
-                  signal: AbortSignal.timeout(3000),
-                },
-              )
+              const listRes = capabilities.dashboard.available
+                ? await dashboardFetch('/api/sessions?limit=1', {
+                    signal: AbortSignal.timeout(3000),
+                  })
+                : await fetch(`${HERMES_API}/api/sessions?limit=1`, {
+                    headers: authHeaders(),
+                    signal: AbortSignal.timeout(3000),
+                  })
               if (listRes.ok) {
                 const listData = (await listRes.json()) as {
                   items?: Array<Record<string, unknown>>
+                  sessions?: Array<Record<string, unknown>>
                 }
-                if (listData.items && listData.items.length > 0) {
-                  sessionData = listData.items[0]
+                const sessions = capabilities.dashboard.available
+                  ? (listData.sessions ?? [])
+                  : (listData.items ?? [])
+                if (sessions.length > 0) {
+                  sessionData = sessions[0]
                 }
               }
             } catch {
@@ -147,13 +169,20 @@ export const Route = createFileRoute('/api/context-usage')({
             try {
               const targetSessionId = sessionId || String(sessionData.id || '')
               if (targetSessionId) {
-                const msgRes = await fetch(
-                  `${HERMES_API}/api/sessions/${encodeURIComponent(targetSessionId)}/messages`,
-                  {
-                    headers: authHeaders(),
-                    signal: AbortSignal.timeout(5000),
-                  },
-                )
+                const msgRes = capabilities.dashboard.available
+                  ? await dashboardFetch(
+                      `/api/sessions/${encodeURIComponent(targetSessionId)}/messages`,
+                      {
+                        signal: AbortSignal.timeout(5000),
+                      },
+                    )
+                  : await fetch(
+                      `${HERMES_API}/api/sessions/${encodeURIComponent(targetSessionId)}/messages`,
+                      {
+                        headers: authHeaders(),
+                        signal: AbortSignal.timeout(5000),
+                      },
+                    )
                 if (msgRes.ok) {
                   const msgData = (await msgRes.json()) as {
                     items?: Array<{
@@ -161,8 +190,15 @@ export const Route = createFileRoute('/api/context-usage')({
                       tool_calls?: unknown
                       reasoning?: string
                     }>
+                    messages?: Array<{
+                      content?: string
+                      tool_calls?: unknown
+                      reasoning?: string
+                    }>
                   }
-                  const messages = msgData.items || []
+                  const messages = capabilities.dashboard.available
+                    ? (msgData.messages ?? [])
+                    : (msgData.items ?? [])
                   let totalChars = 0
                   for (const msg of messages) {
                     totalChars += (msg.content || '').length

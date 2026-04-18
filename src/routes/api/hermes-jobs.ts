@@ -7,6 +7,7 @@ import {
   BEARER_TOKEN,
   HERMES_API,
   HERMES_UPGRADE_INSTRUCTIONS,
+  dashboardFetch,
   ensureGatewayProbed,
   getCapabilities,
 } from '../../server/gateway-capabilities'
@@ -25,8 +26,8 @@ export const Route = createFileRoute('/api/hermes-jobs')({
             status: 401,
           })
         }
-        await ensureGatewayProbed()
-        if (!getCapabilities().jobs) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.jobs) {
           return new Response(
             JSON.stringify({
               ...createCapabilityUnavailablePayload('jobs'),
@@ -38,8 +39,11 @@ export const Route = createFileRoute('/api/hermes-jobs')({
         }
         const url = new URL(request.url)
         const params = url.searchParams.toString()
-        const target = `${HERMES_API}/api/jobs${params ? `?${params}` : ''}`
-        const res = await fetch(target, { headers: authHeaders() })
+        const res = capabilities.dashboard.available
+          ? await dashboardFetch(`/api/cron/jobs${params ? `?${params}` : ''}`)
+          : await fetch(`${HERMES_API}/api/jobs${params ? `?${params}` : ''}`, {
+              headers: authHeaders(),
+            })
         return new Response(res.body, {
           status: res.status,
           headers: { 'Content-Type': 'application/json' },
@@ -51,8 +55,8 @@ export const Route = createFileRoute('/api/hermes-jobs')({
             status: 401,
           })
         }
-        await ensureGatewayProbed()
-        if (!getCapabilities().jobs) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.jobs) {
           return new Response(
             JSON.stringify({
               ...createCapabilityUnavailablePayload('jobs', {
@@ -63,11 +67,17 @@ export const Route = createFileRoute('/api/hermes-jobs')({
           )
         }
         const body = await request.text()
-        const res = await fetch(`${HERMES_API}/api/jobs`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body,
-        })
+        const res = capabilities.dashboard.available
+          ? await dashboardFetch('/api/cron/jobs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body,
+            })
+          : await fetch(`${HERMES_API}/api/jobs`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...authHeaders() },
+              body,
+            })
         return new Response(await res.text(), {
           status: res.status,
           headers: { 'Content-Type': 'application/json' },

@@ -4,6 +4,8 @@ import { isAuthenticated } from '../../../server/auth-middleware'
 import {
   BEARER_TOKEN,
   HERMES_API,
+  dashboardFetch,
+  ensureGatewayProbed,
 } from '../../../server/gateway-capabilities'
 
 function authHeaders(): Record<string, string> {
@@ -37,21 +39,31 @@ export const Route = createFileRoute('/api/skills/toggle')({
             )
           }
 
-          const response = await fetch(
-            `${HERMES_API}/api/skills/toggle`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...authHeaders(),
-              },
-              body: JSON.stringify({
-                name,
-                enabled: body.enabled,
-              }),
-              signal: AbortSignal.timeout(15_000),
-            },
-          )
+          const capabilities = await ensureGatewayProbed()
+          const response = capabilities.dashboard.available
+            ? await dashboardFetch('/api/skills/toggle', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  name,
+                  enabled: body.enabled,
+                }),
+                signal: AbortSignal.timeout(15_000),
+              })
+            : await fetch(`${HERMES_API}/api/skills/toggle`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...authHeaders(),
+                },
+                body: JSON.stringify({
+                  name,
+                  enabled: body.enabled,
+                }),
+                signal: AbortSignal.timeout(15_000),
+              })
 
           const result = await response.json()
           return json(result, { status: response.status })

@@ -24,8 +24,8 @@ export const Route = createFileRoute('/api/sessions')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        await ensureGatewayProbed()
-        if (!getGatewayCapabilities().sessions) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.sessions) {
           return json({
             ok: true,
             sessions: [],
@@ -72,8 +72,8 @@ export const Route = createFileRoute('/api/sessions')({
         }
         const csrfCheckPost = requireJsonContentType(request)
         if (csrfCheckPost) return csrfCheckPost
-        await ensureGatewayProbed()
-        if (!getGatewayCapabilities().sessions) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.sessions) {
           const friendlyId = randomUUID()
           return json({
             ...createCapabilityUnavailablePayload('sessions'),
@@ -100,6 +100,29 @@ export const Route = createFileRoute('/api/sessions')({
           const requestedModel =
             typeof body.model === 'string' ? body.model.trim() : ''
           const model = requestedModel || undefined
+
+          if (capabilities.dashboard.available && !capabilities.enhancedChat) {
+            return json({
+              ok: true,
+              sessionKey: friendlyId,
+              friendlyId,
+              entry: {
+                key: friendlyId,
+                id: friendlyId,
+                title: label || friendlyId,
+                label: label || friendlyId,
+                derivedTitle: label || friendlyId,
+                model: model || '',
+                startedAt: Date.now(),
+                updatedAt: Date.now(),
+                message_count: 0,
+                source: 'dashboard',
+              },
+              modelApplied: Boolean(model),
+              persisted: false,
+            })
+          }
+
           const session = await createSession({
             id: friendlyId || randomUUID(),
             title: label,
@@ -129,8 +152,8 @@ export const Route = createFileRoute('/api/sessions')({
         }
         const csrfCheckPatch = requireJsonContentType(request)
         if (csrfCheckPatch) return csrfCheckPatch
-        await ensureGatewayProbed()
-        if (!getGatewayCapabilities().sessions) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.sessions) {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
             unknown
@@ -170,6 +193,22 @@ export const Route = createFileRoute('/api/sessions')({
             )
           }
 
+          if (capabilities.dashboard.available && !capabilities.enhancedChat) {
+            return json({
+              ok: true,
+              sessionKey,
+              entry: {
+                key: sessionKey,
+                id: sessionKey,
+                title: label || sessionKey,
+                label: label || sessionKey,
+                derivedTitle: label || sessionKey,
+                updatedAt: Date.now(),
+              },
+              updated: false,
+            })
+          }
+
           const session = await updateSession(sessionKey, {
             title: label,
           })
@@ -193,8 +232,8 @@ export const Route = createFileRoute('/api/sessions')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        await ensureGatewayProbed()
-        if (!getGatewayCapabilities().sessions) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.sessions) {
           const url = new URL(request.url)
           const rawSessionKey = url.searchParams.get('sessionKey') ?? ''
           const rawFriendlyId = url.searchParams.get('friendlyId') ?? ''
