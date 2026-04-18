@@ -24,6 +24,12 @@
 
 All tests pass: **25/25** (`pnpm test`).
 
+### ✅ Also done (Aurora, 18:02 EDT)
+
+- [x] Verified `src/routes/api/model-info.ts` already removed (agent took care of it pre-compact)
+- [x] Verified `routeTree.gen.ts` clean (no `api/model-info` references)
+- [x] Full prod build green — `pnpm build` — client 6.19s / SSR 2.15s / 380 modules / 0 errors
+
 ### ⏳ Next up — in this order
 
 - [ ] **Browser QA on :3005** — hard-refresh, clear localStorage, verify:
@@ -31,10 +37,6 @@ All tests pass: **25/25** (`pnpm test`).
   2. Model switcher → pick alternate → toast `Model switching requires the enhanced fork…` fires, model doesn't change
   3. Send `fetch https://example.com` → tool-call pill renders inline in the message
   4. Capture any console errors; if nothing fails, tick this box
-
-- [ ] **Full prod build** — `pnpm build` — confirm no SSR or typecheck regressions
-
-- [ ] **Delete dead route** — `src/routes/api/model-info.ts` is unused (real route is `src/routes/api/model/info.ts` which the client fetches). Grep confirms no imports, but re-check before deleting. Then regenerate `routeTree.gen.ts`. Separate commit.
 
 - [ ] **README v2 rewrite** — merge draft from `/Users/aurora/.ocplatform/workspace/content/workspace-v2-launch/readme-rewrite.md` into `README.md` at repo root. Commit.
 
