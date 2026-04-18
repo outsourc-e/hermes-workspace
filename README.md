@@ -13,6 +13,8 @@
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
+> **v2 — zero-fork architecture.** Runs on stock [`pip install hermes-agent`](https://github.com/NousResearch/hermes-agent). No patches, no drift. Upgrade any time with `pip install -U hermes-agent`. Earlier versions required a fork; upstream shipped full parity, so the fork is gone.
+
 ![Hermes Workspace](./docs/screenshots/splash.png)
 
 </div>
@@ -66,13 +68,11 @@ Point Hermes Workspace at any backend that supports:
 Example Hermes gateway setup:
 
 ```bash
-git clone https://github.com/outsourc-e/hermes-agent.git
-cd hermes-agent
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e .
+pip install hermes-agent
 hermes setup
-hermes --gateway
+hermes gateway run
 ```
 
 If you're using another OpenAI-compatible server, just note its base URL.
@@ -390,12 +390,14 @@ The workspace auto-detects your gateway's capabilities on startup. Check your te
 [gateway] Missing Hermes APIs detected. Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes --gateway
 ```
 
-**Fix:** Use our fork which includes extended gateway endpoints:
+**Fix:** Upgrade to the latest stock `hermes-agent`, which now ships the extended endpoints:
 
 ```bash
-git clone https://github.com/outsourc-e/hermes-agent.git
-cd hermes-agent && pip install -e . && hermes --gateway
+pip install -U hermes-agent
+hermes gateway run
 ```
+
+If you were on the old `outsourc-e/hermes-agent` fork, it's no longer needed as of v2 — uninstall it and install upstream instead.
 
 ### "Connection refused" or workspace hangs on load
 
@@ -423,7 +425,9 @@ Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
 ### "Using upstream NousResearch/hermes-agent"
 
-The upstream hermes-agent supports basic chat via `hermes --gateway`, but doesn't include extended endpoints (sessions, memory, skills, config) yet. The workspace will work in **portable mode** with basic chat. For full features, use our fork (`outsourc-e/hermes-agent`).
+v2+ runs on stock `hermes-agent` with full feature parity. Run `pip install -U hermes-agent` to get the extended endpoints (sessions, memory, skills, config). No fork required.
+
+If you're pinned to an older `hermes-agent` version and missing endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
 
 ### Docker: "Unauthorized" or "Connection refused" to hermes-agent
 
