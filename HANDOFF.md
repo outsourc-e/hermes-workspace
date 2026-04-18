@@ -32,11 +32,10 @@ All tests pass: **25/25** (`pnpm test`).
 
 ### ⏳ Next up — in this order
 
-- [ ] **Browser QA on :3005** — hard-refresh, clear localStorage, verify:
-  1. Onboarding tour renders alone (no workspace shell behind it), completes, shell loads
-  2. Model switcher → pick alternate → toast `Model switching requires the enhanced fork…` fires, model doesn't change
-  3. Send `fetch https://example.com` → tool-call pill renders inline in the message
-  4. Capture any console errors; if nothing fails, tick this box
+- [x] **Browser QA on :3005** — hard-refresh, cleared localStorage, verified flows on 2026-04-18 18:25 EDT:
+  1. **Onboarding:** expected standalone onboarding with no WorkspaceShell behind it, then shell after completion. **Observed:** pass — fresh load showed onboarding alone on a blank dark background; after `Skip setup`, normal shell/chat UI loaded. **Console:** no JS errors.
+  2. **Model switch guard:** expected toast starting `Model switching requires the enhanced fork...` and no displayed model change. **Observed:** partial fail — selecting `Claude Opus 4.6` left the displayed model at `claude-opus-4-5` as expected, but no toast appeared in DOM or visually. **Console:** no JS errors.
+  3. **Tool-call pill:** expected inline tool-call pill in assistant message after `fetch https://example.com`. **Observed:** partial pass — assistant completed with fetched Example Domain content and a visible `Snapshot` tool pill, but the pill rendered above the assistant response rather than clearly inline inside message text. **Console:** no JS errors.
 
 - [ ] **README v2 rewrite** — merge draft from `/Users/aurora/.ocplatform/workspace/content/workspace-v2-launch/readme-rewrite.md` into `README.md` at repo root. Commit.
 
