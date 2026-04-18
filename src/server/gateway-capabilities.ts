@@ -110,7 +110,9 @@ export async function fetchDashboardToken(options?: {
   if (!force && dashboardTokenPromise) return dashboardTokenPromise
 
   dashboardTokenPromise = (async () => {
-    const res = await fetch(`${HERMES_DASHBOARD_URL}/index.html`, {
+    // Dashboard injects the session token inline on `/` (root), not on
+    // `/index.html` which serves the raw Vite-built HTML without the token.
+    const res = await fetch(`${HERMES_DASHBOARD_URL}/`, {
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
     if (!res.ok) {
@@ -119,7 +121,7 @@ export async function fetchDashboardToken(options?: {
     const html = await res.text()
     const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
     if (!token) {
-      throw new Error('Dashboard session token not found in index.html')
+      throw new Error('Dashboard session token not found in root HTML')
     }
     dashboardTokenCache = token
     return token
