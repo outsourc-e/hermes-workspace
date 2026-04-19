@@ -842,7 +842,7 @@ function ChatSidebarComponent({
         if (!isMobile) setIsHoverExpanded(false)
       }}
       aria-hidden={isMobile && isCollapsed ? true : undefined}
-      {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
+      {...(isMobile && isCollapsed ? { inert: true } : {})}
     >
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
