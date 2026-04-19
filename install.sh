@@ -119,11 +119,11 @@ cat <<EOF
 Next steps (two terminals):
 
   1) Start the Hermes gateway:
-       ${BOLD}hermes gateway run${RESET}
-     (first run may prompt for ${BOLD}hermes setup${RESET})
+       hermes gateway run
+     (first run may prompt for hermes setup)
 
   2) Start the workspace UI:
-       ${BOLD}cd $INSTALL_DIR && pnpm dev${RESET}
+       cd $INSTALL_DIR && pnpm dev
 
   3) Open http://localhost:$WORKSPACE_PORT
 
