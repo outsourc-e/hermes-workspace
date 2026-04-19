@@ -5,6 +5,7 @@ import {
   BEARER_TOKEN,
   HERMES_API,
   HERMES_UPGRADE_INSTRUCTIONS,
+  dashboardFetch,
   ensureGatewayProbed,
   getCapabilities,
 } from '../../server/gateway-capabilities'
@@ -187,10 +188,13 @@ function normalizeSkill(value: unknown): SkillSummary | null {
 }
 
 async function fetchHermesSkills(): Promise<Array<SkillSummary>> {
+  const capabilities = getCapabilities()
   const headers: Record<string, string> = {}
   if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
 
-  const response = await fetch(`${HERMES_API}/api/skills`, { headers })
+  const response = capabilities.dashboard.available
+    ? await dashboardFetch('/api/skills')
+    : await fetch(`${HERMES_API}/api/skills`, { headers })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
     throw new Error(body || `Hermes skills request failed (${response.status})`)
@@ -245,8 +249,8 @@ export const Route = createFileRoute('/api/skills')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        await ensureGatewayProbed()
-        if (!getCapabilities().skills) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.skills) {
           return json({
             ...createCapabilityUnavailablePayload('skills'),
             items: [],
@@ -335,8 +339,8 @@ export const Route = createFileRoute('/api/skills')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        await ensureGatewayProbed()
-        if (!getCapabilities().skills) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.skills) {
           return json(
             {
               ...createCapabilityUnavailablePayload('skills', {
@@ -379,6 +383,29 @@ export const Route = createFileRoute('/api/skills')({
               category: body.category || '',
               force: Boolean(body.force),
             }
+          }
+
+          if (capabilities.dashboard.available) {
+            if (action !== 'toggle') {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Skill install/uninstall is only available on the legacy enhanced fork right now. Zero-fork mode supports listing and toggling installed skills.',
+                },
+                { status: 501 },
+              )
+            }
+
+            const response = await dashboardFetch('/api/skills/toggle', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(30_000),
+            })
+
+            const result = await response.json()
+            return json(result, { status: response.status })
           }
 
           const headers: Record<string, string> = {

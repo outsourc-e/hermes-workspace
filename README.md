@@ -13,6 +13,8 @@
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
+> **v2 — zero-fork. Clone, don't fork.** Runs on vanilla [`pip install hermes-agent`](https://github.com/NousResearch/hermes-agent). No patches, no drift. Upgrade any time with `pip install -U hermes-agent`.
+
 ![Hermes Workspace](./docs/screenshots/splash.png)
 
 </div>
@@ -48,15 +50,34 @@
 
 ## 🚀 Quick Start
 
+### One-line install (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
+```
+
+This installs `hermes-agent` from PyPI, clones this repo, sets up `.env`, and installs deps. Then:
+
+```bash
+hermes gateway run                  # terminal 1
+cd ~/hermes-workspace && pnpm dev   # terminal 2
+```
+
+Open http://localhost:3000. That's it.
+
+---
+
+### Manual install
+
 Hermes Workspace works with any OpenAI-compatible backend. If your backend also exposes Hermes gateway APIs, enhanced features like sessions, memory, skills, and jobs unlock automatically.
 
-### Prerequisites
+#### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
 - **An OpenAI-compatible backend** — local, self-hosted, or remote
 - **Optional:** Python 3.11+ if you want to run a Hermes gateway locally
 
-### Step 1: Start your backend
+#### Step 1: Start your backend
 
 Point Hermes Workspace at any backend that supports:
 
@@ -66,13 +87,11 @@ Point Hermes Workspace at any backend that supports:
 Example Hermes gateway setup:
 
 ```bash
-git clone https://github.com/outsourc-e/hermes-agent.git
-cd hermes-agent
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e .
+pip install hermes-agent
 hermes setup
-hermes --gateway
+hermes gateway run
 ```
 
 If you're using another OpenAI-compatible server, just note its base URL.
@@ -91,7 +110,7 @@ pnpm dev                   # Starts on http://localhost:3000
 
 > **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes APIs, advanced features appear automatically.
 
-### Environment Variables
+#### Environment Variables
 
 ```env
 # OpenAI-compatible backend URL
@@ -387,15 +406,17 @@ The workspace auto-detects your gateway's capabilities on startup. Check your te
 
 ```
 [gateway] http://127.0.0.1:8642 available: health, models; missing: sessions, skills, memory, config, jobs
-[gateway] Missing Hermes APIs detected. Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes --gateway
+[gateway] Missing Hermes APIs detected. Update Hermes: pip install -U hermes-agent && hermes gateway run
 ```
 
-**Fix:** Use our fork which includes extended gateway endpoints:
+**Fix:** Upgrade to the latest stock `hermes-agent`, which now ships the extended endpoints:
 
 ```bash
-git clone https://github.com/outsourc-e/hermes-agent.git
-cd hermes-agent && pip install -e . && hermes --gateway
+pip install -U hermes-agent
+hermes gateway run
 ```
+
+If you were on the old `outsourc-e/hermes-agent` fork, it's no longer needed as of v2 — uninstall it and install upstream instead.
 
 ### "Connection refused" or workspace hangs on load
 
@@ -423,7 +444,9 @@ Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
 ### "Using upstream NousResearch/hermes-agent"
 
-The upstream hermes-agent supports basic chat via `hermes --gateway`, but doesn't include extended endpoints (sessions, memory, skills, config) yet. The workspace will work in **portable mode** with basic chat. For full features, use our fork (`outsourc-e/hermes-agent`).
+v2+ runs on vanilla `hermes-agent` with full feature parity. `pip install -U hermes-agent` gets you the extended endpoints (sessions, memory, skills, config). **No fork required, ever.**
+
+If you're pinned to an older `hermes-agent` version and missing endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
 
 ### Docker: "Unauthorized" or "Connection refused" to hermes-agent
 

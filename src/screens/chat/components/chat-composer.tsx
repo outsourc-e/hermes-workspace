@@ -44,6 +44,11 @@ import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 import { toast } from '@/components/ui/toast'
+import {
+  getZeroForkModelInfoFlags,
+  MODEL_SWITCH_BLOCKED_TOAST,
+  shouldBlockZeroForkModelSwitch,
+} from './chat-composer-model-switch'
 
 type ChatComposerAttachment = {
   id: string
@@ -108,6 +113,16 @@ type SessionStatusApiResponse = {
   payload?: unknown
   error?: string
   [key: string]: unknown
+}
+
+type GatewayStatusApiResponse = {
+  mode?: string
+}
+
+type ModelInfoApiResponse = {
+  gatewayMode?: string | null
+  supportsRuntimeSwitching?: boolean | null
+  vanillaAgent?: boolean | null
 }
 
 type ModelSwitchNotice = {
@@ -658,6 +673,23 @@ async function fetchCurrentModelFromStatus(): Promise<string> {
   }
 }
 
+async function fetchGatewayMode(): Promise<string | null> {
+  const response = await fetch('/api/gateway-status')
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
+  }
+  const payload = (await response.json()) as GatewayStatusApiResponse
+  return typeof payload.mode === 'string' ? payload.mode : null
+}
+
+async function fetchModelInfo(): Promise<ModelInfoApiResponse | null> {
+  const response = await fetch('/api/model/info')
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
+  }
+  return (await response.json()) as ModelInfoApiResponse
+}
+
 function focusPromptTarget(target: HTMLTextAreaElement | null) {
   if (!target) return
   try {
@@ -798,6 +830,22 @@ function ChatComposerComponent({
     refetchInterval: 30_000,
     retry: false,
   })
+  const gatewayModeQuery = useQuery({
+    queryKey: ['gateway-status', 'mode'],
+    queryFn: fetchGatewayMode,
+    staleTime: 30_000,
+    retry: false,
+  })
+  const modelInfoQuery = useQuery({
+    queryKey: ['dashboard', 'model-info'],
+    queryFn: fetchModelInfo,
+    staleTime: 30_000,
+    retry: false,
+  })
+  const zeroForkModelInfoFlags = useMemo(
+    () => getZeroForkModelInfoFlags(modelInfoQuery.data),
+    [modelInfoQuery.data],
+  )
 
   // Phase 4.2: (pinned model tracking kept for future use)
   void modelsQuery.data
@@ -854,6 +902,16 @@ function ChatComposerComponent({
         typeof sessionKey === 'string' && sessionKey.trim().length > 0
           ? sessionKey.trim()
           : undefined
+      if (
+        shouldBlockZeroForkModelSwitch(
+          gatewayModeQuery.data,
+          zeroForkModelInfoFlags,
+        )
+      ) {
+        toast(MODEL_SWITCH_BLOCKED_TOAST)
+        setIsModelMenuOpen(false)
+        return
+      }
       setModelNotice(null)
       setCurrentSelectedModel(getResolvedModelKey(model, provider))
       modelSwitchMutation.mutate({
@@ -862,7 +920,12 @@ function ChatComposerComponent({
         sessionKey: normalizedSessionKey,
       })
     },
-    [modelSwitchMutation, sessionKey],
+    [
+      gatewayModeQuery.data,
+      modelSwitchMutation,
+      sessionKey,
+      zeroForkModelInfoFlags,
+    ],
   )
 
   const retryModel = modelNotice?.retryModel ?? ''

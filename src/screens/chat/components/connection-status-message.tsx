@@ -57,9 +57,9 @@ function classifyConnectionError(
 
   if (lower.includes('econnrefused') && lower.includes('8642')) {
     return {
-      title: 'Hermes WebAPI not running',
-      description: 'The Hermes WebAPI server is not running on port 8642.',
-      action: 'Run: cd hermes-agent && pip install -e . && hermes-webapi',
+      title: 'Hermes gateway not running',
+      description: 'The Hermes gateway is not running on port 8642.',
+      action: 'Run: pip install -U hermes-agent && hermes gateway run',
     }
   }
 

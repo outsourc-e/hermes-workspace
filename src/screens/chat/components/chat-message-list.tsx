@@ -556,6 +556,59 @@ type DisplayEntry = {
   attachedToolMessages: Array<ChatMessage>
 }
 
+function isAssistantToolCallOnlyMessage(message: ChatMessage): boolean {
+  if (message.role !== 'assistant') return false
+  const hasToolCalls = getToolCallsFromMessage(message).length > 0
+  const text = textFromMessage(message)
+  return hasToolCalls && text.trim().length === 0
+}
+
+export function buildDisplayEntries(
+  displayMessages: Array<ChatMessage>,
+): Array<DisplayEntry> {
+  const entries: Array<DisplayEntry> = []
+  let pendingAssistantToolMessages: Array<ChatMessage> = []
+
+  displayMessages.forEach((message, index) => {
+    if (isAssistantToolCallOnlyMessage(message)) {
+      pendingAssistantToolMessages.push(message)
+      return
+    }
+
+    if (message.role === 'tool' || message.role === 'toolResult') {
+      const previousEntry = entries[entries.length - 1]
+      if (previousEntry?.message.role === 'assistant') {
+        previousEntry.attachedToolMessages.push(message)
+      } else if (pendingAssistantToolMessages.length > 0) {
+        pendingAssistantToolMessages.push(message)
+      }
+      return
+    }
+
+    const entry: DisplayEntry = {
+      message,
+      sourceIndex: index,
+      attachedToolMessages: [],
+    }
+
+    if (message.role === 'assistant' && pendingAssistantToolMessages.length > 0) {
+      entry.attachedToolMessages.push(...pendingAssistantToolMessages)
+      pendingAssistantToolMessages = []
+    }
+
+    entries.push(entry)
+  })
+
+  if (pendingAssistantToolMessages.length > 0) {
+    const previousEntry = entries[entries.length - 1]
+    if (previousEntry?.message.role === 'assistant') {
+      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
+    }
+  }
+
+  return entries
+}
+
 function escapeAttributeSelector(value: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
     return CSS.escape(value)
@@ -812,28 +865,10 @@ function ChatMessageListComponent({
     return sortMessagesChronologically(deduped)
   }, [hideSystemMessages, messages])
 
-  const displayEntries = useMemo<Array<DisplayEntry>>(() => {
-    const entries: Array<DisplayEntry> = []
-
-    displayMessages.forEach((message, index) => {
-      // Group both 'tool' and 'toolResult' roles into the preceding assistant bubble
-      if (message.role === 'tool' || message.role === 'toolResult') {
-        const previousEntry = entries[entries.length - 1]
-        if (previousEntry?.message.role === 'assistant') {
-          previousEntry.attachedToolMessages.push(message)
-        }
-        return
-      }
-
-      entries.push({
-        message,
-        sourceIndex: index,
-        attachedToolMessages: [],
-      })
-    })
-
-    return entries
-  }, [displayMessages])
+  const displayEntries = useMemo<Array<DisplayEntry>>(
+    () => buildDisplayEntries(displayMessages),
+    [displayMessages],
+  )
 
   // Bug 2 fix: grace-period effects — placed after displayMessages so they can
   // reference it safely.

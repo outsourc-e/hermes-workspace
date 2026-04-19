@@ -154,6 +154,52 @@ type InlineToolSection = {
     | 'output-error'
 }
 
+export type InlineRenderPlanItem =
+  | { kind: 'text'; text: string }
+  | { kind: 'tool'; section: InlineToolSection }
+
+export function buildInlineToolRenderPlan(
+  message: ChatMessage,
+  toolSections: Array<InlineToolSection>,
+): Array<InlineRenderPlanItem> {
+  const parts = Array.isArray(message.content) ? message.content : []
+  if (parts.length === 0) {
+    return toolSections.map((section) => ({ kind: 'tool' as const, section }))
+  }
+
+  const toolSectionsById = new Map(
+    toolSections.map((section) => [section.key, section] as const),
+  )
+  const usedKeys = new Set<string>()
+  const plan: Array<InlineRenderPlanItem> = []
+
+  for (const part of parts) {
+    if (part.type === 'text') {
+      const text = typeof part.text === 'string' ? part.text : ''
+      if (text.length > 0) {
+        plan.push({ kind: 'text', text })
+      }
+      continue
+    }
+
+    if (part.type === 'toolCall') {
+      const toolId = typeof part.id === 'string' ? part.id : ''
+      const matchingSection = toolId ? toolSectionsById.get(toolId) : undefined
+      if (matchingSection) {
+        usedKeys.add(matchingSection.key)
+        plan.push({ kind: 'tool', section: matchingSection })
+      }
+    }
+  }
+
+  const trailingSections = toolSections.filter((section) => !usedKeys.has(section.key))
+  for (const section of trailingSections) {
+    plan.push({ kind: 'tool', section })
+  }
+
+  return plan
+}
+
 function extractToolResultText(msg: ChatMessage | undefined): string {
   if (!msg) return ''
   // Prefer text from content blocks (exec stdout, Read output, etc.)
@@ -1947,6 +1993,10 @@ function MessageItemComponent({
         : section,
     )
   }, [inlineToolSections, effectiveIsStreaming])
+  const inlineRenderPlan = useMemo(
+    () => buildInlineToolRenderPlan(message, finalToolSections),
+    [message, finalToolSections],
+  )
   const hasToolCalls = finalToolSections.length > 0
   const shouldRenderMessageBubble =
     hasText ||
@@ -2147,14 +2197,7 @@ function MessageItemComponent({
           </details>
         </div>
       )}
-      {/* Render tool calls above the message bubble */}
-      {hasToolCalls && (
-        <ToolCallGroup
-          toolSections={finalToolSections}
-          expandAll={expandAllToolSections}
-          isStreaming={effectiveIsStreaming}
-        />
-      )}
+      {/* Tool calls now render inline inside the assistant bubble, not above it */}
 
       {shouldRenderMessageBubble && !(message as any).__isNarration && (
         <Message
@@ -2171,7 +2214,7 @@ function MessageItemComponent({
             <AssistantAvatar size={24} className="mt-0.5" />
           )}
           <div
-            data-chat-message-bubble={isUser ? 'true' : undefined}
+            data-chat-message-bubble={isUser ? 'user' : 'assistant'}
             className={cn(
               'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
               '',
@@ -2277,7 +2320,39 @@ function MessageItemComponent({
                 ))}
               </div>
             )}
+            {!isUser && hasToolCalls && (
+              <div className="flex flex-col gap-2">
+                {inlineRenderPlan.map((item, index) =>
+                  item.kind === 'tool' ? (
+                    <ToolCallGroup
+                      key={item.section.key || `tool-${index}`}
+                      toolSections={[item.section]}
+                      expandAll={expandAllToolSections}
+                      isStreaming={effectiveIsStreaming}
+                    />
+                  ) : item.text.trim().length > 0 ? (
+                    <div key={`text-${index}`} className="relative">
+                      {extractStandaloneMarkdownFence(item.text) ? (
+                        <MarkdownMessageCard content={extractStandaloneMarkdownFence(item.text)!} />
+                      ) : (
+                        <MessageContent
+                          markdown
+                          className={cn(
+                            'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
+                            effectiveIsStreaming && 'chat-streaming-content',
+                            isUser && 'text-white',
+                          )}
+                        >
+                          {item.text}
+                        </MessageContent>
+                      )}
+                    </div>
+                  ) : null,
+                )}
+              </div>
+            )}
             {hasText &&
+              !(!isUser && hasToolCalls) &&
               (isUser ? (
                 <span className="text-pretty">{displayText}</span>
               ) : hasRevealedText ? (

@@ -12,7 +12,7 @@
  * Non-chat routes show the sub-page content.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
+import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Suspense, lazy } from 'react'
 import type { SessionMeta } from '@/screens/chat/types'
@@ -30,11 +30,10 @@ import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
-import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
+
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
 import { HermesReconnectBanner } from '@/components/hermes-reconnect-banner'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
-import { ErrorBoundary } from '@/components/error-boundary'
 // System metrics footer removed — not used in Hermes Workspace
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
@@ -61,7 +60,11 @@ async function fetchSessions(): Promise<SessionsListResponse> {
       : []
 }
 
-export function WorkspaceShell() {
+type WorkspaceShellProps = {
+  children?: React.ReactNode
+}
+
+export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const navigate = useNavigate()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -372,13 +375,7 @@ export function WorkspaceShell() {
                 !isOnChatRoute &&
                 !isOnTerminalRoute &&
                 mobilePageTitle && <MobilePageHeader title={mobilePageTitle} />}
-              <ErrorBoundary
-                className="h-full min-h-0 flex-1"
-                title="Something went wrong"
-                description="This page failed to render. Reload to try again."
-              >
-                <Outlet />
-              </ErrorBoundary>
+              {children}
             </div>
           </main>
 
@@ -406,7 +403,6 @@ export function WorkspaceShell() {
       <MobileHamburgerMenu />
       {/* System metrics footer removed */}
       <CommandPalette pathname={pathname} sessions={sessions} />
-      <HermesOnboarding />
     </>
   )
 }

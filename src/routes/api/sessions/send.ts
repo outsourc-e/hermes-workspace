@@ -20,10 +20,15 @@ export const Route = createFileRoute('/api/sessions/send')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
-        await ensureGatewayProbed()
-        if (!getGatewayCapabilities().sessions) {
+        const capabilities = await ensureGatewayProbed()
+        if (!capabilities.enhancedChat) {
           return json(
-            { ok: false, error: SESSIONS_API_UNAVAILABLE_MESSAGE },
+            {
+              ok: false,
+              error: capabilities.dashboard.available
+                ? 'Legacy session send is not supported in zero-fork mode. Use /api/send-stream.'
+                : SESSIONS_API_UNAVAILABLE_MESSAGE,
+            },
             { status: 503 },
           )
         }

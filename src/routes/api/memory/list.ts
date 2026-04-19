@@ -1,12 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import {
-  ensureGatewayProbed,
-  getCapabilities,
-} from '../../../server/gateway-capabilities'
 import { listMemoryFiles } from '../../../server/memory-browser'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/memory/list')({
   server: {
@@ -15,14 +10,9 @@ export const Route = createFileRoute('/api/memory/list')({
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
-        await ensureGatewayProbed()
-        if (!getCapabilities().memory) {
-          return json({
-            ...createCapabilityUnavailablePayload('memory'),
-            files: [],
-          })
-        }
-
+        // Memory is sourced entirely from local filesystem via memory-browser.ts
+        // (reads $HERMES_HOME/MEMORY.md + $HERMES_HOME/memory/ + /memories/). No
+        // remote gateway endpoint is required, so no capability gate is needed.
         try {
           return json({ files: listMemoryFiles() })
         } catch (error) {

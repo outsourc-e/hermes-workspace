@@ -908,6 +908,7 @@ function AppearanceContent() {
 }
 
 const ENTERPRISE_THEME_FAMILIES: Array<ThemeId> = [
+  'hermes-nous',
   'hermes-official',
   'hermes-classic',
   'hermes-slate',
@@ -918,7 +919,23 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
   ...theme,
   desc: theme.description,
   preview:
-    theme.id === 'hermes-official'
+    theme.id === 'hermes-nous'
+      ? {
+          bg: '#041C1C',
+          panel: '#06282A',
+          border: 'rgba(255,230,203,0.2)',
+          accent: '#FFAC02',
+          text: '#FFE6CB',
+        }
+      : theme.id === 'hermes-nous-light'
+        ? {
+            bg: '#F7F1E4',
+            panel: '#FFFFFF',
+            border: 'rgba(4,28,28,0.2)',
+            accent: '#FFAC02',
+            text: '#041C1C',
+          }
+      : theme.id === 'hermes-official'
       ? {
           bg: '#0A0E1A',
           panel: '#11182A',

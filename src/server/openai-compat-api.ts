@@ -89,7 +89,40 @@ export async function buildRequestBody(
   }
 }
 
-export type StreamChunkType = { type: 'content' | 'reasoning'; text: string }
+export type StreamChunkType =
+  | { type: 'content' | 'reasoning'; text: string }
+  | { type: 'tool'; name: string; label: string }
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+function parseHermesToolProgressChunk(payload: string): StreamChunkType | null {
+  try {
+    const parsed = JSON.parse(payload) as unknown
+    const record = readRecord(parsed)
+    if (!record) return null
+    const name =
+      readString(record.tool) || readString(record.name) || 'tool'
+    const emoji = readString(record.emoji)
+    const labelText = readString(record.label)
+    const label = [emoji, labelText].filter(Boolean).join(' ').trim()
+    if (!label) return null
+    return {
+      type: 'tool',
+      name,
+      label,
+    }
+  } catch {
+    return null
+  }
+}
 
 export async function* parseOpenAIStream(
   response: Response,
@@ -113,12 +146,28 @@ export async function* parseOpenAIStream(
       const rawEvent = buffer.slice(0, boundary)
       buffer = buffer.slice(boundary + 2)
 
+      let eventName = ''
+      const dataLines: string[] = []
+
       for (const line of rawEvent.split('\n')) {
         const trimmed = line.trim()
-        if (!trimmed.startsWith('data:')) continue
+        if (trimmed.startsWith('event:')) {
+          eventName = trimmed.slice(6).trim()
+          continue
+        }
+        if (trimmed.startsWith('data:')) {
+          dataLines.push(trimmed.slice(5).trim())
+        }
+      }
 
-        const payload = trimmed.slice(5).trim()
+      for (const payload of dataLines) {
         if (!payload || payload === '[DONE]') continue
+
+        if (eventName === 'hermes.tool.progress') {
+          const toolChunk = parseHermesToolProgressChunk(payload)
+          if (toolChunk) yield toolChunk
+          continue
+        }
 
         try {
           const parsed = JSON.parse(payload) as {

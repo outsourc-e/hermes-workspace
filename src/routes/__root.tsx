@@ -1,6 +1,11 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRoute,
+} from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
@@ -11,7 +16,14 @@ import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
-import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
+import {
+  HermesOnboarding,
+  ONBOARDING_COMPLETE_EVENT,
+  ONBOARDING_KEY,
+} from '@/components/onboarding/hermes-onboarding'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { getRootSurfaceState } from './-root-layout-state'
+
 
 const APP_CSP = [
   "default-src 'self'",
@@ -193,40 +205,125 @@ export const Route = createRootRoute({
 
 const queryClient = new QueryClient()
 
+export function getRootLayoutMode(onboardingComplete: string | null): 'onboarding' | 'workspace' {
+  return onboardingComplete === 'true' ? 'workspace' : 'onboarding'
+}
+
+export function wrapInlineScript(source: string): string {
+  return `(() => {\n  try {\n${source}\n  } catch (error) {\n    console.error('Inline bootstrap script failed', error)\n  }\n})()`
+}
+
+type ServiceWorkerLike = {
+  getRegistrations: () => Promise<Array<{ unregister: () => void | Promise<void> }>>
+}
+
+type CachesLike = {
+  keys: () => Promise<Array<string>>
+  delete: (name: string) => Promise<boolean> | boolean
+}
+
+export async function unregisterServiceWorkers({
+  serviceWorker,
+  cachesApi,
+}: {
+  serviceWorker?: ServiceWorkerLike
+  cachesApi?: CachesLike
+}): Promise<void> {
+  await serviceWorker
+    ?.getRegistrations()
+    .then((registrations) =>
+      Promise.allSettled(
+        registrations.map((registration) => registration.unregister()),
+      ),
+    )
+    .catch(() => undefined)
+
+  await cachesApi
+    ?.keys()
+    .then((names) => Promise.allSettled(names.map((name) => cachesApi.delete(name))))
+    .catch(() => undefined)
+}
+
 function RootLayout() {
-  // Unregister any existing service workers — they cause stale asset issues
-  // after Docker image updates and behind reverse proxies (Pangolin, Cloudflare, etc.)
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
+    null,
+  )
+
   useEffect(() => {
     initializeSettingsAppearance()
 
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister()
-        }
-      })
-      // Also clear any stale caches
-      if ('caches' in window) {
-        caches.keys().then((names) => {
-          for (const name of names) {
-            caches.delete(name)
-          }
-        })
+    const syncOnboardingCompletion = () => {
+      try {
+        setOnboardingComplete(localStorage.getItem(ONBOARDING_KEY) === 'true')
+      } catch {
+        setOnboardingComplete(false)
       }
+    }
+
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    syncOnboardingCompletion()
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== ONBOARDING_KEY) return
+      syncOnboardingCompletion()
+    }
+
+    const handleOnboardingCompleteChanged = () => {
+      syncOnboardingCompletion()
+    }
+
+    window.addEventListener('storage', handleStorage)
+    window.addEventListener(
+      ONBOARDING_COMPLETE_EVENT,
+      handleOnboardingCompleteChanged,
+    )
+
+    void unregisterServiceWorkers({
+      serviceWorker: 'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
+      cachesApi: 'caches' in window ? caches : undefined,
+    })
+
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener(
+        ONBOARDING_COMPLETE_EVENT,
+        handleOnboardingCompleteChanged,
+      )
     }
   }, [])
 
+  const rootSurfaceState = getRootSurfaceState(onboardingComplete)
+
   return (
     <QueryClientProvider client={queryClient}>
-      <HermesOnboarding />
-      <GlobalShortcutListener />
-      <TerminalShortcutListener />
-      <MobilePromptTrigger />
       <Toaster />
-      <WorkspaceShell />
-      <SearchModal />
-      <OnboardingTour />
-      <KeyboardShortcutsModal />
+      {rootSurfaceState.showOnboarding ? <HermesOnboarding /> : null}
+      {rootSurfaceState.showWorkspaceShell ? (
+        <>
+          <GlobalShortcutListener />
+          <TerminalShortcutListener />
+          <WorkspaceShell>
+            <ErrorBoundary
+              className="h-full min-h-0 flex-1"
+              title="Something went wrong"
+              description="This page failed to render. Reload to try again."
+            >
+              <Outlet />
+            </ErrorBoundary>
+          </WorkspaceShell>
+          <SearchModal />
+          <KeyboardShortcutsModal />
+          {rootSurfaceState.showPostOnboardingOverlays ? (
+            <>
+              <MobilePromptTrigger />
+              <OnboardingTour />
+            </>
+          ) : null}
+        </>
+      ) : null}
     </QueryClientProvider>
   )
 }
@@ -238,7 +335,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <meta httpEquiv="Content-Security-Policy" content={APP_CSP} />
         <script
           dangerouslySetInnerHTML={{
-            __html: `
+            __html: wrapInlineScript(`
           // Polyfill crypto.randomUUID for non-secure contexts (HTTP access via LAN IP)
           if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
             crypto.randomUUID = function() {
@@ -247,17 +344,19 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               });
             };
           }
-        `,
+        `),
           }}
         />
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: wrapInlineScript(themeScript) }} />
         <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: themeColorScript }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: wrapInlineScript(themeColorScript) }}
+        />
       </head>
       <body>
         <script
           dangerouslySetInnerHTML={{
-            __html: `
+            __html: wrapInlineScript(`
           (function(){
             if (document.getElementById('splash-screen')) return;
             var bg = '#0A0E1A', txt = '#E6EAF2', muted = '#9AA5BD', accent = '#6366F1';
@@ -341,14 +440,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               }
             } catch(e) {}
           })()
-        `,
+        `),
           }}
         />
         <div className="root">{children}</div>
         <Scripts />
         <script
           dangerouslySetInnerHTML={{
-            __html: `
+            __html: wrapInlineScript(`
           (function(){
             var start = Date.now();
             function check() {
@@ -359,7 +458,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             }
             setTimeout(check, 2500);
           })()
-        `,
+        `),
           }}
         />
       </body>
