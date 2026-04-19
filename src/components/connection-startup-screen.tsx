@@ -30,23 +30,19 @@ function getSetupSteps(
       note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
     },
     {
-      title: 'Optional: run a Hermes gateway locally',
-      command: 'git clone https://github.com/outsourc-e/hermes-agent.git',
-      note: 'Hermes gateway APIs unlock sessions, skills, memory, and other workspace extras automatically',
+      title: 'Optional: install Hermes Agent locally',
+      command: `${pip} install hermes-agent`,
+      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
     },
     {
-      title: 'Install the gateway',
-      command: `cd hermes-agent && ${python} -m venv .venv && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && ${pip} install -e .`,
-    },
-    {
-      title: 'Enable the HTTP API server',
-      command: 'echo "API_SERVER_ENABLED=true" >> ~/.hermes/.env',
-      note: 'The gateway HTTP API is opt-in. Without this, the gateway serves messaging platforms but does not expose port 8642 for the workspace.',
+      title: 'Set up Hermes',
+      command: 'hermes setup',
+      note: 'Pick your providers once; Hermes stores them under ~/.hermes',
     },
     {
       title: 'Start the gateway',
-      command: `cd hermes-agent && ${platform === 'windows' ? '.venv\\Scripts\\activate' : 'source .venv/bin/activate'} && hermes --gateway`,
-      note: 'Or use Auto-Start below if hermes-agent is already installed locally',
+      command: 'hermes gateway run',
+      note: 'This starts the HTTP API on :8642 for the workspace',
     },
   ]
 }

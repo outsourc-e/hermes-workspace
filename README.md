@@ -406,7 +406,7 @@ The workspace auto-detects your gateway's capabilities on startup. Check your te
 
 ```
 [gateway] http://127.0.0.1:8642 available: health, models; missing: sessions, skills, memory, config, jobs
-[gateway] Missing Hermes APIs detected. Update Hermes: cd hermes-agent && git pull && pip install -e . && hermes --gateway
+[gateway] Missing Hermes APIs detected. Update Hermes: pip install -U hermes-agent && hermes gateway run
 ```
 
 **Fix:** Upgrade to the latest stock `hermes-agent`, which now ships the extended endpoints:
