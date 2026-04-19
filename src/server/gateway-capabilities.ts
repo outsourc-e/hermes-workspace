@@ -442,6 +442,11 @@ export function getEnhancedCapabilities(): EnhancedCapabilities {
 }
 
 export function getGatewayMode(): GatewayMode {
+  // 'zero-fork' requires the optional dashboard plugin bundle; 'enhanced' is
+  // granted whenever the core enhanced-chat endpoints are present — which
+  // vanilla hermes-agent (≥0.10) satisfies. The label 'enhanced-fork' is
+  // legacy copy from the 2025-era fork and does NOT imply an actual fork is
+  // required. We keep the value for backwards compatibility with UI code.
   if (capabilities.dashboard.available && capabilities.chatCompletions) {
     return 'zero-fork'
   }
