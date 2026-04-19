@@ -1,5 +1,5 @@
 export const MODEL_SWITCH_BLOCKED_TOAST =
-  'Model switching requires the enhanced fork or `hermes config set model <id>` — displayed model reflects config default.'
+  'Model switching requires the enhanced runtime. Set a default via `hermes config set model <id>` — the displayed model reflects your config.'
 
 export type ZeroForkModelInfoFlags = {
   vanillaAgent: boolean

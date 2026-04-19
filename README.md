@@ -13,7 +13,7 @@
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
-> **v2 — zero-fork architecture.** Runs on stock [`pip install hermes-agent`](https://github.com/NousResearch/hermes-agent). No patches, no drift. Upgrade any time with `pip install -U hermes-agent`. Earlier versions required a fork; upstream shipped full parity, so the fork is gone.
+> **v2 — zero-fork. Clone, don't fork.** Runs on vanilla [`pip install hermes-agent`](https://github.com/NousResearch/hermes-agent). No patches, no drift. Upgrade any time with `pip install -U hermes-agent`.
 
 ![Hermes Workspace](./docs/screenshots/splash.png)
 
@@ -50,15 +50,34 @@
 
 ## 🚀 Quick Start
 
+### One-line install (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
+```
+
+This installs `hermes-agent` from PyPI, clones this repo, sets up `.env`, and installs deps. Then:
+
+```bash
+hermes gateway run                  # terminal 1
+cd ~/hermes-workspace && pnpm dev   # terminal 2
+```
+
+Open http://localhost:3000. That's it.
+
+---
+
+### Manual install
+
 Hermes Workspace works with any OpenAI-compatible backend. If your backend also exposes Hermes gateway APIs, enhanced features like sessions, memory, skills, and jobs unlock automatically.
 
-### Prerequisites
+#### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
 - **An OpenAI-compatible backend** — local, self-hosted, or remote
 - **Optional:** Python 3.11+ if you want to run a Hermes gateway locally
 
-### Step 1: Start your backend
+#### Step 1: Start your backend
 
 Point Hermes Workspace at any backend that supports:
 
@@ -91,7 +110,7 @@ pnpm dev                   # Starts on http://localhost:3000
 
 > **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes APIs, advanced features appear automatically.
 
-### Environment Variables
+#### Environment Variables
 
 ```env
 # OpenAI-compatible backend URL
@@ -425,7 +444,7 @@ Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
 ### "Using upstream NousResearch/hermes-agent"
 
-v2+ runs on stock `hermes-agent` with full feature parity. Run `pip install -U hermes-agent` to get the extended endpoints (sessions, memory, skills, config). No fork required.
+v2+ runs on vanilla `hermes-agent` with full feature parity. `pip install -U hermes-agent` gets you the extended endpoints (sessions, memory, skills, config). **No fork required, ever.**
 
 If you're pinned to an older `hermes-agent` version and missing endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
 
