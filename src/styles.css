@@ -1065,6 +1065,108 @@ code {
   --theme-input: #ffffff;
 }
 
+/* ============================================================
+   Hermes Nous — matches nousresearch.com/hermes-agent chrome
+   Dark:  deep teal #041C1C background, cream #ffe6cb accent
+   Light: warm parchment, deep teal text, amber #ffac02 accent
+   ============================================================ */
+
+[data-theme='hermes-nous'] {
+  --theme-bg: #041c1c;
+  --theme-sidebar: #06282a;
+  --theme-panel: #06282a;
+  --theme-card: #082f31;
+  --theme-card2: #0a3638;
+  --theme-border: rgba(255, 230, 203, 0.2);
+  --theme-border-subtle: rgba(255, 230, 203, 0.1);
+  --theme-text: #ffe6cb;
+  --theme-muted: rgba(255, 230, 203, 0.6);
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.48);
+  --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.58);
+  --theme-glass: rgba(4, 28, 28, 0.88);
+  --theme-focus: #ffac02;
+  --theme-accent: #ffac02;
+  --theme-accent-secondary: #ffe6cb;
+  --theme-accent-subtle: rgba(255, 172, 2, 0.12);
+  --theme-accent-border: rgba(255, 172, 2, 0.28);
+  --theme-active: #ffac02;
+  --theme-link: #ffe6cb;
+  --theme-success: #8fff89;
+  --theme-warning: #ffac02;
+  --theme-danger: #fb2c36;
+  --theme-stripe: rgba(255, 230, 203, 0.05);
+  --theme-header-bg: #041c1c;
+  --theme-header-border: rgba(255, 230, 203, 0.2);
+  --chat-user-bg: #08302d;
+  --chat-user-border: rgba(255, 172, 2, 0.28);
+  --chat-user-foreground: #ffe6cb;
+  --chat-assistant-bg: #06282a;
+  --chat-assistant-border: rgba(255, 230, 203, 0.1);
+  --chat-assistant-foreground: #ffe6cb;
+  --composer-bg: #06282a;
+  --composer-border: rgba(255, 230, 203, 0.2);
+  --composer-placeholder: rgba(255, 230, 203, 0.45);
+  --tool-card-bg: #06282a;
+  --tool-card-border: rgba(255, 230, 203, 0.15);
+  --tool-card-title: #ffe6cb;
+  --tool-card-muted: rgba(255, 230, 203, 0.55);
+  --code-bg: #02181a;
+  --code-border: rgba(255, 230, 203, 0.12);
+  --code-foreground: #8fff89;
+  --theme-input: #06282a;
+}
+
+[data-theme='hermes-nous-light'] {
+  --theme-bg: #f7f1e4;
+  --theme-sidebar: #efe6d0;
+  --theme-panel: #f4ecda;
+  --theme-card: #ffffff;
+  --theme-card2: #f7f1e4;
+  --theme-border: rgba(4, 28, 28, 0.2);
+  --theme-border-subtle: rgba(4, 28, 28, 0.1);
+  --theme-text: #041c1c;
+  --theme-muted: rgba(4, 28, 28, 0.62);
+  --theme-shadow-1: 0 1px 2px rgba(4, 28, 28, 0.08);
+  --theme-shadow-2: 0 6px 18px rgba(4, 28, 28, 0.1);
+  --theme-shadow-3: 0 16px 36px rgba(4, 28, 28, 0.12);
+  --theme-glass: rgba(247, 241, 228, 0.88);
+  --theme-focus: #ffac02;
+  --theme-accent: #ffac02;
+  --theme-accent-secondary: #c77700;
+  --theme-accent-subtle: rgba(255, 172, 2, 0.14);
+  --theme-accent-border: rgba(255, 172, 2, 0.32);
+  --theme-active: #c77700;
+  --theme-link: #c77700;
+  --theme-success: #2f7f3d;
+  --theme-warning: #c77700;
+  --theme-danger: #b5252d;
+  --theme-stripe: rgba(4, 28, 28, 0.04);
+  --theme-header-bg: #efe6d0;
+  --theme-header-border: rgba(4, 28, 28, 0.18);
+  --chat-user-bg: #f0e4c8;
+  --chat-user-border: rgba(255, 172, 2, 0.32);
+  --chat-user-foreground: #041c1c;
+  --chat-assistant-bg: #f4ecda;
+  --chat-assistant-border: rgba(4, 28, 28, 0.1);
+  --chat-assistant-foreground: #041c1c;
+  --composer-bg: #ffffff;
+  --composer-border: rgba(4, 28, 28, 0.2);
+  --composer-placeholder: rgba(4, 28, 28, 0.45);
+  --tool-card-bg: #f7f1e4;
+  --tool-card-border: rgba(4, 28, 28, 0.15);
+  --tool-card-title: #041c1c;
+  --tool-card-muted: rgba(4, 28, 28, 0.55);
+  --code-bg: #efe6d0;
+  --code-border: rgba(4, 28, 28, 0.15);
+  --code-foreground: #041c1c;
+  --theme-input: #ffffff;
+}
+
+[data-theme='hermes-nous'] html,
+[data-theme='hermes-nous'] body,
+[data-theme='hermes-nous'] #root,
+[data-theme='hermes-nous'] .dark,
 [data-theme='hermes-official'] html,
 [data-theme='hermes-official'] body,
 [data-theme='hermes-official'] #root,
@@ -1085,6 +1187,10 @@ code {
   color: var(--theme-text);
 }
 
+[data-theme='hermes-nous-light'] html,
+[data-theme='hermes-nous-light'] body,
+[data-theme='hermes-nous-light'] #root,
+[data-theme='hermes-nous-light'] .light,
 [data-theme='hermes-official-light'] html,
 [data-theme='hermes-official-light'] body,
 [data-theme='hermes-official-light'] #root,
@@ -1110,6 +1216,7 @@ code {
    to theme-appropriate values so ALL existing Tailwind classes work.
    Dark: 50=darkest surface, 950=lightest text (already set above) */
 
+[data-theme='hermes-nous'],
 [data-theme='hermes-official'],
 [data-theme='hermes-classic'],
 [data-theme='hermes-slate'],
@@ -1136,6 +1243,7 @@ code {
 /* ── Tailwind primary token remaps for light themes ────────────────────
    Light: 50=lightest surface, 950=darkest text */
 
+[data-theme='hermes-nous-light'],
 [data-theme='hermes-official-light'],
 [data-theme='hermes-classic-light'],
 [data-theme='hermes-slate-light'],

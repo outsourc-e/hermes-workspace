@@ -1,4 +1,6 @@
 export type ThemeId =
+  | 'hermes-nous'
+  | 'hermes-nous-light'
   | 'hermes-official'
   | 'hermes-official-light'
   | 'hermes-classic'
@@ -14,6 +16,18 @@ export const THEMES: Array<{
   description: string
   icon: string
 }> = [
+  {
+    id: 'hermes-nous',
+    label: 'Hermes Nous',
+    description: 'Deep teal background, cream accent — matches Nous Research chrome',
+    icon: '◱',
+  },
+  {
+    id: 'hermes-nous-light',
+    label: 'Hermes Nous Light',
+    description: 'Cream parchment + amber accent — editorial light variant',
+    icon: '◲',
+  },
   {
     id: 'hermes-official',
     label: 'Hermes Official',
@@ -71,6 +85,7 @@ const LIGHT_THEME_MAP: Record<
   Exclude<ThemeId, `${string}-light`>,
   Extract<ThemeId, `${string}-light`>
 > = {
+  'hermes-nous': 'hermes-nous-light',
   'hermes-official': 'hermes-official-light',
   'hermes-classic': 'hermes-classic-light',
   'hermes-slate': 'hermes-slate-light',
@@ -80,6 +95,7 @@ const DARK_THEME_MAP: Record<
   Extract<ThemeId, `${string}-light`>,
   Exclude<ThemeId, `${string}-light`>
 > = {
+  'hermes-nous-light': 'hermes-nous',
   'hermes-official-light': 'hermes-official',
   'hermes-classic-light': 'hermes-classic',
   'hermes-slate-light': 'hermes-slate',
@@ -87,6 +103,7 @@ const DARK_THEME_MAP: Record<
 }
 
 const LIGHT_THEMES = new Set<ThemeId>([
+  'hermes-nous-light',
   'hermes-official-light',
   'hermes-classic-light',
   'hermes-slate-light',
