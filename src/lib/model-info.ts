@@ -5,6 +5,12 @@ export type NormalizedModelInfo = {
   raw: Record<string, unknown> | null
 }
 
+export type GatewayModelInfoFallbackCapabilities = {
+  enhancedChat?: boolean
+  config?: boolean
+  sessions?: boolean
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -27,6 +33,31 @@ function readBoolean(value: unknown): boolean | null {
 
 function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+export function deriveFallbackModelInfoFromGateway(
+  gatewayMode: string | null | undefined,
+  capabilities: GatewayModelInfoFallbackCapabilities | null | undefined,
+): NormalizedModelInfo {
+  const hasEnhancedRuntime = Boolean(
+    capabilities?.enhancedChat || capabilities?.config || capabilities?.sessions,
+  )
+
+  if (hasEnhancedRuntime || gatewayMode === 'enhanced-fork') {
+    return {
+      supportsRuntimeSwitching: true,
+      vanillaAgent: false,
+      mode: 'enhanced',
+      raw: null,
+    }
+  }
+
+  return {
+    supportsRuntimeSwitching: null,
+    vanillaAgent: null,
+    mode: null,
+    raw: null,
+  }
 }
 
 export function normalizeModelInfoResponse(value: unknown): NormalizedModelInfo {

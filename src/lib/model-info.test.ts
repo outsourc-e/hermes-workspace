@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeModelInfoResponse } from './model-info'
+import {
+  deriveFallbackModelInfoFromGateway,
+  normalizeModelInfoResponse,
+} from './model-info'
 
 describe('normalizeModelInfoResponse', () => {
   it('recognizes explicit runtime switching support', () => {
@@ -29,6 +32,20 @@ describe('normalizeModelInfoResponse', () => {
     expect(normalizeModelInfoResponse({})).toMatchObject({
       supportsRuntimeSwitching: null,
       vanillaAgent: null,
+    })
+  })
+
+  it('falls back to gateway capabilities for enhanced-fork runtimes when dashboard model info is unavailable', () => {
+    expect(
+      deriveFallbackModelInfoFromGateway('enhanced-fork', {
+        enhancedChat: true,
+        config: true,
+        sessions: true,
+      }),
+    ).toMatchObject({
+      supportsRuntimeSwitching: true,
+      vanillaAgent: false,
+      mode: 'enhanced',
     })
   })
 })
