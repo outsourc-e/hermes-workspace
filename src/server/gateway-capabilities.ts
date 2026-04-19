@@ -239,7 +239,18 @@ async function probeDashboard(): Promise<{ available: boolean; url: string }> {
   }
 }
 
-const OPTIONAL_APIS = new Set(['jobs', 'chatCompletions', 'streaming', 'memory'])
+// Vanilla hermes-agent 0.10.0 satisfies: health, chatCompletions, models, streaming,
+// sessions, skills, config, jobs. Dashboard-only endpoints (themes/plugins) and the
+// legacy enhanced-fork chat stream are optional — their absence should not emit the
+// "Missing Hermes APIs detected" warning, which only applies to critical gaps.
+const OPTIONAL_APIS = new Set([
+  'jobs',
+  'chatCompletions',
+  'streaming',
+  'memory',
+  'dashboard',
+  'enhancedChat',
+])
 
 function logCapabilities(next: GatewayCapabilities): void {
   const core: Array<string> = []
