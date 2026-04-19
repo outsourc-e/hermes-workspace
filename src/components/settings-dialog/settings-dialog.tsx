@@ -908,6 +908,7 @@ function AppearanceContent() {
 }
 
 const ENTERPRISE_THEME_FAMILIES: Array<ThemeId> = [
+  'hermes-nous',
   'hermes-official',
   'hermes-classic',
   'hermes-slate',
