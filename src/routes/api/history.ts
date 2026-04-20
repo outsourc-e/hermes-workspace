@@ -47,12 +47,20 @@ export const Route = createFileRoute('/api/history')({
               messages: [],
             })
           }
-          // "main" doesn't exist in Hermes — resolve it to the latest session.
+          // "main" doesn't exist in Hermes — resolve it to the latest user
+          // chat session. Skip cron job sessions and per-agent Operations
+          // sessions so the orchestrator chat doesn't latch onto them.
           if (sessionKey === 'main') {
             try {
-              const sessions = await listSessions(1, 0)
-              if (sessions.length > 0) {
-                sessionKey = sessions[0].id
+              // Pull a small window so we have something to filter from.
+              const sessions = await listSessions(20, 0)
+              const isInternalKey = (id: string) =>
+                id.startsWith('cron_') ||
+                id.startsWith('cron:') ||
+                id.startsWith('agent:main:ops-')
+              const candidate = sessions.find((s) => !isInternalKey(s.id))
+              if (candidate) {
+                sessionKey = candidate.id
               } else {
                 return json({
                   sessionKey: 'new',
