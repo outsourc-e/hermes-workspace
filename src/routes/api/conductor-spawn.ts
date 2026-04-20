@@ -11,7 +11,8 @@
  * gateway was running on ws://127.0.0.1:18789.
  */
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -34,15 +35,28 @@ type ConductorSpawnBody = {
   supervised?: unknown
 }
 
+// Resolve the workspace root from this module's location so we find the
+// bundled skill regardless of where the server is launched from.
+function repoRoot(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url))
+    // src/routes/api -> repo root (../..)
+    return resolve(here, '..', '..', '..')
+  } catch {
+    return process.cwd()
+  }
+}
+
 function loadDispatchSkill(): string {
   if (cachedSkill !== null) return cachedSkill
   const candidates = [
+    resolve(repoRoot(), 'skills/workspace-dispatch/SKILL.md'),
     resolve(process.cwd(), 'skills/workspace-dispatch/SKILL.md'),
+    resolve(process.env.HOME ?? '~', '.hermes/skills/workspace-dispatch/SKILL.md'),
     resolve(
       process.env.HOME ?? '~',
       '.ocplatform/workspace/skills/workspace-dispatch/SKILL.md',
     ),
-    resolve(process.env.HOME ?? '~', '.hermes/skills/workspace-dispatch/SKILL.md'),
   ]
   for (const p of candidates) {
     try {

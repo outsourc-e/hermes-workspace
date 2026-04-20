@@ -149,6 +149,23 @@ cyan "→ Installing npm deps (pnpm install)…"
 pnpm install --silent
 green "  deps installed ✓"
 
+# ─── seed Hermes skills (Conductor needs workspace-dispatch) ─────────────
+
+cyan "→ Linking bundled skills into ~/.hermes/skills…"
+HERMES_SKILLS_DIR="$HOME/.hermes/skills"
+mkdir -p "$HERMES_SKILLS_DIR"
+if [[ -d "$INSTALL_DIR/skills" ]]; then
+  for skill_path in "$INSTALL_DIR/skills"/*/; do
+    skill_name=$(basename "$skill_path")
+    target="$HERMES_SKILLS_DIR/$skill_name"
+    if [[ -e "$target" || -L "$target" ]]; then
+      continue
+    fi
+    ln -sf "$skill_path" "$target" 2>/dev/null && \
+      green "  linked $skill_name ✓" || true
+  done
+fi
+
 # ─── done ─────────────────────────────────────────────────────────────────
 
 bold ""
