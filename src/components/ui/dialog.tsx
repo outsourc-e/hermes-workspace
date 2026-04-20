@@ -19,9 +19,10 @@ function DialogTrigger({ className, ...props }: DialogTriggerProps) {
 type DialogContentProps = {
   className?: string
   children: React.ReactNode
+  style?: React.CSSProperties
 }
 
-function DialogContent({ className, children }: DialogContentProps) {
+function DialogContent({ className, children, style }: DialogContentProps) {
   return (
     <Dialog.Portal>
       <Dialog.Backdrop
@@ -42,6 +43,7 @@ function DialogContent({ className, children }: DialogContentProps) {
           border: '1px solid var(--theme-border)',
           boxShadow: 'var(--theme-shadow-3)',
           color: 'var(--theme-text)',
+          ...style,
         }}
       >
         {children}

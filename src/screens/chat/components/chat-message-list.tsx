@@ -412,9 +412,9 @@ function ThinkingBubble({
               }}
               className="flex flex-wrap gap-1.5"
             >
-              {allTools.slice(0, 4).map((tool) => (
+              {allTools.slice(0, 4).map((tool, index) => (
                 <span
-                  key={tool.id}
+                  key={`${tool.name}-${tool.phase}-${index}`}
                   className="inline-flex items-center rounded-full bg-primary-200/60 dark:bg-primary-800/30 px-2 py-0.5 text-[10px] font-mono text-primary-500 dark:text-primary-400 select-none"
                 >
                   {tool.name}

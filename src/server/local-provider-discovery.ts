@@ -109,15 +109,15 @@ async function probeProvider(
         : []
 
     const models: DiscoveredModel[] = rawModels
-      .map((entry: Record<string, unknown>) => {
+      .flatMap((entry: Record<string, unknown>) => {
         const id =
           typeof entry.id === 'string'
             ? entry.id
             : typeof entry.name === 'string'
               ? entry.name
               : ''
-        if (!id) return null
-        return {
+        if (!id) return []
+        return [{
           id,
           name: cleanModelName(id),
           provider: def.id,
@@ -126,9 +126,8 @@ async function probeProvider(
             typeof entry.size === 'number'
               ? Math.round(entry.size / 1024 / 1024 / 1024)
               : null,
-        }
+        }]
       })
-      .filter((m: DiscoveredModel | null): m is DiscoveredModel => m !== null)
 
     return { def, online: true, models, lastProbe: Date.now() }
   } catch {

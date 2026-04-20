@@ -105,6 +105,7 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
   const isDark = !currentDataTheme.endsWith('-light')
   const themeIcon = isDark ? Sun02Icon : Moon02Icon
   const themeLabel = isDark ? 'Light mode' : 'Dark mode'
+  const nextTheme = isDark ? 'light mode' : 'dark mode'
 
   function toggleThemeWithinFamily() {
     const current = getTheme()

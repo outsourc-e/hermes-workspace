@@ -91,7 +91,7 @@ export const Route = createFileRoute('/api/history')({
               return json({ sessionKey: 'new', sessionId: 'new', messages: [] })
             }
           }
-          let messages
+          let messages: Awaited<ReturnType<typeof getMessages>> = []
           try {
             messages = await getMessages(sessionKey)
           } catch {

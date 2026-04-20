@@ -462,20 +462,17 @@ export function KnowledgeBrowserScreen() {
           </button>
 
           <DialogRoot open={settingsOpen} onOpenChange={setSettingsOpen}>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-primary-100 dark:hover:bg-neutral-900"
-                style={{
-                  border: '1px solid var(--theme-border)',
-                  backgroundColor: 'var(--theme-card)',
-                  color: 'var(--theme-text)',
-                }}
-                title="Knowledge base settings"
-              >
-                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.7} />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
+            <DialogTrigger
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-primary-100 dark:hover:bg-neutral-900"
+              style={{
+                border: '1px solid var(--theme-border)',
+                backgroundColor: 'var(--theme-card)',
+                color: 'var(--theme-text)',
+              }}
+              title="Knowledge base settings"
+            >
+              <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.7} />
+              <span className="hidden sm:inline">Settings</span>
             </DialogTrigger>
             <DialogContent
               className="sm:max-w-md"

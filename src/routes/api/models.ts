@@ -74,17 +74,18 @@ function readHermesModelsJson(): Array<ModelEntry> {
     const entries = JSON.parse(raw)
     if (!Array.isArray(entries)) return []
     return entries
-      .map((entry: Record<string, unknown>) => {
+      .map((entry: unknown): ModelEntry | null => {
+        const record = asRecord(entry)
         // models.json uses "model" field for the model ID
-        const modelId = readString(entry.model) || readString(entry.id)
+        const modelId = readString(record.model) || readString(record.id)
         if (!modelId) return null
         return {
           id: modelId,
-          name: readString(entry.name) || modelId,
-          provider: readString(entry.provider) || 'unknown',
+          name: readString(record.name) || modelId,
+          provider: readString(record.provider) || 'unknown',
         }
       })
-      .filter((e: ModelEntry | null): e is ModelEntry => e !== null)
+      .filter((entry): entry is ModelEntry => entry !== null)
   } catch {
     return []
   }

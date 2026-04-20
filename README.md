@@ -114,6 +114,28 @@ pnpm dev                   # Starts on http://localhost:3000
 
 > **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes APIs, advanced features appear automatically.
 
+### Agent W Managed Companion
+
+When Hermes Workspace is running behind Agent W's local HTTPS proxy, the
+managed companion entrypoint is:
+
+```bash
+https://localhost:4445/chat/new
+```
+
+For local validation from the workspace checkout:
+
+```bash
+pnpm exec tsc --noEmit
+pnpm test
+pnpm build
+pnpm smoke:managed
+```
+
+`pnpm smoke:managed` checks the managed `4445` surface and fails if the recent
+PM2 error log still contains the missing-asset/runtime signatures that show up
+when `dist` drifts under a live server process.
+
 #### Environment Variables
 
 ```env

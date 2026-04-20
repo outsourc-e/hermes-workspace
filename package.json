@@ -13,6 +13,7 @@
     "start:dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev --port 3000",
     "preview": "vite preview",
     "test": "vitest run",
+    "smoke:managed": "node scripts/managed-companion-smoke.mjs",
     "lint": "eslint",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix"

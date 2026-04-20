@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { toast } from '@/components/ui/toast'
 
-type SkillsTab = 'installed' | 'marketplace'
+type SkillsTab = 'installed' | 'marketplace' | 'featured'
 type SkillsSort = 'name' | 'category'
 
 type SecurityRisk = {
@@ -298,7 +298,7 @@ export function SkillsScreen() {
                 ? 'safe'
                 : skill.trust_level === 'trusted'
                   ? 'safe'
-                  : 'review',
+                  : 'medium',
             flags: [],
             score: 0,
           },

@@ -214,7 +214,7 @@ export function wrapInlineScript(source: string): string {
 }
 
 type ServiceWorkerLike = {
-  getRegistrations: () => Promise<Array<{ unregister: () => void | Promise<void> }>>
+  getRegistrations: () => Promise<ReadonlyArray<{ unregister: () => boolean | Promise<boolean> | void | Promise<void> }>>
 }
 
 type CachesLike = {

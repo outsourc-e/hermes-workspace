@@ -38,6 +38,7 @@ for pid in $(lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true); do
 done
 
 echo "[stable] building Hermes Workspace..."
+rm -rf dist
 pnpm build >"$BUILD_LOG_FILE" 2>&1
 
 echo "[stable] starting Hermes Workspace on port $PORT..."
@@ -46,8 +47,8 @@ new_pid=$!
 echo "$new_pid" >"$PID_FILE"
 
 for _ in {1..40}; do
-  if curl -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
-    echo "[stable] up on http://127.0.0.1:$PORT"
+  if curl -fsS "http://127.0.0.1:$PORT/chat/new" >/dev/null 2>&1; then
+    echo "[stable] up on http://127.0.0.1:$PORT/chat/new"
     echo "[stable] pid=$new_pid"
     echo "[stable] log=$LOG_FILE"
     exit 0
