@@ -34,17 +34,21 @@
 
 ## 📸 Screenshots
 
-|                 Chat                 |                 Files                  |
-| :----------------------------------: | :------------------------------------: |
-| ![Chat](./docs/screenshots/chat.png) | ![Files](./docs/screenshots/files.png) |
+|                 Chat                 |                  Conductor                   |
+| :----------------------------------: | :------------------------------------------: |
+| ![Chat](./docs/screenshots/chat.png) | ![Conductor](./docs/screenshots/conductor.png) |
 
-|                   Terminal                   |                  Memory                  |
+|                   Dashboard                  |                  Memory                  |
 | :------------------------------------------: | :--------------------------------------: |
-| ![Terminal](./docs/screenshots/terminal.png) | ![Memory](./docs/screenshots/memory.png) |
+| ![Dashboard](./docs/screenshots/dashboard.png) | ![Memory](./docs/screenshots/memory.png) |
 
-|                  Skills                  |                   Settings                   |
-| :--------------------------------------: | :------------------------------------------: |
-| ![Skills](./docs/screenshots/skills.png) | ![Settings](./docs/screenshots/settings.png) |
+|                   Terminal                   |                   Settings                   |
+| :------------------------------------------: | :------------------------------------------: |
+| ![Terminal](./docs/screenshots/terminal.png) | ![Settings](./docs/screenshots/settings.png) |
+
+|                  Tasks                  |                 Jobs                 |
+| :--------------------------------------: | :----------------------------------: |
+| ![Tasks](./docs/screenshots/tasks.png) | ![Jobs](./docs/screenshots/jobs.png) |
 
 ---
 
