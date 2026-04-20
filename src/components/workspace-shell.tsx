@@ -362,8 +362,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                   />
                 </Suspense>
               </div>
-              {/* Mobile input bar — sibling to terminal, NOT a child, so SSE re-renders don't freeze it */}
-              {isMobile && <MobileTerminalInput />}
+              {/* Mobile input bar — only mount on the terminal route.
+                  It uses fixed bottom positioning, so if it stays mounted while
+                  hidden it leaks onto other mobile pages like Operations. */}
+              {isMobile && isOnTerminalRoute && <MobileTerminalInput />}
             </div>
 
             <div
