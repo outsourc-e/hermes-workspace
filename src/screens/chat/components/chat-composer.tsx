@@ -83,6 +83,9 @@ type ChatComposerProps = {
   /** Called when user changes thinking level */
   onThinkingLevelChange?: (level: ThinkingLevel) => void
   onAbort?: () => void
+  /** Embedded inside another surface (e.g. Operations card), so mobile composer
+   * must stay inline instead of docking fixed to the viewport bottom. */
+  embedded?: boolean
 }
 
 type ChatComposerHelpers = {
@@ -713,6 +716,7 @@ function ChatComposerComponent({
   thinkingLevel: externalThinkingLevel,
   onThinkingLevelChange,
   onAbort,
+  embedded = false,
 }: ChatComposerProps) {
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore(
@@ -1716,7 +1720,7 @@ function ChatComposerComponent({
   const effectiveScrollHidden = scrollHidden && !keyboardOrFocusActive
 
   const composerWrapperStyle = useMemo(() => {
-    if (!isMobileViewport)
+    if (!isMobileViewport || embedded)
       return { maxWidth: 'min(768px, 100%)' } as CSSProperties
     const safeArea = 'env(safe-area-inset-bottom, 0px)'
     const tabBarH = 'var(--tabbar-h, 0px)'
@@ -1755,30 +1759,36 @@ function ChatComposerComponent({
       WebkitTransform: tf,
       '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
     } as CSSProperties
-  }, [isMobileViewport, keyboardOrFocusActive, effectiveScrollHidden])
+  }, [isMobileViewport, keyboardOrFocusActive, effectiveScrollHidden, embedded])
 
   return (
     <div
       className={cn(
         'no-swipe pointer-events-auto touch-manipulation',
         isMobileViewport
-          ? [
-              'fixed z-[70] transition-all duration-200',
-              chatNavMode === 'dock'
-                ? [
-                    // iMessage-style: edge-to-edge, docked to bottom
-                    'left-0 right-0',
-                    'bg-surface/95 backdrop-blur-xl',
-                    'border-t border-primary-200/60',
-                  ].join(' ')
-                : [
-                    // scroll-hide / integrated: floating pill above tab bar
-                    'left-4 right-4',
-                    'bg-surface/95 backdrop-blur-2xl',
-                    'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
-                    'rounded-[22px]',
-                  ].join(' '),
-            ].join(' ')
+          ? embedded
+            ? [
+                // Embedded mobile composer: stay inside the card, no fixed bottom.
+                'relative z-40 w-full',
+                'bg-surface border-t border-primary-200/60',
+              ].join(' ')
+            : [
+                'fixed z-[70] transition-all duration-200',
+                chatNavMode === 'dock'
+                  ? [
+                      // iMessage-style: edge-to-edge, docked to bottom
+                      'left-0 right-0',
+                      'bg-surface/95 backdrop-blur-xl',
+                      'border-t border-primary-200/60',
+                    ].join(' ')
+                  : [
+                      // scroll-hide / integrated: floating pill above tab bar
+                      'left-4 right-4',
+                      'bg-surface/95 backdrop-blur-2xl',
+                      'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
+                      'rounded-[22px]',
+                    ].join(' '),
+              ].join(' ')
           : [
               'relative z-40 shrink-0 w-full mx-auto px-3 pt-2 sm:px-5',
               'bg-surface',

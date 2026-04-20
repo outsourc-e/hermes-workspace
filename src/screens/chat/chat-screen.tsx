@@ -2719,6 +2719,7 @@ export function ChatScreen({
               }
               wrapperRef={composerRef}
               composerRef={composerHandleRef}
+              embedded={embedded}
               // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
               focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
               thinkingLevel={thinkingLevel}
