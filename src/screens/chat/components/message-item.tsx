@@ -2340,8 +2340,12 @@ function MessageItemComponent({
                           className={cn(
                             'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                             effectiveIsStreaming && 'chat-streaming-content',
-                            isUser && 'text-white',
                           )}
+                          style={
+                            isUser
+                              ? { color: 'var(--chat-user-foreground)' }
+                              : undefined
+                          }
                         >
                           {item.text}
                         </MessageContent>
@@ -2365,8 +2369,12 @@ function MessageItemComponent({
                       className={cn(
                         'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
-                        isUser && 'text-white',
                       )}
+                      style={
+                        isUser
+                          ? { color: 'var(--chat-user-foreground)' }
+                          : undefined
+                      }
                     >
                       {assistantDisplayText}
                     </MessageContent>
@@ -2378,7 +2386,12 @@ function MessageItemComponent({
               ) : null)}
             {/* Sent indicator — message delivered, waiting for response */}
             {isUser && isQueued && (
-              <span className="text-[10px] text-white/60 self-end">Sent</span>
+              <span
+                className="self-end text-[10px]"
+                style={{ color: 'color-mix(in srgb, var(--chat-user-foreground) 60%, transparent)' }}
+              >
+                Sent
+              </span>
             )}
           </div>
         </Message>
