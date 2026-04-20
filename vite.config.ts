@@ -34,12 +34,26 @@ function resolveHermesAgentDir(env: Record<string, string>): string | null {
   // Resolve relative to the workspace root (parent of hermes-workspace/)
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'), // sibling hermes-agent directory
-    resolve(workspaceRoot, '..', 'hermes-agent'), // one level up
+    resolve(workspaceRoot, 'hermes-agent'),            // sibling (old README)
+    resolve(workspaceRoot, '..', 'hermes-agent'),      // one level up
+    resolve(os.homedir(), '.hermes', 'hermes-agent'),  // Nous installer default
+    resolve(os.homedir(), 'hermes-agent'),             // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
     if (existsSync(resolve(candidate, 'webapi'))) return candidate
+  }
+  return null
+}
+
+/** Find the `hermes` CLI binary installed by Nous's installer. */
+function resolveHermesBinary(): string | null {
+  const candidates = [
+    resolve(os.homedir(), '.hermes', 'bin', 'hermes'),
+    resolve(os.homedir(), '.local', 'bin', 'hermes'),
+  ]
+  for (const c of candidates) {
+    if (existsSync(c)) return c
   }
   return null
 }
@@ -98,36 +112,59 @@ const config = defineConfig(({ mode, command }) => {
       return
     }
 
+    const hermesBin = resolveHermesBinary()
     const agentDir = resolveHermesAgentDir(env)
-    if (!agentDir) {
+
+    // Prefer the `hermes gateway run` binary path (Nous installer's canonical
+    // entrypoint). Fall back to launching uvicorn against the source tree if
+    // only a directory is present (dev / cloned-in-place setups).
+    let launchCmd: string
+    let commandArgs: string[]
+    let launchCwd: string | undefined
+
+    if (hermesBin) {
+      launchCmd = hermesBin
+      commandArgs = ['gateway', 'run']
+      launchCwd = agentDir ?? undefined
+      console.log(`[hermes-agent] Starting ${hermesBin} gateway run`)
+    } else if (agentDir) {
+      launchCmd = resolveHermesPython(agentDir)
+      const useGatewayRun = existsSync(resolve(agentDir, 'gateway', 'run.py'))
+      commandArgs = useGatewayRun
+        ? ['-m', 'gateway.run']
+        : ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', '8642']
+      launchCwd = agentDir
+      console.log(
+        `[hermes-agent] Starting from ${agentDir} using ${launchCmd} (${useGatewayRun ? 'gateway.run' : 'uvicorn'})`,
+      )
+    } else {
       console.warn(
-        '[hermes-agent] Could not find hermes-agent directory.\n' +
-          '  Set HERMES_AGENT_PATH in .env or clone hermes-agent as a sibling:\n' +
-          '    git clone https://github.com/outsourc-e/hermes-agent.git ../hermes-agent',
+        '[hermes-agent] Could not find hermes-agent installation.\n' +
+          '  Run the installer:\n' +
+          '    curl -fsSL https://hermes-workspace.com/install.sh | bash\n' +
+          '  Or set HERMES_AGENT_PATH in .env to point at your hermes-agent clone.',
       )
       return
     }
 
-    const python = resolveHermesPython(agentDir)
-    const useGatewayRun = existsSync(resolve(agentDir, 'gateway', 'run.py'))
-    const commandArgs = useGatewayRun
-      ? ['-m', 'gateway.run']
-      : ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', '8642']
-
-    console.log(
-      `[hermes-agent] Starting from ${agentDir} using ${python} (${useGatewayRun ? 'gateway.run' : 'uvicorn'})`,
-    )
-
     const child = spawn(
-      python,
+      launchCmd,
       commandArgs,
       {
-        cwd: agentDir,
+        cwd: launchCwd,
         detached: false, // keep tied to vite process — stops when dev server stops
         stdio: 'pipe',
         env: {
           ...process.env,
-          PATH: `${resolve(agentDir, '.venv', 'bin')}:${resolve(agentDir, 'venv', 'bin')}:${process.env.PATH || ''}`,
+          PATH: [
+            resolve(os.homedir(), '.hermes', 'bin'),
+            resolve(os.homedir(), '.local', 'bin'),
+            agentDir ? resolve(agentDir, '.venv', 'bin') : '',
+            agentDir ? resolve(agentDir, 'venv', 'bin') : '',
+            process.env.PATH || '',
+          ]
+            .filter(Boolean)
+            .join(':'),
         },
       },
     )

@@ -49,7 +49,7 @@ function readHermesEnv(): Record<string, string> {
   }
 }
 
-/** Same directory resolution logic as vite.config.ts. */
+/** Same directory resolution logic as vite.config.ts. Kept in sync. */
 export function resolveHermesAgentDir(
   env: Record<string, string | undefined> = process.env,
 ): string | null {
@@ -61,8 +61,10 @@ export function resolveHermesAgentDir(
 
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'),
-    resolve(workspaceRoot, '..', 'hermes-agent'),
+    resolve(workspaceRoot, 'hermes-agent'),          // sibling (old README)
+    resolve(workspaceRoot, '..', 'hermes-agent'),    // one level up
+    resolve(homedir(), '.hermes', 'hermes-agent'),   // Nous installer default
+    resolve(homedir(), 'hermes-agent'),              // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
@@ -72,11 +74,26 @@ export function resolveHermesAgentDir(
   return null
 }
 
+/** Find the `hermes` CLI binary installed by Nous's installer (or on PATH). */
+export function resolveHermesBinary(): string | null {
+  const candidates = [
+    resolve(homedir(), '.hermes', 'bin', 'hermes'),
+    resolve(homedir(), '.local', 'bin', 'hermes'),
+  ]
+  for (const c of candidates) {
+    if (existsSync(c)) return c
+  }
+  return null
+}
+
 export function resolveHermesPython(agentDir: string): string {
   const venvPython = resolve(agentDir, '.venv', 'bin', 'python')
   if (existsSync(venvPython)) return venvPython
   const uvVenv = resolve(agentDir, 'venv', 'bin', 'python')
   if (existsSync(uvVenv)) return uvVenv
+  // Nous installer ships its own uv-managed python alongside the binary
+  const nousPython = resolve(homedir(), '.hermes', 'venv', 'bin', 'python')
+  if (existsSync(nousPython)) return nousPython
   return 'python3'
 }
 
@@ -104,21 +121,24 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
 
   startPromise = (async () => {
     try {
-      const agentDir = resolveHermesAgentDir()
-      if (!agentDir) {
-        return {
-          ok: false,
-          error:
-            'hermes-agent not found. Clone it as a sibling directory or set HERMES_AGENT_PATH in .env',
-        }
-      }
-
-      const python = resolveHermesPython(agentDir)
       const hermesEnv = readHermesEnv()
+      const hermesBin = resolveHermesBinary()
+      const agentDir = resolveHermesAgentDir()
 
-      const child = spawn(
-        python,
-        [
+      // Prefer the `hermes gateway run` binary path (the Nous installer's
+      // canonical entrypoint). Fall back to launching uvicorn against the
+      // source tree if we only have a directory.
+      let command: string
+      let commandArgs: Array<string>
+      let cwd: string | undefined
+
+      if (hermesBin) {
+        command = hermesBin
+        commandArgs = ['gateway', 'run']
+        cwd = agentDir ?? undefined
+      } else if (agentDir) {
+        command = resolveHermesPython(agentDir)
+        commandArgs = [
           '-m',
           'uvicorn',
           'webapi.app:app',
@@ -126,15 +146,33 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
           '0.0.0.0',
           '--port',
           String(HERMES_START_PORT),
-        ],
+        ]
+        cwd = agentDir
+      } else {
+        return {
+          ok: false,
+          error:
+            "hermes-agent not found. Run the installer: curl -fsSL https://hermes-workspace.com/install.sh | bash",
+        }
+      }
+
+      const child = spawn(
+        command,
+        commandArgs,
         {
-          cwd: agentDir,
+          cwd,
           detached: true,
           stdio: 'ignore',
           env: {
             ...process.env,
             ...hermesEnv,
-            PATH: `${resolve(agentDir, '.venv', 'bin')}:${resolve(agentDir, 'venv', 'bin')}:${process.env.PATH || ''}`,
+            PATH: [
+              resolve(homedir(), '.hermes', 'bin'),
+              resolve(homedir(), '.local', 'bin'),
+              agentDir ? resolve(agentDir, '.venv', 'bin') : '',
+              agentDir ? resolve(agentDir, 'venv', 'bin') : '',
+              process.env.PATH || '',
+            ].filter(Boolean).join(':'),
           },
         },
       )
