@@ -5,10 +5,11 @@
 #   curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
 #
 # What it does:
-#   1. Verifies Node 22+, Python 3.11+, pnpm
-#   2. Installs hermes-agent via pip (vanilla, no fork)
+#   1. Verifies Node 22+, git, pnpm
+#   2. Installs hermes-agent via Nous's official upstream installer
+#      (hermes-agent is NOT on PyPI; it's a source install handled by Nous)
 #   3. Clones hermes-workspace
-#   4. Sets up .env, installs deps, starts both servers
+#   4. Sets up .env, installs deps, links bundled skills
 #
 # Re-runnable. Will skip anything already installed.
 
@@ -18,6 +19,7 @@ REPO_URL="${REPO_URL:-https://github.com/outsourc-e/hermes-workspace.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/hermes-workspace}"
 GATEWAY_PORT="${GATEWAY_PORT:-8642}"
 WORKSPACE_PORT="${WORKSPACE_PORT:-3000}"
+NOUS_INSTALLER_URL="${NOUS_INSTALLER_URL:-https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh}"
 
 # ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -40,6 +42,16 @@ banner() {
 EOF
 }
 
+# ensure_path: prepend a dir to PATH for this shell if it's not already there
+ensure_path() {
+  local candidate="$1"
+  [[ -d "$candidate" ]] || return 0
+  case ":$PATH:" in
+    *":$candidate:"*) ;;
+    *) export PATH="$candidate:$PATH" ;;
+  esac
+}
+
 # ─── preflight ────────────────────────────────────────────────────────────
 
 banner
@@ -56,14 +68,8 @@ green "  Node $(node -v) ✓"
 need git "Install git: https://git-scm.com/"
 green "  git $(git --version | awk '{print $3}') ✓"
 
-need python3 "Install Python 3.11+: https://www.python.org/"
-py_major=$(python3 -c 'import sys; print(sys.version_info[0])')
-py_minor=$(python3 -c 'import sys; print(sys.version_info[1])')
-if [[ "$py_major" -lt 3 ]] || { [[ "$py_major" -eq 3 ]] && [[ "$py_minor" -lt 11 ]]; }; then
-  red "Python $py_major.$py_minor detected; need 3.11+."
-  exit 1
-fi
-green "  Python $(python3 --version | awk '{print $2}') ✓"
+need curl "Install curl (usually: apt install curl / brew install curl)"
+green "  curl ✓"
 
 if ! command -v pnpm &>/dev/null; then
   yellow "  pnpm not found — installing via corepack…"
@@ -71,98 +77,36 @@ if ! command -v pnpm &>/dev/null; then
 fi
 green "  pnpm $(pnpm --version) ✓"
 
-# ─── install hermes-agent (vanilla, no fork) ──────────────────────────────
+# ─── install hermes-agent (delegate to Nous upstream installer) ──────────
+# hermes-agent is NOT on PyPI. It installs from source via Nous's own
+# script, which handles PEP 668, uv, Python toolchain, Termux, etc. We
+# only need to ensure `hermes` ends up on PATH before continuing.
 
-cyan "→ Installing hermes-agent (vanilla from PyPI)…"
-if python3 -c "import project_agent" &>/dev/null; then
-  green "  hermes-agent already installed ✓"
+cyan "→ Installing hermes-agent (via Nous upstream installer)…"
+# Pick up hermes if it was installed in a prior run but not on PATH yet
+ensure_path "$HOME/.hermes/bin"
+ensure_path "$HOME/.local/bin"
+
+if command -v hermes &>/dev/null; then
+  green "  hermes-agent already installed ✓ ($(command -v hermes))"
 else
-  # Detect PEP 668 environments (Debian 12+, Ubuntu 23.04+, recent Fedora, etc.)
-  # PEP 668 places EXTERNALLY-MANAGED *inside* the stdlib directory; older drafts
-  # used the parent. Check both, plus a runtime probe as a last resort.
-  is_externally_managed() {
-    python3 - <<'PY' 2>/dev/null
-import sys, sysconfig, pathlib, subprocess
-stdlib = pathlib.Path(sysconfig.get_paths()["stdlib"])
-for candidate in (stdlib / "EXTERNALLY-MANAGED", stdlib.parent / "EXTERNALLY-MANAGED"):
-    if candidate.exists():
-        sys.exit(0)
-# Fallback: ask pip to dry-install something tiny and look for the marker
-try:
-    res = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--dry-run", "--user", "pip"],
-        capture_output=True, text=True, timeout=8,
-    )
-    blob = (res.stderr or "") + (res.stdout or "")
-    if "third-partyly-managed-environment" in blob.lower():
-        sys.exit(0)
-except Exception:
-    pass
-sys.exit(1)
-PY
-  }
-
-  ensure_pipx() {
-    if command -v pipx &>/dev/null; then return 0; fi
-    yellow "  pipx not found — attempting auto-install…"
-    if command -v apt-get &>/dev/null; then
-      sudo apt-get update -y >/dev/null 2>&1 || true
-      if sudo apt-get install -y pipx >/dev/null 2>&1; then
-        command -v pipx &>/dev/null && return 0
-      fi
-      # Older Debian/Ubuntu may use python3-pipx
-      if sudo apt-get install -y python3-pipx >/dev/null 2>&1; then
-        command -v pipx &>/dev/null && return 0
-      fi
-    elif command -v dnf &>/dev/null; then
-      sudo dnf install -y pipx >/dev/null 2>&1 && command -v pipx &>/dev/null && return 0
-    elif command -v pacman &>/dev/null; then
-      sudo pacman -Sy --noconfirm python-pipx >/dev/null 2>&1 && command -v pipx &>/dev/null && return 0
-    elif command -v brew &>/dev/null; then
-      brew install pipx >/dev/null 2>&1 && command -v pipx &>/dev/null && return 0
-    fi
-    return 1
-  }
-
-  install_with_pipx() {
-    ensure_pipx || return 1
-    pipx install --force "hermes-agent[cron]" && pipx ensurepath >/dev/null 2>&1
-  }
-
-  install_with_venv() {
-    local venv_dir="$HOME/.local/share/hermes-agent/venv"
-    local bin_dir="$HOME/.local/bin"
-    yellow "  Creating isolated venv at $venv_dir"
-    if ! python3 -m venv "$venv_dir" 2>/tmp/hermes-venv-err; then
-      red "  python3 -m venv failed:"
-      cat /tmp/hermes-venv-err >&2 || true
-      yellow "  On Debian/Ubuntu you may need: sudo apt install python3-venv python3-full"
-      return 1
-    fi
-    "$venv_dir/bin/pip" install --upgrade pip >/dev/null
-    "$venv_dir/bin/pip" install --upgrade "hermes-agent[cron]"
-    mkdir -p "$bin_dir"
-    ln -sf "$venv_dir/bin/project-agent" "$bin_dir/project-agent" 2>/dev/null || true
-    ln -sf "$venv_dir/bin/hermes-agent" "$bin_dir/hermes-agent" 2>/dev/null || true
-    case ":$PATH:" in
-      *":$bin_dir:"*) ;;
-      *) yellow "  Add to your shell rc: export PATH=\"$bin_dir:\$PATH\"" ;;
-    esac
-  }
-
-  if is_externally_managed; then
-    yellow "  PEP 668 environment detected (system Python is externally managed)"
-    if install_with_pipx; then
-      green "  hermes-agent installed via pipx ✓"
-    else
-      yellow "  pipx not available — falling back to isolated venv"
-      install_with_venv
-      green "  hermes-agent installed in venv ✓"
-    fi
-  else
-    python3 -m pip install --user --upgrade "hermes-agent[cron]"
-    green "  hermes-agent installed ✓"
+  yellow "  Delegating to: $NOUS_INSTALLER_URL"
+  if ! curl -fsSL "$NOUS_INSTALLER_URL" | bash; then
+    red "  Nous installer failed. See its output above for details."
+    red "  You can retry manually:"
+    red "    curl -fsSL $NOUS_INSTALLER_URL | bash"
+    exit 1
   fi
+  # Nous typically installs `hermes` to ~/.hermes/bin or ~/.local/bin
+  ensure_path "$HOME/.hermes/bin"
+  ensure_path "$HOME/.local/bin"
+  if ! command -v hermes &>/dev/null; then
+    red "  hermes-agent installed, but 'hermes' is not on PATH in this shell."
+    yellow "  Open a new shell (or: source ~/.bashrc / ~/.zshrc) and re-run:"
+    yellow "    curl -fsSL https://hermes-workspace.com/install.sh | bash"
+    exit 1
+  fi
+  green "  hermes-agent installed ✓ ($(command -v hermes))"
 fi
 
 # ─── clone workspace ──────────────────────────────────────────────────────
