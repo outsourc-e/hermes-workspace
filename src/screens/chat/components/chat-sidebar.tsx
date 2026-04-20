@@ -15,6 +15,7 @@ import {
   PencilEdit02Icon,
   PuzzleIcon,
 
+  Rocket01Icon,
   Search01Icon, Settings01Icon, Sun02Icon, UserGroupIcon, UserMultipleIcon
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
@@ -71,8 +72,10 @@ function ThemeToggleMini() {
     : 'hermes-official'
   const isDark = !currentDataTheme.endsWith('-light')
 
-  // Map between dark and light counterparts
+  // Map between dark and light counterparts — must include all theme families
   const LIGHT_DARK_PAIRS: Record<string, string> = {
+    'hermes-nous': 'hermes-nous-light',
+    'hermes-nous-light': 'hermes-nous',
     'hermes-official': 'hermes-official-light',
     'hermes-official-light': 'hermes-official',
     'hermes-classic': 'hermes-classic-light',
@@ -85,7 +88,8 @@ function ThemeToggleMini() {
     <button
       type="button"
       onClick={() => {
-        const nextDataTheme = LIGHT_DARK_PAIRS[currentDataTheme] || (isDark ? 'hermes-official-light' : 'hermes-official')
+        // Fall back to current family rather than dropping the user into hermes-official
+        const nextDataTheme = LIGHT_DARK_PAIRS[currentDataTheme] || (isDark ? `${currentDataTheme}-light` : currentDataTheme.replace(/-light$/, ''))
         // Import and call setTheme to persist and apply
         import('@/lib/theme').then(({ setTheme }) => {
           setTheme(nextDataTheme as any)
@@ -556,6 +560,7 @@ function ChatSidebarComponent({
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
+  const isConductorActive = pathname === '/conductor'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
@@ -790,6 +795,13 @@ function ChatSidebarComponent({
       icon: CheckListIcon,
       label: t('nav.tasks'),
       active: isTasksActive,
+    },
+    {
+      kind: 'link',
+      to: '/conductor',
+      icon: Rocket01Icon,
+      label: 'Conductor',
+      active: isConductorActive,
     },
   ]
 

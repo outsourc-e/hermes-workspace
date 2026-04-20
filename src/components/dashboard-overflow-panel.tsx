@@ -12,9 +12,9 @@ import {
   Sun02Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
-import type { SettingsThemeMode } from '@/hooks/use-settings'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/hooks/use-settings'
+import { getTheme, getThemeVariant, isDarkTheme, setTheme as setThemeFamily } from '@/lib/theme'
 
 type OverflowItem = {
   icon: typeof File01Icon
@@ -78,7 +78,6 @@ function OverflowGrid({
 
 export function DashboardOverflowPanel({ open, onClose }: Props) {
   const navigate = useNavigate()
-  const theme = useSettingsStore((state) => state.settings.theme)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
 
   useEffect(() => {
@@ -99,16 +98,21 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
     void navigate({ to })
   }
 
-  const nextTheme: SettingsThemeMode =
-    theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
-  const resolvedDarkMode =
-    theme === 'dark' ||
-    (theme === 'system' &&
-      typeof document !== 'undefined' &&
-      document.documentElement.classList.contains('dark'))
-  const themeIcon = resolvedDarkMode ? Moon02Icon : Sun02Icon
-  const themeLabel =
-    theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light'
+  // Detect actual current theme family from data-theme attribute
+  const currentDataTheme = typeof document !== 'undefined'
+    ? (document.documentElement.getAttribute('data-theme') || 'hermes-official')
+    : 'hermes-official'
+  const isDark = !currentDataTheme.endsWith('-light')
+  const themeIcon = isDark ? Sun02Icon : Moon02Icon
+  const themeLabel = isDark ? 'Light mode' : 'Dark mode'
+
+  function toggleThemeWithinFamily() {
+    const current = getTheme()
+    const dark = isDarkTheme(current)
+    const next = getThemeVariant(current, dark ? 'light' : 'dark')
+    setThemeFamily(next)
+    updateSettings({ theme: dark ? 'light' : 'dark' })
+  }
 
   return (
     <div className="fixed inset-0 z-[80] no-swipe md:hidden">
@@ -128,14 +132,14 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
             </h3>
             <button
               type="button"
-              onClick={() => updateSettings({ theme: nextTheme })}
+              onClick={toggleThemeWithinFamily}
               className="flex w-full items-center justify-between rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-left text-sm text-ink transition-colors hover:border-accent-200 hover:bg-accent-50 active:scale-[0.99]"
             >
               <span className="inline-flex items-center gap-2">
                 <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
                   <HugeiconsIcon icon={themeIcon} size={16} strokeWidth={1.6} />
                 </span>
-                <span className="font-medium">{themeLabel} mode</span>
+                <span className="font-medium">{themeLabel}</span>
               </span>
               <span className="text-xs text-primary-500">
                 Tap for {nextTheme}

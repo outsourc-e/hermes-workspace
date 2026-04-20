@@ -1,0 +1,888 @@
+import { randomUUID, generateKeyPairSync, createPrivateKey, createPublicKey, createHash, sign as cryptoSign } from 'node:crypto'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import * as os from 'node:os'
+import WebSocket from 'ws'
+import type { RawData } from 'ws'
+
+export type GatewayFrame =
+  | { type: 'req'; id: string; method: string; params?: unknown }
+  | {
+      type: 'res'
+      id: string
+      ok: boolean
+      payload?: unknown
+      error?: { code: string; message: string; details?: unknown }
+    }
+  | { type: 'event'; event: string; payload?: unknown; seq?: number }
+  | {
+      type: 'evt'
+      event: string
+      payload?: unknown
+      payloadJSON?: string
+      seq?: number
+    }
+
+type ConnectParams = {
+  minProtocol: number
+  maxProtocol: number
+  client: {
+    id: string
+    displayName?: string
+    version: string
+    platform: string
+    mode: string
+    instanceId?: string
+  }
+  auth?: { token?: string; password?: string }
+  role?: 'operator' | 'node'
+  scopes?: Array<string>
+  device?: { id: string; publicKey: string; signature: string; signedAt: number; nonce?: string }
+}
+
+type PendingRequest = {
+  id: string
+  method: string
+  params?: unknown
+  resolve: (value: unknown) => void
+  reject: (reason?: unknown) => void
+}
+
+type InflightRequest = {
+  resolve: (value: unknown) => void
+  reject: (reason?: unknown) => void
+}
+
+// ── Device Identity (Ed25519) ─────────────────────────────────────
+const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
+
+function base64UrlEncode(buf: Buffer): string {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function derivePublicKeyRaw(pem: string): Buffer {
+  const spki = createPublicKey(pem).export({ type: 'spki', format: 'der' })
+  if (spki.length === ED25519_SPKI_PREFIX.length + 32 &&
+      spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX))
+    return spki.subarray(ED25519_SPKI_PREFIX.length)
+  return spki
+}
+
+type DeviceIdentity = { deviceId: string; publicKeyPem: string; privateKeyPem: string }
+
+let _identity: DeviceIdentity | null = null
+function getDeviceIdentity(): DeviceIdentity {
+  if (_identity) return _identity
+  const idPath = path.join(
+    process.env.OPENCLAW_STATE_DIR || path.join(os.homedir(), '.openclaw', 'state'),
+    'identity', 'clawsuite-device.json')
+  try {
+    if (fs.existsSync(idPath)) {
+      const p = JSON.parse(fs.readFileSync(idPath, 'utf8'))
+      if (p?.version === 1 && p.deviceId && p.publicKeyPem && p.privateKeyPem) {
+        _identity = { deviceId: p.deviceId, publicKeyPem: p.publicKeyPem, privateKeyPem: p.privateKeyPem }
+        return _identity
+      }
+    }
+  } catch { /* regenerate */ }
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+  const pubPem = publicKey.export({ type: 'spki', format: 'pem' }).toString()
+  const privPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()
+  const deviceId = createHash('sha256').update(derivePublicKeyRaw(pubPem)).digest('hex')
+  fs.mkdirSync(path.dirname(idPath), { recursive: true })
+  fs.writeFileSync(idPath, JSON.stringify({ version: 1, deviceId, publicKeyPem: pubPem, privateKeyPem: privPem, createdAtMs: Date.now() }, null, 2) + '\n', { mode: 0o600 })
+  _identity = { deviceId, publicKeyPem: pubPem, privateKeyPem: privPem }
+  return _identity
+}
+
+function signPayload(privPem: string, payload: string): string {
+  return base64UrlEncode(cryptoSign(null, Buffer.from(payload, 'utf8'), createPrivateKey(privPem)) as unknown as Buffer)
+}
+
+// ── Constants ─────────────────────────────────────────────────────
+const RECONNECT_DELAYS_MS = [1000, 2000, 4000]
+const MAX_RECONNECT_DELAY_MS = 30000
+const HEARTBEAT_INTERVAL_MS = 30000
+const HEARTBEAT_TIMEOUT_MS = 20000
+const HANDSHAKE_TIMEOUT_MS = 15000
+const RPC_TIMEOUT_MS = 30000
+
+// ── Circuit breaker ───────────────────────────────────────────────
+const CIRCUIT_BREAKER_THRESHOLD = 15   // consecutive failures to trip (raised: one slow RPC shouldn't kill all)
+const CIRCUIT_BREAKER_COOLDOWN_MS = 10000 // how long to stay open
+
+export function getGatewayConfig() {
+  // Check if browser set a custom gateway URL (for network/mobile access)
+  const browserUrl = typeof window !== 'undefined' ? (window as any).__GATEWAY_URL__ : undefined
+  const url = browserUrl || process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+  let token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim() || ''
+  const password = process.env.CLAWDBOT_GATEWAY_PASSWORD?.trim() || ''
+
+  // Fallback: if env token is empty, try reading from ~/.openclaw/openclaw.json directly.
+  // This handles the case where .env gets reset (e.g. by gateway wizard POST)
+  // but the config file still has the correct token.
+  if (!token) {
+    try {
+      const os = require('node:os')
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
+      const raw = fs.readFileSync(configPath, 'utf-8')
+      const config = JSON.parse(raw)
+      const fileToken = config?.gateway?.auth?.token
+      if (fileToken) {
+        token = fileToken
+        // Also fix process.env so subsequent calls don't re-read the file
+        process.env.CLAWDBOT_GATEWAY_TOKEN = fileToken
+      }
+    } catch { /* config file not available — continue without token */ }
+  }
+
+  // Allow connecting without shared auth — device identity signature handles authentication.
+  // Some gateways (e.g. nanobot) run without a token by default.
+
+  return { url, token, password }
+}
+
+export function buildConnectParams(
+  token: string,
+  password: string,
+  nonce?: string,
+): ConnectParams {
+  const identity = getDeviceIdentity()
+  const role = 'operator'
+  const scopes = ['operator.admin']
+  const signedAtMs = Date.now()
+  const clientId = 'openclaw-control-ui'
+  const clientMode = 'ui'
+  const version = nonce ? 'v2' : 'v1'
+  const parts = [version, identity.deviceId, clientId, clientMode, role, scopes.join(','), String(signedAtMs), token || '']
+  if (version === 'v2') parts.push(nonce || '')
+  const signature = signPayload(identity.privateKeyPem, parts.join('|'))
+
+  return {
+    minProtocol: 3,
+    maxProtocol: 3,
+    client: {
+      id: clientId,
+      displayName: 'clawsuite',
+      version: 'dev',
+      platform: process.platform,
+      mode: clientMode,
+      instanceId: randomUUID(),
+    },
+    auth: {
+      token: token || undefined,
+      password: password || undefined,
+    },
+    role,
+    scopes,
+    device: {
+      id: identity.deviceId,
+      publicKey: base64UrlEncode(derivePublicKeyRaw(identity.publicKeyPem)),
+      signature,
+      signedAt: signedAtMs,
+      nonce,
+    },
+  }
+}
+
+export type GatewayEventHandler = (frame: GatewayFrame) => void
+
+class GatewayClient {
+  private ws: WebSocket | null = null
+  private connectPromise: Promise<void> | null = null
+  private reconnectTimer: NodeJS.Timeout | null = null
+  private heartbeatInterval: NodeJS.Timeout | null = null
+  private heartbeatTimeout: NodeJS.Timeout | null = null
+  private reconnectAttempts = 0
+  private authenticated = false
+  private destroyed = false
+  private _lastErrorKind: import('../lib/connection-errors').ConnectionErrorKind | null = null
+
+  // Circuit breaker: prevent request floods when gateway is unreachable
+  private circuitFailures = 0
+  private circuitOpen = false
+  private circuitOpenedAt = 0
+
+  get lastErrorKind() { return this._lastErrorKind }
+
+  private requestQueue: Array<PendingRequest> = []
+  private inflight = new Map<string, InflightRequest>()
+  private eventListeners = new Set<GatewayEventHandler>()
+
+  onEvent(handler: GatewayEventHandler): () => void {
+    this.eventListeners.add(handler)
+    return () => {
+      this.eventListeners.delete(handler)
+    }
+  }
+
+  getConnectionSnapshot(): { readyState: number; authenticated: boolean; errorKind: import('../lib/connection-errors').ConnectionErrorKind | null } {
+    return {
+      readyState: this.ws?.readyState ?? WebSocket.CLOSED,
+      authenticated: this.authenticated,
+      errorKind: this._lastErrorKind,
+    }
+  }
+
+  async request<TPayload = unknown>(
+    method: string,
+    params?: unknown,
+  ): Promise<TPayload> {
+    if (this.destroyed) {
+      throw new Error('Gateway client is shut down')
+    }
+
+    // Circuit breaker: fast-fail when gateway is known-unreachable
+    if (this.circuitOpen) {
+      if (Date.now() - this.circuitOpenedAt < CIRCUIT_BREAKER_COOLDOWN_MS) {
+        throw new Error(`Gateway circuit breaker open (${this.circuitFailures} consecutive failures, cooling down)`)
+      }
+      // Cooldown elapsed — allow one probe request through (half-open)
+      this.circuitOpen = false
+    }
+
+    const requestId = randomUUID()
+    let settled = false
+
+    const rpcCall = new Promise<TPayload>((resolve, reject) => {
+      const request: PendingRequest = {
+        id: requestId,
+        method,
+        params,
+        resolve: (value: unknown) => {
+          if (settled) return
+          settled = true
+          this.circuitFailures = 0
+          this.circuitOpen = false
+          resolve(value as TPayload)
+        },
+        reject: (reason?: unknown) => {
+          if (settled) return
+          settled = true
+          reject(reason)
+        },
+      }
+
+      this.requestQueue.push(request)
+      this.ensureConnected().catch(() => {
+        // keep requests queued; reconnect loop will flush after reconnect
+      })
+      this.flushQueue()
+    })
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        if (settled) return // RPC already resolved/rejected — skip
+        settled = true
+        this.cleanupPendingRequest(requestId)
+        // Don't count known-slow RPCs toward circuit breaker
+        const slowRpcs = ['sessions.usage', 'sessions.costs', 'usage.analytics', 'usage.summary']
+        if (!slowRpcs.includes(method)) {
+          this.circuitFailures += 1
+        }
+        if (this.circuitFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+          this.circuitOpen = true
+          this.circuitOpenedAt = Date.now()
+          console.warn(`[gateway] Circuit breaker OPEN after ${this.circuitFailures} consecutive timeouts (last: ${method})`)
+        } else {
+          console.warn(`[gateway] RPC timeout after ${RPC_TIMEOUT_MS}ms for ${method} (${this.circuitFailures}/${CIRCUIT_BREAKER_THRESHOLD})`)
+        }
+        reject(new Error('Gateway RPC timeout'))
+      }, RPC_TIMEOUT_MS)
+    })
+
+    return Promise.race([rpcCall, timeoutPromise])
+  }
+
+  async ensureConnected(): Promise<void> {
+    if (this.destroyed) {
+      throw new Error('Gateway client is shut down')
+    }
+    if (this.authenticated && this.ws?.readyState === WebSocket.OPEN) {
+      return
+    }
+    if (this.connectPromise) {
+      return this.connectPromise
+    }
+
+    this.connectPromise = this.openAndHandshake()
+      .then(() => {
+        this.reconnectAttempts = 0
+      })
+      .catch((error: unknown) => {
+        const err = error instanceof Error ? error : new Error(String(error))
+        this.scheduleReconnect()
+        throw err
+      })
+      .finally(() => {
+        this.connectPromise = null
+      })
+
+    return this.connectPromise
+  }
+
+  async shutdown(): Promise<void> {
+    this.destroyed = true
+    this.clearReconnectTimer()
+    this.stopHeartbeat()
+
+    const ws = this.ws
+    this.ws = null
+    this.authenticated = false
+
+    const closePromise = ws ? this.closeSocket(ws) : Promise.resolve()
+
+    this.rejectQueuedRequests(new Error('Gateway client is shut down'))
+    this.rejectInflightRequests(new Error('Gateway client is shut down'))
+
+    await closePromise.catch(() => {
+      // ignore
+    })
+  }
+
+  private async openAndHandshake(): Promise<void> {
+    let lastError: Error | null = null
+    const maxRetries = 2
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Wait a bit before retry (WebSocket Race Condition mitigation)
+          await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
+        }
+
+        const { url, token, password } = getGatewayConfig()
+        // B4: derive origin from gateway URL instead of hardcoded localhost:3000
+        const gatewayOrigin = (() => {
+          try {
+            const parsed = new URL(url.replace(/^ws/, 'http'))
+            return `${parsed.protocol}//${parsed.host}`
+          } catch { return 'http://127.0.0.1:18789' }
+        })()
+        const ws = new WebSocket(url, { origin: gatewayOrigin, headers: { Origin: gatewayOrigin } })
+
+        this.clearReconnectTimer()
+        this.attachSocket(ws)
+
+        await this.waitForOpen(ws, HANDSHAKE_TIMEOUT_MS)
+
+        if (this.destroyed) {
+          ws.terminate()
+          throw new Error('Gateway client is shut down')
+        }
+
+        this.ws = ws
+        this.authenticated = false
+
+        // Wait for connect.challenge to get nonce.
+        // Capture nonce via a flag instead of swapping listeners to avoid
+        // a race condition where the challenge event fires during listener
+        // transition and is lost (causes "missing nonce" rejection).
+        let challengeNonce: string | undefined
+        let challengeResolved = false
+        const nonce = await new Promise<string | undefined>((resolve) => {
+          const originalHandler = (data: RawData) => {
+            try {
+              const f = JSON.parse(rawDataToString(data))
+              if ((f.type === 'event' || f.type === 'evt') && f.event === 'connect.challenge') {
+                challengeNonce = f.payload?.nonce || undefined
+                if (!challengeResolved) {
+                  challengeResolved = true
+                  resolve(challengeNonce)
+                }
+                return
+              }
+            } catch { /* ignore */ }
+            // Forward non-challenge messages to normal handler
+            this.handleMessage(data)
+          }
+          // Replace with a handler that captures challenge AND forwards others
+          ws.removeAllListeners('message')
+          ws.on('message', originalHandler)
+          // Fallback if no challenge (older gateway without protocol 3)
+          setTimeout(() => {
+            if (!challengeResolved) {
+              challengeResolved = true
+              resolve(undefined)
+            }
+          }, 3000)
+        })
+        // Re-attach the normal message handler (challenge phase done)
+        ws.removeAllListeners('message')
+        ws.on('message', (data: RawData) => { this.handleMessage(data) })
+
+        const connectId = randomUUID()
+        const connectReq: GatewayFrame = {
+          type: 'req',
+          id: connectId,
+          method: 'connect',
+          params: buildConnectParams(token, password, nonce),
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            this.inflight.delete(connectId)
+            reject(new Error('Gateway handshake timed out'))
+          }, HANDSHAKE_TIMEOUT_MS)
+
+          this.inflight.set(connectId, {
+            resolve: () => {
+              clearTimeout(timeout)
+              resolve()
+            },
+            reject: (err) => {
+              clearTimeout(timeout)
+              reject(err)
+            },
+          })
+
+          this.sendFrame(connectReq).catch((error: unknown) => {
+            this.inflight.delete(connectId)
+            clearTimeout(timeout)
+            reject(error)
+          })
+        })
+
+        this.authenticated = true
+        this.startHeartbeat()
+        this.flushQueue()
+        this._lastErrorKind = null
+        // Reset circuit breaker on successful connection
+        this.circuitFailures = 0
+        this.circuitOpen = false
+        return // Success
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+        // Classify the error for UI display
+        try {
+          const { classifyConnectionError } = require('../lib/connection-errors') as typeof import('../lib/connection-errors')
+          this._lastErrorKind = classifyConnectionError(lastError)
+        } catch { /* module may not be available in all contexts */ }
+        if (this.ws) {
+          this.ws.terminate()
+          this.ws = null
+        }
+        if (this.destroyed) break
+      }
+    }
+
+    throw lastError || new Error('Failed to connect to gateway after retries')
+  }
+
+  private attachSocket(ws: WebSocket) {
+    ws.on('message', (data: RawData) => {
+      this.handleMessage(data)
+    })
+
+    ws.on('pong', () => {
+      if (this.heartbeatTimeout) {
+        clearTimeout(this.heartbeatTimeout)
+        this.heartbeatTimeout = null
+      }
+    })
+
+    ws.on('close', (code: number, reason: Buffer) => {
+      const reasonText = reason?.toString() || 'n/a'
+      this.handleDisconnect(
+        new Error(`Gateway connection closed (code=${code}, reason=${reasonText})`),
+      )
+    })
+
+    ws.on('error', (error: unknown) => {
+      const err = error instanceof Error ? error : new Error(String(error))
+      this.handleDisconnect(err)
+    })
+  }
+
+  private handleMessage(data: RawData) {
+    let frame: GatewayFrame
+
+    try {
+      frame = JSON.parse(rawDataToString(data)) as GatewayFrame
+    } catch {
+      return
+    }
+
+    if (frame.type === 'event' || frame.type === 'evt') {
+      for (const listener of this.eventListeners) {
+        try {
+          listener(frame)
+        } catch {
+          // ignore listener errors
+        }
+      }
+      return
+    }
+
+    if (frame.type !== 'res') return
+
+    const pending = this.inflight.get(frame.id)
+    if (!pending) return
+
+    this.inflight.delete(frame.id)
+
+    if (frame.ok) {
+      pending.resolve(frame.payload)
+      return
+    }
+
+    pending.reject(new Error(frame.error?.message ?? 'gateway error'))
+  }
+
+  private handleDisconnect(error: Error) {
+    const ws = this.ws
+    this.ws = null
+    this.authenticated = false
+    this.stopHeartbeat()
+
+    if (
+      ws &&
+      (ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING)
+    ) {
+      try {
+        ws.terminate()
+      } catch {
+        // ignore
+      }
+    }
+
+    this.rejectInflightRequests(error)
+
+    if (this.destroyed) {
+      this.rejectQueuedRequests(error)
+      return
+    }
+
+    this.scheduleReconnect()
+  }
+
+  private flushQueue() {
+    if (
+      !this.authenticated ||
+      !this.ws ||
+      this.ws.readyState !== WebSocket.OPEN
+    ) {
+      return
+    }
+
+    while (this.requestQueue.length > 0) {
+      const pending = this.requestQueue.shift()
+      if (!pending) continue
+
+      const frame: GatewayFrame = {
+        type: 'req',
+        id: pending.id,
+        method: pending.method,
+        params: pending.params,
+      }
+
+      this.inflight.set(pending.id, {
+        resolve: pending.resolve,
+        reject: pending.reject,
+      })
+
+      this.sendFrame(frame).catch((error: unknown) => {
+        this.inflight.delete(pending.id)
+        pending.reject(error)
+      })
+    }
+  }
+
+  private scheduleReconnect() {
+    if (this.destroyed || this.reconnectTimer || this.connectPromise) {
+      return
+    }
+
+    const delay = nextReconnectDelayMs(this.reconnectAttempts)
+    this.reconnectAttempts += 1
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      this.ensureConnected()
+        .then(() => {
+          this.flushQueue()
+        })
+        .catch(() => {
+          // next reconnect is scheduled by ensureConnected/openAndHandshake
+        })
+    }, delay)
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat()
+
+    this.heartbeatInterval = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        return
+      }
+
+      try {
+        this.ws.ping()
+      } catch {
+        this.handleDisconnect(new Error('Gateway ping failed'))
+        return
+      }
+
+      if (this.heartbeatTimeout) {
+        clearTimeout(this.heartbeatTimeout)
+      }
+
+      this.heartbeatTimeout = setTimeout(() => {
+        this.heartbeatTimeout = null
+        this.handleDisconnect(new Error('Gateway ping timeout'))
+      }, HEARTBEAT_TIMEOUT_MS)
+    }, HEARTBEAT_INTERVAL_MS)
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval)
+      this.heartbeatInterval = null
+    }
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout)
+      this.heartbeatTimeout = null
+    }
+  }
+
+  private async sendFrame(frame: GatewayFrame): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Gateway connection not open')
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      this.ws?.send(JSON.stringify(frame), (err: Error | undefined) => {
+        if (err) {
+          reject(err)
+          return
+        }
+        resolve()
+      })
+    })
+  }
+
+  private waitForOpen(ws: WebSocket, timeoutMs: number): Promise<void> {
+    if (ws.readyState === WebSocket.OPEN) return Promise.resolve()
+
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(new Error('WebSocket connection timed out'))
+      }, timeoutMs)
+
+      function onOpen() {
+        cleanup()
+        resolve()
+      }
+
+      function onError(error: Error) {
+        cleanup()
+        reject(new Error(`WebSocket error: ${String(error.message)}`))
+      }
+
+      function cleanup() {
+        clearTimeout(timeout)
+        ws.off('open', onOpen)
+        ws.off('error', onError)
+      }
+
+      ws.on('open', onOpen)
+      ws.on('error', onError)
+    })
+  }
+
+  private closeSocket(ws: WebSocket): Promise<void> {
+    if (
+      ws.readyState === WebSocket.CLOSED ||
+      ws.readyState === WebSocket.CLOSING
+    ) {
+      return Promise.resolve()
+    }
+
+    return new Promise<void>((resolve) => {
+      ws.once('close', () => resolve())
+      ws.close()
+    })
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+  }
+
+  private rejectQueuedRequests(error: Error) {
+    for (const pending of this.requestQueue) {
+      pending.reject(error)
+    }
+    this.requestQueue = []
+  }
+
+  private rejectInflightRequests(error: Error) {
+    for (const pending of this.inflight.values()) {
+      pending.reject(error)
+    }
+    this.inflight.clear()
+  }
+
+  private cleanupPendingRequest(requestId: string): boolean {
+    const queueIndex = this.requestQueue.findIndex((pending) => pending.id === requestId)
+    if (queueIndex >= 0) {
+      this.requestQueue.splice(queueIndex, 1)
+      return true
+    }
+
+    if (this.inflight.has(requestId)) {
+      this.inflight.delete(requestId)
+      return true
+    }
+
+    return false
+  }
+}
+
+function nextReconnectDelayMs(attempt: number) {
+  if (attempt < RECONNECT_DELAYS_MS.length) {
+    return RECONNECT_DELAYS_MS[attempt]
+  }
+
+  const doubled =
+    RECONNECT_DELAYS_MS[RECONNECT_DELAYS_MS.length - 1] * 2 ** (attempt - 2)
+  return Math.min(doubled, MAX_RECONNECT_DELAY_MS)
+}
+
+function rawDataToString(data: RawData): string {
+  if (typeof data === 'string') return data
+  if (Array.isArray(data)) return Buffer.concat(data).toString('utf8')
+  return data.toString()
+}
+
+// Singleton guard: survive Vite SSR module reloads
+const GW_KEY = '__clawsuite_gateway_client__' as const
+const ACTIVE_SEND_RUNS_KEY = '__clawsuite_active_send_stream_runs__' as const
+declare global {
+  // eslint-disable-next-line no-var
+  var __clawsuite_gateway_client__: GatewayClient | undefined
+  // eslint-disable-next-line no-var
+  var __clawsuite_active_send_stream_runs__: Set<string> | undefined
+}
+const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined
+if (existingClient) {
+  const snapshot = existingClient.getConnectionSnapshot()
+  // Only trigger reconnect if disconnected AND enough time has passed since last attempt.
+  // This prevents a race when two Vite SSR workers both load this module simultaneously —
+  // both would see a healthy singleton and both would fire ensureConnected(), causing an
+  // HTTPError on the first request before the doubled handshake settles.
+  const GW_LAST_RECONNECT_KEY = '__clawsuite_gateway_last_reconnect__' as const
+  const lastReconnect = (globalThis as any)[GW_LAST_RECONNECT_KEY] as number | undefined
+  const cooldownMs = 5_000
+  const now = Date.now()
+  const cooledDown = !lastReconnect || now - lastReconnect > cooldownMs
+  if ((!snapshot.authenticated || snapshot.readyState !== WebSocket.OPEN) && cooledDown) {
+    ;(globalThis as any)[GW_LAST_RECONNECT_KEY] = now
+    console.warn('[gateway] WARNING: Reused singleton is disconnected — triggering reconnect')
+    existingClient.ensureConnected().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
+    })
+  }
+}
+let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()
+;(globalThis as any)[GW_KEY] = gatewayClient
+
+// Prevent gateway WebSocket errors from crashing the Vite dev server.
+// Unhandled rejections from in-flight RPC calls during disconnect would
+// otherwise kill the Node process.
+const GW_UHR_KEY = '__clawsuite_gateway_uhr_installed__' as const
+if (!(globalThis as any)[GW_UHR_KEY]) {
+  ;(globalThis as any)[GW_UHR_KEY] = true
+  process.on('unhandledRejection', (reason: unknown) => {
+    const msg = reason instanceof Error ? reason.message : String(reason)
+    // Only swallow gateway-related rejections — let others propagate
+    if (
+      msg.includes('gateway') ||
+      msg.includes('Gateway') ||
+      msg.includes('WebSocket') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('ECONNRESET') ||
+      msg.includes('unknown method') ||
+      msg.includes('RPC timeout') ||
+      msg.includes('circuit breaker') ||
+      msg.includes('shut down')
+    ) {
+      // Avoid log spam — only log non-timeout rejections
+      if (!msg.includes('RPC timeout') && !msg.includes('circuit breaker')) {
+        console.warn(`[gateway] Swallowed unhandled rejection: ${msg}`)
+      }
+      return
+    }
+    // Re-throw non-gateway rejections so they're visible
+    console.error('[unhandledRejection]', reason)
+  })
+
+  // Graceful shutdown: clean up WebSocket on SIGTERM/SIGINT so the process
+  // exits cleanly instead of hanging on an open socket.
+  const shutdownHandler = () => {
+    console.warn('[gateway] Received shutdown signal — cleaning up')
+    gatewayClient.shutdown().catch(() => {}).finally(() => {
+      process.exit(0)
+    })
+  }
+  process.on('SIGTERM', shutdownHandler)
+  process.on('SIGINT', shutdownHandler)
+}
+const activeSendStreamRuns =
+  (globalThis as any)[ACTIVE_SEND_RUNS_KEY] as Set<string> | undefined
+  ?? new Set<string>()
+;(globalThis as any)[ACTIVE_SEND_RUNS_KEY] = activeSendStreamRuns
+
+export async function gatewayRpc<TPayload = unknown>(
+  method: string,
+  params?: unknown,
+): Promise<TPayload> {
+  return gatewayClient.request<TPayload>(method, params)
+}
+
+export function onGatewayEvent(handler: GatewayEventHandler): () => void {
+  return gatewayClient.onEvent(handler)
+}
+
+export function registerActiveSendRun(runId: string): void {
+  if (!runId) return
+  activeSendStreamRuns.add(runId)
+}
+
+export function unregisterActiveSendRun(runId: string): void {
+  if (!runId) return
+  activeSendStreamRuns.delete(runId)
+}
+
+export function hasActiveSendRun(runId: string | null | undefined): boolean {
+  if (!runId) return false
+  return activeSendStreamRuns.has(runId)
+}
+
+
+
+export async function gatewayConnectCheck(): Promise<void> {
+  await gatewayClient.ensureConnected()
+}
+
+export async function cleanupGatewayConnection(): Promise<void> {
+  await gatewayClient.shutdown()
+}
+
+/**
+ * Force-reconnect the gateway client with current process.env values.
+ * Call this after updating CLAWDBOT_GATEWAY_URL / CLAWDBOT_GATEWAY_TOKEN.
+ */
+export async function gatewayReconnect(): Promise<void> {
+  await gatewayClient.shutdown()
+  gatewayClient = new GatewayClient()
+  ;(globalThis as any)[GW_KEY] = gatewayClient
+  await gatewayClient.ensureConnected()
+}
