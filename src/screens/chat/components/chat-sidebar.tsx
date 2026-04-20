@@ -561,7 +561,6 @@ function ChatSidebarComponent({
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
-  const isOperationsActive = pathname === '/operations'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
@@ -803,13 +802,6 @@ function ChatSidebarComponent({
       icon: Rocket01Icon,
       label: 'Conductor',
       active: isConductorActive,
-    },
-    {
-      kind: 'link',
-      to: '/operations',
-      icon: UserGroupIcon,
-      label: 'Operations',
-      active: isOperationsActive,
     },
   ]
 
