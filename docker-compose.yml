@@ -32,6 +32,11 @@ services:
     environment:
       # Pass through the API key from .env (required!)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Optional: authenticate the gateway when exposing on 0.0.0.0.
+      # If set, workspace MUST pass the same value as HERMES_API_TOKEN.
+      API_SERVER_KEY: ${API_SERVER_KEY:-}
+      API_SERVER_HOST: ${API_SERVER_HOST:-0.0.0.0}
+      API_SERVER_ENABLED: 'true'
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8642/health']
       interval: 10s
@@ -55,5 +60,7 @@ services:
     environment:
       # Internal Docker network URL (not localhost!)
       HERMES_API_URL: http://hermes-agent:8642
+      # Must match API_SERVER_KEY on the hermes-agent side when that is set
+      HERMES_API_TOKEN: ${API_SERVER_KEY:-}
     ports:
       - '3000:3000'
