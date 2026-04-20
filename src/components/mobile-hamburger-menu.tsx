@@ -10,6 +10,7 @@ import {
   File01Icon,
   Menu01Icon,
   PuzzleIcon,
+  Rocket01Icon,
   Settings01Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
@@ -50,6 +51,20 @@ const NAV_ITEMS = [
     icon: Clock01Icon,
     to: '/jobs',
     match: (p: string) => p.startsWith('/jobs'),
+  },
+  {
+    id: 'conductor',
+    label: 'Conductor',
+    icon: Rocket01Icon,
+    to: '/conductor',
+    match: (p: string) => p.startsWith('/conductor'),
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    icon: UserGroupIcon,
+    to: '/operations',
+    match: (p: string) => p.startsWith('/operations'),
   },
   {
     id: 'memory',
