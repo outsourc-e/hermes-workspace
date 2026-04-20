@@ -1260,7 +1260,7 @@ export function Conductor() {
                   <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
                     <iframe
                       src={selectedHistoryPreviewUrl!}
-                      className="h-[500px] w-full"
+                      className="h-[clamp(280px,55vh,520px)] w-full"
                       sandbox="allow-scripts allow-same-origin"
                       title="Mission history output preview"
                     />
@@ -1971,7 +1971,7 @@ export function Conductor() {
   if (phase === 'complete') {
     return (
       <div className="flex min-h-dvh flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col justify-center px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
           <div className="space-y-6">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
@@ -2070,7 +2070,7 @@ export function Conductor() {
                 <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
                   <iframe
                     src={previewUrl!}
-                    className="h-[500px] w-full"
+                    className="h-[clamp(280px,55vh,520px)] w-full"
                     sandbox="allow-scripts allow-same-origin"
                     title="Mission output preview"
                   />

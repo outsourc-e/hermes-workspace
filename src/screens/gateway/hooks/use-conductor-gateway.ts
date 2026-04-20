@@ -413,12 +413,34 @@ function workersLookComplete(workers: ConductorWorker[], staleAfterMs: number): 
   })
 }
 
+function prettifyCronLabel(value: string): string {
+  // Hermes cron sessions are keyed `cron_<jobId>_<YYYYMMDD>_<HHMMSS>`
+  // and Conductor names jobs `conductor-<unix_ms>`. Strip both to a
+  // human-friendly tag instead of leaking the raw runtime key.
+  const cronMatch = value.match(/^cron[_:]([0-9a-f]{6,})/i)
+  if (cronMatch) {
+    return `Mission ${cronMatch[1].slice(0, 6)}`
+  }
+  const conductorMatch = value.match(/^conductor[-_](\d+)/i)
+  if (conductorMatch) {
+    return `Mission ${conductorMatch[1].slice(-6)}`
+  }
+  return value.replace(/[-_]+/g, ' ').trim()
+}
+
 function formatDisplayName(session: GatewaySession): string {
   const label = readString(session.label)
-  if (label) return label.replace(/^worker-/, '').replace(/[-_]+/g, ' ')
+  if (label) {
+    if (/^cron[_:]|^conductor[-_]/i.test(label)) return prettifyCronLabel(label)
+    return label.replace(/^worker-/, '').replace(/[-_]+/g, ' ')
+  }
   const title = readString(session.title) ?? readString(session.derivedTitle)
-  if (title) return title
+  if (title) {
+    if (/^cron[_:]|^conductor[-_]/i.test(title)) return prettifyCronLabel(title)
+    return title
+  }
   const key = readString(session.key) ?? 'worker'
+  if (/^cron[_:]/i.test(key)) return prettifyCronLabel(key)
   return key.split(':').pop()?.replace(/[-_]+/g, ' ') ?? key
 }
 
