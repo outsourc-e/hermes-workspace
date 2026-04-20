@@ -20,6 +20,7 @@ import {
   createSession,
   ensureGatewayProbed,
   getGatewayCapabilities,
+  listSessions,
   streamChat,
 } from '../../server/hermes-api'
 import type {OpenAICompatContentPart, OpenAICompatMessage} from '../../server/openai-compat-api';
@@ -543,9 +544,50 @@ export const Route = createFileRoute('/api/send-stream')({
               }
 
               if (SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
-                const session = await createSession()
-                sessionKey = session.id
-                resolvedFriendlyId = session.id
+                // 'main' should land in the user's existing main chat,
+                // not spin up a brand new session every time. Skip cron
+                // and Operations per-agent sessions so the orchestrator
+                // chat doesn't latch onto them.
+                let reused: string | null = null
+                if (sessionKey === 'main') {
+                  try {
+                    const recent = await listSessions(30, 0)
+                    const isInternal = (id: string) =>
+                      id.startsWith('cron_') ||
+                      id.startsWith('cron:') ||
+                      id.startsWith('agent:main:ops-')
+                    const hasRealTitle = (s: {
+                      id: string
+                      title?: string | null
+                    }) => {
+                      const t = (s.title ?? '').trim()
+                      return t.length > 0 && t !== s.id
+                    }
+                    const titled = recent.find(
+                      (s) => !isInternal(s.id) && hasRealTitle(s),
+                    )
+                    const fallback = titled
+                      ? null
+                      : recent.find(
+                          (s) =>
+                            !isInternal(s.id) &&
+                            typeof s.message_count === 'number' &&
+                            s.message_count > 0,
+                        )
+                    const candidate = titled ?? fallback
+                    if (candidate) reused = candidate.id
+                  } catch {
+                    // fall through to createSession()
+                  }
+                }
+                if (reused) {
+                  sessionKey = reused
+                  resolvedFriendlyId = reused
+                } else {
+                  const session = await createSession()
+                  sessionKey = session.id
+                  resolvedFriendlyId = session.id
+                }
               }
 
               let startedSent = false

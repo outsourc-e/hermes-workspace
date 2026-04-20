@@ -47,18 +47,37 @@ export const Route = createFileRoute('/api/history')({
               messages: [],
             })
           }
-          // "main" doesn't exist in Hermes — resolve it to the latest user
-          // chat session. Skip cron job sessions and per-agent Operations
-          // sessions so the orchestrator chat doesn't latch onto them.
+          // "main" doesn't exist in Hermes — resolve it to the user's real
+          // main chat session. We prefer (in order):
+          //   1. The most recent session with a real human-set title
+          //      (label !== id, e.g. "hows everything"). This is what users
+          //      actually mean by "main".
+          //   2. The most recent non-internal session with messages.
+          // Cron + Operations per-agent sessions are skipped so the
+          // orchestrator chat doesn't latch onto runtime junk.
           if (sessionKey === 'main') {
             try {
-              // Pull a small window so we have something to filter from.
-              const sessions = await listSessions(20, 0)
+              const sessions = await listSessions(30, 0)
               const isInternalKey = (id: string) =>
                 id.startsWith('cron_') ||
                 id.startsWith('cron:') ||
                 id.startsWith('agent:main:ops-')
-              const candidate = sessions.find((s) => !isInternalKey(s.id))
+              const hasRealTitle = (s: { id: string; title?: string | null }) => {
+                const t = (s.title ?? '').trim()
+                return t.length > 0 && t !== s.id
+              }
+              const titled = sessions.find(
+                (s) => !isInternalKey(s.id) && hasRealTitle(s),
+              )
+              const fallback = titled
+                ? null
+                : sessions.find(
+                    (s) =>
+                      !isInternalKey(s.id) &&
+                      typeof s.message_count === 'number' &&
+                      s.message_count > 0,
+                  )
+              const candidate = titled ?? fallback
               if (candidate) {
                 sessionKey = candidate.id
               } else {
