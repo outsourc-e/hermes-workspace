@@ -112,6 +112,12 @@ type ChatScreenProps = {
   forcedSessionKey?: string
   /** Hide header + file explorer + terminal for panel mode */
   compact?: boolean
+  /**
+   * Disables internal `navigate()` side effects so the chat can be embedded
+   * in other routes (e.g. Operations orchestrator card) without yanking the
+   * user out to /chat/<uuid> on mount, refresh, or after send.
+   */
+  embedded?: boolean
 }
 
 type PortableHistoryMessage = {
@@ -450,6 +456,7 @@ export function ChatScreen({
   onSessionResolved,
   forcedSessionKey,
   compact = false,
+  embedded = false,
 }: ChatScreenProps) {
   const navigate = useNavigate()
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
@@ -1098,10 +1105,12 @@ export function ChatScreen({
         activeSendRef.current = null
         setSending(false)
         if (isMissingAuth(messageText)) {
-          try {
-            navigate({ to: '/', replace: true })
-          } catch {
-            /* router not ready */
+          if (!embedded) {
+            try {
+              navigate({ to: '/', replace: true })
+            } catch {
+              /* router not ready */
+            }
           }
           return
         }
@@ -1604,7 +1613,7 @@ export function ChatScreen({
       }
       return
     }
-    if (isMissingAuth(messageText)) {
+    if (isMissingAuth(messageText) && !embedded) {
       navigate({ to: '/', replace: true })
     }
     const message = sessionsError
@@ -1639,6 +1648,7 @@ export function ChatScreen({
   }, [isNewChat, isRedirecting, sessionsQuery.isSuccess, shouldRedirectToNew])
 
   useEffect(() => {
+    if (embedded) return
     if (isNewChat) return
     if (!sessionsQuery.isSuccess) return
     if (sessions.length === 0) return
@@ -1662,6 +1672,7 @@ export function ChatScreen({
     sessions,
     sessionsQuery.isSuccess,
     shouldRedirectToNew,
+    embedded,
   ])
 
   const hideUi = shouldRedirectToNew || isRedirecting
@@ -2308,11 +2319,13 @@ export function ChatScreen({
             : '',
         )
         // In portable mode, navigate to /chat/main instead of UUID
-        navigate({
-          to: '/chat/$sessionKey',
-          params: { sessionKey: threadId },
-          replace: true,
-        })
+        if (!embedded) {
+          navigate({
+            to: '/chat/$sessionKey',
+            params: { sessionKey: threadId },
+            replace: true,
+          })
+        }
         return
       }
 

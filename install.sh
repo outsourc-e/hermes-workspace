@@ -74,11 +74,52 @@ green "  pnpm $(pnpm --version) ✓"
 # ─── install hermes-agent (vanilla, no fork) ──────────────────────────────
 
 cyan "→ Installing hermes-agent (vanilla from PyPI)…"
-if ! python3 -c "import project_agent" &>/dev/null; then
-  python3 -m pip install --user --upgrade hermes-agent
-  green "  hermes-agent installed ✓"
-else
+if python3 -c "import project_agent" &>/dev/null; then
   green "  hermes-agent already installed ✓"
+else
+  # Detect PEP 668 environments (Debian 12+, Ubuntu 23.04+, recent Fedora, etc.)
+  is_externally_managed() {
+    python3 - <<'PY' 2>/dev/null
+import sys, sysconfig, pathlib
+p = pathlib.Path(sysconfig.get_paths()["stdlib"]).parent / "EXTERNALLY-MANAGED"
+sys.exit(0 if p.exists() else 1)
+PY
+  }
+
+  install_with_pipx() {
+    if ! command -v pipx &>/dev/null; then return 1; fi
+    pipx install --force "hermes-agent[cron]" && pipx ensurepath >/dev/null 2>&1
+  }
+
+  install_with_venv() {
+    local venv_dir="$HOME/.local/share/hermes-agent/venv"
+    local bin_dir="$HOME/.local/bin"
+    yellow "  Creating isolated venv at $venv_dir"
+    python3 -m venv "$venv_dir"
+    "$venv_dir/bin/pip" install --upgrade pip >/dev/null
+    "$venv_dir/bin/pip" install --upgrade "hermes-agent[cron]"
+    mkdir -p "$bin_dir"
+    ln -sf "$venv_dir/bin/project-agent" "$bin_dir/project-agent" 2>/dev/null || true
+    ln -sf "$venv_dir/bin/hermes-agent" "$bin_dir/hermes-agent" 2>/dev/null || true
+    case ":$PATH:" in
+      *":$bin_dir:"*) ;;
+      *) yellow "  Add to your shell rc: export PATH=\"$bin_dir:\$PATH\"" ;;
+    esac
+  }
+
+  if is_externally_managed; then
+    yellow "  PEP 668 environment detected (system Python is externally managed)"
+    if install_with_pipx; then
+      green "  hermes-agent installed via pipx ✓"
+    else
+      yellow "  pipx not available — falling back to isolated venv"
+      install_with_venv
+      green "  hermes-agent installed in venv ✓"
+    fi
+  else
+    python3 -m pip install --user --upgrade "hermes-agent[cron]"
+    green "  hermes-agent installed ✓"
+  fi
 fi
 
 # ─── clone workspace ──────────────────────────────────────────────────────

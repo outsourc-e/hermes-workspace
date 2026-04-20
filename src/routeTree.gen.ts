@@ -37,6 +37,8 @@ import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
+import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
+import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
@@ -65,6 +67,7 @@ import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
 import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
 import { Route as ApiProfilesRenameRouteImport } from './routes/api/profiles/rename'
 import { Route as ApiProfilesReadRouteImport } from './routes/api/profiles/read'
 import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
@@ -232,6 +235,16 @@ const ApiSessionStatusRoute = ApiSessionStatusRouteImport.update({
   path: '/api/session-status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionSendRoute = ApiSessionSendRouteImport.update({
+  id: '/api/session-send',
+  path: '/api/session-send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionHistoryRoute = ApiSessionHistoryRouteImport.update({
+  id: '/api/session-history',
+  path: '/api/session-history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
   id: '/api/send-stream',
   path: '/api/send-stream',
@@ -371,6 +384,11 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   id: '/send',
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
+} as any)
+const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
+  id: '/api/profiles/update',
+  path: '/api/profiles/update',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProfilesRenameRoute = ApiProfilesRenameRouteImport.update({
   id: '/api/profiles/rename',
@@ -542,6 +560,8 @@ export interface FileRoutesByFullPath {
   '/api/ping': typeof ApiPingRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-history': typeof ApiSessionHistoryRoute
+  '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
@@ -581,6 +601,7 @@ export interface FileRoutesByFullPath {
   '/api/profiles/list': typeof ApiProfilesListRoute
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
+  '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -625,6 +646,8 @@ export interface FileRoutesByTo {
   '/api/ping': typeof ApiPingRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-history': typeof ApiSessionHistoryRoute
+  '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
@@ -664,6 +687,7 @@ export interface FileRoutesByTo {
   '/api/profiles/list': typeof ApiProfilesListRoute
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
+  '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -710,6 +734,8 @@ export interface FileRoutesById {
   '/api/ping': typeof ApiPingRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-history': typeof ApiSessionHistoryRoute
+  '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
@@ -749,6 +775,7 @@ export interface FileRoutesById {
   '/api/profiles/list': typeof ApiProfilesListRoute
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
+  '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -796,6 +823,8 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-history'
+    | '/api/session-send'
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
@@ -835,6 +864,7 @@ export interface FileRouteTypes {
     | '/api/profiles/list'
     | '/api/profiles/read'
     | '/api/profiles/rename'
+    | '/api/profiles/update'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
@@ -879,6 +909,8 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-history'
+    | '/api/session-send'
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
@@ -918,6 +950,7 @@ export interface FileRouteTypes {
     | '/api/profiles/list'
     | '/api/profiles/read'
     | '/api/profiles/rename'
+    | '/api/profiles/update'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
@@ -963,6 +996,8 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-history'
+    | '/api/session-send'
     | '/api/session-status'
     | '/api/sessions'
     | '/api/skills'
@@ -1002,6 +1037,7 @@ export interface FileRouteTypes {
     | '/api/profiles/list'
     | '/api/profiles/read'
     | '/api/profiles/rename'
+    | '/api/profiles/update'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
@@ -1048,6 +1084,8 @@ export interface RootRouteChildren {
   ApiPingRoute: typeof ApiPingRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
+  ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
+  ApiSessionSendRoute: typeof ApiSessionSendRoute
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRouteWithChildren
@@ -1078,6 +1116,7 @@ export interface RootRouteChildren {
   ApiProfilesListRoute: typeof ApiProfilesListRoute
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
+  ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1278,6 +1317,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session-send': {
+      id: '/api/session-send'
+      path: '/api/session-send'
+      fullPath: '/api/session-send'
+      preLoaderRoute: typeof ApiSessionSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/session-history': {
+      id: '/api/session-history'
+      path: '/api/session-history'
+      fullPath: '/api/session-history'
+      preLoaderRoute: typeof ApiSessionHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/send-stream': {
       id: '/api/send-stream'
       path: '/api/send-stream'
@@ -1473,6 +1526,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sessions/send'
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/profiles/update': {
+      id: '/api/profiles/update'
+      path: '/api/profiles/update'
+      fullPath: '/api/profiles/update'
+      preLoaderRoute: typeof ApiProfilesUpdateRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/profiles/rename': {
       id: '/api/profiles/rename'
@@ -1788,6 +1848,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPingRoute: ApiPingRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
+  ApiSessionHistoryRoute: ApiSessionHistoryRoute,
+  ApiSessionSendRoute: ApiSessionSendRoute,
   ApiSessionStatusRoute: ApiSessionStatusRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRouteWithChildren,
@@ -1818,6 +1880,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesListRoute: ApiProfilesListRoute,
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
+  ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

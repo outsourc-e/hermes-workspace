@@ -304,6 +304,28 @@ export function deleteProfile(name: string): void {
   fs.renameSync(profilePath, path.join(trashDir, trashName))
 }
 
+export function updateProfileConfig(
+  name: string,
+  patch: Record<string, unknown>,
+): ProfileDetail {
+  const normalized = name.trim() || 'default'
+  const profilePath =
+    normalized === 'default'
+      ? getHermesRoot()
+      : path.join(getProfilesRoot(), validateProfileName(normalized))
+  if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
+  const configPath = path.join(profilePath, 'config.yaml')
+  const current = readYamlConfig(configPath)
+  const merged = { ...current, ...patch }
+  // Strip undefined keys
+  for (const key of Object.keys(merged)) {
+    if (merged[key] === undefined) delete merged[key]
+  }
+  fs.mkdirSync(path.dirname(configPath), { recursive: true })
+  fs.writeFileSync(configPath, YAML.stringify(merged), 'utf-8')
+  return readProfile(normalized)
+}
+
 export function renameProfile(oldName: string, newName: string): ProfileDetail {
   const from = validateProfileName(oldName)
   const to = validateProfileName(newName)

@@ -198,15 +198,23 @@ function normalizeJob(row: Record<string, unknown>, index: number): CronJob {
   }
 }
 
+function friendlyError(raw: string): string {
+  if (!raw) return 'Request failed'
+  if (raw.includes("require 'croniter'") || raw.includes('croniter')) {
+    return "Cron support missing: reinstall hermes-agent with 'pip install \"hermes-agent[cron]\"' (or 'pipx install --force hermes-agent[cron]'), then restart the gateway."
+  }
+  return raw
+}
+
 async function readError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as Record<string, unknown>
-    if (typeof payload.error === 'string') return payload.error
-    if (typeof payload.message === 'string') return payload.message
+    if (typeof payload.error === 'string') return friendlyError(payload.error)
+    if (typeof payload.message === 'string') return friendlyError(payload.message)
     return JSON.stringify(payload)
   } catch {
     const text = await response.text().catch(() => '')
-    return text || response.statusText || 'Request failed'
+    return friendlyError(text || response.statusText || 'Request failed')
   }
 }
 
@@ -234,8 +242,12 @@ async function readJsonAndCheckOk<T>(response: Response): Promise<T> {
   return payload
 }
 
+// Hermes-Workspace cron API: backed by /api/hermes-jobs (FastAPI proxy)
+// Each "cron job" is a scheduled task in Hermes' job runner. Operations
+// names jobs `ops:<agentId>:<slug>` so they bind to a specific profile.
+
 export async function fetchCronJobs(): Promise<Array<CronJob>> {
-  const response = await fetch('/api/cron')
+  const response = await fetch('/api/hermes-jobs')
   if (!response.ok) {
     throw new Error(await readError(response))
   }
@@ -249,7 +261,7 @@ export async function fetchCronJobs(): Promise<Array<CronJob>> {
 
 export async function fetchCronRuns(jobId: string): Promise<Array<CronRun>> {
   const response = await fetch(
-    `/api/cron/runs/${encodeURIComponent(jobId)}?limit=20`,
+    `/api/hermes-jobs/${encodeURIComponent(jobId)}?action=runs&limit=20`,
   )
   if (!response.ok) {
     throw new Error(await readError(response))
@@ -263,13 +275,13 @@ export async function fetchCronRuns(jobId: string): Promise<Array<CronRun>> {
 }
 
 export async function runCronJob(jobId: string): Promise<RunCronPayload> {
-  const response = await fetch('/api/cron/run', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    `/api/hermes-jobs/${encodeURIComponent(jobId)}?action=run`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     },
-    body: JSON.stringify({ jobId }),
-  })
+  )
 
   if (!response.ok) {
     throw new Error(await readError(response))
@@ -281,13 +293,13 @@ export async function runCronJob(jobId: string): Promise<RunCronPayload> {
 export async function runCronJobIfDue(
   jobId: string,
 ): Promise<RunCronPayload> {
-  const response = await fetch('/api/cron/run-if-due', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    `/api/hermes-jobs/${encodeURIComponent(jobId)}?action=run-if-due`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     },
-    body: JSON.stringify({ jobId }),
-  })
+  )
 
   if (!response.ok) {
     throw new Error(await readError(response))
@@ -300,13 +312,14 @@ export async function toggleCronJob(payload: {
   jobId: string
   enabled: boolean
 }): Promise<ToggleCronPayload> {
-  const response = await fetch('/api/cron/toggle', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    `/api/hermes-jobs/${encodeURIComponent(payload.jobId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: payload.enabled }),
     },
-    body: JSON.stringify(payload),
-  })
+  )
 
   if (!response.ok) {
     throw new Error(await readError(response))
@@ -318,11 +331,13 @@ export async function toggleCronJob(payload: {
 export async function upsertCronJob(
   payload: UpsertCronJobInput,
 ): Promise<UpsertCronPayload> {
-  const response = await fetch('/api/cron/upsert', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+  const isUpdate = Boolean(payload.jobId)
+  const url = isUpdate
+    ? `/api/hermes-jobs/${encodeURIComponent(payload.jobId as string)}`
+    : '/api/hermes-jobs'
+  const response = await fetch(url, {
+    method: isUpdate ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
 
@@ -334,13 +349,12 @@ export async function upsertCronJob(
 }
 
 export async function deleteCronJob(jobId: string): Promise<{ ok?: boolean }> {
-  const response = await fetch('/api/cron/delete', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    `/api/hermes-jobs/${encodeURIComponent(jobId)}`,
+    {
+      method: 'DELETE',
     },
-    body: JSON.stringify({ jobId }),
-  })
+  )
 
   if (!response.ok) {
     throw new Error(await readError(response))

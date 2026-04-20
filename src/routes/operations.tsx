@@ -1,12 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { AgentsScreen } from '@/screens/gateway/agents-screen'
+import { OperationsScreen } from '@/screens/agents/operations-screen'
 
 export const Route = createFileRoute('/operations')({
   ssr: false,
   component: function OperationsRoute() {
     usePageTitle('Operations')
-    return <AgentsScreen />
+    return <OperationsScreen />
   },
   errorComponent: function OperationsError({ error }) {
     return (
