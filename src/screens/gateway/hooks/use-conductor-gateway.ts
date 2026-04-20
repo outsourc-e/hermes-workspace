@@ -1080,13 +1080,23 @@ export function useConductorGateway() {
         throw new Error(text || `Spawn failed (${response.status})`)
       }
 
-      const result = (await response.json()) as { ok?: boolean; sessionKey?: string; error?: string }
+      const result = (await response.json()) as {
+        ok?: boolean
+        sessionKey?: string
+        sessionKeyPrefix?: string
+        jobId?: string
+        error?: string
+      }
       if (!result.ok || !result.sessionKey) {
         throw new Error(result.error ?? 'Failed to spawn orchestrator')
       }
 
-      // Track the orchestrator session key — it will spawn child workers
+      // Hermes runs cron jobs in sessions keyed `cron_<jobId>_<timestamp>`.
+      // The session doesn't exist yet at spawn time — the cron loop creates
+      // it within ~5s. Poll /api/sessions until we find one matching the
+      // prefix, then track it as the orchestrator session.
       const orchestratorKey = result.sessionKey
+      const prefix = result.sessionKeyPrefix
       setOrchestratorSessionKey(orchestratorKey)
       setMissionWorkerKeys((current) => {
         if (current.has(orchestratorKey)) return current
@@ -1094,6 +1104,38 @@ export function useConductorGateway() {
         next.add(orchestratorKey)
         return next
       })
+
+      if (prefix) {
+        // Async: resolve the placeholder to the real session key once it exists.
+        const resolveOrchestrator = async () => {
+          for (let attempt = 0; attempt < 30; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            try {
+              const sessionPayload = await fetchSessions()
+              const sessions = Array.isArray(sessionPayload.sessions)
+                ? sessionPayload.sessions
+                : []
+              const match = sessions.find((session) => {
+                const key = typeof session.key === 'string' ? session.key : ''
+                return key.startsWith(prefix)
+              })
+              if (match && typeof match.key === 'string') {
+                setOrchestratorSessionKey(match.key)
+                setMissionWorkerKeys((current) => {
+                  const next = new Set(current)
+                  next.delete(orchestratorKey)
+                  next.add(match.key as string)
+                  return next
+                })
+                return
+              }
+            } catch {
+              // ignore; try again
+            }
+          }
+        }
+        void resolveOrchestrator()
+      }
 
       // Transition to running — the orchestrator is alive, workers will appear via polling
       setPlanText(`Orchestrator spawned. Decomposing mission and spawning workers...`)

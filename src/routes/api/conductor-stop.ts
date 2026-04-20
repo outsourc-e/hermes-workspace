@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
+import { deleteSession, ensureGatewayProbed } from '../../server/hermes-api'
 
 export const Route = createFileRoute('/api/conductor-stop')({
   server: {
@@ -15,15 +15,19 @@ export const Route = createFileRoute('/api/conductor-stop')({
         if (csrfCheck) return csrfCheck
 
         try {
+          await ensureGatewayProbed()
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
           const sessionKeys = Array.isArray(body.sessionKeys)
-            ? body.sessionKeys.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+            ? body.sessionKeys.filter(
+                (value): value is string =>
+                  typeof value === 'string' && value.trim().length > 0,
+              )
             : []
 
           let deleted = 0
           for (const sessionKey of sessionKeys) {
             try {
-              await gatewayRpc('sessions.delete', { key: sessionKey })
+              await deleteSession(sessionKey)
               deleted += 1
             } catch {
               // Ignore per-session delete errors so one bad key doesn't block the rest.
