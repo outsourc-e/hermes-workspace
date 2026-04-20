@@ -835,96 +835,50 @@ code {
   --theme-input: #232a33;
 }
 
-[data-theme='hermes-mono'] {
-  --theme-bg: #111111;
-  --theme-sidebar: #111111;
-  --theme-panel: #1a1a1a;
-  --theme-card: #222222;
-  --theme-card2: #2a2a2a;
-  --theme-border: #333333;
-  --theme-border-subtle: #222222;
-  --theme-text: #e6edf3;
-  --theme-muted: #888888;
-  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
-  --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.52);
-  --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.62);
-  --theme-glass: rgba(17, 17, 17, 0.88);
-  --theme-focus: #aaaaaa;
-  --theme-accent: #aaaaaa;
-  --theme-accent-secondary: #cccccc;
-  --theme-accent-subtle: rgba(170, 170, 170, 0.14);
-  --theme-accent-border: rgba(170, 170, 170, 0.3);
-  --theme-active: #aaaaaa;
-  --theme-link: #cccccc;
-  --theme-success: #888888;
-  --theme-warning: #999999;
-  --theme-danger: #cccccc;
-  --theme-stripe: rgba(51, 51, 51, 0.48);
-  --theme-header-bg: #1a1a1a;
-  --theme-header-border: #333333;
-  --chat-user-bg: #1e1e1e;
-  --chat-user-border: #4a4a4a;
-  --chat-user-foreground: #e6edf3;
-  --chat-assistant-bg: #1a1a1a;
-  --chat-assistant-border: #333333;
-  --chat-assistant-foreground: #e6edf3;
-  --composer-bg: #111111;
-  --composer-border: #333333;
-  --composer-placeholder: #888888;
-  --tool-card-bg: #1a1a1a;
-  --tool-card-border: #333333;
-  --tool-card-title: #e6edf3;
-  --tool-card-muted: #a0a0a0;
-  --code-bg: #111111;
-  --code-border: #333333;
-  --code-foreground: #e6edf3;
-  --theme-input: #222222;
-}
-
 [data-theme='hermes-official-light'] {
-  --theme-bg: #f6f8fc;
-  --theme-sidebar: #eef2ff;
-  --theme-panel: #eef2ff;
-  --theme-card: #ffffff;
-  --theme-card2: #f8faff;
-  --theme-border: #d7deee;
-  --theme-border-subtle: #e6ebf7;
-  --theme-text: #111827;
-  --theme-muted: #4b5563;
-  --theme-shadow-1: 0 1px 2px rgba(17, 24, 39, 0.06);
-  --theme-shadow-2: 0 8px 20px rgba(17, 24, 39, 0.09);
-  --theme-shadow-3: 0 18px 38px rgba(17, 24, 39, 0.12);
-  --theme-glass: rgba(246, 248, 252, 0.86);
-  --theme-focus: #6366f1;
-  --theme-accent: #4f46e5;
-  --theme-accent-secondary: #6366f1;
-  --theme-accent-subtle: rgba(79, 70, 229, 0.1);
-  --theme-accent-border: rgba(79, 70, 229, 0.22);
-  --theme-active: #2563eb;
-  --theme-link: #4f46e5;
-  --theme-success: #16a34a;
-  --theme-warning: #d97706;
-  --theme-danger: #dc2626;
-  --theme-stripe: rgba(215, 222, 238, 0.38);
-  --theme-header-bg: #eef2ff;
-  --theme-header-border: #d7deee;
-  --chat-user-bg: #eef2ff;
-  --chat-user-border: #c7d2fe;
-  --chat-user-foreground: #111827;
-  --chat-assistant-bg: #edf0f8;
-  --chat-assistant-border: #d7deee;
-  --chat-assistant-foreground: #111827;
-  --composer-bg: #ffffff;
-  --composer-border: #c7d2fe;
-  --composer-placeholder: #6b7280;
-  --tool-card-bg: #f3f6ff;
-  --tool-card-border: #d6ddf0;
-  --tool-card-title: #111827;
-  --tool-card-muted: #4b5563;
-  --code-bg: #f3f6ff;
-  --code-border: #d6ddf0;
-  --code-foreground: #111827;
-  --theme-input: #ffffff;
+  --theme-bg: #f7f7f1;
+  --theme-sidebar: #f2f3ed;
+  --theme-panel: #f4f5ef;
+  --theme-card: #fafbf6;
+  --theme-card2: #f1f3ed;
+  --theme-border: #cdd5da;
+  --theme-border-subtle: #e3e8e7;
+  --theme-text: #16315f;
+  --theme-muted: #6f7d96;
+  --theme-shadow-1: 0 0 0 rgba(22, 49, 95, 0);
+  --theme-shadow-2: 0 1px 2px rgba(22, 49, 95, 0.03);
+  --theme-shadow-3: 0 8px 24px rgba(22, 49, 95, 0.05);
+  --theme-glass: rgba(247, 247, 241, 0.92);
+  --theme-focus: #2557b7;
+  --theme-accent: #2557b7;
+  --theme-accent-secondary: #3f6fca;
+  --theme-accent-subtle: rgba(37, 87, 183, 0.07);
+  --theme-accent-border: rgba(37, 87, 183, 0.18);
+  --theme-active: #2557b7;
+  --theme-link: #2557b7;
+  --theme-success: #4f7c64;
+  --theme-warning: #9c6b2f;
+  --theme-danger: #a24b4b;
+  --theme-stripe: rgba(205, 213, 218, 0.5);
+  --theme-header-bg: #f4f5ef;
+  --theme-header-border: #cdd5da;
+  --chat-user-bg: #eef2f6;
+  --chat-user-border: #c8d3df;
+  --chat-user-foreground: #16315f;
+  --chat-assistant-bg: #f8f9f4;
+  --chat-assistant-border: #d7dee2;
+  --chat-assistant-foreground: #16315f;
+  --composer-bg: #fbfcf7;
+  --composer-border: #c8d3df;
+  --composer-placeholder: #73819a;
+  --tool-card-bg: #f3f6f2;
+  --tool-card-border: #d6dee1;
+  --tool-card-title: #16315f;
+  --tool-card-muted: #6f7d96;
+  --code-bg: #f2f6f1;
+  --code-border: #d2dce0;
+  --code-foreground: #16315f;
+  --theme-input: #fbfcf7;
 }
 
 [data-theme='hermes-classic-light'] {
@@ -1019,51 +973,6 @@ code {
   --theme-input: #ffffff;
 }
 
-[data-theme='hermes-mono-light'] {
-  --theme-bg: #fafafa;
-  --theme-sidebar: #f5f5f5;
-  --theme-panel: #f0f0f0;
-  --theme-card: #ffffff;
-  --theme-card2: #f7f7f7;
-  --theme-border: #d4d4d4;
-  --theme-border-subtle: #e5e5e5;
-  --theme-text: #1a1a1a;
-  --theme-muted: #666666;
-  --theme-shadow-1: 0 1px 2px rgba(26, 26, 26, 0.06);
-  --theme-shadow-2: 0 8px 20px rgba(26, 26, 26, 0.09);
-  --theme-shadow-3: 0 18px 38px rgba(26, 26, 26, 0.12);
-  --theme-glass: rgba(250, 250, 250, 0.86);
-  --theme-focus: #666666;
-  --theme-accent: #666666;
-  --theme-accent-secondary: #8a8a8a;
-  --theme-accent-subtle: rgba(102, 102, 102, 0.1);
-  --theme-accent-border: rgba(102, 102, 102, 0.22);
-  --theme-active: #4a4a4a;
-  --theme-link: #4a4a4a;
-  --theme-success: #5c5c5c;
-  --theme-warning: #7a7a7a;
-  --theme-danger: #8a8a8a;
-  --theme-stripe: rgba(212, 212, 212, 0.38);
-  --theme-header-bg: #f5f5f5;
-  --theme-header-border: #d4d4d4;
-  --chat-user-bg: #ececec;
-  --chat-user-border: #c7c7c7;
-  --chat-user-foreground: #1a1a1a;
-  --chat-assistant-bg: #ffffff;
-  --chat-assistant-border: #dddddd;
-  --chat-assistant-foreground: #1a1a1a;
-  --composer-bg: #ffffff;
-  --composer-border: #d4d4d4;
-  --composer-placeholder: #7a7a7a;
-  --tool-card-bg: #f5f5f5;
-  --tool-card-border: #d6d6d6;
-  --tool-card-title: #1a1a1a;
-  --tool-card-muted: #666666;
-  --code-bg: #f5f5f5;
-  --code-border: #d4d4d4;
-  --code-foreground: #1a1a1a;
-  --theme-input: #ffffff;
-}
 
 /* ============================================================
    Hermes Nous — matches nousresearch.com/hermes-agent chrome
@@ -1118,49 +1027,49 @@ code {
 }
 
 [data-theme='hermes-nous-light'] {
-  --theme-bg: #f7f1e4;
-  --theme-sidebar: #efe6d0;
-  --theme-panel: #f4ecda;
-  --theme-card: #ffffff;
-  --theme-card2: #f7f1e4;
-  --theme-border: rgba(4, 28, 28, 0.2);
-  --theme-border-subtle: rgba(4, 28, 28, 0.1);
-  --theme-text: #041c1c;
-  --theme-muted: rgba(4, 28, 28, 0.62);
-  --theme-shadow-1: 0 1px 2px rgba(4, 28, 28, 0.08);
-  --theme-shadow-2: 0 6px 18px rgba(4, 28, 28, 0.1);
-  --theme-shadow-3: 0 16px 36px rgba(4, 28, 28, 0.12);
-  --theme-glass: rgba(247, 241, 228, 0.88);
-  --theme-focus: #ffac02;
-  --theme-accent: #ffac02;
-  --theme-accent-secondary: #c77700;
-  --theme-accent-subtle: rgba(255, 172, 2, 0.14);
-  --theme-accent-border: rgba(255, 172, 2, 0.32);
-  --theme-active: #c77700;
-  --theme-link: #c77700;
-  --theme-success: #2f7f3d;
-  --theme-warning: #c77700;
-  --theme-danger: #b5252d;
-  --theme-stripe: rgba(4, 28, 28, 0.04);
-  --theme-header-bg: #efe6d0;
-  --theme-header-border: rgba(4, 28, 28, 0.18);
-  --chat-user-bg: #f0e4c8;
-  --chat-user-border: rgba(255, 172, 2, 0.32);
-  --chat-user-foreground: #041c1c;
-  --chat-assistant-bg: #f4ecda;
-  --chat-assistant-border: rgba(4, 28, 28, 0.1);
-  --chat-assistant-foreground: #041c1c;
-  --composer-bg: #ffffff;
-  --composer-border: rgba(4, 28, 28, 0.2);
-  --composer-placeholder: rgba(4, 28, 28, 0.45);
-  --tool-card-bg: #f7f1e4;
-  --tool-card-border: rgba(4, 28, 28, 0.15);
-  --tool-card-title: #041c1c;
-  --tool-card-muted: rgba(4, 28, 28, 0.55);
-  --code-bg: #efe6d0;
-  --code-border: rgba(4, 28, 28, 0.15);
-  --code-foreground: #041c1c;
-  --theme-input: #ffffff;
+  --theme-bg: #f8faf8;
+  --theme-sidebar: #f2f6f4;
+  --theme-panel: #f4f7f5;
+  --theme-card: #fbfdfb;
+  --theme-card2: #f1f5f2;
+  --theme-border: rgba(30, 74, 92, 0.18);
+  --theme-border-subtle: rgba(30, 74, 92, 0.1);
+  --theme-text: #16315f;
+  --theme-muted: rgba(22, 49, 95, 0.6);
+  --theme-shadow-1: 0 0 0 rgba(22, 49, 95, 0);
+  --theme-shadow-2: 0 1px 2px rgba(22, 49, 95, 0.03);
+  --theme-shadow-3: 0 8px 24px rgba(22, 49, 95, 0.05);
+  --theme-glass: rgba(248, 250, 248, 0.92);
+  --theme-focus: #2557b7;
+  --theme-accent: #2557b7;
+  --theme-accent-secondary: #3f6fca;
+  --theme-accent-subtle: rgba(37, 87, 183, 0.07);
+  --theme-accent-border: rgba(37, 87, 183, 0.18);
+  --theme-active: #2557b7;
+  --theme-link: #2557b7;
+  --theme-success: #4f7c64;
+  --theme-warning: #9c6b2f;
+  --theme-danger: #a24b4b;
+  --theme-stripe: rgba(30, 74, 92, 0.05);
+  --theme-header-bg: #f2f6f4;
+  --theme-header-border: rgba(30, 74, 92, 0.16);
+  --chat-user-bg: #eef2f6;
+  --chat-user-border: rgba(37, 87, 183, 0.18);
+  --chat-user-foreground: #16315f;
+  --chat-assistant-bg: #f7faf8;
+  --chat-assistant-border: rgba(30, 74, 92, 0.1);
+  --chat-assistant-foreground: #16315f;
+  --composer-bg: #fbfdfb;
+  --composer-border: rgba(30, 74, 92, 0.18);
+  --composer-placeholder: rgba(22, 49, 95, 0.45);
+  --tool-card-bg: #f3f7f4;
+  --tool-card-border: rgba(30, 74, 92, 0.14);
+  --tool-card-title: #16315f;
+  --tool-card-muted: rgba(22, 49, 95, 0.55);
+  --code-bg: #f1f6f3;
+  --code-border: rgba(30, 74, 92, 0.14);
+  --code-foreground: #16315f;
+  --theme-input: #fbfdfb;
 }
 
 [data-theme='hermes-nous'] html,
@@ -1178,11 +1087,7 @@ code {
 [data-theme='hermes-slate'] html,
 [data-theme='hermes-slate'] body,
 [data-theme='hermes-slate'] #root,
-[data-theme='hermes-slate'] .dark,
-[data-theme='hermes-mono'] html,
-[data-theme='hermes-mono'] body,
-[data-theme='hermes-mono'] #root,
-[data-theme='hermes-mono'] .dark {
+[data-theme='hermes-slate'] .dark {
   background-color: var(--theme-bg);
   color: var(--theme-text);
 }
@@ -1202,11 +1107,7 @@ code {
 [data-theme='hermes-slate-light'] html,
 [data-theme='hermes-slate-light'] body,
 [data-theme='hermes-slate-light'] #root,
-[data-theme='hermes-slate-light'] .light,
-[data-theme='hermes-mono-light'] html,
-[data-theme='hermes-mono-light'] body,
-[data-theme='hermes-mono-light'] #root,
-[data-theme='hermes-mono-light'] .light {
+[data-theme='hermes-slate-light'] .light {
   background-color: var(--theme-bg);
   color: var(--theme-text);
 }
@@ -1219,8 +1120,7 @@ code {
 [data-theme='hermes-nous'],
 [data-theme='hermes-official'],
 [data-theme='hermes-classic'],
-[data-theme='hermes-slate'],
-[data-theme='hermes-mono'] {
+[data-theme='hermes-slate'] {
   --color-primary-50: var(--theme-panel);
   --color-primary-100: var(--theme-card);
   --color-primary-200: var(--theme-border);
@@ -1246,8 +1146,7 @@ code {
 [data-theme='hermes-nous-light'],
 [data-theme='hermes-official-light'],
 [data-theme='hermes-classic-light'],
-[data-theme='hermes-slate-light'],
-[data-theme='hermes-mono-light'] {
+[data-theme='hermes-slate-light'] {
   color-scheme: light !important;
   --color-primary-50: var(--theme-card) !important;
   --color-primary-100: var(--theme-card2) !important;
@@ -1285,6 +1184,197 @@ code {
 [data-theme] .composer-input:focus-within {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 65%, transparent);
   border-color: var(--theme-accent);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   EDITORIAL VOCABULARY — v2 surface pass
+   Apply these utilities + treatments across components for the
+   Hermes/Nous editorial museum-catalog feel.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Editorial micro-label (uppercase, tracked, restrained)
+   Use for section headers, metric labels, KPI captions.
+   Replaces casual lowercase mid-weight headings. */
+.micro-label {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  color: var(--theme-muted);
+  font-feature-settings: 'ss01';
+}
+
+/* Editorial display heading — sparse use only (splash, hero, empty states) */
+.editorial-display {
+  font-family: 'EB Garamond', 'Iowan Old Style', Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+/* Architectural frame (thin 1px border, no shadow, square-ish) */
+.frame {
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  background: var(--theme-card);
+}
+.frame-panel {
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  background: var(--theme-panel);
+}
+.frame-flat {
+  border: 1px solid var(--theme-border);
+  border-radius: 0;
+  background: var(--theme-card);
+}
+
+/* Subtle inner top highlight on light surfaces (no drop shadow) */
+[data-theme$='-light'] .frame,
+[data-theme$='-light'] .frame-panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Light theme: paper-grain surface texture (very subtle) */
+[data-theme$='-light'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  mix-blend-mode: multiply;
+}
+
+/* Light theme: kill heavy drop shadows globally on cards.
+   Components opting in to depth should use .frame-elevated. */
+[data-theme$='-light'] .shadow-lg,
+[data-theme$='-light'] .shadow-xl,
+[data-theme$='-light'] .shadow-2xl {
+  box-shadow: 0 1px 0 rgba(22, 49, 95, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+[data-theme$='-light'] .shadow-md {
+  box-shadow: 0 1px 0 rgba(22, 49, 95, 0.04) !important;
+}
+[data-theme$='-light'] .shadow-sm,
+[data-theme$='-light'] .shadow-xs {
+  box-shadow: none !important;
+}
+
+/* Reserved depth class for genuinely floating UI (modals, popovers, toasts) */
+.frame-elevated {
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  background: var(--theme-card);
+  box-shadow:
+    0 1px 0 rgba(22, 49, 95, 0.04),
+    0 8px 28px rgba(22, 49, 95, 0.08);
+}
+[data-theme$='-light'] .frame-elevated {
+  box-shadow:
+    0 1px 0 rgba(22, 49, 95, 0.05),
+    0 12px 36px rgba(22, 49, 95, 0.1);
+}
+
+/* Square corner radius variables for component opt-in */
+:root {
+  --radius-editorial-card: 6px;
+  --radius-editorial-panel: 8px;
+  --radius-editorial-dialog: 10px;
+  --radius-editorial-input: 6px;
+}
+
+/* Restrain border-radius on common component patterns in light themes
+   (dark themes can keep their existing softer radii for now to avoid surprise) */
+[data-theme$='-light'] .rounded-2xl {
+  border-radius: 8px !important;
+}
+[data-theme$='-light'] .rounded-3xl {
+  border-radius: 10px !important;
+}
+
+/* Fluid serif numeral for hero/empty-state metrics (optional opt-in) */
+.numeral-display {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   LIGHT THEME COLOR DRIFT FIX — unify decorative accents.
+   Tailwind classes that decoratively use indigo / violet / fuchsia / sky
+   get pulled into the theme's cobalt accent system in light themes.
+   Semantic colors (success=green, warning=amber, danger=red) preserved.
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme$='-light'] .text-indigo-50,
+[data-theme$='-light'] .text-indigo-100,
+[data-theme$='-light'] .text-indigo-200,
+[data-theme$='-light'] .text-indigo-300,
+[data-theme$='-light'] .text-indigo-400,
+[data-theme$='-light'] .text-indigo-500,
+[data-theme$='-light'] .text-indigo-600,
+[data-theme$='-light'] .text-indigo-700,
+[data-theme$='-light'] .text-violet-300,
+[data-theme$='-light'] .text-violet-400,
+[data-theme$='-light'] .text-violet-500,
+[data-theme$='-light'] .text-violet-600,
+[data-theme$='-light'] .text-fuchsia-400,
+[data-theme$='-light'] .text-fuchsia-500,
+[data-theme$='-light'] .text-sky-300,
+[data-theme$='-light'] .text-sky-400,
+[data-theme$='-light'] .text-sky-500 {
+  color: var(--theme-accent) !important;
+}
+[data-theme$='-light'] .bg-indigo-50,
+[data-theme$='-light'] .bg-indigo-100,
+[data-theme$='-light'] .bg-violet-50,
+[data-theme$='-light'] .bg-violet-100,
+[data-theme$='-light'] .bg-fuchsia-50,
+[data-theme$='-light'] .bg-fuchsia-100,
+[data-theme$='-light'] .bg-sky-50,
+[data-theme$='-light'] .bg-sky-100 {
+  background-color: var(--theme-accent-subtle) !important;
+}
+[data-theme$='-light'] .bg-indigo-500,
+[data-theme$='-light'] .bg-indigo-600,
+[data-theme$='-light'] .bg-violet-500,
+[data-theme$='-light'] .bg-violet-600 {
+  background-color: var(--theme-accent) !important;
+}
+[data-theme$='-light'] .border-indigo-200,
+[data-theme$='-light'] .border-indigo-300,
+[data-theme$='-light'] .border-indigo-400,
+[data-theme$='-light'] .border-violet-200,
+[data-theme$='-light'] .border-violet-300 {
+  border-color: var(--theme-accent-border) !important;
+}
+
+/* Tame decorative orange used as non-warning accent in light themes.
+   Real warnings (amber) preserved — we only catch standalone orange. */
+[data-theme$='-light'] .text-orange-400,
+[data-theme$='-light'] .text-orange-500,
+[data-theme$='-light'] .text-orange-600 {
+  color: var(--theme-warning) !important;
+}
+[data-theme$='-light'] .bg-orange-50,
+[data-theme$='-light'] .bg-orange-100 {
+  background-color: rgba(156, 107, 47, 0.08) !important;
+}
+
+/* Subtle architectural rule (replaces border for major section dividers) */
+.editorial-rule {
+  border: none;
+  border-top: 1px solid var(--theme-border);
+  margin: 1.5rem 0;
+}
+.editorial-rule-double {
+  border: none;
+  border-top: 1px solid var(--theme-border);
+  border-bottom: 1px solid var(--theme-border-subtle);
+  height: 4px;
+  margin: 1.5rem 0;
 }
 
 /* Demo mode — activated via ?demo=1 query param */

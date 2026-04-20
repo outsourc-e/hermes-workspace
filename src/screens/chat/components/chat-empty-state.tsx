@@ -45,37 +45,39 @@ export function ChatEmptyState({
       className="flex h-full flex-col items-center justify-center px-4 py-8"
     >
       <div className="flex max-w-xl flex-col items-center text-center">
-        {/* Avatar with accent glow */}
-        <div className="relative mb-5">
-          <div
-            className="absolute inset-0 rounded-2xl blur-2xl opacity-35"
-            style={{
-              background: 'var(--theme-accent)',
-              transform: 'scale(1.6)',
-            }}
-          />
+        {/* Avatar in editorial frame, no glow — architectural restraint */}
+        <div className="relative mb-6">
           <img
             src="/hermes-avatar.webp"
             alt="Hermes"
-            className="relative size-20 rounded-2xl"
+            className="relative size-20 rounded-md"
             style={{
-              boxShadow:
-                '0 8px 32px color-mix(in srgb, var(--theme-accent) 30%, transparent)',
+              border: '1px solid var(--theme-border)',
+              padding: '4px',
+              background: 'var(--theme-card)',
             }}
           />
         </div>
 
-        {/* Title + value prop */}
-        <h2
-          className="text-xl font-semibold tracking-tight"
-          style={{ color: 'var(--theme-text)' }}
+        {/* Editorial micro-label */}
+        <p
+          className="micro-label mb-2"
+          style={{ color: 'var(--theme-muted)' }}
         >
           Hermes Workspace
+        </p>
+
+        {/* Editorial display title */}
+        <h2
+          className="editorial-display text-3xl"
+          style={{ color: 'var(--theme-text)' }}
+        >
+          Begin a session
         </h2>
 
         {!compact && (
           <>
-            <p className="mt-2 text-sm" style={{ color: 'var(--theme-muted)' }}>
+            <p className="mt-3 text-sm" style={{ color: 'var(--theme-muted)' }}>
               Agent chat · live tools · memory · full observability
             </p>
           </>
@@ -88,7 +90,7 @@ export function ChatEmptyState({
               key={suggestion.label}
               type="button"
               onClick={() => onSuggestionClick?.(suggestion.prompt)}
-              className="flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition-all hover:scale-[1.02]"
+              className="flex cursor-pointer items-center gap-2 rounded-md px-3.5 py-2 text-xs font-medium transition-all"
               style={{
                 background: 'var(--theme-card)',
                 border: '1px solid var(--theme-border)',

@@ -7,8 +7,6 @@ export type ThemeId =
   | 'hermes-classic-light'
   | 'hermes-slate'
   | 'hermes-slate-light'
-  | 'hermes-mono'
-  | 'hermes-mono-light'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -25,7 +23,7 @@ export const THEMES: Array<{
   {
     id: 'hermes-nous-light',
     label: 'Hermes Nous Light',
-    description: 'Cream parchment + amber accent — editorial light variant',
+    description: 'Cold paper white with restrained cobalt framing',
     icon: '◲',
   },
   {
@@ -37,7 +35,7 @@ export const THEMES: Array<{
   {
     id: 'hermes-official-light',
     label: 'Hermes Official Light',
-    description: 'Soft indigo light palette',
+    description: 'Editorial paper white with muted cobalt accents',
     icon: '⚕',
   },
   {
@@ -64,18 +62,6 @@ export const THEMES: Array<{
     description: 'GitHub-light palette with blue accents',
     icon: '🔷',
   },
-  {
-    id: 'hermes-mono',
-    label: 'Mono',
-    description: 'Clean monochrome grayscale',
-    icon: '◐',
-  },
-  {
-    id: 'hermes-mono-light',
-    label: 'Mono Light',
-    description: 'Bright monochrome grayscale',
-    icon: '◐',
-  },
 ]
 
 const STORAGE_KEY = 'hermes-theme'
@@ -89,7 +75,6 @@ const LIGHT_THEME_MAP: Record<
   'hermes-official': 'hermes-official-light',
   'hermes-classic': 'hermes-classic-light',
   'hermes-slate': 'hermes-slate-light',
-  'hermes-mono': 'hermes-mono-light',
 }
 const DARK_THEME_MAP: Record<
   Extract<ThemeId, `${string}-light`>,
@@ -99,7 +84,6 @@ const DARK_THEME_MAP: Record<
   'hermes-official-light': 'hermes-official',
   'hermes-classic-light': 'hermes-classic',
   'hermes-slate-light': 'hermes-slate',
-  'hermes-mono-light': 'hermes-mono',
 }
 
 const LIGHT_THEMES = new Set<ThemeId>([
@@ -107,7 +91,6 @@ const LIGHT_THEMES = new Set<ThemeId>([
   'hermes-official-light',
   'hermes-classic-light',
   'hermes-slate-light',
-  'hermes-mono-light',
 ])
 
 export function isValidTheme(

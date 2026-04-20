@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -35,6 +35,51 @@ function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
+}
+
+function themeColor(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim()
+  return value || fallback
+}
+
+function alpha(color: string, amount: number): string {
+  const pct = Math.max(0, Math.min(100, Math.round(amount * 100)))
+  return `color-mix(in srgb, ${color} ${pct}%, transparent)`
+}
+
+function readDashboardPalette() {
+  return {
+    accent: themeColor('--theme-accent', '#6366f1'),
+    accentSecondary: themeColor('--theme-accent-secondary', '#8b5cf6'),
+    success: themeColor('--theme-success', '#22c55e'),
+    warning: themeColor('--theme-warning', '#f59e0b'),
+    danger: themeColor('--theme-danger', '#ef4444'),
+    muted: themeColor('--theme-muted', '#6b7280'),
+    border: themeColor('--theme-border', '#333333'),
+    card: themeColor('--theme-card', '#1a1a2e'),
+    text: themeColor('--theme-text', '#e5e7eb'),
+  }
+}
+
+function useDashboardPalette() {
+  const [palette, setPalette] = useState(readDashboardPalette)
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    const refresh = () => setPalette(readDashboardPalette())
+    refresh()
+    const observer = new MutationObserver(refresh)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'style', 'class'],
+    })
+    return () => observer.disconnect()
+  }, [])
+
+  return palette
 }
 
 // ── Glass Card ───────────────────────────────────────────────────
@@ -91,7 +136,14 @@ function GlassCard({
 
 function EnhancedBadge({ label = 'Enhanced API' }: { label?: string }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+    <span
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
+      style={{
+        border: `1px solid ${themeColor('--theme-accent-border', 'rgba(245, 158, 11, 0.28)')}`,
+        background: themeColor('--theme-accent-subtle', 'rgba(245, 158, 11, 0.12)'),
+        color: themeColor('--theme-accent', '#f59e0b'),
+      }}
+    >
       {label}
     </span>
   )
@@ -108,7 +160,7 @@ function UnavailableWidget({
     <GlassCard
       title={title}
       titleRight={<EnhancedBadge />}
-      accentColor="#f59e0b"
+      accentColor={themeColor('--theme-warning', '#f59e0b')}
       className="h-full"
     >
       <div className="flex h-full min-h-[180px] items-center justify-center rounded-lg border border-dashed border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 text-center">
@@ -200,7 +252,13 @@ function MetricTile({
 
 // ── Activity Chart ───────────────────────────────────────────────
 
-function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
+function ActivityChart({
+  sessions,
+  palette,
+}: {
+  sessions: Array<HermesSession>
+  palette: ReturnType<typeof readDashboardPalette>
+}) {
   const chartData = useMemo(() => {
     const dayMap = new Map<string, { sessions: number; messages: number }>()
     const now = Date.now() / 1000
@@ -225,14 +283,12 @@ function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
         entry.messages += s.message_count ?? 0
       }
     }
-    // Trim leading empty days so active days fill the chart rather than
-    // showing a long flat line at the start of the window.
     const all = Array.from(dayMap.entries()).map(([date, data]) => ({
       date,
       ...data,
     }))
     let firstActive = all.findIndex((d) => d.sessions > 0 || d.messages > 0)
-    if (firstActive > 0) firstActive = Math.max(0, firstActive - 1) // keep 1 buffer day
+    if (firstActive > 0) firstActive = Math.max(0, firstActive - 1)
     return firstActive > 0 ? all.slice(firstActive) : all
   }, [sessions])
 
@@ -240,38 +296,35 @@ function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
     <GlassCard
       title="Activity"
       titleRight={<span className="text-[10px] text-muted">14 days</span>}
-      accentColor="#6366f1"
+      accentColor={palette.accent}
       className="h-full"
     >
       <div className="h-[200px] w-full -ml-2">
         <ResponsiveContainer width="100%" height="100%">
-          {/* Dual Y-axis: messages (left, larger values) + sessions (right, smaller values).
-              Without this, sessions flatlines at zero because message counts dominate
-              the shared scale. */}
           <AreaChart
             data={chartData}
             margin={{ top: 8, right: 32, left: -16, bottom: 0 }}
           >
             <defs>
               <linearGradient id="g-sessions" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                <stop offset="0%" stopColor={palette.accent} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={palette.accent} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="g-messages" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.2} />
-                <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                <stop offset="0%" stopColor={palette.success} stopOpacity={0.2} />
+                <stop offset="100%" stopColor={palette.success} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+            <CartesianGrid strokeDasharray="3 3" stroke={palette.border} opacity={0.45} />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 10, fill: '#666' }}
+              tick={{ fontSize: 10, fill: palette.muted }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 10, fill: '#22c55e' }}
+              tick={{ fontSize: 10, fill: palette.success }}
               axisLine={false}
               tickLine={false}
               allowDecimals={false}
@@ -280,7 +333,7 @@ function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 10, fill: '#6366f1' }}
+              tick={{ fontSize: 10, fill: palette.accent }}
               axisLine={false}
               tickLine={false}
               allowDecimals={false}
@@ -288,18 +341,18 @@ function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
             />
             <Tooltip
               contentStyle={{
-                background: '#1a1a2e',
-                border: '1px solid #333',
+                background: palette.card,
+                border: `1px solid ${palette.border}`,
                 borderRadius: '8px',
                 fontSize: '11px',
               }}
-              labelStyle={{ color: '#888', fontSize: '10px' }}
+              labelStyle={{ color: palette.muted, fontSize: '10px' }}
             />
             <Area
               yAxisId="left"
               type="monotone"
               dataKey="messages"
-              stroke="#22c55e"
+              stroke={palette.success}
               fill="url(#g-messages)"
               strokeWidth={1.5}
               dot={false}
@@ -308,7 +361,7 @@ function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
               yAxisId="right"
               type="monotone"
               dataKey="sessions"
-              stroke="#6366f1"
+              stroke={palette.accent}
               fill="url(#g-sessions)"
               strokeWidth={2}
               dot={false}
@@ -316,13 +369,13 @@ function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex items-center gap-5 mt-2 text-[10px] text-neutral-500">
+      <div className="mt-2 flex items-center gap-5 text-[10px] text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[#6366f1]" />
+          <span className="size-2 rounded-full" style={{ background: palette.accent }} />
           Sessions
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[#22c55e]" />
+          <span className="size-2 rounded-full" style={{ background: palette.success }} />
           Messages
         </span>
       </div>
@@ -332,7 +385,7 @@ function ActivityChart({ sessions }: { sessions: Array<HermesSession> }) {
 
 // ── Model Card ───────────────────────────────────────────────────
 
-function ModelCard() {
+function ModelCard({ palette }: { palette: ReturnType<typeof readDashboardPalette> }) {
   const sessionsAvailable = useFeatureAvailable('sessions')
   const configAvailable = useFeatureAvailable('config')
   const configQuery = useQuery({
@@ -389,12 +442,15 @@ function ModelCard() {
           {connected ? 'Online' : 'Offline'}
         </span>
       }
-      accentColor={connected ? '#22c55e' : '#ef4444'}
+      accentColor={connected ? palette.success : palette.danger}
       className="h-full"
     >
       <div className="space-y-2">
         <div className="flex items-center gap-3 rounded-lg p-2.5 bg-[var(--theme-card2)] border border-[var(--theme-border)]">
-          <div className="flex size-7 items-center justify-center rounded-md bg-indigo-500/10 text-sm">
+          <div
+            className="flex size-7 items-center justify-center rounded-md text-sm"
+            style={{ background: alpha(palette.accent, 0.1), color: palette.accent }}
+          >
             🤖
           </div>
           <div className="min-w-0 flex-1">
@@ -429,7 +485,7 @@ function ModelCard() {
 
 // ── Skills Widget ────────────────────────────────────────────────
 
-function SkillsWidget() {
+function SkillsWidget({ palette }: { palette: ReturnType<typeof readDashboardPalette> }) {
   const skillsAvailable = useFeatureAvailable('skills')
   const skillsQuery = useQuery({
     queryKey: ['hermes-skills'],
@@ -464,7 +520,7 @@ function SkillsWidget() {
           {skills.length} installed
         </span>
       }
-      accentColor="#f59e0b"
+      accentColor={palette.warning}
     >
       {skills.length === 0 ? (
         <div className="text-xs text-neutral-400 py-4 text-center">
@@ -555,10 +611,12 @@ function SessionRow({
   session,
   maxTokens,
   onClick,
+  palette,
 }: {
   session: HermesSession
   maxTokens: number
   onClick: () => void
+  palette: ReturnType<typeof readDashboardPalette>
 }) {
   const tokens = (session.input_tokens ?? 0) + (session.output_tokens ?? 0)
   const msgs = session.message_count ?? 0
@@ -579,9 +637,15 @@ function SessionRow({
           {session.started_at ? timeAgo(session.started_at) : ''}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[10px] text-neutral-500 mb-1.5">
+      <div className="mb-1.5 flex items-center gap-2 text-[10px] text-neutral-500">
         {session.model && (
-          <span className="font-mono px-1.5 py-0.5 rounded text-[9px] bg-indigo-500/10 text-indigo-400 font-medium">
+          <span
+            className="rounded px-1.5 py-0.5 font-mono text-[9px] font-medium"
+            style={{
+              background: alpha(palette.accent, 0.1),
+              color: palette.accent,
+            }}
+          >
             {session.model}
           </span>
         )}
@@ -594,7 +658,7 @@ function SessionRow({
           className="h-full rounded-full transition-all duration-700"
           style={{
             width: `${barWidth}%`,
-            background: 'linear-gradient(90deg, #6366f1, #a855f7)',
+            background: `linear-gradient(90deg, ${palette.accent}, ${palette.accentSecondary})`,
           }}
         />
       </div>
@@ -673,6 +737,7 @@ export function DashboardScreen() {
   }, [recentSessions])
 
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
+  const palette = useDashboardPalette()
 
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   const [isDark, setIsDark] = useState(() => {
@@ -700,14 +765,14 @@ export function DashboardScreen() {
           aria-label="Toggle theme"
           onClick={() => {
             const LIGHT_DARK_PAIRS: Record<string, string> = {
+              'hermes-nous': 'hermes-nous-light',
+              'hermes-nous-light': 'hermes-nous',
               'hermes-official': 'hermes-official-light',
               'hermes-official-light': 'hermes-official',
               'hermes-classic': 'hermes-classic-light',
               'hermes-classic-light': 'hermes-classic',
               'hermes-slate': 'hermes-slate-light',
               'hermes-slate-light': 'hermes-slate',
-              'hermes-mono': 'hermes-mono-light',
-              'hermes-mono-light': 'hermes-mono',
             }
             const cur = document.documentElement.getAttribute('data-theme') || 'hermes-official'
             const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'hermes-official-light' : 'hermes-official')
@@ -729,16 +794,17 @@ export function DashboardScreen() {
         <img
           src="/hermes-avatar.webp"
           alt="Hermes"
-          className="size-12 md:size-14 rounded-xl shadow-md shadow-indigo-500/10 border border-[var(--theme-border)]"
+          className="size-12 md:size-14 rounded-md border border-[var(--theme-border)]"
+          style={{ padding: '3px', background: 'var(--theme-card)' }}
         />
-        <h1 className="text-sm font-semibold text-ink tracking-wide">
+        <p className="micro-label" style={{ color: 'var(--theme-muted)' }}>
           Hermes Workspace
-        </h1>
+        </p>
         <div className="mt-1 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
           <QuickAction
             label="New Chat"
             icon="💬"
-            accentColor="#6366f1"
+            accentColor={palette.accent}
             onClick={() =>
               navigate({
                 to: '/chat/$sessionKey',
@@ -749,13 +815,13 @@ export function DashboardScreen() {
           <QuickAction
             label="Terminal"
             icon="💻"
-            accentColor="#22c55e"
+            accentColor={palette.success}
             onClick={() => navigate({ to: '/terminal' })}
           />
           <QuickAction
             label="Skills"
             icon="🧩"
-            accentColor="#f59e0b"
+            accentColor={palette.warning}
             onClick={() => navigate({ to: '/skills' })}
             disabled={!skillsAvailable}
             badge={!skillsAvailable ? 'Enhanced' : undefined}
@@ -763,7 +829,7 @@ export function DashboardScreen() {
           <QuickAction
             label="Settings"
             icon="⚙️"
-            accentColor="#a855f7"
+            accentColor={palette.accentSecondary}
             onClick={() => navigate({ to: '/settings' })}
           />
         </div>
@@ -776,26 +842,26 @@ export function DashboardScreen() {
             label="Sessions"
             value={formatNumber(stats.totalSessions)}
             icon="💬"
-            accentColor="#6366f1"
+            accentColor={palette.accent}
           />
           <MetricTile
             label="Messages"
             value={formatNumber(stats.totalMessages)}
             icon="✉️"
-            accentColor="#22c55e"
+            accentColor={palette.success}
           />
           <MetricTile
             label="Tool Calls"
             value={formatNumber(stats.totalToolCalls)}
             icon="🔧"
-            accentColor="#f59e0b"
+            accentColor={palette.warning}
           />
           <MetricTile
             label="Tokens"
             value={formatNumber(stats.totalTokens)}
             sub={costEstimate}
             icon="⚡"
-            accentColor="#a855f7"
+            accentColor={palette.accentSecondary}
           />
         </div>
       ) : (
@@ -809,7 +875,7 @@ export function DashboardScreen() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
         <div className="lg:col-span-5">
           {sessionsAvailable ? (
-            <ActivityChart sessions={sessions} />
+            <ActivityChart sessions={sessions} palette={palette} />
           ) : (
             <UnavailableWidget
               title="Activity"
@@ -818,10 +884,10 @@ export function DashboardScreen() {
           )}
         </div>
         <div className="lg:col-span-4">
-          <ModelCard />
+          <ModelCard palette={palette} />
         </div>
         <div className="lg:col-span-3">
-          <SkillsWidget />
+          <SkillsWidget palette={palette} />
         </div>
       </div>
 
@@ -843,7 +909,7 @@ export function DashboardScreen() {
               View all →
             </button>
           }
-          accentColor="#6366f1"
+          accentColor={palette.accent}
           noPadding
         >
           <div className="py-1">
@@ -857,6 +923,7 @@ export function DashboardScreen() {
                   key={s.id}
                   session={s}
                   maxTokens={maxTokens}
+                  palette={palette}
                   onClick={() =>
                     navigate({
                       to: '/chat/$sessionKey',

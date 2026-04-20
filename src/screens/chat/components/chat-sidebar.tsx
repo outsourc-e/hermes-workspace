@@ -79,8 +79,6 @@ function ThemeToggleMini() {
     'hermes-classic-light': 'hermes-classic',
     'hermes-slate': 'hermes-slate-light',
     'hermes-slate-light': 'hermes-slate',
-    'hermes-mono': 'hermes-mono-light',
-    'hermes-mono-light': 'hermes-mono',
   }
 
   return (

@@ -91,6 +91,20 @@ const THEME_PREVIEWS: Record<
   ThemeId,
   { bg: string; panel: string; border: string; accent: string; text: string }
 > = {
+  'hermes-nous': {
+    bg: '#031a1a',
+    panel: '#082224',
+    border: 'rgba(255,255,255,0.12)',
+    accent: '#ffac02',
+    text: '#f8f1e3',
+  },
+  'hermes-nous-light': {
+    bg: '#F8FAF8',
+    panel: '#FBFDFB',
+    border: 'rgba(30,74,92,0.18)',
+    accent: '#2557B7',
+    text: '#16315F',
+  },
   'hermes-official': {
     bg: '#0A0E1A',
     panel: '#11182A',
@@ -99,11 +113,11 @@ const THEME_PREVIEWS: Record<
     text: '#E6EAF2',
   },
   'hermes-official-light': {
-    bg: '#F6F8FC',
-    panel: '#FFFFFF',
-    border: '#D7DEEE',
-    accent: '#4F46E5',
-    text: '#111827',
+    bg: '#F7F7F1',
+    panel: '#FAFBF6',
+    border: '#CDD5DA',
+    accent: '#2557B7',
+    text: '#16315F',
   },
   'hermes-classic': {
     bg: '#0d0f12',
@@ -119,13 +133,6 @@ const THEME_PREVIEWS: Record<
     accent: '#7eb8f6',
     text: '#c9d1d9',
   },
-  'hermes-mono': {
-    bg: '#111111',
-    panel: '#222222',
-    border: '#333333',
-    accent: '#aaaaaa',
-    text: '#e6edf3',
-  },
   'hermes-classic-light': {
     bg: '#F5F2ED',
     panel: '#FFFFFF',
@@ -140,13 +147,6 @@ const THEME_PREVIEWS: Record<
     accent: '#3b82f6',
     text: '#1F2328',
   },
-  'hermes-mono-light': {
-    bg: '#FAFAFA',
-    panel: '#FFFFFF',
-    border: '#D4D4D4',
-    accent: '#666666',
-    text: '#1a1a1a',
-  },
 }
 
 function WorkspaceThemePicker() {
@@ -160,7 +160,7 @@ function WorkspaceThemePicker() {
   }
 
   return (
-    <div className="grid w-full gap-2 md:grid-cols-3">
+    <div className="grid w-full grid-cols-2 gap-3 lg:grid-cols-4">
       {THEMES.map((t) => {
         const isActive = current === t.id
         return (
@@ -169,10 +169,10 @@ function WorkspaceThemePicker() {
             type="button"
             onClick={() => applyWorkspaceTheme(t.id)}
             className={cn(
-              'flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
+              'flex min-h-[112px] flex-col gap-2.5 rounded-xl border p-3.5 text-left transition-all',
               isActive
-                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-subtle)] text-[var(--theme-text)]'
-                : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-subtle)] text-[var(--theme-text)] shadow-sm'
+                : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:-translate-y-0.5 hover:bg-[var(--theme-card2)]',
             )}
           >
             <PageThemeSwatch colors={THEME_PREVIEWS[t.id]} />
@@ -417,7 +417,7 @@ function SettingsRoute() {
               >
                 <SettingsRow
                   label="Theme"
-                  description="All workspace themes are dark. Pick the palette you want to use."
+                  description="Choose the workspace palette. Light and dark variants are both available."
                 >
                   <div className="w-full">
                     <WorkspaceThemePicker />
