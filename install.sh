@@ -78,16 +78,54 @@ if python3 -c "import project_agent" &>/dev/null; then
   green "  hermes-agent already installed ✓"
 else
   # Detect PEP 668 environments (Debian 12+, Ubuntu 23.04+, recent Fedora, etc.)
+  # PEP 668 places EXTERNALLY-MANAGED *inside* the stdlib directory; older drafts
+  # used the parent. Check both, plus a runtime probe as a last resort.
   is_externally_managed() {
     python3 - <<'PY' 2>/dev/null
-import sys, sysconfig, pathlib
-p = pathlib.Path(sysconfig.get_paths()["stdlib"]).parent / "EXTERNALLY-MANAGED"
-sys.exit(0 if p.exists() else 1)
+import sys, sysconfig, pathlib, subprocess
+stdlib = pathlib.Path(sysconfig.get_paths()["stdlib"])
+for candidate in (stdlib / "EXTERNALLY-MANAGED", stdlib.parent / "EXTERNALLY-MANAGED"):
+    if candidate.exists():
+        sys.exit(0)
+# Fallback: ask pip to dry-install something tiny and look for the marker
+try:
+    res = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "--dry-run", "--user", "pip"],
+        capture_output=True, text=True, timeout=8,
+    )
+    blob = (res.stderr or "") + (res.stdout or "")
+    if "third-partyly-managed-environment" in blob.lower():
+        sys.exit(0)
+except Exception:
+    pass
+sys.exit(1)
 PY
   }
 
+  ensure_pipx() {
+    if command -v pipx &>/dev/null; then return 0; fi
+    yellow "  pipx not found — attempting auto-install…"
+    if command -v apt-get &>/dev/null; then
+      sudo apt-get update -y >/dev/null 2>&1 || true
+      if sudo apt-get install -y pipx >/dev/null 2>&1; then
+        command -v pipx &>/dev/null && return 0
+      fi
+      # Older Debian/Ubuntu may use python3-pipx
+      if sudo apt-get install -y python3-pipx >/dev/null 2>&1; then
+        command -v pipx &>/dev/null && return 0
+      fi
+    elif command -v dnf &>/dev/null; then
+      sudo dnf install -y pipx >/dev/null 2>&1 && command -v pipx &>/dev/null && return 0
+    elif command -v pacman &>/dev/null; then
+      sudo pacman -Sy --noconfirm python-pipx >/dev/null 2>&1 && command -v pipx &>/dev/null && return 0
+    elif command -v brew &>/dev/null; then
+      brew install pipx >/dev/null 2>&1 && command -v pipx &>/dev/null && return 0
+    fi
+    return 1
+  }
+
   install_with_pipx() {
-    if ! command -v pipx &>/dev/null; then return 1; fi
+    ensure_pipx || return 1
     pipx install --force "hermes-agent[cron]" && pipx ensurepath >/dev/null 2>&1
   }
 
@@ -95,7 +133,12 @@ PY
     local venv_dir="$HOME/.local/share/hermes-agent/venv"
     local bin_dir="$HOME/.local/bin"
     yellow "  Creating isolated venv at $venv_dir"
-    python3 -m venv "$venv_dir"
+    if ! python3 -m venv "$venv_dir" 2>/tmp/hermes-venv-err; then
+      red "  python3 -m venv failed:"
+      cat /tmp/hermes-venv-err >&2 || true
+      yellow "  On Debian/Ubuntu you may need: sudo apt install python3-venv python3-full"
+      return 1
+    fi
     "$venv_dir/bin/pip" install --upgrade pip >/dev/null
     "$venv_dir/bin/pip" install --upgrade "hermes-agent[cron]"
     mkdir -p "$bin_dir"

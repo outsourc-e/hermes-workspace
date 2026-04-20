@@ -46,6 +46,12 @@ export function HermesReconnectBanner({
   >(null)
   const wasDisconnectedRef = useRef(false)
   const flashTimerRef = useRef<number | null>(null)
+  // Silent auto-restart: if the gateway disappears mid-session, fire
+  // /api/start-hermes once. After that, fall back to the manual "Start Agent"
+  // button so we don't loop forever on a busted environment.
+  const autoRestartTriedAtRef = useRef<number>(0)
+  // Cool-down so a permanently-dead gateway doesn't get poked every probe.
+  const AUTO_RESTART_COOLDOWN_MS = 5 * 60_000
 
   useEffect(() => {
     mountedRef.current = true
@@ -107,6 +113,40 @@ export function HermesReconnectBanner({
           } else {
             wasDisconnectedRef.current = true
             setBannerState('disconnected')
+            const sinceLastTry =
+              Date.now() - autoRestartTriedAtRef.current
+            if (sinceLastTry > AUTO_RESTART_COOLDOWN_MS) {
+              autoRestartTriedAtRef.current = Date.now()
+              void fetch('/api/start-hermes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              })
+                .then(async (res) => {
+                  if (!mountedRef.current) return
+                  const ct = res.headers.get('content-type') || ''
+                  if (!ct.includes('application/json')) return
+                  const data = (await res.json().catch(() => ({}))) as {
+                    ok?: boolean
+                    message?: string
+                  }
+                  if (res.ok && data.ok) {
+                    setMessage(
+                      data.message ||
+                        'Auto-restarting Hermes gateway…',
+                    )
+                    // Probe again shortly so the banner clears as soon as
+                    // the gateway answers /health.
+                    window.setTimeout(() => {
+                      if (mountedRef.current) {
+                        void probeNowRef.current?.(false)
+                      }
+                    }, 2_500)
+                  }
+                })
+                .catch(() => {
+                  // silent: user can still hit "Start Agent"
+                })
+            }
           }
 
           return connected
