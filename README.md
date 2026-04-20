@@ -288,6 +288,38 @@ Open `http://localhost:3000` and complete the onboarding.
 
 > **Verify:** Check the Docker logs for `[gateway] Connected to Hermes` — this confirms the workspace successfully connected to the agent.
 
+### Using a Pre-Built Image (Coolify / Easypanel / Dokploy / Unraid)
+
+If you'd rather deploy Project Workspace to a PaaS/home-lab stack without
+building from source, pull the pre-built image from GitHub Container Registry:
+
+```
+ghcr.io/outsourc-e/hermes-workspace:latest
+```
+
+Available tags:
+
+| Tag | What it is |
+|---|---|
+| `latest` | Latest `main` commit (stable; recommended) |
+| `v2.0.0` | Pinned semver tag |
+| `main-<sha>` | Specific commit |
+
+Minimal Coolify / Easypanel config:
+
+```yaml
+service: hermes-workspace
+image: ghcr.io/outsourc-e/hermes-workspace:latest
+port: 3000
+env:
+  HERMES_API_URL: http://hermes-agent:8642   # point at your gateway
+  HERMES_API_TOKEN: ${API_SERVER_KEY}        # if gateway auth is enabled
+```
+
+The image is built for `linux/amd64` and `linux/arm64`. Pair it with either
+your own `hermes-agent` container (use our `docker/agent/Dockerfile`) or an
+existing gateway on another host.
+
 ---
 
 ## 📱 Install as App (Recommended)
