@@ -13,7 +13,7 @@
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
-> **v2 — zero-fork. Clone, don't fork.** Runs on vanilla [`pip install hermes-agent`](https://github.com/NousResearch/hermes-agent). No patches, no drift. Upgrade any time with `pip install -U hermes-agent`.
+> **v2 — zero-fork. Clone, don't fork.** Runs on vanilla [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) installed via Nous's own installer. No patches, no drift.
 
 ![Hermes Workspace](./docs/screenshots/splash.png)
 
@@ -88,17 +88,18 @@ Point Hermes Workspace at any backend that supports:
 - `POST /v1/chat/completions`
 - `GET /v1/models` recommended
 
-Example Hermes gateway setup:
+Example Hermes gateway setup (from scratch):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install hermes-agent
+# Install hermes-agent via Nous's official installer
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+
+# Configure a provider + start the gateway
 hermes setup
 hermes gateway run
 ```
 
-If you're using another OpenAI-compatible server, just note its base URL.
+Our one-liner installer (below) does both steps automatically. If you're using another OpenAI-compatible server, just note its base URL.
 
 ### Step 2: Install & Run Hermes Workspace
 
@@ -142,8 +143,13 @@ when `dist` drifts under a live server process.
 # OpenAI-compatible backend URL
 HERMES_API_URL=http://127.0.0.1:8642
 
-# Optional provider keys for Hermes gateway-managed config
-ANTHROPIC_API_KEY=your-key-here
+# Optional: provider keys the Hermes gateway can read at runtime.
+# You only need the key(s) for whichever provider(s) you actually use.
+# ANTHROPIC_API_KEY=sk-ant-...         # Claude
+# OPENAI_API_KEY=sk-...                # GPT / o-series
+# OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (incl. free models)
+# GOOGLE_API_KEY=AIza...               # Gemini
+# (Ollama / LM Studio / local servers don't need a key)
 
 # Optional: password-protect the web UI
 # HERMES_PASSWORD=your_password
@@ -251,13 +257,19 @@ cd hermes-workspace
 cp .env.example .env
 ```
 
-Edit `.env` and add your API key:
+Edit `.env` and add **at least one** LLM provider key — whichever provider you want hermes-agent to use:
 
 ```env
-ANTHROPIC_API_KEY=your-key-here
+# Pick one (or more). You do NOT need all of these.
+ANTHROPIC_API_KEY=sk-ant-...           # Claude
+# OPENAI_API_KEY=sk-...                # GPT / o-series
+# OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (free models available)
+# GOOGLE_API_KEY=AIza...               # Gemini
 ```
 
-> **Important:** The `hermes-agent` container requires `ANTHROPIC_API_KEY` to function. Without it, the gateway will fail to authenticate.
+Using **Ollama, LM Studio, or another local server**? No key needed — just point hermes-agent at your local endpoint via the onboarding flow.
+
+> **Heads up:** `hermes-agent` needs to be able to reach _some_ model. If you don't configure any provider (API key or local server), chat will fail on first message.
 
 ### Step 2: Start the Services
 
@@ -432,27 +444,27 @@ The workspace auto-detects your gateway's capabilities on startup. Check your te
 
 ```
 [gateway] http://127.0.0.1:8642 available: health, models; missing: sessions, skills, memory, config, jobs
-[gateway] Missing Hermes APIs detected. Update Hermes: pip install -U hermes-agent && hermes gateway run
+[gateway] Missing Hermes APIs detected. Update hermes-agent to the latest version.
 ```
 
-**Fix:** Upgrade to the latest stock `hermes-agent`, which now ships the extended endpoints:
+**Fix:** Upgrade to the latest stock `hermes-agent`, which ships the extended endpoints:
 
 ```bash
-pip install -U hermes-agent
+cd ~/hermes-agent && git pull && uv pip install -e .
 hermes gateway run
 ```
 
-If you were on the old `outsourc-e/hermes-agent` fork, it's no longer needed as of v2 — uninstall it and install upstream instead.
+(If you installed via a different path, follow your Nous installer's upgrade instructions.) If you were on the old `outsourc-e/hermes-agent` fork, it's no longer needed as of v2 — uninstall it and use upstream instead.
 
 ### "Connection refused" or workspace hangs on load
 
 Your Hermes gateway isn't running. Start it:
 
 ```bash
-cd hermes-agent
-source .venv/bin/activate
 hermes gateway run
 ```
+
+First-time run? Do `hermes setup` first to pick a provider and model.
 
 ### Ollama: chat returns empty or model shows "Offline"
 
@@ -470,7 +482,7 @@ Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
 ### "Using upstream NousResearch/hermes-agent"
 
-v2+ runs on vanilla `hermes-agent` with full feature parity. `pip install -U hermes-agent` gets you the extended endpoints (sessions, memory, skills, config). **No fork required, ever.**
+v2+ runs on vanilla `hermes-agent` with full feature parity. The upstream ships all extended endpoints (sessions, memory, skills, config). **No fork required, ever.**
 
 If you're pinned to an older `hermes-agent` version and missing endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
 
@@ -478,12 +490,14 @@ If you're pinned to an older `hermes-agent` version and missing endpoints, the w
 
 If using Docker Compose and getting auth errors:
 
-1. **Check your API key is set:**
+1. **Check at least one provider key is set:**
 
    ```bash
-   cat .env | grep ANTHROPIC_API_KEY
-   # Should show: ANTHROPIC_API_KEY=sk-ant-...
+   grep -E '_API_KEY' .env
+   # Should show one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, GOOGLE_API_KEY, ...
    ```
+
+   (hermes-agent reads whichever key matches the provider configured in `~/.hermes/config.yaml`.)
 
 2. **View the agent container logs:**
 
