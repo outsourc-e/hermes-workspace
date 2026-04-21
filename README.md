@@ -71,6 +71,35 @@ Open http://localhost:3000. That's it.
 
 ---
 
+### Already running `hermes-agent`? Attach the workspace to it
+
+If you already have `hermes-agent` installed (via Nous's installer, `pip install`, systemd, Docker, etc.) and it's serving the gateway at `http://<host>:8642`, you don't need to reinstall anything — just point the workspace at it.
+
+```bash
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
+pnpm install
+cp .env.example .env
+
+# Point at your existing gateway. Local, Tailscale, LAN — whatever URL works.
+echo 'HERMES_API_URL=http://127.0.0.1:8642' >> .env
+
+# If your gateway was started with API_SERVER_KEY (auth enabled), set the same value:
+# echo 'HERMES_API_TOKEN=<your-key>' >> .env
+
+pnpm dev                            # http://localhost:3000
+```
+
+Requirements on the agent side:
+
+- Gateway bound to an address the workspace can reach (typically `API_SERVER_HOST=0.0.0.0` + the port exposed).
+- `API_SERVER_ENABLED=true` in `~/.hermes/.env` (or the agent's env). Enhanced endpoints (`/api/sessions`, `/api/skills`, `/api/config`, `/api/jobs`) come online automatically when the API server is enabled.
+- If `API_SERVER_KEY` is set, the workspace must pass the same value via `HERMES_API_TOKEN` — otherwise leave both unset.
+
+Verify: `curl http://127.0.0.1:8642/health` should return ok. Then start the workspace and complete onboarding — it'll detect the existing gateway and unlock the enhanced panes (sessions, memory, skills, dashboard) automatically.
+
+---
+
 ### Manual install
 
 Hermes Workspace works with any OpenAI-compatible backend. If your backend also exposes Hermes gateway APIs, enhanced features like sessions, memory, skills, and jobs unlock automatically.
