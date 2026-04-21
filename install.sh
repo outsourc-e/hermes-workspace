@@ -7,9 +7,9 @@
 # What it does:
 #   1. Verifies Node 22+, git, pnpm
 #   2. Installs hermes-agent via Nous's official upstream installer
-#      (hermes-agent is NOT on PyPI; it's a source install handled by Nous)
 #   3. Clones hermes-workspace
-#   4. Sets up .env, installs deps, links bundled skills
+#   4. Sets up .env, enables the Hermes HTTP API, installs deps,
+#      and links bundled skills
 #
 # Re-runnable. Will skip anything already installed.
 
@@ -18,7 +18,6 @@ set -euo pipefail
 REPO_URL="${REPO_URL:-https://github.com/outsourc-e/hermes-workspace.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/hermes-workspace}"
 GATEWAY_PORT="${GATEWAY_PORT:-8642}"
-WORKSPACE_PORT="${WORKSPACE_PORT:-3000}"
 NOUS_INSTALLER_URL="${NOUS_INSTALLER_URL:-https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh}"
 
 # ─── helpers ──────────────────────────────────────────────────────────────
@@ -50,6 +49,38 @@ ensure_path() {
     *":$candidate:"*) ;;
     *) export PATH="$candidate:$PATH" ;;
   esac
+}
+
+ensure_env_key() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp
+
+  mkdir -p "$(dirname "$file")"
+  tmp="$(mktemp)"
+
+  if [[ -f "$file" ]]; then
+    awk -v key="$key" -v value="$value" '
+      BEGIN { found = 0 }
+      index($0, key "=") == 1 {
+        print key "=" value
+        found = 1
+        next
+      }
+      { print }
+      END {
+        if (!found) {
+          if (NR > 0) print ""
+          print key "=" value
+        }
+      }
+    ' "$file" > "$tmp"
+  else
+    printf '%s=%s\n' "$key" "$value" > "$tmp"
+  fi
+
+  mv "$tmp" "$file"
 }
 
 # ─── preflight ────────────────────────────────────────────────────────────
@@ -112,9 +143,13 @@ fi
 # ─── clone workspace ──────────────────────────────────────────────────────
 
 cyan "→ Cloning hermes-workspace…"
-if [[ -d "$INSTALL_DIR" ]]; then
+if [[ -d "$INSTALL_DIR/.git" ]]; then
   yellow "  $INSTALL_DIR exists; pulling latest"
   git -C "$INSTALL_DIR" pull --ff-only
+elif [[ -e "$INSTALL_DIR" ]]; then
+  red "Path exists but is not a git repo: $INSTALL_DIR"
+  red "Move/remove it or set INSTALL_DIR=..."
+  exit 1
 else
   git clone "$REPO_URL" "$INSTALL_DIR"
 fi
@@ -127,10 +162,16 @@ cyan "→ Configuring .env…"
 if [[ ! -f .env ]]; then
   cp .env.example .env
 fi
-if ! grep -q "HERMES_API_URL=" .env 2>/dev/null; then
-  printf '\nHERMES_API_URL=http://127.0.0.1:%s\n' "$GATEWAY_PORT" >> .env
-fi
+ensure_env_key "$INSTALL_DIR/.env" "HERMES_API_URL" "http://127.0.0.1:${GATEWAY_PORT}"
 green "  .env ready ✓"
+
+cyan "→ Enabling Hermes HTTP API…"
+HERMES_ENV_PATH="$(hermes config env-path 2>/dev/null || true)"
+if [[ -z "$HERMES_ENV_PATH" ]]; then
+  HERMES_ENV_PATH="$HOME/.hermes/.env"
+fi
+ensure_env_key "$HERMES_ENV_PATH" "API_SERVER_ENABLED" "true"
+green "  Hermes env updated: $HERMES_ENV_PATH ✓"
 
 cyan "→ Installing npm deps (pnpm install)…"
 pnpm install --silent
@@ -170,10 +211,10 @@ Next steps (two terminals):
   2) Start the workspace UI:
        cd $INSTALL_DIR && pnpm dev
 
-  3) Open http://localhost:$WORKSPACE_PORT
+  3) Open http://localhost:3000
 
-Optional auto-start:
-  pnpm start:all   # launches both in one command (see package.json)
+If the gateway was already running before this install,
+restart it so API_SERVER_ENABLED=true takes effect.
 
 EOF
 
