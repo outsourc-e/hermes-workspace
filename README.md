@@ -277,10 +277,14 @@ Using **Ollama, LM Studio, or another local server**? No key needed — just poi
 docker compose up
 ```
 
-This starts two services:
+This pulls two pre-built images and starts them:
 
-- **hermes-agent** — The AI agent gateway (port 8642)
-- **hermes-workspace** — The web UI (port 3000)
+- **hermes-agent** → `nousresearch/hermes-agent:latest` on port **8642**
+- **hermes-workspace** → `ghcr.io/outsourc-e/hermes-workspace:latest` on port **3000**
+
+No local build. First run takes a minute to pull; subsequent starts are instant.
+Agent state (config, sessions, skills, memory, credentials) persists in the
+`hermes-data` named volume, so containers can be recreated without data loss.
 
 ### Step 3: Access the Workspace
 
@@ -288,10 +292,21 @@ Open `http://localhost:3000` and complete the onboarding.
 
 > **Verify:** Check the Docker logs for `[gateway] Connected to Hermes` — this confirms the workspace successfully connected to the agent.
 
+### Building from source
+
+Want to hack on the workspace or the bundled agent Dockerfile? Use the dev overlay:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+The base `docker-compose.yml` stays untouched — the overlay adds `build:` blocks
+that take priority over `image:`, so both services compile from local source.
+
 ### Using a Pre-Built Image (Coolify / Easypanel / Dokploy / Unraid)
 
-If you'd rather deploy Project Workspace to a PaaS/home-lab stack without
-building from source, pull the pre-built image from GitHub Container Registry:
+Deploying Project Workspace to a PaaS or home-lab stack? Pull the image
+directly from GitHub Container Registry:
 
 ```
 ghcr.io/outsourc-e/hermes-workspace:latest
@@ -317,8 +332,8 @@ env:
 ```
 
 The image is built for `linux/amd64` and `linux/arm64`. Pair it with either
-your own `hermes-agent` container (use our `docker/agent/Dockerfile`) or an
-existing gateway on another host.
+a `nousresearch/hermes-agent:latest` container (what our `docker-compose.yml`
+does by default) or an existing gateway on another host.
 
 ---
 

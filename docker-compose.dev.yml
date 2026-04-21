@@ -1,0 +1,23 @@
+# Project Workspace + Agent — Development Overlay
+#
+# Builds both services from source instead of pulling pre-built images.
+# Use when modifying the workspace or the bundled agent Dockerfile.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# The base docker-compose.yml stays untouched for a regular install-and-run.
+# When this overlay is merged in, `build:` takes priority over `image:` for
+# each service, so source code is compiled locally and tagged with the
+# upstream image name.
+
+services:
+  hermes-agent:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+
+  hermes-workspace:
+    build:
+      context: .
+      dockerfile: docker/workspace/Dockerfile

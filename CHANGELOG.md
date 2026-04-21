@@ -3,6 +3,11 @@
 All notable changes to Project Workspace are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- **`docker compose up` now pulls pre-built images by default** (#82) — `nousresearch/hermes-agent:latest` for the gateway and `ghcr.io/outsourc-e/hermes-workspace:latest` for the UI. Agent state persists in the `hermes-data` named volume. Adds `docker-compose.dev.yml` overlay for building from source.
+
 ## [2.0.0] — 2026-04-20
 
 **Zero-fork release.** Clone, don't fork. Project Workspace now runs on vanilla `pip install hermes-agent` with no patches, no drift, no custom gateway required.

@@ -12,23 +12,30 @@
 #   3. docker compose up
 #   4. Open http://localhost:3000
 #
-# Enhanced Mode (sessions, skills, memory, config):
-#   The bundled agent Dockerfile builds from outsourc-e/hermes-agent which
-#   includes the enhanced gateway APIs. Vanilla NousResearch/hermes-agent
-#   will work in "portable" mode (chat only, no sessions/skills/memory).
+# Images:
+#   This file pulls pre-built images by default — no local build required.
+#     - nousresearch/hermes-agent:latest  (Project Agent, Dockerfile upstream)
+#     - ghcr.io/outsourc-e/hermes-workspace:latest  (this workspace)
+#
+#   To build from source instead (e.g. for development), use:
+#     docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Persistent data:
+#   The `hermes-data` named volume mounts at /opt/data inside the agent
+#   container. Config, sessions, skills, memory, and credentials live there
+#   and survive container recreation. For host-path mounts see the commented
+#   `volumes:` block on the hermes-agent service.
 #
 # Troubleshooting:
 #   - See README.md "Docker" troubleshooting section
 #   - Check logs: docker compose logs hermes-agent
-#   - Agent must expose port 8642 with: hermes gateway run
+#   - Agent must expose port 8642
 
 services:
   # The Hermes AI Agent Gateway
   # Provides the backend API that the workspace connects to
   hermes-agent:
-    build:
-      context: .
-      dockerfile: docker/agent/Dockerfile
+    image: nousresearch/hermes-agent:latest
     env_file:
       - .env
     environment:
@@ -46,8 +53,13 @@ services:
       API_SERVER_KEY: ${API_SERVER_KEY:-}
       API_SERVER_HOST: ${API_SERVER_HOST:-0.0.0.0}
       API_SERVER_ENABLED: 'true'
+    volumes:
+      # Persist agent state across container recreation. Swap for a
+      # host-path mount (e.g. `./data:/opt/data`) if you want to edit
+      # config/skills directly from the host.
+      - hermes-data:/opt/data
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8642/health']
+      test: ['CMD-SHELL', 'curl -fsS http://localhost:8642/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,9 +70,7 @@ services:
   # The Project Workspace Web UI
   # Connects to hermes-agent at http://hermes-agent:8642
   hermes-workspace:
-    build:
-      context: .
-      dockerfile: docker/workspace/Dockerfile
+    image: ghcr.io/outsourc-e/hermes-workspace:latest
     depends_on:
       hermes-agent:
         condition: service_healthy
@@ -73,3 +83,6 @@ services:
       HERMES_API_TOKEN: ${API_SERVER_KEY:-}
     ports:
       - '3000:3000'
+
+volumes:
+  hermes-data:
