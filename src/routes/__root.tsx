@@ -42,7 +42,7 @@ const APP_CSP = [
 ].join('; ')
 
 const THEME_STORAGE_KEY = 'hermes-theme'
-const DEFAULT_THEME = 'hermes-official'
+const DEFAULT_THEME = 'hermes-nous'
 const VALID_THEMES = [
   'hermes-nous',
   'hermes-nous-light',
@@ -359,7 +359,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             __html: wrapInlineScript(`
           (function(){
             if (document.getElementById('splash-screen')) return;
-            var bg = '#0A0E1A', txt = '#E6EAF2', muted = '#9AA5BD', accent = '#6366F1';
+            var bg = '#031A1A', txt = '#F8F1E3', muted = '#9CB2AE', accent = '#FFAC02';
             try {
               var theme = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_THEME}';
               if (theme === 'hermes-nous') {

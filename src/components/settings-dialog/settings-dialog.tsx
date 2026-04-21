@@ -1026,7 +1026,7 @@ function ThemeSwatch({
 function EnterpriseThemePicker() {
   const { updateSettings } = useSettings()
   const [current, setCurrent] = useState(() => {
-    if (typeof window === 'undefined') return 'hermes-official'
+    if (typeof window === 'undefined') return 'hermes-nous'
     return getTheme()
   })
   const currentMode = isDarkTheme(current) ? 'dark' : 'light'
