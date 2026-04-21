@@ -173,6 +173,25 @@ fi
 ensure_env_key "$HERMES_ENV_PATH" "API_SERVER_ENABLED" "true"
 green "  Hermes env updated: $HERMES_ENV_PATH ✓"
 
+# Guard against a common foot-gun: users editing ~/.hermes/.env by hand and
+# writing env var names without underscores (APISERVERENABLED vs
+# API_SERVER_ENABLED). The gateway reads exact names — typos are silently
+# ignored, which produces a "gateway starts but API server never binds"
+# failure that's hard to diagnose from the UI.
+if [[ -f "$HERMES_ENV_PATH" ]]; then
+  SUSPICIOUS=$(grep -E "^(API[A-Z]+|HERMES[A-Z]+)=" "$HERMES_ENV_PATH" 2>/dev/null \
+    | grep -vE "^(API_|HERMES_)" || true)
+  if [[ -n "$SUSPICIOUS" ]]; then
+    yellow ""
+    yellow "⚠  Found env var names missing underscores in $HERMES_ENV_PATH:"
+    echo "$SUSPICIOUS" | sed 's/^/      /'
+    yellow "   The gateway reads names with underscores (API_SERVER_ENABLED,"
+    yellow "   not APISERVERENABLED). These lines will be silently ignored."
+    yellow "   Fix them and run: hermes gateway run --replace"
+    yellow ""
+  fi
+fi
+
 cyan "→ Installing npm deps (pnpm install)…"
 pnpm install --silent
 green "  deps installed ✓"
