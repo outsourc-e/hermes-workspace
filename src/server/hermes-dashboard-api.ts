@@ -178,13 +178,76 @@ export async function getConfigRaw(): Promise<{ yaml: string }> {
   return dashboardJson('/api/config/raw')
 }
 
+/**
+ * Deep merge two records. Arrays and non-objects are replaced wholesale;
+ * plain objects recurse. Values set to \`null\` in `patch` are treated as
+ * explicit removals of the target key.
+ */
+function deepMerge(
+  target: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...target }
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      delete out[key]
+      continue
+    }
+    const existing = out[key]
+    const bothObjects =
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      existing &&
+      typeof existing === 'object' &&
+      !Array.isArray(existing)
+    if (bothObjects) {
+      out[key] = deepMerge(
+        existing as Record<string, unknown>,
+        value as Record<string, unknown>,
+      )
+    } else {
+      out[key] = value
+    }
+  }
+  return out
+}
+
+/**
+ * Save a partial config patch. Fetches the current dashboard config first and
+ * deep-merges the patch on top so we never send a truncated PUT that would
+ * destroy unrelated sections (see issue #85).
+ *
+ * Callers pass ONLY the fields they want to change; anything not present in
+ * `config` is preserved from the current dashboard config.
+ */
 export async function saveConfig(
   config: Record<string, unknown>,
 ): Promise<{ ok: boolean }> {
+  let merged: Record<string, unknown> = config
+  try {
+    const current = await getConfig()
+    // Dashboards have historically wrapped the config in `{ config: {...} }`.
+    // Support both shapes defensively.
+    const base =
+      current && typeof current === 'object' && 'config' in current
+        ? ((current as Record<string, unknown>).config as Record<
+            string,
+            unknown
+          >)
+        : (current as Record<string, unknown>)
+    if (base && typeof base === 'object') {
+      merged = deepMerge(base, config)
+    }
+  } catch {
+    // If we can't read the current config, fall back to sending the raw patch.
+    // The dashboard will reject or overwrite — this is no worse than the old
+    // behaviour, and the happy path (GET working) is the common case.
+  }
   return dashboardJson('/api/config', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ config }),
+    body: JSON.stringify({ config: merged }),
   })
 }
 
