@@ -81,11 +81,13 @@ cd hermes-workspace
 pnpm install
 cp .env.example .env
 
-# Point at your existing gateway. Local, Tailscale, LAN — whatever URL works.
+# Point at your existing Hermes services.
 echo 'HERMES_API_URL=http://127.0.0.1:8642' >> .env
+# Zero-fork installs also need the separate dashboard API for config/sessions/skills/jobs.
+echo 'HERMES_DASHBOARD_URL=http://127.0.0.1:9119' >> .env
 
 # If your gateway was started with API_SERVER_KEY (auth enabled), set the same value:
-# echo 'HERMES_API_TOKEN=<your-key>' >> .env
+# echo 'HERMES_API_TOKEN=***' >> .env
 
 pnpm dev                            # http://localhost:3000
 ```
@@ -93,10 +95,16 @@ pnpm dev                            # http://localhost:3000
 Requirements on the agent side:
 
 - Gateway bound to an address the workspace can reach (typically `API_SERVER_HOST=0.0.0.0` + the port exposed).
-- `API_SERVER_ENABLED=true` in `~/.hermes/.env` (or the agent's env). Enhanced endpoints (`/api/sessions`, `/api/skills`, `/api/config`, `/api/jobs`) come online automatically when the API server is enabled.
+- `API_SERVER_ENABLED=true` in `~/.hermes/.env` (or the agent's env) so the gateway serves core APIs on `:8642`.
+- `hermes dashboard` running (default `http://127.0.0.1:9119`) for zero-fork installs. The dashboard provides config, sessions, skills, and jobs APIs.
 - If `API_SERVER_KEY` is set, the workspace must pass the same value via `HERMES_API_TOKEN` — otherwise leave both unset.
 
-Verify: `curl http://127.0.0.1:8642/health` should return ok. Then start the workspace and complete onboarding — it'll detect the existing gateway and unlock the enhanced panes (sessions, memory, skills, dashboard) automatically.
+Verify both services before opening the workspace:
+
+- `curl http://127.0.0.1:8642/health` should return ok.
+- `curl http://127.0.0.1:9119/api/status` should return dashboard metadata.
+
+Then start the workspace and complete onboarding — it should detect the gateway + dashboard pair and unlock the enhanced panes automatically.
 
 ---
 
@@ -253,14 +261,19 @@ You can adapt the same shape for other OpenAI-compatible local runners, but `Ato
 API_SERVER_ENABLED=true
 ```
 
-**3. Start the gateway and workspace:**
+**3. Start the gateway, dashboard, and workspace:**
 
 ```bash
-hermes gateway run          # Starts on :8642
-HERMES_API_URL=http://127.0.0.1:8642 pnpm dev
+hermes gateway run          # Starts core APIs on :8642
+hermes dashboard            # Starts dashboard APIs on :9119
+HERMES_API_URL=http://127.0.0.1:8642 \
+HERMES_DASHBOARD_URL=http://127.0.0.1:9119 \
+pnpm dev
 ```
 
-All workspace features unlock automatically — sessions persist, memory saves across chats, skills are available, and the dashboard shows real usage data.
+For authenticated gateways, also set `HERMES_API_TOKEN` in the workspace environment to the same value as `API_SERVER_KEY`.
+
+All workspace features unlock automatically once both services are reachable — sessions persist, memory saves across chats, skills are available, and the dashboard shows real usage data.
 
 > **Works with any OpenAI-compatible server** — Atomic Chat, Ollama, LM Studio, vLLM, llama.cpp, LocalAI, etc. Just change the `base_url` and `model` in the config above.
 
