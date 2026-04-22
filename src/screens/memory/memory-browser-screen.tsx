@@ -424,7 +424,7 @@ export function MemoryBrowserScreen() {
                       type="button"
                       disabled={isSaving}
                       onClick={handleSaveEditing}
-                      className="rounded-md bg-accent-500 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-md bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isSaving ? 'Saving...' : 'Save'}
                     </button>
