@@ -244,6 +244,7 @@ export function useChatHistory({
   )
 
   const sessionKeyForHistory = useMemo(() => {
+    if (isNewChat) return 'new'
     const candidates = [
       normalizedForcedSessionKey,
       normalizedActiveSessionKey,
@@ -253,6 +254,7 @@ export function useChatHistory({
     return match || 'main'
   }, [
     explicitRouteSessionKey,
+    isNewChat,
     normalizedActiveSessionKey,
     normalizedForcedSessionKey,
   ])
