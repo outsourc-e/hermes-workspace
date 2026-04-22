@@ -15,6 +15,7 @@ export type LoaderStyle =
 export const DEFAULT_CHAT_DISPLAY_NAME = 'User'
 
 export type EnterBehavior = 'send' | 'newline'
+export type ChatWidth = 'comfortable' | 'wide' | 'full'
 
 export type ChatSettings = {
   showToolMessages: boolean
@@ -29,6 +30,15 @@ export type ChatSettings = {
    *  - 'newline' — Enter inserts a newline, Cmd+Enter / Ctrl+Enter sends
    */
   enterBehavior: EnterBehavior
+  /**
+   * Max-width of the chat content column (#89).
+   *  - 'comfortable' — 900px (default, keeps prior layout)
+   *  - 'wide'        — 1200px
+   *  - 'full'        — 100% of the pane (edge-to-edge)
+   * Implemented via the --chat-content-max-width CSS variable switched by
+   * the `data-chat-width` attribute on <html>.
+   */
+  chatWidth: ChatWidth
 }
 
 type ChatSettingsState = {
@@ -45,6 +55,7 @@ function defaultChatSettings(): ChatSettings {
     displayName: DEFAULT_CHAT_DISPLAY_NAME,
     avatarDataUrl: null,
     enterBehavior: 'send',
+    chatWidth: 'comfortable',
   }
 }
 
@@ -111,6 +122,22 @@ export function selectChatProfileAvatarDataUrl(
 
 export function selectEnterBehavior(state: ChatSettingsState): EnterBehavior {
   return state.settings.enterBehavior
+}
+
+export function selectChatWidth(state: ChatSettingsState): ChatWidth {
+  return state.settings.chatWidth
+}
+
+/**
+ * Hook: keep <html data-chat-width='...'> in sync with the current setting.
+ * Call once in the app root so CSS vars react to the pref.
+ */
+export function useApplyChatWidth(): void {
+  const chatWidth = useChatSettingsStore(selectChatWidth)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.setAttribute('data-chat-width', chatWidth)
+  }, [chatWidth])
 }
 
 export function useChatSettings() {

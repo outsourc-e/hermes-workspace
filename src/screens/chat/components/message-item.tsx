@@ -2119,7 +2119,7 @@ function MessageItemComponent({
       )}
 
       {thinking && !hasText && !hasStreamToolCalls && (
-        <div className="w-full max-w-[900px]">
+        <div className="w-full max-w-[var(--chat-content-max-width)]">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-fit">
               <HugeiconsIcon
@@ -2161,7 +2161,7 @@ function MessageItemComponent({
         </div>
       )}
       {effectiveIsStreaming && hasLifecycleEvents && !hasToolCalls && (
-        <div className="w-full max-w-[900px] flex flex-col gap-1">
+        <div className="w-full max-w-[var(--chat-content-max-width)] flex flex-col gap-1">
           {effectiveLifecycleEvents.map((event, index) => (
             <LifecycleEventCard
               key={`${event.timestamp}-${index}-${event.text}`}
@@ -2174,7 +2174,7 @@ function MessageItemComponent({
       )}
       {/* Narration messages (tool-call activity) — compact collapsible row */}
       {!isUser && (message as any).__isNarration && hasText && (
-        <div className="w-full max-w-[900px]">
+        <div className="w-full max-w-[var(--chat-content-max-width)]">
           <details className="group/narration rounded-lg border border-primary-200/50 bg-primary-50/30 hover:bg-primary-50 dark:hover:bg-primary-800/50 transition-colors">
             <summary className="flex items-center gap-2 cursor-pointer select-none px-3 py-2 list-none [&::-webkit-details-marker]:hidden">
               <span className="size-6 flex items-center justify-center rounded-full bg-accent-500/15 shrink-0">

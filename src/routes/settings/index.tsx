@@ -863,6 +863,28 @@ function ChatDisplaySection() {
             aria-label="Enter inserts newline instead of sending"
           />
         </SettingsRow>
+        <SettingsRow
+          label="Chat content width"
+          description="Controls the max-width of the message column on wide screens."
+        >
+          <select
+            value={chatSettings.chatWidth}
+            onChange={(e) =>
+              updateChatSettings({
+                chatWidth: e.target.value as
+                  | 'comfortable'
+                  | 'wide'
+                  | 'full',
+              })
+            }
+            className="h-8 rounded-md border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400"
+            aria-label="Chat content width"
+          >
+            <option value="comfortable">Comfortable (900px)</option>
+            <option value="wide">Wide (1200px)</option>
+            <option value="full">Full width</option>
+          </select>
+        </SettingsRow>
       </SettingsSection>
       {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>

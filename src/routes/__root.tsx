@@ -16,6 +16,7 @@ import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
+import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import {
   HermesOnboarding,
   ONBOARDING_COMPLETE_EVENT,
@@ -248,6 +249,7 @@ function RootLayout() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
+  useApplyChatWidth()
 
   useEffect(() => {
     initializeSettingsAppearance()
