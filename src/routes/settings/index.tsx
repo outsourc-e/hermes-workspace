@@ -845,6 +845,24 @@ function ChatDisplaySection() {
             aria-label="Show reasoning blocks"
           />
         </SettingsRow>
+        <SettingsRow
+          label="Enter key behavior"
+          description={
+            chatSettings.enterBehavior === 'newline'
+              ? 'Enter inserts a newline. Use ⌘/Ctrl+Enter to send.'
+              : 'Enter sends the message. Use Shift+Enter for a newline.'
+          }
+        >
+          <Switch
+            checked={chatSettings.enterBehavior === 'newline'}
+            onCheckedChange={(checked) =>
+              updateChatSettings({
+                enterBehavior: checked ? 'newline' : 'send',
+              })
+            }
+            aria-label="Enter inserts newline instead of sending"
+          />
+        </SettingsRow>
       </SettingsSection>
       {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>
