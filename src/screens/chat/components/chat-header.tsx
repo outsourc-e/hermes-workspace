@@ -351,7 +351,7 @@ function ChatHeaderComponent({
                 void saveTitleEdit()
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
                   event.preventDefault()
                   void saveTitleEdit()
                   return

@@ -887,7 +887,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               ref={nameInputRef}
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && teamName.trim()) setStep(2) }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && teamName.trim() && !e.nativeEvent.isComposing) setStep(2) }}
               placeholder="e.g. Research Squad, Dev Team..."
               className="h-11 w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-2 transition-colors"
             />

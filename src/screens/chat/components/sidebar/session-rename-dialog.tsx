@@ -46,7 +46,7 @@ export function SessionRenameDialog({
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                 e.preventDefault()
                 onSave(renameValue)
               }

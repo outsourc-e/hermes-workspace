@@ -397,7 +397,7 @@ function OrchestratorCard({
                 onChange={(e) => setEditValue(e.target.value)}
                 onBlur={commitEdit}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitEdit()
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) commitEdit()
                   if (e.key === 'Escape') setIsEditing(false)
                 }}
                 placeholder="Agent name..."

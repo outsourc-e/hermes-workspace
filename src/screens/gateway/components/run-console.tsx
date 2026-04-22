@@ -510,7 +510,7 @@ export function RunConsole({
                 value={steerInput}
                 onChange={(e) => setSteerInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && steerInput.trim()) {
+                  if (e.key === 'Enter' && steerInput.trim() && !e.nativeEvent.isComposing) {
                     onSteerAgent(steerTarget, steerInput.trim())
                     setSteerInput('')
                     setSteerTarget(null)

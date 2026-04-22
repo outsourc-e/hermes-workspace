@@ -1349,7 +1349,7 @@ export function FilesScreen() {
               value={promptValue}
               onChange={(e) => setPromptValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void handlePromptSubmit()
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handlePromptSubmit()
               }}
               className="w-full rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-3 py-2 text-sm text-primary-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-300"
               autoFocus
