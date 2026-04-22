@@ -89,7 +89,7 @@ echo 'HERMES_DASHBOARD_URL=http://127.0.0.1:9119' >> .env
 # If your gateway was started with API_SERVER_KEY (auth enabled), set the same value:
 # echo 'HERMES_API_TOKEN=***' >> .env
 
-pnpm dev                            # http://localhost:3000
+pnpm dev                            # http://localhost:3000 (override with PORT=4000 pnpm dev)
 ```
 
 Requirements on the agent side:

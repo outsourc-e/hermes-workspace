@@ -7,10 +7,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev --port 3000",
+    "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
     "build": "vite build",
     "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node .output/server/index.mjs",
-    "start:dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev --port 3000",
+    "start:dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
     "preview": "vite preview",
     "test": "vitest run",
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",

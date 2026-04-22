@@ -442,8 +442,12 @@ const config = defineConfig(({ mode, command }) => {
     server: {
       // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking connectivity
       host: '0.0.0.0',
-      port: 3002,
-      strictPort: false, // allow fallback if 3002 is taken, but log clearly
+      // Port precedence:
+      //   1. --port CLI flag (wins, but we no longer hardcode it in package.json)
+      //   2. $PORT env var (for containers, reverse proxies, WhatsApp bridge collisions, etc. — see #96)
+      //   3. default 3000 (matches README/docs/docker-compose expectations)
+      port: process.env.PORT ? Number(process.env.PORT) : 3000,
+      strictPort: false, // allow fallback if port is taken, but log clearly
       allowedHosts: true,
       watch: {
         // Exclude generated route tree — TanStack Router's file watcher
