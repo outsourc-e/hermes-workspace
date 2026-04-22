@@ -39,11 +39,24 @@ function getActiveProfilePath(): string {
   return path.join(getHermesRoot(), 'active_profile')
 }
 
+/**
+ * Validate a profile name that will be *written* to disk. The 'default'
+ * profile is reserved — callers must not create or mutate it via the UI.
+ */
 function validateProfileName(name: string): string {
-  const trimmed = name.trim()
-  if (!trimmed) throw new Error('Profile name is required')
+  const trimmed = validateProfileIdentifier(name)
   if (trimmed === 'default')
     throw new Error('Default profile cannot be modified here')
+  return trimmed
+}
+
+/**
+ * Validate a profile name that will only be *read* (e.g. \`cloneFrom\` source).
+ * Any existing profile name is allowed, including 'default'.
+ */
+function validateProfileIdentifier(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Profile name is required')
   if (
     trimmed.includes('/') ||
     trimmed.includes('\\') ||
@@ -254,12 +267,13 @@ export function createProfile(
 
   // Clone config from source profile if specified
   if (options?.cloneFrom) {
-    const sourceName = validateProfileName(options.cloneFrom)
-    const sourceConfigPath = path.join(
-      getProfilesRoot(),
-      sourceName,
-      'config.yaml',
-    )
+    const sourceName = validateProfileIdentifier(options.cloneFrom)
+    // The 'default' profile lives at ~/.hermes, not ~/.hermes/profiles/default
+    const sourceRoot =
+      sourceName === 'default'
+        ? getHermesRoot()
+        : path.join(getProfilesRoot(), sourceName)
+    const sourceConfigPath = path.join(sourceRoot, 'config.yaml')
     if (fs.existsSync(sourceConfigPath)) {
       fs.copyFileSync(sourceConfigPath, configPath)
     } else {
