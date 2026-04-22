@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { usePageTitle } from '@/hooks/use-page-title'
 import {
@@ -16,6 +16,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Markdown } from '@/components/prompt-kit/markdown'
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Types
@@ -146,86 +147,6 @@ function getParentPath(pathValue: string): string {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Simple markdown → HTML (no deps)
-// ──────────────────────────────────────────────────────────────────────────────
-
-function markdownToHtml(md: string): string {
-  let html = md
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-
-  // Fenced code blocks
-  html = html.replace(/```[\w]*\n([\s\S]*?)```/g, (_m, code: string) => {
-    return `<pre class="md-code-block"><code>${code}</code></pre>`
-  })
-
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>')
-
-  // Headers
-  html = html.replace(/^#{6}\s+(.+)$/gm, '<h6 class="md-h6">$1</h6>')
-  html = html.replace(/^#{5}\s+(.+)$/gm, '<h5 class="md-h5">$1</h5>')
-  html = html.replace(/^#{4}\s+(.+)$/gm, '<h4 class="md-h4">$1</h4>')
-  html = html.replace(/^#{3}\s+(.+)$/gm, '<h3 class="md-h3">$1</h3>')
-  html = html.replace(/^#{2}\s+(.+)$/gm, '<h2 class="md-h2">$1</h2>')
-  html = html.replace(/^#{1}\s+(.+)$/gm, '<h1 class="md-h1">$1</h1>')
-
-  // Bold / italic
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>')
-  html = html.replace(/_(.+?)_/g, '<em>$1</em>')
-
-  // Strikethrough
-  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>')
-
-  // Horizontal rules
-  html = html.replace(/^---+$/gm, '<hr class="md-hr" />')
-
-  // Blockquotes (re-escaped)
-  html = html.replace(
-    /^&gt;\s+(.+)$/gm,
-    '<blockquote class="md-blockquote">$1</blockquote>',
-  )
-
-  // Unordered lists
-  html = html.replace(/^[-*+]\s+(.+)$/gm, '<li class="md-li">$1</li>')
-  html = html.replace(
-    /(<li[^>]*>.*<\/li>\n?)+/g,
-    (m) => `<ul class="md-ul">${m}</ul>`,
-  )
-
-  // Links
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>',
-  )
-
-  // Paragraphs
-  const lines = html.split('\n')
-  const result: Array<string> = []
-  for (const line of lines) {
-    if (
-      line.trim() === '' ||
-      line.startsWith('<h') ||
-      line.startsWith('<ul') ||
-      line.startsWith('<ol') ||
-      line.startsWith('<li') ||
-      line.startsWith('<pre') ||
-      line.startsWith('<blockquote') ||
-      line.startsWith('<hr')
-    ) {
-      result.push(line)
-    } else {
-      result.push(`<p class="md-p">${line}</p>`)
-    }
-  }
-  return result.join('\n')
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
 // Line-by-line diff (no external lib)
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -342,49 +263,112 @@ const KEYWORDS = new Set([
   'delete',
 ])
 
-function highlightCode(code: string, ext: string): string {
-  if (ext === 'json') {
-    return code
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/("(?:[^"\\]|\\.)*")(\s*:)/g, '<span class="hl-key">$1</span>$2')
-      .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="hl-str">$1</span>')
-      .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="hl-num">$1</span>')
-      .replace(/:\s*(true|false|null)/g, ': <span class="hl-kw">$1</span>')
+type HighlightKind =
+  | 'plain'
+  | 'comment'
+  | 'jsonKey'
+  | 'keyword'
+  | 'number'
+  | 'string'
+  | 'type'
+
+type HighlightToken = {
+  text: string
+  kind: HighlightKind
+}
+
+const HIGHLIGHT_CLASS_BY_KIND: Record<Exclude<HighlightKind, 'plain'>, string> = {
+  comment: 'hl-comment',
+  jsonKey: 'hl-key',
+  keyword: 'hl-kw',
+  number: 'hl-num',
+  string: 'hl-str',
+  type: 'hl-type',
+}
+
+function pushHighlightToken(tokens: Array<HighlightToken>, text: string, kind: HighlightKind = 'plain') {
+  if (!text) return
+  tokens.push({ text, kind })
+}
+
+function tokenizeJson(code: string): Array<HighlightToken> {
+  const tokens: Array<HighlightToken> = []
+  const pattern = /("(?:[^"\\]|\\.)*")(\s*:)?|-?\d+\.?\d*|\b(?:true|false|null)\b/g
+  let lastIndex = 0
+
+  for (const match of code.matchAll(pattern)) {
+    const index = match.index ?? 0
+    pushHighlightToken(tokens, code.slice(lastIndex, index))
+
+    const [value, stringValue, colon] = match
+    if (stringValue) {
+      pushHighlightToken(tokens, stringValue, colon ? 'jsonKey' : 'string')
+      if (colon) pushHighlightToken(tokens, colon)
+    } else if (value === 'true' || value === 'false' || value === 'null') {
+      pushHighlightToken(tokens, value, 'keyword')
+    } else {
+      pushHighlightToken(tokens, value, 'number')
+    }
+
+    lastIndex = index + value.length
   }
 
-  const escaped = code
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  pushHighlightToken(tokens, code.slice(lastIndex))
+  return tokens
+}
 
-  // Strings (single + double + template)
-  let out = escaped.replace(
-    /(["'`])(?:(?!\1)[^\\]|\\.)*?\1/g,
-    '<span class="hl-str">$&</span>',
-  )
+function tokenizeCode(code: string): Array<HighlightToken> {
+  const tokens: Array<HighlightToken> = []
+  const pattern =
+    /\/\/[^\n]*|\/\*[\s\S]*?\*\/|(["'`])(?:(?!\1)[^\\]|\\.)*?\1|(?<![a-zA-Z_$])\b\d+\.?\d*\b|\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/g
+  let lastIndex = 0
 
-  // Line comments
-  out = out.replace(/(\/\/[^\n]*)/g, '<span class="hl-comment">$1</span>')
+  for (const match of code.matchAll(pattern)) {
+    const index = match.index ?? 0
+    const value = match[0]
+    pushHighlightToken(tokens, code.slice(lastIndex, index))
 
-  // Block comments
-  out = out.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="hl-comment">$1</span>')
+    if (value.startsWith('//') || value.startsWith('/*')) {
+      pushHighlightToken(tokens, value, 'comment')
+    } else if (value.startsWith('"') || value.startsWith("'") || value.startsWith('`')) {
+      pushHighlightToken(tokens, value, 'string')
+    } else if (/^-?\d+\.?\d*$/.test(value)) {
+      pushHighlightToken(tokens, value, 'number')
+    } else if (KEYWORDS.has(value)) {
+      pushHighlightToken(tokens, value, 'keyword')
+    } else if (/^[A-Z]/.test(value)) {
+      pushHighlightToken(tokens, value, 'type')
+    } else {
+      pushHighlightToken(tokens, value)
+    }
 
-  // Keywords and type names
-  out = out.replace(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g, (match) => {
-    if (KEYWORDS.has(match)) return `<span class="hl-kw">${match}</span>`
-    if (/^[A-Z]/.test(match)) return `<span class="hl-type">${match}</span>`
-    return match
+    lastIndex = index + value.length
+  }
+
+  pushHighlightToken(tokens, code.slice(lastIndex))
+  return tokens
+}
+
+function highlightCode(code: string, ext: string): Array<ReactNode> {
+  const tokens = ext === 'json' ? tokenizeJson(code) : tokenizeCode(code)
+  return tokens.map((token, index) => {
+    if (token.kind === 'plain') {
+      return <Fragment key={index}>{token.text}</Fragment>
+    }
+
+    return (
+      <span key={index} className={HIGHLIGHT_CLASS_BY_KIND[token.kind]}>
+        {token.text}
+      </span>
+    )
   })
+}
 
-  // Numbers
-  out = out.replace(
-    /(?<![a-zA-Z_$])\b(\d+\.?\d*)\b/g,
-    '<span class="hl-num">$1</span>',
-  )
-
-  return out
+function highlightCodeContent(code: string, ext: string): Array<ReactNode> {
+  if (ext === 'json') {
+    return highlightCode(code, 'json')
+  }
+  return highlightCode(code, ext)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -705,14 +689,8 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   const isCode = isCodeFile(fileName)
   const isEditable = isEditableFile(fileName)
 
-  // Always call useMemo unconditionally
-  const mdHtml = useMemo(
-    () => (isMd && !rawMode && content ? markdownToHtml(content) : ''),
-    [isMd, rawMode, content],
-  )
-
-  const highlighted = useMemo(
-    () => (isCode && !isMd && content ? highlightCode(content, ext) : ''),
+  const highlighted = useMemo<Array<ReactNode>>(
+    () => (isCode && !isMd && content ? highlightCodeContent(content, ext) : []),
     [isCode, isMd, content, ext],
   )
 
@@ -945,11 +923,9 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
           {header}
           <ScrollAreaRoot className="flex-1 min-h-0">
             <ScrollAreaViewport>
-              {/* eslint-disable-next-line react/no-danger */}
-              <div
-                className="markdown-preview px-6 py-5 text-sm text-primary-900 dark:text-neutral-200"
-                dangerouslySetInnerHTML={{ __html: mdHtml }}
-              />
+              <div className="markdown-preview px-6 py-5 text-sm text-primary-900 dark:text-neutral-200">
+                <Markdown className="gap-3">{content}</Markdown>
+              </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar orientation="vertical">
               <ScrollAreaThumb />
@@ -965,7 +941,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   // ── Code viewer (syntax highlighted) — also raw mode for md ───────────────
 
   if (isCode) {
-    const displayHtml = isMd ? highlightCode(content, 'md') : highlighted
+    const displayContent = isMd ? highlightCodeContent(content, 'md') : highlighted
     return (
       <>
         {diffModal}
@@ -973,11 +949,9 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
           {header}
           <ScrollAreaRoot className="flex-1 min-h-0">
             <ScrollAreaViewport>
-              <pre
-                className="code-viewer px-4 py-4 text-xs font-mono leading-relaxed text-primary-800 dark:text-neutral-300"
-                // eslint-disable-next-line react/no-danger
-                dangerouslySetInnerHTML={{ __html: displayHtml }}
-              />
+              <pre className="code-viewer px-4 py-4 text-xs font-mono leading-relaxed text-primary-800 dark:text-neutral-300">
+                <code>{displayContent}</code>
+              </pre>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar orientation="vertical">
               <ScrollAreaThumb />
