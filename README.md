@@ -122,7 +122,7 @@ echo 'API_SERVER_HOST=0.0.0.0' >> ~/.hermes/.env
 
 Then restart the gateway, dashboard, and workspace. Hit the workspace from the remote device and the connection probe will use the Tailscale IP instead of localhost. Both `HERMES_API_URL` and `HERMES_DASHBOARD_URL` must be set to Tailscale/LAN-reachable URLs — setting only one will leave the other probing `127.0.0.1` and failing.
 
-**If you've already started the workspace**, stop it (Ctrl+C), edit `.env`, and start it again. The URL is read at process start; there is currently no UI-side override (planned for a future release — see #101).
+**If you've already started the workspace**, you can update both URLs from `Settings → Connection` without restarting. The values are persisted to `~/.hermes/workspace-overrides.json` and take effect immediately (gateway capabilities are reprobed on save). Editing `.env` still works for pre-start config and for CI/containers.
 
 ---
 

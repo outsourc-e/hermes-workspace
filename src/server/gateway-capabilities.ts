@@ -7,14 +7,129 @@
  *
  * Legacy enhanced-fork compatibility remains for users still running the
  * older all-in-one web API on the gateway port.
+ *
+ * Precedence for gateway/dashboard URLs:
+ *   1. Runtime override saved via setGatewayUrl() / setDashboardUrl()
+ *      (persisted to ~/.hermes/workspace-overrides.json) — set from the UI
+ *      so remote / Tailscale users can relocate without a restart (#101).
+ *   2. process.env.HERMES_API_URL / HERMES_DASHBOARD_URL at process start.
+ *   3. Default localhost (8645 / 9119).
  */
 
-export let HERMES_API = (
-  process.env.HERMES_API_URL || 'http://127.0.0.1:8645'
-).replace(/\/+$/, '')
-export let HERMES_DASHBOARD_URL = (
-  process.env.HERMES_DASHBOARD_URL || 'http://127.0.0.1:9119'
-).replace(/\/+$/, '')
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+
+type WorkspaceOverrides = {
+  hermesApiUrl?: string
+  hermesDashboardUrl?: string
+}
+
+function overridesPath(): string {
+  const home = process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
+  return path.join(home, 'workspace-overrides.json')
+}
+
+function readOverrides(): WorkspaceOverrides {
+  try {
+    const raw = fs.readFileSync(overridesPath(), 'utf-8')
+    const parsed = JSON.parse(raw) as WorkspaceOverrides
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeOverrides(next: WorkspaceOverrides): void {
+  const file = overridesPath()
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
+    fs.writeFileSync(file, JSON.stringify(next, null, 2), {
+      encoding: 'utf-8',
+      mode: 0o600,
+    })
+  } catch {
+    console.warn(`[gateway] failed to persist workspace overrides to ${file}`)
+  }
+}
+
+function normalizeUrl(u: string): string {
+  return u.trim().replace(/\/+$/, '')
+}
+
+const _initialOverrides = readOverrides()
+
+export let HERMES_API = normalizeUrl(
+  _initialOverrides.hermesApiUrl ||
+    process.env.HERMES_API_URL ||
+    'http://127.0.0.1:8645',
+)
+export let HERMES_DASHBOARD_URL = normalizeUrl(
+  _initialOverrides.hermesDashboardUrl ||
+    process.env.HERMES_DASHBOARD_URL ||
+    'http://127.0.0.1:9119',
+)
+
+/**
+ * Update the gateway URL at runtime, persist it, and reset the probe cache
+ * so the next call to ensureGatewayProbed() re-detects capabilities.
+ * Returns the saved URL (normalized). Pass an empty string to clear the
+ * override and fall back to env/default.
+ */
+export function setGatewayUrl(input: string | null | undefined): string {
+  const normalized = input ? normalizeUrl(input) : ''
+  const overrides = readOverrides()
+  if (normalized) {
+    overrides.hermesApiUrl = normalized
+    HERMES_API = normalized
+  } else {
+    delete overrides.hermesApiUrl
+    HERMES_API = normalizeUrl(
+      process.env.HERMES_API_URL || 'http://127.0.0.1:8645',
+    )
+  }
+  writeOverrides(overrides)
+  // Force reprobe on the next capability check.
+  probePromise = null
+  lastProbeAt = 0
+  return HERMES_API
+}
+
+/**
+ * Same as setGatewayUrl() but for the dashboard service.
+ */
+export function setDashboardUrl(input: string | null | undefined): string {
+  const normalized = input ? normalizeUrl(input) : ''
+  const overrides = readOverrides()
+  if (normalized) {
+    overrides.hermesDashboardUrl = normalized
+    HERMES_DASHBOARD_URL = normalized
+  } else {
+    delete overrides.hermesDashboardUrl
+    HERMES_DASHBOARD_URL = normalizeUrl(
+      process.env.HERMES_DASHBOARD_URL || 'http://127.0.0.1:9119',
+    )
+  }
+  writeOverrides(overrides)
+  probePromise = null
+  lastProbeAt = 0
+  return HERMES_DASHBOARD_URL
+}
+
+/** Current resolved URLs (after any runtime override). */
+export function getResolvedUrls(): {
+  gateway: string
+  dashboard: string
+  source: 'override' | 'env' | 'default'
+} {
+  const overrides = readOverrides()
+  const source = overrides.hermesApiUrl
+    ? 'override'
+    : process.env.HERMES_API_URL
+      ? 'env'
+      : 'default'
+  return { gateway: HERMES_API, dashboard: HERMES_DASHBOARD_URL, source }
+}
 
 export const HERMES_UPGRADE_INSTRUCTIONS =
   'For full features, install Hermes from source (`git clone https://github.com/NousResearch/hermes-agent && cd hermes-agent && pip install -e .`), then start the gateway on :8642 (`hermes gateway run`). For the extended APIs (Sessions, Skills, Config, Jobs) also start the dashboard on :9119 (`hermes dashboard`).'
