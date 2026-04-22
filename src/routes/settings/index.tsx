@@ -815,6 +815,22 @@ function ChatDisplaySection() {
             <option value="full">Full width</option>
           </select>
         </SettingsRow>
+        <SettingsRow
+          label="Expand sidebar on hover"
+          description={
+            chatSettings.sidebarHoverExpand
+              ? 'Collapsed sidebar expands temporarily when you hover over it.'
+              : 'Collapsed sidebar stays at 48px. Click the toggle to open (default).'
+          }
+        >
+          <Switch
+            checked={chatSettings.sidebarHoverExpand}
+            onCheckedChange={(checked) =>
+              updateChatSettings({ sidebarHoverExpand: checked })
+            }
+            aria-label="Expand sidebar on hover"
+          />
+        </SettingsRow>
       </SettingsSection>
       {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>

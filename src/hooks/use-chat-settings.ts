@@ -39,6 +39,14 @@ export type ChatSettings = {
    * the `data-chat-width` attribute on <html>.
    */
   chatWidth: ChatWidth
+  /**
+   * When the chat sidebar is collapsed to the 48px rail, should hovering
+   * the rail temporarily expand it? Follow-up to #91 — some users liked the
+   * previous hover-preview behavior.
+   *  - false (default) — rail stays 48px, icons directly clickable
+   *  - true            — rail expands on hover, re-collapses on leave
+   */
+  sidebarHoverExpand: boolean
 }
 
 type ChatSettingsState = {
@@ -56,6 +64,7 @@ function defaultChatSettings(): ChatSettings {
     avatarDataUrl: null,
     enterBehavior: 'send',
     chatWidth: 'comfortable',
+    sidebarHoverExpand: false,
   }
 }
 
@@ -126,6 +135,10 @@ export function selectEnterBehavior(state: ChatSettingsState): EnterBehavior {
 
 export function selectChatWidth(state: ChatSettingsState): ChatWidth {
   return state.settings.chatWidth
+}
+
+export function selectSidebarHoverExpand(state: ChatSettingsState): boolean {
+  return state.settings.sidebarHoverExpand
 }
 
 /**

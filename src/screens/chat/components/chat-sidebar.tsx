@@ -49,6 +49,7 @@ import { SEARCH_MODAL_EVENTS, useSearchModal } from '@/hooks/use-search-modal'
 import {
   selectChatProfileAvatarDataUrl,
   selectChatProfileDisplayName,
+  selectSidebarHoverExpand,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { StatusDot } from '@/components/status-indicator'
@@ -608,6 +609,8 @@ function ChatSidebarComponent({
   const [deleteSessionTitle, setDeleteSessionTitle] = useState('')
   const [providersOpen, setProvidersOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isHoverExpanded, setIsHoverExpanded] = useState(false)
+  const sidebarHoverExpand = useChatSettingsStore(selectSidebarHoverExpand)
   const sidebarRef = useRef<HTMLElement | null>(null)
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -662,7 +665,25 @@ function ChatSidebarComponent({
     return () => media.removeEventListener('change', update)
   }, [])
 
-  const isVisuallyCollapsed = isCollapsed
+  useEffect(() => {
+    if (isMobile || !isCollapsed || !sidebarHoverExpand) {
+      setIsHoverExpanded(false)
+    }
+  }, [isCollapsed, isMobile, sidebarHoverExpand])
+
+  const isHoverPreviewExpanded =
+    sidebarHoverExpand && !isMobile && isCollapsed && isHoverExpanded
+  const isVisuallyCollapsed = isCollapsed && !isHoverPreviewExpanded
+
+  function handleSidebarToggle() {
+    // In hover-preview mode, a click should dismiss the preview first;
+    // otherwise toggle the persistent collapsed state.
+    if (isHoverPreviewExpanded) {
+      setIsHoverExpanded(false)
+      return
+    }
+    onToggleCollapse()
+  }
 
   const asideProps = {
     className: cn(
@@ -836,6 +857,14 @@ function ChatSidebarComponent({
       className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
+      onMouseEnter={() => {
+        if (sidebarHoverExpand && !isMobile && isCollapsed) {
+          setIsHoverExpanded(true)
+        }
+      }}
+      onMouseLeave={() => {
+        if (sidebarHoverExpand && !isMobile) setIsHoverExpanded(false)
+      }}
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: true } : {})}
     >
@@ -869,16 +898,16 @@ function ChatSidebarComponent({
         <TooltipProvider>
           <TooltipRoot>
             <TooltipTrigger
-              onClick={onToggleCollapse}
+              onClick={handleSidebarToggle}
               render={
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                  aria-label={isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
                   className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
                   data-tour="sidebar-collapse-toggle"
                 >
-                  {isCollapsed ? (
+                  {isVisuallyCollapsed ? (
                     <HugeiconsIcon
                       icon={ArrowRight01Icon}
                       size={18}
@@ -895,7 +924,7 @@ function ChatSidebarComponent({
               }
             />
             <TooltipContent side="right">
-              {isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+              {isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
             </TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
