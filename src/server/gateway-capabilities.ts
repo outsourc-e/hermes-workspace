@@ -9,9 +9,12 @@
  * older all-in-one web API on the gateway port.
  */
 
-export let HERMES_API = process.env.HERMES_API_URL || 'http://127.0.0.1:8645'
-export let HERMES_DASHBOARD_URL =
+export let HERMES_API = (
+  process.env.HERMES_API_URL || 'http://127.0.0.1:8645'
+).replace(/\/+$/, '')
+export let HERMES_DASHBOARD_URL = (
   process.env.HERMES_DASHBOARD_URL || 'http://127.0.0.1:9119'
+).replace(/\/+$/, '')
 
 export const HERMES_UPGRADE_INSTRUCTIONS =
   'For full features, install upstream Hermes Agent (`pip install hermes-agent`) and run `hermes gateway run` plus `hermes dashboard` in separate terminals.'
