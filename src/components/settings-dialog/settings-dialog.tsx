@@ -1218,6 +1218,58 @@ function ChatContent() {
             aria-label="Show reasoning blocks"
           />
         </Row>
+        <Row
+          label="Enter key behavior"
+          description={
+            cs.enterBehavior === 'newline'
+              ? 'Enter inserts a newline. Use ⌘/Ctrl+Enter to send.'
+              : 'Enter sends the message. Use Shift+Enter for a newline.'
+          }
+        >
+          <Switch
+            checked={cs.enterBehavior === 'newline'}
+            onCheckedChange={(c) =>
+              updateCS({ enterBehavior: c ? 'newline' : 'send' })
+            }
+            aria-label="Enter inserts newline instead of sending"
+          />
+        </Row>
+        <Row
+          label="Chat content width"
+          description="Max-width of the message column on wide screens."
+        >
+          <select
+            value={cs.chatWidth}
+            onChange={(e) =>
+              updateCS({
+                chatWidth: e.target.value as
+                  | 'comfortable'
+                  | 'wide'
+                  | 'full',
+              })
+            }
+            className="h-8 rounded-md border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400"
+            aria-label="Chat content width"
+          >
+            <option value="comfortable">Comfortable (900px)</option>
+            <option value="wide">Wide (1200px)</option>
+            <option value="full">Full width</option>
+          </select>
+        </Row>
+        <Row
+          label="Expand sidebar on hover"
+          description={
+            cs.sidebarHoverExpand
+              ? 'Collapsed sidebar expands temporarily on hover.'
+              : 'Collapsed sidebar stays at 48px until you click the toggle.'
+          }
+        >
+          <Switch
+            checked={cs.sidebarHoverExpand}
+            onCheckedChange={(c) => updateCS({ sidebarHoverExpand: c })}
+            aria-label="Expand sidebar on hover"
+          />
+        </Row>
       </div>
       {/* Loading animation removed — not relevant for Hermes */}
     </div>
