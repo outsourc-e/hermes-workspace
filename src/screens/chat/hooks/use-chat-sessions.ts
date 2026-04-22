@@ -56,9 +56,14 @@ export function useChatSessions({
     const rawSessions = sessionsQuery.data ?? []
     const filtered = filterSessionsWithTombstones(rawSessions)
     if (!filtered.length) return filtered
-    return filtered.map((session) =>
+    const merged = filtered.map((session) =>
       mergeSessionTitle(session, storedTitles[session.friendlyId]),
     )
+    return merged.sort((a, b) => {
+      const aTs = a.updatedAt ?? 0
+      const bTs = b.updatedAt ?? 0
+      return bTs - aTs
+    })
   }, [sessionsQuery.data, storedTitles])
 
   const activeSession = useMemo(() => {

@@ -300,9 +300,10 @@ export function toSessionSummary(
     kind: 'chat',
     status: session.ended_at ? 'ended' : 'idle',
     model: session.model || '',
-    label: session.title || session.id,
-    title: session.title || session.id,
-    derivedTitle: session.title || session.id,
+    label: session.title || undefined,
+    title: session.title || undefined,
+    derivedTitle: session.title || session.preview || undefined,
+    preview: session.preview || undefined,
     tokenCount: (session.input_tokens ?? 0) + (session.output_tokens ?? 0),
     totalTokens: (session.input_tokens ?? 0) + (session.output_tokens ?? 0),
     message_count: session.message_count ?? 0,
@@ -312,11 +313,13 @@ export function toSessionSummary(
     cost: 0,
     createdAt: session.started_at ? session.started_at * 1000 : Date.now(),
     startedAt: session.started_at ? session.started_at * 1000 : Date.now(),
-    updatedAt: session.ended_at
-      ? session.ended_at * 1000
-      : session.started_at
-        ? session.started_at * 1000
-        : Date.now(),
+    updatedAt: session.last_active
+      ? session.last_active * 1000
+      : session.ended_at
+        ? session.ended_at * 1000
+        : session.started_at
+          ? session.started_at * 1000
+          : Date.now(),
     usage: {
       promptTokens: session.input_tokens ?? 0,
       completionTokens: session.output_tokens ?? 0,

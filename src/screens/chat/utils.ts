@@ -227,7 +227,9 @@ export function normalizeSessions(
       typeof session.derivedTitle === 'string' &&
       session.derivedTitle.trim().length > 0
         ? session.derivedTitle.trim()
-        : undefined
+        : typeof session.preview === 'string' && session.preview.trim().length > 0
+          ? session.preview.trim()
+          : undefined
     const titleStatus = deriveTitleStatus(
       label,
       explicitTitle,
@@ -253,6 +255,7 @@ export function normalizeSessions(
       titleStatus,
       titleSource,
       titleError: session.titleError ?? null,
+      preview: session.preview ?? null,
     }
   })
 }

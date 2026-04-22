@@ -73,6 +73,7 @@ export type SessionSummary = {
   titleStatus?: SessionTitleStatus
   titleSource?: SessionTitleSource
   titleError?: string | null
+  preview?: string | null
 }
 
 export type SessionListResponse = {
@@ -96,6 +97,7 @@ export type SessionMeta = {
   titleStatus?: SessionTitleStatus
   titleSource?: SessionTitleSource
   titleError?: string | null
+  preview?: string | null
 }
 
 export type PathsPayload = {
