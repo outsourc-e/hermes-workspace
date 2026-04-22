@@ -44,6 +44,7 @@ export type HermesSession = {
   output_tokens?: number
   parent_session_id?: string | null
   last_active?: number | null
+  preview?: string | null
 }
 
 export type HermesMessage = {
