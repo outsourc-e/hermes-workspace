@@ -106,6 +106,24 @@ Verify both services before opening the workspace:
 
 Then start the workspace and complete onboarding — it should detect the gateway + dashboard pair and unlock the enhanced panes automatically.
 
+#### Running on a remote host (Tailscale / VPN / LAN)
+
+If the workspace and its browser live on different machines — e.g. the workspace runs on a Pi/Mac/home server and you access it from your phone over Tailscale — point `HERMES_API_URL` at the **reachable** backend address, not `127.0.0.1`:
+
+```bash
+# On the server running the workspace + gateway:
+echo 'HERMES_API_URL=http://100.x.y.z:8642' >> .env
+echo 'HERMES_DASHBOARD_URL=http://100.x.y.z:9119' >> .env
+
+# Also tell the gateway to listen on all interfaces so Tailscale peers can reach it.
+# In ~/.hermes/.env (or wherever the gateway reads config):
+echo 'API_SERVER_HOST=0.0.0.0' >> ~/.hermes/.env
+```
+
+Then restart the gateway, dashboard, and workspace. Hit the workspace from the remote device and the connection probe will use the Tailscale IP instead of localhost. Both `HERMES_API_URL` and `HERMES_DASHBOARD_URL` must be set to Tailscale/LAN-reachable URLs — setting only one will leave the other probing `127.0.0.1` and failing.
+
+**If you've already started the workspace**, stop it (Ctrl+C), edit `.env`, and start it again. The URL is read at process start; there is currently no UI-side override (planned for a future release — see #101).
+
 ---
 
 ### Manual install

@@ -322,7 +322,12 @@ async function autoDetectGatewayUrl(): Promise<void> {
     }
   }
 
-  console.warn('[gateway] Could not reach Hermes gateway on 8645, 8642, or 8643')
+  console.warn(
+    '[gateway] Could not reach Hermes gateway on 8645, 8642, or 8643. ' +
+      'If you run the workspace on a different machine (Tailscale / VPN / LAN), ' +
+      'set HERMES_API_URL=http://<reachable-host>:8642 in .env and restart. ' +
+      'Also set API_SERVER_HOST=0.0.0.0 on the gateway so remote peers can connect.',
+  )
 }
 
 async function autoDetectDashboardUrl(): Promise<void> {
