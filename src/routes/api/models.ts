@@ -67,7 +67,10 @@ function normalizeModel(entry: unknown): ModelEntry | null {
  * Each entry has: { id, name, provider, model, baseUrl, createdAt }
  */
 function readHermesModelsJson(): Array<ModelEntry> {
-  const modelsPath = path.join(os.homedir(), '.hermes', 'models.json')
+  const modelsPath = path.join(
+    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
+    'models.json',
+  )
   try {
     if (!fs.existsSync(modelsPath)) return []
     const raw = fs.readFileSync(modelsPath, 'utf-8')
@@ -96,7 +99,10 @@ function readHermesModelsJson(): Array<ModelEntry> {
  * Looks for "default: <model-id>" under the "model:" section.
  */
 function readHermesDefaultModel(): ModelEntry | null {
-  const configPath = path.join(os.homedir(), '.hermes', 'config.yaml')
+  const configPath = path.join(
+    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
+    'config.yaml',
+  )
   try {
     if (!fs.existsSync(configPath)) return null
     const raw = fs.readFileSync(configPath, 'utf-8')

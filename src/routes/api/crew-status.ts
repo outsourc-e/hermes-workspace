@@ -34,7 +34,7 @@ function titleCase(value: string): string {
 }
 
 function buildCrewDefinitions(): CrewDefinition[] {
-  const base = join(homedir(), '.hermes')
+  const base = process.env.HERMES_HOME ?? join(homedir(), '.hermes')
   const profilesDir = join(base, 'profiles')
   const dynamicProfiles = existsSync(profilesDir)
     ? readdirSync(profilesDir, { withFileTypes: true })
@@ -55,7 +55,7 @@ function buildCrewDefinitions(): CrewDefinition[] {
 }
 
 function getHermesHome(profilePath: string | null): string {
-  const base = join(homedir(), '.hermes')
+  const base = process.env.HERMES_HOME ?? join(homedir(), '.hermes')
   return profilePath ? join(base, 'profiles', profilePath) : base
 }
 

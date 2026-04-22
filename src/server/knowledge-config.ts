@@ -15,7 +15,8 @@ const DEFAULT_CONFIG: KnowledgeBaseConfig = {
 }
 
 function getConfigPath(): string {
-  const hermesHome = path.join(os.homedir(), '.hermes')
+  const hermesHome =
+    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
   return path.join(hermesHome, 'knowledge-config.json')
 }
 

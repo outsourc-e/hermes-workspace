@@ -11,7 +11,8 @@ const BodySchema = z.object({
 })
 
 function saveNousTokens(accessToken: string, refreshToken?: string) {
-  const hermesDir = path.join(os.homedir(), '.hermes')
+  const hermesDir =
+    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
   const authPath = path.join(hermesDir, 'auth.json')
 
   let existing: Record<string, unknown> = {}

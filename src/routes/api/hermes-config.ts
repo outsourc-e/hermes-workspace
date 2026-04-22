@@ -16,7 +16,7 @@ import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
 
-const HERMES_HOME = path.join(os.homedir(), '.hermes')
+const HERMES_HOME = process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
 const CONFIG_PATH = path.join(HERMES_HOME, 'config.yaml')
 const ENV_PATH = path.join(HERMES_HOME, '.env')
 
