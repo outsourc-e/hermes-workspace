@@ -22,6 +22,10 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import {
+  SettingsMobilePills,
+  SettingsSidebar,
+} from '@/components/settings/settings-sidebar'
 
 type Transport = 'stdio' | 'http'
 
@@ -520,9 +524,13 @@ export function McpSettingsScreen() {
   }
 
   return (
-    <div className="min-h-full bg-surface">
-      <main className="mx-auto w-full max-w-5xl px-4 py-6 text-primary-900 md:px-6 md:py-8">
-        <div className="space-y-5">
+    <div className="min-h-screen bg-surface text-primary-900">
+      <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pt-6 pb-24 sm:px-6 md:flex-row md:gap-6 md:pb-8 lg:pt-8">
+        <SettingsSidebar activeId="mcp" />
+
+        <SettingsMobilePills activeId="mcp" />
+
+        <div className="flex-1 min-w-0 space-y-5">
           <header className="rounded-2xl border border-primary-200 bg-primary-50/80 p-5 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2">
@@ -531,7 +539,7 @@ export function McpSettingsScreen() {
                   size="sm"
                   className="-ml-2 w-fit"
                   render={
-                    <Link to="/settings">
+                    <Link to="/settings" search={{}}>
                       <HugeiconsIcon
                         icon={ArrowLeft01Icon}
                         size={16}
@@ -548,7 +556,7 @@ export function McpSettingsScreen() {
                   <p className="mt-1 text-sm text-primary-600">
                     Review configured MCP servers, draft changes locally, and
                     copy the YAML into
-                    <code className="mx-1 rounded bg-white px-1.5 py-0.5 font-mono text-xs">
+                    <code className="mx-1 rounded border border-primary-200 bg-primary-100 px-1.5 py-0.5 font-mono text-xs">
                       config.yaml
                     </code>
                     until gateway config writes land.
@@ -563,16 +571,16 @@ export function McpSettingsScreen() {
           </header>
 
           {notice ? (
-            <div className="rounded-2xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-600 shadow-sm">
+            <div className="rounded-2xl border border-primary-200 bg-primary-100 px-4 py-3 text-sm text-primary-600 shadow-sm">
               {notice}
             </div>
           ) : null}
 
           {isDirty ? (
-            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+            <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 shadow-sm">
               You have unsaved changes. Copy the YAML below and paste it into
               your{' '}
-              <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs">
+              <code className="rounded bg-amber-500/20 px-1.5 py-0.5 font-mono text-xs">
                 config.yaml
               </code>
               .
@@ -615,13 +623,13 @@ export function McpSettingsScreen() {
             </div>
 
             {loading ? (
-              <div className="rounded-xl border border-primary-200 bg-white px-4 py-3 text-sm text-primary-600">
+              <div className="rounded-xl border border-primary-200 bg-primary-100 px-4 py-3 text-sm text-primary-600">
                 Loading MCP servers...
               </div>
             ) : null}
 
             {!loading && servers.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-primary-300 bg-white px-4 py-8 text-center text-sm text-primary-600">
+              <div className="rounded-xl border border-dashed border-primary-300 bg-primary-100 px-4 py-8 text-center text-sm text-primary-600">
                 No MCP servers found yet. Add one to generate a starter config
                 snippet.
               </div>
@@ -632,7 +640,7 @@ export function McpSettingsScreen() {
                 {servers.map((server) => (
                   <article
                     key={server.name}
-                    className="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm"
+                    className="rounded-2xl border border-primary-200 bg-primary-100 p-4 shadow-sm"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0 space-y-2">
@@ -679,7 +687,7 @@ export function McpSettingsScreen() {
                           variant="outline"
                           size="sm"
                           className={cn(
-                            'text-red-600 hover:bg-red-50 hover:text-red-700',
+                            'text-red-500 hover:bg-red-500/10 hover:text-red-400',
                           )}
                           onClick={() => {
                             setServers((current) =>
@@ -715,11 +723,11 @@ export function McpSettingsScreen() {
                 </h2>
                 <p className="mt-1 text-sm text-primary-600">
                   Add this to your{' '}
-                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">
+                  <code className="rounded border border-primary-200 bg-primary-100 px-1.5 py-0.5 font-mono text-xs">
                     config.yaml
                   </code>{' '}
                   under{' '}
-                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">
+                  <code className="rounded border border-primary-200 bg-primary-100 px-1.5 py-0.5 font-mono text-xs">
                     mcp_servers
                   </code>
                   .
@@ -731,7 +739,7 @@ export function McpSettingsScreen() {
               </Button>
             </div>
 
-            <pre className="mt-4 overflow-x-auto rounded-2xl border border-primary-200 bg-white p-4 text-xs leading-6 text-primary-800">
+            <pre className="mt-4 overflow-x-auto rounded-2xl border border-primary-200 bg-surface p-4 text-xs leading-6 text-primary-800">
               <code>{yamlSnippet}</code>
             </pre>
           </section>

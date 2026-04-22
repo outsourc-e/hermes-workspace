@@ -12,12 +12,18 @@ import {
   UserIcon,
   VolumeHighIcon,
 } from '@hugeicons/core-free-icons'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import type * as React from 'react'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
+import type { SettingsNavId } from '@/components/settings/settings-sidebar'
+import {
+  SETTINGS_NAV_ITEMS,
+  SettingsMobilePills,
+  SettingsSidebar,
+} from '@/components/settings/settings-sidebar'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -36,8 +42,21 @@ import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 // useWorkspaceStore removed — hamburger eliminated on mobile
 
+const VALID_SECTION_IDS: ReadonlyArray<SettingsNavId> = SETTINGS_NAV_ITEMS.map(
+  (item) => item.id,
+)
+
 export const Route = createFileRoute('/settings/')({
   ssr: false,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { section?: SettingsNavId } => {
+    const raw = typeof search.section === 'string' ? search.section : undefined
+    if (raw && (VALID_SECTION_IDS as ReadonlyArray<string>).includes(raw)) {
+      return { section: raw as SettingsNavId }
+    }
+    return {}
+  },
   component: SettingsRoute,
 })
 
@@ -245,36 +264,7 @@ function SettingsRow({ label, description, children }: RowProps) {
   )
 }
 
-type SettingsSectionId =
-  | 'profile'
-  | 'appearance'
-  | 'chat'
-  | 'hermes'
-  | 'agent'
-  | 'routing'
-  | 'voice'
-  | 'display'
-  | 'notifications'
-  | 'advanced'
-
-type SettingsNavItem = {
-  id: SettingsSectionId | 'mcp'
-  label: string
-  to?: '/settings/mcp'
-}
-
-const SETTINGS_NAV_ITEMS: Array<SettingsNavItem> = [
-  { id: 'hermes', label: 'Model & Provider' },
-  { id: 'agent', label: 'Agent Behavior' },
-  { id: 'routing', label: 'Smart Routing' },
-  { id: 'voice', label: 'Voice' },
-  { id: 'display', label: 'Display' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'chat', label: 'Chat' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'mcp', label: 'MCP Servers', to: '/settings/mcp' },
-  { id: 'language' as SettingsSectionId, label: 'Language' },
-]
+type SettingsSectionId = SettingsNavId
 
 function SettingsRoute() {
   usePageTitle('Settings')
@@ -310,8 +300,8 @@ function SettingsRoute() {
     void fetchModels()
   }, [])
 
-  const [activeSection, setActiveSection] =
-    useState<SettingsSectionId>('hermes')
+  const { section } = Route.useSearch()
+  const activeSection: SettingsSectionId = section ?? 'hermes'
 
   return (
     <div className="min-h-screen bg-surface text-primary-900">
@@ -319,74 +309,9 @@ function SettingsRoute() {
       <div className="pointer-events-none fixed inset-0 bg-gradient-to-br from-primary-100/25 via-transparent to-primary-300/20" />
 
       <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pt-6 pb-24 sm:px-6 md:flex-row md:gap-6 md:pb-8 lg:pt-8">
-        {/* Sidebar nav */}
-        <nav className="hidden w-48 shrink-0 md:block">
-          <div className="sticky top-8">
-            <h1 className="mb-4 text-lg font-semibold text-primary-900 px-3">
-              Settings
-            </h1>
-            <div className="flex flex-col gap-0.5">
-              {SETTINGS_NAV_ITEMS.map((item) =>
-                item.to ? (
-                  <Link
-                    key={item.id}
-                    to={item.to}
-                    className="rounded-lg px-3 py-2 text-left text-sm text-primary-600 transition-colors hover:bg-primary-100 hover:text-primary-900"
-                  >
-                    {item.label}
-                  </Link>
-                ) : (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() =>
-                      setActiveSection(item.id as SettingsSectionId)
-                    }
-                    className={cn(
-                      'rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                      activeSection === item.id
-                        ? 'bg-accent-500/10 text-accent-600 font-medium'
-                        : 'text-primary-600 hover:bg-primary-100 hover:text-primary-900',
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
-        </nav>
+        <SettingsSidebar activeId={activeSection} />
 
-        {/* Mobile header — intentionally omitted; MobilePageHeader above shows "Settings" */}
-
-        {/* Mobile section pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none md:hidden">
-          {SETTINGS_NAV_ITEMS.map((item) =>
-            item.to ? (
-              <Link
-                key={item.id}
-                to={item.to}
-                className="shrink-0 rounded-full bg-primary-100 px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors"
-              >
-                {item.label}
-              </Link>
-            ) : (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveSection(item.id as SettingsSectionId)}
-                className={cn(
-                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                  activeSection === item.id
-                    ? 'bg-accent-500 text-white'
-                    : 'bg-primary-100 text-primary-600',
-                )}
-              >
-                {item.label}
-              </button>
-            ),
-          )}
-        </div>
+        <SettingsMobilePills activeId={activeSection} />
 
         {/* Content area */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
@@ -415,18 +340,19 @@ function SettingsRoute() {
                 description="Choose a workspace theme and accent color."
                 icon={PaintBoardIcon}
               >
-                <SettingsRow
-                  label="Theme"
-                  description="Choose the workspace palette. Light and dark variants are both available."
-                >
-                  <div className="w-full">
-                    <WorkspaceThemePicker />
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium text-primary-900">
+                      Theme
+                    </p>
+                    <p className="text-xs text-primary-600 text-pretty">
+                      Choose the workspace palette. Light and dark variants are
+                      both available.
+                    </p>
                   </div>
-                </SettingsRow>
-
-                {/* Accent color removed — themes control accent */}
+                  <WorkspaceThemePicker />
+                </div>
               </SettingsSection>
-              {/* LoaderStyleSection removed — not relevant for Hermes */}
             </>
           )}
 

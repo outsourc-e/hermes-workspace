@@ -132,7 +132,7 @@ export function SearchModal() {
         description: 'Open the settings workspace',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/settings' })
+          navigate({ to: '/settings', search: {} })
         },
       },
       {

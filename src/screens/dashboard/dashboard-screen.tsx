@@ -830,7 +830,7 @@ export function DashboardScreen() {
             label="Settings"
             icon="⚙️"
             accentColor={palette.accentSecondary}
-            onClick={() => navigate({ to: '/settings' })}
+            onClick={() => navigate({ to: '/settings', search: {} })}
           />
         </div>
       </div>

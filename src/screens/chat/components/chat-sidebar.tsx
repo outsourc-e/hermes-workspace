@@ -608,7 +608,6 @@ function ChatSidebarComponent({
   const [deleteSessionTitle, setDeleteSessionTitle] = useState('')
   const [providersOpen, setProvidersOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [isHoverExpanded, setIsHoverExpanded] = useState(false)
   const sidebarRef = useRef<HTMLElement | null>(null)
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -663,23 +662,7 @@ function ChatSidebarComponent({
     return () => media.removeEventListener('change', update)
   }, [])
 
-  useEffect(() => {
-    if (isMobile || !isCollapsed) {
-      setIsHoverExpanded(false)
-    }
-  }, [isCollapsed, isMobile])
-
-  const isVisuallyCollapsed = isCollapsed && !isHoverExpanded
-  const isHoverPreviewExpanded = !isMobile && isCollapsed && isHoverExpanded
-
-
-  function handleSidebarToggle() {
-    if (isHoverPreviewExpanded) {
-      setIsHoverExpanded(false)
-      return
-    }
-    onToggleCollapse()
-  }
+  const isVisuallyCollapsed = isCollapsed
 
   const asideProps = {
     className: cn(
@@ -853,12 +836,6 @@ function ChatSidebarComponent({
       className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
-      onMouseEnter={() => {
-        if (!isMobile && isCollapsed) setIsHoverExpanded(true)
-      }}
-      onMouseLeave={() => {
-        if (!isMobile) setIsHoverExpanded(false)
-      }}
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: true } : {})}
     >
@@ -892,16 +869,16 @@ function ChatSidebarComponent({
         <TooltipProvider>
           <TooltipRoot>
             <TooltipTrigger
-              onClick={handleSidebarToggle}
+              onClick={onToggleCollapse}
               render={
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                  aria-label={isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
                   className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
                   data-tour="sidebar-collapse-toggle"
                 >
-                  {isVisuallyCollapsed ? (
+                  {isCollapsed ? (
                     <HugeiconsIcon
                       icon={ArrowRight01Icon}
                       size={18}
@@ -918,7 +895,7 @@ function ChatSidebarComponent({
               }
             />
             <TooltipContent side="right">
-              {isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+              {isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
             </TooltipContent>
           </TooltipRoot>
         </TooltipProvider>

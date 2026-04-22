@@ -211,7 +211,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
         keywords: 'preferences configuration',
         shortcut: 'Go',
         icon: Settings01Icon,
-        onSelect: () => void navigate({ to: '/settings' }),
+        onSelect: () => void navigate({ to: '/settings', search: {} }),
       },
     ],
     [navigate],
