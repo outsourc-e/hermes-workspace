@@ -15,8 +15,7 @@ RUN corepack enable && apt-get update && apt-get install -y --no-install-recomme
 WORKDIR /app
 
 # Install deps (cache-friendly: copy only manifests first)
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
-COPY workspace-daemon/package.json workspace-daemon/
+COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile
 
 # Copy sources and build
