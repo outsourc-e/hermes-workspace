@@ -142,19 +142,9 @@ function checkAuthStore(providerId: string): {
   maskedKey?: string
 } {
   // Check Hermes auth store
-  for (const storePath of [
-    path.join(os.homedir(), '.hermes', 'auth-profiles.json'),
-    path.join(
-      os.homedir(),
-      '.openclaw',
-      'agents',
-      'main',
-      'agent',
-      'auth-profiles.json',
-    ),
-  ]) {
-    try {
-      if (!fs.existsSync(storePath)) continue
+  const storePath = path.join(os.homedir(), '.hermes', 'auth-profiles.json')
+  try {
+    if (fs.existsSync(storePath)) {
       const store = JSON.parse(fs.readFileSync(storePath, 'utf-8'))
       const profiles = store?.profiles || {}
       for (const [key, value] of Object.entries(profiles)) {
@@ -163,14 +153,11 @@ function checkAuthStore(providerId: string): {
         const p = value as Record<string, unknown>
         const token = String(p.token || p.key || p.access || '').trim()
         if (token) {
-          const source = storePath.includes('.hermes')
-            ? 'hermes-auth-store'
-            : 'openclaw-auth-store'
-          return { hasToken: true, source, maskedKey: maskKey(token) }
+          return { hasToken: true, source: 'hermes-auth-store', maskedKey: maskKey(token) }
         }
       }
-    } catch {}
-  }
+    }
+  } catch {}
   return { hasToken: false, source: '' }
 }
 

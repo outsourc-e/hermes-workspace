@@ -252,6 +252,10 @@ export function setActiveProfile(name: string): void {
   if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
   fs.mkdirSync(getHermesRoot(), { recursive: true })
   fs.writeFileSync(getActiveProfilePath(), `${normalized}\n`, 'utf-8')
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[profiles] Active profile set to "${normalized}". Restart the Hermes gateway for this profile switch to take effect.`,
+  )
 }
 
 export function createProfile(
@@ -330,13 +334,42 @@ export function updateProfileConfig(
   if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
   const configPath = path.join(profilePath, 'config.yaml')
   const current = readYamlConfig(configPath)
-  const merged = { ...current, ...patch }
-  // Strip undefined keys
-  for (const key of Object.keys(merged)) {
-    if (merged[key] === undefined) delete merged[key]
+
+  // Deep merge helper (same logic as hermes-config.ts)
+  function deepMerge(
+    target: Record<string, unknown>,
+    source: Record<string, unknown>,
+  ) {
+    for (const [key, value] of Object.entries(source)) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        target[key] &&
+        typeof target[key] === 'object'
+      ) {
+        deepMerge(
+          target[key] as Record<string, unknown>,
+          value as Record<string, unknown>,
+        )
+      } else {
+        target[key] = value
+      }
+    }
   }
+
+  // Handle null values as explicit removals
+  const updates = { ...patch }
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null) {
+      delete current[key]
+      delete updates[key]
+    }
+  }
+  deepMerge(current, updates)
+
   fs.mkdirSync(path.dirname(configPath), { recursive: true })
-  fs.writeFileSync(configPath, YAML.stringify(merged), 'utf-8')
+  fs.writeFileSync(configPath, YAML.stringify(current), 'utf-8')
   return readProfile(normalized)
 }
 

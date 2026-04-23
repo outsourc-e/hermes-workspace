@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import YAML from 'yaml'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -14,6 +15,10 @@ import {
   getDiscoveredModels,
   ensureProviderInConfig,
 } from '../../server/local-provider-discovery'
+
+const HERMES_HOME = process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
+const MODELS_PATH = path.join(HERMES_HOME, 'models.json')
+const CONFIG_PATH = path.join(HERMES_HOME, 'config.yaml')
 
 type ModelEntry = {
   provider?: string
@@ -62,18 +67,12 @@ function normalizeModel(entry: unknown): ModelEntry | null {
 }
 
 /**
- * Read user-configured models from ~/.hermes/models.json.
- * This is the curated list the user manages via the Hermes CLI or UI.
- * Each entry has: { id, name, provider, model, baseUrl, createdAt }
+ * Read user-configured models from active profile's models.json.
  */
 function readHermesModelsJson(): Array<ModelEntry> {
-  const modelsPath = path.join(
-    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
-    'models.json',
-  )
   try {
-    if (!fs.existsSync(modelsPath)) return []
-    const raw = fs.readFileSync(modelsPath, 'utf-8')
+    if (!fs.existsSync(MODELS_PATH)) return []
+    const raw = fs.readFileSync(MODELS_PATH, 'utf-8')
     const entries = JSON.parse(raw)
     if (!Array.isArray(entries)) return []
     return entries
@@ -95,22 +94,30 @@ function readHermesModelsJson(): Array<ModelEntry> {
 }
 
 /**
- * Read the default model from ~/.hermes/config.yaml without a YAML parser.
- * Looks for "default: <model-id>" under the "model:" section.
+ * Read the default model from active profile's config.yaml using a proper YAML parser.
  */
 function readHermesDefaultModel(): ModelEntry | null {
-  const configPath = path.join(
-    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
-    'config.yaml',
-  )
   try {
-    if (!fs.existsSync(configPath)) return null
-    const raw = fs.readFileSync(configPath, 'utf-8')
-    const defaultMatch = raw.match(/^\s*default:\s*(.+)$/m)
-    const providerMatch = raw.match(/^\s*provider:\s*(.+)$/m)
-    if (!defaultMatch) return null
-    const modelId = defaultMatch[1].trim()
-    const provider = providerMatch ? providerMatch[1].trim() : 'unknown'
+    if (!fs.existsSync(CONFIG_PATH)) return null
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
+    const parsed = YAML.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const config = parsed as Record<string, unknown>
+    let modelId = ''
+    let provider = ''
+    const modelField = config.model
+    if (typeof modelField === 'string') {
+      modelId = modelField
+      provider = (config.provider as string) || 'unknown'
+    } else if (modelField && typeof modelField === 'object') {
+      const modelObj = modelField as Record<string, unknown>
+      modelId = (modelObj.default as string) || ''
+      provider =
+        (modelObj.provider as string) ||
+        (config.provider as string) ||
+        'unknown'
+    }
+    if (!modelId) return null
     return { id: modelId, name: modelId, provider }
   } catch {
     return null

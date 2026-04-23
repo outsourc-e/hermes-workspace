@@ -152,6 +152,7 @@ export function HermesOnboarding() {
   >('idle')
   const [testMessage, setTestMessage] = useState('')
   const [configuredModel, setConfiguredModel] = useState('')
+  const [discoveredProviders, setDiscoveredProviders] = useState<Array<{ id: string; name?: string; configured?: boolean }>>([])
 
   const [oauthStep, setOauthStep] = useState<
     'idle' | 'loading' | 'waiting' | 'success' | 'error'
@@ -182,6 +183,7 @@ export function HermesOnboarding() {
       const data = (await res.json()) as {
         activeModel?: string
         activeProvider?: string
+        providers?: Array<{ id: string; name?: string; configured?: boolean }>
       }
       if (data.activeModel) {
         const normalizedModel = stripProviderPrefix(data.activeModel)
@@ -190,6 +192,9 @@ export function HermesOnboarding() {
       }
       if (data.activeProvider) {
         setSelectedProvider((current) => current || data.activeProvider || null)
+      }
+      if (data.providers) {
+        setDiscoveredProviders(data.providers)
       }
     } catch {}
   }, [])
@@ -666,37 +671,52 @@ export function HermesOnboarding() {
               </div>
 
               <div className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto pr-1">
-                {PROVIDERS.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setSelectedProvider(p.id)
-                      setApiKey('')
-                      setBaseUrl('')
-                      setSaveError('')
-                    }}
-                    className={cn(
-                      'flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all',
-                      selectedProvider === p.id ? 'ring-2 ring-accent-500' : '',
-                    )}
-                    style={cardStyle}
-                  >
-                    <ProviderLogo
-                      provider={p.id}
-                      size={40}
-                      className="shrink-0 rounded-xl"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold">{p.name}</div>
-                      <div className="text-xs" style={mutedStyle}>
-                        {p.desc}
+                {(() => {
+                  const seen = new Set(PROVIDERS.map((p) => p.id))
+                  const merged = [
+                    ...PROVIDERS,
+                    ...discoveredProviders
+                      .filter((p) => p.id && !seen.has(p.id))
+                      .map((p) => ({
+                        id: p.id,
+                        name: p.name || p.id,
+                        logo: '/providers/openai.png',
+                        desc: p.configured ? 'Configured provider' : 'Custom provider',
+                        authType: 'custom' as const,
+                      })),
+                  ]
+                  return merged.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setSelectedProvider(p.id)
+                        setApiKey('')
+                        setBaseUrl('')
+                        setSaveError('')
+                      }}
+                      className={cn(
+                        'flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all',
+                        selectedProvider === p.id ? 'ring-2 ring-accent-500' : '',
+                      )}
+                      style={cardStyle}
+                    >
+                      <ProviderLogo
+                        provider={p.id}
+                        size={40}
+                        className="shrink-0 rounded-xl"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold">{p.name}</div>
+                        <div className="text-xs" style={mutedStyle}>
+                          {p.desc}
+                        </div>
                       </div>
-                    </div>
-                    {selectedProvider === p.id ? (
-                      <span className="ml-auto size-2.5 shrink-0 rounded-full bg-green-500" />
-                    ) : null}
-                  </button>
-                ))}
+                      {selectedProvider === p.id ? (
+                        <span className="ml-auto size-2.5 shrink-0 rounded-full bg-green-500" />
+                      ) : null}
+                    </button>
+                  ))
+                })()}
               </div>
 
               {selectedProvider &&

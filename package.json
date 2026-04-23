@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
     "build": "vite build",
+    "start:all": "concurrently \"hermes gateway run\" \"pnpm dev\"",
     "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node .output/server/index.mjs",
     "start:dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
     "preview": "vite preview",
@@ -62,6 +63,7 @@
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.0",
+    "concurrently": "^8.2.2",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^22.10.2",

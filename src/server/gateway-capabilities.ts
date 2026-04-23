@@ -2,7 +2,7 @@
  * Probes Hermes services to detect which API groups are available.
  *
  * Zero-fork architecture:
- *   - Gateway (:8645 by default): /health, /v1/chat/completions, /v1/models
+ *   - Gateway (:8642 by default): /health, /v1/chat/completions, /v1/models
  *   - Dashboard (:9119 by default): sessions, skills, config, cron, env, analytics
  *
  * Legacy enhanced-fork compatibility remains for users still running the
@@ -13,7 +13,7 @@
  *      (persisted to ~/.hermes/workspace-overrides.json) — set from the UI
  *      so remote / Tailscale users can relocate without a restart (#101).
  *   2. process.env.HERMES_API_URL / HERMES_DASHBOARD_URL at process start.
- *   3. Default localhost (8645 / 9119).
+ *   3. Default localhost (8642 / 9119).
  */
 
 import fs from 'node:fs'
@@ -62,7 +62,7 @@ const _initialOverrides = readOverrides()
 export let HERMES_API = normalizeUrl(
   _initialOverrides.hermesApiUrl ||
     process.env.HERMES_API_URL ||
-    'http://127.0.0.1:8645',
+    'http://127.0.0.1:8642',
 )
 export let HERMES_DASHBOARD_URL = normalizeUrl(
   _initialOverrides.hermesDashboardUrl ||
@@ -85,7 +85,7 @@ export function setGatewayUrl(input: string | null | undefined): string {
   } else {
     delete overrides.hermesApiUrl
     HERMES_API = normalizeUrl(
-      process.env.HERMES_API_URL || 'http://127.0.0.1:8645',
+      process.env.HERMES_API_URL || 'http://127.0.0.1:8642',
     )
   }
   writeOverrides(overrides)
@@ -417,9 +417,9 @@ async function autoDetectGatewayUrl(): Promise<void> {
   if (process.env.HERMES_API_URL) return
 
   const candidates = [
-    'http://127.0.0.1:8645',
     'http://127.0.0.1:8642',
     'http://127.0.0.1:8643',
+    'http://127.0.0.1:8645',
   ]
 
   for (const candidate of candidates) {

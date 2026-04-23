@@ -12,6 +12,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import YAML from 'yaml'
 
 // -------------------------------------------------------------------
 // Well-known local providers
@@ -242,22 +243,39 @@ void ensureDiscovery()
 // Config auto-writer
 // -------------------------------------------------------------------
 
-const CONFIG_PATH = path.join(os.homedir(), '.hermes', 'config.yaml')
+const CONFIG_PATH = path.join(
+  process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
+  'config.yaml',
+)
+
+const loggedWarnings = new Set<string>()
+
+function readYamlConfig(): Record<string, unknown> {
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
+    const parsed = YAML.parse(raw)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch {}
+  return {}
+}
 
 /**
  * Check if a provider is already in custom_providers config.
- * Returns true if the provider already has a config entry.
+ * Reads the active profile config using a YAML parser.
  */
 export function isProviderConfigured(providerId: string): boolean {
   try {
-    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
-    // Simple check — look for the provider name in custom_providers
-    // Full YAML parsing would be better but this avoids adding a dep
-    const cpMatch = raw.match(
-      /custom_providers:\s*\n((?:\s+-[\s\S]*?)*)(?=\n\S|\n*$)/,
+    const config = readYamlConfig()
+    const customProviders = config.custom_providers
+    if (!Array.isArray(customProviders)) return false
+    return customProviders.some(
+      (entry: unknown) =>
+        entry &&
+        typeof entry === 'object' &&
+        (entry as Record<string, unknown>).name === providerId,
     )
-    if (!cpMatch) return false
-    return cpMatch[0].includes(`name: ${providerId}`)
   } catch {
     return false
   }
@@ -277,8 +295,11 @@ export function ensureProviderInConfig(providerId: string): boolean {
   const def = LOCAL_PROVIDERS.find((p) => p.id === providerId)
   if (!def) return false
   // Don't auto-write — just signal that config is needed
-  console.log(
-    `[local-discovery] ${def.name} detected but not in custom_providers. Gateway restart needed after adding it.`,
-  )
+  if (!loggedWarnings.has(providerId)) {
+    loggedWarnings.add(providerId)
+    console.log(
+      `[local-discovery] ${def.name} detected but not in custom_providers. Gateway restart needed after adding it.`,
+    )
+  }
   return false
 }

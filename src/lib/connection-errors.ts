@@ -71,24 +71,24 @@ export function getConnectionErrorMessage(
         action: 'Enter your password to continue',
       }
     case 'gateway_auth_rejected':
+    case 'clawsuite_auth_required':
       return {
-        title: 'Authentication required',
-        description:
-          'The gateway rejected this connection.',
-        action: 'Update your gateway token in Settings and try again.',
+        title: 'Hermes Login Required',
+        description: 'This instance requires a password to access.',
+        action: 'Enter your password to continue',
       }
     case 'gateway_pairing_required':
       return {
         title: 'Pair this device first',
         description:
           'This device is not paired with the gateway yet.',
-        action: 'Run `openclaw pair` on the gateway machine, then reconnect.',
+        action: 'Run `hermes pair` on the gateway machine, then reconnect.',
       }
     case 'gateway_unreachable':
       return {
         title: 'Gateway unreachable',
-        description: 'ClawSuite cannot reach the configured OpenClaw gateway.',
-        action: 'Check that OpenClaw is running and the gateway URL is correct.',
+        description: 'Hermes cannot reach the configured gateway.',
+        action: 'Check that the gateway is running and the URL is correct.',
       }
     case 'handshake_failed':
       return {

@@ -1103,8 +1103,7 @@ function ActiveModelCard({
           </h3>
           <p className="text-sm text-primary-600">
             Update the primary model, optional fallback, and stream timeout
-            settings saved in{' '}
-            <code className="font-mono">~/.hermes/config.yaml</code>.
+            settings saved in the active profile configuration.
           </p>
         </div>
         <Button
