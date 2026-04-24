@@ -216,18 +216,55 @@ let dashboardTokenCache = ''
 /** Optional bearer token for authenticated gateway endpoints. */
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || ''
 
+/**
+ * Optional explicit bearer token for dashboard API calls.
+ *
+ * Preferred over scraping the dashboard's root HTML for an inline token
+ * (the legacy path, which creates a brittle trust boundary — see #124).
+ * When set, the workspace uses this directly and never parses HTML.
+ */
+const DASHBOARD_BEARER_TOKEN =
+  process.env.HERMES_DASHBOARD_TOKEN || process.env.HERMES_API_TOKEN || ''
+
 function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 }
 
+let loggedHtmlScrapeFallback = false
+
+/**
+ * Resolve a bearer token for dashboard API calls.
+ *
+ * Lookup order:
+ *   1.  HERMES_DASHBOARD_TOKEN / HERMES_API_TOKEN env (preferred)
+ *   2.  Inline token injected into the dashboard's root HTML (legacy
+ *      fallback — logs a deprecation warning; to be removed once all
+ *      supported dashboards expose a first-class token endpoint). See #124.
+ */
 export async function fetchDashboardToken(options?: {
   force?: boolean
 }): Promise<string> {
   const force = options?.force === true
+
+  // Prefer the explicit service-to-service token — no HTML scrape at all.
+  if (DASHBOARD_BEARER_TOKEN) {
+    dashboardTokenCache = DASHBOARD_BEARER_TOKEN
+    return DASHBOARD_BEARER_TOKEN
+  }
+
   if (!force && dashboardTokenCache) return dashboardTokenCache
   if (!force && dashboardTokenPromise) return dashboardTokenPromise
 
   dashboardTokenPromise = (async () => {
+    if (!loggedHtmlScrapeFallback) {
+      loggedHtmlScrapeFallback = true
+      console.warn(
+        '[gateway] HERMES_DASHBOARD_TOKEN is not set — falling back to the legacy ' +
+          'HTML-scrape token flow. This fallback will be removed in a future release. ' +
+          'Set HERMES_DASHBOARD_TOKEN (or HERMES_API_TOKEN) to a dashboard bearer ' +
+          'token to migrate. See #124.',
+      )
+    }
     // Dashboard injects the session token inline on `/` (root), not on
     // `/index.html` which serves the raw Vite-built HTML without the token.
     const res = await fetch(`${HERMES_DASHBOARD_URL}/`, {

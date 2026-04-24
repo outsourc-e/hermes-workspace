@@ -537,9 +537,21 @@ Features pending cloud infrastructure:
 
 - Auth middleware on all API routes
 - CSP headers via meta tags
-- Path traversal prevention on file/memory routes
+- Path traversal prevention on file/memory routes (real-path boundary check, not string prefix)
 - Rate limiting on endpoints
+- Fail-closed startup guard: refuses to bind non-loopback without `HERMES_PASSWORD`
+- Session cookies: `HttpOnly` + `SameSite=Strict` + `Secure` (in production)
 - Optional password protection for web UI
+
+**Key env vars for remote / Docker deployments:**
+
+- `HERMES_PASSWORD` — required whenever `HOST ≠ 127.0.0.1`
+- `COOKIE_SECURE=1` — force the `Secure` cookie flag when terminating HTTPS at a proxy
+- `TRUST_PROXY=1` — trust `x-forwarded-for` / `x-real-ip` (only set behind a sanitizing reverse proxy)
+- `HERMES_DASHBOARD_TOKEN` — explicit bearer for dashboard API (preferred over the legacy HTML-scrape fallback)
+- `HERMES_ALLOW_INSECURE_REMOTE=1` — bypass the fail-closed guard (not recommended)
+
+See `.env.example` for the full list. Credits to [@kiosvantra](https://github.com/kiosvantra) for the security audit surfacing #121–#125.
 
 ---
 

@@ -43,11 +43,28 @@ export function rateLimit(
 
 /**
  * Extract client IP from request for rate limiting key.
+ *
+ * Honors `x-forwarded-for` only when `TRUST_PROXY=1` is set — otherwise a
+ * client-controlled header could trivially rotate the rate-limit key. See
+ * #125. When no trusted forwarded header is present, fall back to the
+ * request's remote address, or a static `local` bucket when the adapter
+ * does not expose one (tests / raw fetch).
  */
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0].trim()
-  return 'local'
+  const trustProxy = (() => {
+    const v = (process.env.TRUST_PROXY || '').trim().toLowerCase()
+    return v === '1' || v === 'true' || v === 'yes'
+  })()
+  if (trustProxy) {
+    const forwarded = request.headers.get('x-forwarded-for')
+    const first = forwarded?.split(',')[0]?.trim()
+    if (first) return first
+    const real = request.headers.get('x-real-ip')?.trim()
+    if (real) return real
+  }
+  const maybeAddress = (request as unknown as { remoteAddress?: string })
+    .remoteAddress
+  return (maybeAddress && maybeAddress.trim()) || 'local'
 }
 
 /**

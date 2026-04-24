@@ -188,9 +188,42 @@ export function getSessionTokenFromCookie(
   return null
 }
 
+/**
+ * Whether the workspace is configured to trust proxy-forwarded headers
+ * (`x-forwarded-for`, `x-real-ip`). Off by default — enabled explicitly when
+ * deployed behind a trusted reverse proxy (Traefik, Nginx, Cloudflare).
+ * See #125.
+ */
+function isTrustedProxyEnabled(): boolean {
+  const v = (process.env.TRUST_PROXY || '').trim().toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
+}
+
+/**
+ * Best-effort extraction of the peer IP, preferring the actual socket
+ * address when available. Forwarded headers are only honored when
+ * TRUST_PROXY is set — otherwise a client-controlled `x-forwarded-for`
+ * could spoof local classification (#125).
+ */
+export function getRequestIp(request: Request): string {
+  if (isTrustedProxyEnabled()) {
+    const forwarded = request.headers.get('x-forwarded-for')
+    const first = forwarded?.split(',')[0]?.trim()
+    if (first) return first
+    const real = request.headers.get('x-real-ip')?.trim()
+    if (real) return real
+  }
+  // Node's Request does not expose the socket; the adapter that constructs it
+  // (TanStack Start / undici) may attach `remoteAddress` under a well-known
+  // symbol. Fall back to loopback when nothing is available so we fail *safe*
+  // (no LAN/Tailscale bypass for unknown peers).
+  const maybeAddress = (request as unknown as { remoteAddress?: string })
+    .remoteAddress
+  return (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
+}
+
 function isLocalRequest(request: Request): boolean {
-  const forwarded = request.headers.get('x-forwarded-for')
-  const ip = forwarded?.split(',')[0]?.trim() || '127.0.0.1'
+  const ip = getRequestIp(request)
   const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1']
   if (localIPs.includes(ip)) return true
   // Allow Tailscale (100.x.x.x) and private LAN ranges
@@ -232,13 +265,32 @@ export function requireLocalOrAuth(request: Request): boolean {
 }
 
 /**
+ * Whether session cookies should set the `Secure` attribute.
+ *
+ * Defaults ON in production, OFF in development (so localhost-over-HTTP
+ * login flows still work). Operators can override with
+ * `COOKIE_SECURE=0` (force off) or `COOKIE_SECURE=1` (force on). See #123.
+ */
+function shouldSetSecureCookie(): boolean {
+  const override = (process.env.COOKIE_SECURE || '').trim().toLowerCase()
+  if (override === '1' || override === 'true' || override === 'yes') return true
+  if (override === '0' || override === 'false' || override === 'no') return false
+  return process.env.NODE_ENV === 'production'
+}
+
+/**
  * Create a Set-Cookie header for the session token.
+ *
+ * Attributes:
+ *   - HttpOnly    — blocks JS access, mitigates XSS session theft
+ *   - Secure      — HTTPS only (production default, overridable)
+ *   - SameSite=Strict — CSRF protection
+ *   - Path=/      — available across the whole app
+ *   - Max-Age     — 30 days
  */
 export function createSessionCookie(token: string): string {
-  // httpOnly: prevents JS access
-  // secure: HTTPS only (disabled for local dev)
-  // sameSite=strict: CSRF protection
-  // path=/: available everywhere
-  // maxAge: 30 days
-  return `hermes-auth=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${30 * 24 * 60 * 60}`
+  const attrs = ['HttpOnly']
+  if (shouldSetSecureCookie()) attrs.push('Secure')
+  attrs.push('SameSite=Strict', 'Path=/', `Max-Age=${30 * 24 * 60 * 60}`)
+  return `hermes-auth=${token}; ${attrs.join('; ')}`
 }
