@@ -163,14 +163,30 @@ export function listProfiles(): Array<ProfileSummary> {
       const sessionCount = countFilesRecursive(sessionsDir, (full) =>
         /\.(jsonl|json|sqlite|db)$/i.test(full),
       )
+      // Resolve model/provider from nested or flat config structure
+      let modelName: string | undefined
+      let providerName: string | undefined
+      if (typeof config.model === 'string') {
+        modelName = config.model
+      } else if (
+        config.model &&
+        typeof config.model === 'object' &&
+        !Array.isArray(config.model)
+      ) {
+        const m = config.model as Record<string, unknown>
+        if (typeof m.default === 'string') modelName = m.default
+        if (typeof m.provider === 'string') providerName = m.provider
+      }
+      if (!providerName && typeof config.provider === 'string') {
+        providerName = config.provider
+      }
       results.push({
         name,
         path: profilePath,
         active: name === activeProfile,
         exists: true,
-        model: typeof config.model === 'string' ? config.model : undefined,
-        provider:
-          typeof config.provider === 'string' ? config.provider : undefined,
+        model: modelName,
+        provider: providerName,
         skillCount,
         sessionCount,
         hasEnv: fs.existsSync(envPath),
@@ -187,14 +203,30 @@ export function listProfiles(): Array<ProfileSummary> {
 
   const root = getHermesRoot()
   const config = readYamlConfig(path.join(root, 'config.yaml'))
+  // Resolve model/provider for default profile too
+  let defaultModel: string | undefined
+  let defaultProvider: string | undefined
+  if (typeof config.model === 'string') {
+    defaultModel = config.model
+  } else if (
+    config.model &&
+    typeof config.model === 'object' &&
+    !Array.isArray(config.model)
+  ) {
+    const m = config.model as Record<string, unknown>
+    if (typeof m.default === 'string') defaultModel = m.default
+    if (typeof m.provider === 'string') defaultProvider = m.provider
+  }
+  if (!defaultProvider && typeof config.provider === 'string') {
+    defaultProvider = config.provider
+  }
   results.unshift({
     name: 'default',
     path: root,
     active: activeProfile === 'default',
     exists: true,
-    model: typeof config.model === 'string' ? config.model : undefined,
-    provider:
-      typeof config.provider === 'string' ? config.provider : undefined,
+    model: defaultModel,
+    provider: defaultProvider,
     skillCount: countFilesRecursive(
       path.join(root, 'skills'),
       (full) => path.basename(full) === 'SKILL.md',
