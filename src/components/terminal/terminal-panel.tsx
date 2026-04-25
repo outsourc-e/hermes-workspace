@@ -284,6 +284,24 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
             )
             continue
           }
+          if (currentEvent === 'exit' || currentEvent === 'close') {
+            // Server reported the PTY is gone. Clear the tab's sessionId so
+            // any subsequent /api/terminal-input or /api/terminal-resize
+            // calls don't fire against a dead session and 404. (#80)
+            const exitInfo =
+              currentEvent === 'exit' && typeof payload === 'object'
+                ? ` (exit code ${payload?.code ?? '?'}${payload?.signal ? `, signal ${payload.signal}` : ''})`
+                : ''
+            terminal.writeln(`\r\n\x1b[2m[session ended${exitInfo}]\x1b[0m`)
+            terminal.writeln(`\x1b[2m[click + to open a new tab, or reload to retry]\x1b[0m`)
+            setTabs((prev) =>
+              prev.map((tab) =>
+                tab.id === tabId ? { ...tab, sessionId: undefined } : tab,
+              ),
+            )
+            sessionId = undefined
+            continue
+          }
           if (currentEvent === 'data') {
             const textChunk =
               payload?.data ??
