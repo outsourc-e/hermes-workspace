@@ -1219,6 +1219,16 @@ function ChatContent() {
           />
         </Row>
         <Row
+          label="Sound on response complete"
+          description="Play a short sound in the browser when the agent finishes replying."
+        >
+          <Switch
+            checked={cs.soundOnChatComplete}
+            onCheckedChange={(c) => updateCS({ soundOnChatComplete: c })}
+            aria-label="Sound on response complete"
+          />
+        </Row>
+        <Row
           label="Enter key behavior"
           description={
             cs.enterBehavior === 'newline'

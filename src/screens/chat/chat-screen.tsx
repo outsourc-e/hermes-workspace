@@ -51,6 +51,8 @@ import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useStreamingMessage } from './hooks/use-streaming-message'
+import { playChatComplete } from '@/lib/sounds'
+import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { useActiveRunCheck } from './hooks/use-active-run-check'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
@@ -1088,6 +1090,11 @@ export function ChatScreen({
       setSending(false)
       // Clear waitingForResponse so ThinkingBubble hides and message renders
       streamFinish()
+      // Play notification sound if the user opted in (Settings → Chat).
+      // Read directly from the store to avoid re-creating this callback on every settings change.
+      if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
+        playChatComplete()
+      }
     }, [queryClient, streamFinish]),
     onError: useCallback(
       (messageText: string) => {

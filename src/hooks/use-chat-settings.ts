@@ -47,6 +47,12 @@ export type ChatSettings = {
    *  - true            — rail expands on hover, re-collapses on leave
    */
   sidebarHoverExpand: boolean
+  /**
+   * Play a short notification sound in the browser when the agent finishes
+   * responding in the main chat. Off by default so existing users don't get
+   * surprised by sound on next page load.
+   */
+  soundOnChatComplete: boolean
 }
 
 type ChatSettingsState = {
@@ -65,6 +71,7 @@ function defaultChatSettings(): ChatSettings {
     enterBehavior: 'send',
     chatWidth: 'comfortable',
     sidebarHoverExpand: false,
+    soundOnChatComplete: false,
   }
 }
 

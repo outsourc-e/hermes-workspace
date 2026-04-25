@@ -776,6 +776,18 @@ function ChatDisplaySection() {
           />
         </SettingsRow>
         <SettingsRow
+          label="Sound on response complete"
+          description="Play a short sound in the browser when the agent finishes replying."
+        >
+          <Switch
+            checked={chatSettings.soundOnChatComplete}
+            onCheckedChange={(checked) =>
+              updateChatSettings({ soundOnChatComplete: checked })
+            }
+            aria-label="Sound on response complete"
+          />
+        </SettingsRow>
+        <SettingsRow
           label="Enter key behavior"
           description={
             chatSettings.enterBehavior === 'newline'
