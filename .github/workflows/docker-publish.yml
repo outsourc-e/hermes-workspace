@@ -56,6 +56,45 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
+      - name: Build smoke-test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: hermes-workspace:smoke
+          cache-from: type=gha
+
+      - name: Smoke test container startup
+        run: |
+          set -euo pipefail
+
+          cid=$(docker run -d \
+            -p 127.0.0.1:3000:3000 \
+            -e HERMES_API_URL=http://127.0.0.1:8642 \
+            hermes-workspace:smoke)
+          trap 'docker logs "$cid" || true; docker rm -f "$cid" || true' EXIT
+
+          for _ in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$cid")
+            case "$status" in
+              exited*)
+                echo "Container exited before becoming healthy: $status"
+                exit 1
+                ;;
+            esac
+
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
+              echo "Container stayed alive and served HTTP successfully"
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          echo "Container did not become ready before timeout"
+          exit 1
+
       - name: Build & push
         uses: docker/build-push-action@v5
         with:
