@@ -1720,8 +1720,9 @@ function ChatComposerComponent({
   const effectiveScrollHidden = scrollHidden && !keyboardOrFocusActive
 
   const composerWrapperStyle = useMemo(() => {
+    const chatContentMaxWidth = 'min(var(--chat-content-max-width), 100%)'
     if (!isMobileViewport || embedded)
-      return { maxWidth: 'min(768px, 100%)' } as CSSProperties
+      return { maxWidth: chatContentMaxWidth } as CSSProperties
     const safeArea = 'env(safe-area-inset-bottom, 0px)'
     const tabBarH = 'var(--tabbar-h, 0px)'
     const tf = effectiveScrollHidden ? 'translateY(110%)' : 'translateY(0)'
