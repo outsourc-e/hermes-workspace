@@ -222,9 +222,17 @@ export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || ''
  * Preferred over scraping the dashboard's root HTML for an inline token
  * (the legacy path, which creates a brittle trust boundary — see #124).
  * When set, the workspace uses this directly and never parses HTML.
+ *
+ * NOTE: do NOT fall back to HERMES_API_TOKEN here. The gateway and the
+ * upstream Hermes dashboard use independent token schemes — the gateway
+ * accepts a long-lived bearer (HERMES_API_TOKEN), while the dashboard
+ * issues an ephemeral session token at boot (web_server.py:_SESSION_TOKEN).
+ * Treating them as interchangeable wedges the workspace into 401 loops on
+ * /api/sessions, /api/skills, etc. against the official dashboard. If
+ * HERMES_DASHBOARD_TOKEN isn't set, leave this empty and let
+ * fetchDashboardToken() fall through to the HTML-scrape legacy path.
  */
-const DASHBOARD_BEARER_TOKEN =
-  process.env.HERMES_DASHBOARD_TOKEN || process.env.HERMES_API_TOKEN || ''
+const DASHBOARD_BEARER_TOKEN = process.env.HERMES_DASHBOARD_TOKEN || ''
 
 function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
