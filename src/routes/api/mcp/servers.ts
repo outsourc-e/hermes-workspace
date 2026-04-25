@@ -6,6 +6,7 @@ import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../../server/gateway-capabilities'
+import { getConfig } from '../../../server/hermes-dashboard-api'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
@@ -110,25 +111,33 @@ export const Route = createFileRoute('/api/mcp/servers')({
         }
 
         try {
-          const response = await fetch(`${HERMES_API}/api/config`, {
-            headers: authHeaders(),
-          })
+          const capabilities = getCapabilities()
+          let payload: unknown
 
-          if (!response.ok) {
-            return Response.json({
-              servers: [],
-              ok: false,
-              message: `Failed to load MCP servers from gateway config (${response.status}).`,
+          if (capabilities.dashboard.available) {
+            payload = await getConfig()
+          } else {
+            const response = await fetch(`${HERMES_API}/api/config`, {
+              headers: authHeaders(),
             })
+
+            if (!response.ok) {
+              return Response.json({
+                servers: [],
+                ok: false,
+                message: `Failed to load MCP servers from gateway config (${response.status}).`,
+              })
+            }
+
+            payload = (await response.json().catch(() => ({}))) as unknown
           }
 
-          const payload = (await response.json().catch(() => ({}))) as unknown
           return Response.json({ ok: true, servers: readServers(payload) })
         } catch {
           return Response.json({
             servers: [],
             ok: false,
-            message: 'Could not reach Hermes gateway config endpoint.',
+            message: 'Could not reach Hermes config endpoint.',
           })
         }
       },
