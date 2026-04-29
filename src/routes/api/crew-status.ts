@@ -3,10 +3,10 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
-import yaml from 'yaml'
+import * as yaml from 'yaml'
 import { BEARER_TOKEN, HERMES_API, ensureGatewayProbed } from '../../server/gateway-capabilities'
+import { getHermesRoot, getProfileHermesHome, getWorkspaceHermesHome } from '../../server/hermes-paths'
 
 type CrewDefinition = {
   id: string
@@ -34,8 +34,7 @@ function titleCase(value: string): string {
 }
 
 function buildCrewDefinitions(): CrewDefinition[] {
-  const base = process.env.HERMES_HOME ?? join(homedir(), '.hermes')
-  const profilesDir = join(base, 'profiles')
+  const profilesDir = join(getHermesRoot(), 'profiles')
   const dynamicProfiles = existsSync(profilesDir)
     ? readdirSync(profilesDir, { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
@@ -55,8 +54,7 @@ function buildCrewDefinitions(): CrewDefinition[] {
 }
 
 function getHermesHome(profilePath: string | null): string {
-  const base = process.env.HERMES_HOME ?? join(homedir(), '.hermes')
-  return profilePath ? join(base, 'profiles', profilePath) : base
+  return profilePath ? getProfileHermesHome(profilePath) : getWorkspaceHermesHome()
 }
 
 function readGatewayState(hermesHome: string) {

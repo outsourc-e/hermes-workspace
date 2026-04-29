@@ -14,18 +14,17 @@ import {
   Moon02Icon,
   PencilEdit02Icon,
   PuzzleIcon,
-
   Rocket01Icon,
-  Search01Icon, Settings01Icon, Sun02Icon, UserGroupIcon, UserMultipleIcon
+  Search01Icon,
+  Settings01Icon,
+  Sun02Icon,
+  UserGroupIcon,
+  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { t } from '@/lib/i18n'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
-import {
-  CHAT_OPEN_SETTINGS_EVENT
-  
-} from '../chat-events'
+import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
 import { useRenameSession } from '../hooks/use-rename-session'
@@ -33,8 +32,9 @@ import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
-import type {ChatOpenSettingsDetail} from '../chat-events';
+import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionMeta } from '../types'
+import { t } from '@/lib/i18n'
 import { SettingsDialog } from '@/components/settings-dialog'
 import {
   TooltipContent,
@@ -68,9 +68,10 @@ function ThemeToggleMini() {
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   void _theme
   // Detect dark/light from actual data-theme attribute
-  const currentDataTheme = typeof document !== 'undefined'
-    ? document.documentElement.getAttribute('data-theme') || 'hermes-nous'
-    : 'hermes-nous'
+  const currentDataTheme =
+    typeof document !== 'undefined'
+      ? document.documentElement.getAttribute('data-theme') || 'hermes-nous'
+      : 'hermes-nous'
   const isDark = !currentDataTheme.endsWith('-light')
 
   // Map between dark and light counterparts — must include all theme families
@@ -90,7 +91,11 @@ function ThemeToggleMini() {
       type="button"
       onClick={() => {
         // Fall back to current family rather than dropping the user into hermes-official
-        const nextDataTheme = LIGHT_DARK_PAIRS[currentDataTheme] || (isDark ? `${currentDataTheme}-light` : currentDataTheme.replace(/-light$/, ''))
+        const nextDataTheme =
+          LIGHT_DARK_PAIRS[currentDataTheme] ||
+          (isDark
+            ? `${currentDataTheme}-light`
+            : currentDataTheme.replace(/-light$/, ''))
         // Import and call setTheme to persist and apply
         import('@/lib/theme').then(({ setTheme }) => {
           setTheme(nextDataTheme as any)
@@ -104,7 +109,11 @@ function ThemeToggleMini() {
       style={{ color: 'var(--theme-muted)' }}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
+      <HugeiconsIcon
+        icon={isDark ? Sun02Icon : Moon02Icon}
+        size={16}
+        strokeWidth={1.5}
+      />
     </button>
   )
 }
@@ -123,8 +132,6 @@ type ChatSidebarProps = {
   sessionsError: string | null
   onRetrySessions: () => void
 }
-
-
 
 // ── Reusable nav item ───────────────────────────────────────────────────
 
@@ -206,7 +213,9 @@ function NavItem({
           transition={transition}
           className="flex min-w-0 items-center gap-2"
         >
-          <span className="overflow-hidden whitespace-nowrap">{item.label}</span>
+          <span className="overflow-hidden whitespace-nowrap">
+            {item.label}
+          </span>
           {item.badge && item.badge !== 'error-dot' ? (
             <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full border border-primary-700 bg-primary-900 px-2 py-0.5 text-[10px] font-semibold leading-none text-primary-300">
               {item.badge}
@@ -229,7 +238,7 @@ function NavItem({
             <TooltipTrigger
               render={
                 <Link
-                  to={item.to!}
+                  to={item.to}
                   search={item.search}
                   hash={item.hash}
                   onClick={handleSelect}
@@ -247,7 +256,7 @@ function NavItem({
     }
     return (
       <Link
-        to={item.to!}
+        to={item.to}
         search={item.search}
         hash={item.hash}
         onClick={handleSelect}
@@ -504,12 +513,8 @@ function ChatSidebarComponent({
   sessionsError,
   onRetrySessions,
 }: ChatSidebarProps) {
-  const {
-    settingsOpen,
-    settingsSection,
-    setSettingsOpen,
-    handleOpenSettings,
-  } = useSidebarSettings()
+  const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
+    useSidebarSettings()
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
@@ -527,7 +532,7 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail?.section === 'appearance' ? 'appearance' : 'hermes')
+      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'hermes')
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
@@ -563,6 +568,8 @@ function ChatSidebarComponent({
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
+  const isSwarmActive = pathname === '/swarm'
+  const isSwarm2Active = pathname === '/swarm2'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
@@ -581,8 +588,6 @@ function ChatSidebarComponent({
     duration: 0.15,
     ease: isCollapsed ? 'easeIn' : 'easeOut',
   } as const
-
-
 
   // Collapsible section states
   const [mainExpanded, toggleMain] = usePersistedBool(
@@ -815,6 +820,20 @@ function ChatSidebarComponent({
       label: 'Operations',
       active: isOperationsActive,
     },
+    {
+      kind: 'link',
+      to: '/swarm',
+      icon: UserMultipleIcon,
+      label: 'Swarm',
+      active: isSwarmActive,
+    },
+    {
+      kind: 'link',
+      to: '/swarm2',
+      icon: UserMultipleIcon,
+      label: 'Swarm2',
+      active: isSwarm2Active,
+    },
   ]
 
   const knowledgeItems: Array<NavItemDef> = [
@@ -851,10 +870,19 @@ function ChatSidebarComponent({
       }}
       initial={false}
       animate={{
-        width: isVisuallyCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
+        width: isVisuallyCollapsed
+          ? isMobile
+            ? 0
+            : 48
+          : isMobile
+            ? '85vw'
+            : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
+      className={cn(
+        asideProps.className,
+        isMobile && isCollapsed && 'pointer-events-none overflow-hidden',
+      )}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
       onMouseEnter={() => {
@@ -889,8 +917,17 @@ function ChatSidebarComponent({
                   'w-full pl-1.5 justify-start gap-2',
                 )}
               >
-                <img src="/hermes-avatar.webp" alt="Hermes" className="size-6 rounded-lg" />
-                <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--theme-text)' }}>Hermes Workspace</span>
+                <img
+                  src="/hermes-avatar.webp"
+                  alt="Hermes"
+                  className="size-6 rounded-lg"
+                />
+                <span
+                  className="text-sm font-semibold tracking-tight"
+                  style={{ color: 'var(--theme-text)' }}
+                >
+                  Hermes Workspace
+                </span>
               </Link>
             </motion.div>
           ) : null}
@@ -903,7 +940,9 @@ function ChatSidebarComponent({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                  aria-label={
+                    isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'
+                  }
                   className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
                   data-tour="sidebar-collapse-toggle"
                 >
@@ -1023,12 +1062,7 @@ function ChatSidebarComponent({
         </div>
 
         {/* Sessions list */}
-        <div
-          className={cn(
-            'shrink-0 mt-1',
-            isMobile && 'order-1',
-          )}
-        >
+        <div className={cn('shrink-0 mt-1', isMobile && 'order-1')}>
           <AnimatePresence initial={false}>
             {!isVisuallyCollapsed && (
               <motion.div
@@ -1062,10 +1096,12 @@ function ChatSidebarComponent({
       {/* ── Footer with User Menu ─────────────────────────────────── */}
       <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
         {/* User card + actions */}
-        <div className={cn(
-          'flex items-center rounded-lg transition-colors',
-          isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
-        )}>
+        <div
+          className={cn(
+            'flex items-center rounded-lg transition-colors',
+            isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
+          )}
+        >
           {/* User menu trigger */}
           <MenuRoot>
             <MenuTrigger
@@ -1125,7 +1161,11 @@ function ChatSidebarComponent({
                 className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >
-                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
+                <HugeiconsIcon
+                  icon={Settings01Icon}
+                  size={16}
+                  strokeWidth={1.5}
+                />
               </button>
               <ThemeToggleMini />
             </div>

@@ -50,7 +50,9 @@ export function createTerminalSession(params: {
       : process.platform === 'darwin'
         ? '/bin/zsh'
         : '/bin/bash'
-  const shell = params.command?.[0] ?? process.env.SHELL ?? defaultShell
+  const command = params.command?.length
+    ? params.command
+    : [process.env.SHELL ?? defaultShell]
   let cwd = params.cwd ?? home
   if (cwd.startsWith('~')) {
     cwd = cwd.replace('~', home)
@@ -86,7 +88,7 @@ export function createTerminalSession(params: {
   // Spawn Python PTY helper
   const proc: ChildProcess = spawn(
     'python3',
-    [PTY_HELPER, shell, cwd, String(cols), String(rows)],
+    [PTY_HELPER, cwd, String(cols), String(rows), '--', ...command],
     {
       env: {
         ...process.env,

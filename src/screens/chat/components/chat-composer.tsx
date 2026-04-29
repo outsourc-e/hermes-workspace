@@ -86,6 +86,7 @@ type ChatComposerProps = {
   /** Embedded inside another surface (e.g. Operations card), so mobile composer
    * must stay inline instead of docking fixed to the viewport bottom. */
   embedded?: boolean
+  hideModelSelector?: boolean
 }
 
 type ChatComposerHelpers = {
@@ -717,6 +718,7 @@ function ChatComposerComponent({
   onThinkingLevelChange,
   onAbort,
   embedded = false,
+  hideModelSelector = false,
 }: ChatComposerProps) {
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore(
@@ -2432,10 +2434,11 @@ function ChatComposerComponent({
                   </span>
                 )}
 
-                <div
-                  className="ml-0.5 md:ml-1 flex min-w-0 items-center"
-                  ref={modelSelectorRef}
-                >
+                {!hideModelSelector ? (
+                  <div
+                    className="ml-0.5 md:ml-1 flex min-w-0 items-center"
+                    ref={modelSelectorRef}
+                  >
                   <button
                     type="button"
                     onClick={() => setIsModelMenuOpen((prev) => !prev)}
@@ -2622,7 +2625,8 @@ function ChatComposerComponent({
                       </div>
                     </>
                   )}
-                </div>
+                  </div>
+                ) : null}
               </div>
               <div className="ml-1 flex shrink-0 items-center gap-0.5 md:gap-1">
                 {voiceInput.isSupported || voiceRecorder.isSupported ? (

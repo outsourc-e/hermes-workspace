@@ -11,10 +11,17 @@
  * Chat routes get the full ChatScreen treatment.
  * Non-chat routes show the sub-page content.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Suspense, lazy } from 'react'
 import type { SessionMeta } from '@/screens/chat/types'
 import type { AuthStatus } from '@/lib/hermes-auth'
 import { cn } from '@/lib/utils'
@@ -102,12 +109,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (path.startsWith('/files')) return 2
     if (path.startsWith('/terminal')) return 3
     if (path.startsWith('/jobs')) return 4
-    if (path.startsWith('/conductor')) return 5
-    if (path.startsWith('/operations')) return 6
-    if (path.startsWith('/memory')) return 7
-    if (path.startsWith('/skills')) return 8
-    if (path.startsWith('/profiles')) return 9
-    if (path.startsWith('/settings')) return 10
+    if (path.startsWith('/swarm2')) return 5
+    if (path.startsWith('/memory')) return 6
+    if (path.startsWith('/skills')) return 7
+    if (path.startsWith('/profiles')) return 8
+    if (path.startsWith('/settings')) return 9
     return -1
   }, [])
 
@@ -135,6 +141,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/conductor')) return 'Conductor'
     if (pathname.startsWith('/operations')) return 'Operations'
+    if (pathname.startsWith('/swarm2')) return 'Swarm2'
+    if (pathname === '/swarm') return 'Swarm'
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
     if (pathname.startsWith('/profiles')) return 'Profiles'

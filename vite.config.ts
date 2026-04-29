@@ -449,11 +449,6 @@ const config = defineConfig(({ mode, command }) => {
       port: process.env.PORT ? Number(process.env.PORT) : 3000,
       strictPort: false, // allow fallback if port is taken, but log clearly
       allowedHosts: true,
-      watch: {
-        // Exclude generated route tree — TanStack Router's file watcher
-        // detects its own output as a change → infinite regeneration loop
-        ignored: ['**/routeTree.gen.ts'],
-      },
       proxy: {
         // WebSocket proxy: clients connect to /ws-hermes on the Hermes Workspace
         // server (any IP/port), which internally forwards to the local server.

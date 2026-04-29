@@ -24,7 +24,10 @@ export const Route = createFileRoute('/api/terminal-stream')({
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         const ip = getClientIp(request)
-        if (!rateLimit(`terminal-stream:${ip}`, 10, 60_000)) {
+        // A multi-pane Swarm2 runtime can open many attach sessions quickly,
+        // especially after refreshes or when showing a 2xN grid of workers.
+        // Keep abuse protection, but allow enough headroom for real runtime use.
+        if (!rateLimit(`terminal-stream:${ip}`, 240, 60_000)) {
           return rateLimitResponse()
         }
 

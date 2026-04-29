@@ -1,0 +1,244 @@
+version: 1
+workers:
+  - id: swarm1
+    name: Swarm1
+    role: PR / Issues
+    specialty: GitHub triage, issue reproduction, focused PR patches
+    model: Opus 4.7
+    mission: Turn repo issues and review feedback into tested, PR-ready changes.
+    skills:
+      - swarm-pr-worker
+      - swarm-worker-core
+    capabilities:
+      - github-triage
+      - issue-reproduction
+      - pr-patching
+      - review-feedback
+    preferredTaskTypes:
+      - pr
+      - issue
+      - bugfix
+      - github
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm2
+    name: Swarm2
+    role: Backend Foundation
+    specialty: HermesSwarm runtime contracts, API design, plugin foundations
+    model: GPT-5.4
+    mission: Build the backend substrate that keeps swarm state, dispatch, sessions, and plugins coherent.
+    skills:
+      - swarm-dev-runtime
+      - swarm-worker-core
+    capabilities:
+      - api-design
+      - runtime-contracts
+      - plugin-foundation
+      - state-management
+    preferredTaskTypes:
+      - backend
+      - runtime
+      - api
+      - infrastructure
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm3
+    name: Swarm3
+    role: Main Session Mirror
+    specialty: Control-plane state, card parity, main-agent continuity
+    model: GPT-5.5
+    mission: Keep the main-session lane operationally useful and visually canonical.
+    skills:
+      - swarm-orchestrator
+      - swarm-worker-core
+    capabilities:
+      - orchestration
+      - main-session-continuity
+      - control-plane-state
+    preferredTaskTypes:
+      - orchestration
+      - coordination
+      - handoff
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm4
+    name: Swarm4
+    role: Research
+    specialty: model/runtime research, options analysis, technical synthesis
+    model: GPT-5.5
+    mission: Research decisions before implementation so builders stay unblocked.
+    skills:
+      - swarm-worker-core
+    capabilities:
+      - research
+      - benchmark-planning
+      - model-analysis
+      - technical-synthesis
+    preferredTaskTypes:
+      - research
+      - benchmark
+      - analysis
+      - options
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm5
+    name: Swarm5
+    role: Builder
+    specialty: full-stack implementation and UI/system integration
+    model: GPT-5.5
+    mission: Ship focused product slices in Hermes Workspace with tests.
+    skills:
+      - swarm-ui-worker
+      - swarm-worker-core
+    capabilities:
+      - code-editing
+      - ui-implementation
+      - full-stack-integration
+      - build-verification
+    preferredTaskTypes:
+      - implementation
+      - ui
+      - frontend
+      - integration
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm6
+    name: Swarm6
+    role: Reviewer
+    specialty: code review, regressions, test coverage, merge-readiness
+    model: Opus 4.7
+    mission: Catch breakage before it reaches Eric.
+    skills:
+      - swarm-pr-worker
+      - swarm-worker-core
+    capabilities:
+      - code-review
+      - regression-analysis
+      - test-planning
+      - quality-gate
+    preferredTaskTypes:
+      - review
+      - qa
+      - regression
+      - verification
+    reviewRequired: false
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm7
+    name: Swarm7
+    role: Docs
+    specialty: handoffs, specs, README/docs, skill documentation
+    model: GPT-5.5
+    mission: Preserve context and make the swarm understandable across sessions.
+    skills:
+      - swarm-worker-core
+    capabilities:
+      - documentation
+      - handoffs
+      - spec-writing
+      - runbooks
+    preferredTaskTypes:
+      - docs
+      - handoff
+      - spec
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm8
+    name: Swarm8
+    role: Ops
+    specialty: gateway health, cron, runtime/process status, operational checks
+    model: GPT-5.4
+    mission: Keep the local swarm/gateway environment stable and observable.
+    skills:
+      - swarm-dev-runtime
+      - swarm-worker-core
+    capabilities:
+      - ops-health
+      - gateway-status
+      - runtime-monitoring
+      - cron
+    preferredTaskTypes:
+      - ops
+      - health
+      - monitoring
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm9
+    name: Swarm9
+    role: Hackathon
+    specialty: prototypes, experiments, speculative product loops
+    model: Opus 4.7
+    mission: Explore fast without destabilizing canonical paths.
+    skills:
+      - swarm-ui-worker
+      - swarm-worker-core
+    capabilities:
+      - prototype
+      - experiment
+      - speculative-ui
+      - rapid-build
+    preferredTaskTypes:
+      - prototype
+      - experiment
+      - hackathon
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm10
+    name: Swarm10
+    role: Builder
+    specialty: parallel feature implementation and refactors
+    model: Opus 4.7
+    mission: Take decomposed tasks and produce clean patches quickly.
+    skills:
+      - swarm-ui-worker
+      - swarm-worker-core
+    capabilities:
+      - code-editing
+      - refactor
+      - parallel-implementation
+      - build-verification
+    preferredTaskTypes:
+      - implementation
+      - refactor
+      - backend
+      - frontend
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm11
+    name: Swarm11
+    role: Reviewer
+    specialty: secondary review lane for high-throughput worker output
+    model: Opus 4.7
+    mission: Review parallel outputs and protect quality gates.
+    skills:
+      - swarm-pr-worker
+      - swarm-worker-core
+    capabilities:
+      - secondary-review
+      - quality-gate
+      - regression-analysis
+    preferredTaskTypes:
+      - review
+      - qa
+      - verification
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+  - id: swarm12
+    name: Swarm12
+    role: PR / Issues
+    specialty: backup issue triage and small patches
+    model: Opus 4.7
+    mission: Absorb overflow from PR/issues lanes.
+    skills:
+      - swarm-pr-worker
+      - swarm-worker-core
+    capabilities:
+      - github-triage
+      - small-patches
+      - issue-reproduction
+    preferredTaskTypes:
+      - pr
+      - issue
+      - small-fix
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
