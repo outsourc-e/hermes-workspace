@@ -137,7 +137,10 @@ export function listMemoryFiles(): Array<MemoryFileMeta> {
   const workspaceRoot = getMemoryWorkspaceRoot()
   const results: Array<MemoryFileMeta> = []
 
-  walkWorkspaceDir(results, workspaceRoot, workspaceRoot)
+  pushIfMarkdownFile(results, workspaceRoot, path.join(workspaceRoot, 'MEMORY.md'))
+  for (const subdir of ['memory', 'memories']) {
+    walkWorkspaceDir(results, workspaceRoot, path.join(workspaceRoot, subdir))
+  }
 
   results.sort(compareMemoryFiles)
   return results
