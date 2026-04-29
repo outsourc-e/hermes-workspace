@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildInlineToolRenderPlan } from './message-item'
+import { buildInlineToolRenderPlan, compactInlineToolRenderPlan } from './message-item'
 import type { ChatMessage } from '../types'
 
 describe('buildInlineToolRenderPlan', () => {
@@ -43,6 +43,105 @@ describe('buildInlineToolRenderPlan', () => {
         },
       },
       { kind: 'text', text: 'After tool.' },
+    ])
+  })
+})
+
+describe('compactInlineToolRenderPlan', () => {
+  it('stacks consecutive tool calls without moving surrounding text', () => {
+    const plan = compactInlineToolRenderPlan([
+      { kind: 'text', text: 'Before. ' },
+      {
+        kind: 'tool',
+        section: {
+          key: 'tc-1',
+          type: 'read_file',
+          outputText: '',
+          state: 'output-available',
+        },
+      },
+      {
+        kind: 'tool',
+        section: {
+          key: 'tc-2',
+          type: 'search_files',
+          outputText: '',
+          state: 'output-available',
+        },
+      },
+      { kind: 'text', text: 'After.' },
+    ])
+
+    expect(plan).toEqual([
+      { kind: 'text', text: 'Before. ' },
+      {
+        kind: 'tools',
+        sections: [
+          {
+            key: 'tc-1',
+            type: 'read_file',
+            outputText: '',
+            state: 'output-available',
+          },
+          {
+            key: 'tc-2',
+            type: 'search_files',
+            outputText: '',
+            state: 'output-available',
+          },
+        ],
+      },
+      { kind: 'text', text: 'After.' },
+    ])
+  })
+
+  it('keeps separate stacks when text appears between tool calls', () => {
+    const plan = compactInlineToolRenderPlan([
+      {
+        kind: 'tool',
+        section: {
+          key: 'tc-1',
+          type: 'read_file',
+          outputText: '',
+          state: 'output-available',
+        },
+      },
+      { kind: 'text', text: 'Then ' },
+      {
+        kind: 'tool',
+        section: {
+          key: 'tc-2',
+          type: 'search_files',
+          outputText: '',
+          state: 'output-available',
+        },
+      },
+    ])
+
+    expect(plan).toEqual([
+      {
+        kind: 'tools',
+        sections: [
+          {
+            key: 'tc-1',
+            type: 'read_file',
+            outputText: '',
+            state: 'output-available',
+          },
+        ],
+      },
+      { kind: 'text', text: 'Then ' },
+      {
+        kind: 'tools',
+        sections: [
+          {
+            key: 'tc-2',
+            type: 'search_files',
+            outputText: '',
+            state: 'output-available',
+          },
+        ],
+      },
     ])
   })
 })

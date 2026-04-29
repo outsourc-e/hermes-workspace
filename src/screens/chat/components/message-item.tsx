@@ -158,6 +158,10 @@ export type InlineRenderPlanItem =
   | { kind: 'text'; text: string }
   | { kind: 'tool'; section: InlineToolSection }
 
+export type CompactInlineRenderPlanItem =
+  | { kind: 'text'; text: string }
+  | { kind: 'tools'; sections: Array<InlineToolSection> }
+
 export function buildInlineToolRenderPlan(
   message: ChatMessage,
   toolSections: Array<InlineToolSection>,
@@ -198,6 +202,32 @@ export function buildInlineToolRenderPlan(
   }
 
   return plan
+}
+
+export function compactInlineToolRenderPlan(
+  plan: Array<InlineRenderPlanItem>,
+): Array<CompactInlineRenderPlanItem> {
+  const compactPlan: Array<CompactInlineRenderPlanItem> = []
+  let pendingToolSections: Array<InlineToolSection> = []
+
+  const flushTools = () => {
+    if (pendingToolSections.length === 0) return
+    compactPlan.push({ kind: 'tools', sections: pendingToolSections })
+    pendingToolSections = []
+  }
+
+  for (const item of plan) {
+    if (item.kind === 'tool') {
+      pendingToolSections.push(item.section)
+      continue
+    }
+
+    flushTools()
+    compactPlan.push(item)
+  }
+
+  flushTools()
+  return compactPlan
 }
 
 function extractToolResultText(msg: ChatMessage | undefined): string {
@@ -1404,8 +1434,6 @@ function InlineToolSectionItem({
   const hasInputData =
     toolSection.input && Object.keys(toolSection.input).length > 0
   const hasOutputData = !!(toolSection.outputText || toolSection.errorText)
-  // Always expandable — show args, output, or at minimum the tool name/state
-  const hasExpandableContent = true
 
   return (
     <div>
@@ -1452,11 +1480,9 @@ function InlineToolSectionItem({
           {isRunning && (
             <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />
           )}
-          {hasExpandableContent && (
-            <span className="text-[8px] opacity-30 ml-0.5">
-              {open ? '▾' : '▸'}
-            </span>
-          )}
+          <span className="text-[8px] opacity-30 ml-0.5">
+            {open ? '▾' : '▸'}
+          </span>
         </div>
         {isRunning && (
           <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
@@ -1577,11 +1603,78 @@ function InlineToolSectionItem({
 function ToolCallGroup({
   toolSections,
   expandAll,
+  isStreaming,
 }: {
   toolSections: Array<InlineToolSection>
   expandAll?: boolean
   isStreaming?: boolean
 }) {
+  const [open, setOpen] = useState(Boolean(expandAll))
+  useEffect(() => {
+    if (expandAll) setOpen(true)
+  }, [expandAll])
+
+  if (toolSections.length > 1) {
+    const runningCount = toolSections.filter((section) => section.state === 'input-available' || section.state === 'input-streaming').length
+    const errorCount = toolSections.filter((section) => section.state === 'output-error').length
+    const doneCount = toolSections.length - runningCount - errorCount
+    const labels = Array.from(new Set(toolSections.map((section) => formatToolDisplayLabel(section.type, section.input))))
+    const visibleLabels = labels.slice(0, 3).join(', ')
+    const overflowLabel = labels.length > 3 ? ` +${labels.length - 3} more` : ''
+    const statusLabel =
+      runningCount > 0
+        ? `${runningCount} running`
+        : errorCount > 0
+          ? `${errorCount} failed`
+          : `${doneCount} done`
+
+    return (
+      <div className="my-3 w-full max-w-[min(100%,700px)] border-l-2 border-primary-200/60 pl-3">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-primary-600 hover:bg-primary-50/70"
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span className="font-mono font-semibold text-ink">Tool activity</span>
+          <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] tabular-nums text-primary-600">
+            {toolSections.length} calls
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[10px] opacity-60">
+            {visibleLabels}
+            {overflowLabel}
+          </span>
+          <span
+            className={cn(
+              'shrink-0 text-[10px] tabular-nums',
+              errorCount > 0
+                ? 'text-red-500'
+                : runningCount > 0 || isStreaming
+                  ? 'text-indigo-500'
+                  : 'text-green-600',
+            )}
+          >
+            {statusLabel}
+          </span>
+          <span className="shrink-0 text-[9px] opacity-40">
+            {open ? '▾' : '▸'}
+          </span>
+        </button>
+        {open && (
+          <div className="mt-2 flex flex-col gap-2.5">
+            {toolSections.map((toolSection, index) => (
+              <InlineToolSectionItem
+                key={toolSection.key || `${toolSection.type}-${index}`}
+                toolSection={toolSection}
+                index={index}
+                forceOpen={expandAll}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-2.5 my-3 w-full max-w-[min(100%,700px)]">
       {toolSections.map((toolSection, index) => (
@@ -1694,8 +1787,8 @@ function MessageItemComponent({
   }, [])
 
   // Simulate streaming is only active while words are still being revealed
-  const totalWords = countWords(displayText)
-  const revealComplete = revealedWordCount >= totalWords && totalWords > 0
+  const displayWordCount = countWords(displayText)
+  const revealComplete = revealedWordCount >= displayWordCount && displayWordCount > 0
   const effectiveIsStreaming =
     remoteStreamingActive || (_simulateStreaming && !revealComplete)
   const assistantDisplayText = effectiveIsStreaming ? revealedText : displayText
@@ -1705,7 +1798,7 @@ function MessageItemComponent({
   )
 
   useEffect(() => {
-    const totalWords = countWords(displayText)
+    const nextTotalWords = countWords(displayText)
     const previousText = previousTextRef.current
     const previousLength = previousTextLengthRef.current
     const textGrew =
@@ -1713,7 +1806,7 @@ function MessageItemComponent({
       displayText.startsWith(previousText)
     const textChanged = displayText !== previousText
 
-    targetWordCountRef.current = totalWords
+    targetWordCountRef.current = nextTotalWords
     previousTextRef.current = displayText
     previousTextLengthRef.current = displayText.length
 
@@ -1722,12 +1815,12 @@ function MessageItemComponent({
         window.clearInterval(revealTimerRef.current)
         revealTimerRef.current = null
       }
-      setRevealedWordCount(totalWords)
+      setRevealedWordCount(nextTotalWords)
       return
     }
 
     if (textChanged && !textGrew) {
-      setRevealedWordCount(totalWords)
+      setRevealedWordCount(nextTotalWords)
       return
     }
 
@@ -1736,25 +1829,25 @@ function MessageItemComponent({
     }
 
     // Don't start animation if already fully revealed
-    setRevealedWordCount((currentWordCount) => {
-      if (currentWordCount >= totalWords) {
-        return currentWordCount
+    setRevealedWordCount((wordCount) => {
+      if (wordCount >= nextTotalWords) {
+        return wordCount
       }
 
       function tick() {
-        setRevealedWordCount((currentWordCount) => {
+        setRevealedWordCount((visibleWordCount) => {
           const targetWordCount = targetWordCountRef.current
-          if (currentWordCount >= targetWordCount) {
+          if (visibleWordCount >= targetWordCount) {
             if (revealTimerRef.current !== null) {
               window.clearInterval(revealTimerRef.current)
               revealTimerRef.current = null
             }
-            return currentWordCount
+            return visibleWordCount
           }
 
           const nextWordCount = Math.min(
             targetWordCount,
-            currentWordCount + WORDS_PER_TICK,
+            visibleWordCount + WORDS_PER_TICK,
           )
 
           if (
@@ -1770,7 +1863,7 @@ function MessageItemComponent({
       }
 
       revealTimerRef.current = window.setInterval(tick, TICK_INTERVAL_MS)
-      return currentWordCount
+      return wordCount
     })
   }, [displayText, effectiveIsStreaming])
 
@@ -1996,6 +2089,10 @@ function MessageItemComponent({
   const inlineRenderPlan = useMemo(
     () => buildInlineToolRenderPlan(message, finalToolSections),
     [message, finalToolSections],
+  )
+  const compactInlineRenderPlan = useMemo(
+    () => compactInlineToolRenderPlan(inlineRenderPlan),
+    [inlineRenderPlan],
   )
   const hasToolCalls = finalToolSections.length > 0
   const shouldRenderMessageBubble =
@@ -2322,11 +2419,11 @@ function MessageItemComponent({
             )}
             {!isUser && hasToolCalls && (
               <div className="flex flex-col gap-2">
-                {inlineRenderPlan.map((item, index) =>
-                  item.kind === 'tool' ? (
+                {compactInlineRenderPlan.map((item, index) =>
+                  item.kind === 'tools' ? (
                     <ToolCallGroup
-                      key={item.section.key || `tool-${index}`}
-                      toolSections={[item.section]}
+                      key={item.sections.map((section) => section.key).join(':') || `tools-${index}`}
+                      toolSections={item.sections}
                       expandAll={expandAllToolSections}
                       isStreaming={effectiveIsStreaming}
                     />
@@ -2341,11 +2438,6 @@ function MessageItemComponent({
                             'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                             effectiveIsStreaming && 'chat-streaming-content',
                           )}
-                          style={
-                            isUser
-                              ? { color: 'var(--chat-user-foreground)' }
-                              : undefined
-                          }
                         >
                           {item.text}
                         </MessageContent>
@@ -2370,11 +2462,6 @@ function MessageItemComponent({
                         'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
                       )}
-                      style={
-                        isUser
-                          ? { color: 'var(--chat-user-foreground)' }
-                          : undefined
-                      }
                     >
                       {assistantDisplayText}
                     </MessageContent>
