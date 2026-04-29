@@ -23,6 +23,8 @@ import {
   ONBOARDING_KEY,
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { LoginScreen } from '@/components/auth/login-screen'
+import { fetchHermesAuthStatus, type AuthStatus } from '@/lib/hermes-auth'
 import { getRootSurfaceState } from './-root-layout-state'
 
 
@@ -249,6 +251,7 @@ function RootLayout() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
   useApplyChatWidth()
 
   useEffect(() => {
@@ -307,12 +310,30 @@ function RootLayout() {
     }
   }, [])
 
-  const rootSurfaceState = getRootSurfaceState(onboardingComplete)
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    let cancelled = false
+    fetchHermesAuthStatus()
+      .then((status) => {
+        if (!cancelled) setAuthStatus(status)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAuthStatus({ authenticated: true, authRequired: false })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const rootSurfaceState = getRootSurfaceState(onboardingComplete, authStatus)
 
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
-      {rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
+      {rootSurfaceState.showLogin ? <LoginScreen /> : null}
+      {rootSurfaceState.showOnboarding ? <HermesOnboarding /> : null}
       {rootSurfaceState.showWorkspaceShell ? (
         <>
           <GlobalShortcutListener />
