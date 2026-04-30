@@ -71,14 +71,14 @@ import type {
   ChatComposerHelpers,
   ThinkingLevel,
 } from './components/chat-composer'
-import type { ApprovalRequest } from '@/lib/approvals-store'
+import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type { ChatRunCommandDetail } from './chat-events'
 import {
   addApproval,
   loadApprovals,
   saveApprovals,
-} from '@/lib/approvals-store'
+} from '@/screens/gateway/lib/approvals-store'
 import { stripQueuedWrapper } from '@/lib/strip-queued-wrapper'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
@@ -653,7 +653,7 @@ export function ChatScreen({
       if (
         approvalId &&
         currentApprovals.some((entry) => {
-          return entry.status === 'pending' && entry.approvalId === approvalId
+          return entry.status === 'pending' && entry.gatewayApprovalId === approvalId
         })
       ) {
         setPendingApprovals(
@@ -694,8 +694,8 @@ export function ChatScreen({
         agentName,
         action,
         context,
-        source: 'claude',
-        approvalId: approvalId || undefined,
+        source: 'agent',
+        gatewayApprovalId: approvalId || undefined,
       })
       setPendingApprovals(
         loadApprovals().filter((entry) => entry.status === 'pending'),
@@ -782,12 +782,12 @@ export function ChatScreen({
       setPendingApprovals(
         nextApprovals.filter((entry) => entry.status === 'pending'),
       )
-      if (!approval.approvalId) return
+      if (!approval.gatewayApprovalId) return
 
       const endpoint =
         status === 'approved'
-          ? `/api/approvals/${approval.approvalId}/approve`
-          : `/api/approvals/${approval.approvalId}/deny`
+          ? `/api/approvals/${approval.gatewayApprovalId}/approve`
+          : `/api/approvals/${approval.gatewayApprovalId}/deny`
       try {
         await fetch(endpoint, { method: 'POST' })
       } catch {
