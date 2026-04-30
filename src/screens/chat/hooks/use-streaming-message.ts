@@ -52,6 +52,7 @@ type UseStreamingMessageOptions = {
     friendlyId: string,
     clientId: string,
   ) => void
+  onAbort?: () => void
   onSessionResolved?: (payload: {
     sessionKey: string
     friendlyId: string
@@ -69,6 +70,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     onThinking,
     onTool,
     onMessageAccepted,
+    onAbort,
     onSessionResolved,
     acceptedTimeoutMs,
     handoffTimeoutMs,
@@ -831,7 +833,17 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           finishStream()
         }
       } catch (err) {
-        if ((err as Error).name === 'AbortError') return
+        if ((err as Error).name === 'AbortError') {
+          eventSourceRef.current = null
+          clearHandoffTimer()
+          clearSendStreamRun()
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+          }))
+          onAbort?.()
+          return
+        }
         const errorMessage = err instanceof Error ? err.message : String(err)
         markFailed(errorMessage)
       }
@@ -840,6 +852,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       finishStream,
       markAccepted,
       markFailed,
+      onAbort,
       onMessageAccepted,
       onSessionResolved,
       processEvent,

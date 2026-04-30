@@ -908,7 +908,13 @@ export function ChatScreen({
         )
         if (!res.ok) return
         const data = await res.json()
-        if (!data.ok || !data.run || !['accepted', 'active', 'handoff'].includes(data.run.status)) {
+        if (!data.ok) return
+        // Run not yet registered (gateway lag during silent processing) → keep waiting
+        if (!data.run) return
+        const status = data.run.status
+        // Treat unknown / transient statuses as still-active to avoid premature teardown
+        const terminalStatuses = ['completed', 'failed', 'cancelled', 'error']
+        if (terminalStatuses.includes(status)) {
           streamFinish()
           refreshHistoryRef.current()
         }
@@ -939,18 +945,6 @@ export function ChatScreen({
       return data
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-  })
-
-  const streamConfigQuery = useQuery({
-    queryKey: ['stream-config'],
-    queryFn: async () => {
-      const res = await fetch('/api/stream-config')
-      if (!res.ok) return null
-      const data = await res.json()
-      return data as { acceptedTimeoutMs: number; handoffTimeoutMs: number }
-    },
-    staleTime: Infinity,
-    retry: false,
   })
 
   const currentModelQuery = useQuery({
@@ -1169,8 +1163,14 @@ export function ChatScreen({
       },
       [queryClient],
     ),
-    acceptedTimeoutMs: streamConfigQuery.data?.acceptedTimeoutMs,
-    handoffTimeoutMs: streamConfigQuery.data?.handoffTimeoutMs,
+    onAbort: useCallback(() => {
+      activeSendRef.current = null
+      setSending(false)
+      setPendingGeneration(false)
+      setWaitingForResponse(false)
+    }, [setWaitingForResponse]),
+    acceptedTimeoutMs: modelsQuery.data?.streamAcceptedTimeoutMs,
+    handoffTimeoutMs: modelsQuery.data?.streamHandoffTimeoutMs,
   })
 
   const activeIsRealtimeStreaming = isPortableMode

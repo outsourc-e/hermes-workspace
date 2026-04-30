@@ -610,6 +610,23 @@ const config = defineConfig(({ mode, command }) => {
             }
           })
 
+          // Dev-only: disable Node's default 5-minute request timeout so
+          // long-running SSE streams (agent runs that go silent for minutes
+          // during heavy reasoning / tool calls) don't get killed mid-stream
+          // by the HTTP layer. Heartbeats handle keep-alive at the application
+          // layer. Production servers should keep their default timeouts to
+          // avoid slowloris exposure.
+          if (command === 'serve' && server.httpServer) {
+            const httpServer = server.httpServer as unknown as {
+              requestTimeout?: number
+              headersTimeout?: number
+              timeout?: number
+            }
+            httpServer.requestTimeout = 0
+            httpServer.headersTimeout = 0
+            httpServer.timeout = 0
+          }
+
           server.httpServer?.on('close', () => {
             workspaceDaemonShuttingDown = true
             workspaceDaemonStarted = false
