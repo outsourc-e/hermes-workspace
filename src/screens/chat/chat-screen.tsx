@@ -941,6 +941,18 @@ export function ChatScreen({
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
+  const streamConfigQuery = useQuery({
+    queryKey: ['stream-config'],
+    queryFn: async () => {
+      const res = await fetch('/api/stream-config')
+      if (!res.ok) return null
+      const data = await res.json()
+      return data as { acceptedTimeoutMs: number; handoffTimeoutMs: number }
+    },
+    staleTime: Infinity,
+    retry: false,
+  })
+
   const currentModelQuery = useQuery({
     queryKey: ['claude', 'session-status-model'],
     queryFn: async () => {
@@ -1157,6 +1169,8 @@ export function ChatScreen({
       },
       [queryClient],
     ),
+    acceptedTimeoutMs: streamConfigQuery.data?.acceptedTimeoutMs,
+    handoffTimeoutMs: streamConfigQuery.data?.handoffTimeoutMs,
   })
 
   const activeIsRealtimeStreaming = isPortableMode

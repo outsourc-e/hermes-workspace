@@ -56,6 +56,8 @@ type UseStreamingMessageOptions = {
     sessionKey: string
     friendlyId: string
   }) => void
+  acceptedTimeoutMs?: number
+  handoffTimeoutMs?: number
 }
 
 export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
@@ -68,6 +70,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     onTool,
     onMessageAccepted,
     onSessionResolved,
+    acceptedTimeoutMs,
+    handoffTimeoutMs,
   } = options
 
   const [state, setState] = useState<StreamingState>({
@@ -98,9 +102,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const processStoreEvent = useChatStore((s) => s.processEvent)
   const clearStreamingSession = useChatStore((s) => s.clearStreamingSession)
 
-  // Hermes tool calls can take 60-120s (file reads, terminal commands, web searches)
-  const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 120_000
-  const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = 180_000
+  const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = acceptedTimeoutMs ?? 120_000
+  const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = handoffTimeoutMs ?? 300_000
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {
