@@ -126,7 +126,7 @@ async function tryServeStatic(req, res) {
   }
 }
 
-const httpServer = createServer(async (req, res) => {
+async function requestHandler(req, res) {
   // Try static files first (client assets)
   if (req.method === 'GET' || req.method === 'HEAD') {
     const served = await tryServeStatic(req, res)
@@ -191,8 +191,23 @@ const httpServer = createServer(async (req, res) => {
     res.writeHead(500)
     res.end('Internal Server Error')
   }
-})
+}
 
-httpServer.listen(port, host, () => {
-  console.log(`Hermes Workspace running at http://${host}:${port}`)
-})
+function listenOn(bindHost) {
+  const httpServer = createServer(requestHandler)
+  httpServer.listen(port, bindHost, () => {
+    console.log(`Hermes Workspace running at http://${bindHost}:${port}`)
+  })
+  return httpServer
+}
+
+listenOn(host)
+
+// Cloudflared remote-managed ingress currently points at http://localhost:10280.
+// On macOS, localhost may resolve to ::1 before 127.0.0.1; if Workspace only
+// listens on IPv4 loopback, tunneled requests intermittently fail with
+// `dial tcp [::1]:10280: connect: connection refused`. Keep the default
+// local-only security posture while also serving IPv6 loopback.
+if (host === '127.0.0.1') {
+  listenOn('::1')
+}

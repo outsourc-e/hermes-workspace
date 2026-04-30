@@ -439,14 +439,16 @@ export function useChatHistory({
         // Filter out system event forwards (subagent task announcements etc)
         if (text.startsWith('A subagent task')) return false
         if (text.startsWith('[Queued announce messages')) return false
+        // Hide internal system-forwarded prompts only when the whole message is the
+        // system event. Do not hide user-pasted context summaries merely because
+        // they quote these phrases somewhere inside the text.
         if (text.startsWith('Pre-compaction memory flush')) return false
-        if (text.includes('Pre-compaction memory flush')) return false
-        if (text.includes('Store durable memories now')) return false
-        if (text.includes('Summarize this naturally for the user')) return false
-        if (text.includes('APPEND new content only and do not overwrite'))
+        if (text.startsWith('Store durable memories now')) return false
+        if (text.startsWith('Summarize this naturally for the user')) return false
+        if (text.startsWith('APPEND new content only and do not overwrite'))
           return false
         if (
-          text.includes('Stats: runtime') &&
+          text.startsWith('Stats: runtime') &&
           text.includes('sessionKey agent:codex:subagent:')
         )
           return false

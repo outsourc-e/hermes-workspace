@@ -195,13 +195,12 @@ export function useRealtimeChatHistory({
           const msgText = extractUserMessageText(message)
           if (
             msgText.startsWith('Pre-compaction memory flush') ||
-            msgText.includes('Pre-compaction memory flush') ||
-            msgText.includes('Store durable memories now') ||
-            msgText.includes('APPEND new content only and do not overwrite') ||
+            msgText.startsWith('Store durable memories now') ||
+            msgText.startsWith('APPEND new content only and do not overwrite') ||
             msgText.startsWith('A subagent task') ||
             msgText.startsWith('[Queued announce messages') ||
-            msgText.includes('Summarize this naturally for the user') ||
-            (msgText.includes('Stats: runtime') &&
+            msgText.startsWith('Summarize this naturally for the user') ||
+            (msgText.startsWith('Stats: runtime') &&
               msgText.includes('sessionKey agent:'))
           ) {
             onUserMessage?.(message, source)

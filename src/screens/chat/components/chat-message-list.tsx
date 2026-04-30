@@ -442,16 +442,13 @@ const VIRTUAL_OVERSCAN = 8
 const NEAR_BOTTOM_THRESHOLD = 200
 // Pull-to-refresh constants removed
 
-const HIDDEN_SYSTEM_USER_SUBSTRINGS = [
+const HIDDEN_SYSTEM_USER_PREFIXES = [
   'Pre-compaction memory flush',
   'Read HEARTBEAT.md',
   'HEARTBEAT_OK',
   'Execute your Session Startup sequence',
   '[Queued messages',
   'Heartbeat prompt',
-] as const
-
-const HIDDEN_SYSTEM_USER_PREFIXES = [
   '[Fri ',
   '[Mon ',
   '[Tue ',
@@ -464,14 +461,10 @@ const HIDDEN_SYSTEM_USER_PREFIXES = [
 function shouldHideSystemInjectedUserMessage(text: string): boolean {
   const trimmed = text.trim()
   if (!trimmed) return false
-  if (
-    HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
-  ) {
-    return true
-  }
-  return HIDDEN_SYSTEM_USER_SUBSTRINGS.some((substring) =>
-    trimmed.includes(substring),
-  )
+  // Only hide messages that begin with known system-injected prompts. User
+  // context summaries may quote these phrases later in the message and must
+  // remain visible/persistent in the chat UI.
+  return HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
 }
 
 function getChronologyRank(message: ChatMessage): number {

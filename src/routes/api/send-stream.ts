@@ -380,15 +380,38 @@ export const Route = createFileRoute('/api/send-stream')({
 
         const stream = new ReadableStream({
           async start(controller) {
-            const sendEvent = (event: string, data: unknown) => {
+            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+            let lastClientEventAt = Date.now()
+            const enqueueRaw = (payload: string) => {
               if (streamClosed) return
-              const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
               controller.enqueue(encoder.encode(payload))
             }
+            const sendEvent = (event: string, data: unknown) => {
+              if (streamClosed) return
+              lastClientEventAt = Date.now()
+              const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+              enqueueRaw(payload)
+            }
+
+            // Cloudflare Tunnel/Access can otherwise leave small SSE streams idle
+            // long enough that the browser-side fetch is canceled before visible
+            // assistant chunks arrive. Send an initial padding comment and a
+            // lightweight recognized event periodically so public Workspace chats
+            // do not sit at "Thinking…" until the frontend reports failure.
+            enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
+            heartbeatTimer = setInterval(() => {
+              if (streamClosed) return
+              if (Date.now() - lastClientEventAt < 10_000) return
+              sendEvent('thinking', { text: 'Still working…', sessionKey })
+            }, 10_000)
 
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
+              if (heartbeatTimer) {
+                clearInterval(heartbeatTimer)
+                heartbeatTimer = null
+              }
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
                 unregisterTimer = null
@@ -1101,10 +1124,11 @@ export const Route = createFileRoute('/api/send-stream')({
         return new Response(stream, {
           headers: {
             'Content-Type': 'text/event-stream; charset=utf-8',
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-cache, no-transform',
             Connection: 'keep-alive',
-            'X-Claude-Session-Key': sessionKey,
-            'X-Claude-Friendly-Id': resolvedFriendlyId,
+            'X-Accel-Buffering': 'no',
+            'X-Hermes-Session-Key': sessionKey,
+            'X-Hermes-Friendly-Id': resolvedFriendlyId,
           },
         })
       },
