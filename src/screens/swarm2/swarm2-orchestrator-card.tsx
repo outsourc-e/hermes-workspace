@@ -168,7 +168,7 @@ export function Swarm2OrchestratorCard({
             {([
               ['cards', 'Control'],
               ['kanban', 'Board'],
-              ['reports', 'Reports'],
+              ['reports', 'Inbox'],
               ['runtime', 'Runtime'],
             ] as const).map(([mode, label]) => (
               <button

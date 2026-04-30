@@ -1,8 +1,79 @@
 import { join } from 'node:path'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 import { getSwarmProfilePath } from './swarm-foundation'
 import { publishChatEvent } from './chat-event-bus'
+
+const ORCHESTRATOR_WORKER_ID = process.env.SWARM_ORCHESTRATOR_WORKER_ID?.trim() || 'swarm3'
+const ORCHESTRATOR_TMUX_SESSION = `swarm-${ORCHESTRATOR_WORKER_ID}`
+const MAIN_SESSION_KEY = process.env.SWARM_MAIN_SESSION_KEY?.trim() || 'main'
+
+function tmuxSessionExists(session: string): boolean {
+  try {
+    execFileSync('tmux', ['has-session', '-t', session], { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function tmuxSendText(session: string, text: string): { sent: boolean; error?: string } {
+  if (!tmuxSessionExists(session)) {
+    return { sent: false, error: `tmux session ${session} not found` }
+  }
+  try {
+    // Use literal mode so multi-line content sends without shell interpretation, then send Enter to submit.
+    execFileSync('tmux', ['send-keys', '-t', session, '-l', text], { stdio: 'ignore' })
+    execFileSync('tmux', ['send-keys', '-t', session, 'Enter'], { stdio: 'ignore' })
+    return { sent: true }
+  } catch (err) {
+    return { sent: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function orchestratorPromptForCheckpoint(input: {
+  workerId: string
+  checkpoint: ParsedSwarmCheckpoint
+  missionId?: string | null
+}): string {
+  const lines: Array<string> = [
+    `## Checkpoint from ${input.workerId}`,
+    `STATE: ${input.checkpoint.stateLabel}`,
+  ]
+  if (input.missionId) lines.push(`Mission: ${input.missionId}`)
+  if (input.checkpoint.result) lines.push(`Result: ${input.checkpoint.result}`)
+  if (input.checkpoint.blocker && input.checkpoint.blocker.toLowerCase() !== 'none') {
+    lines.push(`Blocker: ${input.checkpoint.blocker}`)
+  }
+  if (input.checkpoint.nextAction && input.checkpoint.nextAction.toLowerCase() !== 'none') {
+    lines.push(`Next: ${input.checkpoint.nextAction}`)
+  }
+  lines.push('')
+  lines.push(`Decide next action per /Users/aurora/.ocplatform/workspace/swarm-specs/projects/${input.workerId}.md and /Users/aurora/.ocplatform/workspace/swarm-specs/playbooks/auto-repair.yaml:`)
+  lines.push(`- DONE → mark mission complete, assign next from lane priority`)
+  lines.push(`- HANDOFF → dispatch to named worker per next_action`)
+  lines.push(`- BLOCKED → consult auto-repair.yaml; if not in playbook, escalate to Aurora (publish to '${MAIN_SESSION_KEY}')`)
+  lines.push(`- NEEDS_INPUT → escalate to Aurora`)
+  lines.push(`- NEEDS_REVIEW → queue Inbox card, route to Eric`)
+  lines.push('')
+  lines.push(`Reply with the dispatch you fired (POST /api/swarm-dispatch on http://localhost:3002) OR the escalation summary.`)
+  return lines.join('\n')
+}
+
+export function publishCheckpointToOrchestrator(input: {
+  workerId: string
+  checkpoint: ParsedSwarmCheckpoint
+  missionId?: string | null
+}): { sent: boolean; session: string; error?: string; skippedSelf?: boolean } {
+  // Don't echo a checkpoint into the orchestrator's own pane.
+  if (input.workerId === ORCHESTRATOR_WORKER_ID) {
+    return { sent: false, session: ORCHESTRATOR_TMUX_SESSION, skippedSelf: true }
+  }
+  const text = orchestratorPromptForCheckpoint(input)
+  const result = tmuxSendText(ORCHESTRATOR_TMUX_SESSION, text)
+  return { ...result, session: ORCHESTRATOR_TMUX_SESSION }
+}
 
 function publishChatStatus(sessionKey: string, text: string): void {
   publishChatEvent('status', {
@@ -66,22 +137,28 @@ export function publishSwarmActionPrompt(input: {
   return { published: true, sessionKey }
 }
 
+function shouldEscalateToMain(stateLabel: string): boolean {
+  // Only NEEDS_INPUT escalates to Aurora directly.
+  // BLOCKED/HANDOFF/DONE go to the orchestrator first; orchestrator escalates if needed.
+  return stateLabel === 'NEEDS_INPUT'
+}
+
 export function publishSwarmCheckpointNotification(input: {
   workerId: string
   checkpoint: ParsedSwarmCheckpoint
   missionId?: string | null
   assignmentId?: string | null
   notifySessionKey?: string | null
-}): { published: boolean; sessionKey: string } {
+}): { published: boolean; sessionKey: string; route: 'orchestrator' | 'main' | 'noop'; orchestrator?: { sent: boolean; session: string; error?: string; skippedSelf?: boolean } } {
   const profilePath = getSwarmProfilePath(input.workerId)
   const runtimePath = join(profilePath, 'runtime.json')
   const current = readRuntime(runtimePath)
   const currentRaw = typeof current.lastNotifiedCheckpointRaw === 'string' ? current.lastNotifiedCheckpointRaw : null
   const checkpointRaw = input.checkpoint.raw?.trim() || ''
-  const sessionKey = input.notifySessionKey?.trim() || (typeof current.notifySessionKey === 'string' && current.notifySessionKey.trim()) || 'main'
+  const sessionKey = input.notifySessionKey?.trim() || (typeof current.notifySessionKey === 'string' && current.notifySessionKey.trim()) || MAIN_SESSION_KEY
 
   if (checkpointRaw && currentRaw === checkpointRaw) {
-    return { published: false, sessionKey }
+    return { published: false, sessionKey, route: 'noop' }
   }
 
   const headline = `[${input.workerId}] ${input.checkpoint.stateLabel}`
@@ -91,32 +168,51 @@ export function publishSwarmCheckpointNotification(input: {
     checkpointSummary(input.checkpoint),
   ].filter(Boolean).join(' — ')
 
-  publishChatEvent('message', {
-    type: 'message',
-    sessionKey,
-    transport: 'chat-events',
-    message: {
-      role: 'assistant',
-      timestamp: Date.now(),
-      content: [{ type: 'text', text }],
-      details: {
-        source: 'swarm-checkpoint',
-        workerId: input.workerId,
-        missionId: input.missionId ?? null,
-        assignmentId: input.assignmentId ?? null,
-        checkpointState: input.checkpoint.stateLabel,
-      },
-    },
+  // 1. Route to orchestrator (swarm3) by default.
+  const orchestratorResult = publishCheckpointToOrchestrator({
+    workerId: input.workerId,
+    checkpoint: input.checkpoint,
+    missionId: input.missionId,
   })
 
-  publishChatStatus(sessionKey, text)
+  // 2. Escalate to Aurora (main) only on NEEDS_INPUT, or when orchestrator unreachable.
+  const mustEscalate = shouldEscalateToMain(input.checkpoint.stateLabel) || (!orchestratorResult.sent && !orchestratorResult.skippedSelf)
+  let publishedToMain = false
+
+  if (mustEscalate) {
+    publishChatEvent('message', {
+      type: 'message',
+      sessionKey,
+      transport: 'chat-events',
+      message: {
+        role: 'assistant',
+        timestamp: Date.now(),
+        content: [{ type: 'text', text }],
+        details: {
+          source: 'swarm-checkpoint',
+          workerId: input.workerId,
+          missionId: input.missionId ?? null,
+          assignmentId: input.assignmentId ?? null,
+          checkpointState: input.checkpoint.stateLabel,
+          escalationReason: shouldEscalateToMain(input.checkpoint.stateLabel)
+            ? `state ${input.checkpoint.stateLabel} requires main-agent input`
+            : `orchestrator unreachable: ${orchestratorResult.error ?? 'unknown'}`,
+        },
+      },
+    })
+    publishChatStatus(sessionKey, text)
+    publishedToMain = true
+  }
 
   writeRuntime(runtimePath, {
     ...current,
     notifySessionKey: sessionKey,
     lastNotifiedCheckpointRaw: checkpointRaw || null,
     lastNotifiedAt: new Date().toISOString(),
+    lastCheckpointRoute: publishedToMain ? 'main' : 'orchestrator',
+    lastOrchestratorSendOk: orchestratorResult.sent,
   })
 
-  return { published: true, sessionKey }
+  const route: 'orchestrator' | 'main' | 'noop' = publishedToMain ? 'main' : (orchestratorResult.sent || orchestratorResult.skippedSelf ? 'orchestrator' : 'noop')
+  return { published: publishedToMain || orchestratorResult.sent, sessionKey, route, orchestrator: orchestratorResult }
 }

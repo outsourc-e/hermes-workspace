@@ -227,6 +227,119 @@ type SwarmMissionsResponse = {
 
 type ViewMode = 'cards' | 'kanban' | 'runtime' | 'reports'
 
+type RolePreset = {
+  role: string
+  specialty: string
+  mission: string
+  systemPrompt: string
+  skills: Array<string>
+  defaultModel?: string
+}
+
+const ROLE_PRESETS: ReadonlyArray<RolePreset> = [
+  {
+    role: 'Orchestrator',
+    specialty: 'control-plane state, dispatch, drift detection, escalation',
+    mission: 'Run the swarm. Read /swarm-specs/ at start. Dispatch workers per their standing missions. Detect drift, re-prompt, escalate to main agent when stuck.',
+    systemPrompt: 'You are the Project Agent orchestrator for the swarm. Read /swarm-specs/SWARM_SPEC.md and /swarm-specs/projects/swarmN.md for every worker before dispatching. Apply the swarm-orchestrator skill: assign work, request proof-bearing checkpoints, detect drift, re-prompt with stronger framing, escalate when blocked. Never make irreversible external actions without main-agent ack.',
+    skills: ['swarm-orchestrator', 'swarm-worker-core', 'swarm-review-learning-loop', 'self-improvement'],
+    defaultModel: 'GPT-5.4',
+  },
+  {
+    role: 'Builder',
+    specialty: 'full-stack implementation, fast ship cycles',
+    mission: 'Implement features per dispatched briefs. Smallest landed artifact first. Tests + build + smoke before checkpoint.',
+    systemPrompt: 'You are a senior builder. Ship working code. Always read the brief, plan smallest landed artifact, implement, run tests + build + smoke, commit (not push), checkpoint with proof.',
+    skills: ['swarm-worker-core', 'byte-verified-code-review'],
+    defaultModel: 'GPT-5.5',
+  },
+  {
+    role: 'Reviewer',
+    specialty: 'byte-verified code review, naming + tests + build gate',
+    mission: 'No PR ships without you. Verify diff, byte-check naming, run tests/build/smoke, verdict APPROVED/CHANGES_REQUESTED/BLOCKED.',
+    systemPrompt: 'You are the merge gate. For every PR: pull branch, read diff, xxd byte-check naming-sensitive areas, run tests, run build, smoke test. Verdict APPROVED routes to main agent for merge ack. Never merge yourself.',
+    skills: ['swarm-worker-core', 'byte-verified-code-review', 'swarm-review-learning-loop'],
+    defaultModel: 'GPT-5.4',
+  },
+  {
+    role: 'Triage',
+    specialty: 'autonomous PR/issues processor',
+    mission: 'Score open issues every 4h, repro top-1, fix branch + tests + PR, request review. Never merge or close.',
+    systemPrompt: 'You are the issues/PRs autopilot. Every 4h: gh issue list per repo, score by Impact x Tractability x (1 + locally-tested), pick top-1 unassigned, repro, fix branch, push, gh pr create, request reviewer. Never merge, never close, always escalate to main agent for greenlight.',
+    skills: ['swarm-worker-core', 'byte-verified-code-review', 'swarm-review-learning-loop'],
+    defaultModel: 'GPT-5.5',
+  },
+  {
+    role: 'Lab',
+    specialty: 'local-model R&D, spec-dec, benchmarking',
+    mission: 'Run autonomous lab loop. Test new model pulls. Wire spec-dec/DFlash/TurboQuant. Push tk/s + quality. Document every experiment.',
+    systemPrompt: 'You are the local-model lab. Read /swarm-specs/projects/lane-c-lab.md. Iterate experiments from open hypothesis space. Log to lab-loop-runs.jsonl. Escalate breakthroughs (>=10% tk/s) and install requests to main agent.',
+    skills: ['swarm-worker-core', 'pc1-ollama-gguf-bench', 'swarm-bench-worker'],
+    defaultModel: 'GPT-5.4',
+  },
+  {
+    role: 'Sage',
+    specialty: 'research + scripts + X content + creative briefs',
+    mission: 'Research what matters. Draft scripts, X content, briefs. Cite sources. Never post externally without ack.',
+    systemPrompt: 'You are the research/content scout. Find angles, write scripts and drafts, always cite sources. Never post X/Discord/blog without main-agent ack — always draft + escalate.',
+    skills: ['swarm-worker-core', 'last30days', 'pdf-and-paper-deep-reading'],
+    defaultModel: 'GPT-5.5',
+  },
+  {
+    role: 'Scribe',
+    specialty: 'docs, skills hygiene, memory curation',
+    mission: 'Keep docs current. Hygiene the skills folder. Curate memory. Write submission/release copy.',
+    systemPrompt: 'You are the source-of-truth keeper. Audit /skills/ every 12h, flag stale/unused/poorly-documented. Maintain SWARM_SPEC and worker specs as system evolves. Draft READMEs and changelogs.',
+    skills: ['swarm-worker-core', 'last30days', 'creative-writing'],
+    defaultModel: 'GPT-5.5',
+  },
+  {
+    role: 'Foundation',
+    specialty: 'infra, repair playbook, autopilot wiring',
+    mission: 'Keep the swarm running. Apply repair playbook. Wire autopilot. Maintain loop infra.',
+    systemPrompt: 'You are infrastructure. Maintain /swarm-specs/playbooks/auto-repair.yaml. Health-check tmux sessions, autopilot tick, dev server. Apply known fixes; escalate novel failures.',
+    skills: ['swarm-worker-core'],
+    defaultModel: 'GPT-5.4',
+  },
+  {
+    role: 'QA',
+    specialty: 'regression QA, render verification',
+    mission: 'Run regression suite on every commit + render. Block bad ships.',
+    systemPrompt: 'You are QA. On commit: full test suite. On render: ffprobe + tone consistency + pacing. Verdict PASS/FAIL/FLAKY with evidence.',
+    skills: ['swarm-worker-core', 'byte-verified-code-review'],
+    defaultModel: 'GPT-5.4',
+  },
+  {
+    role: 'Mirror Integrations',
+    specialty: 'asset packs, upstream sync',
+    mission: 'Generate assets. Watch upstream. Pack integrations.',
+    systemPrompt: 'You produce assets and watch upstream. Generate art/audio per Lane A. Every 12h diff upstream Project Agent main, surface portable items. Never cross-org PR without ack.',
+    skills: ['swarm-worker-core', 'claude-promo', 'songwriting-and-ai-music'],
+    defaultModel: 'GPT-5.4',
+  },
+  {
+    role: 'Custom',
+    specialty: '',
+    mission: '',
+    systemPrompt: '',
+    skills: [],
+  },
+] as const
+
+const ROLE_NAMES = ROLE_PRESETS.map((p) => p.role)
+
+async function fetchAvailableModels(): Promise<Array<{ id: string; name: string; provider: string }>> {
+  try {
+    const res = await fetch('/api/models')
+    if (!res.ok) return []
+    const data = await res.json()
+    if (!data?.ok || !Array.isArray(data?.data)) return []
+    return data.data
+  } catch {
+    return []
+  }
+}
+
 type RuntimeResponse = {
   entries: Array<RuntimeEntry>
   tmuxAvailable?: boolean
@@ -877,6 +990,18 @@ export function Swarm2Screen() {
   const [addSwarmOpen, setAddSwarmOpen] = useState(false)
   const [addSwarmSaving, setAddSwarmSaving] = useState(false)
   const [addSwarmError, setAddSwarmError] = useState<string | null>(null)
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; provider: string }>>([])
+
+  useEffect(() => {
+    if (!addSwarmOpen) return
+    let cancelled = false
+    void fetchAvailableModels().then((models) => {
+      if (!cancelled) setAvailableModels(models)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [addSwarmOpen])
   const [newWorkerId, setNewWorkerId] = useState('')
   const [newWorkerName, setNewWorkerName] = useState('')
   const [newWorkerRole, setNewWorkerRole] = useState('Builder')
@@ -1296,6 +1421,7 @@ export function Swarm2Screen() {
     setAddSwarmSaving(true)
     setAddSwarmError(null)
     try {
+      const preset = ROLE_PRESETS.find((p) => p.role === newWorkerRole)
       const res = await fetch('/api/swarm-roster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1303,10 +1429,11 @@ export function Swarm2Screen() {
           id: newWorkerId.trim(),
           name: newWorkerName.trim(),
           role: newWorkerRole.trim(),
-          specialty: newWorkerSpecialty.trim(),
+          specialty: newWorkerSpecialty.trim() || preset?.specialty || '',
           model: newWorkerModel.trim(),
-          mission: newWorkerMission.trim() || 'Awaiting orchestrator dispatch.',
-          skills: [],
+          mission: newWorkerMission.trim() || preset?.mission || 'Awaiting orchestrator dispatch.',
+          systemPrompt: preset?.systemPrompt ?? null,
+          skills: preset?.skills ?? [],
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -1490,30 +1617,78 @@ export function Swarm2Screen() {
               </button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
+              <label className="block text-sm md:col-span-2">
+                <span className="mb-1 block text-[var(--theme-muted)]">Role preset</span>
+                <select
+                  value={newWorkerRole}
+                  onChange={(e) => {
+                    const role = e.target.value
+                    setNewWorkerRole(role)
+                    const preset = ROLE_PRESETS.find((p) => p.role === role)
+                    if (preset && role !== 'Custom') {
+                      if (!newWorkerSpecialty.trim()) setNewWorkerSpecialty(preset.specialty)
+                      if (!newWorkerMission.trim()) setNewWorkerMission(preset.mission)
+                      if (preset.defaultModel && !newWorkerModel.trim()) setNewWorkerModel(preset.defaultModel)
+                    }
+                  }}
+                  className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
+                >
+                  {ROLE_NAMES.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
+                  Presets auto-fill specialty, mission, system prompt, and skill stack. Pick “Custom” for a blank slate.
+                </p>
+              </label>
               <label className="block text-sm">
                 <span className="mb-1 block text-[var(--theme-muted)]">Worker ID</span>
-                <input value={newWorkerId} onChange={(e) => setNewWorkerId(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" />
+                <input value={newWorkerId} onChange={(e) => setNewWorkerId(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder="swarmN" />
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block text-[var(--theme-muted)]">Display name</span>
-                <input value={newWorkerName} onChange={(e) => setNewWorkerName(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" />
+                <input value={newWorkerName} onChange={(e) => setNewWorkerName(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder="e.g. Mirror, Builder" />
               </label>
-              <label className="block text-sm">
-                <span className="mb-1 block text-[var(--theme-muted)]">Role</span>
-                <input value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" />
-              </label>
-              <label className="block text-sm">
+              <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-[var(--theme-muted)]">Model</span>
-                <input value={newWorkerModel} onChange={(e) => setNewWorkerModel(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" />
+                <select
+                  value={newWorkerModel}
+                  onChange={(e) => setNewWorkerModel(e.target.value)}
+                  className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
+                >
+                  {availableModels.length === 0 ? (
+                    <option value={newWorkerModel}>{newWorkerModel || 'Loading models…'}</option>
+                  ) : (
+                    <>
+                      {!availableModels.some((m) => m.name === newWorkerModel || m.id === newWorkerModel) && newWorkerModel ? (
+                        <option value={newWorkerModel}>{newWorkerModel} (current)</option>
+                      ) : null}
+                      {availableModels.map((m) => (
+                        <option key={m.id} value={m.name}>{m.name} · {m.provider}</option>
+                      ))}
+                    </>
+                  )}
+                </select>
+                <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
+                  Loaded from your Project Agent /api/models. Changes require restarting the worker session.
+                </p>
               </label>
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-[var(--theme-muted)]">Specialty</span>
-                <input value={newWorkerSpecialty} onChange={(e) => setNewWorkerSpecialty(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" />
+                <input value={newWorkerSpecialty} onChange={(e) => setNewWorkerSpecialty(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder={ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.specialty || 'short focus area'} />
               </label>
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-[var(--theme-muted)]">Mission</span>
-                <textarea value={newWorkerMission} onChange={(e) => setNewWorkerMission(e.target.value)} rows={3} className="w-full resize-none rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" />
+                <textarea value={newWorkerMission} onChange={(e) => setNewWorkerMission(e.target.value)} rows={3} className="w-full resize-none rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder={ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.mission || 'standing mission for this worker'} />
               </label>
+              {ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.systemPrompt ? (
+                <div className="md:col-span-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-xs text-[var(--theme-muted-2)]">
+                  <div className="mb-1 font-semibold text-[var(--theme-muted)]">System prompt (embedded with role)</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.systemPrompt}</div>
+                  <div className="mt-2 font-semibold text-[var(--theme-muted)]">Skills loaded</div>
+                  <div className="font-mono">{(ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.skills ?? []).join(', ') || '—'}</div>
+                </div>
+              ) : null}
             </div>
             {addSwarmError ? <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{addSwarmError}</div> : null}
             <div className="mt-4 flex items-center justify-end gap-3">
