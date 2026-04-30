@@ -148,6 +148,35 @@ export async function deleteSession(id: string): Promise<{ ok: boolean }> {
   })
 }
 
+export async function createSession(
+  body: Record<string, unknown>,
+): Promise<{ session: DashboardSession }> {
+  return dashboardJson('/api/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateSession(
+  id: string,
+  body: Record<string, unknown>,
+): Promise<{ session: DashboardSession }> {
+  return dashboardJson(`/api/sessions/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function forkSession(
+  id: string,
+): Promise<{ session: DashboardSession; forked_from: string }> {
+  return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/fork`, {
+    method: 'POST',
+  })
+}
+
 export async function getSkills(): Promise<SkillInfo[]> {
   return dashboardJson('/api/skills')
 }

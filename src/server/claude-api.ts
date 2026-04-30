@@ -15,11 +15,14 @@ import {
   probeGateway,
 } from './gateway-capabilities'
 import {
+  createSession as createDashboardSession,
   deleteSession as deleteDashboardSession,
+  forkSession as forkDashboardSession,
   getSession as getDashboardSession,
   getSessionMessages as getDashboardSessionMessages,
   listSessions as listDashboardSessions,
   searchSessions as searchDashboardSessions,
+  updateSession as updateDashboardSession,
 } from './claude-dashboard-api'
 
 const _authHeaders = (): Record<string, string> =>
@@ -151,6 +154,10 @@ export async function createSession(opts?: {
   title?: string
   model?: string
 }): Promise<ClaudeSession> {
+  if (getCapabilities().dashboard.available) {
+    const resp = await createDashboardSession(opts || {})
+    return resp.session as ClaudeSession
+  }
   const resp = await claudePost<{ session: ClaudeSession }>(
     '/api/sessions',
     opts || {},
@@ -162,6 +169,10 @@ export async function updateSession(
   sessionId: string,
   updates: { title?: string },
 ): Promise<ClaudeSession> {
+  if (getCapabilities().dashboard.available) {
+    const resp = await updateDashboardSession(sessionId, updates)
+    return resp.session as ClaudeSession
+  }
   const resp = await claudePatch<{ session: ClaudeSession }>(
     `/api/sessions/${sessionId}`,
     updates,
@@ -205,6 +216,12 @@ export async function searchSessions(
 export async function forkSession(
   sessionId: string,
 ): Promise<{ session: ClaudeSession; forked_from: string }> {
+  if (getCapabilities().dashboard.available) {
+    return forkDashboardSession(sessionId) as Promise<{
+      session: ClaudeSession
+      forked_from: string
+    }>
+  }
   return claudePost(`/api/sessions/${sessionId}/fork`)
 }
 
