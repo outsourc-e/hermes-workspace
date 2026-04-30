@@ -158,13 +158,11 @@ export const Route = createFileRoute('/api/models')({
           let models = readClaudeModelsJson()
           let source = 'models.json'
 
-          // Ensure the default model from config.yaml is always included
+          // Ensure the default model from config.yaml is always first
           const defaultModel = readClaudeDefaultModel()
           if (defaultModel) {
-            const hasDefault = models.some((m) => m.id === defaultModel.id)
-            if (!hasDefault) {
-              models.unshift(defaultModel)
-            }
+            models = models.filter((m) => m.id !== defaultModel.id)
+            models.unshift(defaultModel)
           }
 
           // Fallback: if no models.json, fetch from hermes-agent /v1/models
