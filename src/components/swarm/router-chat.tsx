@@ -59,6 +59,9 @@ type Props = {
   onClose: () => void
   showClosedDock?: boolean
   embedded?: boolean
+  seedPrompt?: string | null
+  seedMode?: Mode
+  seedKey?: string | number | null
   onResults: (response: DispatchResponse) => void
 }
 
@@ -86,6 +89,9 @@ export function RouterChat({
   onClose,
   showClosedDock = false,
   embedded = false,
+  seedPrompt,
+  seedMode,
+  seedKey,
   onResults,
 }: Props) {
   const [mode, setMode] = useState<Mode>('auto')
@@ -98,6 +104,18 @@ export function RouterChat({
   const [dispatchError, setDispatchError] = useState<string | null>(null)
   const [results, setResults] = useState<DispatchResponse | null>(null)
   const [followUp, setFollowUp] = useState<FollowUpResponse | null>(null)
+
+  useEffect(() => {
+    if (!seedPrompt?.trim()) return
+    setPrompt(seedPrompt)
+    if (seedMode) setMode(seedMode)
+    setAssignments([])
+    setUnassigned([])
+    setResults(null)
+    setFollowUp(null)
+    setDecomposeError(null)
+    setDispatchError(null)
+  }, [seedKey, seedMode, seedPrompt])
 
   useEffect(() => {
     if (
@@ -235,7 +253,7 @@ export function RouterChat({
       setResults(data)
       onResults(data)
       if (plan.length > 1 && data.results.some((result) => result.checkpointStatus === 'checkpointed')) {
-        const reviewer = members.find((member) => /review|qa|critic/i.test(`${member.role} ${member.specialty ?? ''}`))
+        const reviewer = members.find((member) => member.id === 'swarm6') ?? members.find((member) => /review|qa|critic/i.test(`${member.role} ${member.specialty ?? ''}`))
         const follow = await fetch('/api/swarm-orchestrator-loop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

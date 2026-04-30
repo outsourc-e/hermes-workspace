@@ -25,6 +25,7 @@ import {
   type SwarmWorkerState,
 } from '../../server/swarm-foundation'
 import { rosterByWorkerId } from '../../server/swarm-roster'
+import { readSwarmMode, writeSwarmMode } from '../../server/swarm-mode'
 
 type RuntimeEntry = {
   workerId: string
@@ -248,7 +249,23 @@ export const Route = createFileRoute('/api/swarm-runtime')({
           workspaceRoot: process.cwd(),
           tmuxAvailable,
           entries,
+          mode: readSwarmMode(),
         })
+      },
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        let body: { mode?: unknown }
+        try {
+          body = (await request.json()) as { mode?: unknown }
+        } catch {
+          return json({ error: 'Invalid JSON body' }, { status: 400 })
+        }
+        if (body.mode !== 'auto' && body.mode !== 'manual') {
+          return json({ error: 'mode must be auto or manual' }, { status: 400 })
+        }
+        return json({ ok: true, mode: writeSwarmMode(body.mode) })
       },
     },
   },

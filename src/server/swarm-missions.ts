@@ -16,6 +16,8 @@ export type SwarmMissionAssignment = {
   state: SwarmMissionAssignmentState
   dispatchedAt: number | null
   completedAt: number | null
+  reviewedAt: number | null
+  reviewedBy: string | null
   checkpoint: ParsedSwarmCheckpoint | null
 }
 
@@ -26,6 +28,23 @@ export type SwarmMissionEvent = {
   workerId?: string
   assignmentId?: string
   message: string
+  data?: Record<string, unknown>
+}
+
+export type SwarmCheckpointReport = {
+  missionId: string
+  assignmentId: string
+  workerId: string
+  recordedAt: number
+  stateLabel: ParsedSwarmCheckpoint['stateLabel']
+  checkpointStatus: ParsedSwarmCheckpoint['checkpointStatus']
+  runtimeState: ParsedSwarmCheckpoint['runtimeState']
+  filesChanged: string | null
+  commandsRun: string | null
+  result: string | null
+  blocker: string | null
+  nextAction: string | null
+  source: string
 }
 
 export type SwarmMission = {
@@ -74,6 +93,30 @@ function event(type: SwarmMissionEvent['type'], message: string, extra?: Partial
   return { id: shortId('evt'), type, at: now(), message, ...extra }
 }
 
+function reportFromCheckpoint(input: {
+  missionId: string
+  assignmentId: string
+  workerId: string
+  checkpoint: ParsedSwarmCheckpoint
+  source?: string | null
+}): SwarmCheckpointReport {
+  return {
+    missionId: input.missionId,
+    assignmentId: input.assignmentId,
+    workerId: input.workerId,
+    recordedAt: now(),
+    stateLabel: input.checkpoint.stateLabel,
+    checkpointStatus: input.checkpoint.checkpointStatus,
+    runtimeState: input.checkpoint.runtimeState,
+    filesChanged: input.checkpoint.filesChanged,
+    commandsRun: input.checkpoint.commandsRun,
+    result: input.checkpoint.result,
+    blocker: input.checkpoint.blocker,
+    nextAction: input.checkpoint.nextAction,
+    source: input.source?.trim() || 'unknown',
+  }
+}
+
 function deriveMissionState(assignments: Array<SwarmMissionAssignment>): SwarmMissionState {
   if (assignments.some((item) => item.state === 'blocked' || item.state === 'needs_input')) return 'blocked'
   if (assignments.length > 0 && assignments.every((item) => item.state === 'done' || (item.state === 'checkpointed' && !item.reviewRequired))) return 'complete'
@@ -90,6 +133,24 @@ export function listSwarmMissions(limit = 20): Array<SwarmMission> {
 
 export function getSwarmMission(missionId: string): SwarmMission | null {
   return readStore().missions.find((mission) => mission.id === missionId) ?? null
+}
+
+export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): { archivedIds: string[]; count: number } {
+  const store = readStore()
+  const now = Date.now()
+  const archivedIds: string[] = []
+  for (const mission of store.missions) {
+    if (mission.state !== 'executing' && mission.state !== 'planning') continue
+    if ((now - mission.updatedAt) < staleMs) continue
+    if (!mission.assignments.every(a => ['done', 'checkpointed', 'blocked', 'needs_input'].includes(a.state))) continue
+    mission.state = 'complete'
+    mission.events.push(event('continuation', `Archived as stale (>${Math.round(staleMs / 3600000)}h, all assignments terminal)`))
+    archivedIds.push(mission.id)
+  }
+  if (archivedIds.length) {
+    writeStore(store)
+  }
+  return { archivedIds, count: archivedIds.length }
 }
 
 export type CreateOrUpdateMissionResult = SwarmMission & { _created?: boolean }
@@ -133,6 +194,8 @@ export function createOrUpdateMission(input: {
       state: 'queued',
       dispatchedAt: null,
       completedAt: null,
+      reviewedAt: null,
+      reviewedBy: null,
       checkpoint: null,
     })
   }
@@ -146,6 +209,8 @@ export function markMissionAssignmentDispatched(input: {
   missionId: string
   workerId: string
   task: string
+  source?: string | null
+  author?: string | null
 }): SwarmMission | null {
   const store = readStore()
   const mission = store.missions.find((item) => item.id === input.missionId)
@@ -154,7 +219,15 @@ export function markMissionAssignmentDispatched(input: {
   if (!assignment) return null
   assignment.state = 'dispatched'
   assignment.dispatchedAt = now()
-  mission.events.push(event('assignment_dispatched', `Dispatched ${assignment.id} to ${input.workerId}`, { workerId: input.workerId, assignmentId: assignment.id }))
+  mission.events.push(event('assignment_dispatched', `Dispatched ${assignment.id} to ${input.workerId}`, {
+    workerId: input.workerId,
+    assignmentId: assignment.id,
+    data: {
+      task: assignment.task,
+      source: input.source?.trim() || 'swarm-dispatch',
+      author: input.author?.trim() || 'aurora',
+    },
+  }))
   mission.updatedAt = now()
   mission.state = deriveMissionState(mission.assignments)
   writeStore(store)
@@ -165,16 +238,24 @@ export type RecordCheckpointResult = (SwarmMission & { _completed?: boolean }) |
 
 export function recordMissionCheckpoint(input: {
   missionId?: string | null
+  assignmentId?: string | null
   workerId: string
   checkpoint: ParsedSwarmCheckpoint
+  source?: string | null
 }): RecordCheckpointResult {
   if (!input.missionId) return null
   const store = readStore()
   const mission = store.missions.find((item) => item.id === input.missionId)
   if (!mission) return null
-  const assignment = [...mission.assignments].reverse().find((item) => item.workerId === input.workerId && item.state !== 'done')
+  const assignment = (input.assignmentId
+    ? mission.assignments.find((item) => item.id === input.assignmentId)
+    : null)
+    ?? [...mission.assignments].reverse().find((item) => item.workerId === input.workerId && item.state !== 'done')
     ?? [...mission.assignments].reverse().find((item) => item.workerId === input.workerId)
   if (!assignment) return null
+  if (assignment.checkpoint?.raw === input.checkpoint.raw) {
+    return Object.assign(mission, { _completed: mission.state === 'complete' })
+  }
   assignment.checkpoint = input.checkpoint
   assignment.completedAt = now()
   assignment.state = input.checkpoint.stateLabel === 'BLOCKED'
@@ -184,7 +265,18 @@ export function recordMissionCheckpoint(input: {
       : input.checkpoint.stateLabel === 'IN_PROGRESS'
         ? 'dispatched'
         : 'checkpointed'
-  mission.events.push(event('checkpoint', `${input.workerId} checkpointed: ${input.checkpoint.stateLabel}`, { workerId: input.workerId, assignmentId: assignment.id }))
+  const report = reportFromCheckpoint({
+    missionId: mission.id,
+    assignmentId: assignment.id,
+    workerId: input.workerId,
+    checkpoint: input.checkpoint,
+    source: input.source,
+  })
+  mission.events.push(event('checkpoint', `${input.workerId} checkpointed: ${input.checkpoint.stateLabel}`, {
+    workerId: input.workerId,
+    assignmentId: assignment.id,
+    data: report,
+  }))
   mission.updatedAt = now()
   const previousState = mission.state
   mission.state = deriveMissionState(mission.assignments)
@@ -209,9 +301,13 @@ export function appendMissionContinuation(input: {
     workerId: input.workerId,
     task: input.task,
     rationale: input.rationale,
+    dependsOn: [],
+    reviewRequired: false,
     state: 'queued',
     dispatchedAt: null,
     completedAt: null,
+    reviewedAt: null,
+    reviewedBy: null,
     checkpoint: null,
   })
   mission.events.push(event('continuation', `Queued continuation ${id} for ${input.workerId}`, { workerId: input.workerId, assignmentId: id }))
@@ -220,7 +316,6 @@ export function appendMissionContinuation(input: {
   writeStore(store)
   return mission
 }
-
 
 export function readyQueuedAssignments(missionId: string): Array<SwarmMissionAssignment> {
   const mission = getSwarmMission(missionId)
@@ -237,9 +332,65 @@ export function markMissionAssignmentReviewed(input: { missionId?: string | null
   const assignment = mission.assignments.find((item) => item.id === input.assignmentId)
   if (!assignment) return null
   assignment.state = 'done'
+  assignment.reviewedAt = now()
+  assignment.reviewedBy = input.reviewerId ?? null
   mission.events.push(event('review', `Reviewed ${assignment.id}${input.reviewerId ? ` by ${input.reviewerId}` : ''}`, { workerId: input.reviewerId, assignmentId: assignment.id }))
   mission.updatedAt = now()
   mission.state = deriveMissionState(mission.assignments)
   writeStore(store)
   return mission
+}
+
+export function markMissionAssignmentsReviewedByWorker(input: {
+  missionId?: string | null
+  reviewerId: string
+  excludeAssignmentId?: string | null
+}): { mission: SwarmMission; reviewedAssignmentIds: Array<string> } | null {
+  if (!input.missionId) return null
+  const store = readStore()
+  const mission = store.missions.find((item) => item.id === input.missionId)
+  if (!mission) return null
+
+  const reviewedAt = now()
+  const reviewed = mission.assignments.filter((assignment) => (
+    assignment.id !== input.excludeAssignmentId
+    && assignment.workerId !== input.reviewerId
+    && assignment.reviewRequired
+    && assignment.state === 'checkpointed'
+  ))
+
+  if (reviewed.length === 0) return { mission, reviewedAssignmentIds: [] }
+
+  for (const assignment of reviewed) {
+    assignment.state = 'done'
+    assignment.reviewedAt = reviewedAt
+    assignment.reviewedBy = input.reviewerId
+    mission.events.push(event('review', `Reviewed ${assignment.id} by ${input.reviewerId}`, {
+      workerId: input.reviewerId,
+      assignmentId: assignment.id,
+    }))
+  }
+
+  mission.updatedAt = reviewedAt
+  mission.state = deriveMissionState(mission.assignments)
+  writeStore(store)
+  return { mission, reviewedAssignmentIds: reviewed.map((assignment) => assignment.id) }
+}
+
+export function listSwarmReports(input?: {
+  missionId?: string | null
+  workerId?: string | null
+  limit?: number
+}): Array<SwarmCheckpointReport> {
+  const limit = Math.max(1, Math.min(500, input?.limit ?? 100))
+  const mission = input?.missionId ? getSwarmMission(input.missionId) : null
+  const missions = mission ? [mission] : readStore().missions
+
+  return missions
+    .flatMap((entry) => entry.events)
+    .filter((event) => event.type === 'checkpoint' && event.data)
+    .map((event) => event.data as SwarmCheckpointReport)
+    .filter((report) => !input?.workerId || report.workerId === input.workerId)
+    .sort((a, b) => b.recordedAt - a.recordedAt)
+    .slice(0, limit)
 }

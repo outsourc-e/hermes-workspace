@@ -1,12 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { SwarmScreen } from '@/screens/swarm/swarm-screen'
+import { Swarm2Screen } from '@/screens/swarm2/swarm2-screen'
 
 export const Route = createFileRoute('/swarm')({
   ssr: false,
   component: function SwarmRoute() {
     usePageTitle('Swarm')
-    return <SwarmScreen />
+    return <Swarm2Screen />
   },
   errorComponent: function SwarmError({ error }) {
     return (

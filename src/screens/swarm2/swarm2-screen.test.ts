@@ -21,7 +21,8 @@ describe('Swarm2 surface contract', () => {
     expect(SWARM2_INFORMATION_HIERARCHY[5]).toContain(
       'Central bottom router chat',
     )
-    expect(SWARM2_INFORMATION_HIERARCHY[6]).toContain('Runtime view')
+    expect(SWARM2_INFORMATION_HIERARCHY).toContainEqual(expect.stringContaining('Kanban view'))
+    expect(SWARM2_INFORMATION_HIERARCHY).toContainEqual(expect.stringContaining('Runtime view'))
   })
 
   it('documents the operational surfaces without replacing /swarm', () => {
@@ -47,7 +48,9 @@ describe('Swarm2 surface contract', () => {
       '/api/crew-status',
       '/api/swarm-environment',
       '/api/swarm-runtime',
+      '/api/swarm-missions',
       '/api/swarm-roster',
+      '/api/integrations',
       '/api/swarm-health',
       '/api/swarm-decompose',
       '/api/swarm-dispatch',

@@ -28,6 +28,7 @@ type DispatchRequest = {
   assignments?: unknown
   timeoutSeconds?: unknown
   waitForCheckpoint?: unknown
+  allowAsync?: unknown
   checkpointPollSeconds?: unknown
   missionId?: unknown
   missionTitle?: unknown
@@ -398,6 +399,7 @@ function buildWorkerPrompt(input: {
 }
 
 function markDispatchStarted(workerId: string, task: string, missionId?: string | null, assignmentId?: string | null, notifySessionKey?: string | null): void {
+  const controlMessage = `Dispatched task: ${task.slice(0, 180)}`
   writeRuntimePatch(workerId, {
     state: 'executing',
     phase: 'dispatched',
@@ -411,7 +413,8 @@ function markDispatchStarted(workerId: string, task: string, missionId?: string 
     lastDispatchMode: 'tmux',
     lastDispatchResult: 'Dispatch queued',
     lastCheckIn: new Date().toISOString(),
-    lastSummary: `Dispatched task: ${task.slice(0, 180)}`,
+    lastSummary: controlMessage,
+    lastControlMessage: controlMessage,
     nextAction: 'Worker should execute and return the required checkpoint format.',
     notifySessionKey: notifySessionKey ?? 'main',
   })
@@ -438,6 +441,9 @@ function markCheckpointResult(workerId: string, checkpoint: ParsedSwarmCheckpoin
     lastOutputAt: Date.now(),
     lastSummary: checkpoint.result,
     lastResult: checkpoint.result,
+    lastRealSummary: checkpoint.result,
+    lastRealResult: checkpoint.result,
+    lastControlMessage: null,
     nextAction: checkpoint.nextAction,
     blockedReason: checkpoint.stateLabel === 'BLOCKED' || checkpoint.stateLabel === 'NEEDS_INPUT' ? checkpoint.blocker : null,
     needsHuman: checkpoint.stateLabel === 'NEEDS_INPUT',
@@ -636,7 +642,15 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     const previousRaw = runtimeBeforeDispatch.checkpointRaw
     const baselineRuntimeSignature = runtimeCheckpointSignature(runtimeBeforeDispatch)
     markDispatchStarted(workerId, assignment.task, options?.missionId ?? null, assignment.assignmentId ?? null, options?.notifySessionKey ?? 'main')
-    if (options?.missionId) markMissionAssignmentDispatched({ missionId: options.missionId, workerId, task: assignment.task })
+    if (options?.missionId) {
+      markMissionAssignmentDispatched({
+        missionId: options.missionId,
+        workerId,
+        task: assignment.task,
+        source: 'swarm-dispatch',
+        author: 'aurora',
+      })
+    }
     appendSwarmMemoryEvent({
       workerId,
       missionId: options?.missionId ?? null,
@@ -667,7 +681,13 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
         )
         if (checkpoint) {
           markCheckpointResult(workerId, checkpoint, options?.notifySessionKey ?? 'main')
-          const updatedMission = recordMissionCheckpoint({ missionId: options?.missionId, workerId, checkpoint })
+          const updatedMission = recordMissionCheckpoint({
+            missionId: options?.missionId,
+            assignmentId: assignment.assignmentId ?? null,
+            workerId,
+            checkpoint,
+            source: 'swarm-dispatch',
+          })
           if (updatedMission?._completed) {
             try {
               for (const wId of new Set(updatedMission.assignments.map((a) => a.workerId))) {
@@ -851,7 +871,12 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         const timeoutRaw = typeof body.timeoutSeconds === 'number' ? body.timeoutSeconds : DEFAULT_TIMEOUT_S
         const timeoutSeconds = Math.max(10, Math.min(MAX_TIMEOUT_S, Math.floor(timeoutRaw)))
         const timeoutMs = timeoutSeconds * 1000
-        const waitForCheckpoint = body.waitForCheckpoint === true
+        // Swarm2 control-plane dispatches should be observable by default:
+        // wait for a fresh checkpoint so completion/blocker notifications can
+        // be published and worker progress cards can resolve. Callers that
+        // intentionally want fire-and-forget delivery must opt out with both
+        // waitForCheckpoint:false and allowAsync:true.
+        const waitForCheckpoint = !(body.waitForCheckpoint === false && body.allowAsync === true)
         const pollRaw = typeof body.checkpointPollSeconds === 'number' ? body.checkpointPollSeconds : 90
         const checkpointPollSeconds = Math.max(5, Math.min(300, Math.floor(pollRaw)))
         const notifySessionKey = typeof body.notifySessionKey === 'string' && body.notifySessionKey.trim() ? body.notifySessionKey.trim() : 'main'

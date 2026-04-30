@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Cancel01Icon,
@@ -13,11 +13,26 @@ import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { Button } from '@/components/ui/button'
 import { RouterChat, type DispatchResponse } from '@/components/swarm/router-chat'
+import { OfficeView } from '@/screens/gateway/components/office-view'
+import type { AgentWorkingRow } from '@/screens/gateway/components/agents-working-panel'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 
 const ORCHESTRATOR_NAME_KEY = 'swarm2:orchestrator:name'
 const DEFAULT_NAME = 'Aurora · Main Agent'
+
+type SwarmCardMode = 'cards' | 'office'
+type AgentLens = 'all' | 'working' | 'reviewing' | 'blocked' | 'ready'
+
+const AGENT_PAGE_SIZE = 12
+
+const AGENT_LENSES: Array<{ id: AgentLens; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'working', label: 'Run' },
+  { id: 'reviewing', label: 'Review' },
+  { id: 'blocked', label: 'Blocked' },
+  { id: 'ready', label: 'Ready' },
+]
 
 export type Swarm2OrchestratorCardProps = {
   totalWorkers: number
@@ -26,14 +41,17 @@ export type Swarm2OrchestratorCardProps = {
   authErrors: number
   selectedLabel: string
   workspaceModel: string | null
-  viewMode: 'cards' | 'runtime'
-  onViewModeChange: (mode: 'cards' | 'runtime') => void
+  viewMode: 'cards' | 'kanban' | 'runtime' | 'reports'
+  onViewModeChange: (mode: 'cards' | 'kanban' | 'runtime' | 'reports') => void
   lanes?: Array<{ role: string; count: number; active: number }>
+  activeAgents?: Array<{ workerId: string; workerName: string; role: string; task: string; progress: number; state: 'working' | 'reviewing' | 'blocked' | 'ready'; age: string }>
   members: Array<CrewMember>
   roomIds: Array<string>
   selectedId: string | null
   recentUpdates?: Array<{ workerId: string; workerName: string; text: string; age: string; tone: 'idle' | 'active' | 'warning' }>
   latestMission?: { id: string; title: string; state: string; assignmentCount: number; checkpointedCount: number } | null
+  inboxCounts?: { needsReview: number; blocked: number; ready: number }
+  routerSeed?: { key: number; prompt: string; mode: 'auto' | 'manual' | 'broadcast' } | null
   onOpenRouter: () => void
   onRouterResults?: (response: DispatchResponse) => void
   /**
@@ -59,17 +77,23 @@ export function Swarm2OrchestratorCard({
   viewMode,
   onViewModeChange,
   lanes = [],
+  activeAgents = [],
   members,
   roomIds,
   selectedId,
   recentUpdates = [],
   latestMission = null,
+  inboxCounts = { needsReview: 0, blocked: 0, ready: 0 },
+  routerSeed = null,
   onOpenRouter,
   onRouterResults,
   onAnchorRef,
   className,
 }: Swarm2OrchestratorCardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [swarmCardMode, setSwarmCardMode] = useState<SwarmCardMode>('cards')
+  const [agentLens, setAgentLens] = useState<AgentLens>('all')
+  const [agentPage, setAgentPage] = useState(0)
   const [name, setName] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_NAME
     return window.localStorage.getItem(ORCHESTRATOR_NAME_KEY) || DEFAULT_NAME
@@ -97,6 +121,39 @@ export function Swarm2OrchestratorCard({
   }
 
   const isActive = activeRuntimeCount > 0
+  const lensIndex = AGENT_LENSES.findIndex((lens) => lens.id === agentLens)
+  const filteredAgents = useMemo(
+    () => activeAgents.filter((agent) => agentLens === 'all' || agent.state === agentLens),
+    [activeAgents, agentLens],
+  )
+  const agentCounts = useMemo(() => {
+    const counts: Record<AgentLens, number> = { all: activeAgents.length, working: 0, reviewing: 0, blocked: 0, ready: 0 }
+    for (const agent of activeAgents) counts[agent.state] += 1
+    return counts
+  }, [activeAgents])
+
+  const agentPageCount = Math.max(1, Math.ceil(filteredAgents.length / AGENT_PAGE_SIZE))
+  const visibleAgents = filteredAgents.slice(agentPage * AGENT_PAGE_SIZE, agentPage * AGENT_PAGE_SIZE + AGENT_PAGE_SIZE)
+  const officeAgents = useMemo<AgentWorkingRow[]>(() => activeAgents.map((agent) => ({
+    id: agent.workerId,
+    name: agent.workerName,
+    modelId: agent.role,
+    status: agent.state === 'blocked' ? 'error' : agent.state === 'ready' ? 'done' : 'active',
+    lastLine: agent.task,
+    lastAt: Date.now(),
+    taskCount: agent.state === 'ready' ? 0 : 1,
+    currentTask: agent.task,
+    roleDescription: agent.role,
+  })), [activeAgents])
+
+  function cycleAgentPage(delta: -1 | 1) {
+    setAgentPage((page) => (page + delta + agentPageCount) % agentPageCount)
+  }
+
+  function selectAgentLens(lens: AgentLens) {
+    setAgentLens(lens)
+    setAgentPage(0)
+  }
 
   return (
     <>
@@ -107,49 +164,41 @@ export function Swarm2OrchestratorCard({
         )}
       >
         <div className="relative flex flex-col items-center gap-3 text-center">
-          <div className="absolute left-0 top-0 flex shrink-0 items-center gap-2">
-            <div className="inline-flex rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 shadow-sm">
+          <div className="absolute left-0 top-0 flex shrink-0 items-center gap-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 shadow-sm">
+            {([
+              ['cards', 'Control'],
+              ['kanban', 'Board'],
+              ['reports', 'Reports'],
+              ['runtime', 'Runtime'],
+            ] as const).map(([mode, label]) => (
               <button
+                key={mode}
                 type="button"
-                onClick={() => onViewModeChange('cards')}
+                onClick={() => onViewModeChange(mode)}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-                  viewMode === 'cards'
+                  'rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                  viewMode === mode
                     ? 'bg-[var(--theme-accent)] text-primary-950'
-                    : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)]',
+                    : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
                 )}
               >
-                <HugeiconsIcon icon={ViewIcon} size={13} />
-                Control plane
+                {label}
               </button>
-              <button
-                type="button"
-                onClick={() => onViewModeChange('runtime')}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-                  viewMode === 'runtime'
-                    ? 'bg-[var(--theme-accent)] text-primary-950'
-                    : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)]',
-                )}
-              >
-                <HugeiconsIcon icon={ComputerTerminal01Icon} size={13} />
-                Runtime / tmux
-              </button>
-            </div>
+            ))}
           </div>
 
           <div className="absolute right-0 top-0 flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={onOpenRouter}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--theme-accent)] px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
+              className="inline-flex h-9 items-center gap-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
             >
               <HugeiconsIcon
                 icon={MessageMultiple01Icon}
                 size={13}
                 strokeWidth={1.8}
               />
-              Advanced
+              Router
             </button>
             <button
               type="button"
@@ -205,6 +254,18 @@ export function Swarm2OrchestratorCard({
               <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1">
                 {activeRuntimeCount} live
               </span>
+              <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-amber-700">
+                Review {inboxCounts.needsReview}
+              </span>
+              <span className="rounded-full border border-red-400/40 bg-red-500/10 px-2.5 py-1 text-red-700">
+                Blocked {inboxCounts.blocked}
+              </span>
+              <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-1 text-emerald-700">
+                Ready {inboxCounts.ready}
+              </span>
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+              Reviewer gate pinned to swarm6
             </div>
           </div>
         </div>
@@ -217,73 +278,128 @@ export function Swarm2OrchestratorCard({
             open
             embedded
             showClosedDock={false}
+            seedPrompt={routerSeed?.prompt ?? null}
+            seedMode={routerSeed?.mode}
+            seedKey={routerSeed?.key ?? null}
             onClose={() => undefined}
             onResults={(response) => onRouterResults?.(response)}
           />
         </div>
 
-        <div className="mt-auto min-h-[7.5rem] pt-4">
-          {latestMission ? (
-            <div className="mb-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3 text-left">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Latest mission</div>
-                  <div className="mt-1 truncate text-sm font-medium text-[var(--theme-text)]">{latestMission.title}</div>
-                </div>
-                <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                  {latestMission.state}
-                </span>
+        <div className="mt-auto pt-4">
+          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-2.5 text-left">
+            <div className="mb-2 grid items-center gap-2 md:grid-cols-[1fr_auto_1fr]">
+              <div className="flex flex-wrap justify-center gap-1 md:justify-start">
+                {AGENT_LENSES.map((lens) => (
+                  <button
+                    key={lens.id}
+                    type="button"
+                    onClick={() => selectAgentLens(lens.id)}
+                    className={cn(
+                      'rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] transition-colors',
+                      agentLens === lens.id
+                        ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+                        : 'border-transparent bg-transparent text-[var(--theme-muted)] hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)] hover:text-[var(--theme-text)]',
+                    )}
+                  >
+                    {lens.label}{lens.id !== 'all' && agentCounts[lens.id] ? ` ${agentCounts[lens.id]}` : ''}
+                  </button>
+                ))}
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--theme-card)]">
-                <div
-                  className="h-full rounded-full bg-[var(--theme-accent)]"
-                  style={{ width: `${latestMission.assignmentCount ? Math.round((latestMission.checkpointedCount / latestMission.assignmentCount) * 100) : 0}%` }}
+              <div className="flex items-center gap-1 justify-self-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1">
+                <button
+                  type="button"
+                  onClick={() => setSwarmCardMode('cards')}
+                  className={cn('rounded-lg px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]', swarmCardMode === 'cards' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
+                >
+                  Active Swarm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSwarmCardMode('office')}
+                  className={cn('rounded-lg px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]', swarmCardMode === 'office' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
+                >
+                  Office
+                </button>
+              </div>
+              <div className={cn('flex items-center justify-center gap-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 justify-self-center md:justify-self-end', swarmCardMode === 'office' && 'opacity-40')}>
+                <button
+                  type="button"
+                  onClick={() => cycleAgentPage(-1)}
+                  disabled={filteredAgents.length <= AGENT_PAGE_SIZE}
+                  className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label="Previous agent page"
+                >
+                  ←
+                </button>
+                <div className="flex items-center gap-1 px-1" aria-label={`Agent page ${Math.min(agentPage + 1, agentPageCount)} of ${agentPageCount}`}>
+                  {Array.from({ length: Math.min(agentPageCount, 5) }).map((_, index) => (
+                    <span
+                      key={index}
+                      className={cn(
+                        'size-1.5 rounded-full',
+                        index === agentPage % 5 ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-muted)]/30',
+                      )}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => cycleAgentPage(1)}
+                  disabled={filteredAgents.length <= AGENT_PAGE_SIZE}
+                  className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label="Next agent page"
+                >
+                  →
+                </button>
+              </div>
+            </div>
+
+            {swarmCardMode === 'office' ? (
+              <div className="h-[255px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
+                <OfficeView
+                  agentRows={officeAgents}
+                  missionRunning={activeAgents.some((agent) => agent.state === 'working' || agent.state === 'reviewing')}
+                  onViewOutput={() => undefined}
+                  containerHeight={255}
+                  hideHeader
                 />
               </div>
-              <div className="mt-1 text-[10px] text-[var(--theme-muted)]">
-                {latestMission.checkpointedCount}/{latestMission.assignmentCount} checkpointed · {latestMission.id}
+            ) : visibleAgents.length ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {visibleAgents.map((agent) => {
+                  const isBlocked = agent.state === 'blocked'
+                  const isReview = agent.state === 'reviewing'
+                  return (
+                    <div key={agent.workerId} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="relative shrink-0">
+                          <PixelAvatar
+                            size={30}
+                            color={isBlocked ? '#ef4444' : isReview ? '#f59e0b' : '#34d399'}
+                            accentColor={isBlocked ? '#fecaca' : isReview ? '#fde68a' : '#bbf7d0'}
+                            status={isBlocked ? 'failed' : isReview ? 'thinking' : 'running'}
+                          />
+                          <span className={cn('absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-[var(--theme-card)]', isBlocked ? 'bg-red-500' : isReview ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse')} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[11px] font-semibold text-[var(--theme-text)]">{agent.workerName}</div>
+                          <div className="truncate text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">{agent.state}</div>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 truncate text-[10px] text-[var(--theme-muted-2)]" title={agent.task}>{agent.task}</div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--theme-bg)]">
+                        <div className={cn('h-full rounded-full transition-all', isBlocked ? 'bg-red-500' : isReview ? 'bg-amber-500' : 'bg-[var(--theme-accent)]')} style={{ width: `${agent.progress}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-          ) : null}
-          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                Recent updates
+            ) : (
+              <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-[11px] text-[var(--theme-muted)]">
+                {activeAgents.length ? `No ${AGENT_LENSES[lensIndex]?.label.toLowerCase() ?? 'matching'} agents right now.` : 'Dispatch a mission to see each worker appear here with progress.'}
               </div>
-              <div className="text-[10px] text-[var(--theme-muted)]">
-                Last 3 worker signals
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              {recentUpdates.length > 0 ? recentUpdates.slice(0, 3).map((update) => (
-                <div
-                  key={`${update.workerId}-${update.age}`}
-                  className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2"
-                >
-                  <span className={cn(
-                    'inline-block size-2 rounded-full',
-                    update.tone === 'warning'
-                      ? 'bg-amber-500'
-                      : update.tone === 'active'
-                        ? 'bg-emerald-500'
-                        : 'bg-[var(--theme-muted)]/50',
-                  )} />
-                  <span className="inline-flex shrink-0 items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                    {update.workerName}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--theme-text)]">
-                    {update.text}
-                  </span>
-                  <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">
-                    {update.age}
-                  </span>
-                </div>
-              )) : (
-                <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-[11px] text-[var(--theme-muted)]">
-                  Waiting for worker activity.
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
 

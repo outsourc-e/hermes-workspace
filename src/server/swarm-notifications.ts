@@ -4,6 +4,15 @@ import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 import { getSwarmProfilePath } from './swarm-foundation'
 import { publishChatEvent } from './chat-event-bus'
 
+function publishChatStatus(sessionKey: string, text: string): void {
+  publishChatEvent('status', {
+    type: 'status',
+    sessionKey,
+    transport: 'chat-events',
+    text,
+  })
+}
+
 function readRuntime(runtimePath: string): Record<string, unknown> {
   if (!existsSync(runtimePath)) return {}
   try {
@@ -24,6 +33,37 @@ function checkpointSummary(checkpoint: ParsedSwarmCheckpoint): string {
     checkpoint.nextAction && checkpoint.nextAction.toLowerCase() !== 'none' ? `Next: ${checkpoint.nextAction}` : null,
   ].filter(Boolean)
   return parts.join(' | ')
+}
+
+export function publishSwarmActionPrompt(input: {
+  sessionKey?: string | null
+  missionId?: string | null
+  title: string
+  text: string
+  details?: Record<string, unknown>
+}): { published: boolean; sessionKey: string } {
+  const sessionKey = input.sessionKey?.trim() || 'main'
+  const headline = input.missionId ? `[Swarm] ${input.title} — Mission: ${input.missionId}` : `[Swarm] ${input.title}`
+  const messageText = [headline, input.text].filter(Boolean).join('\n')
+
+  publishChatEvent('message', {
+    type: 'message',
+    sessionKey,
+    transport: 'chat-events',
+    message: {
+      role: 'assistant',
+      timestamp: Date.now(),
+      content: [{ type: 'text', text: messageText }],
+      details: {
+        source: 'swarm-orchestrator',
+        missionId: input.missionId ?? null,
+        ...input.details,
+      },
+    },
+  })
+
+  publishChatStatus(sessionKey, `${headline} — ${input.text}`)
+  return { published: true, sessionKey }
 }
 
 export function publishSwarmCheckpointNotification(input: {
@@ -69,12 +109,7 @@ export function publishSwarmCheckpointNotification(input: {
     },
   })
 
-  publishChatEvent('status', {
-    type: 'status',
-    sessionKey,
-    transport: 'chat-events',
-    text,
-  })
+  publishChatStatus(sessionKey, text)
 
   writeRuntime(runtimePath, {
     ...current,

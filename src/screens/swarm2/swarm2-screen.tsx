@@ -12,8 +12,8 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  AlarmClockIcon,
   CpuIcon,
-  DashboardSquare03Icon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
@@ -22,6 +22,8 @@ import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
 import { Swarm2ActivityFeed } from './swarm2-activity-feed'
+import { Swarm2KanbanBoard } from './swarm2-kanban-board'
+import { Swarm2ReportsView, buildSwarm2InboxLanes, type Swarm2InboxItem } from './swarm2-reports-view'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { cn } from '@/lib/utils'
@@ -57,6 +59,7 @@ export const SWARM2_INFORMATION_HIERARCHY = [
   'Operations-style worker node cards: role, state, current task, last useful signal, direct inline chat/action affordances.',
   'Minimal attention rail: only auth, worker availability, room count, selected runtime metadata.',
   'Central bottom router chat: orchestration brain for auto/manual/broadcast dispatch.',
+  'Kanban view: manual planning lanes for backlog, ready, running, review, blocked, and done.',
   'Runtime view: side-by-side tmux terminals for selected room workers or the focused worker.',
 ] as const
 
@@ -70,6 +73,7 @@ export const SWARM2_SURFACE_CONTRACT = {
   routerPlacement: 'bottom-center',
   cardInlineChat: true,
   routerDefaultOpen: false,
+  heartbeatOrchestration: 'main-session loop processes checkpoints and prompts review/continue decisions',
 } as const
 
 export const SWARM2_OPERATIONS_REUSE = [
@@ -92,7 +96,9 @@ export const SWARM2_REAL_API_ENDPOINTS = [
   '/api/crew-status',
   '/api/swarm-environment',
   '/api/swarm-runtime',
+  '/api/swarm-missions',
   '/api/swarm-roster',
+  '/api/integrations',
   '/api/swarm-health',
   '/api/swarm-decompose',
   '/api/swarm-dispatch',
@@ -166,6 +172,7 @@ type HealthData = {
   }
 }
 
+
 type SwarmRosterWorker = {
   id: string
   name: string
@@ -191,7 +198,25 @@ type SwarmMissionSummary = {
   id: string
   title: string
   state: string
-  assignments?: Array<{ state: string }>
+  assignments?: Array<{
+    id?: string
+    state: string
+    task?: string
+    workerId?: string
+    reviewRequired?: boolean
+    completedAt?: number | null
+    dispatchedAt?: number | null
+    checkpoint?: {
+      stateLabel?: string | null
+      checkpointStatus?: string | null
+      runtimeState?: string | null
+      filesChanged?: string | null
+      commandsRun?: string | null
+      result?: string | null
+      blocker?: string | null
+      nextAction?: string | null
+    } | null
+  }>
   updatedAt: number
 }
 
@@ -200,7 +225,7 @@ type SwarmMissionsResponse = {
   missions?: Array<SwarmMissionSummary>
 }
 
-type ViewMode = 'cards' | 'runtime'
+type ViewMode = 'cards' | 'kanban' | 'runtime' | 'reports'
 
 type RuntimeResponse = {
   entries: Array<RuntimeEntry>
@@ -228,7 +253,7 @@ async function fetchRoster(): Promise<Array<SwarmRosterWorker>> {
 }
 
 async function fetchMissions(): Promise<Array<SwarmMissionSummary>> {
-  const res = await fetch('/api/swarm-missions?limit=5')
+  const res = await fetch('/api/swarm-missions?limit=50')
   if (!res.ok) throw new Error(`Missions request failed: ${res.status}`)
   const data = (await res.json()) as SwarmMissionsResponse
   return Array.isArray(data.missions) ? data.missions : []
@@ -458,6 +483,46 @@ function relativeTime(ts: number | null | undefined): string {
   return `${Math.floor(diff / 86_400_000)}d ago`
 }
 
+function progressForRuntime(runtime: RuntimeEntry | undefined): number {
+  if (!runtime) return 0
+  if (runtime.checkpointStatus === 'done' || runtime.checkpointStatus === 'handoff') return 100
+  if (runtime.checkpointStatus === 'blocked' || runtime.checkpointStatus === 'needs_input') return 100
+  if (!runtime.currentTask?.trim()) return 0
+  const text = `${runtime.phase ?? ''} ${runtime.currentTask ?? ''}`.toLowerCase()
+  if (text.includes('review')) return 72
+  if (text.includes('test') || text.includes('qa')) return 78
+  if (text.includes('implement') || text.includes('build') || text.includes('patch')) return 64
+  if (text.includes('plan') || text.includes('research') || text.includes('design')) return 48
+  return 58
+}
+
+function cleanSwarmLabel(rawValue: string, fallback = 'Ready for task', maxLength = 64): string {
+  const raw = rawValue.trim()
+  if (!raw) return fallback
+  const lines = raw.split('\n').map((line) => line.trim()).filter(Boolean)
+  const goalLine = lines.find((line) => /^goal\s*:/i.test(line))
+  const selected = goalLine
+    ? goalLine.replace(/^goal\s*:\s*/i, '')
+    : lines.find((line) => !/^you are\b/i.test(line) && !/^context\b/i.test(line) && !/^constraints\b/i.test(line)) || lines[0]
+  const cleaned = selected
+    .replace(/^[A-Z][A-Z0-9_ -]{2,}TASK\s*:\s*/i, '')
+    .replace(/^DESIGN_ADDENDUM\s*:\s*/i, '')
+    .replace(/^CONTROL_PLANE_REPROMPT\s*:\s*/i, '')
+    .replace(/^EXPERIMENT_PLANNING_TASK\s*:\s*/i, '')
+    .replace(/^UPDATE\s*:\s*/i, '')
+    .replace(/^You are\s+[^.]{1,80}\.\s*/i, '')
+    .replace(/^[-*]\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return compactText(cleaned || raw, maxLength)
+}
+
+function displayTaskTitle(runtime: RuntimeEntry | undefined, fallback: string): string {
+  const realSummary = runtime?.lastRealSummary ?? null
+  const realResult = runtime?.lastRealResult ?? null
+  return cleanSwarmLabel(runtime?.blockedReason || runtime?.currentTask || realSummary || runtime?.lastSummary || realResult || runtime?.lastResult || fallback || '', 'Ready for task', 64)
+}
+
 
 function formatAssignedModel(model?: string | null, provider?: string | null): string {
   const value = `${model || ''} ${provider || ''}`.toLowerCase()
@@ -480,8 +545,15 @@ type ControlPlaneStageProps = {
   selectedLabel: string
   workspaceModel: string | null
   lanes: Array<{ role: string; count: number; active: number }>
+  activeAgents: Array<{ workerId: string; workerName: string; role: string; task: string; progress: number; state: 'working' | 'reviewing' | 'blocked' | 'ready'; age: string }>
   recentUpdates: Array<{ workerId: string; workerName: string; text: string; age: string; tone: 'idle' | 'active' | 'warning' }>
   latestMission: { id: string; title: string; state: string; assignmentCount: number; checkpointedCount: number } | null
+  missions: Array<SwarmMissionSummary>
+  runtimeEntries: Array<RuntimeEntry>
+  inboxCounts: { needsReview: number; blocked: number; ready: number }
+  routerSeed: { key: number; prompt: string; mode: 'auto' | 'manual' | 'broadcast' } | null
+  onOpenInboxItem: (item: Swarm2InboxItem) => void
+  onRouteToReviewer: (item: Swarm2InboxItem) => void
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   onOpenRouter: () => void
@@ -510,8 +582,15 @@ function ControlPlaneStage({
   selectedLabel,
   workspaceModel,
   lanes,
+  activeAgents,
   recentUpdates,
   latestMission,
+  missions,
+  runtimeEntries,
+  inboxCounts,
+  routerSeed,
+  onOpenInboxItem,
+  onRouteToReviewer,
   viewMode,
   onViewModeChange,
   onOpenRouter,
@@ -613,11 +692,14 @@ function ControlPlaneStage({
           viewMode={viewMode}
           onViewModeChange={onViewModeChange}
           lanes={lanes}
+          activeAgents={activeAgents}
           recentUpdates={recentUpdates}
           latestMission={latestMission}
+          inboxCounts={inboxCounts}
           members={members}
           roomIds={roomIds}
           selectedId={selectedId}
+          routerSeed={routerSeed}
           onOpenRouter={onOpenRouter}
           onRouterResults={() => {
             void onRouterResults()
@@ -627,6 +709,8 @@ function ControlPlaneStage({
         />
         <div className="relative w-full pt-3">
           <div className={cn('relative z-10', viewMode === 'cards' ? 'block' : 'hidden')}>
+            <div className="mb-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-muted-2)]">
+            </div>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 min-[1680px]:grid-cols-3">
               {members.length === 0 ? (
                 <div className="col-span-full rounded-[1.5rem] border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-8 text-sm text-[var(--theme-muted)]">
@@ -643,7 +727,7 @@ function ControlPlaneStage({
                       currentTask={runtime?.currentTask ?? null}
                       recentLines={recentLines(runtime)}
                       recentOutputAt={runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? null}
-                      recentSummary={runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? null}
+                      recentSummary={runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? null}
                       artifacts={runtime?.artifacts ?? []}
                       previews={runtime?.previews ?? []}
                       inRoom={roomIds.includes(member.id)}
@@ -733,6 +817,29 @@ function ControlPlaneStage({
               )}
             </div>
           </div>
+
+          <div className={cn('relative z-10', viewMode === 'kanban' ? 'block' : 'hidden')}>
+            <Swarm2KanbanBoard
+              workers={members}
+              latestMission={latestMission}
+              selectedWorkerId={selectedId}
+              onSelectWorker={onSelect}
+              onOpenRouter={onOpenRouter}
+            />
+          </div>
+
+          <div className={cn('relative z-10', viewMode === 'reports' ? 'block' : 'hidden')}>
+            <Swarm2ReportsView
+              missions={missions}
+              runtimes={runtimeEntries}
+              onSelectWorker={(workerId) => {
+                onSelect(workerId)
+                onViewModeChange('cards')
+              }}
+              onOpenItem={onOpenInboxItem}
+              onRouteToReviewer={onRouteToReviewer}
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -765,6 +872,8 @@ export function Swarm2Screen() {
   })
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [routerOpen, setRouterOpen] = useState(false)
+  const [routerSeed, setRouterSeed] = useState<{ key: number; prompt: string; mode: 'auto' | 'manual' | 'broadcast' } | null>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [addSwarmOpen, setAddSwarmOpen] = useState(false)
   const [addSwarmSaving, setAddSwarmSaving] = useState(false)
   const [addSwarmError, setAddSwarmError] = useState<string | null>(null)
@@ -1007,21 +1116,140 @@ export function Swarm2Screen() {
     const mission = missionsQuery.data?.[0]
     if (!mission) return null
     const assignments = mission.assignments ?? []
+    const genericTitle = /^\d+\s+assigned tasks?$/i.test(mission.title.trim()) || /assigned tasks/i.test(mission.title)
+    const firstTask = assignments.find((assignment) => assignment.task?.trim())?.task ?? ''
     return {
       id: mission.id,
-      title: mission.title,
+      title: cleanSwarmLabel(genericTitle ? firstTask : mission.title, 'Swarm mission', 72),
       state: mission.state,
       assignmentCount: assignments.length,
       checkpointedCount: assignments.filter((assignment) => ['checkpointed', 'done'].includes(assignment.state)).length,
     }
   }, [missionsQuery.data])
 
+  const activeAgents = useMemo(() => {
+    return members
+      .map((member) => {
+        const runtime = runtimeByWorker.get(member.id)
+        const currentTask = runtime?.currentTask?.trim()
+        const blocked = Boolean(runtime?.blockedReason || runtime?.needsHuman || runtime?.checkpointStatus === 'blocked' || runtime?.checkpointStatus === 'needs_input')
+        const done = runtime?.checkpointStatus === 'done' || runtime?.checkpointStatus === 'handoff'
+        if (!currentTask && !blocked) return null
+        const state: 'working' | 'reviewing' | 'blocked' | 'ready' = blocked
+          ? 'blocked'
+          : done
+            ? 'ready'
+            : `${runtime?.phase ?? ''} ${currentTask ?? ''}`.toLowerCase().includes('review')
+              ? 'reviewing'
+              : 'working'
+        const ts = runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? member.lastSessionAt ?? null
+        return {
+          workerId: member.id,
+          workerName: member.displayName || member.id,
+          role: member.role || runtime?.role || 'Worker',
+          task: displayTaskTitle(runtime, 'Awaiting checkpoint'),
+          progress: progressForRuntime(runtime),
+          state,
+          age: relativeTime(ts),
+          ts: ts ?? 0,
+        }
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .sort((a, b) => {
+        const priority = { blocked: 0, reviewing: 1, working: 2, ready: 3 }
+        return priority[a.state] - priority[b.state] || b.ts - a.ts || a.workerId.localeCompare(b.workerId)
+      })
+      .map((item) => ({
+        workerId: item.workerId,
+        workerName: item.workerName,
+        role: item.role,
+        task: item.task,
+        progress: item.progress,
+        state: item.state,
+        age: item.age,
+      }))
+  }, [members, runtimeByWorker])
+
+  const inboxLanes = useMemo(
+    () => buildSwarm2InboxLanes({ missions: missionsQuery.data ?? [], runtimes: runtimeQuery.data?.entries ?? [] }),
+    [missionsQuery.data, runtimeQuery.data?.entries],
+  )
+
+  const openInboxItem = useCallback((item: Swarm2InboxItem) => {
+    if (item.workerId) {
+      setSelectedId(item.workerId)
+      setFocusedRuntimeWorkerId(item.workerId)
+    }
+    setViewMode('reports')
+    setNotificationsOpen(false)
+  }, [])
+
+  const routeInboxItemToReviewer = useCallback((item: Swarm2InboxItem) => {
+    setSelectedId('swarm6')
+    setRouterSeed({
+      key: Date.now(),
+      mode: 'manual',
+      prompt: [
+        `Review ${item.workerId}'s Swarm control-plane output for mission ${item.missionId ?? 'unknown mission'}. Do not broaden scope. Return the required checkpoint format.`,
+        '',
+        `Task: ${item.title}`,
+        `Summary: ${item.summary}`,
+        `Checkpoint: ${item.checkpointStatus ?? item.stateLabel}`,
+        `Blocker: ${item.blocker ?? 'none'}`,
+        `Next action: ${item.nextAction ?? 'none'}`,
+      ].join('\n'),
+    })
+    setRouterOpen(true)
+    setViewMode('reports')
+  }, [])
+
+  const swarmNotifications = useMemo(() => {
+    const laneItems = [
+      ...inboxLanes.needs_review.map((item) => ({
+        id: `review-${item.id}`,
+        workerId: item.workerId,
+        title: `${item.workerName} · Needs review`,
+        body: item.summary,
+        age: relativeTime(item.updatedAt),
+        actionable: true,
+      })),
+      ...inboxLanes.blocked.map((item) => ({
+        id: `blocked-${item.id}`,
+        workerId: item.workerId,
+        title: `${item.workerName} · Needs input`,
+        body: item.blocker ?? item.summary,
+        age: relativeTime(item.updatedAt),
+        actionable: true,
+      })),
+      ...inboxLanes.ready.map((item) => ({
+        id: `ready-${item.id}`,
+        workerId: item.workerId,
+        title: `${item.workerName} · Ready`,
+        body: item.summary,
+        age: relativeTime(item.updatedAt),
+        actionable: true,
+      })),
+    ]
+    if (latestMission) {
+      laneItems.unshift({
+        id: `mission-${latestMission.id}`,
+        workerId: '',
+        title: `Mission ${latestMission.state}`,
+        body: `${latestMission.checkpointedCount}/${latestMission.assignmentCount} checkpointed · ${latestMission.title}`,
+        age: latestMission.id,
+        actionable: latestMission.checkpointedCount < latestMission.assignmentCount,
+      })
+    }
+    return laneItems.slice(0, 8)
+  }, [inboxLanes, latestMission])
+  const actionableNotificationCount = swarmNotifications.filter((item) => item.actionable).length
+
   const recentUpdates = useMemo(() => {
     return members
       .map((member) => {
         const runtime = runtimeByWorker.get(member.id)
         const ts = runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? member.lastSessionAt ?? null
-        const rawText = runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? runtime?.currentTask ?? member.lastSessionTitle ?? `Ready in ${member.role || 'worker'} lane`
+        const rawText = runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? runtime?.currentTask ?? member.lastSessionTitle ?? `Ready in ${member.role || 'worker'} lane`
         const state = (runtime?.phase || runtime?.currentTask || '').toLowerCase()
         const tone: 'idle' | 'active' | 'warning' = runtime?.blockedReason
           ? 'warning'
@@ -1094,6 +1322,7 @@ export function Swarm2Screen() {
     }
   }
 
+
   return (
     <div ref={topRef} className="min-h-full bg-surface text-primary-900" style={SWARM2_OPERATION_THEME}>
       <div
@@ -1106,14 +1335,69 @@ export function Swarm2Screen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-accent)] shadow-sm">
-                <HugeiconsIcon icon={DashboardSquare03Icon} size={22} />
+                <HugeiconsIcon icon={CpuIcon} size={22} />
               </div>
-              <h1 className="truncate text-base font-semibold text-primary-900">
-                Swarm2
-              </h1>
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold text-primary-900">
+                  Swarm
+                </h1>
+                <p className="truncate text-xs text-[var(--theme-muted-2)]">
+                  12-agent Hermes control plane for planning, routing, reports, and reviewer-gated execution.
+                </p>
+              </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2 text-sm text-[var(--theme-muted)]">
+            <div className="relative flex shrink-0 items-center gap-2 text-sm text-[var(--theme-muted)]">
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen((open) => !open)}
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] text-base shadow-sm hover:bg-[var(--theme-card2)]"
+                aria-label="Swarm notifications"
+                title="Swarm notifications"
+              >
+                <HugeiconsIcon icon={AlarmClockIcon} size={17} strokeWidth={1.8} />
+                {actionableNotificationCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {actionableNotificationCount}
+                  </span>
+                ) : null}
+              </button>
+              {notificationsOpen ? (
+                <div className="absolute right-0 top-12 z-40 w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 text-left shadow-[0_24px_80px_var(--theme-shadow)]">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Swarm updates</div>
+                      <div className="text-xs text-[var(--theme-muted-2)]">Actionable state from canonical mission checkpoints and durable report lanes.</div>
+                    </div>
+                    <button type="button" onClick={() => setNotificationsOpen(false)} className="rounded-lg px-2 py-1 text-xs hover:bg-[var(--theme-card2)]">Close</button>
+                  </div>
+                  <div className="max-h-80 space-y-2 overflow-y-auto">
+                    {swarmNotifications.length ? swarmNotifications.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          if (item.workerId) {
+                            setViewMode('reports')
+                            setSelectedId(item.workerId)
+                            setFocusedRuntimeWorkerId(item.workerId)
+                          }
+                          setNotificationsOpen(false)
+                        }}
+                        className="block w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-left hover:border-[var(--theme-accent)]"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-medium text-[var(--theme-text)]">{item.title}</span>
+                          <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">{item.age}</span>
+                        </div>
+                        <div className="mt-1 truncate text-xs text-[var(--theme-muted-2)]">{item.body}</div>
+                      </button>
+                    )) : (
+                      <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">No active swarm updates.</div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={openAddSwarm}
@@ -1136,6 +1420,7 @@ export function Swarm2Screen() {
             selectedLabel={selectedLabel}
             workspaceModel={healthQuery.data?.workspaceModel ?? null}
             lanes={rosterLanes}
+            activeAgents={activeAgents}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onOpenRouter={() => setRouterOpen(true)}
@@ -1156,6 +1441,16 @@ export function Swarm2Screen() {
             runtimeByWorker={runtimeByWorker}
             recentUpdates={recentUpdates}
             latestMission={latestMission}
+            missions={missionsQuery.data ?? []}
+            runtimeEntries={runtimeQuery.data?.entries ?? []}
+            inboxCounts={{
+              needsReview: inboxLanes.needs_review.length,
+              blocked: inboxLanes.blocked.length,
+              ready: inboxLanes.ready.length,
+            }}
+            routerSeed={routerSeed}
+            onOpenInboxItem={openInboxItem}
+            onRouteToReviewer={routeInboxItemToReviewer}
             terminalTargets={terminalTargets}
             tmuxAvailable={tmuxAvailable}
             pendingTmux={pendingTmux}
@@ -1176,6 +1471,7 @@ export function Swarm2Screen() {
           />
         ) : null}
       </div>
+
 
       {addSwarmOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-sm">
@@ -1234,10 +1530,14 @@ export function Swarm2Screen() {
         selectedId={selectedId}
         open={routerOpen}
         showClosedDock={false}
+        seedPrompt={routerSeed?.prompt ?? null}
+        seedMode={routerSeed?.mode}
+        seedKey={routerSeed?.key ?? null}
         onOpen={() => setRouterOpen(true)}
         onClose={() => setRouterOpen(false)}
         onResults={() => {
           void runtimeQuery.refetch()
+          void missionsQuery.refetch()
         }}
       />
     </div>
