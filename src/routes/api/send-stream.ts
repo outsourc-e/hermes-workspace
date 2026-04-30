@@ -363,6 +363,7 @@ export const Route = createFileRoute('/api/send-stream')({
         let activeRunId: string | null = null
         let unregisterTimer: ReturnType<typeof setTimeout> | null = null
         let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+        let heartbeatTimer: ReturnType<typeof setInterval> | null = null
         const abortController = new AbortController()
         let closeStream = () => {
           streamClosed = true
@@ -387,6 +388,10 @@ export const Route = createFileRoute('/api/send-stream')({
                 clearTimeout(streamTimeoutTimer)
                 streamTimeoutTimer = null
               }
+              if (heartbeatTimer) {
+                clearInterval(heartbeatTimer)
+                heartbeatTimer = null
+              }
               if (activeRunId) {
                 unregisterActiveSendRun(activeRunId)
                 activeRunId = null
@@ -398,6 +403,13 @@ export const Route = createFileRoute('/api/send-stream')({
                 // ignore
               }
             }
+
+            // Keep the SSE stream alive during long agent processing (tool calls,
+            // slow LLM responses on large contexts). Without this the client-side
+            // no-activity timer fires after 2-3 min and aborts the stream.
+            heartbeatTimer = setInterval(() => {
+              sendEvent('heartbeat', { timestamp: Date.now() })
+            }, 30_000)
 
             try {
               if (chatMode === 'portable') {

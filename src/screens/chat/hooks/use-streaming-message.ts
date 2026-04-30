@@ -642,6 +642,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           }
           break
         }
+        case 'heartbeat': {
+          markActivity()
+          break
+        }
         case 'close': {
           if (fullTextRef.current) {
             finishStream()
