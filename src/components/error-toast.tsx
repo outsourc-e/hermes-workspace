@@ -44,6 +44,9 @@ function classifyError(raw: string): string {
   ) {
     return 'Connection lost — retrying…'
   }
+  if (lower.includes('tool_use') && lower.includes('tool_result')) {
+    return 'Tool call context error — conversation history got out of sync. Start a new session to continue.'
+  }
   // Return original message if no pattern matched
   return raw
 }
