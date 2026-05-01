@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { cn } from '@/lib/utils'
@@ -412,24 +412,109 @@ function buildWorkerReportCards(rows: Array<Swarm2ReportRow>): Array<WorkerRepor
   })
 }
 
+function detailValue(row: Swarm2ReportRow, label: string): string | null {
+  return row.details.find((detail) => detail.label === label)?.value ?? null
+}
+
+function cleanDetail(value: string | null | undefined): string | null {
+  const text = value?.trim()
+  return text && text !== '—' ? text : null
+}
+
+export function buildBlockedGuidanceTask(row: Swarm2InboxItem, guidance: string): string {
+  return [
+    guidance.trim(),
+    '',
+    `Prior blocker: ${cleanDetail(row.blocker) ?? 'none'}`,
+    `Latest next action: ${cleanDetail(row.nextAction) ?? 'none'}`,
+    '',
+    'Resume: address the blocker and continue.',
+  ].join('\n')
+}
+
+export function buildReviewerDispatchTask(row: Swarm2InboxItem): string {
+  return `Review ${row.workerId} checkpoint at ${row.checkpointStatus ?? row.stateLabel}. Read the swarm6 review spec from the configured swarm-specs workspace. Verify, byte-check, return APPROVED/CHANGES_REQUESTED/BLOCKED.`
+}
+
+export function extractPullRequestUrl(row: Swarm2ReportRow): string | null {
+  const sources = [
+    row.summary,
+    row.title,
+    cleanDetail(detailValue(row, 'Result')),
+    cleanDetail(detailValue(row, 'Real result')),
+    cleanDetail(detailValue(row, 'Summary')),
+    cleanDetail(detailValue(row, 'Real summary')),
+  ].filter(Boolean) as Array<string>
+  for (const source of sources) {
+    const match = source.match(/https?:\/\/\S+\/pull\/\d+\S*/i)
+    if (match) return match[0].replace(/[)>.,]+$/, '')
+  }
+  return null
+}
+
+export async function postSwarmDispatch(body: { assignments: Array<{ workerId: string; task: string }> }, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const res = await fetchImpl('/api/swarm-dispatch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `HTTP ${res.status}`)
+  }
+}
+
+export async function markInboxItemReadyForEric(input: { missionId: string; assignmentId: string }, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const res = await fetchImpl('/api/swarm-missions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'mark_ready_for_eric', ...input }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `HTTP ${res.status}`)
+  }
+}
+
+function buildReplyPrefill(row: Swarm2InboxItem): string {
+  return [
+    `Worker: ${row.workerId}`,
+    `Prior blocker: ${cleanDetail(row.blocker) ?? 'none'}`,
+    `Latest next action: ${cleanDetail(row.nextAction) ?? 'none'}`,
+    '',
+  ].join('\n')
+}
+
 export function Swarm2ReportsView({
   missions,
   runtimes,
   onSelectWorker,
   onOpenItem,
   onRouteToReviewer,
+  onRefresh,
 }: {
   missions: Array<MissionSummary>
   runtimes: Array<RuntimeReportEntry>
   onSelectWorker?: (workerId: string) => void
   onOpenItem?: (row: Swarm2InboxItem) => void
   onRouteToReviewer?: (row: Swarm2InboxItem) => void
+  onRefresh?: () => Promise<void> | void
 }) {
   const [stateFilter, setStateFilter] = useState<ReportState>('all')
   const [layout, setLayout] = useState<ReportLayout>('cards')
   const [workerFilter, setWorkerFilter] = useState('all')
   const [missionFilter, setMissionFilter] = useState('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({})
+  const [replyErrors, setReplyErrors] = useState<Record<string, string | null>>({})
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!toastMessage) return
+    const timer = window.setTimeout(() => setToastMessage(null), 2500)
+    return () => window.clearTimeout(timer)
+  }, [toastMessage])
 
   const rows = useMemo(() => buildSwarm2ReportRows({ missions, runtimes }), [missions, runtimes])
   const inboxLanes = useMemo(() => buildSwarm2InboxLanes({ missions, runtimes }), [missions, runtimes])
@@ -453,6 +538,160 @@ export function Swarm2ReportsView({
     { needs_review: 0, ready: 0, blocked: 0, in_progress: 0, artifact: 0 },
   )
 
+  function showToast(message: string) {
+    setToastMessage(message)
+  }
+
+  async function refreshData() {
+    await onRefresh?.()
+  }
+
+  async function sendGuidance(row: Swarm2InboxItem) {
+    const guidance = cleanDetail(replyDrafts[row.id])
+    if (!guidance) {
+      setReplyErrors((current) => ({ ...current, [row.id]: 'Add guidance before sending.' }))
+      return
+    }
+    setBusyId(`reply:${row.id}`)
+    setReplyErrors((current) => ({ ...current, [row.id]: null }))
+    try {
+      await postSwarmDispatch({
+        assignments: [{ workerId: row.workerId, task: buildBlockedGuidanceTask(row, guidance) }],
+      })
+      await refreshData()
+      setReplyDrafts((current) => ({ ...current, [row.id]: buildReplyPrefill(row) }))
+      setExpandedId(null)
+      showToast(`Sent to ${row.workerId}`)
+    } catch (error) {
+      setReplyErrors((current) => ({
+        ...current,
+        [row.id]: error instanceof Error ? error.message : 'Failed to send guidance.',
+      }))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function routeToReviewer(row: Swarm2InboxItem) {
+    setBusyId(`review:${row.id}`)
+    try {
+      await postSwarmDispatch({
+        assignments: [{ workerId: 'swarm6', task: buildReviewerDispatchTask(row) }],
+      })
+      await refreshData()
+      onRouteToReviewer?.(row)
+      showToast(`Sent to swarm6 for ${row.workerId}`)
+    } catch (error) {
+      setReplyErrors((current) => ({
+        ...current,
+        [row.id]: error instanceof Error ? error.message : 'Failed to route reviewer.',
+      }))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function markReady(row: Swarm2InboxItem) {
+    if (!row.missionId || !row.assignmentId) return
+    setBusyId(`ready:${row.id}`)
+    try {
+      await markInboxItemReadyForEric({ missionId: row.missionId, assignmentId: row.assignmentId })
+      await refreshData()
+      showToast(`Marked ${row.workerId} ready for Eric merge`)
+    } catch (error) {
+      setReplyErrors((current) => ({
+        ...current,
+        [row.id]: error instanceof Error ? error.message : 'Failed to mark ready for Eric.',
+      }))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function openReply(row: Swarm2InboxItem) {
+    const key = `reply:${row.id}`
+    setReplyDrafts((current) => ({
+      ...current,
+      [row.id]: current[row.id] ?? buildReplyPrefill(row),
+    }))
+    setReplyErrors((current) => ({ ...current, [row.id]: null }))
+    setExpandedId(expandedId === key ? null : key)
+  }
+
+  function openWorker(row: Swarm2InboxItem) {
+    onOpenItem?.(row)
+  }
+
+  function renderReplyComposer(row: Swarm2InboxItem) {
+    const disabled = busyId === `reply:${row.id}`
+    return (
+      <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
+        <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]" htmlFor={`guidance-${row.id}`}>
+          Guidance for {row.workerId}
+        </label>
+        <textarea
+          id={`guidance-${row.id}`}
+          value={replyDrafts[row.id] ?? buildReplyPrefill(row)}
+          onChange={(event) => setReplyDrafts((current) => ({ ...current, [row.id]: event.target.value }))}
+          rows={6}
+          className="w-full resize-none rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none"
+        />
+        {replyErrors[row.id] ? <div className="mt-2 text-xs text-red-600">{replyErrors[row.id]}</div> : null}
+        <div className="mt-2 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setExpandedId(null)}
+            className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => void sendGuidance(row)}
+            className="rounded-lg bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-primary-950 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {disabled ? 'Sending…' : 'Send guidance'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  function renderRowActions(row: Swarm2InboxItem, compact = false) {
+    const prUrl = extractPullRequestUrl(row)
+    const buttonClass = compact
+      ? 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
+      : 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
+    return (
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <button type="button" aria-label={`Open ${row.workerId} worker`} onClick={() => openWorker(row)} className={buttonClass}>
+          ↗
+        </button>
+        {row.state === 'blocked' ? (
+          <button type="button" onClick={() => openReply(row)} className={buttonClass}>
+            Guide worker
+          </button>
+        ) : null}
+        {row.state === 'needs_review' ? (
+          <button type="button" onClick={() => void routeToReviewer(row)} className={cn(buttonClass, 'border-amber-400/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15')}>
+            Route to reviewer
+          </button>
+        ) : null}
+        {row.state === 'ready' && prUrl ? (
+          <>
+            <a href={prUrl} target="_blank" rel="noreferrer" className={cn(buttonClass, 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15')}>
+              Open PR
+            </a>
+            <button type="button" onClick={() => void markReady(row)} className={cn(buttonClass, 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15')}>
+              Mark ready for Eric merge
+            </button>
+          </>
+        ) : null}
+      </div>
+    )
+  }
+
   function renderInboxLane(lane: Swarm2InboxLaneId, title: string, rowsForLane: Array<Swarm2InboxItem>, emptyText: string) {
     const laneTone = toneClass(lane)
     return (
@@ -474,24 +713,8 @@ export function Swarm2ReportsView({
                 <div className="shrink-0 text-[10px] text-[var(--theme-muted)]">{formatAge(row.updatedAt)}</div>
               </div>
               <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--theme-muted-2)]">{row.summary}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onOpenItem?.(row)}
-                  className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
-                >
-                  Open
-                </button>
-                {lane === 'needs_review' ? (
-                  <button
-                    type="button"
-                    onClick={() => onRouteToReviewer?.(row)}
-                    className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-700 hover:bg-amber-500/15"
-                  >
-                    Route swarm6
-                  </button>
-                ) : null}
-              </div>
+              {renderRowActions(row, true)}
+              {expandedId === `reply:${row.id}` ? renderReplyComposer(row) : null}
             </div>
           )) : (
             <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-4 text-xs text-[var(--theme-muted)]">
@@ -577,77 +800,101 @@ export function Swarm2ReportsView({
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {workerCards.length ? workerCards.map((card) => {
             const expanded = expandedId === `worker:${card.workerId}`
+            const latestInboxItem = {
+              ...card.latest,
+              lane: (card.latest.state === 'blocked' ? 'blocked' : card.latest.state === 'ready' ? 'ready' : 'needs_review') as Swarm2InboxLaneId,
+            }
             return (
               <article key={card.workerId} className="rounded-[1.4rem] border border-[var(--theme-border)] border-l-4 border-l-[var(--theme-accent)] bg-[var(--theme-bg)] p-4 shadow-[0_16px_40px_color-mix(in_srgb,var(--theme-shadow)_10%,transparent)]">
-                <div className="flex items-start gap-3">
-                  <div className="relative flex size-12 shrink-0 items-center justify-center">
-                    <AgentProgress
-                      value={card.state === 'blocked' ? 30 : card.state === 'needs_review' ? 74 : card.state === 'ready' ? 100 : 58}
-                      status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'done' : card.state === 'needs_review' ? 'thinking' : 'running'}
-                      size={48}
-                      strokeWidth={2.5}
-                      className={card.state === 'blocked' ? 'text-red-500' : card.state === 'needs_review' ? 'text-amber-500' : card.state === 'ready' ? 'text-emerald-500' : 'text-sky-500'}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <PixelAvatar size={34} color={colorForWorker(card.workerId)} accentColor="#fbbf24" status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'running' : 'idle'} />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="relative flex size-12 shrink-0 items-center justify-center">
+                      <AgentProgress
+                        value={card.state === 'blocked' ? 30 : card.state === 'needs_review' ? 74 : card.state === 'ready' ? 100 : 58}
+                        status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'done' : card.state === 'needs_review' ? 'thinking' : 'running'}
+                        size={48}
+                        strokeWidth={2.5}
+                        className={card.state === 'blocked' ? 'text-red-500' : card.state === 'needs_review' ? 'text-amber-500' : card.state === 'ready' ? 'text-emerald-500' : 'text-sky-500'}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <PixelAvatar size={34} color={colorForWorker(card.workerId)} accentColor="#fbbf24" status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'running' : 'idle'} />
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button type="button" onClick={() => onSelectWorker?.(card.workerId)} className="truncate text-left text-sm font-semibold text-[var(--theme-text)] hover:text-[var(--theme-accent-strong)]">
+                          {card.workerName}
+                        </button>
+                        <span className={cn('rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]', toneClass(card.state))}>{card.stateLabel}</span>
+                      </div>
+                      <div className="mt-1 text-[10px] text-[var(--theme-muted)]">{card.role} · {formatAge(card.latest.updatedAt)}</div>
                     </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button type="button" onClick={() => onSelectWorker?.(card.workerId)} className="truncate text-left text-sm font-semibold text-[var(--theme-text)] hover:text-[var(--theme-accent-strong)]">
-                        {card.workerName}
-                      </button>
-                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]', toneClass(card.state))}>{card.stateLabel}</span>
-                    </div>
-                    <div className="mt-1 text-[11px] text-[var(--theme-muted)]">{card.role} · {formatAge(card.latest.updatedAt)}</div>
-                    <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-[var(--theme-text)]">{card.latest.title}</h3>
-                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[var(--theme-muted-2)]">{card.latest.summary}</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
-                  <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-2 py-1">Review {card.reviewCount}</div>
-                  <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-2 py-1">Ready {card.readyCount}</div>
-                  <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-2 py-1">Blocked {card.blockedCount}</div>
-                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1">Files {card.artifactCount}</div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(expanded ? null : `worker:${card.workerId}`)}
-                    className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
-                  >
-                    {expanded ? 'Hide reports' : `Open reports (${card.rows.length})`}
-                  </button>
-                  {card.state === 'needs_review' ? (
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
-                      onClick={() => onRouteToReviewer?.({ ...card.latest, lane: 'needs_review' })}
-                      className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/15"
+                      onClick={() => setExpandedId(expanded ? null : `worker:${card.workerId}`)}
+                      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
                     >
-                      Route swarm6
+                      {expanded ? 'Hide reports' : `Open reports (${card.rows.length})`}
                     </button>
-                  ) : null}
+                    {card.prUrl ? (
+                      <a
+                        href={card.prUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+                      >
+                        ↗
+                      </a>
+                    ) : null}
+                    {(card.state === 'needs_review' || card.state === 'blocked' || card.state === 'ready') ? (
+                      <button
+                        type="button"
+                        onClick={() => onRouteToReviewer?.(card)}
+                        className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+                      >
+                        Steer
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
+
+                <h3 className="mt-3 text-center line-clamp-2 text-lg font-semibold leading-tight text-[var(--theme-text)]">{card.latest.title}</h3>
+                <p className="mt-1 text-center text-[11px] text-[var(--theme-muted)]">{card.latest.summary}</p>
+
+                <div className="mt-4 flex flex-wrap gap-1.5 text-center text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                  <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5">Review {card.reviewCount}</div>
+                  <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5">Ready {card.readyCount}</div>
+                  <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-1.5 py-0.5">Blocked {card.blockedCount}</div>
+                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-1.5 py-0.5">Files {card.artifactCount}</div>
+                </div>
+
+                {expandedId === `reply:${latestInboxItem.id}` ? renderReplyComposer(latestInboxItem) : null}
 
                 {expanded ? (
                   <div className="mt-3 space-y-2 border-t border-[var(--theme-border)] pt-3">
-                    {card.rows.slice(0, 4).map((row) => (
-                      <button
-                        key={row.id}
-                        type="button"
-                        onClick={() => onOpenItem?.({ ...row, lane: (row.state === 'blocked' ? 'blocked' : row.state === 'ready' ? 'ready' : 'needs_review') as Swarm2InboxLaneId })}
-                        className="block w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 text-left hover:border-[var(--theme-accent)]"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]', toneClass(row.state))}>{row.stateLabel}</span>
-                          <span className="text-[10px] text-[var(--theme-muted)]">{formatAge(row.updatedAt)}</span>
+                    {card.rows.slice(0, 4).map((row) => {
+                      const inboxRow = {
+                        ...row,
+                        lane: (row.state === 'blocked' ? 'blocked' : row.state === 'ready' ? 'ready' : 'needs_review') as Swarm2InboxLaneId,
+                      }
+                      return (
+                        <div
+                          key={row.id}
+                          className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]', toneClass(row.state))}>{row.stateLabel}</span>
+                            <span className="text-[10px] text-[var(--theme-muted)]">{formatAge(row.updatedAt)}</span>
+                          </div>
+                          <div className="mt-2 line-clamp-1 text-xs font-semibold text-[var(--theme-text)]">{row.title}</div>
+                          <div className="mt-1 line-clamp-2 text-[11px] text-[var(--theme-muted-2)]">{row.summary}</div>
+                          {renderRowActions(inboxRow)}
+                          {expandedId === `reply:${row.id}` ? renderReplyComposer(inboxRow) : null}
                         </div>
-                        <div className="mt-2 line-clamp-1 text-xs font-semibold text-[var(--theme-text)]">{row.title}</div>
-                        <div className="mt-1 line-clamp-2 text-[11px] text-[var(--theme-muted-2)]">{row.summary}</div>
-                      </button>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : null}
               </article>
