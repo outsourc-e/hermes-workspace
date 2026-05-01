@@ -254,15 +254,6 @@ export function Swarm2OrchestratorCard({
               <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1">
                 {activeRuntimeCount} live
               </span>
-              <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-amber-700">
-                Review {agentCounts.reviewing}
-              </span>
-              <span className="rounded-full border border-red-400/40 bg-red-500/10 px-2.5 py-1 text-red-700">
-                Blocked {agentCounts.blocked}
-              </span>
-              <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-1 text-emerald-700">
-                Ready {agentCounts.ready}
-              </span>
             </div>
             {/* Reviewer gate text removed — reviewer routing should be derived from roster/config, not pinned in hero chrome. */}
           </div>
@@ -364,7 +355,7 @@ export function Swarm2OrchestratorCard({
                 />
               </div>
             ) : visibleAgents.length ? (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {visibleAgents.map((agent) => {
                   const isBlocked = agent.state === 'blocked'
                   const isReview = agent.state === 'reviewing'
@@ -382,14 +373,11 @@ export function Swarm2OrchestratorCard({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[11px] font-semibold text-[var(--theme-text)]">{agent.workerName}</div>
-                          <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
-                            <span className="truncate">{agent.state}</span>
-                            <span className="normal-case tracking-normal">{agent.age}</span>
-                          </div>
+                          <div className="truncate text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">{agent.state}</div>
                         </div>
                       </div>
-                      <div className="mt-1.5 line-clamp-2 text-[10px] leading-snug text-[var(--theme-muted-2)]" title={agent.task}>{agent.task}</div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--theme-bg)]">
+                      <div className="mt-1.5 truncate text-[10px] text-[var(--theme-muted-2)]" title={agent.task}>{agent.task}</div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--theme-bg)]">
                         <div className={cn('h-full rounded-full transition-all', isBlocked ? 'bg-red-500' : isReview ? 'bg-amber-500' : 'bg-[var(--theme-accent)]')} style={{ width: `${agent.progress}%` }} />
                       </div>
                     </div>
