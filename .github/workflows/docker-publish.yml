@@ -72,6 +72,7 @@ jobs:
           cid=$(docker run -d \
             -p 127.0.0.1:3000:3000 \
             -e HERMES_API_URL=http://127.0.0.1:8642 \
+            -e CLAUDE_PASSWORD=ci-smoke-test-password \
             hermes-workspace:smoke)
           trap 'docker logs "$cid" || true; docker rm -f "$cid" || true' EXIT
 
