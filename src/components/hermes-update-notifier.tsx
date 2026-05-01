@@ -470,22 +470,33 @@ export function HermesUpdateNotifier() {
                   {agentPhase === 'error'
                     ? agentErrorMsg
                     : agentData.remote.error
-                      ? agentData.remote.error
+                      ? `Update blocked: ${agentData.remote.error}`
                       : `${shortSha(agentData.remote.currentHead)} → ${shortSha(agentData.remote.remoteHead)}`}
                 </p>
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
-                {(agentPhase === 'idle' || agentPhase === 'error') &&
-                agentData.remote.canUpdate ? (
-                  <button
-                    type="button"
-                    onClick={handleAgentUpdate}
-                    className="rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                    style={{ background: 'var(--theme-accent)' }}
-                  >
-                    {agentPhase === 'error' ? 'Retry' : 'Install'}
-                  </button>
+                {agentPhase === 'idle' || agentPhase === 'error' ? (
+                  agentData.remote.canUpdate ? (
+                    <button
+                      type="button"
+                      onClick={handleAgentUpdate}
+                      className="rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                      style={{ background: 'var(--theme-accent)' }}
+                    >
+                      {agentPhase === 'error' ? 'Retry' : 'Install'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={copyAgentManualCommand}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                      style={{ background: 'var(--theme-accent)' }}
+                      title={agentManualCommand}
+                    >
+                      Copy update command
+                    </button>
+                  )
                 ) : null}
                 <button
                   type="button"
@@ -505,10 +516,10 @@ export function HermesUpdateNotifier() {
 
             {agentPhase === 'idle' || agentPhase === 'error' ? (
               <div
-                className="flex items-center justify-between border-t px-5 py-2.5"
+                className="flex items-center justify-between gap-3 border-t px-5 py-2.5"
                 style={{ borderColor: 'var(--theme-border)' }}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <HugeiconsIcon
                     icon={Settings02Icon}
                     size={14}
@@ -516,33 +527,48 @@ export function HermesUpdateNotifier() {
                     style={{ color: 'var(--theme-muted)' }}
                   />
                   <span
-                    className="text-xs"
+                    className="truncate text-xs"
                     style={{ color: 'var(--theme-muted)' }}
                   >
-                    Auto-update Agent when safe
+                    {agentData.remote.canUpdate
+                      ? 'Auto-update Agent when safe'
+                      : 'Manual cleanup required. Copy the command, fix local changes, then run it.'}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={toggleAgentAutoUpdate}
-                  className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200"
-                  style={{
-                    background: agentAutoUpdate
-                      ? 'var(--theme-accent)'
-                      : 'var(--theme-card2)',
-                  }}
-                  role="switch"
-                  aria-checked={agentAutoUpdate}
-                >
-                  <span
-                    className={cn(
-                      'pointer-events-none mt-0.5 inline-block size-4 rounded-full bg-white shadow-sm transition-transform duration-200',
-                      agentAutoUpdate
-                        ? 'translate-x-[17px]'
-                        : 'translate-x-0.5',
-                    )}
-                  />
-                </button>
+                {agentData.remote.canUpdate ? (
+                  <button
+                    type="button"
+                    onClick={toggleAgentAutoUpdate}
+                    className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200"
+                    style={{
+                      background: agentAutoUpdate
+                        ? 'var(--theme-accent)'
+                        : 'var(--theme-card2)',
+                    }}
+                    role="switch"
+                    aria-checked={agentAutoUpdate}
+                  >
+                    <span
+                      className={cn(
+                        'pointer-events-none mt-0.5 inline-block size-4 rounded-full bg-white shadow-sm transition-transform duration-200',
+                        agentAutoUpdate
+                          ? 'translate-x-[17px]'
+                          : 'translate-x-0.5',
+                      )}
+                    />
+                  </button>
+                ) : (
+                  <code
+                    className="hidden max-w-[11rem] shrink-0 truncate rounded px-2 py-1 text-[10px] sm:block"
+                    style={{
+                      background: 'var(--theme-card2)',
+                      color: 'var(--theme-muted)',
+                    }}
+                    title={agentManualCommand}
+                  >
+                    hermes update
+                  </code>
+                )}
               </div>
             ) : null}
           </motion.div>
