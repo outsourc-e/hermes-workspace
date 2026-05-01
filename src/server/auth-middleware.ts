@@ -24,7 +24,7 @@ interface SessionStore {
 }
 
 const STORE_FILE = join(
-  process.env.CLAUDE_HOME ?? join(homedir(), '.claude'),
+  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
   'workspace-sessions.json',
 )
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days

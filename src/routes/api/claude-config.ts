@@ -16,7 +16,7 @@ import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
 
-const CLAUDE_HOME = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
 const ENV_PATH = path.join(CLAUDE_HOME, '.env')
 
@@ -142,7 +142,7 @@ function checkAuthStore(providerId: string): {
   maskedKey?: string
 } {
   // Check Claude auth store
-  const storePath = path.join(os.homedir(), '.claude', 'auth-profiles.json')
+  const storePath = path.join(CLAUDE_HOME, 'auth-profiles.json')
   try {
     if (fs.existsSync(storePath)) {
       const store = JSON.parse(fs.readFileSync(storePath, 'utf-8'))

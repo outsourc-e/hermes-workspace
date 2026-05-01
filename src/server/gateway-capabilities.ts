@@ -25,9 +25,12 @@ type WorkspaceOverrides = {
   claudeDashboardUrl?: string
 }
 
+function hermesHome(): string {
+  return process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+}
+
 function overridesPath(): string {
-  const home = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
-  return path.join(home, 'workspace-overrides.json')
+  return path.join(hermesHome(), 'workspace-overrides.json')
 }
 
 function readOverrides(): WorkspaceOverrides {
@@ -61,11 +64,13 @@ const _initialOverrides = readOverrides()
 
 export let CLAUDE_API = normalizeUrl(
   _initialOverrides.claudeApiUrl ||
+    process.env.HERMES_API_URL ||
     process.env.CLAUDE_API_URL ||
     'http://127.0.0.1:8642',
 )
 export let CLAUDE_DASHBOARD_URL = normalizeUrl(
   _initialOverrides.claudeDashboardUrl ||
+    process.env.HERMES_DASHBOARD_URL ||
     process.env.CLAUDE_DASHBOARD_URL ||
     'http://127.0.0.1:9119',
 )
@@ -85,7 +90,7 @@ export function setGatewayUrl(input: string | null | undefined): string {
   } else {
     delete overrides.claudeApiUrl
     CLAUDE_API = normalizeUrl(
-      process.env.CLAUDE_API_URL || 'http://127.0.0.1:8642',
+      process.env.HERMES_API_URL || process.env.CLAUDE_API_URL || 'http://127.0.0.1:8642',
     )
   }
   writeOverrides(overrides)
@@ -107,7 +112,7 @@ export function setDashboardUrl(input: string | null | undefined): string {
   } else {
     delete overrides.claudeDashboardUrl
     CLAUDE_DASHBOARD_URL = normalizeUrl(
-      process.env.CLAUDE_DASHBOARD_URL || 'http://127.0.0.1:9119',
+      process.env.HERMES_DASHBOARD_URL || process.env.CLAUDE_DASHBOARD_URL || 'http://127.0.0.1:9119',
     )
   }
   writeOverrides(overrides)
@@ -125,7 +130,7 @@ export function getResolvedUrls(): {
   const overrides = readOverrides()
   const source = overrides.claudeApiUrl
     ? 'override'
-    : process.env.CLAUDE_API_URL
+    : (process.env.HERMES_API_URL || process.env.CLAUDE_API_URL)
       ? 'env'
       : 'default'
   return { gateway: CLAUDE_API, dashboard: CLAUDE_DASHBOARD_URL, source }
@@ -214,7 +219,7 @@ let dashboardTokenPromise: Promise<string> | null = null
 let dashboardTokenCache = ''
 
 /** Optional bearer token for authenticated gateway endpoints. */
-export const BEARER_TOKEN = process.env.CLAUDE_API_TOKEN || ''
+export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
 
 /**
  * Optional explicit bearer token for dashboard API calls.
@@ -232,7 +237,7 @@ export const BEARER_TOKEN = process.env.CLAUDE_API_TOKEN || ''
  * CLAUDE_DASHBOARD_TOKEN isn't set, leave this empty and let
  * fetchDashboardToken() fall through to the HTML-scrape legacy path.
  */
-const DASHBOARD_BEARER_TOKEN = process.env.CLAUDE_DASHBOARD_TOKEN || ''
+const DASHBOARD_BEARER_TOKEN = process.env.HERMES_DASHBOARD_TOKEN || process.env.CLAUDE_DASHBOARD_TOKEN || ''
 
 function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
@@ -459,7 +464,7 @@ function logCapabilities(next: GatewayCapabilities): void {
 }
 
 async function autoDetectGatewayUrl(): Promise<void> {
-  if (process.env.CLAUDE_API_URL) return
+  if (process.env.HERMES_API_URL || process.env.CLAUDE_API_URL) return
 
   const candidates = [
     'http://127.0.0.1:8642',
