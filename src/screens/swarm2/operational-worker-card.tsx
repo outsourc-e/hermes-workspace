@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Add01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
   CheckListIcon,
-  CheckmarkCircle02Icon,
   ComputerTerminal01Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
@@ -14,7 +15,6 @@ import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { useQuery } from '@tanstack/react-query'
 import { Swarm2Artifacts, type Swarm2Artifact, type Swarm2Preview } from './swarm2-artifacts'
 import { Swarm2LiveChat } from './swarm2-live-chat'
-import { Swarm2MemoryPanel } from './swarm2-memory-panel'
 import { Swarm2TaskQueue } from './swarm2-task-queue'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { getOnlineStatus } from '@/hooks/use-crew-status'
@@ -103,32 +103,6 @@ function statusStyles(state: WorkerState) {
     return { dot: 'bg-emerald-500', ring: 'text-emerald-500', label: 'Thinking', progress: 'thinking' as const, avatar: 'thinking' as const }
   }
   return { dot: 'bg-emerald-500', ring: 'text-emerald-500', label: 'Active', progress: 'running' as const, avatar: 'running' as const }
-}
-
-function compactText(value: string | null | undefined, max = 74): string {
-  if (!value) return '—'
-  return value.length > max ? `${value.slice(0, max)}…` : value
-}
-
-function simplifyRecentLine(line: string): string {
-  const strippedTimestamp = line.replace(/^\s*\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s+/i, '')
-  const strippedLevel = strippedTimestamp.replace(/^INFO\s+/i, '')
-  const strippedPrefix = strippedLevel.replace(/^agent\.auxiliary_client:\s*/i, '')
-
-  if (/Auxiliary auto-detect:/i.test(strippedPrefix)) {
-    return strippedPrefix.replace(/^Auxiliary auto-detect:\s*/i, 'Auto-detect: ')
-  }
-  if (/Auxiliary title_generation:/i.test(strippedPrefix)) {
-    return strippedPrefix.replace(/^Auxiliary title_generation:\s*/i, 'Title generation: ')
-  }
-  return strippedPrefix
-}
-
-function filterRecentLines(lines: Array<string>): Array<string> {
-  return lines
-    .map((line) => simplifyRecentLine(line.trim()))
-    .filter(Boolean)
-    .slice(-3)
 }
 
 function relativeOutputTime(ts: number | null | undefined): string {
@@ -234,7 +208,6 @@ export type OperationalWorkerCardProps = {
 export function OperationalWorkerCard({
   member,
   currentTask = null,
-  recentLines = [],
   recentOutputAt = null,
   recentSummary = null,
   artifacts = [],
@@ -254,6 +227,7 @@ export function OperationalWorkerCard({
   const [draftRole, setDraftRole] = useState('')
   const [draftModel, setDraftModel] = useState('')
   const [draftAvatar, setDraftAvatar] = useState('')
+  const [taskComposerOpen, setTaskComposerOpen] = useState(false)
   const state = deriveWorkerState(member, currentTask)
   const status = statusStyles(state)
   const role = settings.role || member.role || roleFromId(member.id)
@@ -272,30 +246,61 @@ export function OperationalWorkerCard({
   const projectBranch = projectQuery.data?.branch ?? null
   const cardChangedFiles = projectQuery.data?.changedFiles ?? []
   const previewUrl = projectQuery.data?.previewUrls?.[0] ?? null
-  const previewSource = projectQuery.data?.previewSource ?? 'none'
   const livePulse = isLivePulse(recentOutputAt)
   const activeCount = member.assignedTaskCount + member.cronJobCount
   const hasPreview = Boolean(previewUrl)
   const progressValue =
     state === 'idle' || state === 'offline' ? 8 : state === 'waiting' ? 38 : 68
-  const displayLines = filterRecentLines(recentLines)
-  const latestSignal = displayLines[displayLines.length - 1]
-  const signalLabel = recentSummary
-    ? `Summary: ${compactText(recentSummary, 92)}`
-    : latestSignal
-      ? `Runtime: ${compactText(latestSignal, 82)}`
-      : member.lastSessionTitle
-        ? `Last session: ${compactText(member.lastSessionTitle, 74)}`
-        : 'No runtime output captured yet'
-  const outputHeadline = recentSummary
-    ? compactText(recentSummary, 96)
-    : latestSignal
-      ? compactText(latestSignal, 96)
-      : `${role} · ${status.label.toLowerCase()}${selected ? ' · focused' : ''}${inRoom ? ' · wired' : ''}`
   const baseModelLabel = formatAssignedModel(member.model, member.provider)
   const modelLabel = settings.modelLabel || baseModelLabel
   const avatarGlyph = settings.avatarGlyph || ''
   const outputFreshness = relativeOutputTime(recentOutputAt)
+  const focusPanels = useMemo(() => {
+    const panels: Array<{
+      key: 'tasks' | 'output' | 'files'
+      label: string
+      meta: string
+      helper: string
+    }> = [
+      {
+        key: 'tasks',
+        label: 'Tasks',
+        meta: `${activeCount} active lanes`,
+        helper: 'Tracked work for this agent lives here.',
+      },
+      {
+        key: 'output',
+        label: 'Output',
+        meta: `${artifacts.length} artifacts · ${previews.length} previews`,
+        helper: 'Published runtime artifacts, previews, and reports.',
+      },
+    ]
+    if (cardChangedFiles.length > 0) {
+      panels.push({
+        key: 'files',
+        label: 'Files',
+        meta: `${cardChangedFiles.length} changed`,
+        helper: 'Git-inferred file changes until runtime artifacts replace them.',
+      })
+    }
+    return panels
+  }, [activeCount, artifacts.length, previews.length, cardChangedFiles.length])
+  const [focusPanel, setFocusPanel] = useState<'tasks' | 'output' | 'files'>('tasks')
+  const panelCollapsedLimit = selected ? 6 : 4
+  const panelExpandedLimit = selected ? 8 : 5
+  useEffect(() => {
+    if (!focusPanels.some((panel) => panel.key === focusPanel)) {
+      setFocusPanel('tasks')
+    }
+  }, [focusPanels, focusPanel])
+  const activeFocusPanel = focusPanels.find((panel) => panel.key === focusPanel) ?? focusPanels[0]
+
+  function cycleFocusPanel(direction: -1 | 1) {
+    const currentIndex = focusPanels.findIndex((panel) => panel.key === focusPanel)
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0
+    const nextIndex = (safeIndex + direction + focusPanels.length) % focusPanels.length
+    setFocusPanel(focusPanels[nextIndex]?.key ?? 'tasks')
+  }
 
   useEffect(() => {
     try {
@@ -432,14 +437,10 @@ export function OperationalWorkerCard({
         </div>
       ) : null}
 
-      <div className="mb-2 min-h-[4.25rem] min-w-0 mx-auto w-full max-w-3xl">
-        <Swarm2TaskQueue workerId={member.id} limit={3} doneLimit={2} summaryTask={outputHeadline} />
-      </div>
-
       <div
         ref={chatAnchorRef}
         onClick={(event) => event.stopPropagation()}
-        className="flex-1 min-h-[16rem]"
+        className={cn('flex-1', selected ? 'mt-5 min-h-[18rem]' : 'mt-4 min-h-[16rem]')}
       >
         <Swarm2LiveChat
           workerId={member.id}
@@ -450,21 +451,98 @@ export function OperationalWorkerCard({
         />
       </div>
 
-      <Swarm2Artifacts
-        workerId={member.id}
-        artifacts={artifacts}
-        previews={previews}
-        changedFiles={cardChangedFiles}
-        expanded={selected}
-        className="mt-2 min-h-[7rem]"
-      />
+      <section
+        className={cn(
+          'mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2',
+          selected ? 'min-h-[5.75rem]' : 'min-h-[5rem]',
+        )}
+        onClick={(event) => event.stopPropagation()}
+      >
+          <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+            <button
+              type="button"
+              aria-label="Previous panel"
+              title="Previous panel"
+              onClick={() => cycleFocusPanel(-1)}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={11} />
+            </button>
+            <div className="min-w-0 flex-1 text-center">
+              <div className="truncate">{activeFocusPanel?.label ?? 'Panel'}</div>
+              <div className="truncate text-[10px] font-medium normal-case tracking-normal text-[var(--theme-muted)]/80">
+                {activeFocusPanel?.meta ?? outputFreshness}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {focusPanel === 'tasks' ? (
+                <button
+                  type="button"
+                  aria-label={taskComposerOpen ? 'Close add task' : 'Add task'}
+                  title={taskComposerOpen ? 'Close add task' : 'Add task'}
+                  onClick={() => setTaskComposerOpen((value) => !value)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={11} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                aria-label="Next panel"
+                title="Next panel"
+                onClick={() => cycleFocusPanel(1)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
+              >
+                <HugeiconsIcon icon={ArrowRight01Icon} size={11} />
+              </button>
+            </div>
+          </div>
 
-      {selected ? (
-        <Swarm2MemoryPanel
-          workerId={member.id}
-          className="mt-2"
-        />
-      ) : null}
+          <p className="mb-2 mx-auto max-w-2xl text-center text-[11px] leading-relaxed text-[var(--theme-muted)]">
+            {activeFocusPanel?.helper ?? 'Worker details'}
+          </p>
+
+          {focusPanel === 'tasks' ? (
+            <Swarm2TaskQueue
+              workerId={member.id}
+              limit={selected ? 5 : 3}
+              doneLimit={selected ? 3 : 2}
+              showHeader={false}
+              composerOpen={taskComposerOpen}
+              onComposerOpenChange={setTaskComposerOpen}
+              centered
+              className={cn(selected ? 'min-h-[5.75rem]' : 'min-h-[5rem]')}
+            />
+          ) : focusPanel === 'files' ? (
+            <Swarm2Artifacts
+              workerId={member.id}
+              artifacts={artifacts}
+              previews={[]}
+              changedFiles={cardChangedFiles}
+              expanded={selected}
+              collapsedLimit={panelCollapsedLimit}
+              expandedLimit={panelExpandedLimit}
+              mode="files"
+              showHeader={false}
+              centered
+              className={cn(selected ? 'min-h-[5.75rem]' : 'min-h-[5rem]', 'border-0 bg-transparent px-0 py-0')}
+            />
+          ) : (
+            <Swarm2Artifacts
+              workerId={member.id}
+              artifacts={artifacts}
+              previews={previews}
+              changedFiles={cardChangedFiles}
+              expanded={selected}
+              collapsedLimit={panelCollapsedLimit}
+              expandedLimit={panelExpandedLimit}
+              mode="artifacts"
+              showHeader={false}
+              centered
+              className={cn(selected ? 'min-h-[5.75rem]' : 'min-h-[5rem]', 'border-0 bg-transparent px-0 py-0')}
+            />
+          )}
+      </section>
 
       <div
         className="mt-auto pt-3 flex items-center justify-between gap-2 border-t border-[var(--theme-border)] text-[11px]"

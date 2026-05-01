@@ -46,6 +46,9 @@ type Swarm2ArtifactsProps = {
   /** Larger chip count when selected. */
   expandedLimit?: number
   expanded?: boolean
+  mode?: 'auto' | 'artifacts' | 'files'
+  showHeader?: boolean
+  centered?: boolean
 }
 
 function synthesizeFromChangedFiles(
@@ -101,12 +104,23 @@ export function Swarm2Artifacts({
   collapsedLimit = 3,
   expandedLimit = 8,
   expanded = false,
+  mode = 'auto',
+  showHeader = true,
+  centered = false,
 }: Swarm2ArtifactsProps) {
   const declaredArtifacts = artifacts ?? []
   const changedFileArtifacts =
     changedFiles.length > 0 ? synthesizeFromChangedFiles(workerId, changedFiles) : []
-  const showingChangedFiles = changedFileArtifacts.length > 0
-  const allArtifacts = showingChangedFiles ? changedFileArtifacts : declaredArtifacts
+  const showingChangedFiles = mode === 'files'
+    ? changedFileArtifacts.length > 0
+    : mode === 'artifacts'
+      ? false
+      : changedFileArtifacts.length > 0
+  const allArtifacts = mode === 'files'
+    ? changedFileArtifacts
+    : showingChangedFiles
+      ? changedFileArtifacts
+      : declaredArtifacts
   const allPreviews = previews ?? []
   const limit = expanded ? expandedLimit : collapsedLimit
   const visibleArtifacts = allArtifacts.slice(0, limit)
@@ -121,24 +135,26 @@ export function Swarm2Artifacts({
         className,
       )}
     >
-      <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-        <span className="inline-flex items-center gap-1">
-          <HugeiconsIcon icon={Files01Icon} size={11} />
-          {showingChangedFiles ? 'Changed files' : 'Output'}
-        </span>
-        <span className="font-medium normal-case tracking-normal">
-          {showingChangedFiles
-            ? `${allArtifacts.length} changed`
-            : declaredArtifacts.length > 0
-              ? `${allArtifacts.length} artifacts`
-              : '0 artifacts'}
-          {' · '}
-          {allPreviews.length} previews
-        </span>
-      </div>
+      {showHeader ? (
+        <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+          <span className="inline-flex items-center gap-1">
+            <HugeiconsIcon icon={Files01Icon} size={11} />
+            {showingChangedFiles ? 'Changed files' : 'Output'}
+          </span>
+          <span className="font-medium normal-case tracking-normal">
+            {showingChangedFiles
+              ? `${allArtifacts.length} changed`
+              : declaredArtifacts.length > 0
+                ? `${allArtifacts.length} artifacts`
+                : '0 artifacts'}
+            {' · '}
+            {allPreviews.length} previews
+          </span>
+        </div>
+      ) : null}
 
-      <div className="space-y-2">
-        <p className="text-[11px] leading-relaxed text-[var(--theme-muted)]">
+      <div className={cn('space-y-2', centered && 'text-center')}>
+        <p className={cn('text-[11px] leading-relaxed text-[var(--theme-muted)]', centered && 'mx-auto max-w-2xl')}>
           {isEmpty
             ? `No artifacts yet for ${workerId}. Will surface as the agent writes files, diffs, or build outputs.`
             : showingChangedFiles
@@ -147,7 +163,7 @@ export function Swarm2Artifacts({
         </p>
 
         {visibleArtifacts.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
+          <div className={cn('flex flex-wrap gap-1.5', centered && 'justify-center')}>
             {visibleArtifacts.slice(0, expanded ? 6 : 4).map((artifact) => {
               const icon = iconForKind(artifact.kind)
               return (
@@ -170,7 +186,7 @@ export function Swarm2Artifacts({
         ) : null}
 
         {visiblePreviews.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1">
+          <div className={cn('flex flex-wrap items-center gap-1', centered && 'justify-center')}>
             {visiblePreviews.map((preview) => (
               <a
                 key={preview.id}

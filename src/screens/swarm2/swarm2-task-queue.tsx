@@ -33,6 +33,10 @@ type Swarm2TaskQueueProps = {
   limit?: number
   doneLimit?: number
   summaryTask?: string | null
+  showHeader?: boolean
+  composerOpen?: boolean
+  onComposerOpenChange?: (open: boolean) => void
+  centered?: boolean
 }
 
 const POLL_MS = 30_000
@@ -100,10 +104,20 @@ export function Swarm2TaskQueue({
   limit = 3,
   doneLimit = 2,
   summaryTask = null,
+  showHeader = true,
+  composerOpen: composerOpenProp,
+  onComposerOpenChange,
+  centered = false,
 }: Swarm2TaskQueueProps) {
   const queryClient = useQueryClient()
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [composerOpen, setComposerOpen] = useState(false)
+  const [internalComposerOpen, setInternalComposerOpen] = useState(false)
+  const composerOpen = composerOpenProp ?? internalComposerOpen
+  const setComposerOpen = (next: boolean | ((value: boolean) => boolean)) => {
+    const resolved = typeof next === 'function' ? next(composerOpen) : next
+    if (onComposerOpenChange) onComposerOpenChange(resolved)
+    if (composerOpenProp === undefined) setInternalComposerOpen(resolved)
+  }
   const [draftTitle, setDraftTitle] = useState('')
   const [draftDescription, setDraftDescription] = useState('')
 
@@ -159,40 +173,42 @@ export function Swarm2TaskQueue({
 
   return (
     <section className={cn('flex min-h-[4.25rem] flex-col px-0 py-0', className)} onClick={(event) => event.stopPropagation()}>
-      <div className="mb-2">
-        <div className="flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[0.02em] text-[var(--theme-muted)]">
-          <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--theme-muted)]/80">
-            Tasks
-          </span>
-          <span className="text-[10px] normal-case tracking-normal text-[var(--theme-muted)]/80">
-            {activeTasks.length} active · {doneCount} done
-          </span>
-          <button
-            type="button"
-            aria-label={composerOpen ? 'Close add task' : 'Add task'}
-            title={composerOpen ? 'Close add task' : 'Add task'}
-            onClick={() => setComposerOpen((value) => !value)}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-md text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
-          >
-            <HugeiconsIcon icon={Add01Icon} size={10} />
-          </button>
-          {hasOverflow ? (
+      {showHeader ? (
+        <div className="mb-2">
+          <div className="flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[0.02em] text-[var(--theme-muted)]">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--theme-muted)]/80">
+              Tasks
+            </span>
+            <span className="text-[10px] normal-case tracking-normal text-[var(--theme-muted)]/80">
+              {activeTasks.length} active · {doneCount} done
+            </span>
             <button
               type="button"
-              aria-label={detailsOpen ? 'Collapse task details' : 'Expand task details'}
-              title={detailsOpen ? 'Collapse task details' : 'Expand task details'}
-              onClick={() => setDetailsOpen((value) => !value)}
+              aria-label={composerOpen ? 'Close add task' : 'Add task'}
+              title={composerOpen ? 'Close add task' : 'Add task'}
+              onClick={() => setComposerOpen((value) => !value)}
               className="inline-flex h-5 w-5 items-center justify-center rounded-md text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
             >
-              <HugeiconsIcon icon={ViewIcon} size={10} />
+              <HugeiconsIcon icon={Add01Icon} size={10} />
             </button>
-          ) : null}
+            {hasOverflow ? (
+              <button
+                type="button"
+                aria-label={detailsOpen ? 'Collapse task details' : 'Expand task details'}
+                title={detailsOpen ? 'Collapse task details' : 'Expand task details'}
+                onClick={() => setDetailsOpen((value) => !value)}
+                className="inline-flex h-5 w-5 items-center justify-center rounded-md text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
+              >
+                <HugeiconsIcon icon={ViewIcon} size={10} />
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-1 border-b border-[var(--theme-border)]/70" />
         </div>
-        <div className="mt-1 border-b border-[var(--theme-border)]/70" />
-      </div>
+      ) : null}
 
       {composerOpen ? (
-        <div className="mb-2 mx-auto max-w-xl space-y-2 rounded-lg border border-[var(--theme-border)] bg-[color:rgba(255,255,255,0.02)] p-2 text-left">
+        <div className={cn('mb-2 mx-auto max-w-xl space-y-2 rounded-lg border border-[var(--theme-border)] bg-[color:rgba(255,255,255,0.02)] p-2 text-left', centered && 'w-full')}>
           <input
             value={draftTitle}
             onChange={(event) => setDraftTitle(event.target.value)}
@@ -229,7 +245,7 @@ export function Swarm2TaskQueue({
         </div>
       ) : null}
 
-      <div className="flex-1">
+      <div className={cn('flex-1', centered && 'flex flex-col justify-center')}>
       {query.isPending ? (
         <p className="pt-2 text-[11px] text-[var(--theme-muted)] text-center">Loading…</p>
       ) : totalVisible === 0 ? (
