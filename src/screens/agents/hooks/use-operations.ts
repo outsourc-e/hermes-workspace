@@ -6,8 +6,8 @@ import { fetchCronJobs } from '@/lib/cron-api'
 import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
 import { formatModelName, formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
-// Claude-Workspace adapter: Operations is backed by Claude profiles
-// (each profile = one persistent agent). Profiles live at ~/.claude/profiles/<name>/
+// Claude-Workspace adapter: Operations is backed by Hermes profiles
+// (each profile = one persistent agent). Profiles live at ~/.hermes/profiles/<name>/
 // with their own config.yaml, sessions, skills.
 type ClaudeProfileSummary = {
   name: string
@@ -228,7 +228,7 @@ async function fetchClaudeProfiles(): Promise<ClaudeProfileSummary[]> {
   return Array.isArray(payload.profiles) ? payload.profiles : []
 }
 
-// Adapt Claude profiles into the ConfigPayload shape that the existing
+// Adapt Hermes profiles into the ConfigPayload shape that the existing
 // Operations UI expects. Each profile becomes one agent.
 async function fetchOperationsConfig(): Promise<ConfigPayload> {
   const profiles = await fetchClaudeProfiles()

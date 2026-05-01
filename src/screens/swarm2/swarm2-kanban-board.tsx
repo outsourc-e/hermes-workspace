@@ -64,7 +64,7 @@ export function getKanbanBackendPresentation(backend: KanbanBackendMeta | null |
       badgeLabel: 'Detecting board',
       badgeTone: 'unknown',
       toastTitle: 'Detecting Swarm Board backend',
-      toastBody: 'Checking Claude Kanban before falling back locally.',
+      toastBody: 'Checking Hermes Kanban before falling back locally.',
       title: undefined,
     }
   }
@@ -81,7 +81,7 @@ export function getKanbanBackendPresentation(backend: KanbanBackendMeta | null |
     badgeLabel: 'Local fallback',
     badgeTone: 'local',
     toastTitle: 'Using local Swarm Board',
-    toastBody: backend.details || 'Claude Kanban is not available yet. Cards stay local and the board will switch automatically when Claude storage is detected.',
+    toastBody: backend.details || 'Hermes Kanban is not available yet. Cards stay local and the board will switch automatically when Hermes storage is detected.',
     title: backend.details ?? backend.path ?? 'Local Swarm Board fallback',
   }
 }

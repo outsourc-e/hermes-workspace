@@ -58,7 +58,7 @@ describe('profiles-browser', () => {
       const mod = await loadMod()
       mod.setActiveProfile('jarvis')
       expect(warnSpy).toHaveBeenCalledTimes(1)
-      expect(warnSpy.mock.calls[0][0]).toContain('Restart the Claude gateway')
+      expect(warnSpy.mock.calls[0][0]).toContain('Restart the Hermes Agent gateway')
 
       warnSpy.mockRestore()
     })

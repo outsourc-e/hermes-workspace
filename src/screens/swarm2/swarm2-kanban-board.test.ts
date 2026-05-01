@@ -13,7 +13,7 @@ describe('Swarm2 Kanban backend presentation', () => {
   it('presents detected Kanban as the default shared board, not a backend demo', () => {
     expect(getKanbanBackendPresentation({
       id: 'claude',
-      label: 'Claude Kanban',
+      label: 'Hermes Kanban',
       detected: true,
       writable: true,
       details: 'Canonical storage detected',

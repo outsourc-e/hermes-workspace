@@ -39,11 +39,11 @@ function getSetupSteps(
     {
       title: 'Set up your agent',
       command: 'claude setup',
-      note: 'Pick your providers once; Claude stores them under ~/.claude',
+      note: 'Pick your providers once; Hermes Agent stores them under ~/.hermes',
     },
     {
       title: 'Start the gateway',
-      command: 'claude gateway run',
+      command: 'hermes gateway run',
       note: 'This starts the HTTP API on :8642 for the workspace',
     },
   ]
@@ -115,7 +115,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           setServerLog([
             String(
               data.message ||
-                'Auto-started Claude gateway — reconnecting…',
+                'Auto-started Hermes Agent gateway — reconnecting…',
             ),
           ])
         }
@@ -281,7 +281,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                     Detecting...
                   </span>
                 ) : (
-                  'Auto-Start Claude Gateway'
+                  'Auto-Start Hermes Agent Gateway'
                 )}
               </button>
 

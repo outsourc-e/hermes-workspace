@@ -1,6 +1,6 @@
 # Swarm Role Presets
 
-The Add Swarm dialog ships with role presets so new Project Agents start with a real operating contract instead of a blank textarea and optimism. Pick the closest preset, tune the mission, then start the worker.
+The Add Swarm dialog ships with role presets so new Hermes Agents start with a real operating contract instead of a blank textarea and optimism. Pick the closest preset, tune the mission, then start the worker.
 
 Each role has:
 

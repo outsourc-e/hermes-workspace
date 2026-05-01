@@ -49,9 +49,9 @@ The hub card should show:
 
 It should not consume the main content area with a full chat UI.
 
-### 2.2 Sub-Claude Agent
+### 2.2 Sub-Hermes Agent
 
-A swarm agent is a cloned Claude profile with:
+A swarm agent is a cloned Hermes profile with:
 
 - model/provider config
 - skills/tool access
@@ -170,7 +170,7 @@ Required:
 
 Task sources:
 
-- Claude tasks API
+- Hermes tasks API
 - worker runtime.json currentTask/state
 - optional project issue/PR metadata
 
@@ -490,12 +490,12 @@ Acceptance: one Swarm route, no duplicates, all swarm tests green, docs/README/n
 
 Execution contract for this mission:
 - Context, memory, and handoffs come from `/Users/aurora/.openclaw/workspace`
-- Swarm2 code, git, build, and tests run in `/Users/aurora/claude-workspace`
+- Swarm2 code, git, build, and tests run in `/Users/aurora/hermes-workspace`
 - Do not use legacy workspace aliases
 - Before any build/test/git loop, run:
 
 ```bash
-cd /Users/aurora/claude-workspace &&
+cd /Users/aurora/hermes-workspace &&
 pwd &&
 test -f package.json &&
 jq -r .name package.json

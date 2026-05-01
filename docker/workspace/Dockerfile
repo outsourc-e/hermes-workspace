@@ -10,7 +10,7 @@ RUN pnpm install --no-frozen-lockfile
 
 COPY . .
 
-ENV CLAUDE_API_URL=http://claude-agent:8642
+ENV HERMES_API_URL=http://hermes-agent:8642
 
 EXPOSE 3000
 

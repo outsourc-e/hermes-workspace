@@ -108,7 +108,7 @@ export function LoginScreen() {
         <p className="mt-6 text-center text-xs text-primary-500">
           Powered by{' '}
           <a
-            href="https://github.com/NousResearch/claude-agent"
+            href="https://github.com/NousResearch/hermes-agent"
             target="_blank"
             rel="noopener noreferrer"
             className="text-accent-500 hover:text-accent-600 transition-colors"

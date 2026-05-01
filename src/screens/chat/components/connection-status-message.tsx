@@ -38,8 +38,8 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Authentication required',
-      description: 'Claude rejected the connection token.',
-      action: 'Go to Settings -> Advanced -> Claude to update your token.',
+      description: 'Hermes Agent rejected the connection token.',
+      action: 'Go to Settings -> Advanced -> Hermes Agent to update your token.',
     }
   }
 
@@ -50,16 +50,16 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Pairing required',
-      description: "This device isn't paired with Claude yet.",
+      description: "This device isn't paired with Hermes Agent yet.",
       action: 'Check Hermes Agent connection.',
     }
   }
 
   if (lower.includes('econnrefused') && lower.includes('8642')) {
     return {
-      title: 'Claude gateway not running',
-      description: 'The Claude gateway is not running on port 8642.',
-      action: 'Run: pip install -U claude-agent && claude gateway run',
+      title: 'Hermes Agent gateway not running',
+      description: 'The Hermes Agent gateway is not running on port 8642.',
+      action: 'Run: pip install -U hermes-agent && hermes gateway run',
     }
   }
 
@@ -71,8 +71,8 @@ function classifyConnectionError(
     lower.includes('timeout')
   ) {
     return {
-      title: 'Claude unreachable',
-      description: "Can't connect to Claude at the configured URL.",
+      title: 'Hermes Agent unreachable',
+      description: "Can't connect to Hermes Agent at the configured URL.",
       action: 'Make sure Hermes is running and the URL is correct.',
     }
   }
@@ -80,7 +80,7 @@ function classifyConnectionError(
   return {
     title: 'Connection error',
     description: normalizedError || 'Something went wrong.',
-    action: 'Try refreshing or check Settings -> Advanced -> Claude.',
+    action: 'Try refreshing or check Settings -> Advanced -> Hermes.',
   }
 }
 
@@ -133,7 +133,7 @@ export function ConnectionStatusMessage({
         />
         <div className="flex-1 text-xs">
           <p className="font-medium">
-            {isChecking ? 'Connecting to Claude...' : errorInfo.title}
+            {isChecking ? 'Connecting to Hermes Agent...' : errorInfo.title}
           </p>
           {!isChecking ? (
             <>

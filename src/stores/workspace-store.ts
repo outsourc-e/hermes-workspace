@@ -62,7 +62,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setChatPanelSessionKey: (key) => set({ chatPanelSessionKey: key }),
     }),
     {
-      name: 'claude-workspace-v1',
+      name: 'hermes-workspace-v1',
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         fileExplorerCollapsed: state.fileExplorerCollapsed,

@@ -23,7 +23,7 @@ Swarm Mode is built around a durable loop: intent enters through Aurora, dispatc
     │ dispatches by role + standing mission
     ▼
 ┌────────────────────────────────────────────────────┐
-│ Project Agents                                      │
+│ Hermes Agents                                      │
 │ swarm4 research  swarm5 build  swarm6 review        │
 │ swarm7 docs      swarm8 ops    swarm9 lab           │
 │ swarm10 patches  swarm11 QA    swarm12 triage       │
@@ -254,10 +254,10 @@ Important endpoints:
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/swarm-roster` | Return configured Project Agents and role metadata. |
+| `GET /api/swarm-roster` | Return configured Hermes Agents and role metadata. |
 | `GET /api/swarm-runtime` | Return runtime state and tmux attachability. |
 | `GET /api/swarm-missions` | Return mission and assignment history. |
-| `POST /api/swarm-dispatch` | Send work to one or more Project Agents. |
+| `POST /api/swarm-dispatch` | Send work to one or more Hermes Agents. |
 | `POST /api/swarm-tmux-start` | Start a tmux-backed worker session. |
 | `POST /api/swarm-tmux-stop` | Stop a worker tmux session. |
 | `POST /api/swarm-tmux-scroll` | Scroll a tmux session from the UI. |

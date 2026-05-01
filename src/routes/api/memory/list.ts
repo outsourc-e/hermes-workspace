@@ -11,7 +11,7 @@ export const Route = createFileRoute('/api/memory/list')({
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
         // Memory is sourced entirely from local filesystem via memory-browser.ts
-        // (reads $CLAUDE_HOME/MEMORY.md + $CLAUDE_HOME/memory/ + /memories/). No
+        // (reads $HERMES_HOME/MEMORY.md + $HERMES_HOME/memory/ + /memories/). No
         // remote gateway endpoint is required, so no capability gate is needed.
         try {
           return json({ files: listMemoryFiles() })

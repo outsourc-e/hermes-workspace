@@ -1,5 +1,5 @@
 /**
- * Probes Claude services to detect which API groups are available.
+ * Probes Hermes services to detect which API groups are available.
  *
  * Zero-fork architecture:
  *   - Gateway (:8642 by default): /health, /v1/chat/completions, /v1/models
@@ -10,9 +10,9 @@
  *
  * Precedence for gateway/dashboard URLs:
  *   1. Runtime override saved via setGatewayUrl() / setDashboardUrl()
- *      (persisted to ~/.claude/workspace-overrides.json) — set from the UI
+ *      (persisted to ~/.hermes/workspace-overrides.json) — set from the UI
  *      so remote / Tailscale users can relocate without a restart (#101).
- *   2. process.env.CLAUDE_API_URL / CLAUDE_DASHBOARD_URL at process start.
+ *   2. process.env.HERMES_API_URL / HERMES_DASHBOARD_URL at process start.
  *   3. Default localhost (8642 / 9119).
  */
 
@@ -137,9 +137,9 @@ export function getResolvedUrls(): {
 }
 
 export const CLAUDE_UPGRADE_INSTRUCTIONS =
-  'For full features, install Claude from source (`git clone https://github.com/NousResearch/claude-agent && cd claude-agent && pip install -e .`), then start the gateway on :8642 (`claude gateway run`). For the extended APIs (Sessions, Skills, Config, Jobs) also start the dashboard on :9119 (`claude dashboard`).'
+  'For full features, install Hermes Agent from source (`git clone https://github.com/NousResearch/hermes-agent && cd hermes-agent && pip install -e .`), then start the gateway on :8642 (`hermes gateway run`). For the extended APIs (Sessions, Skills, Config, Jobs) also start the dashboard on :9119 (`hermes dashboard`).'
 
-export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Claude backend does not support the sessions API. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
+export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes backend does not support the sessions API. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
 
 const PROBE_TIMEOUT_MS = 3_000
 const PROBE_TTL_MS = 120_000
@@ -229,7 +229,7 @@ export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_A
  * When set, the workspace uses this directly and never parses HTML.
  *
  * NOTE: do NOT fall back to CLAUDE_API_TOKEN here. The gateway and the
- * upstream Claude dashboard use independent token schemes — the gateway
+ * upstream Hermes Agent dashboard use independent token schemes — the gateway
  * accepts a long-lived bearer (CLAUDE_API_TOKEN), while the dashboard
  * issues an ephemeral session token at boot (web_server.py:_SESSION_TOKEN).
  * Treating them as interchangeable wedges the workspace into 401 loops on
@@ -407,10 +407,10 @@ async function probeDashboard(): Promise<{ available: boolean; url: string }> {
   }
 }
 
-// Vanilla claude-agent 0.10.0 satisfies: health, chatCompletions, models, streaming,
+// Vanilla hermes-agent 0.10.0 satisfies: health, chatCompletions, models, streaming,
 // sessions, skills, config, jobs. Dashboard-only endpoints (themes/plugins) and the
 // legacy enhanced-fork chat stream are optional — their absence should not emit the
-// "Missing Claude APIs detected" warning, which only applies to critical gaps.
+// "Missing Hermes APIs detected" warning, which only applies to critical gaps.
 const OPTIONAL_APIS = new Set([
   'jobs',
   'chatCompletions',
@@ -458,7 +458,7 @@ function logCapabilities(next: GatewayCapabilities): void {
   const criticalMissing = missing.filter((key) => !OPTIONAL_APIS.has(key))
   if (criticalMissing.length > 0 && (next.health || next.dashboard.available)) {
     console.warn(
-      `[gateway] Missing Claude APIs detected. ${CLAUDE_UPGRADE_INSTRUCTIONS}`,
+      `[gateway] Missing Hermes APIs detected. ${CLAUDE_UPGRADE_INSTRUCTIONS}`,
     )
   }
 }
@@ -479,7 +479,7 @@ async function autoDetectGatewayUrl(): Promise<void> {
       })
       if (res.ok) {
         CLAUDE_API = candidate
-        console.log(`[gateway] Connected to Claude gateway at ${CLAUDE_API}`)
+        console.log(`[gateway] Connected to Hermes gateway at ${CLAUDE_API}`)
         return
       }
     } catch {
@@ -488,9 +488,9 @@ async function autoDetectGatewayUrl(): Promise<void> {
   }
 
   console.warn(
-    '[gateway] Could not reach Claude gateway on 8645, 8642, or 8643. ' +
+    '[gateway] Could not reach Hermes gateway on 8645, 8642, or 8643. ' +
       'If you run the workspace on a different machine (Tailscale / VPN / LAN), ' +
-      'set CLAUDE_API_URL=http://<reachable-host>:8642 in .env and restart. ' +
+      'set HERMES_API_URL=http://<reachable-host>:8642 in .env and restart. ' +
       'Also set API_SERVER_HOST=0.0.0.0 on the gateway so remote peers can connect.',
   )
 }
@@ -559,7 +559,7 @@ export async function probeGateway(options?: {
       sessions: dashboard.available || legacySessions,
       enhancedChat,
       skills: dashboard.available || legacySkills,
-      // Memory is always available: workspace reads $CLAUDE_HOME/MEMORY.md +
+      // Memory is always available: workspace reads $HERMES_HOME/MEMORY.md +
       // memory/*.md + memories/*.md directly from the local filesystem.
       // No remote gateway endpoint is required.
       memory: true,
@@ -617,7 +617,7 @@ export function getEnhancedCapabilities(): EnhancedCapabilities {
 export function getGatewayMode(): GatewayMode {
   // 'zero-fork' requires the optional dashboard plugin bundle; 'enhanced' is
   // granted whenever the core enhanced-chat endpoints are present — which
-  // vanilla claude-agent (≥0.10) satisfies. The label 'enhanced-fork' is
+  // vanilla hermes-agent (≥0.10) satisfies. The label 'enhanced-fork' is
   // legacy copy from the 2025-era fork and does NOT imply an actual fork is
   // required. We keep the value for backwards compatibility with UI code.
   if (capabilities.dashboard.available && capabilities.chatCompletions) {

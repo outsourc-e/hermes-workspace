@@ -101,7 +101,7 @@ import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
-// Activity store removed — not used in Claude Workspace
+// Activity store removed — not used in Hermes Workspace
 const _noopSetActivity = (_s: string) => {}
 
 type ChatScreenProps = {
@@ -240,7 +240,7 @@ function exportConversationTranscript(payload: {
     .join('\n\n')
     .trim()
 
-  const content = `# Claude Conversation Export\n\nSession: ${payload.sessionLabel}\nExported: ${new Date().toISOString()}\n\n${body || '_No messages in this conversation._'}\n`
+  const content = `# Hermes Conversation Export\n\nSession: ${payload.sessionLabel}\nExported: ${new Date().toISOString()}\n\n${body || '_No messages in this conversation._'}\n`
   const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -1501,7 +1501,7 @@ export function ChatScreen({
           }
         : statusQuery.data && !statusQuery.data.ok
           ? {
-              message: statusQuery.data.error || 'Claude unavailable',
+              message: statusQuery.data.error || 'Hermes Agent unavailable',
               status: statusQuery.data.status,
             }
           : null
@@ -1544,7 +1544,7 @@ export function ChatScreen({
   // Memory, etc.), the component re-mounts. If a response finished while we
   // were away, the initial refetch may hit stale data. A delayed re-refetch
   // ensures we pick up responses that were persisted shortly after the first
-  // fetch. See: https://github.com/outsourc-e/claude-workspace/issues/43
+  // fetch. See: https://github.com/outsourc-e/hermes-workspace/issues/43
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void historyQuery.refetch()
@@ -1628,7 +1628,7 @@ export function ChatScreen({
       : historyError
         ? `Failed to load history. ${historyError}`
         : statusError
-          ? `Claude unavailable. ${statusError.message}`
+          ? `Hermes Agent unavailable. ${statusError.message}`
           : null
     if (message) setError(message)
   }, [
@@ -2054,7 +2054,7 @@ export function ChatScreen({
 
   useEffect(() => {
     if (false) {
-      // Server connection checks removed — Claude uses direct API
+      // Server connection checks removed — Hermes Agent uses direct API
       hasSeenDisconnectRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return

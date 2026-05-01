@@ -9,7 +9,7 @@ describe('listProfiles', () => {
   let tempHome: string
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-workspace-profiles-'))
+    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-profiles-'))
     vi.spyOn(os, 'homedir').mockReturnValue(tempHome)
   })
 

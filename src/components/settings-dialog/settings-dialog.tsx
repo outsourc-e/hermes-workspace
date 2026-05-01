@@ -238,7 +238,7 @@ const PROVIDER_CARDS: Array<{
   { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
 ]
 
-function ClaudeContent() {
+function HermesContent() {
   const configAvailable = useFeatureAvailable('config')
   const [activeProvider, setActiveProvider] = useState('')
   const [activeModel, setActiveModel] = useState('')
@@ -489,7 +489,7 @@ function ClaudeContent() {
         if (!disc || !disc.needsRestart) return null
         return (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-            ⚠️ Gateway restart needed to use {disc.name}. Run <code className="rounded bg-black/30 px-1">claude gateway restart</code> in your terminal.
+            ⚠️ Gateway restart needed to use {disc.name}. Run <code className="rounded bg-black/30 px-1">hermes gateway restart</code> in your terminal.
           </div>
         )
       })()}
@@ -674,7 +674,7 @@ function ClaudeContent() {
               '—'}
           </span>
           <span style={mutedStyle}>Config</span>
-          <span className="font-mono font-medium">~/.claude/config.yaml</span>
+          <span className="font-mono font-medium">~/.hermes/config.yaml</span>
         </div>
       </div>
     </div>
@@ -890,7 +890,7 @@ function AppearanceContent() {
       <div className={SETTINGS_CARD_CLASS}>
         <Row
           label="System metrics footer"
-          description="Show a persistent footer with CPU, RAM, disk, and Claude status."
+          description="Show a persistent footer with CPU, RAM, disk, and Hermes Agent status."
         >
           <Switch
             checked={settings.showSystemMetricsFooter}
@@ -901,7 +901,7 @@ function AppearanceContent() {
           />
         </Row>
 
-        {/* Mobile chat nav removed — not relevant for Claude */}
+        {/* Mobile chat nav removed — not relevant for Hermes */}
       </div>
     </div>
   )
@@ -1124,7 +1124,7 @@ function _LoaderContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const styles: Array<{ value: LoaderStyle; label: string }> = [
     { value: 'dots', label: 'Dots' },
-    { value: 'braille-claude', label: 'Claude' },
+    { value: 'braille-claude', label: 'Hermes' },
     { value: 'braille-orbit', label: 'Orbit' },
     { value: 'braille-breathe', label: 'Breathe' },
     { value: 'braille-pulse', label: 'Pulse' },
@@ -1281,7 +1281,7 @@ function ChatContent() {
           />
         </Row>
       </div>
-      {/* Loading animation removed — not relevant for Claude */}
+      {/* Loading animation removed — not relevant for Hermes */}
     </div>
   )
 }
@@ -1367,10 +1367,10 @@ function _AdvancedContent() {
     <div className="space-y-4">
       <SectionHeader
         title="Advanced"
-        description="Claude endpoint and connectivity."
+        description="Hermes Agent endpoint and connectivity."
       />
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Claude URL" description="Used for API requests from Studio">
+        <Row label="Hermes Agent URL" description="Used for API requests from Studio">
           <div className="w-full max-w-sm">
             <Input
               type="url"
@@ -1378,7 +1378,7 @@ function _AdvancedContent() {
               value={settings.claudeUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
-              aria-label="Claude URL"
+              aria-label="Hermes Agent URL"
               aria-invalid={!!urlError}
               aria-describedby={urlError ? urlErrorId : undefined}
             />
@@ -1931,7 +1931,7 @@ function LanguageContent() {
 // ── Main Dialog ─────────────────────────────────────────────────────────
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
-  claude: ClaudeContent,
+  claude: HermesContent,
   agent: AgentBehaviorContent,
   routing: SmartRoutingContent,
   voice: VoiceContent,

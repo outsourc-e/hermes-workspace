@@ -321,7 +321,7 @@ export function UsageDetailsModal({
         <div>
           <DialogTitle>Usage Overview</DialogTitle>
           <DialogDescription>
-            Live usage from your Claude session and connected providers.
+            Live usage from your Hermes session and connected providers.
           </DialogDescription>
         </div>
         <DialogClose className="text-primary-700">Close</DialogClose>
@@ -493,7 +493,7 @@ export function UsageDetailsModal({
                     chatting.
                   </div>
                   <div className="mt-1 text-xs text-primary-500">
-                    Open Settings -{'>'} Providers to connect Claude CLI or add
+                    Open Settings -{'>'} Providers to connect Hermes CLI or add
                     an API key.
                   </div>
                 </div>

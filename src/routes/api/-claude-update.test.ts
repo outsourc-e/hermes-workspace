@@ -3,16 +3,16 @@ import { createRemoteStatus, remoteUrlMatchesExpectedRepo } from './claude-updat
 
 describe('claude update repo gating', () => {
   it('matches Claude workspace repo aliases', () => {
-    expect(remoteUrlMatchesExpectedRepo('https://github.com/example/claude-workspace.git', ['claude-workspace'])).toBe(true)
-    expect(remoteUrlMatchesExpectedRepo('git@github.com:outsourc-e/claude-workspace.git', ['outsourc-e/claude-workspace'])).toBe(true)
+    expect(remoteUrlMatchesExpectedRepo('https://github.com/example/hermes-workspace.git', ['hermes-workspace'])).toBe(true)
+    expect(remoteUrlMatchesExpectedRepo('git@github.com:outsourc-e/hermes-workspace.git', ['outsourc-e/hermes-workspace'])).toBe(true)
   })
 
   it('blocks update availability for wrong remote repos even when heads differ', () => {
     const status = createRemoteStatus({
       name: 'origin',
-      label: 'Claude Workspace',
-      expectedRepo: 'claude-workspace',
-      aliases: ['claude-workspace'],
+      label: 'Hermes Workspace',
+      expectedRepo: 'hermes-workspace',
+      aliases: ['hermes-workspace'],
       url: 'https://github.com/example/not-workspace.git',
       currentHead: 'local',
       remoteHead: 'remote',
@@ -20,16 +20,16 @@ describe('claude update repo gating', () => {
 
     expect(status.repoMatches).toBe(false)
     expect(status.updateAvailable).toBe(false)
-    expect(status.error).toContain('expected claude-workspace')
+    expect(status.error).toContain('expected hermes-workspace')
   })
 
   it('allows update availability only for the expected repo with a newer remote head', () => {
     const status = createRemoteStatus({
       name: 'upstream',
-      label: 'Claude Agent',
-      expectedRepo: 'claude-agent',
-      aliases: ['claude-agent'],
-      url: 'https://github.com/NousResearch/claude-agent.git',
+      label: 'Hermes Agent',
+      expectedRepo: 'hermes-agent',
+      aliases: ['hermes-agent'],
+      url: 'https://github.com/NousResearch/hermes-agent.git',
       currentHead: 'local',
       remoteHead: 'remote',
     })

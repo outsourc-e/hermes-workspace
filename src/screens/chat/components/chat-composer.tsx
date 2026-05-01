@@ -138,7 +138,7 @@ type ModelSwitchNotice = {
 
 // Models are fetched through the workspace API proxy (/api/models, /api/claude-proxy)
 // to support Docker and reverse-proxy deployments where the browser cannot reach
-// the Claude gateway directly.
+// the Hermes Agent gateway directly.
 
 function readModelText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -215,7 +215,7 @@ async function fetchModels(): Promise<{
       const provider =
         readModelText(record.provider) ||
         readModelText(record.owned_by) ||
-        (id.includes('/') ? id.split('/')[0] : 'claude-agent')
+        (id.includes('/') ? id.split('/')[0] : 'hermes-agent')
 
       return {
         ...record,
@@ -258,7 +258,7 @@ async function fetchModelsForProvider(
     `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(normalizedProvider)}`,
   )
   if (!response.ok) {
-    throw new Error(`Claude models request failed (${response.status})`)
+    throw new Error(`Hermes models request failed (${response.status})`)
   }
 
   const payload = (await response.json()) as ClaudeAvailableModelsResponse
@@ -301,7 +301,7 @@ async function switchModel(
   // Switching to a cloud model — clear any local override
   setLocalModelOverride('')
 
-  // Write the model change to ~/.claude/config.yaml via the webapi
+  // Write the model change to ~/.hermes/config.yaml via the webapi
   const patch: Record<string, string> = { model: modelId }
   if (modelProvider) patch.provider = modelProvider
 
@@ -318,7 +318,7 @@ async function switchModel(
   return {
     ok: true,
     resolved: {
-      modelProvider: modelProvider || 'claude-agent',
+      modelProvider: modelProvider || 'hermes-agent',
       model: modelId,
     },
   }
@@ -946,9 +946,9 @@ function ChatComposerComponent({
 
   const currentModel = currentModelQuery.data ?? ''
 
-  // Auto-switch to claude-agent model on mount (Claude Workspace always uses Claude)
-  // Removed: auto-switch to claude-agent. The workspace respects the
-  // model/provider configured in ~/.claude/config.yaml. Users switch
+  // Auto-switch to hermes-agent model on mount (Hermes Workspace uses Hermes Agent)
+  // Removed: auto-switch to hermes-agent. The workspace respects the
+  // model/provider configured in ~/.hermes/config.yaml. Users switch
   // via the model selector or Settings page.
 
   // When model switches to Claude 4.6 and thinking is 'off', auto-upgrade to 'adaptive'
@@ -2201,7 +2201,7 @@ function ChatComposerComponent({
                                   No models available
                                 </p>
                                 <p className="text-xs">
-                                  Check your Claude provider configuration.
+                                  Check your Hermes provider configuration.
                                 </p>
                               </div>
                             )
@@ -2427,7 +2427,7 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 )}
-                {/* Token counter — bottom bar, mirrors Claude style, triggers at ~25 tokens */}
+                {/* Token counter — bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
                 {value.length >= 100 && (
                   <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
                     ~{Math.ceil(value.length / 4)} tokens

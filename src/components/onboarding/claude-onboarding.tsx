@@ -240,7 +240,7 @@ export function ClaudeOnboarding() {
         setBackendStatus('ready')
         setBackendMessage(
           data.capabilities.sessions
-            ? 'Backend connected. Core chat works, and Claude gateway enhancements are available.'
+            ? 'Backend connected. Core chat works, and Hermes Agent gateway enhancements are available.'
             : 'Backend connected. Core chat is ready.',
         )
         return
@@ -530,7 +530,7 @@ export function ClaudeOnboarding() {
               />
               <h2 className="text-xl font-bold">Welcome to Hermes Workspace</h2>
               <p className="text-sm" style={mutedStyle}>
-                Works with any OpenAI-compatible backend. Claude gateway APIs
+                Works with any OpenAI-compatible backend. Hermes Agent gateway APIs
                 unlock sessions, memory, skills, and other extras automatically.
               </p>
               <button
@@ -601,7 +601,7 @@ export function ClaudeOnboarding() {
                     <p className="mt-2" style={mutedStyle}>
                       Use any backend that exposes{' '}
                       <code>/v1/chat/completions</code>. If you point Hermes Agent
-                      Workspace at a Claude gateway, enhanced features unlock
+                      Workspace at a Hermes Agent gateway, enhanced features unlock
                       automatically.
                     </p>
                     <div
@@ -614,7 +614,7 @@ export function ClaudeOnboarding() {
                       className="mt-2 rounded-lg px-3 py-2 font-mono text-[11px]"
                       style={{ background: 'rgba(0,0,0,0.2)' }}
                     >
-                      claude --gateway
+                      hermes --gateway
                     </div>
                   </div>
                 </div>
@@ -657,7 +657,7 @@ export function ClaudeOnboarding() {
                 <p style={mutedStyle}>Backend mode</p>
                 <p className="mt-1">
                   {backendInfo?.capabilities?.sessions
-                    ? 'Claude gateway detected'
+                    ? 'Hermes Agent gateway detected'
                     : 'Portable OpenAI-compatible backend'}
                 </p>
                 {configuredModel ? (
@@ -978,7 +978,7 @@ export function ClaudeOnboarding() {
               <div className="text-4xl">🧪</div>
               <h2 className="text-lg font-bold">Test Chat</h2>
               <p className="text-sm" style={mutedStyle}>
-                Verify that core chat works first. Enhanced Claude features are
+                Verify that core chat works first. Enhanced Hermes Agent features are
                 optional and appear automatically when supported.
               </p>
 
@@ -1098,8 +1098,8 @@ export function ClaudeOnboarding() {
               <p className="text-sm" style={mutedStyle}>
                 Core chat is set up.{' '}
                 {enhancedFeatures.length > 0
-                  ? 'This backend also exposes Claude gateway enhancements.'
-                  : 'If you later connect a Claude gateway, enhanced features unlock automatically.'}
+                  ? 'This backend also exposes Hermes Agent gateway enhancements.'
+                  : 'If you later connect a Hermes Agent gateway, enhanced features unlock automatically.'}
               </p>
               <div
                 className="grid grid-cols-3 gap-2 text-xs"

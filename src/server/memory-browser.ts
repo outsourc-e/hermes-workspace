@@ -24,10 +24,10 @@ function isBrowserMemoryPath(relativePath: string): boolean {
 }
 
 function normalizeWorkspaceRoot(): string {
-  // Honor CLAUDE_HOME when set (e.g. ~/.claude-vanilla for running alongside prod).
-  // Fall back to ~/.claude for the default install location.
-  const envHome = process.env.CLAUDE_HOME?.trim()
-  const resolved = envHome ? path.resolve(envHome) : path.resolve(path.join(os.homedir(), '.claude'))
+  // Honor HERMES_HOME when set (e.g. ~/.hermes-vanilla for running alongside prod).
+  // Fall back to ~/.hermes for the default install location.
+  const envHome = (process.env.HERMES_HOME || process.env.CLAUDE_HOME)?.trim()
+  const resolved = envHome ? path.resolve(envHome) : path.resolve(path.join(os.homedir(), '.hermes'))
   return resolved
 }
 

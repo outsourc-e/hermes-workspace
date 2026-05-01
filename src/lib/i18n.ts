@@ -184,7 +184,7 @@ export const LOCALE_LABELS: Record<LocaleId, string> = {
   ar: 'العربية',
 }
 
-const STORAGE_KEY = 'claude-workspace-locale'
+const STORAGE_KEY = 'hermes-workspace-locale'
 
 export function getLocale(): LocaleId {
   if (typeof window === 'undefined') return 'en'

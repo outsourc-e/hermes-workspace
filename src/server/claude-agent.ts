@@ -20,12 +20,12 @@ export type StartClaudeAgentResult =
     }
 
 /**
- * Read ~/.claude/.env and return key=value pairs as an object.
+ * Read ~/.hermes/.env and return key=value pairs as an object.
  * Silently returns {} if the file doesn't exist or can't be parsed.
  */
 function readClaudeEnv(): Record<string, string> {
   const envPath = join(
-    process.env.CLAUDE_HOME ?? join(homedir(), '.claude'),
+    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
     '.env',
   )
   try {
@@ -64,10 +64,10 @@ export function resolveClaudeAgentDir(
 
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'claude-agent'),          // sibling (old README)
-    resolve(workspaceRoot, '..', 'claude-agent'),    // one level up
-    resolve(homedir(), '.claude', 'claude-agent'),   // Nous installer default
-    resolve(homedir(), 'claude-agent'),              // ~/claude-agent
+    resolve(workspaceRoot, 'hermes-agent'),          // sibling (old README)
+    resolve(workspaceRoot, '..', 'hermes-agent'),    // one level up
+    resolve(homedir(), '.hermes', 'hermes-agent'),   // Nous installer default
+    resolve(homedir(), 'hermes-agent'),              // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
@@ -128,7 +128,7 @@ export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
       const claudeBin = resolveClaudeBinary()
       const agentDir = resolveClaudeAgentDir()
 
-      // Prefer the `claude gateway run` binary path (the Nous installer's
+      // Prefer the `hermes gateway run` binary path (the Nous installer's
       // canonical entrypoint). Fall back to launching uvicorn against the
       // source tree if we only have a directory.
       let command: string
@@ -155,7 +155,7 @@ export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
         return {
           ok: false,
           error:
-            "claude-agent not found. Run the installer: curl -fsSL https://claude-workspace.com/install.sh | bash",
+            "hermes-agent not found. Run the installer: curl -fsSL https://hermes-workspace.com/install.sh | bash",
         }
       }
 

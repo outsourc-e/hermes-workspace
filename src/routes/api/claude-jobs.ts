@@ -1,5 +1,5 @@
 /**
- * Jobs API proxy — forwards to Claude FastAPI /api/jobs
+ * Jobs API proxy — forwards to Hermes Agent FastAPI /api/jobs
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'

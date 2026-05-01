@@ -2,13 +2,13 @@
 
 Date: 2026-04-28
 Status: Stage 1 implementation spec
-Canonical repo: `/Users/aurora/claude-workspace`
+Canonical repo: `/Users/aurora/hermes-workspace`
 
 ## Goal
 
 Swarm2 workers need continuity across tasks, compaction, restarts, and multi-session missions.
 
-Today each worker has a Claude profile, a `state.db`, a `runtime.json`, and a tmux session. That gives process identity, but not a structured memory layer. The memory framework adds deterministic file-backed memory that can later be augmented with Claude-native semantic memory providers.
+Today each worker has a Hermes profile, a `state.db`, a `runtime.json`, and a tmux session. That gives process identity, but not a structured memory layer. The memory framework adds deterministic file-backed memory that can later be augmented with Claude-native semantic memory providers.
 
 The first version must be simple, inspectable, and durable:
 
@@ -24,37 +24,37 @@ These paths are locked. Do not substitute Claude/OpenClaw profile paths for work
 
 | Layer | Canonical path |
 | --- | --- |
-| Worker profile root | `~/.claude/profiles/<workerId>/` |
-| Worker chat DB | `~/.claude/profiles/<workerId>/state.db` |
-| Worker runtime state | `~/.claude/profiles/<workerId>/runtime.json` |
-| Worker memory root | `~/.claude/profiles/<workerId>/memory/` |
-| Worker curated memory | `~/.claude/profiles/<workerId>/memory/MEMORY.md` |
-| Worker identity file | `~/.claude/profiles/<workerId>/memory/IDENTITY.md` |
-| Worker role/persona file | `~/.claude/profiles/<workerId>/memory/SOUL.md` |
-| Worker mission memory | `~/.claude/profiles/<workerId>/memory/missions/<missionId>/` |
-| Worker mission summary | `~/.claude/profiles/<workerId>/memory/missions/<missionId>/SUMMARY.md` |
-| Worker mission event log | `~/.claude/profiles/<workerId>/memory/missions/<missionId>/events.jsonl` |
-| Worker episodic logs | `~/.claude/profiles/<workerId>/memory/episodes/YYYY-MM-DD.md` |
-| Worker handoffs | `~/.claude/profiles/<workerId>/memory/handoffs/<missionId>.md` |
-| Swarm control-plane runtime | `/Users/aurora/claude-workspace/.runtime/` |
-| Swarm mission ledger | `/Users/aurora/claude-workspace/.runtime/swarm-missions.json` |
-| Swarm roster/source of truth | `/Users/aurora/claude-workspace/swarm.yaml` |
+| Worker profile root | `~/.hermes/profiles/<workerId>/` |
+| Worker chat DB | `~/.hermes/profiles/<workerId>/state.db` |
+| Worker runtime state | `~/.hermes/profiles/<workerId>/runtime.json` |
+| Worker memory root | `~/.hermes/profiles/<workerId>/memory/` |
+| Worker curated memory | `~/.hermes/profiles/<workerId>/memory/MEMORY.md` |
+| Worker identity file | `~/.hermes/profiles/<workerId>/memory/IDENTITY.md` |
+| Worker role/persona file | `~/.hermes/profiles/<workerId>/memory/SOUL.md` |
+| Worker mission memory | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/` |
+| Worker mission summary | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/SUMMARY.md` |
+| Worker mission event log | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/events.jsonl` |
+| Worker episodic logs | `~/.hermes/profiles/<workerId>/memory/episodes/YYYY-MM-DD.md` |
+| Worker handoffs | `~/.hermes/profiles/<workerId>/memory/handoffs/<missionId>.md` |
+| Swarm control-plane runtime | `/Users/aurora/hermes-workspace/.runtime/` |
+| Swarm mission ledger | `/Users/aurora/hermes-workspace/.runtime/swarm-missions.json` |
+| Swarm roster/source of truth | `/Users/aurora/hermes-workspace/swarm.yaml` |
 | Shared swarm handoffs | `/Users/aurora/.openclaw/workspace/memory/handoffs/swarm/` |
 | Shared swarm archive/memory | `/Users/aurora/.openclaw/workspace/memory/swarm/` |
 | Completed mission archive | `/Users/aurora/.openclaw/workspace/memory/swarm/missions/<missionId>/` |
 
 Explicitly wrong paths:
 
-- `~/.claude/profiles/...`
+- `~/.hermes/profiles/...`
 - `~/.openclaw/profiles/...`
-- `/Users/aurora/claude-workspace/.runtime/...`
+- `/Users/aurora/hermes-workspace/.runtime/...`
 - `/Users/aurora/.ocplatform/workspace/...` for new canonical writes
 
 ## Ownership model
 
 ### Worker-local memory
 
-Stored under `~/.claude/profiles/<workerId>/memory/`.
+Stored under `~/.hermes/profiles/<workerId>/memory/`.
 
 Owned by the worker. Used for:
 
@@ -66,7 +66,7 @@ Owned by the worker. Used for:
 
 ### Swarm control-plane state
 
-Stored under `/Users/aurora/claude-workspace/.runtime/`.
+Stored under `/Users/aurora/hermes-workspace/.runtime/`.
 
 Owned by Swarm2 server code. Used for:
 
@@ -156,7 +156,7 @@ Purpose:
 
 Path:
 
-`~/.claude/profiles/<workerId>/memory/missions/<missionId>/`
+`~/.hermes/profiles/<workerId>/memory/missions/<missionId>/`
 
 Files:
 
@@ -222,7 +222,7 @@ Event types:
 
 Path:
 
-`~/.claude/profiles/<workerId>/memory/episodes/YYYY-MM-DD.md`
+`~/.hermes/profiles/<workerId>/memory/episodes/YYYY-MM-DD.md`
 
 Purpose:
 
@@ -248,7 +248,7 @@ Template:
 
 Worker-local handoff:
 
-`~/.claude/profiles/<workerId>/memory/handoffs/<missionId>.md`
+`~/.hermes/profiles/<workerId>/memory/handoffs/<missionId>.md`
 
 Shared latest handoff:
 
@@ -383,8 +383,8 @@ Already defines Claude-native profile/tmux invariants.
 
 Memory framework must respect:
 
-- `~/.claude/profiles/<workerId>` profile root,
-- `CLAUDE_HOME` per worker,
+- `~/.hermes/profiles/<workerId>` profile root,
+- `HERMES_HOME` per worker,
 - tmux sessions named `swarm-<workerId>`,
 - wrappers in `~/.local/bin/swarmN`.
 
@@ -424,7 +424,7 @@ Future `swarm-memory` skill should instruct workers to load:
 Resume prompt should be compact:
 
 ```text
-Load your worker memory from ~/.claude/profiles/<workerId>/memory/.
+Load your worker memory from ~/.hermes/profiles/<workerId>/memory/.
 If runtime.json has currentMissionId, read that mission SUMMARY.md and latest handoff.
 Continue from the handoff's Next exact action.
 ```

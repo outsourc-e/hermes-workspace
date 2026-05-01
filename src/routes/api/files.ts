@@ -20,10 +20,10 @@ import {
 const execFileAsync = promisify(execFile)
 
 const WORKSPACE_ROOT = (
+  process.env.HERMES_WORKSPACE_DIR ||
   process.env.CLAUDE_WORKSPACE_DIR ||
-  process.env.CLAUDE_WORKSPACE_DIR ||
-  process.env.CLAUDE_HOME ||
-  path.join(os.homedir(), '.claude')
+  process.env.HERMES_HOME || process.env.CLAUDE_HOME ||
+  path.join(os.homedir(), '.hermes')
 ).trim()
 
 type FileEntry = {

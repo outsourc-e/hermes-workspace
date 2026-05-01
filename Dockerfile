@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.6
-# Project Workspace — production Docker image
-# Publishes to ghcr.io/outsourc-e/claude-workspace
+# Hermes Workspace — production Docker image
+# Publishes to ghcr.io/outsourc-e/hermes-workspace
 #
 # Build locally:
-#   docker build -t claude-workspace .
+#   docker build -t hermes-workspace .
 # Run:
-#   docker run -p 3000:3000 -e CLAUDE_API_URL=http://host.docker.internal:8642 claude-workspace
+#   docker run -p 3000:3000 -e HERMES_API_URL=http://host.docker.internal:8642 hermes-workspace
 # Or pull pre-built:
-#   docker pull ghcr.io/outsourc-e/claude-workspace:latest
+#   docker pull ghcr.io/outsourc-e/hermes-workspace:latest
 #
 # ─── build stage ─────────────────────────────────────────────────────────
 FROM node:22-slim AS build
@@ -46,7 +46,7 @@ USER workspace
 ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0 \
-    CLAUDE_API_URL=http://claude-agent:8642
+    HERMES_API_URL=http://hermes-agent:8642
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

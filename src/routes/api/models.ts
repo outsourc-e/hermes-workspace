@@ -16,7 +16,7 @@ import {
   ensureProviderInConfig,
 } from '../../server/local-provider-discovery'
 
-const CLAUDE_HOME = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const MODELS_PATH = path.join(CLAUDE_HOME, 'models.json')
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
 
@@ -125,14 +125,14 @@ function readClaudeDefaultModel(): ModelEntry | null {
 }
 
 /**
- * Fallback: fetch models from the claude-agent /v1/models endpoint.
+ * Fallback: fetch models from the hermes-agent /v1/models endpoint.
  */
 async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
   const headers: Record<string, string> = {}
   if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
   const response = await fetch(`${CLAUDE_API}/v1/models`, { headers })
   if (!response.ok)
-    throw new Error(`Claude models request failed (${response.status})`)
+    throw new Error(`Hermes models request failed (${response.status})`)
   const payload = asRecord(await response.json())
   const rawModels = Array.isArray(payload.data)
     ? payload.data
@@ -154,7 +154,7 @@ export const Route = createFileRoute('/api/models')({
         await ensureGatewayProbed()
 
         try {
-          // Primary: read user-configured models from ~/.claude/models.json
+          // Primary: read user-configured models from ~/.hermes/models.json
           let models = readClaudeModelsJson()
           let source = 'models.json'
 
@@ -167,10 +167,10 @@ export const Route = createFileRoute('/api/models')({
             }
           }
 
-          // Fallback: if no models.json, fetch from claude-agent /v1/models
+          // Fallback: if no models.json, fetch from hermes-agent /v1/models
           if (models.length === 0 && getGatewayCapabilities().models) {
             models = await fetchClaudeModels()
-            source = 'claude-agent'
+            source = 'hermes-agent'
           }
 
           // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)

@@ -286,7 +286,7 @@ export function setActiveProfile(name: string): void {
   fs.writeFileSync(getActiveProfilePath(), `${normalized}\n`, 'utf-8')
   // eslint-disable-next-line no-console
   console.warn(
-    `[profiles] Active profile set to "${normalized}". Restart the Claude gateway for this profile switch to take effect.`,
+    `[profiles] Active profile set to "${normalized}". Restart the Hermes Agent gateway for this profile switch to take effect.`,
   )
 }
 
@@ -304,7 +304,7 @@ export function createProfile(
   // Clone config from source profile if specified
   if (options?.cloneFrom) {
     const sourceName = validateProfileIdentifier(options.cloneFrom)
-    // The 'default' profile lives at ~/.claude, not ~/.claude/profiles/default
+    // The 'default' profile lives at ~/.hermes, not ~/.hermes/profiles/default
     const sourceRoot =
       sourceName === 'default'
         ? getClaudeRoot()

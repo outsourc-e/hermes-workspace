@@ -1,6 +1,6 @@
 # Swarm Mode Quickstart
 
-This quickstart gets a local Project Workspace checkout running, confirms profile auto-detection, starts a tmux-backed Project Agent, dispatches a first task, and shows where to review the result.
+This quickstart gets a local Hermes Workspace checkout running, confirms profile auto-detection, starts a tmux-backed Hermes Agent, dispatches a first task, and shows where to review the result.
 
 ## 0. Prerequisites
 
@@ -10,15 +10,15 @@ You need:
 - pnpm
 - git
 - tmux for persistent TUI-backed workers
-- a configured Project Agent profile under `~/.claude/profiles/`
+- a configured Hermes Agent profile under `~/.hermes/profiles/`
 
 The workspace can still render without tmux, but tmux is what makes the worker sessions feel alive instead of one-shot and disposable.
 
 ## 1. Clone the workspace
 
 ```bash
-git clone https://github.com/outsourc-e/claude-workspace.git
-cd claude-workspace
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
 ```
 
 ## 2. Install dependencies
@@ -43,16 +43,16 @@ Some release lanes run on `:3002`; trust the terminal output if it differs.
 
 ## 4. First-run profile detection
 
-On first run, the workspace looks for Project Agent profiles in:
+On first run, the workspace looks for Hermes Agent profiles in:
 
 ```text
-~/.claude/profiles/
+~/.hermes/profiles/
 ```
 
 Each worker profile can include:
 
 ```text
-~/.claude/profiles/<workerId>/
+~/.hermes/profiles/<workerId>/
   MEMORY.md
   SOUL.md
   USER.md
@@ -81,7 +81,7 @@ Replace `swarm7` with the worker ID you want. The convention is:
 
 ```text
 tmux session: swarm-<workerId>
-profile:      ~/.claude/profiles/<workerId>
+profile:      ~/.hermes/profiles/<workerId>
 ```
 
 After the script starts the session, open Swarm Mode and use Runtime view to attach to the TUI.
@@ -210,7 +210,7 @@ Pick the closest role first, then tune. Avoid starting from Custom unless you ar
 Before trusting a new worker:
 
 - It appears in the roster.
-- Its profile exists under `~/.claude/profiles/<workerId>/`.
+- Its profile exists under `~/.hermes/profiles/<workerId>/`.
 - Runtime view can attach to tmux or open a shell/log stream.
 - `/api/swarm-dispatch` can deliver a task.
 - The worker returns the canonical checkpoint format.

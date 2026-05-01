@@ -62,7 +62,7 @@ type TerminalSessionResponse = {
   sessionId?: string
 }
 
-const DEFAULT_TERMINAL_CWD = '~/.claude'
+const DEFAULT_TERMINAL_CWD = '~/.hermes'
 const TERMINAL_BG = '#0d0d0d'
 
 function toDebugAnalysis(value: unknown): DebugAnalysis | null {

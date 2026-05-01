@@ -2,17 +2,17 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Claude Workspace, please report it responsibly.
+If you discover a security vulnerability in Hermes Workspace, please report it responsibly.
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, report via [GitHub Security Advisories](https://github.com/outsourc-e/claude-workspace/security/advisories) or DM [@ericousodev on X](https://x.com/ericousodev).
+Instead, report via [GitHub Security Advisories](https://github.com/outsourc-e/hermes-workspace/security/advisories) or DM [@ericousodev on X](https://x.com/ericousodev).
 
 We will acknowledge your report within 48 hours and aim to provide a fix within 7 days for critical issues.
 
 ## Scope
 
-- Claude Workspace web application code
+- Hermes Workspace web application code
 - API routes and Claude communication
 - Authentication and session management
 - Client-side data handling and rendering
@@ -21,7 +21,7 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 
 ## Out of Scope
 
-- Claude Agent itself (report to the Claude Agent project)
+- Hermes Agent itself (report to the Hermes Agent project)
 - Third-party dependencies (report to the respective maintainer)
 - Social engineering attacks
 

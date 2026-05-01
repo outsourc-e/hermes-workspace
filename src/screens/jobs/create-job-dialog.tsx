@@ -149,7 +149,7 @@ export function CreateJobDialog({
                   className="mt-1 text-sm"
                   style={{ color: 'var(--theme-muted)' }}
                 >
-                  Build a scheduled Claude task with preset timing options.
+                  Build a scheduled Hermes task with preset timing options.
                 </p>
               </div>
               <button
@@ -263,7 +263,7 @@ export function CreateJobDialog({
                       prompt: event.target.value,
                     }))
                   }
-                  placeholder="What should Claude do?"
+                  placeholder="What should Hermes Agent do?"
                   required
                   rows={5}
                   className="w-full resize-none rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
@@ -326,7 +326,7 @@ export function CreateJobDialog({
                           onClick={() => toggleDelivery(option)}
                           title={
                             needsGateway
-                              ? `Requires Claude Gateway with ${option} configured`
+                              ? `Requires Hermes Agent gateway with ${option} configured`
                               : undefined
                           }
                           className="rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors"

@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 PORT="${PORT:-3002}"
-PID_FILE="$ROOT/.runtime/claude-workspace.pid"
+PID_FILE="$ROOT/.runtime/hermes-workspace.pid"
 
 stop_pid() {
   local pid="$1"
@@ -33,4 +33,4 @@ for pid in $(lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true); do
   stop_pid "$pid"
 done
 
-echo "[stable] stopped Claude Workspace on port $PORT"
+echo "[stable] stopped Hermes Workspace on port $PORT"

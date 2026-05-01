@@ -1,4 +1,4 @@
-# Project Workspace + Agent — Development Overlay
+# Hermes Workspace + Agent — Development Overlay
 #
 # Builds both services from source instead of pulling pre-built images.
 # Use when modifying the workspace or the bundled agent Dockerfile.
@@ -12,12 +12,12 @@
 # upstream image name.
 
 services:
-  claude-agent:
+  hermes-agent:
     build:
       context: .
       dockerfile: docker/agent/Dockerfile
 
-  claude-workspace:
+  hermes-workspace:
     build:
       context: .
       dockerfile: docker/workspace/Dockerfile

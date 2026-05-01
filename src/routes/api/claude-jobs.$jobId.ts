@@ -1,5 +1,5 @@
 /**
- * Jobs API proxy — forwards individual job operations to Claude FastAPI
+ * Jobs API proxy — forwards individual job operations to Hermes Agent FastAPI
  * or the upstream dashboard cron API.
  */
 import { createFileRoute } from '@tanstack/react-router'

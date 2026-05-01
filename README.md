@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="./public/claude-avatar.webp" alt="Claude Workspace" width="80" style="border-radius: 16px" />
+<img src="./public/claude-avatar.webp" alt="Hermes Workspace" width="80" style="border-radius: 16px" />
 
-# Claude Workspace
+# Hermes Workspace
 
 **Your AI agent's command center — chat, files, memory, skills, and terminal in one place.**
 
@@ -13,9 +13,9 @@
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
-> **v2 — zero-fork. Clone, don't fork.** Runs on vanilla [`NousResearch/claude-agent`](https://github.com/NousResearch/claude-agent) installed via Nous's own installer. No patches, no drift.
+> **v2 — zero-fork. Clone, don't fork.** Runs on vanilla [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) installed via Nous's own installer. No patches, no drift.
 
-![Claude Workspace](./docs/screenshots/splash.png)
+![Hermes Workspace](./docs/screenshots/splash.png)
 
 </div>
 
@@ -23,7 +23,7 @@
 
 ## Swarm Mode
 
-Project Agent Swarm turns the workspace into a live control plane: unlimited Project Agents, 1 orchestrator, 0 humans manually dispatching.
+Hermes Agent Swarm turns the workspace into a live control plane: unlimited Hermes Agents, 1 orchestrator, 0 humans manually dispatching.
 Persistent tmux workers keep context across tasks, rotate safely, and report proof-bearing checkpoints.
 Role-based dispatch routes builders, reviewers, docs, research, ops, triage, QA, and lab lanes without turning Eric into the task router.
 A byte-verified review gate protects release branches before PRs ship.
@@ -32,7 +32,7 @@ Autonomous PR/issue lanes, lab experiments, and the repair playbook keep the mac
 Start here: [docs/swarm/](./docs/swarm/)
 
 - **Orchestrator Chat** — ask the control plane for one task, a decomposed mission, or a full broadcast.
-- **Multi-Agent Control Plane** — see persistent Project Agents, roles, state, runtime, and routing wires in one surface.
+- **Multi-Agent Control Plane** — see persistent Hermes Agents, roles, state, runtime, and routing wires in one surface.
 - **Kanban TaskBoard** — plan backlog, ready, running, review, blocked, and done lanes without leaving the workspace.
 - **Reports + Inbox** — review checkpoints, blockers, handoffs, and ready-for-human decisions.
 - **TUI View built in** — attach to tmux-backed workers or fall back to a live shell/log stream.
@@ -41,7 +41,7 @@ Start here: [docs/swarm/](./docs/swarm/)
 
 ## ✨ Features
 
-- 🤖 **Claude Agent Integration** — Direct gateway connection with real-time SSE streaming
+- 🤖 **Hermes Agent Integration** — Direct gateway connection with real-time SSE streaming
 - 🎨 **8-Theme System** — Official, Classic, Slate, Mono — each with light and dark variants
 - 🔒 **Security Hardened** — Auth middleware on all API routes, CSP headers, exec approval prompts
 - 📱 **Mobile-First PWA** — Full feature parity on any device via Tailscale
@@ -75,37 +75,37 @@ Start here: [docs/swarm/](./docs/swarm/)
 ### One-line install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/outsourc-e/claude-workspace/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
 ```
 
-This installs `claude-agent` from PyPI, clones this repo, sets up `.env`, and installs deps. Then:
+This installs `hermes-agent` from PyPI, clones this repo, sets up `.env`, and installs deps. Then:
 
 ```bash
-claude gateway run                  # terminal 1
-cd ~/claude-workspace && pnpm dev   # terminal 2
+hermes gateway run                  # terminal 1
+cd ~/hermes-workspace && pnpm dev   # terminal 2
 ```
 
 Open http://localhost:3000. That's it.
 
 ---
 
-### Already running `claude-agent`? Attach the workspace to it
+### Already running `hermes-agent`? Attach the workspace to it
 
-If you already have `claude-agent` installed (via Nous's installer, `pip install`, systemd, Docker, etc.) and it's serving the gateway at `http://<host>:8642`, you don't need to reinstall anything — just point the workspace at it.
+If you already have `hermes-agent` installed (via Nous's installer, `pip install`, systemd, Docker, etc.) and it's serving the gateway at `http://<host>:8642`, you don't need to reinstall anything — just point the workspace at it.
 
 ```bash
-git clone https://github.com/outsourc-e/claude-workspace.git
-cd claude-workspace
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
 pnpm install
 cp .env.example .env
 
-# Point at your existing Claude services.
-echo 'CLAUDE_API_URL=http://127.0.0.1:8642' >> .env
+# Point at your existing Hermes Agent services.
+echo 'HERMES_API_URL=http://127.0.0.1:8642' >> .env
 # Zero-fork installs also need the separate dashboard API for config/sessions/skills/jobs.
-echo 'CLAUDE_DASHBOARD_URL=http://127.0.0.1:9119' >> .env
+echo 'HERMES_DASHBOARD_URL=http://127.0.0.1:9119' >> .env
 
 # If your gateway was started with API_SERVER_KEY (auth enabled), set the same value:
-# echo 'CLAUDE_API_TOKEN=***' >> .env
+# echo 'HERMES_API_TOKEN=***' >> .env
 
 pnpm dev                            # http://localhost:3000 (override with PORT=4000 pnpm dev)
 ```
@@ -113,9 +113,9 @@ pnpm dev                            # http://localhost:3000 (override with PORT=
 Requirements on the agent side:
 
 - Gateway bound to an address the workspace can reach (typically `API_SERVER_HOST=0.0.0.0` + the port exposed).
-- `API_SERVER_ENABLED=true` in `~/.claude/.env` (or the agent's env) so the gateway serves core APIs on `:8642`.
-- `claude dashboard` running (default `http://127.0.0.1:9119`) for zero-fork installs. The dashboard provides config, sessions, skills, and jobs APIs.
-- If `API_SERVER_KEY` is set, the workspace must pass the same value via `CLAUDE_API_TOKEN` — otherwise leave both unset.
+- `API_SERVER_ENABLED=true` in `~/.hermes/.env` (or the agent's env) so the gateway serves core APIs on `:8642`.
+- `hermes dashboard` running (default `http://127.0.0.1:9119`) for zero-fork installs. The dashboard provides config, sessions, skills, and jobs APIs.
+- If `API_SERVER_KEY` is set, the workspace must pass the same value via `HERMES_API_TOKEN` — otherwise leave both unset.
 
 Verify both services before opening the workspace:
 
@@ -126,71 +126,71 @@ Then start the workspace and complete onboarding — it should detect the gatewa
 
 #### Running on a remote host (Tailscale / VPN / LAN)
 
-If the workspace and its browser live on different machines — e.g. the workspace runs on a Pi/Mac/home server and you access it from your phone over Tailscale — point `CLAUDE_API_URL` at the **reachable** backend address, not `127.0.0.1`:
+If the workspace and its browser live on different machines — e.g. the workspace runs on a Pi/Mac/home server and you access it from your phone over Tailscale — point `HERMES_API_URL` at the **reachable** backend address, not `127.0.0.1`:
 
 ```bash
 # On the server running the workspace + gateway:
-echo 'CLAUDE_API_URL=http://100.x.y.z:8642' >> .env
-echo 'CLAUDE_DASHBOARD_URL=http://100.x.y.z:9119' >> .env
+echo 'HERMES_API_URL=http://100.x.y.z:8642' >> .env
+echo 'HERMES_DASHBOARD_URL=http://100.x.y.z:9119' >> .env
 
 # Also tell the gateway to listen on all interfaces so Tailscale peers can reach it.
-# In ~/.claude/.env (or wherever the gateway reads config):
-echo 'API_SERVER_HOST=0.0.0.0' >> ~/.claude/.env
+# In ~/.hermes/.env (or wherever the gateway reads config):
+echo 'API_SERVER_HOST=0.0.0.0' >> ~/.hermes/.env
 ```
 
-Then restart the gateway, dashboard, and workspace. Hit the workspace from the remote device and the connection probe will use the Tailscale IP instead of localhost. Both `CLAUDE_API_URL` and `CLAUDE_DASHBOARD_URL` must be set to Tailscale/LAN-reachable URLs — setting only one will leave the other probing `127.0.0.1` and failing.
+Then restart the gateway, dashboard, and workspace. Hit the workspace from the remote device and the connection probe will use the Tailscale IP instead of localhost. Both `HERMES_API_URL` and `HERMES_DASHBOARD_URL` must be set to Tailscale/LAN-reachable URLs — setting only one will leave the other probing `127.0.0.1` and failing.
 
-**If you've already started the workspace**, you can update both URLs from `Settings → Connection` without restarting. The values are persisted to `~/.claude/workspace-overrides.json` and take effect immediately (gateway capabilities are reprobed on save). Editing `.env` still works for pre-start config and for CI/containers.
+**If you've already started the workspace**, you can update both URLs from `Settings → Connection` without restarting. The values are persisted to `~/.hermes/workspace-overrides.json` and take effect immediately (gateway capabilities are reprobed on save). Editing `.env` still works for pre-start config and for CI/containers.
 
 ---
 
 ### Manual install
 
-Claude Workspace works with any OpenAI-compatible backend. If your backend also exposes Claude gateway APIs, enhanced features like sessions, memory, skills, and jobs unlock automatically.
+Hermes Workspace works with any OpenAI-compatible backend. If your backend also exposes Hermes Agent gateway APIs, enhanced features like sessions, memory, skills, and jobs unlock automatically.
 
 #### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
 - **An OpenAI-compatible backend** — local, self-hosted, or remote
-- **Optional:** Python 3.11+ if you want to run a Claude gateway locally
+- **Optional:** Python 3.11+ if you want to run a Hermes Agent gateway locally
 
 #### Step 1: Start your backend
 
-Point Claude Workspace at any backend that supports:
+Point Hermes Workspace at any backend that supports:
 
 - `POST /v1/chat/completions`
 - `GET /v1/models` recommended
 
-Example Claude gateway setup (from scratch):
+Example Hermes Agent gateway setup (from scratch):
 
 ```bash
-# Install claude-agent via Nous's official installer
-curl -fsSL https://raw.githubusercontent.com/NousResearch/claude-agent/main/scripts/install.sh | bash
+# Install hermes-agent via Nous's official installer
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 
 # Configure a provider + start the gateway
 claude setup
-claude gateway run
+hermes gateway run
 ```
 
 Our one-liner installer (below) does both steps automatically. If you're using another OpenAI-compatible server, just note its base URL.
 
-### Step 2: Install & Run Claude Workspace
+### Step 2: Install & Run Hermes Workspace
 
 ```bash
 # In a new terminal
-git clone https://github.com/outsourc-e/claude-workspace.git
-cd claude-workspace
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
 pnpm install
 cp .env.example .env
-printf '\nCLAUDE_API_URL=http://127.0.0.1:8642\n' >> .env
+printf '\nHERMES_API_URL=http://127.0.0.1:8642\n' >> .env
 pnpm dev                   # Starts on http://localhost:3000
 ```
 
-> **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Claude APIs, advanced features appear automatically.
+> **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes Agent APIs, advanced features appear automatically.
 
 ### Agent W Managed Companion
 
-When Claude Workspace is running behind Agent W's local HTTPS proxy, the
+When Hermes Workspace is running behind Agent W's local HTTPS proxy, the
 managed companion entrypoint is:
 
 ```bash
@@ -214,9 +214,9 @@ when `dist` drifts under a live server process.
 
 ```env
 # OpenAI-compatible backend URL
-CLAUDE_API_URL=http://127.0.0.1:8642
+HERMES_API_URL=http://127.0.0.1:8642
 
-# Optional: provider keys the Claude gateway can read at runtime.
+# Optional: provider keys the Hermes Agent gateway can read at runtime.
 # You only need the key(s) for whichever provider(s) you actually use.
 # ANTHROPIC_API_KEY=sk-ant-...         # Claude
 # OPENAI_API_KEY=sk-...                # GPT / o-series
@@ -232,20 +232,20 @@ CLAUDE_API_URL=http://127.0.0.1:8642
 
 ## 🧠 Local Models (Ollama, Atomic Chat, LM Studio, vLLM)
 
-Claude Workspace supports two modes with local models:
+Hermes Workspace supports two modes with local models:
 
 ### Portable Mode (Easiest)
 
-Point the workspace directly at your local server — no Claude gateway needed.
+Point the workspace directly at your local server — no Hermes Agent gateway needed.
 
 ### Atomic Chat
 
 ```bash
 # Start workspace pointed at Atomic Chat
-CLAUDE_API_URL=http://127.0.0.1:1337/v1 pnpm dev
+HERMES_API_URL=http://127.0.0.1:1337/v1 pnpm dev
 ```
 
-Download [Atomic Chat](https://atomic.chat/), launch the desktop app, and make sure a model is loaded before starting Claude Workspace.
+Download [Atomic Chat](https://atomic.chat/), launch the desktop app, and make sure a model is loaded before starting Hermes Workspace.
 
 ### Ollama
 
@@ -254,16 +254,16 @@ Download [Atomic Chat](https://atomic.chat/), launch the desktop app, and make s
 OLLAMA_ORIGINS=* ollama serve
 
 # Start workspace pointed at Ollama
-CLAUDE_API_URL=http://127.0.0.1:11434 pnpm dev
+HERMES_API_URL=http://127.0.0.1:11434 pnpm dev
 ```
 
 Chat works immediately. Sessions, memory, and skills show "Not Available" — that's expected in portable mode.
 
 ### Enhanced Mode (Full Features)
 
-Route through the Claude gateway for sessions, memory, skills, jobs, and tools.
+Route through the Hermes Agent gateway for sessions, memory, skills, jobs, and tools.
 
-Here are two explicit `~/.claude/config.yaml` examples for the local providers we support directly in the workspace:
+Here are two explicit `~/.hermes/config.yaml` examples for the local providers we support directly in the workspace:
 
 **Atomic Chat**
 
@@ -291,7 +291,7 @@ custom_providers:
 
 You can adapt the same shape for other OpenAI-compatible local runners, but `Atomic Chat` and `Ollama` are the two built-in local paths documented in the workspace UI.
 
-**2. Enable the API server in `~/.claude/.env`:**
+**2. Enable the API server in `~/.hermes/.env`:**
 
 ```env
 API_SERVER_ENABLED=true
@@ -300,14 +300,14 @@ API_SERVER_ENABLED=true
 **3. Start the gateway, dashboard, and workspace:**
 
 ```bash
-claude gateway run          # Starts core APIs on :8642
-claude dashboard            # Starts dashboard APIs on :9119
-CLAUDE_API_URL=http://127.0.0.1:8642 \
-CLAUDE_DASHBOARD_URL=http://127.0.0.1:9119 \
+hermes gateway run          # Starts core APIs on :8642
+hermes dashboard            # Starts dashboard APIs on :9119
+HERMES_API_URL=http://127.0.0.1:8642 \
+HERMES_DASHBOARD_URL=http://127.0.0.1:9119 \
 pnpm dev
 ```
 
-For authenticated gateways, also set `CLAUDE_API_TOKEN` in the workspace environment to the same value as `API_SERVER_KEY`.
+For authenticated gateways, also set `HERMES_API_TOKEN` in the workspace environment to the same value as `API_SERVER_KEY`.
 
 All workspace features unlock automatically once both services are reachable — sessions persist, memory saves across chats, skills are available, and the dashboard shows real usage data.
 
@@ -317,9 +317,9 @@ All workspace features unlock automatically once both services are reachable —
 
 ## 🐳 Docker Quickstart
 
-[![Open in GitHub Codespaces](https://img.shields.io/badge/GitHub%20Codespaces-Open-181717?logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=outsourc-e/claude-workspace)
+[![Open in GitHub Codespaces](https://img.shields.io/badge/GitHub%20Codespaces-Open-181717?logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=outsourc-e/hermes-workspace)
 
-The Docker setup runs both the **Claude Agent gateway** and **Claude Workspace** together.
+The Docker setup runs both the **Hermes Agent gateway** and **Hermes Workspace** together.
 
 ### Prerequisites
 
@@ -330,12 +330,12 @@ The Docker setup runs both the **Claude Agent gateway** and **Claude Workspace**
 ### Step 1: Configure Environment
 
 ```bash
-git clone https://github.com/outsourc-e/claude-workspace.git
-cd claude-workspace
+git clone https://github.com/outsourc-e/hermes-workspace.git
+cd hermes-workspace
 cp .env.example .env
 ```
 
-Edit `.env` and add **at least one** LLM provider key — whichever provider you want claude-agent to use:
+Edit `.env` and add **at least one** LLM provider key — whichever provider you want hermes-agent to use:
 
 ```env
 # Pick one (or more). You do NOT need all of these.
@@ -345,9 +345,9 @@ ANTHROPIC_API_KEY=sk-ant-...           # Claude
 # GOOGLE_API_KEY=AIza...               # Gemini
 ```
 
-Using **Ollama, LM Studio, or another local server**? No key needed — just point claude-agent at your local endpoint via the onboarding flow.
+Using **Ollama, LM Studio, or another local server**? No key needed — just point hermes-agent at your local endpoint via the onboarding flow.
 
-> **Heads up:** `claude-agent` needs to be able to reach _some_ model. If you don't configure any provider (API key or local server), chat will fail on first message.
+> **Heads up:** `hermes-agent` needs to be able to reach _some_ model. If you don't configure any provider (API key or local server), chat will fail on first message.
 
 ### Step 2: Start the Services
 
@@ -357,8 +357,8 @@ docker compose up
 
 This pulls two pre-built images and starts them:
 
-- **claude-agent** → `nousresearch/claude-agent:latest` on port **8642**
-- **claude-workspace** → `ghcr.io/outsourc-e/claude-workspace:latest` on port **3000**
+- **hermes-agent** → `nousresearch/hermes-agent:latest` on port **8642**
+- **hermes-workspace** → `ghcr.io/outsourc-e/hermes-workspace:latest` on port **3000**
 
 No local build. First run takes a minute to pull; subsequent starts are instant.
 Agent state (config, sessions, skills, memory, credentials) persists in the
@@ -368,7 +368,7 @@ Agent state (config, sessions, skills, memory, credentials) persists in the
 
 Open `http://localhost:3000` and complete the onboarding.
 
-> **Verify:** Check the Docker logs for `[gateway] Connected to Claude` — this confirms the workspace successfully connected to the agent.
+> **Verify:** Check the Docker logs for `[gateway] Connected to Hermes Agent` — this confirms the workspace successfully connected to the agent.
 
 ### Building from source
 
@@ -383,11 +383,11 @@ that take priority over `image:`, so both services compile from local source.
 
 ### Using a Pre-Built Image (Coolify / Easypanel / Dokploy / Unraid)
 
-Deploying Project Workspace to a PaaS or home-lab stack? Pull the image
+Deploying Hermes Workspace to a PaaS or home-lab stack? Pull the image
 directly from GitHub Container Registry:
 
 ```
-ghcr.io/outsourc-e/claude-workspace:latest
+ghcr.io/outsourc-e/hermes-workspace:latest
 ```
 
 Available tags:
@@ -401,52 +401,52 @@ Available tags:
 Minimal Coolify / Easypanel config:
 
 ```yaml
-service: claude-workspace
-image: ghcr.io/outsourc-e/claude-workspace:latest
+service: hermes-workspace
+image: ghcr.io/outsourc-e/hermes-workspace:latest
 port: 3000
 env:
-  CLAUDE_API_URL: http://claude-agent:8642   # point at your gateway
-  CLAUDE_API_TOKEN: ${API_SERVER_KEY}        # if gateway auth is enabled
+  HERMES_API_URL: http://hermes-agent:8642   # point at your gateway
+  HERMES_API_TOKEN: ${API_SERVER_KEY}        # if gateway auth is enabled
 ```
 
 The image is built for `linux/amd64` and `linux/arm64`. Pair it with either
-a `nousresearch/claude-agent:latest` container (what our `docker-compose.yml`
+a `nousresearch/hermes-agent:latest` container (what our `docker-compose.yml`
 does by default) or an existing gateway on another host.
 
 ---
 
 ## 📱 Install as App (Recommended)
 
-Claude Workspace is a **Progressive Web App (PWA)** — install it for the full native app experience with no browser chrome, keyboard shortcuts, and offline support.
+Hermes Workspace is a **Progressive Web App (PWA)** — install it for the full native app experience with no browser chrome, keyboard shortcuts, and offline support.
 
 ### 🖥️ Desktop (macOS / Windows / Linux)
 
-1. Open Claude Workspace in **Chrome** or **Edge** at `http://localhost:3000`
+1. Open Hermes Workspace in **Chrome** or **Edge** at `http://localhost:3000`
 2. Click the **install icon** (⊕) in the address bar
-3. Click **Install** — Claude Workspace opens as a standalone desktop app
+3. Click **Install** — Hermes Workspace opens as a standalone desktop app
 4. Pin to Dock / Taskbar for quick access
 
 > **macOS users:** After installing, you can also add it to your Launchpad.
 
 ### 📱 iPhone / iPad (iOS Safari)
 
-1. Open Claude Workspace in **Safari** on your iPhone
+1. Open Hermes Workspace in **Safari** on your iPhone
 2. Tap the **Share** button (□↑)
 3. Scroll down and tap **"Add to Home Screen"**
-4. Tap **Add** — the Claude Workspace icon appears on your home screen
+4. Tap **Add** — the Hermes Workspace icon appears on your home screen
 5. Launch from home screen for the full native app experience
 
 ### 🤖 Android
 
-1. Open Claude Workspace in **Chrome** on your Android device
+1. Open Hermes Workspace in **Chrome** on your Android device
 2. Tap the **three-dot menu** (⋮) → **"Add to Home screen"**
-3. Tap **Add** — Claude Workspace is now a native-feeling app on your device
+3. Tap **Add** — Hermes Workspace is now a native-feeling app on your device
 
 ---
 
 ## 📡 Mobile Access via Tailscale
 
-Access Claude Workspace from anywhere on your devices — no port forwarding, no VPN complexity.
+Access Hermes Workspace from anywhere on your devices — no port forwarding, no VPN complexity.
 
 ### Setup
 
@@ -463,7 +463,7 @@ Access Claude Workspace from anywhere on your devices — no port forwarding, no
    # Example output: 100.x.x.x
    ```
 
-4. **Open Claude Workspace on your phone:**
+4. **Open Hermes Workspace on your phone:**
 
    ```
    http://100.x.x.x:3000
@@ -486,7 +486,7 @@ The desktop app will offer:
 - Auto-launch on startup
 - Deep OS integration (macOS menu bar, Windows taskbar)
 
-**In the meantime:** Install Claude Workspace as a PWA (see above) for a near-native desktop experience — it works great.
+**In the meantime:** Install Hermes Workspace as a PWA (see above) for a near-native desktop experience — it works great.
 
 ---
 
@@ -494,7 +494,7 @@ The desktop app will offer:
 
 > **Status: Coming Soon**
 
-A fully managed cloud version of Claude Workspace is in development:
+A fully managed cloud version of Hermes Workspace is in development:
 
 - **One-click deploy** — No self-hosting required
 - **Multi-device sync** — Access your agents from any device
@@ -566,7 +566,7 @@ Features pending cloud infrastructure:
 - `CLAUDE_PASSWORD` — required whenever `HOST ≠ 127.0.0.1`
 - `COOKIE_SECURE=1` — force the `Secure` cookie flag when terminating HTTPS at a proxy
 - `TRUST_PROXY=1` — trust `x-forwarded-for` / `x-real-ip` (only set behind a sanitizing reverse proxy)
-- `CLAUDE_DASHBOARD_TOKEN` — explicit bearer for dashboard API (preferred over the legacy HTML-scrape fallback)
+- `HERMES_DASHBOARD_TOKEN` — explicit bearer for dashboard API (preferred over the legacy HTML-scrape fallback)
 - `CLAUDE_ALLOW_INSECURE_REMOTE=1` — bypass the fail-closed guard (not recommended)
 
 See `.env.example` for the full list. Credits to [@kiosvantra](https://github.com/kiosvantra) for the security audit surfacing #121–#125.
@@ -581,31 +581,31 @@ The workspace auto-detects your gateway's capabilities on startup. Check your te
 
 ```
 [gateway] http://127.0.0.1:8642 available: health, models; missing: sessions, skills, memory, config, jobs
-[gateway] Missing Claude APIs detected. Update claude-agent to the latest version.
+[gateway] Missing Hermes Agent APIs detected. Update hermes-agent to the latest version.
 ```
 
-**Fix:** Upgrade to the latest stock `claude-agent`, which ships the extended endpoints:
+**Fix:** Upgrade to the latest stock `hermes-agent`, which ships the extended endpoints:
 
 ```bash
-cd ~/claude-agent && git pull && uv pip install -e .
-claude gateway run
+cd ~/hermes-agent && git pull && uv pip install -e .
+hermes gateway run
 ```
 
-(If you installed via a different path, follow your Nous installer's upgrade instructions.) If you were on the old `outsourc-e/claude-agent` fork, it's no longer needed as of v2 — uninstall it and use upstream instead.
+(If you installed via a different path, follow your Nous installer's upgrade instructions.) If you were on the old `outsourc-e/hermes-agent` fork, it's no longer needed as of v2 — uninstall it and use upstream instead.
 
 ### "Connection refused" or workspace hangs on load
 
-Your Claude gateway isn't running. Start it:
+Your Hermes Agent gateway isn't running. Start it:
 
 ```bash
-claude gateway run
+hermes gateway run
 ```
 
 First-time run? Do `claude setup` first to pick a provider and model.
 
 ### Ollama: chat returns empty or model shows "Offline"
 
-Make sure your `~/.claude/config.yaml` has the `custom_providers` section and `API_SERVER_ENABLED=true` in `~/.claude/.env`. See [Local Models](#-local-models-ollama-lm-studio-vllm) above.
+Make sure your `~/.hermes/config.yaml` has the `custom_providers` section and `API_SERVER_ENABLED=true` in `~/.hermes/.env`. See [Local Models](#-local-models-ollama-lm-studio-vllm) above.
 
 Also ensure Ollama is running with CORS enabled:
 
@@ -617,13 +617,13 @@ Use `http://127.0.0.1:11434/v1` (not `localhost`) as the base URL.
 
 Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
-### "Using upstream NousResearch/claude-agent"
+### "Using upstream NousResearch/hermes-agent"
 
-v2+ runs on vanilla `claude-agent` with full feature parity. The upstream ships all extended endpoints (sessions, memory, skills, config). **No fork required, ever.**
+v2+ runs on vanilla `hermes-agent` with full feature parity. The upstream ships all extended endpoints (sessions, memory, skills, config). **No fork required, ever.**
 
-If you're pinned to an older `claude-agent` version and missing endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
+If you're pinned to an older `hermes-agent` version and missing endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
 
-### Docker: "Unauthorized" or "Connection refused" to claude-agent
+### Docker: "Unauthorized" or "Connection refused" to hermes-agent
 
 If using Docker Compose and getting auth errors:
 
@@ -634,12 +634,12 @@ If using Docker Compose and getting auth errors:
    # Should show one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, GOOGLE_API_KEY, ...
    ```
 
-   (claude-agent reads whichever key matches the provider configured in `~/.claude/config.yaml`.)
+   (hermes-agent reads whichever key matches the provider configured in `~/.hermes/config.yaml`.)
 
 2. **View the agent container logs:**
 
    ```bash
-   docker compose logs claude-agent
+   docker compose logs hermes-agent
    ```
 
    Look for startup errors or missing API key warnings.
@@ -660,19 +660,19 @@ If using Docker Compose and getting auth errors:
 
 5. **Check workspace logs for gateway status:**
    ```bash
-   docker compose logs claude-workspace
+   docker compose logs hermes-workspace
    ```
-   Look for: `[gateway] http://claude-agent:8642 mode=...` — if it shows `mode=disconnected`, the agent isn't running correctly.
+   Look for: `[gateway] http://hermes-agent:8642 mode=...` — if it shows `mode=disconnected`, the agent isn't running correctly.
 
 ### Docker: "claude webapi command not found"
 
 The `claude webapi` command referenced in older docs doesn't exist. The correct command is:
 
 ```bash
-claude --gateway   # Starts the FastAPI gateway server
+hermes --gateway   # Starts the FastAPI gateway server
 ```
 
-The Docker setup uses `claude --gateway` automatically — no action needed if using `docker compose up`.
+The Docker setup uses `hermes --gateway` automatically — no action needed if using `docker compose up`.
 
 ---
 
@@ -696,11 +696,11 @@ The Docker setup uses `claude --gateway` automatically — no action needed if u
 
 ## ⭐ Star History
 
-## [![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/claude-workspace&type=date&logscale&legend=top-left)](https://www.star-history.com/#outsourc-e/claude-workspace&type=date&logscale&legend=top-left)
+## [![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)](https://www.star-history.com/#outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)
 
 ## 💛 Support the Project
 
-Claude Workspace is free and open source. If it's saving you time and powering your workflow, consider supporting development:
+Hermes Workspace is free and open source. If it's saving you time and powering your workflow, consider supporting development:
 
 **ETH:** `0xB332D4C60f6FBd94913e3Fd40d77e3FE901FAe22`
 
@@ -727,5 +727,5 @@ MIT — see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-  <sub>Built with ⚡ by <a href="https://github.com/outsourc-e">@outsourc-e</a> and the Claude Workspace community</sub>
+  <sub>Built with ⚡ by <a href="https://github.com/outsourc-e">@outsourc-e</a> and the Hermes Workspace community</sub>
 </div>

@@ -319,7 +319,7 @@ function SettingsRoute() {
           {/* -- Connection ------------------ */}
           {activeSection === 'connection' && <ConnectionSection />}
 
-          {/* ── Claude Agent ──────────────────────────────────── */}
+          {/* ── Hermes Agent ──────────────────────────────────── */}
           {activeSection === 'claude' && (
             <ClaudeConfigSection activeView="claude" />
           )}
@@ -844,7 +844,7 @@ function ChatDisplaySection() {
           />
         </SettingsRow>
       </SettingsSection>
-      {/* Mobile Navigation removed — not relevant for Claude Workspace */}
+      {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>
   )
 }
@@ -933,7 +933,7 @@ function _LoaderStyleSection() {
   )
 }
 
-// ── Claude Agent Configuration ──────────────────────────────────────
+// ── Hermes Agent Configuration ──────────────────────────────────────
 
 type ClaudeProvider = {
   id: string
@@ -952,7 +952,7 @@ type ClaudeConfigData = {
   claudeHome: string
 }
 
-const CLAUDE_API = process.env.CLAUDE_API_URL || 'http://127.0.0.1:8642'
+const CLAUDE_API = process.env.HERMES_API_URL || process.env.CLAUDE_API_URL || 'http://127.0.0.1:8642'
 
 type AvailableModelsResponse = {
   provider: string
@@ -1099,7 +1099,7 @@ function ClaudeConfigSection({
     return (
       <SettingsSection
         title="Hermes Agent"
-        description="Could not load Claude configuration."
+        description="Could not load Hermes configuration."
         icon={Settings02Icon}
       >
         <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
@@ -1241,7 +1241,7 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="API Keys"
-        description="Manage provider API keys stored in ~/.claude/.env"
+        description="Manage provider API keys stored in ~/.hermes/.env"
         icon={CloudIcon}
       >
         {data.providers
@@ -1963,7 +1963,7 @@ function ConnectionSection() {
 
   const sourceLabel: Record<ConnectionSettings['source'], string> = {
     override: 'Runtime override (saved in workspace-overrides.json)',
-    env: 'From CLAUDE_API_URL / CLAUDE_DASHBOARD_URL env vars',
+    env: 'From HERMES_API_URL / HERMES_DASHBOARD_URL env vars',
     default: 'Defaults — no override set',
   }
 

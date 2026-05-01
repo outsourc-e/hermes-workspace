@@ -9,7 +9,7 @@ export type ProviderInfo = {
   configExample: string
 }
 
-export const CLAUDE_CONFIG_PATH = '~/.claude/config.yaml'
+export const CLAUDE_CONFIG_PATH = '~/.hermes/config.yaml'
 
 export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {

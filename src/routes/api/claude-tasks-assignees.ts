@@ -1,6 +1,6 @@
 /**
  * Proxy endpoint — returns available task assignees.
- * Reads agent profiles from the Claude gateway and combines with the
+ * Reads agent profiles from the Hermes Agent gateway and combines with the
  * configured human reviewer name (tasks.human_reviewer in config.yaml).
  * Falls back to profile directory listing if the gateway doesn't have
  * a /api/tasks/assignees endpoint.
@@ -13,7 +13,7 @@ import path from 'node:path'
 import os from 'node:os'
 import YAML from 'yaml'
 
-const CLAUDE_HOME = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
 const PROFILES_PATH = path.join(os.homedir(), '.claude', 'profiles')
 

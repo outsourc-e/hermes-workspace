@@ -789,7 +789,7 @@ export function DashboardScreen() {
         </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
-      {/* ── Header: Claude Logo + Quick Actions ── */}
+      {/* ── Header: Hermes Logo + Quick Actions ── */}
       <div className="flex flex-col items-center gap-3 py-3">
         <img
           src="/claude-avatar.webp"

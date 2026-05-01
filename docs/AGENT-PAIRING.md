@@ -1,6 +1,6 @@
 # Agent Pairing Guide — Workspace ↔ Claude Gateway
 
-> **Audience:** AI agents helping users set up Project Workspace.
+> **Audience:** AI agents helping users set up Hermes Workspace.
 > Run these steps in order. Each step has a verification command — don't
 > skip to the next until the check passes.
 
@@ -8,9 +8,9 @@
 
 ```
 ┌─────────────────┐       HTTP :8642        ┌──────────────────┐
-│  Claude Gateway  │◄──────────────────────►│ Project Workspace │
+│  Claude Gateway  │◄──────────────────────►│ Hermes Workspace │
 │  (Python, FastAPI)│  /health, /v1/chat,   │  (Node, Vite)     │
-│  claude gateway   │  /api/sessions, etc.  │  pnpm dev         │
+│  hermes gateway   │  /api/sessions, etc.  │  pnpm dev         │
 │  run              │                       │  port 3000        │
 └─────────────────┘                        └──────────────────┘
 ```
@@ -20,20 +20,20 @@ If `curl http://127.0.0.1:8642/health` returns JSON, they can pair.
 
 ---
 
-## Step 1 — Is claude-agent installed?
+## Step 1 — Is hermes-agent installed?
 
 ```bash
 claude --version
 ```
 
-**Pass:** prints `Project Agent vX.Y.Z`.
+**Pass:** prints `Hermes Agent vX.Y.Z`.
 **Fail:** `command not found`.
 
-### Fix (if claude-agent not installed)
+### Fix (if hermes-agent not installed)
 
 ```bash
 # Official Nous installer — works on macOS, Linux, WSL
-curl -fsSL https://raw.githubusercontent.com/NousResearch/claude-agent/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 ```
 
 After install, restart your shell or run:
@@ -103,17 +103,17 @@ correct for local Workspace.
 pgrep -af "claude.*gateway" || echo "NOT RUNNING"
 ```
 
-**Pass:** shows a `claude gateway run` (or similar) process.
+**Pass:** shows a `hermes gateway run` (or similar) process.
 **Fail:** nothing.
 
 ### Fix
 
 ```bash
 # Start in foreground (recommended for debugging — you see all output)
-claude gateway run
+hermes gateway run
 
 # OR if using systemd
-claude gateway install   # creates the service
+hermes gateway install   # creates the service
 systemctl --user start claude-gateway
 ```
 
@@ -135,7 +135,7 @@ lsof -iTCP:8642 -sTCP:LISTEN || echo "PORT NOT BOUND"
 curl -sf http://127.0.0.1:8642/health && echo "OK" || echo "NOT REACHABLE"
 ```
 
-**Pass:** port is bound AND `curl /health` returns `{"status": "ok", "platform": "claude-agent"}`.
+**Pass:** port is bound AND `curl /health` returns `{"status": "ok", "platform": "hermes-agent"}`.
 
 **Fail — gateway running but port not bound:** API server didn't start.
 Go back to Step 2 and verify the env vars have underscores.
@@ -153,22 +153,22 @@ ss -tlnp | grep 8642   # Linux
 ## Step 5 — Is Workspace pointed at the gateway?
 
 ```bash
-# In the claude-workspace directory
-cat .env | grep CLAUDE_API_URL
+# In the hermes-workspace directory
+cat .env | grep HERMES_API_URL
 ```
 
-**Pass:** `CLAUDE_API_URL=http://127.0.0.1:8642`
+**Pass:** `HERMES_API_URL=http://127.0.0.1:8642`
 
 **Fail or missing:**
 ```bash
-# In the claude-workspace directory
-echo 'CLAUDE_API_URL=http://127.0.0.1:8642' >> .env
+# In the hermes-workspace directory
+echo 'HERMES_API_URL=http://127.0.0.1:8642' >> .env
 ```
 
 If `.env` doesn't exist:
 ```bash
 cp .env.example .env
-# Then set CLAUDE_API_URL as above
+# Then set HERMES_API_URL as above
 ```
 
 ---
@@ -176,7 +176,7 @@ cp .env.example .env
 ## Step 6 — Start Workspace and verify pairing
 
 ```bash
-cd ~/claude-workspace   # or wherever it's installed
+cd ~/hermes-workspace   # or wherever it's installed
 pnpm dev
 ```
 
@@ -223,17 +223,17 @@ grep -q '^API_SERVER_ENABLED=' "$CLAUDE_ENV" 2>/dev/null && \
 sed -i.bak '/^APISERVERENABLED/d; /^APISERVERHOST/d' "$CLAUDE_ENV" 2>/dev/null || true
 
 # 4. Restart gateway
-claude gateway stop 2>/dev/null; sleep 2; claude gateway run &
+hermes gateway stop 2>/dev/null; sleep 2; hermes gateway run &
 sleep 8
 
 # 5. Verify
 curl -sf http://127.0.0.1:8642/health && echo "✅ Gateway API is up" || echo "❌ Gateway API not reachable"
 
 # 6. Set workspace env
-cd ~/claude-workspace 2>/dev/null || cd "$(find ~ -maxdepth 2 -name claude-workspace -type d | head -1)"
-grep -q '^CLAUDE_API_URL=' .env 2>/dev/null && \
-  sed -i.bak 's|^CLAUDE_API_URL=.*|CLAUDE_API_URL=http://127.0.0.1:8642|' .env || \
-  echo 'CLAUDE_API_URL=http://127.0.0.1:8642' >> .env
+cd ~/hermes-workspace 2>/dev/null || cd "$(find ~ -maxdepth 2 -name hermes-workspace -type d | head -1)"
+grep -q '^HERMES_API_URL=' .env 2>/dev/null && \
+  sed -i.bak 's|^HERMES_API_URL=.*|HERMES_API_URL=http://127.0.0.1:8642|' .env || \
+  echo 'HERMES_API_URL=http://127.0.0.1:8642' >> .env
 
 echo "✅ Done. Run: pnpm dev"
 ```
@@ -247,7 +247,7 @@ echo "✅ Done. Run: pnpm dev"
 - Python cold-start is slower on WSL due to filesystem I/O overhead.
   The gateway may take 10–15 seconds to bind port 8642.
 - If Workspace's health check times out before the gateway is ready,
-  start the gateway separately first (`claude gateway run`), wait for
+  start the gateway separately first (`hermes gateway run`), wait for
   the port to bind, then start Workspace in a second terminal.
 - Use `127.0.0.1`, not `localhost` — WSL2 sometimes resolves `localhost`
   to the Windows host instead of the WSL VM.
@@ -260,7 +260,7 @@ echo "✅ Done. Run: pnpm dev"
 
 ### Linux (native)
 
-- systemd users: `claude gateway install` creates a user service.
+- systemd users: `hermes gateway install` creates a user service.
   Check status with `systemctl --user status claude-gateway`.
 - If using a different `$HOME` for the systemd service (e.g. running as
   a different user), the `.env` file location changes. Use
@@ -275,11 +275,11 @@ Collect this diagnostic bundle and share it:
 ```bash
 echo "=== claude version ===" && claude --version 2>&1
 echo "=== claude env path ===" && claude config env-path 2>&1
-echo "=== claude env (redacted) ===" && grep -E "^(API_SERVER|CLAUDE_)" "$(claude config env-path 2>/dev/null || echo ~/.claude/.env)" 2>&1
+echo "=== claude env (redacted) ===" && grep -E "^(API_SERVER|CLAUDE_)" "$(claude config env-path 2>/dev/null || echo ~/.hermes/.env)" 2>&1
 echo "=== gateway process ===" && pgrep -af "claude.*gateway" 2>&1 || echo "not running"
 echo "=== port 8642 ===" && (ss -tlnp 2>/dev/null || lsof -iTCP:8642 -sTCP:LISTEN 2>/dev/null) | grep 8642 || echo "not bound"
 echo "=== health check ===" && curl -sf http://127.0.0.1:8642/health 2>&1 || echo "not reachable"
-echo "=== workspace .env ===" && grep CLAUDE ~/claude-workspace/.env 2>&1 || echo "no .env"
+echo "=== workspace .env ===" && grep CLAUDE ~/hermes-workspace/.env 2>&1 || echo "no .env"
 echo "=== OS ===" && uname -a
 echo "=== Node ===" && node --version
 echo "=== Python ===" && python3 --version 2>&1

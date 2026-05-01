@@ -1,5 +1,5 @@
 # Multi-Gateway Pool Architecture
-## Claude Workspace — Profile-Parallel Agent Execution
+## Hermes Workspace — Profile-Parallel Agent Execution
 
 ### Status: Design Document — PR Proposal
 
@@ -7,7 +7,7 @@
 
 ## 1. Problem Statement
 
-Claude Workspace currently operates as a **single-gateway, single-profile UI**. The gateway loads one `CLAUDE_HOME` at startup and all chat sessions, operations, and memory access flow through that one process.
+Hermes Workspace currently operates as a **single-gateway, single-profile UI**. The gateway loads one `HERMES_HOME` at startup and all chat sessions, operations, and memory access flow through that one process.
 
 For multi-profile users (the primary Claude use case), this means:
 - **No parallel agent execution**: Cannot brainstorm with Nous while Jules orchestrates Architect and Sentinel in Operations
@@ -23,11 +23,11 @@ For multi-profile users (the primary Claude use case), this means:
 
 ## 2. First-Principles Design
 
-**Core truth**: Each Claude profile is a **distinct cognitive agent** — different SOUL.md, different skills, different memory, different purpose. They are not "modes" of one agent. They are parallel agents.
+**Core truth**: Each Hermes profile is a **distinct cognitive agent** — different SOUL.md, different skills, different memory, different purpose. They are not "modes" of one agent. They are parallel agents.
 
 **Implication**: The workspace must be an **agent orchestrator**, not just a UI skin over one gateway.
 
-**Constraint**: Claude gateway is designed as a single-tenant process. It cannot dynamically reload profiles. Each profile needs its own gateway instance.
+**Constraint**: Hermes Agent gateway is designed as a single-tenant process. It cannot dynamically reload profiles. Each profile needs its own gateway instance.
 
 **Solution**: The workspace maintains a **gateway pool** — one gateway process per active profile, each on its own port, all health-monitored, all routable from the UI.
 
@@ -43,7 +43,7 @@ For multi-profile users (the primary Claude use case), this means:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Claude Workspace UI                      │
+│                     Hermes Workspace UI                      │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌───────────────┐  │
 │  │ Chat    │  │ Ops     │  │ Memory  │  │ Profile       │  │
 │  │ (Nous)  │  │ (Jules) │  │ (all)   │  │ Selector      │  │
@@ -90,7 +90,7 @@ function getGatewayPort(profileName: string, profiles: string[]): number {
 
 Profiles are sorted alphabetically to ensure stable port assignment. A persistence file (`gateway-pool.json`) remembers assignments across restarts.
 
-**Profile-count agnostic**: The pool manager discovers profiles dynamically from the filesystem (`~/.claude/profiles/*`). There is no hardcoded list, no maximum count, and no special-casing of specific profile names. A user with 2 profiles and a user with 50 profiles use the exact same code path.
+**Profile-count agnostic**: The pool manager discovers profiles dynamically from the filesystem (`~/.hermes/profiles/*`). There is no hardcoded list, no maximum count, and no special-casing of specific profile names. A user with 2 profiles and a user with 50 profiles use the exact same code path.
 
 ### 4.2 Gateway Lifecycle States
 
@@ -110,7 +110,7 @@ function spawnGateway(profileName: string, port: number): ChildProcess {
   const profilePath = path.join(getClaudeRoot(), 'profiles', profileName)
   const env = {
     ...process.env,
-    CLAUDE_HOME: profilePath,
+    HERMES_HOME: profilePath,
     CLAUDE_GATEWAY_PORT: String(port),
     CLAUDE_PROFILE_NAME: profileName,
   }
@@ -118,7 +118,7 @@ function spawnGateway(profileName: string, port: number): ChildProcess {
 }
 ```
 
-**Note**: The gateway must be spawned via `claude gateway`, not via the workspace's internal gateway.ts. The workspace becomes an orchestrator, not a gateway host.
+**Note**: The gateway must be spawned via `hermes gateway`, not via the workspace's internal gateway.ts. The workspace becomes an orchestrator, not a gateway host.
 
 ### 4.4 Health Monitor
 
@@ -176,7 +176,7 @@ export async function proxyToGateway(
 ### 5.3 Backward Compatibility
 
 When no profile is specified:
-- Default to `activeProfile` (from `~/.claude/active_profile` file)
+- Default to `activeProfile` (from `~/.hermes/active_profile` file)
 - If that file doesn't exist, default to first available profile
 - Single-profile users see **zero behavioral change**
 
@@ -186,7 +186,7 @@ When no profile is specified:
 
 ### 6.1 Session Storage
 
-Currently: All sessions in `~/.claude/sessions/` (or profile's sessions dir)
+Currently: All sessions in `~/.hermes/sessions/` (or profile's sessions dir)
 
 With multi-gateway: Each gateway manages its own sessions in its own profile directory. The workspace **aggregates** them for display but **routes** them per-profile.
 
@@ -236,7 +236,7 @@ SESSIONS
 A persistent pill/button in the top-left (next to sidebar toggle):
 
 ```
-[☰] [ nous ▼ ]              Claude Workspace
+[☰] [ nous ▼ ]              Hermes Workspace
 ```
 
 - Dropdown lists all profiles with status indicators
@@ -339,7 +339,7 @@ CLAUDE_GATEWAY_HEALTH_INTERVAL=30  # Health check seconds
 ## 11. Security & Privacy Considerations
 
 - Gateways bind to `127.0.0.1` only (already default)
-- No cross-profile memory leakage (each gateway has its own `CLAUDE_HOME`)
+- No cross-profile memory leakage (each gateway has its own `HERMES_HOME`)
 - Profile selector respects auth middleware
 - Admin-only: ability to spawn/stop gateways
 - **No secrets in code or PRs**: API keys, passwords, tokens, and PII must never appear in source code, test fixtures, log output, or PR descriptions. All sensitive configuration lives in profile-local `.env` files which are `.gitignore`d.
@@ -381,7 +381,7 @@ CLAUDE_GATEWAY_HEALTH_INTERVAL=30  # Health check seconds
 
 ## 15. Related Work
 
-- PR #118: Profile-aware config (merged) — provides `CLAUDE_HOME` resolution and profile listing
+- PR #118: Profile-aware config (merged) — provides `HERMES_HOME` resolution and profile listing
 - Issue #?: Multi-profile session management (to be created)
 - Issue #?: Gateway lifecycle hooks (to be created)
 
@@ -396,5 +396,5 @@ CLAUDE_GATEWAY_HEALTH_INTERVAL=30  # Health check seconds
 
 ---
 
-*Authored by Nous (Vivere Vitalis) for the Claude Workspace project.*
+*Authored by Nous (Vivere Vitalis) for the Hermes Workspace project.*
 *First-principles architecture: if each profile is a distinct agent, the workspace must be an agent orchestrator.*

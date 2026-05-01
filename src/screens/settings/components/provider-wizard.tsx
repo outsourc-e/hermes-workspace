@@ -80,7 +80,7 @@ function getAuthTypeMeta(authType: ProviderAuthType): AuthTypeMeta {
     return {
       title: 'CLI Token',
       description:
-        'Use your existing Claude CLI auth token (from Claude Code / claude.ai)',
+        'Use your existing Hermes CLI auth token (from Hermes Agent Code / claude.ai)',
     }
   }
 
@@ -277,7 +277,7 @@ export function ProviderWizard({
       setSaveState('saved')
       setVerifyState('checking')
       setVerificationMessage(
-        `${providerName} API key saved. Claude is restarting…`,
+        `${providerName} API key saved. Hermes Agent is restarting…`,
       )
       setStep('verify')
 
@@ -301,7 +301,7 @@ export function ProviderWizard({
         } else {
           setVerifyState('warning')
           setVerificationMessage(
-            `Claude restarted, but ${providerName} models haven't appeared yet. ` +
+            `Hermes Agent restarted, but ${providerName} models haven't appeared yet. ` +
               `Check your API key or wait a moment and refresh.`,
           )
         }
@@ -353,7 +353,7 @@ export function ProviderWizard({
                 </DialogTitle>
                 <DialogDescription className="text-pretty">
                   Add provider credentials safely. API keys stay local in your
-                  Claude config file and are never sent to Studio.
+                  Hermes config file and are never sent to Studio.
                 </DialogDescription>
               </div>
               <Button
@@ -572,7 +572,7 @@ export function ProviderWizard({
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
                             'Run "claude setup" in the terminal and select Google OAuth when prompted. ' +
-                              'A browser window will open for sign-in. Once complete, Claude will restart automatically.',
+                              'A browser window will open for sign-in. Once complete, Hermes Agent will restart automatically.',
                           )
                           setVerifyState('warning')
                           setStep('verify')
@@ -599,7 +599,7 @@ export function ProviderWizard({
                         <p className="text-xs text-primary-700 text-pretty">
                           No terminal access?{' '}
                           <a
-                            href="https://github.com/NousResearch/claude-agent"
+                            href="https://github.com/NousResearch/hermes-agent"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
@@ -614,8 +614,8 @@ export function ProviderWizard({
                 ) : selectedAuthType === 'cli-token' ? (
                   <>
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
-                      If you have Claude Code or the Claude CLI installed,
-                      Claude can use the same auth token. Run the configure
+                      If you have Claude Code or the Hermes CLI installed,
+                      Hermes Agent can use the same auth token. Run the configure
                       command to detect and import it automatically.
                     </p>
 
@@ -644,15 +644,15 @@ export function ProviderWizard({
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
                           Select <strong>Anthropic</strong> →{' '}
-                          <strong>Setup Token (Claude CLI)</strong>. It will
+                          <strong>Setup Token (Hermes CLI)</strong>. It will
                           detect your existing Claude credentials from{' '}
-                          <code className="font-mono">~/.claude/</code>.
+                          <code className="font-mono">~/.hermes/</code>.
                         </p>
                       </div>
 
                       <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2">
                         <p className="text-xs text-amber-800 text-pretty">
-                          <strong>Requires:</strong> Claude Code or Claude CLI
+                          <strong>Requires:</strong> Claude Code or Hermes CLI
                           must be installed and authenticated first. Run{' '}
                           <code className="font-mono">claude</code> in terminal
                           to verify.
@@ -663,7 +663,7 @@ export function ProviderWizard({
                         <p className="text-xs text-primary-700 text-pretty">
                           No terminal access?{' '}
                           <a
-                            href="https://github.com/NousResearch/claude-agent"
+                            href="https://github.com/NousResearch/hermes-agent"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
@@ -723,7 +723,7 @@ export function ProviderWizard({
                             strokeWidth={1.5}
                             className="inline mr-1"
                           />
-                          Key saved! Claude is restarting to apply changes.
+                          Key saved! Hermes Agent is restarting to apply changes.
                         </p>
                       ) : null}
                     </div>
@@ -856,7 +856,7 @@ export function ProviderWizard({
                     {verifyTitle}
                   </p>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
-                    {verificationMessage || 'Waiting for Claude to respond…'}
+                    {verificationMessage || 'Waiting for Hermes Agent to respond…'}
                   </p>
                 </div>
 

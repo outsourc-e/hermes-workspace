@@ -27,7 +27,7 @@ export const Route = createFileRoute('/api/send')({
         return json(
           {
             ok: false,
-            error: 'Legacy send is not available in Claude Workspace.',
+            error: 'Legacy send is not available in Hermes Workspace.',
           },
           { status: 501 },
         )

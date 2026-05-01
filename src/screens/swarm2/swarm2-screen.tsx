@@ -1465,7 +1465,7 @@ export function Swarm2Screen() {
                 <p className="truncate text-xs text-[var(--theme-muted-2)]">
                   {members.length > 0
                     ? `Detected ${members.length} worker${members.length === 1 ? '' : 's'} for planning, routing, reports, and reviewer-gated execution.`
-                    : 'Detected Claude profiles and roster workers for planning, routing, reports, and reviewer-gated execution.'}
+                    : 'Detected Hermes profiles and roster workers for planning, routing, reports, and reviewer-gated execution.'}
                 </p>
               </div>
             </div>
@@ -1663,7 +1663,7 @@ export function Swarm2Screen() {
                   ))}
                 </datalist>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                  Searchable picker backed by /api/models, the same source as chat. {modelsQuery.isError ? 'Model discovery errored, so this is empty until refresh.' : 'Start typing to see every detected model from the user’s Claude config and local providers.'}
+                  Searchable picker backed by /api/models, the same source as chat. {modelsQuery.isError ? 'Model discovery errored, so this is empty until refresh.' : 'Start typing to see every detected model from the user’s Hermes config and local providers.'}
                 </p>
               </label>
               <label className="block text-sm md:col-span-2">

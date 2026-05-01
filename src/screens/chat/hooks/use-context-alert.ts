@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const POLL_MS = 15_000
 const STORAGE_KEY = 'claude-ctx-alert'
-// 35% threshold fires BEFORE the Claude compacts (~40% / 80k on 200k window)
+// 35% threshold fires BEFORE the Hermes compacts (~40% / 80k on 200k window)
 const THRESHOLDS = [90, 75, 35] as const
 
 type Threshold = (typeof THRESHOLDS)[number]

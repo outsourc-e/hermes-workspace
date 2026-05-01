@@ -40,7 +40,7 @@ describe('parseOpenAIStream', () => {
     ])
   })
 
-  it('emits synthetic tool events for Claude tool progress frames', async () => {
+  it('emits synthetic tool events for Hermes tool progress frames', async () => {
     const response = createStreamResponse([
       'event: claude.tool.progress\n',
       'data: {"tool":"terminal","emoji":"💻","label":"ls -la"}\n\n',

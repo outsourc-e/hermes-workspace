@@ -42,7 +42,7 @@ export const Route = createFileRoute('/api/memory/write')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
-        // Memory writes go directly to local fs ($CLAUDE_HOME/memory/...).
+        // Memory writes go directly to local fs ($HERMES_HOME/memory/...).
         // No remote gateway endpoint is involved.
         try {
           const body = (await request.json().catch(() => ({}))) as {

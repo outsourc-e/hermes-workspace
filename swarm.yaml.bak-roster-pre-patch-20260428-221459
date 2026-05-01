@@ -86,7 +86,7 @@ workers:
     role: Builder
     specialty: full-stack implementation and UI/system integration
     model: GPT-5.5
-    mission: Ship focused product slices in Claude Workspace with tests.
+    mission: Ship focused product slices in Hermes Workspace with tests.
     skills:
       - swarm-ui-worker
       - swarm-worker-core

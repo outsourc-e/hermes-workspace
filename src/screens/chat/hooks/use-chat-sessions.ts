@@ -85,7 +85,7 @@ export function useChatSessions({
       if (activeSession.titleStatus === 'error') return 'New Session'
       return 'New Session'
     }
-    return activeFriendlyId === 'main' ? 'Claude' : activeFriendlyId
+    return activeFriendlyId === 'main' ? 'Hermes' : activeFriendlyId
   }, [activeFriendlyId, activeSession])
 
   const sessionsError =

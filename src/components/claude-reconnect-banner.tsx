@@ -11,7 +11,7 @@ type BannerState = 'hidden' | 'disconnected' | 'connected'
 
 async function probeClaudeHealth(): Promise<boolean> {
   // Use the portable-aware connection status endpoint first,
-  // which works with both full Claude and OpenAI-compatible backends.
+  // which works with both Hermes Agent and OpenAI-compatible backends.
   try {
     const response = await fetch('/api/connection-status', {
       cache: 'no-store',
@@ -132,7 +132,7 @@ export function ClaudeReconnectBanner({
                   if (res.ok && data.ok) {
                     setMessage(
                       data.message ||
-                        'Auto-restarting Claude gateway…',
+                        'Auto-restarting Hermes Agent gateway…',
                     )
                     // Probe again shortly so the banner clears as soon as
                     // the gateway answers /health.
@@ -210,17 +210,17 @@ export function ClaudeReconnectBanner({
       }
 
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Failed to start Claude agent')
+        throw new Error(payload.error || 'Failed to start Hermes Agent')
       }
 
       setMessage(
         payload.message === 'already running'
-          ? 'Claude agent is already running'
-          : 'Starting Claude agent…',
+          ? 'Hermes Agent is already running'
+          : 'Starting Hermes Agent…',
       )
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : 'Failed to start Claude agent',
+        error instanceof Error ? error.message : 'Failed to start Hermes Agent',
       )
     } finally {
       setIsStarting(false)
@@ -260,7 +260,7 @@ export function ClaudeReconnectBanner({
           />
           <div className="min-w-0">
             <p className="text-sm font-semibold">
-              {isDisconnected ? 'Claude agent not connected' : 'Connected'}
+              {isDisconnected ? 'Hermes Agent not connected' : 'Connected'}
             </p>
             {message ? (
               <p className="truncate text-xs opacity-80">{message}</p>

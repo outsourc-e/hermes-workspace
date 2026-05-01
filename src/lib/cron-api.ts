@@ -201,7 +201,7 @@ function normalizeJob(row: Record<string, unknown>, index: number): CronJob {
 function friendlyError(raw: string): string {
   if (!raw) return 'Request failed'
   if (raw.includes("require 'croniter'") || raw.includes('croniter')) {
-    return "Cron support missing: reinstall claude-agent with 'pip install \"claude-agent[cron]\"' (or 'pipx install --force claude-agent[cron]'), then restart the gateway."
+    return "Cron support missing: reinstall hermes-agent with 'pip install \"hermes-agent[cron]\"' (or 'pipx install --force hermes-agent[cron]'), then restart the gateway."
   }
   return raw
 }

@@ -4,7 +4,7 @@ Date: 2026-04-24
 
 ## Problem
 
-Claude Agent sessions fill context extremely fast during normal tool-heavy workflows. In one Workspace session (`cda915a9-fbf6-4bbf-9617-e7e9d26f40be`):
+Hermes Agent sessions fill context extremely fast during normal tool-heavy workflows. In one Workspace session (`cda915a9-fbf6-4bbf-9617-e7e9d26f40be`):
 
 - 256 messages total
 - 7 user messages
@@ -109,11 +109,11 @@ So the right panel is the correct UX destination, but needs a durable backing st
 
 ## Implementation Options
 
-### Option A — Canonical Claude Agent artifact store
+### Option A — Canonical Hermes Agent artifact store
 
 Best long-term because all clients benefit: CLI, gateway, Workspace, future WebUI.
 
-Add a table/store to Claude Agent:
+Add a table/store to Hermes Agent:
 
 ```sql
 tool_artifacts (
@@ -133,7 +133,7 @@ tool_artifacts (
 Large content on disk:
 
 ```txt
-~/.claude/sessions/artifacts/<session_id>/<artifact_id>.json
+~/.hermes/sessions/artifacts/<session_id>/<artifact_id>.json
 ```
 
 API endpoints:
@@ -150,14 +150,14 @@ Faster Workspace-only patch.
 Store artifacts under:
 
 ```txt
-~/claude-workspace/.runtime/artifacts/<session_id>/<artifact_id>.json
+~/hermes-workspace/.runtime/artifacts/<session_id>/<artifact_id>.json
 ```
 
 or a small local DB/JSON index.
 
 Workspace `/api/history` or `/api/send-stream` externalizes oversized tool results before rendering/sending to React.
 
-Good MVP, but not enough for canonical model-context bloat unless Claude Agent context builder also stops reinjecting the full tool payload.
+Good MVP, but not enough for canonical model-context bloat unless Hermes Agent context builder also stops reinjecting the full tool payload.
 
 ## Policy Proposal
 
@@ -243,13 +243,13 @@ pnpm build
 
 All passed. Build only emitted existing chunk-size / sourcemap warnings.
 
-## Current Diagnosis: Workspace vs Claude Agent
+## Current Diagnosis: Workspace vs Hermes Agent
 
 The trailing “Tool work completed” card is a Workspace guardrail, not the desired steady state.
 
 Likely responsibility split:
 
-1. **Claude Agent / session persistence is the root source** when stored history ends with tool messages and no final assistant text. A healthy agent transcript should end each tool-using turn with one user-visible assistant outcome: final answer, error, interrupted/cancelled, no-op, or compact tool-work summary.
+1. **Hermes Agent / session persistence is the root source** when stored history ends with tool messages and no final assistant text. A healthy agent transcript should end each tool-using turn with one user-visible assistant outcome: final answer, error, interrupted/cancelled, no-op, or compact tool-work summary.
 2. **Workspace had UI/rendering bugs** that made the source problem worse:
    - backend `role: "tool"` was not normalized to frontend `toolResult`
    - `toolCallId` / `toolName` were not hoisted consistently
@@ -257,11 +257,11 @@ Likely responsibility split:
    - giant tool outputs were rendered inline instead of artifact-backed
 3. **Our current setup/session amplifies it** because this conversation is extremely tool-heavy and near context max; dev/tool actions after a human-readable assistant response can leave persisted tool rows at the tail.
 
-Conclusion: Workspace should defensively collapse/tool-summary this state, but the canonical fix belongs in Claude Agent’s stream/session writer: never persist a completed chat turn that ends only with tool output.
+Conclusion: Workspace should defensively collapse/tool-summary this state, but the canonical fix belongs in Hermes Agent’s stream/session writer: never persist a completed chat turn that ends only with tool output.
 
-## Claude Agent Fix Implemented
+## Hermes Agent Fix Implemented
 
-Patched `/Users/aurora/claude-agent`:
+Patched `/Users/aurora/hermes-agent`:
 
 - `run_agent.py`
   - `_persist_session()` now calls `_ensure_terminal_assistant_message()` before writing JSON/SQLite.
@@ -283,7 +283,7 @@ Result: all targeted tests pass.
 ## Recommended Next Steps
 
 1. Keep Workspace fallback, but treat it as edge-state handling.
-2. Continue canonical artifact work in Claude Agent: externalize oversized tool outputs before they enter persisted/model context, not only before Workspace renders history.
+2. Continue canonical artifact work in Hermes Agent: externalize oversized tool outputs before they enter persisted/model context, not only before Workspace renders history.
 3. Continue Workspace polish:
    - explicit “Open artifact” action on compact tool-result cards
    - deep-link Inspector Artifacts tab

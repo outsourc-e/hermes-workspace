@@ -709,7 +709,7 @@ code {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ── Claude Workspace Themes ── */
+/* ── Hermes Workspace Themes ── */
 [data-theme='claude-official'] {
   --theme-bg: #0a0e1a;
   --theme-sidebar: #0d1220;
@@ -989,7 +989,7 @@ code {
 
 
 /* ============================================================
-   Claude Nous — matches nousresearch.com/claude-agent chrome
+   Hermes Nous — matches nousresearch.com/hermes-agent chrome
    Dark:  deep teal #041C1C background, cream #ffe6cb accent
    Light: warm parchment, deep teal text, amber #ffac02 accent
    ============================================================ */

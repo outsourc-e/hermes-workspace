@@ -1,7 +1,7 @@
 {
-  "name": "Claude Workspace",
+  "name": "Hermes Workspace",
   "dockerComposeFile": "../docker-compose.yml",
-  "service": "claude-workspace",
+  "service": "hermes-workspace",
   "workspaceFolder": "/app",
   "overrideCommand": false,
   "forwardPorts": [3000, 8642],

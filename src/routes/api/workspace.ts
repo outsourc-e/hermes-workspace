@@ -1,6 +1,6 @@
 /**
  * Phase 2.6: Workspace detection API
- * Auto-detects workspace from Claude config, env, or default paths
+ * Auto-detects workspace from Hermes config, env, or default paths
  */
 import os from 'node:os'
 import path from 'node:path'
@@ -60,7 +60,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
   }
 
   // Priority 3: Default Claude workspace path
-  const defaultPath = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+  const defaultPath = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
   const defaultValid = await isValidDirectory(defaultPath)
   if (defaultValid) {
     return {
@@ -72,7 +72,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
   }
 
   // Priority 4: Claude home directory
-  const claudeDir = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+  const claudeDir = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
   const claudeDirValid = await isValidDirectory(claudeDir)
   if (claudeDirValid) {
     return {

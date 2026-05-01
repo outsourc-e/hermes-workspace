@@ -3,7 +3,7 @@
 CLAUDE="${CLAUDE_BIN:-claude}"
 # Use ANTHROPIC_API_KEY from environment — set in your .env or shell profile
 if [ -z "$ANTHROPIC_API_KEY" ]; then
-  echo "Warning: ANTHROPIC_API_KEY not set. Export it or add to ~/.claude/.env"
+  echo "Warning: ANTHROPIC_API_KEY not set. Export it or add to ~/.hermes/.env"
 fi
 
 echo "Hermes Agent (simple mode) — type your message, press Enter"

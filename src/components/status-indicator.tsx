@@ -84,7 +84,7 @@ function buildTooltip(
     if (!data.modelConfigured) parts.push('No model selected')
   }
   if (data.status === 'enhanced') {
-    parts.push('Claude gateway enhancements detected')
+    parts.push('Hermes Agent gateway enhancements detected')
   }
   if (data.activeModel) parts.push(`Model: ${data.activeModel}`)
   return parts.join(' · ')

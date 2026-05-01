@@ -1,6 +1,6 @@
 /**
  * Connection status endpoint — returns a summary of portable chat readiness
- * plus whether Claude gateway enhancements are available.
+ * plus whether Hermes Agent gateway enhancements are available.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -15,7 +15,7 @@ import {
 import { isAuthenticated } from '../../server/auth-middleware'
 
 const CONFIG_PATH = path.join(
-  process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude'),
+  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes'),
   'config.yaml',
 )
 
@@ -79,11 +79,11 @@ export const Route = createFileRoute('/api/connection-status')({
           label = 'Enhanced'
           detail = modelConfigured
             ? caps.dashboard.available
-              ? 'Core chat works and the Claude dashboard APIs are available.'
-              : 'Core chat works and Claude gateway APIs are available.'
+              ? 'Core chat works and the Hermes Agent dashboard APIs are available.'
+              : 'Core chat works and Hermes Agent gateway APIs are available.'
             : caps.dashboard.available
-              ? 'Claude dashboard APIs are available. Choose a model to start chatting.'
-              : 'Claude gateway APIs are available. Choose a model to start chatting.'
+              ? 'Hermes Agent dashboard APIs are available. Choose a model to start chatting.'
+              : 'Hermes Agent gateway APIs are available. Choose a model to start chatting.'
         } else if (chatReady && modelConfigured) {
           status = 'connected'
           label = 'Connected'
@@ -98,7 +98,7 @@ export const Route = createFileRoute('/api/connection-status')({
               'Backend connected. Choose a provider and model to test chat.'
           } else {
             detail =
-              'Core chat works. Enhanced Claude gateway APIs are optional and unlock automatically when available.'
+              'Core chat works. Enhanced Hermes Agent gateway APIs are optional and unlock automatically when available.'
           }
         }
 

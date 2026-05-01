@@ -1,4 +1,4 @@
-// Claude Workspace Service Worker — DISABLED
+// Hermes Workspace Service Worker — DISABLED
 // Unregisters itself and clears all caches to prevent stale asset issues
 // after Docker image updates or reverse proxy deployments.
 

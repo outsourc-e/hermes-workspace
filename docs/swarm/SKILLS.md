@@ -14,7 +14,7 @@ A skill is not a vibe. It is a procedure: when to use it, what commands to run, 
 | `byte-verified-code-review` | Review diffs with byte-level proof for naming-sensitive and generated-file changes. |
 | `swarm-bench-worker` | Benchmark/lab work for local models, runtime experiments, and result logging. |
 | `swarm-pr-worker` | GitHub issue/PR workflow, triage, patching, PR prep, review feedback. |
-| `swarm-ui-worker` | UI implementation lane for Project Workspace surfaces. |
+| `swarm-ui-worker` | UI implementation lane for Hermes Workspace surfaces. |
 | `swarm-dev-runtime` | Runtime contracts, backend APIs, lifecycle, health, and repair wiring. |
 | `swarm-memory` | File-backed memory expectations for workers and orchestrator history. |
 | `swarm-orchestration-loop` | Canonical orchestration/review loop for persistent worker fleets. |
@@ -24,7 +24,7 @@ Some installations may name the byte review skill differently. If the exact skil
 
 ## How skills auto-load
 
-When you clone the repo and run the workspace, worker sessions load skills from the configured Project Agent profile. In Eric's release environment, profiles point at a shared skills directory, commonly exposed to workers as:
+When you clone the repo and run the workspace, worker sessions load skills from the configured Hermes Agent profile. In Eric's release environment, profiles point at a shared skills directory, commonly exposed to workers as:
 
 ```text
 ~/.ocplatform/workspace/skills/
@@ -33,7 +33,7 @@ When you clone the repo and run the workspace, worker sessions load skills from 
 A worker profile can also carry profile-local skills under:
 
 ```text
-~/.claude/profiles/<workerId>/skills/
+~/.hermes/profiles/<workerId>/skills/
 ```
 
 The important rule is that the worker's runtime must be able to resolve the skill name from its profile. The UI can display a role's default skills, but the worker still needs the skill files available locally.
@@ -58,7 +58,7 @@ The important rule is that the worker's runtime must be able to resolve the skil
 
 ### swarm-worker-core
 
-Base contract for every Project Agent:
+Base contract for every Hermes Agent:
 
 - understand the task
 - set phase

@@ -575,7 +575,7 @@ export function SkillsScreen() {
                   hubQuery.data.source === 'error') ? (
                 <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                   Skills Hub search unavailable — showing installed skills
-                  instead. Ensure the Claude gateway is running.
+                  instead. Ensure the Hermes Agent gateway is running.
                 </div>
               ) : null}
 

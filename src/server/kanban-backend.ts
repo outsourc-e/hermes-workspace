@@ -98,7 +98,7 @@ function detectClaudeKanban(): ClaudeDetection {
       cliPath: null,
       dbPath,
       workspacePath,
-      reason: 'Claude Kanban storage not found; using the local Swarm Board fallback.',
+      reason: 'Hermes Kanban storage not found; using the local Swarm Board fallback.',
     }
   }
 
@@ -108,7 +108,7 @@ function detectClaudeKanban(): ClaudeDetection {
     cliPath: cli.ok ? cli.path ?? null : null,
     dbPath,
     workspacePath,
-    reason: cli.ok ? undefined : 'Claude Kanban storage detected; CLI unavailable, using direct local storage access.',
+    reason: cli.ok ? undefined : 'Hermes Kanban storage detected; CLI unavailable, using direct local storage access.',
   }
 }
 
@@ -257,13 +257,13 @@ const claudeBackend: KanbanBackend = {
     const detection = detectClaudeKanban()
     return {
       id: 'claude',
-      label: 'Claude Kanban',
+      label: 'Hermes Kanban',
       detected: detection.available,
       writable: detection.available,
       path: fs.existsSync(detection.dbPath) ? detection.dbPath : null,
       details: detection.available
-        ? detection.reason ?? `Claude Kanban storage detected (${detection.cliPath ?? 'direct sqlite'}, ${detection.dbPath})`
-        : detection.reason ?? 'Claude Kanban not detected.',
+        ? detection.reason ?? `Hermes Kanban storage detected (${detection.cliPath ?? 'direct sqlite'}, ${detection.dbPath})`
+        : detection.reason ?? 'Hermes Kanban not detected.',
     }
   },
   list() {
@@ -271,7 +271,7 @@ const claudeBackend: KanbanBackend = {
   },
   create(input) {
     const detection = detectClaudeKanban()
-    if (!detection.available) throw new Error(detection.reason ?? 'Claude Kanban not detected')
+    if (!detection.available) throw new Error(detection.reason ?? 'Hermes Kanban not detected')
     const nowSeconds = Math.floor(Date.now() / 1000)
     const taskId = `t_${randomUUID().replace(/-/g, '').slice(0, 8)}`
     const status = mapBoardStatus(input.status ?? 'backlog')
@@ -295,7 +295,7 @@ const claudeBackend: KanbanBackend = {
     ].join(' ')
     runSqlite(detection.dbPath, statements)
     const created = readClaudeTask(taskId)
-    if (!created) throw new Error(`Created Claude task ${taskId} but could not read it back`)
+    if (!created) throw new Error(`Created Hermes task ${taskId} but could not read it back`)
     return claudeTaskToCard(created)
   },
   update(cardId, updates) {

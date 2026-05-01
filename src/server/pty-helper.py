@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PTY helper for Claude Workspace terminal.
+PTY helper for Hermes Workspace terminal.
 Spawns a real PTY process and bridges stdin/stdout.
 Usage: python3 pty-helper.py [cwd] [cols] [rows] -- [command arg1 arg2 ...]
 If no command is provided, falls back to an interactive shell.

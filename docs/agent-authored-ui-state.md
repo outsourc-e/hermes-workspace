@@ -1,6 +1,6 @@
 # Agent-authored UI state
 
-Claude Workspace can render optional structured UI state emitted by the agent instead of relying only on heuristic panel derivation from plain chat text.
+Hermes Workspace can render optional structured UI state emitted by the agent instead of relying only on heuristic panel derivation from plain chat text.
 
 ## Why
 

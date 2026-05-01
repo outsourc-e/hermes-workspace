@@ -149,7 +149,7 @@ export function detectHonchoIntegration(options: DetectHonchoOptions = {}): Honc
   const env = options.env ?? process.env
   const homeDir = options.homeDir ?? os.homedir()
   const openClawHome = expandHome(options.openClawHome ?? env.OPENCLAW_HOME ?? path.join(homeDir, '.openclaw'), homeDir)
-  const claudeHome = expandHome(options.claudeHome ?? env.CLAUDE_HOME ?? path.join(homeDir, '.claude'), homeDir)
+  const claudeHome = expandHome(options.claudeHome ?? env.HERMES_HOME ?? env.CLAUDE_HOME ?? path.join(homeDir, '.hermes'), homeDir)
 
   const processEnvConfigured = envConfigured(env)
 

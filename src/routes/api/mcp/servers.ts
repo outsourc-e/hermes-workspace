@@ -137,7 +137,7 @@ export const Route = createFileRoute('/api/mcp/servers')({
           return Response.json({
             servers: [],
             ok: false,
-            message: 'Could not reach Claude config endpoint.',
+            message: 'Could not reach Hermes config endpoint.',
           })
         }
       },

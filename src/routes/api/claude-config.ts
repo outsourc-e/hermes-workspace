@@ -1,5 +1,5 @@
 /**
- * Claude Config API — read/write ~/.claude/config.yaml and ~/.claude/.env
+ * Hermes Config API — read/write ~/.hermes/config.yaml and ~/.hermes/.env
  * Gives the web UI the same config power as `claude setup`
  */
 import fs from 'node:fs'
@@ -20,7 +20,7 @@ const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.j
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
 const ENV_PATH = path.join(CLAUDE_HOME, '.env')
 
-// Known Claude providers
+// Known Hermes providers
 const PROVIDERS = [
   { id: 'nous', name: 'Nous Portal', authType: 'oauth', envKeys: [] },
   { id: 'openai-codex', name: 'OpenAI Codex', authType: 'oauth', envKeys: [] },

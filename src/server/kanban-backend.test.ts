@@ -68,7 +68,7 @@ async function loadKanbanBackend(options?: {
 }
 
 describe('kanban-backend', () => {
-  it('auto-detect prefers Claude backend when Claude CLI and canonical storage are present', async () => {
+  it('auto-detect prefers Hermes backend when Hermes CLI and canonical storage are present', async () => {
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const sqliteCalls: Array<{ command: string; args?: string[] }> = []
     const mod = await loadKanbanBackend({
@@ -81,7 +81,7 @@ describe('kanban-backend', () => {
           return JSON.stringify([
             {
               id: 't_12345678',
-              title: 'Claude task',
+              title: 'Hermes task',
               body: 'Backed by sqlite',
               status: 'running',
               assignee: 'swarm2',
@@ -105,7 +105,7 @@ describe('kanban-backend', () => {
     expect(cards).toHaveLength(1)
     expect(cards[0]).toMatchObject({
       id: 't_12345678',
-      title: 'Claude task',
+      title: 'Hermes task',
       status: 'running',
       assignedWorker: 'swarm2',
       createdBy: 'claude-kanban',
@@ -113,7 +113,7 @@ describe('kanban-backend', () => {
     expect(sqliteCalls[0]?.args?.[0]).toBe('/Users/aurora/.claude/kanban.db')
   })
 
-  it('auto-detect uses Claude storage directly when the CLI is unavailable', async () => {
+  it('auto-detect uses Hermes storage directly when the CLI is unavailable', async () => {
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
@@ -123,7 +123,7 @@ describe('kanban-backend', () => {
           return JSON.stringify([
             {
               id: 't_direct',
-              title: 'Direct Claude task',
+              title: 'Direct Hermes task',
               body: '',
               status: 'ready',
               assignee: null,
@@ -164,7 +164,7 @@ describe('kanban-backend', () => {
     })
   })
 
-  it('auto-detect falls back to local when canonical Claude storage is missing', async () => {
+  it('auto-detect falls back to local when canonical Hermes storage is missing', async () => {
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const mod = await loadKanbanBackend({
       existsSync: () => false,
@@ -184,7 +184,7 @@ describe('kanban-backend', () => {
     expect(mod.listKanbanCards()[0]?.id).toBe('local-1')
   })
 
-  it('creates and updates Claude tasks through canonical kanban.db path', async () => {
+  it('creates and updates Hermes tasks through canonical kanban.db path', async () => {
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const sqliteCalls: string[] = []
     let readCount = 0
@@ -201,7 +201,7 @@ describe('kanban-backend', () => {
             return JSON.stringify([
               {
                 id: 't_deadbeef',
-                title: readCount === 1 ? 'Created Claude task' : 'Updated Claude task',
+                title: readCount === 1 ? 'Created Hermes task' : 'Updated Hermes task',
                 body: 'Task body',
                 status: readCount === 1 ? 'queued' : 'done',
                 assignee: 'swarm6',
@@ -216,11 +216,11 @@ describe('kanban-backend', () => {
       },
     })
 
-    const created = mod.createKanbanCard({ title: 'Created Claude task', spec: 'Task body', assignedWorker: 'swarm6', status: 'backlog' })
-    const updated = mod.updateKanbanCard('t_deadbeef', { title: 'Updated Claude task', status: 'done', assignedWorker: 'swarm6' })
+    const created = mod.createKanbanCard({ title: 'Created Hermes task', spec: 'Task body', assignedWorker: 'swarm6', status: 'backlog' })
+    const updated = mod.updateKanbanCard('t_deadbeef', { title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
 
-    expect(created).toMatchObject({ id: 't_deadbeef', title: 'Created Claude task', status: 'backlog', assignedWorker: 'swarm6', createdBy: 'claude-kanban' })
-    expect(updated).toMatchObject({ id: 't_deadbeef', title: 'Updated Claude task', status: 'done', assignedWorker: 'swarm6' })
+    expect(created).toMatchObject({ id: 't_deadbeef', title: 'Created Hermes task', status: 'backlog', assignedWorker: 'swarm6', createdBy: 'claude-kanban' })
+    expect(updated).toMatchObject({ id: 't_deadbeef', title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
     expect(sqliteCalls.every((call) => call.startsWith('/Users/aurora/.claude/kanban.db '))).toBe(true)
     expect(sqliteCalls.some((call) => call.includes('insert into tasks'))).toBe(true)
     expect(sqliteCalls.some((call) => call.includes('update tasks set'))).toBe(true)

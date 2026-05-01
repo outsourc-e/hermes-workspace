@@ -16,7 +16,7 @@ const DEFAULT_CONFIG: KnowledgeBaseConfig = {
 
 function getConfigPath(): string {
   const claudeHome =
-    process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
   return path.join(claudeHome, 'knowledge-config.json')
 }
 

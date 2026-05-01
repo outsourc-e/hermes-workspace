@@ -288,7 +288,7 @@ export function WorkspaceSkillsScreen() {
                   </div>
                 ) : visibleSkills.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-500">
-                    No skills found in `~/.claude/skills` for Claude.
+                    No skills found in `~/.hermes/skills` for Hermes Agent.
                   </div>
                 ) : (
                   visibleSkills.map((skill) => {

@@ -416,7 +416,7 @@ export function McpSettingsScreen() {
         setNotice(payload.message ?? null)
       } catch {
         setNotice(
-          'Could not load MCP config from Claude. You can still draft servers here.',
+          'Could not load MCP config from Hermes Agent. You can still draft servers here.',
         )
       } finally {
         setLoading(false)

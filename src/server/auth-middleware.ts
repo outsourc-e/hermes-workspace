@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path'
  * deployments.  For multi-worker setups the file becomes a race-condition
  * window — in that case replace with Redis or a database.
  *
- * File location: ~/.claude/workspace-sessions.json
+ * File location: ~/.hermes/workspace-sessions.json
  */
 interface SessionStore {
   tokens: Record<string, number> // token -> expiry unix-ms

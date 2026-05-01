@@ -1,4 +1,4 @@
-// Stub — exec approvals are not used in Claude Workspace.
+// Stub — exec approvals are not used in Hermes Workspace.
 // Kept as a no-op to satisfy chat-screen imports without breaking chat.
 
 export interface ApprovalRequest {

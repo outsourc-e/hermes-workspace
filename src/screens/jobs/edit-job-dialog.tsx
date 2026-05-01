@@ -188,7 +188,7 @@ export function EditJobDialog({
                   className="mt-1 text-sm"
                   style={{ color: 'var(--theme-muted)' }}
                 >
-                  Update the schedule, prompt, and routing for this Claude task.
+                  Update the schedule, prompt, and routing for this Hermes task.
                 </p>
               </div>
               <button
@@ -296,7 +296,7 @@ export function EditJobDialog({
                       prompt: event.target.value,
                     }))
                   }
-                  placeholder="What should Claude do?"
+                  placeholder="What should Hermes Agent do?"
                   required
                   rows={5}
                   className="w-full resize-none rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
@@ -353,7 +353,7 @@ export function EditJobDialog({
                           onClick={() => toggleDelivery(option)}
                           title={
                             needsGateway
-                              ? `Requires Claude Gateway with ${option} configured`
+                              ? `Requires Hermes Agent gateway with ${option} configured`
                               : undefined
                           }
                           className="rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors"

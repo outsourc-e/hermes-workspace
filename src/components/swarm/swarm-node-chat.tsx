@@ -194,7 +194,7 @@ export function SwarmNodeChat({
           >
             {messages.length === 0 ? (
               <div className="px-2 py-4 text-center text-[11px] text-emerald-100/50">
-                Inline dispatch to {workerId}. Real replies come from its Claude
+                Inline dispatch to {workerId}. Real replies come from its Hermes
                 profile.
               </div>
             ) : (

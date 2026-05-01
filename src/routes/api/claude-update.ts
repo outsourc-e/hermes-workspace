@@ -31,14 +31,14 @@ export const UPDATE_REMOTE_DEFINITIONS: Array<RemoteDefinition> = [
   {
     name: 'origin',
     label: 'Hermes Workspace',
-    expectedRepo: 'claude-workspace',
-    aliases: ['claude-workspace', 'outsourc-e/claude-workspace'],
+    expectedRepo: 'hermes-workspace',
+    aliases: ['hermes-workspace', 'outsourc-e/hermes-workspace'],
   },
   {
     name: 'upstream',
     label: 'Hermes Agent',
-    expectedRepo: 'claude-agent',
-    aliases: ['claude-agent', 'NousResearch/claude-agent'],
+    expectedRepo: 'hermes-agent',
+    aliases: ['hermes-agent', 'NousResearch/hermes-agent'],
   },
 ]
 

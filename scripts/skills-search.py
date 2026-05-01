@@ -4,7 +4,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.expanduser("~/claude-agent"))
+sys.path.insert(0, os.path.expanduser("~/hermes-agent"))
 
 from tools.skills_hub import GitHubAuth, create_source_router, unified_search
 

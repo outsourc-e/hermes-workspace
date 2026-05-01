@@ -92,7 +92,7 @@ Swarm2 UI should show:
 - Return lifecycle state and recommended action.
 - Add request-handoff action that sends a strict handoff prompt to tmux.
 - Add renew action, but require `force: true` for now.
-- Normalize swarm wrappers to use `/Users/aurora/claude-workspace` cwd.
+- Normalize swarm wrappers to use `/Users/aurora/hermes-workspace` cwd.
 
 ## Stage 2
 

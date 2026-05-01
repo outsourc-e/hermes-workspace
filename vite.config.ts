@@ -15,13 +15,13 @@ import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 
 // ---------------------------------------------------------------------------
-// Claude Agent auto-start helpers
+// Hermes Agent auto-start helpers
 // ---------------------------------------------------------------------------
 
-/** Resolve the claude-agent directory using a priority-ordered fallback chain:
+/** Resolve the hermes-agent directory using a priority-ordered fallback chain:
  *  1. CLAUDE_AGENT_PATH env var (explicit override)
- *  2. ../claude-agent  — sibling clone (standard README setup)
- *  3. ../../claude-agent — one level up (monorepo / nested workspace)
+ *  2. ../hermes-agent  — sibling clone (standard README setup)
+ *  3. ../../hermes-agent — one level up (monorepo / nested workspace)
  *  Returns null if none found.
  */
 function resolveClaudeAgentDir(env: Record<string, string>): string | null {
@@ -31,13 +31,13 @@ function resolveClaudeAgentDir(env: Record<string, string>): string | null {
     candidates.push(env.CLAUDE_AGENT_PATH.trim())
   }
 
-  // Resolve relative to the workspace root (parent of claude-workspace/)
+  // Resolve relative to the workspace root (parent of hermes-workspace/)
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'claude-agent'),            // sibling (old README)
-    resolve(workspaceRoot, '..', 'claude-agent'),      // one level up
-    resolve(os.homedir(), '.claude', 'claude-agent'),  // Nous installer default
-    resolve(os.homedir(), 'claude-agent'),             // ~/claude-agent
+    resolve(workspaceRoot, 'hermes-agent'),            // sibling (old README)
+    resolve(workspaceRoot, '..', 'hermes-agent'),      // one level up
+    resolve(os.homedir(), '.claude', 'hermes-agent'),  // Nous installer default
+    resolve(os.homedir(), 'hermes-agent'),             // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
@@ -58,7 +58,7 @@ function resolveClaudeBinary(): string | null {
   return null
 }
 
-/** Resolve the Python executable to use for Claude backend startup.
+/** Resolve the Python executable to use for Hermes backend startup.
  *  Prefers .venv/bin/python inside agentDir, falls back to system python3.
  */
 function resolveClaudePython(agentDir: string): string {
@@ -70,7 +70,7 @@ function resolveClaudePython(agentDir: string): string {
   return 'python3'
 }
 
-/** Check if claude-agent health endpoint is responding */
+/** Check if hermes-agent health endpoint is responding */
 async function isClaudeAgentHealthy(port = 8642): Promise<boolean> {
   try {
     const r = await fetch(`http://127.0.0.1:${port}/health`, {
@@ -86,7 +86,7 @@ const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const claudeApiUrl = env.CLAUDE_API_URL?.trim() || 'http://127.0.0.1:8642'
 
-  // Claude Agent auto-start state
+  // Hermes Agent auto-start state
   let claudeAgentChild: ChildProcess | null = null
   let claudeAgentStarted = false
 
@@ -101,13 +101,13 @@ const config = defineConfig(({ mode, command }) => {
       explicitUrl !== 'http://localhost:8642'
     ) {
       console.log(
-        `[claude-agent] Skipping auto-start — using external API: ${explicitUrl}`,
+        `[hermes-agent] Skipping auto-start — using external API: ${explicitUrl}`,
       )
       claudeAgentStarted = true
       return
     }
     if (await isClaudeAgentHealthy()) {
-      console.log('[claude-agent] Already running — reusing existing process')
+      console.log('[hermes-agent] Already running — reusing existing process')
       claudeAgentStarted = true
       return
     }
@@ -115,7 +115,7 @@ const config = defineConfig(({ mode, command }) => {
     const claudeBin = resolveClaudeBinary()
     const agentDir = resolveClaudeAgentDir(env)
 
-    // Prefer the `claude gateway run` binary path (Nous installer's canonical
+    // Prefer the `hermes gateway run` binary path (Nous installer's canonical
     // entrypoint). Fall back to launching uvicorn against the source tree if
     // only a directory is present (dev / cloned-in-place setups).
     let launchCmd: string
@@ -126,7 +126,7 @@ const config = defineConfig(({ mode, command }) => {
       launchCmd = claudeBin
       commandArgs = ['gateway', 'run']
       launchCwd = agentDir ?? undefined
-      console.log(`[claude-agent] Starting ${claudeBin} gateway run`)
+      console.log(`[hermes-agent] Starting ${claudeBin} gateway run`)
     } else if (agentDir) {
       launchCmd = resolveClaudePython(agentDir)
       const useGatewayRun = existsSync(resolve(agentDir, 'gateway', 'run.py'))
@@ -135,14 +135,14 @@ const config = defineConfig(({ mode, command }) => {
         : ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', '8642']
       launchCwd = agentDir
       console.log(
-        `[claude-agent] Starting from ${agentDir} using ${launchCmd} (${useGatewayRun ? 'gateway.run' : 'uvicorn'})`,
+        `[hermes-agent] Starting from ${agentDir} using ${launchCmd} (${useGatewayRun ? 'gateway.run' : 'uvicorn'})`,
       )
     } else {
       console.warn(
-        '[claude-agent] Could not find claude-agent installation.\n' +
+        '[hermes-agent] Could not find hermes-agent installation.\n' +
           '  Run the installer:\n' +
-          '    curl -fsSL https://claude-workspace.com/install.sh | bash\n' +
-          '  Or set CLAUDE_AGENT_PATH in .env to point at your claude-agent clone.',
+          '    curl -fsSL https://hermes-workspace.com/install.sh | bash\n' +
+          '  Or set CLAUDE_AGENT_PATH in .env to point at your hermes-agent clone.',
       )
       return
     }
@@ -174,18 +174,18 @@ const config = defineConfig(({ mode, command }) => {
 
     child.stdout?.on('data', (d: Buffer) => {
       const line = d.toString().trim()
-      if (line) console.log(`[claude-agent] ${line}`)
+      if (line) console.log(`[hermes-agent] ${line}`)
     })
     child.stderr?.on('data', (d: Buffer) => {
       const line = d.toString().trim()
-      if (line) console.log(`[claude-agent] ${line}`)
+      if (line) console.log(`[hermes-agent] ${line}`)
     })
 
     child.on('exit', (code) => {
       claudeAgentChild = null
       claudeAgentStarted = false
       if (code !== 0 && code !== null) {
-        console.warn(`[claude-agent] Exited with code ${code}`)
+        console.warn(`[hermes-agent] Exited with code ${code}`)
       }
     })
 
@@ -193,12 +193,12 @@ const config = defineConfig(({ mode, command }) => {
     for (let i = 0; i < 15; i++) {
       await new Promise((r) => setTimeout(r, 1000))
       if (await isClaudeAgentHealthy()) {
-        console.log('[claude-agent] ✓ Ready on http://127.0.0.1:8642')
+        console.log('[hermes-agent] ✓ Ready on http://127.0.0.1:8642')
         return
       }
     }
     console.warn(
-      '[claude-agent] Started but health check timed out — may still be loading',
+      '[hermes-agent] Started but health check timed out — may still be loading',
     )
   }
 
@@ -458,7 +458,7 @@ const config = defineConfig(({ mode, command }) => {
       strictPort: false, // allow fallback if port is taken, but log clearly
       allowedHosts: true,
       proxy: {
-        // WebSocket proxy: clients connect to /ws-claude on the Claude Workspace
+        // WebSocket proxy: clients connect to /ws-claude on the Hermes Workspace
         // server (any IP/port), which internally forwards to the local server.
         // This means phone/LAN/Docker users never need to reach port 18789 directly.
         '/ws-claude': {
@@ -467,7 +467,7 @@ const config = defineConfig(({ mode, command }) => {
           ws: true,
           rewrite: (path) => path.replace(/^\/ws-claude/, ''),
         },
-// REST API proxy: API proxy for Claude backend
+// REST API proxy: API proxy for Hermes backend
         '/api/claude-proxy': {
           target: proxyTarget,
           changeOrigin: true,
@@ -523,7 +523,7 @@ const config = defineConfig(({ mode, command }) => {
               requestPath === '/api/connection-status'
             ) {
               try {
-                // Check for enhanced Claude gateway first (has /api/sessions)
+                // Check for enhanced Hermes Agent gateway first (has /api/sessions)
                 const [modelsRes, sessionsRes] = await Promise.all([
                   fetch(`${claudeApiUrl}/v1/models`, {
                     signal: AbortSignal.timeout(3000),
@@ -558,7 +558,7 @@ const config = defineConfig(({ mode, command }) => {
                   )
                   return
                 }
-                // Fall back to /health for full Claude backends
+                // Fall back to /health for full Hermes backends
                 const healthRes = await fetch(`${claudeApiUrl}/health`, {
                   signal: AbortSignal.timeout(3000),
                 })
@@ -620,15 +620,15 @@ const config = defineConfig(({ mode, command }) => {
             }
           })
 
-          // Auto-start claude-agent when dev server launches
+          // Auto-start hermes-agent when dev server launches
           if (command === 'serve') {
             void startClaudeAgent()
           }
 
-          // Shutdown claude-agent when dev server stops
+          // Shutdown hermes-agent when dev server stops
           server.httpServer?.on('close', () => {
             if (claudeAgentChild) {
-              console.log('[claude-agent] Stopping...')
+              console.log('[hermes-agent] Stopping...')
               claudeAgentChild.kill('SIGTERM')
               claudeAgentChild = null
               claudeAgentStarted = false

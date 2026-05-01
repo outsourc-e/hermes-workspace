@@ -98,7 +98,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const processStoreEvent = useChatStore((s) => s.processEvent)
   const clearStreamingSession = useChatStore((s) => s.clearStreamingSession)
 
-  // Claude tool calls can take 60-120s (file reads, terminal commands, web searches)
+  // Hermes tool calls can take 60-120s (file reads, terminal commands, web searches)
   const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 120_000
   const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = 180_000
 
@@ -652,7 +652,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Claude connection closed')
+            markFailed('Hermes Agent connection closed')
           }
           break
         }
@@ -738,7 +738,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             attachments: params.attachments,
             idempotencyKey: params.idempotencyKey ?? crypto.randomUUID(),
             model: params.model || undefined,
-            locale: typeof window !== 'undefined' ? localStorage.getItem('claude-workspace-locale') || 'en' : 'en',
+            locale: typeof window !== 'undefined' ? localStorage.getItem('hermes-workspace-locale') || 'en' : 'en',
           }),
           signal: abortController.signal,
         })
@@ -765,8 +765,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
-        // HTTP 200 — message accepted by Claude. Clear optimistic "sending"
-        // status so the Retry timer never fires. Claude does NOT echo
+        // HTTP 200 — message accepted by Hermes Agent. Clear optimistic "sending"
+        // status so the Retry timer never fires. Hermes Agent does NOT echo
         // user messages via SSE, so this is the only confirmation we get.
         if (params.idempotencyKey && onMessageAccepted) {
           onMessageAccepted(

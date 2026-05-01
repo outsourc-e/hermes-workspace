@@ -1,7 +1,7 @@
-# Claude Workspace — Comprehensive Features Inventory
+# Hermes Workspace — Comprehensive Features Inventory
 
 > **Version:** 2.0.0 | **Stack:** React 19 + TanStack Start/Router + Vite 7 + Tailwind CSS 4 + Zustand + xterm.js + Monaco Editor  
-> **Description:** Desktop workspace for Claude Agent — chat, orchestration, and multi-agent coding pipelines
+> **Description:** Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines
 
 ---
 
@@ -27,7 +27,7 @@
 - **Real-time SSE streaming** with tool call rendering
 - **Multi-session management** — create, rename, delete, fork sessions
 - **Dual chat backend modes:**
-  - **Enhanced Claude** — full session API with persistent history via Claude gateway
+  - **Enhanced Claude** — full session API with persistent history via Hermes Agent gateway
   - **Portable** — OpenAI-compatible `/v1/chat/completions` (works with Ollama, LM Studio, vLLM, etc.)
 - **Chat sidebar** — session list with search, pin, rename, delete dialogs
 - **Message rendering:**
@@ -89,7 +89,7 @@
 
 ### 1.5 Memory Browser Screen (`/memory`)
 
-- **Browse agent memory files** in `~/.claude/` (MEMORY.md, memory/, memories/)
+- **Browse agent memory files** in `~/.hermes/` (MEMORY.md, memory/, memories/)
 - **Search across memory entries** — text search with line-level results (max 200 matches)
 - **Markdown preview** with live editing via MemoryEditor
 - **Memory file list** — sorted with MEMORY.md first, daily files by date
@@ -162,7 +162,7 @@
 
 | Endpoint             | Method | Description                      |
 | -------------------- | ------ | -------------------------------- |
-| `/api/memory`        | GET    | Get memory from Claude gateway   |
+| `/api/memory`        | GET    | Get memory from Hermes Agent gateway   |
 | `/api/memory/list`   | GET    | List local memory markdown files |
 | `/api/memory/read`   | GET    | Read specific memory file        |
 | `/api/memory/search` | GET    | Search across memory files       |
@@ -180,7 +180,7 @@
 | Endpoint             | Method | Description                                  |
 | -------------------- | ------ | -------------------------------------------- |
 | `/api/models`        | GET    | List available models (gateway + auth store) |
-| `/api/claude-config` | GET    | Read Claude config.yaml and .env             |
+| `/api/claude-config` | GET    | Read Hermes config.yaml and .env             |
 | `/api/claude-config` | PATCH  | Update config.yaml and .env                  |
 | `/api/context-usage` | GET    | Token/context usage for a session            |
 
@@ -211,7 +211,7 @@
 | `/api/connection-status` | GET    | Gateway connection status with capabilities   |
 | `/api/gateway-status`    | GET    | Detailed gateway capabilities                 |
 | `/api/start-agent`       | POST   | Auto-start Claude agent process               |
-| `/api/start-claude`      | POST   | Start Claude gateway                          |
+| `/api/start-claude`      | POST   | Start Hermes Agent gateway                          |
 | `/api/workspace`         | GET    | Workspace auto-detection                      |
 
 ### 2.10 OAuth
@@ -326,7 +326,7 @@
 
 | Setting                   | Type                            | Default  | Description                 |
 | ------------------------- | ------------------------------- | -------- | --------------------------- |
-| `claudeUrl`               | string                          | `''`     | Claude API URL              |
+| `claudeUrl`               | string                          | `''`     | Hermes Agent API URL              |
 | `claudeToken`             | string                          | `''`     | Bearer token                |
 | `theme`                   | `system\|light\|dark`           | `system` | Color mode                  |
 | `accentColor`             | `orange\|purple\|blue\|green`   | `blue`   | Accent color                |
@@ -374,26 +374,26 @@
 
 | Variable               | Description                                        |
 | ---------------------- | -------------------------------------------------- |
-| `CLAUDE_API_URL`       | Backend API URL (default: `http://127.0.0.1:8642`) |
+| `HERMES_API_URL`       | Backend API URL (default: `http://127.0.0.1:8642`) |
 | `CLAUDE_PASSWORD`      | Optional password protection for web UI            |
-| `CLAUDE_WORKSPACE_DIR` | Workspace root directory (default: `~/.claude`)    |
-| `CLAUDE_AGENT_PATH`    | Path to claude-agent directory                     |
+| `CLAUDE_WORKSPACE_DIR` | Workspace root directory (default: `~/.hermes`)    |
+| `HERMES_AGENT_PATH`    | Path to hermes-agent directory                     |
 | `CLAUDE_DEFAULT_MODEL` | Default model override                             |
 | `CLAUDE_ALLOWED_HOSTS` | Allowed hosts (default: `.ts.net`)                 |
 | `ANTHROPIC_API_KEY`    | Anthropic API key passthrough (optional)           |
 | `OPENAI_API_KEY`       | OpenAI API key passthrough (optional)              |
 | `OPENROUTER_API_KEY`   | OpenRouter API key passthrough (optional)          |
 | `GOOGLE_API_KEY`       | Google Gemini API key passthrough (optional)       |
-| `CLAUDE_API_TOKEN`     | Auth token for gateway API_SERVER_KEY              |
+| `HERMES_API_TOKEN`     | Auth token for gateway API_SERVER_KEY              |
 | `BEARER_TOKEN`         | Bearer token for backend auth                      |
 | `PORT`                 | Server port (default: 3002 dev, 3000 prod)         |
 
 ### 4.6 Claude Config Management
 
-- **Read/write `~/.claude/config.yaml`** — YAML config via web UI
-- **Read/write `~/.claude/.env`** — environment variables
+- **Read/write `~/.hermes/config.yaml`** — YAML config via web UI
+- **Read/write `~/.hermes/.env`** — environment variables
 - **Provider status** with masked API keys
-- **Auth store integration** — reads from `~/.claude/auth-profiles.json` and `~/.openclaw/agents/main/agent/auth-profiles.json`
+- **Auth store integration** — reads from `~/.hermes/auth-profiles.json` and `~/.openclaw/agents/main/agent/auth-profiles.json`
 
 ---
 
@@ -420,7 +420,7 @@
 
 ### 5.3 Run Store (Persistence)
 
-- Persisted run state at `~/.claude/webui-mvp/runs/`
+- Persisted run state at `~/.hermes/webui-mvp/runs/`
 - Run lifecycle: accepted → active → handoff → stalled → complete → error
 - Tool call tracking with phase management
 - Lifecycle event logging (max 40 per run)
@@ -434,7 +434,7 @@
 
 ### 5.5 Memory Browser (Server)
 
-- Filesystem-based memory browsing in `~/.claude/`
+- Filesystem-based memory browsing in `~/.hermes/`
 - File filters: MEMORY.md, memory/_, memories/_
 - Markdown-only restriction
 - Path traversal prevention
@@ -447,12 +447,12 @@
 - Automatic default model detection from `/v1/models`
 - Multimodal support (image_url content parts)
 
-### 5.7 Claude Agent Auto-Start
+### 5.7 Hermes Agent Auto-Start
 
-- Auto-detects sibling `claude-agent/` directory
+- Auto-detects sibling `hermes-agent/` directory
 - Resolves Python virtualenv (`.venv`, `venv`, system `python3`)
 - Spawns uvicorn with health polling (15 attempts, 1s interval)
-- Reads `~/.claude/.env` for agent configuration
+- Reads `~/.hermes/.env` for agent configuration
 
 ### 5.8 Workspace Daemon (Optional)
 
@@ -499,7 +499,7 @@
 
 - **Device code flow** for Nous Portal
 - Token polling mechanism
-- Auth profile storage in `~/.claude/auth-profiles.json`
+- Auth profile storage in `~/.hermes/auth-profiles.json`
 
 ### 6.5 Workspace Agents
 
@@ -684,8 +684,8 @@ pnpm stop:stable   # Stop via scripts/stop-stable.sh
 
 ### 10.4 Docker Compose
 
-- **claude-agent** container — Python FastAPI gateway on port 8642
-- **claude-workspace** container — Node.js web UI on port 3000
+- **hermes-agent** container — Python FastAPI gateway on port 8642
+- **hermes-workspace** container — Node.js web UI on port 3000
 - Health checks with retries
 - Environment file passthrough
 
@@ -736,4 +736,4 @@ pnpm stop:stable   # Stop via scripts/stop-stable.sh
 
 ---
 
-_Generated from codebase analysis of `/Users/aurora/claude-workspace/`_
+_Generated from codebase analysis of `/Users/aurora/hermes-workspace/`_

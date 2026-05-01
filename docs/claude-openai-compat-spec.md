@@ -1,8 +1,8 @@
-# Claude Workspace OpenAI-Compat Architecture Spec
+# Hermes Workspace OpenAI-Compat Architecture Spec
 
 > **For Claude:** Use `writing-plans` if this turns into an implementation plan. This doc locks the product and backend compatibility direction.
 
-**Goal:** Make Claude Workspace work out of the box against vanilla `claude-agent` and any OpenAI-compatible backend, while unlocking richer workspace features automatically when Claude-specific APIs are available.
+**Goal:** Make Hermes Workspace work out of the box against vanilla `hermes-agent` and any OpenAI-compatible backend, while unlocking richer workspace features automatically when Claude-specific APIs are available.
 
 **Status:** Approved architectural constraint for the next implementation pass.
 
@@ -10,7 +10,7 @@
 
 ## 1. Problem
 
-Claude Workspace currently depends on a forked `claude-agent` gateway for extended functionality:
+Hermes Workspace currently depends on a forked `hermes-agent` gateway for extended functionality:
 
 - session management
 - streaming chat
@@ -23,7 +23,7 @@ That fork dependency is the wrong shape for distribution.
 
 Current downside:
 
-- users cannot point the workspace at stock `claude-agent` and expect it to work
+- users cannot point the workspace at stock `hermes-agent` and expect it to work
 - README/setup flow forces a custom fork
 - chat reliability is coupled to `/api/sessions` instead of the more portable OpenAI-compatible chat interface
 - product adoption is constrained by backend politics instead of frontend usability
@@ -36,9 +36,9 @@ We want to reverse that.
 
 This is the decision to lock in:
 
-> **Claude Workspace must work standalone against any OpenAI-compatible backend.**
+> **Hermes Workspace must work standalone against any OpenAI-compatible backend.**
 >
-> Claude-specific workspace features may enhance the experience when the full Claude API is available, but the product must remain usable without those endpoints.
+> Claude-specific workspace features may enhance the experience when the full Hermes Agent API is available, but the product must remain usable without those endpoints.
 
 Non-negotiable implication:
 
@@ -53,7 +53,7 @@ Non-negotiable implication:
 
 Rewrite the workspace so the core chat product works against:
 
-- vanilla `claude-agent`
+- vanilla `hermes-agent`
 - any backend exposing `/v1/chat/completions`
 - any backend exposing `/v1/models` optionally
 
@@ -61,11 +61,11 @@ In this mode, advanced features degrade gracefully when Claude-specific APIs are
 
 ### Step 2 — Upstream the richer API later
 
-Submit the custom Claude endpoints into upstream `claude-agent`, targeting `gateway/platforms/api_server.py`.
+Submit the custom Claude endpoints into upstream `hermes-agent`, targeting `gateway/platforms/api_server.py`.
 
 If upstream accepts them:
 
-- full workspace functionality works with vanilla `claude-agent`
+- full workspace functionality works with vanilla `hermes-agent`
 - no long-term fork dependency remains
 - the enhanced UX becomes a first-class upstream capability, not a private patchset
 
@@ -117,7 +117,7 @@ The UI should detect these capabilities and progressively enhance.
 
 **Chat is the base product. Everything else is optional enhancement.**
 
-If a user points Claude Workspace at a valid OpenAI-compatible backend, they should be able to send a message and receive a streamed response without caring whether the backend is Claude, OpenAI, OpenRouter, Ollama, vLLM, or something else.
+If a user points Hermes Workspace at a valid OpenAI-compatible backend, they should be able to send a message and receive a streamed response without caring whether the backend is Claude, OpenAI, OpenRouter, Ollama, vLLM, or something else.
 
 Anything beyond that should be treated as capability-based augmentation.
 
@@ -198,7 +198,7 @@ New setup principle:
 Onboarding copy should communicate:
 
 - “Works with any OpenAI-compatible backend”
-- “Enhanced features unlock automatically with Claude gateway APIs”
+- “Enhanced features unlock automatically with Hermes Agent gateway APIs”
 
 ### 6.5 Documentation
 
@@ -207,8 +207,8 @@ README and setup docs must reflect the architecture honestly.
 Required messaging:
 
 - workspace works standalone with OpenAI-compatible backends
-- vanilla `claude-agent` is a supported target
-- the richer Claude API is optional for advanced workspace features
+- vanilla `hermes-agent` is a supported target
+- the richer Hermes Agent API is optional for advanced workspace features
 - upstreaming those APIs is the long-term path
 
 ---
@@ -296,9 +296,9 @@ For Step 2, the custom API endpoints should be proposed upstream in:
 
 Intent:
 
-- make enhanced workspace APIs part of upstream `claude-agent`
+- make enhanced workspace APIs part of upstream `hermes-agent`
 - remove ongoing maintenance burden of a permanent fork
-- let Claude Workspace treat stock Claude as the best backend, without requiring it
+- let Hermes Workspace treat stock Claude as the best backend, without requiring it
 
 ---
 
@@ -307,7 +307,7 @@ Intent:
 This spec does **not** require:
 
 - universal parity across every OpenAI-compatible provider
-- guaranteed session persistence on non-Claude backends
+- guaranteed session persistence on non-Hermes backends
 - memory/skills/config support outside Claude
 - building a backend abstraction for every vendor-specific extension
 
@@ -325,8 +325,8 @@ This initiative is complete when all of the following are true:
 
 ### Product acceptance
 
-- A user can launch Claude Workspace against a stock OpenAI-compatible backend and successfully chat without patching backend code.
-- A user can launch Claude Workspace against vanilla `claude-agent` and get a working core experience.
+- A user can launch Hermes Workspace against a stock OpenAI-compatible backend and successfully chat without patching backend code.
+- A user can launch Hermes Workspace against vanilla `hermes-agent` and get a working core experience.
 - Advanced features do not hard-fail the app when Claude-specific APIs are absent.
 - The UI clearly communicates portable mode vs enhanced Claude mode.
 
@@ -341,7 +341,7 @@ This initiative is complete when all of the following are true:
 
 - README no longer says the fork is required.
 - Setup docs describe OpenAI-compatible standalone mode first.
-- Enhanced Claude API support is documented as progressive enhancement.
+- Enhanced Hermes Agent API support is documented as progressive enhancement.
 - Step 2 upstreaming target is documented clearly.
 
 ---
@@ -364,10 +364,10 @@ This is not the detailed task plan, but the engineering direction should be:
 
 Lock this in:
 
-> Claude Workspace is a standalone frontend for OpenAI-compatible chat backends.
+> Hermes Workspace is a standalone frontend for OpenAI-compatible chat backends.
 >
 > Claude-native APIs are an enhancement layer, not a requirement.
 >
 > Step 1 is portable compatibility now.
 >
-> Step 2 is upstreaming the enhanced Claude APIs so no fork is needed ever again.
+> Step 2 is upstreaming the enhanced Hermes Agent APIs so no fork is needed ever again.
