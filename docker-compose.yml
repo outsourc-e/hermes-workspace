@@ -14,34 +14,34 @@
 #
 # Images:
 #   This file pulls pre-built images by default — no local build required.
-#     - nousresearch/hermes-agent:latest  (Project Agent, Dockerfile upstream)
-#     - ghcr.io/outsourc-e/hermes-workspace:latest  (this workspace)
+#     - nousresearch/claude-agent:latest  (Project Agent, Dockerfile upstream)
+#     - ghcr.io/outsourc-e/claude-workspace:latest  (this workspace)
 #
 #   To build from source instead (e.g. for development), use:
 #     docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
 # Persistent data:
-#   The `hermes-data` named volume mounts at /opt/data inside the agent
+#   The `claude-data` named volume mounts at /opt/data inside the agent
 #   container. Config, sessions, skills, memory, and credentials live there
 #   and survive container recreation. For host-path mounts see the commented
-#   `volumes:` block on the hermes-agent service.
+#   `volumes:` block on the claude-agent service.
 #
 # Troubleshooting:
 #   - See README.md "Docker" troubleshooting section
-#   - Check logs: docker compose logs hermes-agent
+#   - Check logs: docker compose logs claude-agent
 #   - Agent must expose port 8642
 
 services:
-  # The Hermes AI Agent Gateway
+  # The Claude AI Agent Gateway
   # Provides the backend API that the workspace connects to
-  hermes-agent:
-    image: nousresearch/hermes-agent:latest
+  claude-agent:
+    image: nousresearch/claude-agent:latest
     env_file:
       - .env
     environment:
-      # Pass through whichever provider keys are set in .env. hermes-agent
+      # Pass through whichever provider keys are set in .env. claude-agent
       # uses the one that matches the provider configured in
-      # ~/.hermes/config.yaml (or whatever `hermes setup` picked).
+      # ~/.claude/config.yaml (or whatever `claude setup` picked).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
@@ -50,11 +50,11 @@ services:
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
       # Authentication for the gateway when exposing off-loopback.
       # In the default compose setup the gateway is reachable from the
-      # workspace container over the docker network on hermes-agent:8642,
+      # workspace container over the docker network on claude-agent:8642,
       # so an empty key works for localhost-only Docker installs. For any
       # deployment that publishes 8642 on the host or a LAN IP, set a
       # strong API_SERVER_KEY in .env — the workspace passes it through
-      # as HERMES_API_TOKEN below. See #122.
+      # as CLAUDE_API_TOKEN below. See #122.
       API_SERVER_KEY: ${API_SERVER_KEY:-}
       # Bind only on the docker-internal interface by default. Set
       # API_SERVER_HOST=0.0.0.0 in .env *and* set API_SERVER_KEY if you
@@ -65,7 +65,7 @@ services:
       # Persist agent state across container recreation. Swap for a
       # host-path mount (e.g. `./data:/opt/data`) if you want to edit
       # config/skills directly from the host.
-      - hermes-data:/opt/data
+      - claude-data:/opt/data
     healthcheck:
       test: ['CMD-SHELL', 'curl -fsS http://localhost:8642/health || exit 1']
       interval: 10s
@@ -76,23 +76,23 @@ services:
       - '8642:8642'
 
   # The Project Workspace Web UI
-  # Connects to hermes-agent at http://hermes-agent:8642
-  hermes-workspace:
-    image: ghcr.io/outsourc-e/hermes-workspace:latest
+  # Connects to claude-agent at http://claude-agent:8642
+  claude-workspace:
+    image: ghcr.io/outsourc-e/claude-workspace:latest
     depends_on:
-      hermes-agent:
+      claude-agent:
         condition: service_healthy
     env_file:
       - .env
     environment:
       # Internal Docker network URL (not localhost!)
-      HERMES_API_URL: http://hermes-agent:8642
-      # Must match API_SERVER_KEY on the hermes-agent side when that is set
-      HERMES_API_TOKEN: ${API_SERVER_KEY:-}
+      CLAUDE_API_URL: http://claude-agent:8642
+      # Must match API_SERVER_KEY on the claude-agent side when that is set
+      CLAUDE_API_TOKEN: ${API_SERVER_KEY:-}
       # Workspace session password. REQUIRED when HOST is non-loopback (the
       # default for Docker images, so the container binds 0.0.0.0:3000).
       # Pick a strong secret. See #122.
-      HERMES_PASSWORD: ${HERMES_PASSWORD:-}
+      CLAUDE_PASSWORD: ${CLAUDE_PASSWORD:-}
       # Enable the Secure flag on session cookies when terminated behind
       # HTTPS (reverse proxy / Tailscale Funnel / Cloudflare Tunnel). See #123.
       COOKIE_SECURE: ${COOKIE_SECURE:-}
@@ -105,4 +105,4 @@ services:
       - '127.0.0.1:3000:3000'
 
 volumes:
-  hermes-data:
+  claude-data:

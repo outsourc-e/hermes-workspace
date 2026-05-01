@@ -59,7 +59,7 @@ import {
 // ── Types ───────────────────────────────────────────────────────────────
 
 type SectionId =
-  | 'hermes'
+  | 'claude'
   | 'agent'
   | 'routing'
   | 'voice'
@@ -70,7 +70,7 @@ type SectionId =
   | 'language'
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
-  { id: 'hermes', label: 'Model & Provider', icon: CloudIcon },
+  { id: 'claude', label: 'Model & Provider', icon: CloudIcon },
   { id: 'agent', label: 'Agent', icon: Settings02Icon },
   { id: 'routing', label: 'Smart Routing', icon: SparklesIcon },
   { id: 'voice', label: 'Voice', icon: VolumeHighIcon },
@@ -82,10 +82,10 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
-  'hermes-nous',
-  'hermes-official',
-  'hermes-classic',
-  'hermes-slate',
+  'claude-nous',
+  'claude-official',
+  'claude-classic',
+  'claude-slate',
 ])
 
 function _isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
@@ -185,7 +185,7 @@ const PROVIDER_CARDS: Array<{
     id: 'nous',
     name: 'Nous Portal',
     logo: '/providers/nous.png',
-    models: ['xiaomi/mimo-v2-pro', 'xiaomi/mimo-v2-omni', 'hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'],
+    models: ['xiaomi/mimo-v2-pro', 'xiaomi/mimo-v2-omni', 'claude-3-llama-3.1-405b', 'claude-3-llama-3.1-70b'],
     authType: 'oauth',
   },
   {
@@ -238,7 +238,7 @@ const PROVIDER_CARDS: Array<{
   { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
 ]
 
-function HermesContent() {
+function ClaudeContent() {
   const configAvailable = useFeatureAvailable('config')
   const [activeProvider, setActiveProvider] = useState('')
   const [activeModel, setActiveModel] = useState('')
@@ -269,7 +269,7 @@ function HermesContent() {
       }
     }
     fetch(
-      `/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`,
+      `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`,
     )
       .then((r) => r.json())
       .then((d: { models?: Array<{ id: string }> }) => {
@@ -290,7 +290,7 @@ function HermesContent() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/hermes-config')
+    fetch('/api/claude-config')
       .then((r) => r.json())
       .then((d: any) => {
         setActiveProvider(d.activeProvider || '')
@@ -317,14 +317,14 @@ function HermesContent() {
     setSaving(true)
     setMsg(null)
     try {
-      const res = await fetch('/api/hermes-config', {
+      const res = await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       })
       const r = (await res.json()) as { message?: string }
       setMsg(r.message || 'Saved')
-      const ref = await fetch('/api/hermes-config')
+      const ref = await fetch('/api/claude-config')
       const d = await ref.json()
       setActiveProvider(d.activeProvider || '')
       setActiveModel(d.activeModel || '')
@@ -356,7 +356,7 @@ function HermesContent() {
   if (!configAvailable) {
     return (
       <BackendUnavailableState
-        feature="Hermes Agent Settings"
+        feature="Claude Agent Settings"
         description={getUnavailableReason('config')}
       />
     )
@@ -489,7 +489,7 @@ function HermesContent() {
         if (!disc || !disc.needsRestart) return null
         return (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-            ⚠️ Gateway restart needed to use {disc.name}. Run <code className="rounded bg-black/30 px-1">hermes gateway restart</code> in your terminal.
+            ⚠️ Gateway restart needed to use {disc.name}. Run <code className="rounded bg-black/30 px-1">claude gateway restart</code> in your terminal.
           </div>
         )
       })()}
@@ -674,7 +674,7 @@ function HermesContent() {
               '—'}
           </span>
           <span style={mutedStyle}>Config</span>
-          <span className="font-mono font-medium">~/.hermes/config.yaml</span>
+          <span className="font-mono font-medium">~/.claude/config.yaml</span>
         </div>
       </div>
     </div>
@@ -841,7 +841,7 @@ function AppearanceContent() {
   }
 
   function _handleAccentColorChange(selectedAccent: AccentColor) {
-    localStorage.setItem('hermes-accent', selectedAccent)
+    localStorage.setItem('claude-accent', selectedAccent)
     document.documentElement.setAttribute('data-accent', selectedAccent)
     applyAccentColor(selectedAccent)
     updateSettings({ accentColor: selectedAccent })
@@ -890,7 +890,7 @@ function AppearanceContent() {
       <div className={SETTINGS_CARD_CLASS}>
         <Row
           label="System metrics footer"
-          description="Show a persistent footer with CPU, RAM, disk, and Hermes status."
+          description="Show a persistent footer with CPU, RAM, disk, and Claude status."
         >
           <Switch
             checked={settings.showSystemMetricsFooter}
@@ -901,24 +901,24 @@ function AppearanceContent() {
           />
         </Row>
 
-        {/* Mobile chat nav removed — not relevant for Hermes */}
+        {/* Mobile chat nav removed — not relevant for Claude */}
       </div>
     </div>
   )
 }
 
 const ENTERPRISE_THEME_FAMILIES: Array<ThemeId> = [
-  'hermes-nous',
-  'hermes-official',
-  'hermes-classic',
-  'hermes-slate',
+  'claude-nous',
+  'claude-official',
+  'claude-classic',
+  'claude-slate',
 ]
 
 const ENTERPRISE_THEMES = THEMES.map((theme) => ({
   ...theme,
   desc: theme.description,
   preview:
-    theme.id === 'hermes-nous'
+    theme.id === 'claude-nous'
       ? {
           bg: '#041C1C',
           panel: '#06282A',
@@ -926,7 +926,7 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
           accent: '#FFAC02',
           text: '#FFE6CB',
         }
-      : theme.id === 'hermes-nous-light'
+      : theme.id === 'claude-nous-light'
         ? {
             bg: '#F8FAF8',
             panel: '#FBFDFB',
@@ -934,7 +934,7 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
             accent: '#2557B7',
             text: '#16315F',
           }
-      : theme.id === 'hermes-official'
+      : theme.id === 'claude-official'
       ? {
           bg: '#0A0E1A',
           panel: '#11182A',
@@ -942,7 +942,7 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
           accent: '#6366F1',
           text: '#E6EAF2',
         }
-      : theme.id === 'hermes-official-light'
+      : theme.id === 'claude-official-light'
         ? {
             bg: '#F7F7F1',
             panel: '#FAFBF6',
@@ -950,7 +950,7 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
             accent: '#2557B7',
             text: '#16315F',
           }
-        : theme.id === 'hermes-classic'
+        : theme.id === 'claude-classic'
           ? {
               bg: '#0d0f12',
               panel: '#1a1f26',
@@ -958,7 +958,7 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
               accent: '#b98a44',
               text: '#eceff4',
             }
-          : theme.id === 'hermes-classic-light'
+          : theme.id === 'claude-classic-light'
             ? {
                 bg: '#F5F2ED',
                 panel: '#FCFAF7',
@@ -966,7 +966,7 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
                 accent: '#b98a44',
                 text: '#1a1f26',
               }
-            : theme.id === 'hermes-slate'
+            : theme.id === 'claude-slate'
               ? {
                   bg: '#0d1117',
                   panel: '#1c2128',
@@ -1026,7 +1026,7 @@ function ThemeSwatch({
 function EnterpriseThemePicker() {
   const { updateSettings } = useSettings()
   const [current, setCurrent] = useState(() => {
-    if (typeof window === 'undefined') return 'hermes-nous'
+    if (typeof window === 'undefined') return 'claude-nous'
     return getTheme()
   })
   const currentMode = isDarkTheme(current) ? 'dark' : 'light'
@@ -1124,7 +1124,7 @@ function _LoaderContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const styles: Array<{ value: LoaderStyle; label: string }> = [
     { value: 'dots', label: 'Dots' },
-    { value: 'braille-hermes', label: 'Hermes' },
+    { value: 'braille-claude', label: 'Claude' },
     { value: 'braille-orbit', label: 'Orbit' },
     { value: 'braille-breathe', label: 'Breathe' },
     { value: 'braille-pulse', label: 'Pulse' },
@@ -1134,7 +1134,7 @@ function _LoaderContent() {
   ]
   function getPreset(s: LoaderStyle): BrailleSpinnerPreset | null {
     const m: Record<string, BrailleSpinnerPreset> = {
-      'braille-hermes': 'hermes',
+      'braille-claude': 'claude',
       'braille-orbit': 'orbit',
       'braille-breathe': 'breathe',
       'braille-pulse': 'pulse',
@@ -1281,7 +1281,7 @@ function ChatContent() {
           />
         </Row>
       </div>
-      {/* Loading animation removed — not relevant for Hermes */}
+      {/* Loading animation removed — not relevant for Claude */}
     </div>
   )
 }
@@ -1347,7 +1347,7 @@ function _AdvancedContent() {
     } else {
       setUrlError(null)
     }
-    updateSettings({ hermesUrl: value })
+    updateSettings({ claudeUrl: value })
   }
 
   async function testConnection() {
@@ -1361,24 +1361,24 @@ function _AdvancedContent() {
     }
   }
 
-  const urlErrorId = 'hermes-url-error'
+  const urlErrorId = 'claude-url-error'
 
   return (
     <div className="space-y-4">
       <SectionHeader
         title="Advanced"
-        description="Hermes endpoint and connectivity."
+        description="Claude endpoint and connectivity."
       />
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Hermes URL" description="Used for API requests from Studio">
+        <Row label="Claude URL" description="Used for API requests from Studio">
           <div className="w-full max-w-sm">
             <Input
               type="url"
-              placeholder="https://api.hermesworkspace.app"
-              value={settings.hermesUrl}
+              placeholder="https://api.claudeworkspace.app"
+              value={settings.claudeUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
-              aria-label="Hermes URL"
+              aria-label="Claude URL"
               aria-invalid={!!urlError}
               aria-describedby={urlError ? urlErrorId : undefined}
             />
@@ -1476,7 +1476,7 @@ function AgentBehaviorContent() {
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/hermes-config')
+    fetch('/api/claude-config')
       .then((r) => r.json())
       .then((d: any) => {
         setConfig((d.config?.agent as Record<string, unknown>) || {})
@@ -1487,7 +1487,7 @@ function AgentBehaviorContent() {
   const save = async (key: string, value: unknown) => {
     setMsg(null)
     try {
-      await fetch('/api/hermes-config', {
+      await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config: { agent: { [key]: value } } }),
@@ -1566,7 +1566,7 @@ function SmartRoutingContent() {
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/hermes-config')
+    fetch('/api/claude-config')
       .then((r) => r.json())
       .then((d: any) => {
         setConfig(
@@ -1585,7 +1585,7 @@ function SmartRoutingContent() {
   const save = async (key: string, value: unknown) => {
     setMsg(null)
     try {
-      await fetch('/api/hermes-config', {
+      await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1678,7 +1678,7 @@ function VoiceContent() {
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/hermes-config')
+    fetch('/api/claude-config')
       .then((r) => r.json())
       .then((d: any) => {
         setTts((d.config?.tts as Record<string, unknown>) || {})
@@ -1690,7 +1690,7 @@ function VoiceContent() {
   const saveTts = async (key: string, value: unknown) => {
     setMsg(null)
     try {
-      await fetch('/api/hermes-config', {
+      await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config: { tts: { [key]: value } } }),
@@ -1706,7 +1706,7 @@ function VoiceContent() {
   const saveStt = async (key: string, value: unknown) => {
     setMsg(null)
     try {
-      await fetch('/api/hermes-config', {
+      await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config: { stt: { [key]: value } } }),
@@ -1812,7 +1812,7 @@ function DisplayContent() {
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/hermes-config')
+    fetch('/api/claude-config')
       .then((r) => r.json())
       .then((d: any) => {
         setConfig((d.config?.display as Record<string, unknown>) || {})
@@ -1823,7 +1823,7 @@ function DisplayContent() {
   const save = async (key: string, value: unknown) => {
     setMsg(null)
     try {
-      await fetch('/api/hermes-config', {
+      await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config: { display: { [key]: value } } }),
@@ -1931,7 +1931,7 @@ function LanguageContent() {
 // ── Main Dialog ─────────────────────────────────────────────────────────
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
-  hermes: HermesContent,
+  claude: ClaudeContent,
   agent: AgentBehaviorContent,
   routing: SmartRoutingContent,
   voice: VoiceContent,
@@ -1951,7 +1951,7 @@ type SettingsDialogProps = {
 export function SettingsDialog({
   open,
   onOpenChange,
-  initialSection = 'hermes',
+  initialSection = 'claude',
 }: SettingsDialogProps) {
   const [active, setActive] = useState<SectionId>(initialSection)
   const [mobileView, setMobileView] = useState<'nav' | 'content'>('nav')
@@ -1979,7 +1979,7 @@ export function SettingsDialog({
                 Settings
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Configure Hermes Workspace
+                Configure Claude Workspace
               </DialogDescription>
             </div>
             <DialogClose

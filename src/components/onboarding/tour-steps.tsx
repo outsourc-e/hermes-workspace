@@ -5,7 +5,7 @@ export const tourSteps: Array<Step> = [
   {
     target: 'body',
     placement: 'center',
-    title: 'Welcome to Hermes Workspace! ⚕',
+    title: 'Welcome to Claude Workspace! ⚕',
     content: (
       <div
         style={{
@@ -16,8 +16,8 @@ export const tourSteps: Array<Step> = [
         }}
       >
         <img
-          src="/hermes-avatar.webp"
-          alt="Hermes"
+          src="/claude-avatar.webp"
+          alt="Claude"
           style={{ width: 48, height: 48, borderRadius: 12 }}
         />
         <p style={{ textAlign: 'center', margin: 0 }}>
@@ -74,7 +74,7 @@ export const tourSteps: Array<Step> = [
     placement: 'right',
     title: 'Built-in Terminal',
     content:
-      'Built-in terminal for quick commands. Execute shell commands without leaving Hermes Workspace.',
+      'Built-in terminal for quick commands. Execute shell commands without leaving Claude Workspace.',
   },
   // Step 9: Usage Meter (in header)
   {
@@ -90,7 +90,7 @@ export const tourSteps: Array<Step> = [
     placement: 'right',
     title: 'Settings & Customization',
     content:
-      'Configure providers, themes, accent colors, and more. Make Hermes Workspace yours.',
+      'Configure providers, themes, accent colors, and more. Make Claude Workspace yours.',
   },
   // Step 11: Finish
   {
@@ -98,6 +98,6 @@ export const tourSteps: Array<Step> = [
     placement: 'center',
     title: "You're all set! 🎉",
     content:
-      'Start chatting with your AI, explore the tools, and customize Hermes Workspace to fit your workflow. Need help? Press ? to see all keyboard shortcuts.',
+      'Start chatting with your AI, explore the tools, and customize Claude Workspace to fit your workflow. Need help? Press ? to see all keyboard shortcuts.',
   },
 ]

@@ -6,7 +6,7 @@ import {
   getGatewayCapabilities,
   getSession,
   listSessions,
-} from '../../server/hermes-api'
+} from '../../server/claude-api'
 import { isSyntheticSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '@/server/auth-middleware'
 

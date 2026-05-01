@@ -5,7 +5,7 @@ import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
   getGatewayCapabilities,
-} from '../../server/hermes-api'
+} from '../../server/claude-api'
 import { requireJsonContentType } from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/send')({
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/api/send')({
         return json(
           {
             ok: false,
-            error: 'Legacy send is not available in Hermes Workspace.',
+            error: 'Legacy send is not available in Claude Workspace.',
           },
           { status: 501 },
         )

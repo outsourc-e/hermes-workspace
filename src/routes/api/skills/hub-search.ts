@@ -112,7 +112,7 @@ async function searchBundledSkills(
       tags,
       source: 'Bundled Skills',
       trust: 'bundled',
-      installCommand: `hermes skills install ${name}`,
+      installCommand: `claude skills install ${name}`,
       installed: true,
       score,
     })

@@ -29,9 +29,9 @@ export function MobilePromptTrigger() {
     }
 
     const isDismissed =
-      localStorage.getItem('hermes-mobile-access-dismissed') === 'true' ||
-      localStorage.getItem('hermes-mobile-prompt-dismissed') === 'true'
-    const isSetup = localStorage.getItem('hermes-mobile-setup-seen') === 'true'
+      localStorage.getItem('claude-mobile-access-dismissed') === 'true' ||
+      localStorage.getItem('claude-mobile-prompt-dismissed') === 'true'
+    const isSetup = localStorage.getItem('claude-mobile-setup-seen') === 'true'
 
     if (isDismissed || isSetup) {
       return
@@ -58,7 +58,7 @@ export function MobilePromptTrigger() {
 
   const persistDismissalPreference = () => {
     if (dontShowAgain) {
-      localStorage.setItem('hermes-mobile-access-dismissed', 'true')
+      localStorage.setItem('claude-mobile-access-dismissed', 'true')
     }
   }
 
@@ -101,8 +101,8 @@ export function MobilePromptTrigger() {
               <div className="flex items-center gap-3">
                 <div className="flex shrink-0 items-center gap-1.5">
                   <img
-                    src="/hermes-avatar.webp"
-                    alt="Hermes"
+                    src="/claude-avatar.webp"
+                    alt="Claude"
                     className="size-8 rounded-lg"
                   />
                   <span className="text-xs text-primary-600">+</span>
@@ -180,7 +180,7 @@ export function MobilePromptTrigger() {
                     className="text-xs"
                     style={{ color: 'var(--theme-muted)' }}
                   >
-                    Connect your phone to this Hermes Workspace instance in a
+                    Connect your phone to this Claude Workspace instance in a
                     few steps.
                   </p>
                 </div>

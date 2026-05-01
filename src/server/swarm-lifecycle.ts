@@ -2,7 +2,7 @@ import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { getProfilesDir } from './hermes-paths'
+import { getProfilesDir } from './claude-paths'
 import { SWARM_MEMORY_ROOT } from './swarm-environment'
 import { appendSwarmMemoryEvent } from './swarm-memory'
 
@@ -254,7 +254,7 @@ export async function renewWorker(workerId: string): Promise<{ ok: boolean; rest
   if (!started.ok) return { ok: false, restarted: false, resumeSent: false, error: started.error, handoffPath: hp }
   // Wait for shell prompt to appear before sending the resume message.
   await new Promise((resolve) => setTimeout(resolve, 1500))
-  const resumePrompt = `RESUME_AFTER_HANDOFF. Read your latest handoff at ${hp} and the local copy under ~/.hermes/profiles/${workerId}/memory/handoffs/, plus your runtime.json, then continue from "Next exact action". Reply with a fresh checkpoint when you have re-grounded.`
+  const resumePrompt = `RESUME_AFTER_HANDOFF. Read your latest handoff at ${hp} and the local copy under ~/.claude/profiles/${workerId}/memory/handoffs/, plus your runtime.json, then continue from "Next exact action". Reply with a fresh checkpoint when you have re-grounded.`
   const sent = await sendTmux(workerId, resumePrompt)
   const ctx = readRuntimeMissionContext(workerId)
   try {

@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils'
 export type AgentAvatarPreference = 'lobster' | 'logo'
 export type AgentAvatarSize = 'sm' | 'md' | 'lg'
 
-export const AGENT_AVATAR_STORAGE_KEY = 'hermes-loader-preference'
-const AGENT_AVATAR_EVENT = 'hermes-loader-preference-change'
+export const AGENT_AVATAR_STORAGE_KEY = 'claude-loader-preference'
+const AGENT_AVATAR_EVENT = 'claude-loader-preference-change'
 
 type AgentAvatarProps = {
   size?: AgentAvatarSize
@@ -142,8 +142,8 @@ function AgentAvatar({
             </span>
           ) : (
             <img
-              src="/hermes-avatar.webp"
-              alt="Hermes"
+              src="/claude-avatar.webp"
+              alt="Claude"
               className={cn(
                 getLogoSizeClassName(size),
                 iconClassName,

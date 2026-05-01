@@ -1,4 +1,4 @@
-// Stub — Hermes Workspace uses hermes-api.ts for chat streaming, not legacy SSE.
+// Stub — Claude Workspace uses claude-api.ts for chat streaming, not legacy SSE.
 // This hook is kept as a no-op to satisfy use-realtime-chat-history imports.
 
 export function useChatStream(_opts: {

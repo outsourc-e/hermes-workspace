@@ -68,20 +68,20 @@ async function loadKanbanBackend(options?: {
 }
 
 describe('kanban-backend', () => {
-  it('auto-detect prefers Hermes backend when Hermes CLI and canonical storage are present', async () => {
-    vi.stubEnv('HERMES_HOME', '/Users/aurora/.hermes/profiles/swarm2')
+  it('auto-detect prefers Claude backend when Claude CLI and canonical storage are present', async () => {
+    vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const sqliteCalls: Array<{ command: string; args?: string[] }> = []
     const mod = await loadKanbanBackend({
-      existsSync: (target) => target === '/Users/aurora/.hermes/kanban.db' || target === '/Users/aurora/.hermes/kanban',
+      existsSync: (target) => target === '/Users/aurora/.claude/kanban.db' || target === '/Users/aurora/.claude/kanban',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'hermes') return '/Users/aurora/.local/bin/hermes\n'
-        if (command === '/Users/aurora/.local/bin/hermes' && args[0] === '--version') return 'hermes 1.0.0\n'
+        if (command === 'which' && args[0] === 'claude') return '/Users/aurora/.local/bin/claude\n'
+        if (command === '/Users/aurora/.local/bin/claude' && args[0] === '--version') return 'claude 1.0.0\n'
         if (command === 'sqlite3') {
           sqliteCalls.push({ command, args })
           return JSON.stringify([
             {
               id: 't_12345678',
-              title: 'Hermes task',
+              title: 'Claude task',
               body: 'Backed by sqlite',
               status: 'running',
               assignee: 'swarm2',
@@ -95,35 +95,35 @@ describe('kanban-backend', () => {
     })
 
     expect(mod.getKanbanBackendMeta()).toMatchObject({
-      id: 'hermes',
+      id: 'claude',
       detected: true,
       writable: true,
-      path: '/Users/aurora/.hermes/kanban.db',
+      path: '/Users/aurora/.claude/kanban.db',
     })
 
     const cards = mod.listKanbanCards()
     expect(cards).toHaveLength(1)
     expect(cards[0]).toMatchObject({
       id: 't_12345678',
-      title: 'Hermes task',
+      title: 'Claude task',
       status: 'running',
       assignedWorker: 'swarm2',
-      createdBy: 'hermes-kanban',
+      createdBy: 'claude-kanban',
     })
-    expect(sqliteCalls[0]?.args?.[0]).toBe('/Users/aurora/.hermes/kanban.db')
+    expect(sqliteCalls[0]?.args?.[0]).toBe('/Users/aurora/.claude/kanban.db')
   })
 
-  it('auto-detect uses Hermes storage directly when the CLI is unavailable', async () => {
-    vi.stubEnv('HERMES_HOME', '/Users/aurora/.hermes/profiles/swarm2')
+  it('auto-detect uses Claude storage directly when the CLI is unavailable', async () => {
+    vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const mod = await loadKanbanBackend({
-      existsSync: (target) => target === '/Users/aurora/.hermes/kanban.db',
+      existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'hermes') throw new Error('not found')
+        if (command === 'which' && args[0] === 'claude') throw new Error('not found')
         if (command === 'sqlite3') {
           return JSON.stringify([
             {
               id: 't_direct',
-              title: 'Direct Hermes task',
+              title: 'Direct Claude task',
               body: '',
               status: 'ready',
               assignee: null,
@@ -137,40 +137,40 @@ describe('kanban-backend', () => {
     })
 
     expect(mod.getKanbanBackendMeta()).toMatchObject({
-      id: 'hermes',
+      id: 'claude',
       detected: true,
       writable: true,
-      path: '/Users/aurora/.hermes/kanban.db',
+      path: '/Users/aurora/.claude/kanban.db',
     })
     expect(mod.getKanbanBackendMeta().details).toContain('direct local storage access')
     expect(mod.listKanbanCards()[0]).toMatchObject({ id: 't_direct', status: 'ready' })
   })
 
   it('resolves canonical Kanban paths from legacy profile-home env fallback too', async () => {
-    vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.hermes/profiles/swarm5/home')
+    vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm5/home')
     const mod = await loadKanbanBackend({
-      existsSync: (target) => target === '/Users/aurora/.hermes/kanban.db',
+      existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'hermes') throw new Error('not found')
+        if (command === 'which' && args[0] === 'claude') throw new Error('not found')
         if (command === 'sqlite3') return '[]'
         throw new Error(`Unexpected command: ${command} ${args.join(' ')}`)
       },
     })
 
     expect(mod.getKanbanBackendMeta()).toMatchObject({
-      id: 'hermes',
+      id: 'claude',
       detected: true,
-      path: '/Users/aurora/.hermes/kanban.db',
+      path: '/Users/aurora/.claude/kanban.db',
     })
   })
 
-  it('auto-detect falls back to local when canonical Hermes storage is missing', async () => {
-    vi.stubEnv('HERMES_HOME', '/Users/aurora/.hermes/profiles/swarm2')
+  it('auto-detect falls back to local when canonical Claude storage is missing', async () => {
+    vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const mod = await loadKanbanBackend({
       existsSync: () => false,
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'hermes') return '/Users/aurora/.local/bin/hermes\n'
-        if (command === '/Users/aurora/.local/bin/hermes' && args[0] === '--version') return 'hermes 1.0.0\n'
+        if (command === 'which' && args[0] === 'claude') return '/Users/aurora/.local/bin/claude\n'
+        if (command === '/Users/aurora/.local/bin/claude' && args[0] === '--version') return 'claude 1.0.0\n'
         throw new Error(`Unexpected command: ${command} ${args.join(' ')}`)
       },
     })
@@ -184,15 +184,15 @@ describe('kanban-backend', () => {
     expect(mod.listKanbanCards()[0]?.id).toBe('local-1')
   })
 
-  it('creates and updates Hermes tasks through canonical kanban.db path', async () => {
-    vi.stubEnv('HERMES_HOME', '/Users/aurora/.hermes/profiles/swarm2')
+  it('creates and updates Claude tasks through canonical kanban.db path', async () => {
+    vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const sqliteCalls: string[] = []
     let readCount = 0
     const mod = await loadKanbanBackend({
-      existsSync: (target) => target === '/Users/aurora/.hermes/kanban.db' || target === '/Users/aurora/.hermes/kanban',
+      existsSync: (target) => target === '/Users/aurora/.claude/kanban.db' || target === '/Users/aurora/.claude/kanban',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'hermes') return '/Users/aurora/.local/bin/hermes\n'
-        if (command === '/Users/aurora/.local/bin/hermes' && args[0] === '--version') return 'hermes 1.0.0\n'
+        if (command === 'which' && args[0] === 'claude') return '/Users/aurora/.local/bin/claude\n'
+        if (command === '/Users/aurora/.local/bin/claude' && args[0] === '--version') return 'claude 1.0.0\n'
         if (command === 'sqlite3') {
           sqliteCalls.push(args.join(' '))
           const sql = args[2] ?? ''
@@ -201,7 +201,7 @@ describe('kanban-backend', () => {
             return JSON.stringify([
               {
                 id: 't_deadbeef',
-                title: readCount === 1 ? 'Created Hermes task' : 'Updated Hermes task',
+                title: readCount === 1 ? 'Created Claude task' : 'Updated Claude task',
                 body: 'Task body',
                 status: readCount === 1 ? 'queued' : 'done',
                 assignee: 'swarm6',
@@ -216,12 +216,12 @@ describe('kanban-backend', () => {
       },
     })
 
-    const created = mod.createKanbanCard({ title: 'Created Hermes task', spec: 'Task body', assignedWorker: 'swarm6', status: 'backlog' })
-    const updated = mod.updateKanbanCard('t_deadbeef', { title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
+    const created = mod.createKanbanCard({ title: 'Created Claude task', spec: 'Task body', assignedWorker: 'swarm6', status: 'backlog' })
+    const updated = mod.updateKanbanCard('t_deadbeef', { title: 'Updated Claude task', status: 'done', assignedWorker: 'swarm6' })
 
-    expect(created).toMatchObject({ id: 't_deadbeef', title: 'Created Hermes task', status: 'backlog', assignedWorker: 'swarm6', createdBy: 'hermes-kanban' })
-    expect(updated).toMatchObject({ id: 't_deadbeef', title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
-    expect(sqliteCalls.every((call) => call.startsWith('/Users/aurora/.hermes/kanban.db '))).toBe(true)
+    expect(created).toMatchObject({ id: 't_deadbeef', title: 'Created Claude task', status: 'backlog', assignedWorker: 'swarm6', createdBy: 'claude-kanban' })
+    expect(updated).toMatchObject({ id: 't_deadbeef', title: 'Updated Claude task', status: 'done', assignedWorker: 'swarm6' })
+    expect(sqliteCalls.every((call) => call.startsWith('/Users/aurora/.claude/kanban.db '))).toBe(true)
     expect(sqliteCalls.some((call) => call.includes('insert into tasks'))).toBe(true)
     expect(sqliteCalls.some((call) => call.includes('update tasks set'))).toBe(true)
   })

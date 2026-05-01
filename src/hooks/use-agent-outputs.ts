@@ -1,8 +1,8 @@
 // use-agent-outputs.ts
 //
-// Hermes-Workspace stub for the Operations "Outputs" tab.
+// Claude-Workspace stub for the Operations "Outputs" tab.
 // ControlSuite ships a richer implementation backed by the Codex agent
-// activity feed. Hermes does not have that surface yet, so this returns
+// activity feed. Claude does not have that surface yet, so this returns
 // an empty list and a no-op refresher. Replace with a real hook when we
 // wire up an outputs feed.
 

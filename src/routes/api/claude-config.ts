@@ -1,6 +1,6 @@
 /**
- * Hermes Config API — read/write ~/.hermes/config.yaml and ~/.hermes/.env
- * Gives the web UI the same config power as `hermes setup`
+ * Claude Config API — read/write ~/.claude/config.yaml and ~/.claude/.env
+ * Gives the web UI the same config power as `claude setup`
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -16,11 +16,11 @@ import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
 
-const HERMES_HOME = process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
-const CONFIG_PATH = path.join(HERMES_HOME, 'config.yaml')
-const ENV_PATH = path.join(HERMES_HOME, '.env')
+const CLAUDE_HOME = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
+const ENV_PATH = path.join(CLAUDE_HOME, '.env')
 
-// Known Hermes providers
+// Known Claude providers
 const PROVIDERS = [
   { id: 'nous', name: 'Nous Portal', authType: 'oauth', envKeys: [] },
   { id: 'openai-codex', name: 'OpenAI Codex', authType: 'oauth', envKeys: [] },
@@ -94,7 +94,7 @@ function readConfig(): Record<string, unknown> {
 }
 
 function writeConfig(config: Record<string, unknown>): void {
-  fs.mkdirSync(HERMES_HOME, { recursive: true })
+  fs.mkdirSync(CLAUDE_HOME, { recursive: true })
   fs.writeFileSync(CONFIG_PATH, YAML.stringify(config), 'utf-8')
 }
 
@@ -126,7 +126,7 @@ function readEnv(): Record<string, string> {
 }
 
 function writeEnv(env: Record<string, string>): void {
-  fs.mkdirSync(HERMES_HOME, { recursive: true })
+  fs.mkdirSync(CLAUDE_HOME, { recursive: true })
   const lines = Object.entries(env).map(([k, v]) => `${k}=${v}`)
   fs.writeFileSync(ENV_PATH, lines.join('\n') + '\n', 'utf-8')
 }
@@ -141,8 +141,8 @@ function checkAuthStore(providerId: string): {
   source: string
   maskedKey?: string
 } {
-  // Check Hermes auth store
-  const storePath = path.join(os.homedir(), '.hermes', 'auth-profiles.json')
+  // Check Claude auth store
+  const storePath = path.join(os.homedir(), '.claude', 'auth-profiles.json')
   try {
     if (fs.existsSync(storePath)) {
       const store = JSON.parse(fs.readFileSync(storePath, 'utf-8'))
@@ -153,7 +153,7 @@ function checkAuthStore(providerId: string): {
         const p = value as Record<string, unknown>
         const token = String(p.token || p.key || p.access || '').trim()
         if (token) {
-          return { hasToken: true, source: 'hermes-auth-store', maskedKey: maskKey(token) }
+          return { hasToken: true, source: 'claude-auth-store', maskedKey: maskKey(token) }
         }
       }
     }
@@ -161,7 +161,7 @@ function checkAuthStore(providerId: string): {
   return { hasToken: false, source: '' }
 }
 
-export const Route = createFileRoute('/api/hermes-config')({
+export const Route = createFileRoute('/api/claude-config')({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -175,7 +175,7 @@ export const Route = createFileRoute('/api/hermes-config')({
             providers: [],
             activeProvider: '',
             activeModel: '',
-            hermesHome: HERMES_HOME,
+            claudeHome: CLAUDE_HOME,
           })
         }
 
@@ -229,7 +229,7 @@ export const Route = createFileRoute('/api/hermes-config')({
           providers: providerStatus,
           activeProvider,
           activeModel,
-          hermesHome: HERMES_HOME,
+          claudeHome: CLAUDE_HOME,
         })
       },
 
@@ -305,7 +305,7 @@ export const Route = createFileRoute('/api/hermes-config')({
 
         return Response.json({
           ok: true,
-          message: 'Config updated. Restart Hermes to apply changes.',
+          message: 'Config updated. Restart Claude to apply changes.',
         })
       },
     },

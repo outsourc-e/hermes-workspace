@@ -1,21 +1,21 @@
 /**
  * Proxy endpoint — returns available task assignees.
- * Reads agent profiles from the Hermes gateway and combines with the
+ * Reads agent profiles from the Claude gateway and combines with the
  * configured human reviewer name (tasks.human_reviewer in config.yaml).
  * Falls back to profile directory listing if the gateway doesn't have
  * a /api/tasks/assignees endpoint.
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { BEARER_TOKEN, HERMES_API } from '../../server/gateway-capabilities'
+import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import YAML from 'yaml'
 
-const HERMES_HOME = process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
-const CONFIG_PATH = path.join(HERMES_HOME, 'config.yaml')
-const PROFILES_PATH = path.join(os.homedir(), '.hermes', 'profiles')
+const CLAUDE_HOME = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
+const PROFILES_PATH = path.join(os.homedir(), '.claude', 'profiles')
 
 function readConfig(): Record<string, unknown> {
   try {
@@ -43,7 +43,7 @@ function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 }
 
-export const Route = createFileRoute('/api/hermes-tasks-assignees')({
+export const Route = createFileRoute('/api/claude-tasks-assignees')({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -53,7 +53,7 @@ export const Route = createFileRoute('/api/hermes-tasks-assignees')({
 
         // Try gateway first — it may have a richer endpoint
         try {
-          const res = await fetch(`${HERMES_API}/api/tasks/assignees`, {
+          const res = await fetch(`${CLAUDE_API}/api/tasks/assignees`, {
             signal: AbortSignal.timeout(2000),
             headers: authHeaders(),
           })

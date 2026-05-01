@@ -17,14 +17,14 @@ import { dirname, join } from 'node:path'
  * deployments.  For multi-worker setups the file becomes a race-condition
  * window — in that case replace with Redis or a database.
  *
- * File location: ~/.hermes/workspace-sessions.json
+ * File location: ~/.claude/workspace-sessions.json
  */
 interface SessionStore {
   tokens: Record<string, number> // token -> expiry unix-ms
 }
 
 const STORE_FILE = join(
-  process.env.HERMES_HOME ?? join(homedir(), '.hermes'),
+  process.env.CLAUDE_HOME ?? join(homedir(), '.claude'),
   'workspace-sessions.json',
 )
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -142,7 +142,7 @@ export function revokeSessionToken(token: string): void {
  */
 export function isPasswordProtectionEnabled(): boolean {
   return Boolean(
-    process.env.HERMES_PASSWORD && process.env.HERMES_PASSWORD.length > 0,
+    process.env.CLAUDE_PASSWORD && process.env.CLAUDE_PASSWORD.length > 0,
   )
 }
 
@@ -150,7 +150,7 @@ export function isPasswordProtectionEnabled(): boolean {
  * Verify password using timing-safe comparison.
  */
 export function verifyPassword(password: string): boolean {
-  const configured = process.env.HERMES_PASSWORD
+  const configured = process.env.CLAUDE_PASSWORD
   if (!configured || configured.length === 0) {
     return false
   }
@@ -181,8 +181,8 @@ export function getSessionTokenFromCookie(
 
   const cookies = cookieHeader.split(';').map((c) => c.trim())
   for (const cookie of cookies) {
-    if (cookie.startsWith('hermes-auth=')) {
-      return cookie.substring('hermes-auth='.length)
+    if (cookie.startsWith('claude-auth=')) {
+      return cookie.substring('claude-auth='.length)
     }
   }
   return null
@@ -292,5 +292,5 @@ export function createSessionCookie(token: string): string {
   const attrs = ['HttpOnly']
   if (shouldSetSecureCookie()) attrs.push('Secure')
   attrs.push('SameSite=Strict', 'Path=/', `Max-Age=${30 * 24 * 60 * 60}`)
-  return `hermes-auth=${token}; ${attrs.join('; ')}`
+  return `claude-auth=${token}; ${attrs.join('; ')}`
 }

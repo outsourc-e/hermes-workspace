@@ -20,10 +20,10 @@ import {
 const execFileAsync = promisify(execFile)
 
 const WORKSPACE_ROOT = (
-  process.env.HERMES_WORKSPACE_DIR ||
-  process.env.HERMES_WORKSPACE_DIR ||
-  process.env.HERMES_HOME ||
-  path.join(os.homedir(), '.hermes')
+  process.env.CLAUDE_WORKSPACE_DIR ||
+  process.env.CLAUDE_WORKSPACE_DIR ||
+  process.env.CLAUDE_HOME ||
+  path.join(os.homedir(), '.claude')
 ).trim()
 
 type FileEntry = {
@@ -39,7 +39,7 @@ type FileEntry = {
  * Resolve an input path and verify it stays within WORKSPACE_ROOT.
  *
  * Uses path.relative() rather than a string-prefix check (which is unsafe
- * for sibling paths like `/root/.hermes` vs `/root/.hermes2`). The relative
+ * for sibling paths like `/root/.claude` vs `/root/.claude2`). The relative
  * form rejects any candidate that escapes the root via `..` segments or
  * that resolves to an absolute path outside the root. See #121.
  */

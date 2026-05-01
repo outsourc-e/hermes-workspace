@@ -25,7 +25,7 @@ export type SessionTitleInfo = {
   error?: string | null
 }
 
-const STORAGE_KEY = 'hermes.sessionTitles.v1'
+const STORAGE_KEY = 'claude.sessionTitles.v1'
 
 let persistedTitles: Record<string, PersistedTitle> = {}
 const runtimeStates = new Map<string, RuntimeState>()

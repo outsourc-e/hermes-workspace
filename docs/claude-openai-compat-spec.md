@@ -1,8 +1,8 @@
-# Hermes Workspace OpenAI-Compat Architecture Spec
+# Claude Workspace OpenAI-Compat Architecture Spec
 
-> **For Hermes:** Use `writing-plans` if this turns into an implementation plan. This doc locks the product and backend compatibility direction.
+> **For Claude:** Use `writing-plans` if this turns into an implementation plan. This doc locks the product and backend compatibility direction.
 
-**Goal:** Make Hermes Workspace work out of the box against vanilla `hermes-agent` and any OpenAI-compatible backend, while unlocking richer workspace features automatically when Hermes-specific APIs are available.
+**Goal:** Make Claude Workspace work out of the box against vanilla `claude-agent` and any OpenAI-compatible backend, while unlocking richer workspace features automatically when Claude-specific APIs are available.
 
 **Status:** Approved architectural constraint for the next implementation pass.
 
@@ -10,7 +10,7 @@
 
 ## 1. Problem
 
-Hermes Workspace currently depends on a forked `hermes-agent` gateway for extended functionality:
+Claude Workspace currently depends on a forked `claude-agent` gateway for extended functionality:
 
 - session management
 - streaming chat
@@ -23,7 +23,7 @@ That fork dependency is the wrong shape for distribution.
 
 Current downside:
 
-- users cannot point the workspace at stock `hermes-agent` and expect it to work
+- users cannot point the workspace at stock `claude-agent` and expect it to work
 - README/setup flow forces a custom fork
 - chat reliability is coupled to `/api/sessions` instead of the more portable OpenAI-compatible chat interface
 - product adoption is constrained by backend politics instead of frontend usability
@@ -36,9 +36,9 @@ We want to reverse that.
 
 This is the decision to lock in:
 
-> **Hermes Workspace must work standalone against any OpenAI-compatible backend.**
+> **Claude Workspace must work standalone against any OpenAI-compatible backend.**
 >
-> Hermes-specific workspace features may enhance the experience when the full Hermes API is available, but the product must remain usable without those endpoints.
+> Claude-specific workspace features may enhance the experience when the full Claude API is available, but the product must remain usable without those endpoints.
 
 Non-negotiable implication:
 
@@ -53,19 +53,19 @@ Non-negotiable implication:
 
 Rewrite the workspace so the core chat product works against:
 
-- vanilla `hermes-agent`
+- vanilla `claude-agent`
 - any backend exposing `/v1/chat/completions`
 - any backend exposing `/v1/models` optionally
 
-In this mode, advanced features degrade gracefully when Hermes-specific APIs are absent.
+In this mode, advanced features degrade gracefully when Claude-specific APIs are absent.
 
 ### Step 2 — Upstream the richer API later
 
-Submit the custom Hermes endpoints into upstream `hermes-agent`, targeting `gateway/platforms/api_server.py`.
+Submit the custom Claude endpoints into upstream `claude-agent`, targeting `gateway/platforms/api_server.py`.
 
 If upstream accepts them:
 
-- full workspace functionality works with vanilla `hermes-agent`
+- full workspace functionality works with vanilla `claude-agent`
 - no long-term fork dependency remains
 - the enhanced UX becomes a first-class upstream capability, not a private patchset
 
@@ -96,11 +96,11 @@ User does **not** need:
 - `/api/skills`
 - `/api/memory`
 - `/api/config`
-- Hermes-specific metadata endpoints
+- Claude-specific metadata endpoints
 
-### Mode B — Enhanced Hermes Mode
+### Mode B — Enhanced Claude Mode
 
-When Hermes-specific endpoints are present, unlock:
+When Claude-specific endpoints are present, unlock:
 
 - session history and named sessions
 - memory browser / search / editing
@@ -117,7 +117,7 @@ The UI should detect these capabilities and progressively enhance.
 
 **Chat is the base product. Everything else is optional enhancement.**
 
-If a user points Hermes Workspace at a valid OpenAI-compatible backend, they should be able to send a message and receive a streamed response without caring whether the backend is Hermes, OpenAI, OpenRouter, Ollama, vLLM, or something else.
+If a user points Claude Workspace at a valid OpenAI-compatible backend, they should be able to send a message and receive a streamed response without caring whether the backend is Claude, OpenAI, OpenRouter, Ollama, vLLM, or something else.
 
 Anything beyond that should be treated as capability-based augmentation.
 
@@ -131,15 +131,15 @@ The workspace must stop treating `/api/sessions` as the prerequisite for sending
 
 Instead:
 
-1. Detect whether Hermes session APIs exist.
-2. If yes, use the enhanced Hermes session flow.
+1. Detect whether Claude session APIs exist.
+2. If yes, use the enhanced Claude session flow.
 3. If not, send chat through `POST /v1/chat/completions`.
 4. If streaming is supported, render streamed deltas.
 5. If streaming is not supported, render standard non-stream response cleanly.
 
 Result:
 
-- missing Hermes sessions API must no longer cause the product to hang or hard-fail for basic chat
+- missing Claude sessions API must no longer cause the product to hang or hard-fail for basic chat
 
 ### 6.2 Capability detection
 
@@ -153,7 +153,7 @@ Capability probing should explicitly distinguish:
 - streaming support if detectable
 - attachment / image support if inferable
 
-#### Hermes enhancement capabilities
+#### Claude enhancement capabilities
 
 - `/api/sessions`
 - `/api/skills`
@@ -168,7 +168,7 @@ The app should expose these as two layers:
 
 ### 6.3 Graceful degradation
 
-When Hermes-specific APIs are missing, the UI must not show broken loaders, dead tabs, or cryptic errors.
+When Claude-specific APIs are missing, the UI must not show broken loaders, dead tabs, or cryptic errors.
 
 Instead, each advanced surface should do one of the following:
 
@@ -193,12 +193,12 @@ New setup principle:
 
 - connect any OpenAI-compatible backend first
 - verify chat works
-- then advertise extra Hermes-native features if supported
+- then advertise extra Claude-native features if supported
 
 Onboarding copy should communicate:
 
 - “Works with any OpenAI-compatible backend”
-- “Enhanced features unlock automatically with Hermes gateway APIs”
+- “Enhanced features unlock automatically with Claude gateway APIs”
 
 ### 6.5 Documentation
 
@@ -207,8 +207,8 @@ README and setup docs must reflect the architecture honestly.
 Required messaging:
 
 - workspace works standalone with OpenAI-compatible backends
-- vanilla `hermes-agent` is a supported target
-- the richer Hermes API is optional for advanced workspace features
+- vanilla `claude-agent` is a supported target
+- the richer Claude API is optional for advanced workspace features
 - upstreaming those APIs is the long-term path
 
 ---
@@ -222,7 +222,7 @@ Do not frame missing advanced APIs as a fatal error when core chat works.
 Use status language like:
 
 - **Connected** — chat available
-- **Enhanced** — Hermes workspace APIs detected
+- **Enhanced** — Claude workspace APIs detected
 - **Partial** — chat available, some advanced features unavailable
 - **Disconnected** — no usable chat backend detected
 
@@ -232,7 +232,7 @@ Feature gating should feel intentional, not broken.
 
 Good examples:
 
-- “Memory browser requires Hermes memory API.”
+- “Memory browser requires Claude memory API.”
 - “Session history isn’t available on this backend yet.”
 - “Connected in portable mode. Chat works; advanced workspace tools are unavailable.”
 
@@ -245,7 +245,7 @@ Bad examples:
 
 ### 7.3 Session behavior in portable mode
 
-When no Hermes sessions API exists, the app still needs a sane chat UX.
+When no Claude sessions API exists, the app still needs a sane chat UX.
 
 Portable-mode minimum:
 
@@ -277,9 +277,9 @@ Expected response handling:
 - SSE stream chunks for streaming mode
 - standard OpenAI chat completion JSON for non-stream mode
 
-### 8.2 Enhanced Hermes path
+### 8.2 Enhanced Claude path
 
-Enhanced path remains Hermes-native where available, because it provides:
+Enhanced path remains Claude-native where available, because it provides:
 
 - persistent sessions
 - message history
@@ -296,9 +296,9 @@ For Step 2, the custom API endpoints should be proposed upstream in:
 
 Intent:
 
-- make enhanced workspace APIs part of upstream `hermes-agent`
+- make enhanced workspace APIs part of upstream `claude-agent`
 - remove ongoing maintenance burden of a permanent fork
-- let Hermes Workspace treat stock Hermes as the best backend, without requiring it
+- let Claude Workspace treat stock Claude as the best backend, without requiring it
 
 ---
 
@@ -307,14 +307,14 @@ Intent:
 This spec does **not** require:
 
 - universal parity across every OpenAI-compatible provider
-- guaranteed session persistence on non-Hermes backends
-- memory/skills/config support outside Hermes
+- guaranteed session persistence on non-Claude backends
+- memory/skills/config support outside Claude
 - building a backend abstraction for every vendor-specific extension
 
 The goal is simpler:
 
 - portable chat first
-- enhanced Hermes features second
+- enhanced Claude features second
 - no fork requirement
 
 ---
@@ -325,15 +325,15 @@ This initiative is complete when all of the following are true:
 
 ### Product acceptance
 
-- A user can launch Hermes Workspace against a stock OpenAI-compatible backend and successfully chat without patching backend code.
-- A user can launch Hermes Workspace against vanilla `hermes-agent` and get a working core experience.
-- Advanced features do not hard-fail the app when Hermes-specific APIs are absent.
-- The UI clearly communicates portable mode vs enhanced Hermes mode.
+- A user can launch Claude Workspace against a stock OpenAI-compatible backend and successfully chat without patching backend code.
+- A user can launch Claude Workspace against vanilla `claude-agent` and get a working core experience.
+- Advanced features do not hard-fail the app when Claude-specific APIs are absent.
+- The UI clearly communicates portable mode vs enhanced Claude mode.
 
 ### Technical acceptance
 
 - Chat send path no longer hard-depends on `/api/sessions`.
-- Capability probing includes `/v1/chat/completions` readiness, not just Hermes-specific APIs.
+- Capability probing includes `/v1/chat/completions` readiness, not just Claude-specific APIs.
 - Missing `/api/sessions`, `/api/skills`, `/api/memory`, or `/api/config` does not block app boot or core chat.
 - Portable-mode chat streaming works against OpenAI-compatible SSE responses.
 
@@ -341,7 +341,7 @@ This initiative is complete when all of the following are true:
 
 - README no longer says the fork is required.
 - Setup docs describe OpenAI-compatible standalone mode first.
-- Enhanced Hermes API support is documented as progressive enhancement.
+- Enhanced Claude API support is documented as progressive enhancement.
 - Step 2 upstreaming target is documented clearly.
 
 ---
@@ -350,13 +350,13 @@ This initiative is complete when all of the following are true:
 
 This is not the detailed task plan, but the engineering direction should be:
 
-1. Separate **core chat client** from **Hermes enhanced client**.
+1. Separate **core chat client** from **Claude enhanced client**.
 2. Refactor capability probing into portable vs enhanced layers.
 3. Add OpenAI-compatible streaming parser path.
 4. Add local-thread fallback for non-session backends.
 5. Gate advanced screens cleanly behind capability checks.
 6. Rewrite onboarding and docs around portable-first positioning.
-7. After Step 1 is stable, prepare the upstream PR for Hermes-native endpoints.
+7. After Step 1 is stable, prepare the upstream PR for Claude-native endpoints.
 
 ---
 
@@ -364,10 +364,10 @@ This is not the detailed task plan, but the engineering direction should be:
 
 Lock this in:
 
-> Hermes Workspace is a standalone frontend for OpenAI-compatible chat backends.
+> Claude Workspace is a standalone frontend for OpenAI-compatible chat backends.
 >
-> Hermes-native APIs are an enhancement layer, not a requirement.
+> Claude-native APIs are an enhancement layer, not a requirement.
 >
 > Step 1 is portable compatibility now.
 >
-> Step 2 is upstreaming the enhanced Hermes APIs so no fork is needed ever again.
+> Step 2 is upstreaming the enhanced Claude APIs so no fork is needed ever again.

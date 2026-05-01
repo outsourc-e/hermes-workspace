@@ -74,8 +74,8 @@ let _identity: DeviceIdentity | null = null
 function getDeviceIdentity(): DeviceIdentity {
   if (_identity) return _identity
   const idPath = path.join(
-    process.env.HERMES_HOME || path.join(os.homedir(), '.hermes'),
-    'identity', 'hermes-device.json')
+    process.env.CLAUDE_HOME || path.join(os.homedir(), '.claude'),
+    'identity', 'claude-device.json')
   try {
     if (fs.existsSync(idPath)) {
       const p = JSON.parse(fs.readFileSync(idPath, 'utf8'))
@@ -114,9 +114,9 @@ const CIRCUIT_BREAKER_COOLDOWN_MS = 10000 // how long to stay open
 export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
   const browserUrl = typeof window !== 'undefined' ? (window as any).__GATEWAY_URL__ : undefined
-  const url = browserUrl || process.env.HERMES_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
-  let token = process.env.HERMES_GATEWAY_TOKEN?.trim() || ''
-  const password = process.env.HERMES_GATEWAY_PASSWORD?.trim() || ''
+  const url = browserUrl || process.env.CLAUDE_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+  let token = process.env.CLAUDE_GATEWAY_TOKEN?.trim() || ''
+  const password = process.env.CLAUDE_GATEWAY_PASSWORD?.trim() || ''
 
   // Allow connecting without shared auth — device identity signature handles authentication.
   // Some gateways run without a token by default.
@@ -133,7 +133,7 @@ export function buildConnectParams(
   const role = 'operator'
   const scopes = ['operator.admin']
   const signedAtMs = Date.now()
-  const clientId = 'hermes-workspace-ui'
+  const clientId = 'claude-workspace-ui'
   const clientMode = 'ui'
   const version = nonce ? 'v2' : 'v1'
   const parts = [version, identity.deviceId, clientId, clientMode, role, scopes.join(','), String(signedAtMs), token || '']
@@ -858,7 +858,7 @@ export async function cleanupGatewayConnection(): Promise<void> {
 
 /**
  * Force-reconnect the gateway client with current process.env values.
- * Call this after updating HERMES_GATEWAY_URL / HERMES_GATEWAY_TOKEN.
+ * Call this after updating CLAUDE_GATEWAY_URL / CLAUDE_GATEWAY_TOKEN.
  */
 export async function gatewayReconnect(): Promise<void> {
   await gatewayClient.shutdown()

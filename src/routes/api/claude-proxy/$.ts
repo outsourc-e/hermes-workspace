@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { BEARER_TOKEN, HERMES_API } from '../../../server/gateway-capabilities'
+import { BEARER_TOKEN, CLAUDE_API } from '../../../server/gateway-capabilities'
 import { isAuthenticated } from '../../../server/auth-middleware'
 
 async function proxyRequest(request: Request, splat: string) {
   const incomingUrl = new URL(request.url)
   const targetPath = splat.startsWith('/') ? splat : `/${splat}`
-  const targetUrl = new URL(`${HERMES_API}${targetPath}`)
+  const targetUrl = new URL(`${CLAUDE_API}${targetPath}`)
   targetUrl.search = incomingUrl.search
 
   const headers = new Headers(request.headers)
@@ -34,7 +34,7 @@ async function proxyRequest(request: Request, splat: string) {
   })
 }
 
-export const Route = createFileRoute('/api/hermes-proxy/$')({
+export const Route = createFileRoute('/api/claude-proxy/$')({
   server: {
     handlers: {
       GET: async ({ request, params }) => {

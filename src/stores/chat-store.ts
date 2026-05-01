@@ -161,7 +161,7 @@ function persistStreamingState(
   if (_streamingPersistTimer) clearTimeout(_streamingPersistTimer)
   _streamingPersistTimer = setTimeout(() => {
     sessionStorage.setItem(
-      `hermes_streaming_${sessionKey}`,
+      `claude_streaming_${sessionKey}`,
       JSON.stringify({ ...state, _savedAt: Date.now() }),
     )
   }, 500)
@@ -172,7 +172,7 @@ export function restoreStreamingState(
 ): StreamingState | null {
   if (typeof sessionStorage === 'undefined') return null
 
-  const storageKey = `hermes_streaming_${sessionKey}`
+  const storageKey = `claude_streaming_${sessionKey}`
   const raw = sessionStorage.getItem(storageKey)
   if (!raw) return null
 
@@ -197,7 +197,7 @@ export function restoreStreamingState(
 }
 
 const WAITING_TTL_MS = 120_000
-const WAITING_STORAGE_PREFIX = 'hermes_waiting_'
+const WAITING_STORAGE_PREFIX = 'claude_waiting_'
 
 function persistWaitingState(
   sessionKey: string,
@@ -779,7 +779,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           // Content-text dedup: identical assistant text within the same
           // session should never appear twice, even if message IDs differ
-          // (e.g. same reply routed from Telegram + Hermes Workspace).
+          // (e.g. same reply routed from Telegram + Claude Workspace).
           if (
             normalizedMessage.role === 'assistant' &&
             newPlainText.length > 20 &&
@@ -1089,7 +1089,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         streamingMap.delete(sessionKey)
         set({ streamingState: streamingMap, lastEventAt: now })
         if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem(`hermes_streaming_${sessionKey}`)
+          sessionStorage.removeItem(`claude_streaming_${sessionKey}`)
         }
         break
       }

@@ -7,13 +7,13 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { HermesTask, CreateTaskInput, TaskColumn, TaskPriority, TaskAssignee } from '@/lib/tasks-api'
+import type { ClaudeTask, CreateTaskInput, TaskColumn, TaskPriority, TaskAssignee } from '@/lib/tasks-api'
 import { COLUMN_LABELS, COLUMN_ORDER } from '@/lib/tasks-api'
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  task?: HermesTask | null
+  task?: ClaudeTask | null
   defaultColumn?: TaskColumn
   assignees: Array<TaskAssignee>
   onSubmit: (input: CreateTaskInput) => Promise<void>

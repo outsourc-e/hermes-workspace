@@ -44,11 +44,11 @@ export type CreateSwarmKanbanCardInput = {
 
 export type UpdateSwarmKanbanCardInput = Partial<Omit<CreateSwarmKanbanCardInput, 'createdBy'>>
 
-const HERMES_HOME = process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
-export const SWARM_KANBAN_FILE = path.join(HERMES_HOME, 'swarm2-kanban.json')
+const CLAUDE_HOME = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+export const SWARM_KANBAN_FILE = path.join(CLAUDE_HOME, 'swarm2-kanban.json')
 
 function ensureKanbanFile(): void {
-  fs.mkdirSync(HERMES_HOME, { recursive: true })
+  fs.mkdirSync(CLAUDE_HOME, { recursive: true })
   if (!fs.existsSync(SWARM_KANBAN_FILE)) {
     fs.writeFileSync(SWARM_KANBAN_FILE, JSON.stringify({ cards: [] }, null, 2) + '\n', 'utf-8')
   }

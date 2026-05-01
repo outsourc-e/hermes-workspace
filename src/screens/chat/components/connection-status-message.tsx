@@ -25,8 +25,8 @@ function classifyConnectionError(
   if (!normalizedError && !status) {
     return {
       title: 'Not connected',
-      description: "Hermes Workspace can't reach Hermes.",
-      action: 'Check that Hermes is running, then try again.',
+      description: "Claude Workspace can't reach Claude.",
+      action: 'Check that Claude is running, then try again.',
     }
   }
 
@@ -38,8 +38,8 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Authentication required',
-      description: 'Hermes rejected the connection token.',
-      action: 'Go to Settings -> Advanced -> Hermes to update your token.',
+      description: 'Claude rejected the connection token.',
+      action: 'Go to Settings -> Advanced -> Claude to update your token.',
     }
   }
 
@@ -50,16 +50,16 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Pairing required',
-      description: "This device isn't paired with Hermes yet.",
-      action: 'Check Hermes Agent connection.',
+      description: "This device isn't paired with Claude yet.",
+      action: 'Check Claude Agent connection.',
     }
   }
 
   if (lower.includes('econnrefused') && lower.includes('8642')) {
     return {
-      title: 'Hermes gateway not running',
-      description: 'The Hermes gateway is not running on port 8642.',
-      action: 'Run: pip install -U hermes-agent && hermes gateway run',
+      title: 'Claude gateway not running',
+      description: 'The Claude gateway is not running on port 8642.',
+      action: 'Run: pip install -U claude-agent && claude gateway run',
     }
   }
 
@@ -71,16 +71,16 @@ function classifyConnectionError(
     lower.includes('timeout')
   ) {
     return {
-      title: 'Hermes unreachable',
-      description: "Can't connect to Hermes at the configured URL.",
-      action: 'Make sure Hermes is running and the URL is correct.',
+      title: 'Claude unreachable',
+      description: "Can't connect to Claude at the configured URL.",
+      action: 'Make sure Claude is running and the URL is correct.',
     }
   }
 
   return {
     title: 'Connection error',
     description: normalizedError || 'Something went wrong.',
-    action: 'Try refreshing or check Settings -> Advanced -> Hermes.',
+    action: 'Try refreshing or check Settings -> Advanced -> Claude.',
   }
 }
 
@@ -102,9 +102,9 @@ export function ConnectionStatusMessage({
       setFadingOut(true)
       setTimeout(() => setVisible(false), 300)
     }
-    window.addEventListener('hermes:health-restored', handleRestored)
+    window.addEventListener('claude:health-restored', handleRestored)
     return () =>
-      window.removeEventListener('hermes:health-restored', handleRestored)
+      window.removeEventListener('claude:health-restored', handleRestored)
   }, [])
 
   if (!visible) return null
@@ -133,7 +133,7 @@ export function ConnectionStatusMessage({
         />
         <div className="flex-1 text-xs">
           <p className="font-medium">
-            {isChecking ? 'Connecting to Hermes...' : errorInfo.title}
+            {isChecking ? 'Connecting to Claude...' : errorInfo.title}
           </p>
           {!isChecking ? (
             <>

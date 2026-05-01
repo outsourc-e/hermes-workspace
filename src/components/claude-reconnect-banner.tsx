@@ -3,15 +3,15 @@ import { useEffect, useRef, useState } from 'react'
 const POLL_INTERVAL_MS = 10_000
 const FLASH_DURATION_MS = 1_800
 
-type HermesReconnectBannerProps = {
+type ClaudeReconnectBannerProps = {
   enabled?: boolean
 }
 
 type BannerState = 'hidden' | 'disconnected' | 'connected'
 
-async function probeHermesHealth(): Promise<boolean> {
+async function probeClaudeHealth(): Promise<boolean> {
   // Use the portable-aware connection status endpoint first,
-  // which works with both full Hermes and OpenAI-compatible backends.
+  // which works with both full Claude and OpenAI-compatible backends.
   try {
     const response = await fetch('/api/connection-status', {
       cache: 'no-store',
@@ -22,7 +22,7 @@ async function probeHermesHealth(): Promise<boolean> {
   }
   // Fallback to direct health proxy
   try {
-    const response = await fetch('/api/hermes-proxy/health', {
+    const response = await fetch('/api/claude-proxy/health', {
       cache: 'no-store',
     })
     return response.ok
@@ -31,9 +31,9 @@ async function probeHermesHealth(): Promise<boolean> {
   }
 }
 
-export function HermesReconnectBanner({
+export function ClaudeReconnectBanner({
   enabled = true,
-}: HermesReconnectBannerProps) {
+}: ClaudeReconnectBannerProps) {
   const [bannerState, setBannerState] = useState<BannerState>('hidden')
   const [isChecking, setIsChecking] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
@@ -47,7 +47,7 @@ export function HermesReconnectBanner({
   const wasDisconnectedRef = useRef(false)
   const flashTimerRef = useRef<number | null>(null)
   // Silent auto-restart: if the gateway disappears mid-session, fire
-  // /api/start-hermes once. After that, fall back to the manual "Start Agent"
+  // /api/start-claude once. After that, fall back to the manual "Start Agent"
   // button so we don't loop forever on a busted environment.
   const autoRestartTriedAtRef = useRef<number>(0)
   // Cool-down so a permanently-dead gateway doesn't get poked every probe.
@@ -88,7 +88,7 @@ export function HermesReconnectBanner({
         setIsChecking(true)
       }
 
-      const pendingProbe = probeHermesHealth()
+      const pendingProbe = probeClaudeHealth()
         .then((connected) => {
           if (cancelled || !mountedRef.current) return connected
 
@@ -117,7 +117,7 @@ export function HermesReconnectBanner({
               Date.now() - autoRestartTriedAtRef.current
             if (sinceLastTry > AUTO_RESTART_COOLDOWN_MS) {
               autoRestartTriedAtRef.current = Date.now()
-              void fetch('/api/start-hermes', {
+              void fetch('/api/start-claude', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
               })
@@ -132,7 +132,7 @@ export function HermesReconnectBanner({
                   if (res.ok && data.ok) {
                     setMessage(
                       data.message ||
-                        'Auto-restarting Hermes gateway…',
+                        'Auto-restarting Claude gateway…',
                     )
                     // Probe again shortly so the banner clears as soon as
                     // the gateway answers /health.
@@ -210,17 +210,17 @@ export function HermesReconnectBanner({
       }
 
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Failed to start Hermes agent')
+        throw new Error(payload.error || 'Failed to start Claude agent')
       }
 
       setMessage(
         payload.message === 'already running'
-          ? 'Hermes agent is already running'
-          : 'Starting Hermes agent…',
+          ? 'Claude agent is already running'
+          : 'Starting Claude agent…',
       )
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : 'Failed to start Hermes agent',
+        error instanceof Error ? error.message : 'Failed to start Claude agent',
       )
     } finally {
       setIsStarting(false)
@@ -260,7 +260,7 @@ export function HermesReconnectBanner({
           />
           <div className="min-w-0">
             <p className="text-sm font-semibold">
-              {isDisconnected ? 'Hermes agent not connected' : 'Connected'}
+              {isDisconnected ? 'Claude agent not connected' : 'Connected'}
             </p>
             {message ? (
               <p className="truncate text-xs opacity-80">{message}</p>

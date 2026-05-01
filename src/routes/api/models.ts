@@ -8,17 +8,17 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import {
   ensureGatewayProbed,
   getGatewayCapabilities,
-} from '../../server/hermes-api'
-import { BEARER_TOKEN, HERMES_API } from '../../server/gateway-capabilities'
+} from '../../server/claude-api'
+import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
 import {
   ensureDiscovery,
   getDiscoveredModels,
   ensureProviderInConfig,
 } from '../../server/local-provider-discovery'
 
-const HERMES_HOME = process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
-const MODELS_PATH = path.join(HERMES_HOME, 'models.json')
-const CONFIG_PATH = path.join(HERMES_HOME, 'config.yaml')
+const CLAUDE_HOME = process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+const MODELS_PATH = path.join(CLAUDE_HOME, 'models.json')
+const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
 
 type ModelEntry = {
   provider?: string
@@ -69,7 +69,7 @@ function normalizeModel(entry: unknown): ModelEntry | null {
 /**
  * Read user-configured models from active profile's models.json.
  */
-function readHermesModelsJson(): Array<ModelEntry> {
+function readClaudeModelsJson(): Array<ModelEntry> {
   try {
     if (!fs.existsSync(MODELS_PATH)) return []
     const raw = fs.readFileSync(MODELS_PATH, 'utf-8')
@@ -96,7 +96,7 @@ function readHermesModelsJson(): Array<ModelEntry> {
 /**
  * Read the default model from active profile's config.yaml using a proper YAML parser.
  */
-function readHermesDefaultModel(): ModelEntry | null {
+function readClaudeDefaultModel(): ModelEntry | null {
   try {
     if (!fs.existsSync(CONFIG_PATH)) return null
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
@@ -125,14 +125,14 @@ function readHermesDefaultModel(): ModelEntry | null {
 }
 
 /**
- * Fallback: fetch models from the hermes-agent /v1/models endpoint.
+ * Fallback: fetch models from the claude-agent /v1/models endpoint.
  */
-async function fetchHermesModels(): Promise<Array<ModelEntry>> {
+async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
   const headers: Record<string, string> = {}
   if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
-  const response = await fetch(`${HERMES_API}/v1/models`, { headers })
+  const response = await fetch(`${CLAUDE_API}/v1/models`, { headers })
   if (!response.ok)
-    throw new Error(`Hermes models request failed (${response.status})`)
+    throw new Error(`Claude models request failed (${response.status})`)
   const payload = asRecord(await response.json())
   const rawModels = Array.isArray(payload.data)
     ? payload.data
@@ -154,12 +154,12 @@ export const Route = createFileRoute('/api/models')({
         await ensureGatewayProbed()
 
         try {
-          // Primary: read user-configured models from ~/.hermes/models.json
-          let models = readHermesModelsJson()
+          // Primary: read user-configured models from ~/.claude/models.json
+          let models = readClaudeModelsJson()
           let source = 'models.json'
 
           // Ensure the default model from config.yaml is always included
-          const defaultModel = readHermesDefaultModel()
+          const defaultModel = readClaudeDefaultModel()
           if (defaultModel) {
             const hasDefault = models.some((m) => m.id === defaultModel.id)
             if (!hasDefault) {
@@ -167,10 +167,10 @@ export const Route = createFileRoute('/api/models')({
             }
           }
 
-          // Fallback: if no models.json, fetch from hermes-agent /v1/models
+          // Fallback: if no models.json, fetch from claude-agent /v1/models
           if (models.length === 0 && getGatewayCapabilities().models) {
-            models = await fetchHermesModels()
-            source = 'hermes-agent'
+            models = await fetchClaudeModels()
+            source = 'claude-agent'
           }
 
           // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)

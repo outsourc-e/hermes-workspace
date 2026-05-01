@@ -9,7 +9,7 @@ type ChatSSESubscriber = (event: ChatSSEEvent) => void
 
 // ─── Singleton state (survives Vite HMR via globalThis) ─────────────────
 
-const BUS_KEY = '__hermes_chat_event_bus__' as const
+const BUS_KEY = '__claude_chat_event_bus__' as const
 
 interface BusState {
   subscribers: Set<ChatSSESubscriber>

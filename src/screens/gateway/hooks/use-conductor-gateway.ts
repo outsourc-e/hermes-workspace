@@ -414,7 +414,7 @@ function workersLookComplete(workers: ConductorWorker[], staleAfterMs: number): 
 }
 
 function prettifyCronLabel(value: string): string {
-  // Hermes cron sessions are keyed `cron_<jobId>_<YYYYMMDD>_<HHMMSS>`
+  // Claude cron sessions are keyed `cron_<jobId>_<YYYYMMDD>_<HHMMSS>`
   // and Conductor names jobs `conductor-<unix_ms>`. Strip both to a
   // human-friendly tag instead of leaking the raw runtime key.
   const cronMatch = value.match(/^cron[_:]([0-9a-f]{6,})/i)
@@ -1113,7 +1113,7 @@ export function useConductorGateway() {
         throw new Error(result.error ?? 'Failed to spawn orchestrator')
       }
 
-      // Hermes runs cron jobs in sessions keyed `cron_<jobId>_<timestamp>`.
+      // Claude runs cron jobs in sessions keyed `cron_<jobId>_<timestamp>`.
       // The session doesn't exist yet at spawn time — the cron loop creates
       // it within ~5s. Poll /api/sessions until we find one matching the
       // prefix, then track it as the orchestrator session.

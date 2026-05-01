@@ -4,7 +4,7 @@ export interface AuthStatus {
   error?: string
 }
 
-export async function fetchHermesAuthStatus(
+export async function fetchClaudeAuthStatus(
   timeoutMs = 5_000,
 ): Promise<AuthStatus> {
   const controller = new AbortController()
@@ -20,7 +20,7 @@ export async function fetchHermesAuthStatus(
 
     throw error instanceof Error
       ? error
-      : new Error('Failed to connect to Hermes Agent')
+      : new Error('Failed to connect to Claude Agent')
   } finally {
     globalThis.clearTimeout(timeout)
   }

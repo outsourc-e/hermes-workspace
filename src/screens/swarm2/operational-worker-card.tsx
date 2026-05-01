@@ -160,7 +160,7 @@ type WorkerCardSettings = {
   avatarGlyph?: string
 }
 
-const SETTINGS_STORAGE_PREFIX = 'hermes-swarm2-card-settings:'
+const SETTINGS_STORAGE_PREFIX = 'claude-swarm2-card-settings:'
 const ROLE_OPTIONS = [
   'Profile',
   'PR / Issues',

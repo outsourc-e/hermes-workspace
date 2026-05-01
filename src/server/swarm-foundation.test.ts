@@ -54,7 +54,7 @@ describe('classifySwarmPluginBoundary', () => {
 
 describe('deriveSwarmBoundary', () => {
   it('marks external cwd values as outside the workspace boundary', () => {
-    const boundary = deriveSwarmBoundary('/opt/other-project', '/Users/aurora/hermes-workspace')
+    const boundary = deriveSwarmBoundary('/opt/other-project', '/Users/aurora/claude-workspace')
     expect(boundary.insideWorkspace).toBe(false)
     expect(boundary.owner).toBe('external')
     expect(boundary.relativeCwd).toBeNull()
@@ -80,7 +80,7 @@ describe('buildSwarmSessionMetadata', () => {
       })
 
       expect(session.sessionId).toBe('swarm-swarm2')
-      expect(session.sessionTitle).toBe('Hermes worker swarm2')
+      expect(session.sessionTitle).toBe('Claude worker swarm2')
       expect(session.historySource).toBe('state.db')
       expect(session.transport).toBe('tmux')
       expect(session.terminalKind).toBe('tmux')

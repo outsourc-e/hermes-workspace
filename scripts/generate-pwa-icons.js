@@ -34,7 +34,7 @@ async function generateIcon(size) {
   const screenshot = await page.screenshot({ type: 'png' })
   await browser.close()
 
-  const outputPath = join(outputDir, `hermes-icon-${size}.png`)
+  const outputPath = join(outputDir, `claude-icon-${size}.png`)
   writeFileSync(outputPath, screenshot)
   console.log(`✓ Generated ${size}x${size} icon`)
 }

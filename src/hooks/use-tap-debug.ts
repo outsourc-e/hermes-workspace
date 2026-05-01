@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import type { RefObject } from 'react'
 
-const TAP_DEBUG_STORAGE_KEY = 'hermes:tap-debug'
-const TAP_DEBUG_EVENT = 'hermes:tap-debug-change'
+const TAP_DEBUG_STORAGE_KEY = 'claude:tap-debug'
+const TAP_DEBUG_EVENT = 'claude:tap-debug-change'
 
 function describeElement(value: Element | null): string {
   if (!value) return 'null'
@@ -47,14 +47,14 @@ function collectAncestorStyles(value: Element | null, maxDepth = 4) {
 }
 
 type TapDebugWindow = Window & {
-  __HERMES_TAP_DEBUG__?: boolean
+  __CLAUDE_TAP_DEBUG__?: boolean
   setChatTapDebug?: (enabled: boolean) => boolean
   toggleChatTapDebug?: () => boolean
 }
 
 function readEnabled(win: TapDebugWindow): boolean {
-  if (typeof win.__HERMES_TAP_DEBUG__ === 'boolean') {
-    return win.__HERMES_TAP_DEBUG__
+  if (typeof win.__CLAUDE_TAP_DEBUG__ === 'boolean') {
+    return win.__CLAUDE_TAP_DEBUG__
   }
   try {
     return window.localStorage.getItem(TAP_DEBUG_STORAGE_KEY) === '1'
@@ -82,7 +82,7 @@ export function useTapDebug(
 
     const applyEnabled = (next: boolean) => {
       enabled = next
-      debugWindow.__HERMES_TAP_DEBUG__ = next
+      debugWindow.__CLAUDE_TAP_DEBUG__ = next
       try {
         window.localStorage.setItem(TAP_DEBUG_STORAGE_KEY, next ? '1' : '0')
       } catch {

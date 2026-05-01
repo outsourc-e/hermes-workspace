@@ -12,12 +12,12 @@
 # upstream image name.
 
 services:
-  hermes-agent:
+  claude-agent:
     build:
       context: .
       dockerfile: docker/agent/Dockerfile
 
-  hermes-workspace:
+  claude-workspace:
     build:
       context: .
       dockerfile: docker/workspace/Dockerfile

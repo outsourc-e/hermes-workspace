@@ -3,7 +3,7 @@ import type { EnhancedFeature } from '@/lib/feature-gates'
 
 interface GatewayStatus {
   capabilities: Record<string, boolean>
-  hermesUrl: string
+  claudeUrl: string
 }
 
 export function useFeatureAvailable(feature: EnhancedFeature): boolean {

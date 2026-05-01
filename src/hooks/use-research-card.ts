@@ -1,4 +1,4 @@
-// Stub — research card is a legacy feature, not used in Hermes Workspace
+// Stub — research card is a legacy feature, not used in Claude Workspace
 
 export interface ResearchStep {
   id: string

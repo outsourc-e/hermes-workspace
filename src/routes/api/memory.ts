@@ -2,11 +2,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
 import {
-  HERMES_API,
+  CLAUDE_API,
   ensureGatewayProbed,
   getCapabilities,
 } from '../../server/gateway-capabilities'
-import { getMemory } from '../../server/hermes-api'
+import { getMemory } from '../../server/claude-api'
 
 export const Route = createFileRoute('/api/memory')({
   server: {
@@ -21,7 +21,7 @@ export const Route = createFileRoute('/api/memory')({
           return json(
             {
               ok: false,
-              error: `Gateway does not support /api/memory on ${HERMES_API}`,
+              error: `Gateway does not support /api/memory on ${CLAUDE_API}`,
             },
             { status: 503 },
           )

@@ -28,7 +28,7 @@ type DetectHonchoOptions = {
   env?: NodeJS.ProcessEnv
   homeDir?: string
   openClawHome?: string
-  hermesHome?: string
+  claudeHome?: string
   now?: number
 }
 
@@ -149,7 +149,7 @@ export function detectHonchoIntegration(options: DetectHonchoOptions = {}): Honc
   const env = options.env ?? process.env
   const homeDir = options.homeDir ?? os.homedir()
   const openClawHome = expandHome(options.openClawHome ?? env.OPENCLAW_HOME ?? path.join(homeDir, '.openclaw'), homeDir)
-  const hermesHome = expandHome(options.hermesHome ?? env.HERMES_HOME ?? path.join(homeDir, '.hermes'), homeDir)
+  const claudeHome = expandHome(options.claudeHome ?? env.CLAUDE_HOME ?? path.join(homeDir, '.claude'), homeDir)
 
   const processEnvConfigured = envConfigured(env)
 
@@ -159,16 +159,16 @@ export function detectHonchoIntegration(options: DetectHonchoOptions = {}): Honc
   const openClawConfigPath = path.join(openClawHome, 'config.yaml')
   const openClawConfigConfigured = configHasHoncho(readYaml(openClawConfigPath))
 
-  const hermesEnvPath = path.join(hermesHome, '.env')
-  const hermesEnvConfigured = envConfigured(readEnvFile(hermesEnvPath))
-  const hermesConfigPath = path.join(hermesHome, 'config.yaml')
-  const hermesConfigConfigured = configHasHoncho(readYaml(hermesConfigPath))
+  const claudeEnvPath = path.join(claudeHome, '.env')
+  const claudeEnvConfigured = envConfigured(readEnvFile(claudeEnvPath))
+  const claudeConfigPath = path.join(claudeHome, 'config.yaml')
+  const claudeConfigConfigured = configHasHoncho(readYaml(claudeConfigPath))
 
   const localDirs = [
     path.join(homeDir, '.honcho'),
     path.join(homeDir, '.config', 'honcho'),
     path.join(openClawHome, 'honcho'),
-    path.join(hermesHome, 'honcho'),
+    path.join(claudeHome, 'honcho'),
   ]
 
   const sources: Array<HonchoDetectionSource> = [
@@ -194,18 +194,18 @@ export function detectHonchoIntegration(options: DetectHonchoOptions = {}): Honc
       openClawConfigConfigured ? 'Honcho keys found in OpenClaw config.' : 'No Honcho keys found in OpenClaw config.',
     ),
     fileSource(
-      'hermes-env',
+      'claude-env',
       'Current .env compatibility',
-      hermesEnvPath,
-      hermesEnvConfigured,
-      hermesEnvConfigured ? 'Honcho env var present in current .env.' : 'No Honcho env var in current .env.',
+      claudeEnvPath,
+      claudeEnvConfigured,
+      claudeEnvConfigured ? 'Honcho env var present in current .env.' : 'No Honcho env var in current .env.',
     ),
     fileSource(
-      'hermes-config',
+      'claude-config',
       'Current config.yaml compatibility',
-      hermesConfigPath,
-      hermesConfigConfigured,
-      hermesConfigConfigured ? 'Honcho keys found in current config.' : 'No Honcho keys found in current config.'
+      claudeConfigPath,
+      claudeConfigConfigured,
+      claudeConfigConfigured ? 'Honcho keys found in current config.' : 'No Honcho keys found in current config.'
     ),
     ...localDirs.map((dir) => ({
       id: `dir:${dir}`,

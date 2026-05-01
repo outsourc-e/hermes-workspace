@@ -7,7 +7,7 @@ import {
   getMessages,
   listSessions,
   toChatMessage,
-} from '../../server/hermes-api'
+} from '../../server/claude-api'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '@/server/auth-middleware'
 import { getLocalSession, getLocalMessages } from '../../server/local-session-store'
@@ -47,7 +47,7 @@ export const Route = createFileRoute('/api/history')({
               messages: [],
             })
           }
-          // "main" doesn't exist in Hermes — resolve it to the user's real
+          // "main" doesn't exist in Claude — resolve it to the user's real
           // main chat session. We prefer (in order):
           //   1. The most recent session with a real human-set title
           //      (label !== id, e.g. "hows everything"). This is what users

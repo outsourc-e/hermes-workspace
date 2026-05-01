@@ -10,7 +10,7 @@ const CLIENT_DIR = join(__dirname, 'dist', 'client')
 const port = parseInt(process.env.PORT || '3000', 10)
 // Default HOST to localhost-only. Operators who want the workspace reachable
 // on a LAN / Tailscale / public surface must opt in explicitly with
-// HOST=0.0.0.0 *and* set HERMES_PASSWORD (enforced below). See #122.
+// HOST=0.0.0.0 *and* set CLAUDE_PASSWORD (enforced below). See #122.
 const host = process.env.HOST || '127.0.0.1'
 
 function isNonLoopbackHost(h) {
@@ -23,26 +23,26 @@ function isNonLoopbackHost(h) {
 }
 
 if (isNonLoopbackHost(host)) {
-  const password = (process.env.HERMES_PASSWORD || '').trim()
+  const password = (process.env.CLAUDE_PASSWORD || '').trim()
   if (!password) {
     console.error(
       '\n[workspace] refusing to start.\n' +
-        `  HOST is set to "${host}" (non-loopback), but HERMES_PASSWORD is unset.\n` +
+        `  HOST is set to "${host}" (non-loopback), but CLAUDE_PASSWORD is unset.\n` +
         '  This would expose a high-privilege control plane (terminals, files, agents)\n' +
         '  to anyone who can reach the port. Either:\n' +
         '    • set HOST=127.0.0.1 for local-only access, or\n' +
-        '    • set HERMES_PASSWORD=<strong-secret> to enable workspace auth, or\n' +
-        '    • set HERMES_ALLOW_INSECURE_REMOTE=1 to bypass this check (not recommended).\n' +
+        '    • set CLAUDE_PASSWORD=<strong-secret> to enable workspace auth, or\n' +
+        '    • set CLAUDE_ALLOW_INSECURE_REMOTE=1 to bypass this check (not recommended).\n' +
         '  See #122 for context.\n',
     )
-    const allowInsecure = (process.env.HERMES_ALLOW_INSECURE_REMOTE || '')
+    const allowInsecure = (process.env.CLAUDE_ALLOW_INSECURE_REMOTE || '')
       .trim()
       .toLowerCase()
     if (allowInsecure !== '1' && allowInsecure !== 'true' && allowInsecure !== 'yes') {
       process.exit(1)
     }
     console.warn(
-      '[workspace] HERMES_ALLOW_INSECURE_REMOTE is set — starting anyway.',
+      '[workspace] CLAUDE_ALLOW_INSECURE_REMOTE is set — starting anyway.',
     )
   }
 }
@@ -179,5 +179,5 @@ const httpServer = createServer(async (req, res) => {
 })
 
 httpServer.listen(port, host, () => {
-  console.log(`Hermes Workspace running at http://${host}:${port}`)
+  console.log(`Claude Workspace running at http://${host}:${port}`)
 })

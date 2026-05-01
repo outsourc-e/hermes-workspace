@@ -41,7 +41,7 @@ type RuntimeEntry = {
 
 type HealthData = {
   workspaceModel: string | null
-  hermesApiUrl: string | null
+  claudeApiUrl: string | null
   workers: Array<{
     workerId: string
     recentAuthErrors: number

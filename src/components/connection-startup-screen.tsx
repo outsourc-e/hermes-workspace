@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AuthStatus } from '@/lib/hermes-auth'
+import type { AuthStatus } from '@/lib/claude-auth'
 import { writeTextToClipboard } from '@/lib/clipboard'
-import { fetchHermesAuthStatus } from '@/lib/hermes-auth'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 
 const POLL_INTERVAL_MS = 2_000
 const FAILURE_REVEAL_MS = 5_000
@@ -28,22 +28,22 @@ function getSetupSteps(
   return [
     {
       title: 'Use any OpenAI-compatible backend',
-      command: 'Set HERMES_API_URL to your backend base URL',
+      command: 'Set CLAUDE_API_URL to your backend base URL',
       note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
     },
     {
-      title: 'Optional: install Hermes Agent locally',
-      command: `${pip} install hermes-agent`,
-      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
+      title: 'Optional: install Claude Agent locally',
+      command: `${pip} install claude-agent`,
+      note: 'Vanilla claude-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
     },
     {
-      title: 'Set up Hermes',
-      command: 'hermes setup',
-      note: 'Pick your providers once; Hermes stores them under ~/.hermes',
+      title: 'Set up Claude',
+      command: 'claude setup',
+      note: 'Pick your providers once; Claude stores them under ~/.claude',
     },
     {
       title: 'Start the gateway',
-      command: 'hermes gateway run',
+      command: 'claude gateway run',
       note: 'This starts the HTTP API on :8642 for the workspace',
     },
   ]
@@ -95,14 +95,14 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       }
     }, FAILURE_REVEAL_MS)
 
-    // After a short grace period, fire /api/start-hermes once silently.
-    // If hermes-agent is installed and just not running, this brings it back
+    // After a short grace period, fire /api/start-claude once silently.
+    // If claude-agent is installed and just not running, this brings it back
     // up without making the user click anything. The polling loop will see it.
     const fireSilentAutoStart = async () => {
       if (autoStartFired || isDone.current) return
       autoStartFired = true
       try {
-        const res = await fetch('/api/start-hermes', {
+        const res = await fetch('/api/start-claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         })
@@ -115,7 +115,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           setServerLog([
             String(
               data.message ||
-                'Auto-started Hermes gateway — reconnecting…',
+                'Auto-started Claude gateway — reconnecting…',
             ),
           ])
         }
@@ -129,7 +129,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
     const tryConnect = async () => {
       try {
-        const status = await fetchHermesAuthStatus()
+        const status = await fetchClaudeAuthStatus()
         if (isDone.current) return
         isDone.current = true
         clearTimeout(failureTimer)
@@ -171,9 +171,9 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
   const handleAutoStart = async () => {
     setServerStarting(true)
     setServerError(null)
-    setServerLog(['Looking for hermes-agent...'])
+    setServerLog(['Looking for claude-agent...'])
     try {
-      const res = await fetch('/api/start-hermes', {
+      const res = await fetch('/api/start-claude', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
@@ -195,7 +195,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         return
       }
 
-      const msg = String(data.error || 'Could not find hermes-agent')
+      const msg = String(data.error || 'Could not find claude-agent')
       const hint = data.hint ? String(data.hint) : ''
       setServerLog([`Error: ${msg}`])
       if (hint) setServerLog((prev) => [...prev, `Hint: ${hint}`])
@@ -222,13 +222,13 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
     >
       <div className="flex w-full max-w-lg flex-col items-center text-center">
         <img
-          src="/hermes-avatar.webp"
-          alt="Hermes"
+          src="/claude-avatar.webp"
+          alt="Claude"
           className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
         />
 
         <h1 className="text-[2rem] font-semibold tracking-tight text-white">
-          Hermes Workspace
+          Claude Workspace
         </h1>
 
         {/* Connecting spinner */}
@@ -257,7 +257,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               Welcome! Let&apos;s connect your backend
             </p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace works with any OpenAI-compatible backend. Hermes
+              Claude Workspace works with any OpenAI-compatible backend. Claude
               gateway APIs unlock enhanced features automatically when they are
               available.
             </p>
@@ -281,7 +281,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                     Detecting...
                   </span>
                 ) : (
-                  'Auto-Start Hermes Gateway'
+                  'Auto-Start Claude Gateway'
                 )}
               </button>
 
@@ -360,12 +360,12 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                 <p className="text-xs font-medium text-white/50">
                   Point{' '}
                   <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">
-                    HERMES_API_URL
+                    CLAUDE_API_URL
                   </code>{' '}
                   at any OpenAI-compatible backend:
                 </p>
                 <pre className="mt-2 overflow-x-auto font-mono text-xs text-white/60">
-                  HERMES_API_URL=http://your-server:8642 pnpm dev
+                  CLAUDE_API_URL=http://your-server:8642 pnpm dev
                 </pre>
               </div>
             </div>

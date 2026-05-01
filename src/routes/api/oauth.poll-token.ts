@@ -11,9 +11,9 @@ const BodySchema = z.object({
 })
 
 function saveNousTokens(accessToken: string, refreshToken?: string) {
-  const hermesDir =
-    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
-  const authPath = path.join(hermesDir, 'auth.json')
+  const claudeDir =
+    process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+  const authPath = path.join(claudeDir, 'auth.json')
 
   let existing: Record<string, unknown> = {}
   try {
@@ -35,7 +35,7 @@ function saveNousTokens(accessToken: string, refreshToken?: string) {
     active_provider: 'nous',
   }
 
-  fs.mkdirSync(hermesDir, { recursive: true })
+  fs.mkdirSync(claudeDir, { recursive: true })
   fs.writeFileSync(authPath, JSON.stringify(updated, null, 2), 'utf8')
 }
 
@@ -64,7 +64,7 @@ export const Route = createFileRoute('/api/oauth/poll-token')({
           try {
             const params = new URLSearchParams({
               grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-              client_id: 'hermes-cli',
+              client_id: 'claude-cli',
               device_code: deviceCode,
             })
 

@@ -33,7 +33,7 @@ When you clone the repo and run the workspace, worker sessions load skills from 
 A worker profile can also carry profile-local skills under:
 
 ```text
-~/.hermes/profiles/<workerId>/skills/
+~/.claude/profiles/<workerId>/skills/
 ```
 
 The important rule is that the worker's runtime must be able to resolve the skill name from its profile. The UI can display a role's default skills, but the worker still needs the skill files available locally.

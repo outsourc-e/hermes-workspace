@@ -1,5 +1,5 @@
 /**
- * Sound Notification System for Hermes Workspace
+ * Sound Notification System for Claude Workspace
  * Uses Web Audio API to synthesize unique sounds without audio files.
  */
 
@@ -30,7 +30,7 @@ interface SoundPrefs {
   enabled: boolean
 }
 
-const STORAGE_KEY = 'hermes-sound-prefs'
+const STORAGE_KEY = 'claude-sound-prefs'
 const DEFAULT_VOLUME = 0.3
 
 // Shared state

@@ -2,7 +2,7 @@
 
 Date: 2026-04-28
 Status: implementation spec, staged rollout
-Canonical repo: `/Users/aurora/hermes-workspace`
+Canonical repo: `/Users/aurora/claude-workspace`
 
 ## Goal
 
@@ -16,7 +16,7 @@ Swarm2 should then:
 
 1. create or update the swarm roster,
 2. assign roles, skills, and missions,
-3. route work to the right persistent Hermes worker sessions,
+3. route work to the right persistent Claude worker sessions,
 4. keep each worker running in its own profile/tmux session,
 5. collect checkpoints as workers complete subtasks,
 6. automatically prompt workers to continue when more work remains,
@@ -30,7 +30,7 @@ Swarm2 should then:
 - **Proof beats vibes.** Workers checkpoint files changed, commands run, results, blockers, next action.
 - **Orchestrator drives the loop.** Workers execute. Orchestrator decomposes, sequences, monitors, re-prompts, reviews, and escalates.
 - **Autopilot is staged.** The system should work in manual, semi-auto, then full-auto modes.
-- **tmux/Hermes native.** Worker sessions are Hermes profiles in `swarm-<workerId>` tmux sessions.
+- **tmux/Claude native.** Worker sessions are Claude profiles in `swarm-<workerId>` tmux sessions.
 
 ## Current foundation
 
@@ -39,7 +39,7 @@ Already present:
 - `swarm.yaml`, canonical roster config.
 - `/api/swarm-roster`, reads/writes roster entries.
 - `/api/swarm-decompose`, routes a mission into assignments.
-- `/api/swarm-dispatch`, sends prompts to live tmux/Hermes sessions and falls back to one-shot Hermes.
+- `/api/swarm-dispatch`, sends prompts to live tmux/Claude sessions and falls back to one-shot Claude.
 - `/api/swarm-runtime`, reads worker `runtime.json`, tmux state, tasks, artifacts, previews.
 - `/api/swarm-chat`, reads worker chat history from profile `state.db`.
 - `/api/swarm-tmux-start/stop/scroll`, controls persistent sessions.
@@ -65,7 +65,7 @@ Decomposer/router
 Assignment plan
   ↓
 Dispatcher
-  ↓ per-worker prompt into tmux/Hermes
+  ↓ per-worker prompt into tmux/Claude
 Persistent worker sessions
   ↓ workers checkpoint
 runtime.json + state.db + artifacts/previews
@@ -86,13 +86,13 @@ workers:
     role: Builder
     specialty: full-stack implementation and UI/system integration
     model: GPT-5.5
-    mission: Ship focused product slices in Hermes Workspace with tests.
+    mission: Ship focused product slices in Claude Workspace with tests.
     skills: [swarm-ui-worker, swarm-worker-core]
     capabilities:
       - code-editing
       - ui-implementation
       - build-verification
-    defaultCwd: /Users/aurora/hermes-workspace
+    defaultCwd: /Users/aurora/claude-workspace
     preferredTaskTypes: [implementation, refactor, ui]
     maxConcurrentTasks: 1
     acceptsBroadcast: true
@@ -120,7 +120,7 @@ workers:
 
 ## Runtime contract
 
-Each worker profile may expose `~/.hermes/profiles/<workerId>/runtime.json`.
+Each worker profile may expose `~/.claude/profiles/<workerId>/runtime.json`.
 
 The orchestrator and worker should keep these fields current:
 
@@ -204,7 +204,7 @@ Example:
 ```text
 ## Swarm Orchestrator Dispatch
 Worker: swarm5 — Builder
-Mission: Ship focused product slices in Hermes Workspace with tests.
+Mission: Ship focused product slices in Claude Workspace with tests.
 Skills: swarm-ui-worker, swarm-worker-core
 
 ## Assigned Task
@@ -297,8 +297,8 @@ Pass criteria:
 
 ## Open questions
 
-- Should new roster-only agents auto-create Hermes profiles and wrappers, or should Add Swarm remain config-only until first start?
-- Should orchestrator loop run in the browser session, server interval, cron job, or persistent Hermes orchestrator worker?
+- Should new roster-only agents auto-create Claude profiles and wrappers, or should Add Swarm remain config-only until first start?
+- Should orchestrator loop run in the browser session, server interval, cron job, or persistent Claude orchestrator worker?
 - How aggressive should auto-continue be before asking Eric?
 - Should reviews be mandatory for code-changing tasks only, or all workflows?
 

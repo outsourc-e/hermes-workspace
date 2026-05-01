@@ -25,7 +25,7 @@ describe('detectHonchoIntegration', () => {
       env: {},
       homeDir,
       openClawHome: path.join(homeDir, '.openclaw'),
-      hermesHome: path.join(homeDir, '.hermes'),
+      claudeHome: path.join(homeDir, '.claude'),
       now: 1,
     })
 
@@ -43,7 +43,7 @@ describe('detectHonchoIntegration', () => {
       env: {},
       homeDir,
       openClawHome: path.join(homeDir, '.openclaw'),
-      hermesHome: path.join(homeDir, '.hermes'),
+      claudeHome: path.join(homeDir, '.claude'),
       now: 1,
     })
 
@@ -64,7 +64,7 @@ describe('detectHonchoIntegration', () => {
       env: {},
       homeDir,
       openClawHome,
-      hermesHome: path.join(homeDir, '.hermes'),
+      claudeHome: path.join(homeDir, '.claude'),
       now: 1,
     })
 

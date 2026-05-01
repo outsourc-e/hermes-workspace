@@ -38,10 +38,10 @@ vi.mock('../../../server/auth-middleware', () => ({
 
 vi.mock('../../../server/gateway-capabilities', () => ({
   BEARER_TOKEN: '',
-  HERMES_API: 'http://127.0.0.1:8642',
+  CLAUDE_API: 'http://127.0.0.1:8642',
 }))
 
-vi.mock('../../../server/hermes-api', () => ({
+vi.mock('../../../server/claude-api', () => ({
   ensureGatewayProbed: vi.fn(),
   getGatewayCapabilities: () => ({ models: false }),
 }))
@@ -54,7 +54,7 @@ vi.mock('../../../server/local-provider-discovery', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  delete process.env.HERMES_HOME
+  delete process.env.CLAUDE_HOME
 })
 
 describe('models route', () => {
@@ -81,9 +81,9 @@ describe('models route', () => {
     expect(json.data).toEqual([])
   })
 
-  it('reads default model from HERMES_HOME config using YAML.parse', async () => {
+  it('reads default model from CLAUDE_HOME config using YAML.parse', async () => {
     const envHome = '/mock/profiles/jarvis'
-    process.env.HERMES_HOME = envHome
+    process.env.CLAUDE_HOME = envHome
 
     const configYaml = 'model: jarvis-model\nprovider: nous\n'
     const modelsJson = '[{"model":"x","provider":"y"}]'
@@ -108,7 +108,7 @@ describe('models route', () => {
 
   it('reads nested model object syntax from config using YAML.parse', async () => {
     const envHome = '/mock/profiles/jarvis'
-    process.env.HERMES_HOME = envHome
+    process.env.CLAUDE_HOME = envHome
 
     const configYaml = 'model:\n  default: nest-model\n  provider: anthropic\n'
     existsSync.mockImplementation((p: string) => p === `${envHome}/config.yaml`)

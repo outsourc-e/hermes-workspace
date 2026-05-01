@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
-import type { HermesJob } from '@/lib/jobs-api'
+import type { ClaudeJob } from '@/lib/jobs-api'
 
 const SCHEDULE_PRESETS = [
   { label: 'Every 15m', value: 'every 15m' },
@@ -18,7 +18,7 @@ const SCHEDULE_PRESETS = [
 const DELIVERY_OPTIONS = ['local', 'telegram', 'discord'] as const
 
 type EditJobDialogProps = {
-  job: HermesJob | null
+  job: ClaudeJob | null
   open: boolean
   isSubmitting?: boolean
   onOpenChange: (open: boolean) => void
@@ -32,7 +32,7 @@ type EditJobDialogProps = {
   }) => void | Promise<void>
 }
 
-function readScheduleValue(job: HermesJob): string {
+function readScheduleValue(job: ClaudeJob): string {
   if (typeof job.schedule_display === 'string' && job.schedule_display.trim()) {
     return job.schedule_display.trim()
   }
@@ -55,7 +55,7 @@ function readScheduleValue(job: HermesJob): string {
   return ''
 }
 
-function getInitialState(job: HermesJob | null) {
+function getInitialState(job: ClaudeJob | null) {
   const repeatTimes = job?.repeat?.times
   const repeatCompleted = job?.repeat?.completed ?? 0
   const remainingRepeats =
@@ -188,7 +188,7 @@ export function EditJobDialog({
                   className="mt-1 text-sm"
                   style={{ color: 'var(--theme-muted)' }}
                 >
-                  Update the schedule, prompt, and routing for this Hermes task.
+                  Update the schedule, prompt, and routing for this Claude task.
                 </p>
               </div>
               <button
@@ -296,7 +296,7 @@ export function EditJobDialog({
                       prompt: event.target.value,
                     }))
                   }
-                  placeholder="What should Hermes do?"
+                  placeholder="What should Claude do?"
                   required
                   rows={5}
                   className="w-full resize-none rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
@@ -353,7 +353,7 @@ export function EditJobDialog({
                           onClick={() => toggleDelivery(option)}
                           title={
                             needsGateway
-                              ? `Requires Hermes Gateway with ${option} configured`
+                              ? `Requires Claude Gateway with ${option} configured`
                               : undefined
                           }
                           className="rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors"

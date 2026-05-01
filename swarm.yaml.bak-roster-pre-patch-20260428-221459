@@ -24,7 +24,7 @@ workers:
   - id: swarm2
     name: Swarm2
     role: Backend Foundation
-    specialty: HermesSwarm runtime contracts, API design, plugin foundations
+    specialty: ClaudeSwarm runtime contracts, API design, plugin foundations
     model: GPT-5.4
     mission: Build the backend substrate that keeps swarm state, dispatch, sessions, and plugins coherent.
     skills:
@@ -86,7 +86,7 @@ workers:
     role: Builder
     specialty: full-stack implementation and UI/system integration
     model: GPT-5.5
-    mission: Ship focused product slices in Hermes Workspace with tests.
+    mission: Ship focused product slices in Claude Workspace with tests.
     skills:
       - swarm-ui-worker
       - swarm-worker-core

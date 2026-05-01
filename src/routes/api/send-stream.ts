@@ -22,9 +22,9 @@ import {
   getGatewayCapabilities,
   listSessions,
   streamChat,
-} from '../../server/hermes-api'
+} from '../../server/claude-api'
 import type {OpenAICompatContentPart, OpenAICompatMessage} from '../../server/openai-compat-api';
-// Hermes agent runs can take 5+ minutes with complex tool chains
+// Claude agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
 
@@ -183,11 +183,11 @@ function normalizePortableHistory(
   return normalized
 }
 
-function normalizeHermesErrorMessage(error: unknown): string {
+function normalizeClaudeErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   const message = raw.trim()
-  if (!message) return 'Hermes request failed'
-  return message.replace(/\bserver\b/gi, 'Hermes')
+  if (!message) return 'Claude request failed'
+  return message.replace(/\bserver\b/gi, 'Claude')
 }
 
 function readRecord(value: unknown): Record<string, unknown> | undefined {
@@ -320,7 +320,7 @@ export const Route = createFileRoute('/api/send-stream')({
           sessionKey = resolved.sessionKey
           resolvedFriendlyId = resolved.sessionKey
         } catch (err) {
-          const errorMsg = normalizeHermesErrorMessage(err)
+          const errorMsg = normalizeClaudeErrorMessage(err)
           if (errorMsg === 'session not found') {
             return new Response(
               JSON.stringify({ ok: false, error: 'session not found' }),
@@ -529,7 +529,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 } catch (err) {
                   if (!streamClosed) {
                     sendEvent('error', {
-                      message: normalizeHermesErrorMessage(err),
+                      message: normalizeClaudeErrorMessage(err),
                       sessionKey: portableSessionKey,
                       runId,
                     })
@@ -660,7 +660,7 @@ export const Route = createFileRoute('/api/send-stream')({
                               ],
                             },
                             sessionKey: sessionKeyFromEvent,
-                            source: 'hermes',
+                            source: 'claude',
                             runId,
                           })
                       }
@@ -880,7 +880,7 @@ export const Route = createFileRoute('/api/send-stream')({
                             ?.message,
                         ) ||
                         readString(data.message) ||
-                        'Hermes stream error'
+                        'Claude stream error'
                       sendEvent('error', {
                         message: errorMessage,
                         sessionKey: sessionKeyFromEvent,
@@ -914,7 +914,7 @@ export const Route = createFileRoute('/api/send-stream')({
             } catch (err) {
               // Only send error if stream hasn't already completed successfully
               if (!streamClosed) {
-                const errorMsg = normalizeHermesErrorMessage(err)
+                const errorMsg = normalizeClaudeErrorMessage(err)
                 sendEvent('error', {
                   message: errorMsg,
                   sessionKey,
@@ -933,8 +933,8 @@ export const Route = createFileRoute('/api/send-stream')({
             'Content-Type': 'text/event-stream; charset=utf-8',
             'Cache-Control': 'no-cache',
             Connection: 'keep-alive',
-            'X-Hermes-Session-Key': sessionKey,
-            'X-Hermes-Friendly-Id': resolvedFriendlyId,
+            'X-Claude-Session-Key': sessionKey,
+            'X-Claude-Friendly-Id': resolvedFriendlyId,
           },
         })
       },

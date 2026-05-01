@@ -25,7 +25,7 @@ describe('swarm-memory module', () => {
     try { rmSync(tempHome, { recursive: true, force: true }) } catch { /* ignore */ }
   })
 
-  it('scaffolds worker memory files in canonical Hermes profile path', async () => {
+  it('scaffolds worker memory files in canonical Claude profile path', async () => {
     const mod = await loadModule()
     mod.ensureWorkerMemoryScaffold({ workerId: 'swarmtest1', name: 'Swarm Test 1', role: 'Builder', specialty: 'tests', model: 'GPT-5' })
     const root = mod.swarmWorkerMemoryRoot('swarmtest1')

@@ -23,7 +23,7 @@ import {
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import type { SessionMeta } from '@/screens/chat/types'
-import type { AuthStatus } from '@/lib/hermes-auth'
+import type { AuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -39,9 +39,9 @@ import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
 
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
-import { HermesReconnectBanner } from '@/components/hermes-reconnect-banner'
+import { ClaudeReconnectBanner } from '@/components/claude-reconnect-banner'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
-// System metrics footer removed — not used in Hermes Workspace
+// System metrics footer removed — not used in Claude Workspace
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
@@ -275,7 +275,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         className="relative overflow-hidden theme-bg theme-text"
         style={shellStyle}
       >
-        <HermesReconnectBanner enabled={authState.checked} />
+        <ClaudeReconnectBanner enabled={authState.checked} />
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div
@@ -295,7 +295,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 className="text-[13px] font-medium select-none"
                 style={{ color: 'var(--theme-accent, #B98A44)' }}
               >
-                Hermes
+                Claude
               </span>
             </div>
             {/* Right spacer to balance */}

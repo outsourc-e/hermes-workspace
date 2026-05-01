@@ -1,6 +1,6 @@
 # Workspace Final Markdown Review
 
-This is the final review file for the new markdown rendering in Hermes Workspace.
+This is the final review file for the new markdown rendering in Claude Workspace.
 
 ## What to check
 
@@ -35,4 +35,4 @@ export function markdownReviewStatus() {
 | Markdown attachment | Preview-first   |
 | Source mode         | Still available |
 
-[Hermes Agent Repo](https://github.com/NousResearch/hermes-agent)
+[Claude Agent Repo](https://github.com/NousResearch/claude-agent)

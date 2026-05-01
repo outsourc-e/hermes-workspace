@@ -28,7 +28,7 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
   { icon: BrainIcon, label: 'Memory', to: '/memory' },
 ]
 
-const HERMES_ITEMS: Array<OverflowItem> = [
+const CLAUDE_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: PuzzleIcon, label: 'Skills', to: '/skills' },
   { icon: UserGroupIcon, label: 'Profiles', to: '/profiles' },
@@ -100,8 +100,8 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
 
   // Detect actual current theme family from data-theme attribute
   const currentDataTheme = typeof document !== 'undefined'
-    ? (document.documentElement.getAttribute('data-theme') || 'hermes-nous')
-    : 'hermes-nous'
+    ? (document.documentElement.getAttribute('data-theme') || 'claude-nous')
+    : 'claude-nous'
   const isDark = !currentDataTheme.endsWith('-light')
   const themeIcon = isDark ? Sun02Icon : Moon02Icon
   const themeLabel = isDark ? 'Light mode' : 'Dark mode'
@@ -153,8 +153,8 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
             onSelect={handleSelect}
           />
           <OverflowGrid
-            title="Hermes"
-            items={HERMES_ITEMS}
+            title="Claude"
+            items={CLAUDE_ITEMS}
             onSelect={handleSelect}
           />
         </div>

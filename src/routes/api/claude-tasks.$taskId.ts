@@ -24,7 +24,7 @@ function isTaskPriority(value: unknown): value is TaskPriority {
   return value === 'high' || value === 'medium' || value === 'low'
 }
 
-export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
+export const Route = createFileRoute('/api/claude-tasks/$taskId')({
   server: {
     handlers: {
       GET: async ({ request, params }) => {

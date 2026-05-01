@@ -39,27 +39,27 @@ All tests pass: **25/25** (`pnpm test`).
 
 - [x] **README v2 updates** — shipped (`9ec12a6`) — zero-fork banner + pip install upstream path everywhere fork was referenced
 
-- [x] **Vanilla-gateway mesh audit (2026-04-19 15:44 EDT)** — ran against `pip install hermes-agent==0.10.0` on port 8642. All 6 core endpoints return 200 (health, v1/models, api/sessions, api/skills, api/config, api/jobs). Missing: `/api/dashboard/*` and `/api/status` — now marked optional (commit `1ca9a457`) and warning suppressed. Gateway-mode probe classifies vanilla as `enhanced-fork` because vanilla implements the streaming route — this is the intended behavior; `enhanced-fork` is a legacy label that does NOT imply a fork is required (commit `4585fd25`).
+- [x] **Vanilla-gateway mesh audit (2026-04-19 15:44 EDT)** — ran against `pip install claude-agent==0.10.0` on port 8642. All 6 core endpoints return 200 (health, v1/models, api/sessions, api/skills, api/config, api/jobs). Missing: `/api/dashboard/*` and `/api/status` — now marked optional (commit `1ca9a457`) and warning suppressed. Gateway-mode probe classifies vanilla as `enhanced-fork` because vanilla implements the streaming route — this is the intended behavior; `enhanced-fork` is a legacy label that does NOT imply a fork is required (commit `4585fd25`).
 - [x] **Re-QA the two originally failing items (2026-04-19 15:45 EDT):**
-  - **Model switch toast:** originally "fail" because no toast appeared when selecting another model on vanilla hermes. Re-analysis: the MODEL_SWITCH_BLOCKED_TOAST only fires when `mode === 'zero-fork' && vanillaAgent && !supportsRuntimeSwitching`. Vanilla 0.10 returns `mode=enhanced-fork` (streaming available) so the toast correctly does NOT fire — the user CAN switch models on vanilla via `hermes config set model <id>`. Original QA was testing a scenario that only applies to the narrower `zero-fork` dashboard-bundled deployment. **Pass as intended.**
+  - **Model switch toast:** originally "fail" because no toast appeared when selecting another model on vanilla claude. Re-analysis: the MODEL_SWITCH_BLOCKED_TOAST only fires when `mode === 'zero-fork' && vanillaAgent && !supportsRuntimeSwitching`. Vanilla 0.10 returns `mode=enhanced-fork` (streaming available) so the toast correctly does NOT fire — the user CAN switch models on vanilla via `claude config set model <id>`. Original QA was testing a scenario that only applies to the narrower `zero-fork` dashboard-bundled deployment. **Pass as intended.**
   - **Tool pill inline rendering:** `b368871` fix landed after the original QA. Tests cover the synthesizeToolPill code path (chat-composer-model-switch.test.ts, message-item.test.ts). **Pass on automated tests.** Visual re-QA in browser still recommended before launch copy goes live.
 - [ ] **Tag and ship** — `git tag v2.0.0 && git push origin v2-zero-fork --tags` — ready.
 
 ### 🧊 Cold storage (do not touch unless explicitly asked)
 
 - Memory browser already works via gateway `/api/memory/*`
-- Sessions, streaming, config, skills all pass vanilla `pip install hermes-agent`
+- Sessions, streaming, config, skills all pass vanilla `pip install claude-agent`
 - Gateway runs zero-fork mode by default
 
 ## If you hit a wall
 
-- **Rate-limited on openai-codex:** switch model with `hermes config set model anthropic-oauth/claude-opus-4-7` and restart the agent
+- **Rate-limited on openai-codex:** switch model with `claude config set model anthropic-oauth/claude-opus-4-7` and restart the agent
 - **Vite error in :3005 overlay:** read `/tmp/vite-3005.log`. Most errors are HMR hiccups that go away on file save
 - **Tests fail:** do not commit. Report the failing test name and the observed vs expected in this file under a new "⚠️ Blockers" section
 
 ## Related tracks (do not work on from this branch)
 
-- Hackathon entry: `hermes-promo` skill — lives at `/Users/aurora/.ocplatform/workspace/skills/hermes-promo/` (not created yet)
+- Hackathon entry: `claude-promo` skill — lives at `/Users/aurora/.ocplatform/workspace/skills/claude-promo/` (not created yet)
 - Launch copy package: `/Users/aurora/.ocplatform/workspace/content/workspace-v2-launch/`
 - Karborn visual refs: `/Users/aurora/.ocplatform/workspace/content/karborn-refs/`
 

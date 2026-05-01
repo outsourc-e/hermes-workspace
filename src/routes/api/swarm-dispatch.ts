@@ -66,7 +66,7 @@ const DEFAULT_TIMEOUT_S = 240
 const MAX_TIMEOUT_S = 600
 
 function getProfilesDir(): string {
-  const base = process.env.HERMES_HOME ?? join(homedir(), '.hermes')
+  const base = process.env.CLAUDE_HOME ?? join(homedir(), '.claude')
   return join(base, 'profiles')
 }
 
@@ -510,7 +510,7 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
   const cwd = resolveWorkerCwd(workerId)
   const ghToken = resolveGithubToken()
   const launchPrefix = [
-    `HERMES_HOME='${shellEscapeSingle(profilePath)}'`,
+    `CLAUDE_HOME='${shellEscapeSingle(profilePath)}'`,
     ghToken ? `GH_TOKEN='${shellEscapeSingle(ghToken)}'` : '',
     ghToken ? `GITHUB_TOKEN='${shellEscapeSingle(ghToken)}'` : '',
   ].filter(Boolean).join(' ')
@@ -521,7 +521,7 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
     sessionName,
     '-c',
     cwd,
-    `${launchPrefix} exec hermes`,
+    `${launchPrefix} exec claude`,
   ])
   if (!started.ok) {
     return { ok: false, error: started.error }
@@ -754,11 +754,11 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     }
 
     const useWrapper = existsSync(wrapperPath)
-    const cmd = useWrapper ? wrapperPath : 'hermes'
+    const cmd = useWrapper ? wrapperPath : 'claude'
     const args = ['chat', '-q', prompt, '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      HERMES_HOME: profilePath,
+      CLAUDE_HOME: profilePath,
     }
     const ghToken = resolveGithubToken()
     if (ghToken) {

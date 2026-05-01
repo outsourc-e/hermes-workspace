@@ -1,4 +1,4 @@
-// Stub — connection overlay (not used in Hermes Workspace)
+// Stub — connection overlay (not used in Claude Workspace)
 export function useConnectionRestart() {
   return {
     triggerRestart: async (fn: () => Promise<void>) => {

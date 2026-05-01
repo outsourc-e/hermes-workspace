@@ -1,7 +1,7 @@
 /**
- * Conductor mission spawn — Hermes-backed.
+ * Conductor mission spawn — Claude-backed.
  *
- * Spawns a one-shot Hermes job whose prompt is the orchestrator instructions.
+ * Spawns a one-shot Claude job whose prompt is the orchestrator instructions.
  * The orchestrator session, when it runs, uses the create_task / delegate
  * tools to spawn worker agents. The Conductor UI then polls /api/sessions
  * + /api/history to track workers.
@@ -18,7 +18,7 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
-  HERMES_API,
+  CLAUDE_API,
   BEARER_TOKEN,
   dashboardFetch,
   ensureGatewayProbed,
@@ -52,7 +52,7 @@ function loadDispatchSkill(): string {
   const candidates = [
     resolve(repoRoot(), 'skills/workspace-dispatch/SKILL.md'),
     resolve(process.cwd(), 'skills/workspace-dispatch/SKILL.md'),
-    resolve(process.env.HOME ?? '~', '.hermes/skills/workspace-dispatch/SKILL.md'),
+    resolve(process.env.HOME ?? '~', '.claude/skills/workspace-dispatch/SKILL.md'),
     resolve(
       process.env.HOME ?? '~',
       '.ocplatform/workspace/skills/workspace-dispatch/SKILL.md',
@@ -142,11 +142,11 @@ function authHeaders(): Record<string, string> {
 
 function nowPlusSecondsIso(seconds: number): string {
   const t = new Date(Date.now() + seconds * 1000)
-  // Hermes accepts ISO-8601 timestamps; strip milliseconds for cleanliness
+  // Claude accepts ISO-8601 timestamps; strip milliseconds for cleanliness
   return t.toISOString().replace(/\.\d{3}Z$/, 'Z')
 }
 
-async function createHermesJob(payload: {
+async function createClaudeJob(payload: {
   name: string
   schedule: string
   prompt: string
@@ -165,7 +165,7 @@ async function createHermesJob(payload: {
         headers: { 'Content-Type': 'application/json' },
         body,
       })
-    : await fetch(`${HERMES_API}/api/jobs`, {
+    : await fetch(`${CLAUDE_API}/api/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body,
@@ -220,7 +220,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           const jobName = `conductor-${Date.now()}`
           // Schedule a one-shot job ~5s in the future so the cron loop
           // picks it up promptly without racing with the create response.
-          const result = await createHermesJob({
+          const result = await createClaudeJob({
             name: jobName,
             schedule: nowPlusSecondsIso(5),
             prompt,
@@ -234,7 +234,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             )
           }
 
-          // Hermes runs cron jobs in sessions keyed `cron_<jobId>_<timestamp>`.
+          // Claude runs cron jobs in sessions keyed `cron_<jobId>_<timestamp>`.
           // We can't know the timestamp until the cron loop fires, so we return
           // a prefix and the UI polls for any session whose key starts with it.
           const jobId = result.id ?? jobName

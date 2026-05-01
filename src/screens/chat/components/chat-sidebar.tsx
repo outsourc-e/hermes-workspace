@@ -70,27 +70,27 @@ function ThemeToggleMini() {
   // Detect dark/light from actual data-theme attribute
   const currentDataTheme =
     typeof document !== 'undefined'
-      ? document.documentElement.getAttribute('data-theme') || 'hermes-nous'
-      : 'hermes-nous'
+      ? document.documentElement.getAttribute('data-theme') || 'claude-nous'
+      : 'claude-nous'
   const isDark = !currentDataTheme.endsWith('-light')
 
   // Map between dark and light counterparts — must include all theme families
   const LIGHT_DARK_PAIRS: Record<string, string> = {
-    'hermes-nous': 'hermes-nous-light',
-    'hermes-nous-light': 'hermes-nous',
-    'hermes-official': 'hermes-official-light',
-    'hermes-official-light': 'hermes-official',
-    'hermes-classic': 'hermes-classic-light',
-    'hermes-classic-light': 'hermes-classic',
-    'hermes-slate': 'hermes-slate-light',
-    'hermes-slate-light': 'hermes-slate',
+    'claude-nous': 'claude-nous-light',
+    'claude-nous-light': 'claude-nous',
+    'claude-official': 'claude-official-light',
+    'claude-official-light': 'claude-official',
+    'claude-classic': 'claude-classic-light',
+    'claude-classic-light': 'claude-classic',
+    'claude-slate': 'claude-slate-light',
+    'claude-slate-light': 'claude-slate',
   }
 
   return (
     <button
       type="button"
       onClick={() => {
-        // Fall back to current family rather than dropping the user into hermes-official
+        // Fall back to current family rather than dropping the user into claude-official
         const nextDataTheme =
           LIGHT_DARK_PAIRS[currentDataTheme] ||
           (isDark
@@ -316,7 +316,7 @@ function NavItem({
 
 // ── Last-visited route tracking ─────────────────────────────────────────
 
-const LAST_ROUTE_KEY = 'hermes-sidebar-last-route'
+const LAST_ROUTE_KEY = 'claude-sidebar-last-route'
 
 function getLastRoute(section: string): string | null {
   try {
@@ -532,7 +532,7 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'hermes')
+      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'claude')
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
@@ -590,15 +590,15 @@ function ChatSidebarComponent({
 
   // Collapsible section states
   const [mainExpanded, toggleMain] = usePersistedBool(
-    'hermes-sidebar-main-expanded',
+    'claude-sidebar-main-expanded',
     true,
   )
   const [knowledgeExpanded, toggleKnowledge] = usePersistedBool(
-    'hermes-sidebar-knowledge-expanded',
+    'claude-sidebar-knowledge-expanded',
     true,
   )
   const [_systemExpanded, _toggleSystem] = usePersistedBool(
-    'hermes-sidebar-system-expanded',
+    'claude-sidebar-system-expanded',
     false,
   )
 
@@ -911,15 +911,15 @@ function ChatSidebarComponent({
                 )}
               >
                 <img
-                  src="/hermes-avatar.webp"
-                  alt="Hermes"
+                  src="/claude-avatar.webp"
+                  alt="Claude"
                   className="size-6 rounded-lg"
                 />
                 <span
                   className="text-sm font-semibold tracking-tight"
                   style={{ color: 'var(--theme-text)' }}
                 >
-                  Hermes Workspace
+                  Claude Workspace
                 </span>
               </Link>
             </motion.div>
@@ -1129,7 +1129,7 @@ function ChatSidebarComponent({
             <MenuContent side="top" align="start" className="min-w-[200px]">
               <MenuItem
                 onClick={function onOpenSettings() {
-                  handleOpenSettings('hermes')
+                  handleOpenSettings('claude')
                 }}
                 className="justify-between"
               >
@@ -1150,7 +1150,7 @@ function ChatSidebarComponent({
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={() => handleOpenSettings('hermes')}
+                onClick={() => handleOpenSettings('claude')}
                 className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >

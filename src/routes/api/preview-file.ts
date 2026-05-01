@@ -33,15 +33,15 @@ const MIME_BY_EXT: Record<string, string> = {
 
 function allowedPrefixes(): string[] {
   const home = os.homedir()
-  const hermesHome =
-    process.env.HERMES_HOME ?? resolvePath(home, '.hermes')
+  const claudeHome =
+    process.env.CLAUDE_HOME ?? resolvePath(home, '.claude')
   return [
     '/tmp',
     `${home}/tmp`,
     resolvePath(home, 'dispatch'),
     resolvePath(home, 'projects'),
-    resolvePath(hermesHome, 'projects'),
-    resolvePath(home, '.hermes', 'projects'),
+    resolvePath(claudeHome, 'projects'),
+    resolvePath(home, '.claude', 'projects'),
     resolvePath(home, '.ocplatform', 'workspace', 'projects'),
   ]
 }

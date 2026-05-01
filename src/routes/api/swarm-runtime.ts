@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { getProfilesDir } from '../../server/hermes-paths'
+import { getProfilesDir } from '../../server/claude-paths'
 import {
   buildSwarmDispatchMetadata,
   buildSwarmSessionMetadata,

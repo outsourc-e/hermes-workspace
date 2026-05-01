@@ -19,7 +19,7 @@ function ContextAlertModalComponent({
 }: ContextAlertModalProps) {
   const isCritical = threshold >= 90
   const isDanger = threshold >= 75
-  // 35% is an early warning — Hermes auto-compacts at ~40%
+  // 35% is an early warning — Claude auto-compacts at ~40%
 
   const barColor = isCritical
     ? 'bg-red-500'
@@ -102,7 +102,7 @@ function ContextAlertModalComponent({
                 ? "Your conversation history is nearly at the model's limit. Responses may become less accurate as the model loses access to earlier context. You should start a new chat soon."
                 : isDanger
                   ? 'Your conversation is getting long. The model may start forgetting earlier messages. Consider starting a new chat for best results.'
-                  : 'Hermes will auto-compact your context soon (it triggers at ~40% usage). Older messages will be summarized. Consider writing a handoff or starting a new chat to preserve full context.'}
+                  : 'Claude will auto-compact your context soon (it triggers at ~40% usage). Older messages will be summarized. Consider writing a handoff or starting a new chat to preserve full context.'}
             </p>
           </div>
 

@@ -1,11 +1,11 @@
-# Hermes-Workspace v2.1.0 — Swarm
+# Claude-Workspace v2.1.0 — Swarm
 
-Hermes-Workspace 2.1.0 introduces **Swarm**, a built-in multi-agent orchestration surface for running a main HermesAgent with persistent worker agents.
+Claude-Workspace 2.1.0 introduces **Swarm**, a built-in multi-agent orchestration surface for running a main ClaudeAgent with persistent worker agents.
 
 ## Highlights
 
 - **Swarm Mode**
-  - route work from a main HermesAgent into a live worker swarm
+  - route work from a main ClaudeAgent into a live worker swarm
   - persistent tmux-backed workers
   - role-aware dispatch and orchestration surfaces
 
@@ -25,8 +25,8 @@ Hermes-Workspace 2.1.0 introduces **Swarm**, a built-in multi-agent orchestratio
   - dashboard fallback added for session create/update/fork flows
   - workspace reliability patches preserved
 
-- **Hermes path + environment fixes**
-  - canonical Hermes root handling
+- **Claude path + environment fixes**
+  - canonical Claude root handling
   - improved home/env handling for profiles and run storage
 
 - **Docs and security**
@@ -50,19 +50,19 @@ Hermes-Workspace 2.1.0 introduces **Swarm**, a built-in multi-agent orchestratio
 
 ## Suggested short release description
 
-Hermes-Workspace 2.1.0 ships Swarm: a built-in multi-agent control surface for persistent worker agents, orchestrator-first routing, Board + reports + inbox flows, and a set of reliability fixes across chat streaming, approvals, sessions, and Hermes path handling.
+Claude-Workspace 2.1.0 ships Swarm: a built-in multi-agent control surface for persistent worker agents, orchestrator-first routing, Board + reports + inbox flows, and a set of reliability fixes across chat streaming, approvals, sessions, and Claude path handling.
 
 ## Suggested launch post
 
-Hermes-Workspace 2.1.0 is out.
+Claude-Workspace 2.1.0 is out.
 
-It ships **Swarm**: a built-in multi-agent workspace where one HermesAgent can orchestrate persistent worker agents with live checkpoints, Board, inbox/review flow, and better routing between orchestrator and workers.
+It ships **Swarm**: a built-in multi-agent workspace where one ClaudeAgent can orchestrate persistent worker agents with live checkpoints, Board, inbox/review flow, and better routing between orchestrator and workers.
 
 Also in 2.1.0:
 - stronger long-run SSE chat reliability
 - approval banner fix
 - portable session deletion fix
 - dashboard fallback for session actions
-- Hermes path handling improvements
+- Claude path handling improvements
 
 If you want multi-agent control without leaving your workspace, this is the release.

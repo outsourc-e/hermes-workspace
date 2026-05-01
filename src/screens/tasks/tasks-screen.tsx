@@ -22,10 +22,10 @@ import {
   COLUMN_COLORS,
   isOverdue,
 } from '@/lib/tasks-api'
-import type { HermesTask, TaskColumn, CreateTaskInput, TaskAssignee } from '@/lib/tasks-api'
+import type { ClaudeTask, TaskColumn, CreateTaskInput, TaskAssignee } from '@/lib/tasks-api'
 
-const QUERY_KEY = ['hermes', 'tasks'] as const
-const ASSIGNEES_KEY = ['hermes', 'tasks', 'assignees'] as const
+const QUERY_KEY = ['claude', 'tasks'] as const
+const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
 
 export const TASKS_BOARD_HELP_TEXT =
   'Drag cards to change status. Open a card to set assignee and due date.'
@@ -48,7 +48,7 @@ export function TasksScreen() {
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [createColumn, setCreateColumn] = useState<TaskColumn>('backlog')
-  const [editingTask, setEditingTask] = useState<HermesTask | null>(null)
+  const [editingTask, setEditingTask] = useState<ClaudeTask | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<TaskColumn | null>(null)
   const [showDone, setShowDone] = useState(false)
@@ -84,7 +84,7 @@ export function TasksScreen() {
   const tasks = tasksQuery.data ?? []
 
   const tasksByColumn = useMemo(() => {
-    const map: Record<TaskColumn, Array<HermesTask>> = {
+    const map: Record<TaskColumn, Array<ClaudeTask>> = {
       backlog: [], todo: [], in_progress: [], review: [], done: [],
     }
     for (const t of tasks) {

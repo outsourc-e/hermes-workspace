@@ -15,9 +15,9 @@ const DEFAULT_CONFIG: KnowledgeBaseConfig = {
 }
 
 function getConfigPath(): string {
-  const hermesHome =
-    process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
-  return path.join(hermesHome, 'knowledge-config.json')
+  const claudeHome =
+    process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
+  return path.join(claudeHome, 'knowledge-config.json')
 }
 
 export function readKnowledgeBaseConfig(): KnowledgeBaseConfig {
@@ -53,7 +53,7 @@ export function getKnowledgeBaseEffectiveRoot(): string {
   }
   // fallback: legacy env var or default
   if (process.env.KNOWLEDGE_DIR) return path.resolve(process.env.KNOWLEDGE_DIR)
-  const hermesKnowledge = path.join(os.homedir(), '.hermes', 'knowledge')
-  if (fs.existsSync(hermesKnowledge)) return hermesKnowledge
-  return hermesKnowledge
+  const claudeKnowledge = path.join(os.homedir(), '.claude', 'knowledge')
+  if (fs.existsSync(claudeKnowledge)) return claudeKnowledge
+  return claudeKnowledge
 }

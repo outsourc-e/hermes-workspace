@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 // Inlined to avoid SSR module-resolution races against freshly-written
-// helpers; mirrors `src/server/hermes-paths.ts` getProfilesDir().
+// helpers; mirrors `src/server/claude-paths.ts` getProfilesDir().
 function getProfilesDir(): string {
   const envHome = process.env.CLAUDE_HOME
   if (envHome) {
@@ -17,7 +17,7 @@ function getProfilesDir(): string {
     }
     return join(envHome, 'profiles')
   }
-  return join(homedir(), '.hermes', 'profiles')
+  return join(homedir(), '.claude', 'profiles')
 }
 
 /**
@@ -25,7 +25,7 @@ function getProfilesDir(): string {
  * Body: { workerId: "swarm1" }
  *
  * Idempotently ensures a long-lived tmux session exists for a worker.
- * The session runs the worker's `hermes` TUI inside its profile + cwd, so
+ * The session runs the worker's `claude` TUI inside its profile + cwd, so
  * dispatch traffic + the swarm2 Runtime pane both see the same live agent.
  *
  * Returns: { workerId, sessionName, alreadyRunning, started }
@@ -81,7 +81,7 @@ function startSession(
         sessionName,
         '-c',
         cwd,
-        `HERMES_HOME='${profilePath.replace(/'/g, `'\\''`)}' exec hermes chat --continue`,
+        `CLAUDE_HOME='${profilePath.replace(/'/g, `'\\''`)}' exec claude chat --continue`,
       ],
       { timeout: 8_000 },
       (error, _stdout, stderr) => {

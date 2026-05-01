@@ -27,7 +27,7 @@ vi.mock('node:os', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  delete process.env.HERMES_HOME
+  delete process.env.CLAUDE_HOME
 })
 
 async function loadMod() {
@@ -36,24 +36,24 @@ async function loadMod() {
 }
 
 describe('memory-browser', () => {
-  it('normalizes workspace root with HERMES_HOME via path.resolve', async () => {
-    process.env.HERMES_HOME = '/custom/hermes'
+  it('normalizes workspace root with CLAUDE_HOME via path.resolve', async () => {
+    process.env.CLAUDE_HOME = '/custom/claude'
     const mod = await loadMod()
     const root = mod.getMemoryWorkspaceRoot()
-    expect(root).toBe(path.resolve('/custom/hermes'))
+    expect(root).toBe(path.resolve('/custom/claude'))
   })
 
-  it('falls back to ~/.hermes when HERMES_HOME is not set', async () => {
-    delete process.env.HERMES_HOME
+  it('falls back to ~/.claude when CLAUDE_HOME is not set', async () => {
+    delete process.env.CLAUDE_HOME
     const mod = await loadMod()
     const root = mod.getMemoryWorkspaceRoot()
-    expect(root).toBe(path.resolve('/home/testuser/.hermes'))
+    expect(root).toBe(path.resolve('/home/testuser/.claude'))
   })
 
   it('uses path.resolve on env path with trailing slash', async () => {
-    process.env.HERMES_HOME = '/custom/hermes/'
+    process.env.CLAUDE_HOME = '/custom/claude/'
     const mod = await loadMod()
     const root = mod.getMemoryWorkspaceRoot()
-    expect(root).toBe(path.resolve('/custom/hermes'))
+    expect(root).toBe(path.resolve('/custom/claude'))
   })
 })

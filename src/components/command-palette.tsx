@@ -129,7 +129,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
     }
 
     if (command === '/model' || command === '/skin') {
-      const section = command === '/skin' ? 'appearance' : 'hermes'
+      const section = command === '/skin' ? 'appearance' : 'claude'
       if (pathname.startsWith('/chat') || pathname === '/') {
         window.dispatchEvent(
           new CustomEvent(CHAT_OPEN_SETTINGS_EVENT, {
@@ -262,7 +262,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
         id: 'slash-model',
         group: 'Slash Commands',
         label: '/model',
-        keywords: 'open model picker settings hermes provider',
+        keywords: 'open model picker settings claude provider',
         shortcut: 'Run',
         icon: CommandLineIcon,
         onSelect: () => runSlashCommand('/model'),

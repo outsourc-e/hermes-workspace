@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { getProfilesDir } from '../../server/hermes-paths'
+import { getProfilesDir } from '../../server/claude-paths'
 
 type PreviewSource = 'runtime' | 'script-port' | 'none'
 

@@ -1,12 +1,12 @@
 export type ThemeId =
-  | 'hermes-nous'
-  | 'hermes-nous-light'
-  | 'hermes-official'
-  | 'hermes-official-light'
-  | 'hermes-classic'
-  | 'hermes-classic-light'
-  | 'hermes-slate'
-  | 'hermes-slate-light'
+  | 'claude-nous'
+  | 'claude-nous-light'
+  | 'claude-official'
+  | 'claude-official-light'
+  | 'claude-classic'
+  | 'claude-classic-light'
+  | 'claude-slate'
+  | 'claude-slate-light'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -15,82 +15,82 @@ export const THEMES: Array<{
   icon: string
 }> = [
   {
-    id: 'hermes-nous',
-    label: 'Hermes Nous',
+    id: 'claude-nous',
+    label: 'Claude Nous',
     description: 'Deep teal background, cream accent — matches Nous Research chrome',
     icon: '◱',
   },
   {
-    id: 'hermes-nous-light',
-    label: 'Hermes Nous Light',
+    id: 'claude-nous-light',
+    label: 'Claude Nous Light',
     description: 'Cold paper white with restrained cobalt framing',
     icon: '◲',
   },
   {
-    id: 'hermes-official',
-    label: 'Hermes Official',
+    id: 'claude-official',
+    label: 'Claude Official',
     description: 'Navy and indigo flagship theme',
     icon: '⚕',
   },
   {
-    id: 'hermes-official-light',
-    label: 'Hermes Official Light',
+    id: 'claude-official-light',
+    label: 'Claude Official Light',
     description: 'Editorial paper white with muted cobalt accents',
     icon: '⚕',
   },
   {
-    id: 'hermes-classic',
-    label: 'Hermes Classic',
+    id: 'claude-classic',
+    label: 'Claude Classic',
     description: 'Bronze accents on dark charcoal',
     icon: '🔶',
   },
   {
-    id: 'hermes-classic-light',
+    id: 'claude-classic-light',
     label: 'Classic Light',
     description: 'Warm parchment with bronze accents',
     icon: '🔶',
   },
   {
-    id: 'hermes-slate',
+    id: 'claude-slate',
     label: 'Slate',
     description: 'Cool blue developer theme',
     icon: '🔷',
   },
   {
-    id: 'hermes-slate-light',
+    id: 'claude-slate-light',
     label: 'Slate Light',
     description: 'GitHub-light palette with blue accents',
     icon: '🔷',
   },
 ]
 
-const STORAGE_KEY = 'hermes-theme'
-const DEFAULT_THEME: ThemeId = 'hermes-nous'
+const STORAGE_KEY = 'claude-theme'
+const DEFAULT_THEME: ThemeId = 'claude-nous'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
 const LIGHT_THEME_MAP: Record<
   Exclude<ThemeId, `${string}-light`>,
   Extract<ThemeId, `${string}-light`>
 > = {
-  'hermes-nous': 'hermes-nous-light',
-  'hermes-official': 'hermes-official-light',
-  'hermes-classic': 'hermes-classic-light',
-  'hermes-slate': 'hermes-slate-light',
+  'claude-nous': 'claude-nous-light',
+  'claude-official': 'claude-official-light',
+  'claude-classic': 'claude-classic-light',
+  'claude-slate': 'claude-slate-light',
 }
 const DARK_THEME_MAP: Record<
   Extract<ThemeId, `${string}-light`>,
   Exclude<ThemeId, `${string}-light`>
 > = {
-  'hermes-nous-light': 'hermes-nous',
-  'hermes-official-light': 'hermes-official',
-  'hermes-classic-light': 'hermes-classic',
-  'hermes-slate-light': 'hermes-slate',
+  'claude-nous-light': 'claude-nous',
+  'claude-official-light': 'claude-official',
+  'claude-classic-light': 'claude-classic',
+  'claude-slate-light': 'claude-slate',
 }
 
 const LIGHT_THEMES = new Set<ThemeId>([
-  'hermes-nous-light',
-  'hermes-official-light',
-  'hermes-classic-light',
-  'hermes-slate-light',
+  'claude-nous-light',
+  'claude-official-light',
+  'claude-classic-light',
+  'claude-slate-light',
 ])
 
 export function isValidTheme(

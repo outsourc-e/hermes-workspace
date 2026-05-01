@@ -6,10 +6,10 @@ import { fetchCronJobs } from '@/lib/cron-api'
 import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
 import { formatModelName, formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
-// Hermes-Workspace adapter: Operations is backed by Hermes profiles
-// (each profile = one persistent agent). Profiles live at ~/.hermes/profiles/<name>/
+// Claude-Workspace adapter: Operations is backed by Claude profiles
+// (each profile = one persistent agent). Profiles live at ~/.claude/profiles/<name>/
 // with their own config.yaml, sessions, skills.
-type HermesProfileSummary = {
+type ClaudeProfileSummary = {
   name: string
   path: string
   active: boolean
@@ -212,14 +212,14 @@ function parseConfigPayload(payload: ConfigPayload): ConfigPayload {
   return payload
 }
 
-async function fetchHermesProfiles(): Promise<HermesProfileSummary[]> {
+async function fetchClaudeProfiles(): Promise<ClaudeProfileSummary[]> {
   const response = await fetch('/api/profiles/list')
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('json')) {
     throw new Error('/api/profiles/list returned non-JSON')
   }
   const payload = (await response.json().catch(() => ({}))) as {
-    profiles?: HermesProfileSummary[]
+    profiles?: ClaudeProfileSummary[]
     error?: string
   }
   if (!response.ok || payload.error) {
@@ -228,10 +228,10 @@ async function fetchHermesProfiles(): Promise<HermesProfileSummary[]> {
   return Array.isArray(payload.profiles) ? payload.profiles : []
 }
 
-// Adapt Hermes profiles into the ConfigPayload shape that the existing
+// Adapt Claude profiles into the ConfigPayload shape that the existing
 // Operations UI expects. Each profile becomes one agent.
 async function fetchOperationsConfig(): Promise<ConfigPayload> {
-  const profiles = await fetchHermesProfiles()
+  const profiles = await fetchClaudeProfiles()
   const list = profiles.map((profile) => ({
     id: profile.name,
     name: profile.name === 'default' ? 'Workspace' : profile.name,
@@ -250,7 +250,7 @@ async function fetchOperationsConfig(): Promise<ConfigPayload> {
   }
 }
 
-async function createHermesProfile(input: {
+async function createClaudeProfile(input: {
   name: string
   model?: string
   provider?: string
@@ -270,7 +270,7 @@ async function createHermesProfile(input: {
   }
 }
 
-async function updateHermesProfile(name: string, patch: Record<string, unknown>) {
+async function updateClaudeProfile(name: string, patch: Record<string, unknown>) {
   const response = await fetch('/api/profiles/update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -285,7 +285,7 @@ async function updateHermesProfile(name: string, patch: Record<string, unknown>)
   }
 }
 
-async function deleteHermesProfile(name: string) {
+async function deleteClaudeProfile(name: string) {
   const response = await fetch('/api/profiles/delete', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -622,14 +622,14 @@ export function useOperations() {
         throw new Error('A profile with this name already exists')
       }
 
-      await createHermesProfile({
+      await createClaudeProfile({
         name: id,
         model: input.model.trim() || undefined,
       })
       // Persist system prompt + description into the profile config so they
       // survive across browsers; localStorage meta keeps emoji/color preferences.
       if (input.systemPrompt.trim() || input.description?.trim()) {
-        await updateHermesProfile(id, {
+        await updateClaudeProfile(id, {
           system_prompt: input.systemPrompt.trim() || undefined,
           description: input.description?.trim() || undefined,
         })
@@ -669,7 +669,7 @@ export function useOperations() {
       if (input.model.trim()) patch.model = input.model.trim()
       if (input.systemPrompt.trim()) patch.system_prompt = input.systemPrompt.trim()
       if (Object.keys(patch).length > 0) {
-        await updateHermesProfile(input.agentId, patch)
+        await updateClaudeProfile(input.agentId, patch)
       }
       const currentMeta = loadAgentMeta(input.agentId)
       persistAgentMeta(input.agentId, {
@@ -695,7 +695,7 @@ export function useOperations() {
       if (agentId === 'default') {
         throw new Error('Cannot delete the default profile')
       }
-      await deleteHermesProfile(agentId)
+      await deleteClaudeProfile(agentId)
       removeAgentMeta(agentId)
       setMetaVersion((value) => value + 1)
       setSelectedAgentId((current) => (current === agentId ? null : current))

@@ -44,7 +44,7 @@ function validateWorkerId(workerId: string): boolean {
 }
 
 function getProfilesDir(): string {
-  const base = process.env.HERMES_HOME ?? join(homedir(), '.hermes')
+  const base = process.env.CLAUDE_HOME ?? join(homedir(), '.claude')
   return join(base, 'profiles')
 }
 
@@ -140,7 +140,7 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
     sessionName,
     '-c',
     cwd,
-    `HERMES_HOME='${profilePath.replace(/'/g, `'\\''`)}' exec hermes`,
+    `CLAUDE_HOME='${profilePath.replace(/'/g, `'\\''`)}' exec claude`,
   ])
   if (!started.ok) return { ok: false, error: started.error }
   await sleep(1200)

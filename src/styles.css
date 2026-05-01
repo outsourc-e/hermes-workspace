@@ -709,8 +709,8 @@ code {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ── Hermes Workspace Themes ── */
-[data-theme='hermes-official'] {
+/* ── Claude Workspace Themes ── */
+[data-theme='claude-official'] {
   --theme-bg: #0a0e1a;
   --theme-sidebar: #0d1220;
   --theme-panel: #0d1220;
@@ -756,7 +756,7 @@ code {
   --theme-input: #0f1728;
 }
 
-[data-theme='hermes-classic'] {
+[data-theme='claude-classic'] {
   --theme-bg: #0d0f12;
   --theme-sidebar: #13171c;
   --theme-panel: #13171c;
@@ -803,7 +803,7 @@ code {
   --theme-input: #232a33;
 }
 
-[data-theme='hermes-slate'] {
+[data-theme='claude-slate'] {
   --theme-bg: #0d1117;
   --theme-sidebar: #0d1117;
   --theme-panel: #161b22;
@@ -849,7 +849,7 @@ code {
   --theme-input: #232a33;
 }
 
-[data-theme='hermes-official-light'] {
+[data-theme='claude-official-light'] {
   --theme-bg: #f7f7f1;
   --theme-sidebar: #f2f3ed;
   --theme-panel: #f4f5ef;
@@ -895,7 +895,7 @@ code {
   --theme-input: #fbfcf7;
 }
 
-[data-theme='hermes-classic-light'] {
+[data-theme='claude-classic-light'] {
   --theme-bg: #f5f2ed;
   --theme-sidebar: #eee8df;
   --theme-panel: #f0ebe4;
@@ -941,7 +941,7 @@ code {
   --theme-input: #fffdf9;
 }
 
-[data-theme='hermes-slate-light'] {
+[data-theme='claude-slate-light'] {
   --theme-bg: #f6f8fa;
   --theme-sidebar: #f3f5f7;
   --theme-panel: #eef2f6;
@@ -989,12 +989,12 @@ code {
 
 
 /* ============================================================
-   Hermes Nous — matches nousresearch.com/hermes-agent chrome
+   Claude Nous — matches nousresearch.com/claude-agent chrome
    Dark:  deep teal #041C1C background, cream #ffe6cb accent
    Light: warm parchment, deep teal text, amber #ffac02 accent
    ============================================================ */
 
-[data-theme='hermes-nous'] {
+[data-theme='claude-nous'] {
   --theme-bg: #041c1c;
   --theme-sidebar: #06282a;
   --theme-panel: #06282a;
@@ -1040,7 +1040,7 @@ code {
   --theme-input: #06282a;
 }
 
-[data-theme='hermes-nous-light'] {
+[data-theme='claude-nous-light'] {
   --theme-bg: #f8faf8;
   --theme-sidebar: #f2f6f4;
   --theme-panel: #f4f7f5;
@@ -1086,42 +1086,42 @@ code {
   --theme-input: #fbfdfb;
 }
 
-[data-theme='hermes-nous'] html,
-[data-theme='hermes-nous'] body,
-[data-theme='hermes-nous'] #root,
-[data-theme='hermes-nous'] .dark,
-[data-theme='hermes-official'] html,
-[data-theme='hermes-official'] body,
-[data-theme='hermes-official'] #root,
-[data-theme='hermes-official'] .dark,
-[data-theme='hermes-classic'] html,
-[data-theme='hermes-classic'] body,
-[data-theme='hermes-classic'] #root,
-[data-theme='hermes-classic'] .dark,
-[data-theme='hermes-slate'] html,
-[data-theme='hermes-slate'] body,
-[data-theme='hermes-slate'] #root,
-[data-theme='hermes-slate'] .dark {
+[data-theme='claude-nous'] html,
+[data-theme='claude-nous'] body,
+[data-theme='claude-nous'] #root,
+[data-theme='claude-nous'] .dark,
+[data-theme='claude-official'] html,
+[data-theme='claude-official'] body,
+[data-theme='claude-official'] #root,
+[data-theme='claude-official'] .dark,
+[data-theme='claude-classic'] html,
+[data-theme='claude-classic'] body,
+[data-theme='claude-classic'] #root,
+[data-theme='claude-classic'] .dark,
+[data-theme='claude-slate'] html,
+[data-theme='claude-slate'] body,
+[data-theme='claude-slate'] #root,
+[data-theme='claude-slate'] .dark {
   background-color: var(--theme-bg);
   color: var(--theme-text);
 }
 
-[data-theme='hermes-nous-light'] html,
-[data-theme='hermes-nous-light'] body,
-[data-theme='hermes-nous-light'] #root,
-[data-theme='hermes-nous-light'] .light,
-[data-theme='hermes-official-light'] html,
-[data-theme='hermes-official-light'] body,
-[data-theme='hermes-official-light'] #root,
-[data-theme='hermes-official-light'] .light,
-[data-theme='hermes-classic-light'] html,
-[data-theme='hermes-classic-light'] body,
-[data-theme='hermes-classic-light'] #root,
-[data-theme='hermes-classic-light'] .light,
-[data-theme='hermes-slate-light'] html,
-[data-theme='hermes-slate-light'] body,
-[data-theme='hermes-slate-light'] #root,
-[data-theme='hermes-slate-light'] .light {
+[data-theme='claude-nous-light'] html,
+[data-theme='claude-nous-light'] body,
+[data-theme='claude-nous-light'] #root,
+[data-theme='claude-nous-light'] .light,
+[data-theme='claude-official-light'] html,
+[data-theme='claude-official-light'] body,
+[data-theme='claude-official-light'] #root,
+[data-theme='claude-official-light'] .light,
+[data-theme='claude-classic-light'] html,
+[data-theme='claude-classic-light'] body,
+[data-theme='claude-classic-light'] #root,
+[data-theme='claude-classic-light'] .light,
+[data-theme='claude-slate-light'] html,
+[data-theme='claude-slate-light'] body,
+[data-theme='claude-slate-light'] #root,
+[data-theme='claude-slate-light'] .light {
   background-color: var(--theme-bg);
   color: var(--theme-text);
 }
@@ -1131,10 +1131,10 @@ code {
    to theme-appropriate values so ALL existing Tailwind classes work.
    Dark: 50=darkest surface, 950=lightest text (already set above) */
 
-[data-theme='hermes-nous'],
-[data-theme='hermes-official'],
-[data-theme='hermes-classic'],
-[data-theme='hermes-slate'] {
+[data-theme='claude-nous'],
+[data-theme='claude-official'],
+[data-theme='claude-classic'],
+[data-theme='claude-slate'] {
   --color-primary-50: var(--theme-panel);
   --color-primary-100: var(--theme-card);
   --color-primary-200: var(--theme-border);
@@ -1157,10 +1157,10 @@ code {
 /* ── Tailwind primary token remaps for light themes ────────────────────
    Light: 50=lightest surface, 950=darkest text */
 
-[data-theme='hermes-nous-light'],
-[data-theme='hermes-official-light'],
-[data-theme='hermes-classic-light'],
-[data-theme='hermes-slate-light'] {
+[data-theme='claude-nous-light'],
+[data-theme='claude-official-light'],
+[data-theme='claude-classic-light'],
+[data-theme='claude-slate-light'] {
   color-scheme: light !important;
   --color-primary-50: var(--theme-card) !important;
   --color-primary-100: var(--theme-card2) !important;
@@ -1203,7 +1203,7 @@ code {
 /* ════════════════════════════════════════════════════════════════════
    EDITORIAL VOCABULARY — v2 surface pass
    Apply these utilities + treatments across components for the
-   Hermes/Nous editorial museum-catalog feel.
+   Claude/Nous editorial museum-catalog feel.
    ════════════════════════════════════════════════════════════════════ */
 
 /* Editorial micro-label (uppercase, tracked, restrained)

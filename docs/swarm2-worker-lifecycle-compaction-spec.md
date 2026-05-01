@@ -5,7 +5,7 @@ Status: staged implementation
 
 ## Problem
 
-Swarm workers are persistent Hermes agents with their own profiles, sessions, tmux panes, runtime state, and memory. That is the right architecture, but long-running workers will eventually degrade when context approaches the model window.
+Swarm workers are persistent Claude agents with their own profiles, sessions, tmux panes, runtime state, and memory. That is the right architecture, but long-running workers will eventually degrade when context approaches the model window.
 
 We need an automatic lifecycle system so workers can:
 
@@ -58,12 +58,12 @@ Optional timestamped archive can exist later, but `latest.md` is the resume sour
 
 ## Renewal sequence
 
-1. Detect context pressure from Hermes `state.db` session token counts.
+1. Detect context pressure from Claude `state.db` session token counts.
 2. Ask worker for handoff via tmux dispatch.
 3. Parse handoff checkpoint from chat.
 4. Save handoff into durable memory path.
 5. Stop worker tmux session.
-6. Start clean Hermes session with same profile and cwd.
+6. Start clean Claude session with same profile and cwd.
 7. Send resume prompt containing handoff summary + active mission assignment.
 8. Mark runtime state healthy/executing.
 
@@ -92,7 +92,7 @@ Swarm2 UI should show:
 - Return lifecycle state and recommended action.
 - Add request-handoff action that sends a strict handoff prompt to tmux.
 - Add renew action, but require `force: true` for now.
-- Normalize swarm wrappers to use `/Users/aurora/hermes-workspace` cwd.
+- Normalize swarm wrappers to use `/Users/aurora/claude-workspace` cwd.
 
 ## Stage 2
 

@@ -12,7 +12,7 @@ let pendingSend: PendingSendPayload | null = null
 let pendingGeneration = false
 let recentSession: { friendlyId: string; at: number } | null = null
 
-const PENDING_MESSAGE_STORAGE_PREFIX = 'hermes_pending_msg_'
+const PENDING_MESSAGE_STORAGE_PREFIX = 'claude_pending_msg_'
 const PENDING_MESSAGE_MAX_AGE_MS = 5 * 60 * 1000
 
 type PersistedPendingSendPayload = PendingSendPayload & {

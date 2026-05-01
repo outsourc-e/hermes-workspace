@@ -3,8 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   BEARER_TOKEN,
-  HERMES_API,
-  HERMES_UPGRADE_INSTRUCTIONS,
+  CLAUDE_API,
+  CLAUDE_UPGRADE_INSTRUCTIONS,
   dashboardFetch,
   ensureGatewayProbed,
   getCapabilities,
@@ -177,7 +177,7 @@ function normalizeSkill(value: unknown): SkillSummary | null {
         ? record.fileCount
         : 0,
     sourcePath,
-    // Hermes /api/skills returns the installed skill inventory. Older payloads
+    // Claude /api/skills returns the installed skill inventory. Older payloads
     // omit explicit installed/enabled flags, so default to installed=true.
     installed: Boolean(record.installed ?? true),
     enabled: Boolean(record.enabled ?? record.installed ?? true),
@@ -187,17 +187,17 @@ function normalizeSkill(value: unknown): SkillSummary | null {
   }
 }
 
-async function fetchHermesSkills(): Promise<Array<SkillSummary>> {
+async function fetchClaudeSkills(): Promise<Array<SkillSummary>> {
   const capabilities = getCapabilities()
   const headers: Record<string, string> = {}
   if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
 
   const response = capabilities.dashboard.available
     ? await dashboardFetch('/api/skills')
-    : await fetch(`${HERMES_API}/api/skills`, { headers })
+    : await fetch(`${CLAUDE_API}/api/skills`, { headers })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new Error(body || `Hermes skills request failed (${response.status})`)
+    throw new Error(body || `Claude skills request failed (${response.status})`)
   }
 
   const payload = (await response.json()) as unknown
@@ -283,7 +283,7 @@ export const Route = createFileRoute('/api/skills')({
             Math.max(1, Number(url.searchParams.get('limit') || '30')),
           )
 
-          const sourceItems = await fetchHermesSkills()
+          const sourceItems = await fetchClaudeSkills()
           const installedLookup = new Set(
             sourceItems
               .filter((skill) => skill.installed)
@@ -344,7 +344,7 @@ export const Route = createFileRoute('/api/skills')({
           return json(
             {
               ...createCapabilityUnavailablePayload('skills', {
-                error: `Gateway does not support /api/skills. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+                error: `Gateway does not support /api/skills. ${CLAUDE_UPGRADE_INSTRUCTIONS}`,
               }),
             },
             { status: 503 },
@@ -413,7 +413,7 @@ export const Route = createFileRoute('/api/skills')({
           }
           if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
 
-          const response = await fetch(`${HERMES_API}${endpoint}`, {
+          const response = await fetch(`${CLAUDE_API}${endpoint}`, {
             method: 'POST',
             headers,
             body: JSON.stringify(payload),

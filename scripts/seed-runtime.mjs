@@ -7,7 +7,7 @@ const NOW = Date.now()
 const LANES = {
   swarm1:  ['PR / Issues', 'Triage open PRs and surface review-ready items for the orchestrator', 'Standing by on PR/issues lane; tmux session live and wrapper wired.', '/Users/aurora/claude-workspace'],
   swarm6:  ['Reviewer', 'Review pending diffs and gate merges with checklist + tests', 'Reviewer lane initialized; awaiting first dispatch.', '/Users/aurora/claude-workspace'],
-  swarm7:  ['Docs', 'Maintain handoffs, README updates, and skill documentation', 'Docs lane initialized; runtime contract adopted.', '/Users/aurora/hermes-workspace'],
+  swarm7:  ['Docs', 'Maintain handoffs, README updates, and skill documentation', 'Docs lane initialized; runtime contract adopted.', '/Users/aurora/claude-workspace'],
   swarm8:  ['Ops', 'Track infra, gateways, schedulers, and operational health', 'Ops lane initialized; ready to monitor swarm health.', '/Users/aurora/.ocplatform/workspace'],
   swarm9:  ['Hackathon', 'Prototype experimental flows and one-off agent missions', 'Hackathon lane initialized; sandbox ready.', '/Users/aurora/claude-workspace'],
   swarm10: ['Builder', 'Implement feature work assigned by the orchestrator', 'Builder lane initialized; ready for next ticket.', '/Users/aurora/claude-workspace'],

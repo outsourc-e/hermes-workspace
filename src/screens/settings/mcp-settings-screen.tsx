@@ -342,7 +342,7 @@ function ServerDialog(props: {
                       value={draft.headersText}
                       rows={4}
                       placeholder={
-                        'Authorization=Bearer ${GITHUB_TOKEN}\nX-Workspace=hermes'
+                        'Authorization=Bearer ${GITHUB_TOKEN}\nX-Workspace=claude'
                       }
                       className="min-h-[108px] w-full rounded-lg border border-primary-200 bg-surface px-3 py-2 text-sm text-primary-900 outline-none placeholder:text-primary-500"
                       onChange={(event) =>
@@ -416,7 +416,7 @@ export function McpSettingsScreen() {
         setNotice(payload.message ?? null)
       } catch {
         setNotice(
-          'Could not load MCP config from Hermes. You can still draft servers here.',
+          'Could not load MCP config from Claude. You can still draft servers here.',
         )
       } finally {
         setLoading(false)

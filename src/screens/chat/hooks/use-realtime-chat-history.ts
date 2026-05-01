@@ -8,7 +8,7 @@ import { textFromMessage } from '../utils'
 import type { ChatMessage } from '../types'
 import type { StreamingState } from '../../../stores/chat-store'
 
-const PORTABLE_HISTORY_STORAGE_KEY = 'hermes_portable_chat_main'
+const PORTABLE_HISTORY_STORAGE_KEY = 'claude_portable_chat_main'
 const PORTABLE_HISTORY_LIMIT = 100
 
 /** Read clientId from a message using either camelCase or snake_case field. */
@@ -474,7 +474,7 @@ export function useRealtimeChatHistory({
       .join('\n')
       .toLowerCase()
 
-    // Only trigger on Hermes's actual mid-compaction signal.
+    // Only trigger on Claude's actual mid-compaction signal.
     // "pre-compaction memory flush" and "store durable memories now" are routine
     // heartbeat messages — do NOT match those here.
     if (!textCandidates.includes('compacting context')) return

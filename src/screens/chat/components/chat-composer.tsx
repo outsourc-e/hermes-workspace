@@ -136,15 +136,15 @@ type ModelSwitchNotice = {
   retryProvider?: string
 }
 
-// Models are fetched through the workspace API proxy (/api/models, /api/hermes-proxy)
+// Models are fetched through the workspace API proxy (/api/models, /api/claude-proxy)
 // to support Docker and reverse-proxy deployments where the browser cannot reach
-// the Hermes gateway directly.
+// the Claude gateway directly.
 
 function readModelText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-type HermesCatalogEntry =
+type ClaudeCatalogEntry =
   | string
   | {
       id: string
@@ -153,22 +153,22 @@ type HermesCatalogEntry =
       [key: string]: unknown
     }
 
-function isHermesCatalogEntry(
-  entry: HermesCatalogEntry | null,
-): entry is HermesCatalogEntry {
+function isClaudeCatalogEntry(
+  entry: ClaudeCatalogEntry | null,
+): entry is ClaudeCatalogEntry {
   return entry !== null
 }
 
-type HermesProviderOption = {
+type ClaudeProviderOption = {
   id: string
   label: string
   authenticated: boolean
 }
 
-type HermesAvailableModelsResponse = {
+type ClaudeAvailableModelsResponse = {
   provider: string
   models: Array<{ id: string; description: string }>
-  providers: Array<HermesProviderOption>
+  providers: Array<ClaudeProviderOption>
 }
 
 async function fetchModels(): Promise<{
@@ -177,11 +177,11 @@ async function fetchModels(): Promise<{
   configuredProviders?: Array<string>
   currentProvider?: string
   providerLabels?: Record<string, string>
-  providers?: Array<HermesProviderOption>
+  providers?: Array<ClaudeProviderOption>
 }> {
   // Use the curated /api/models endpoint which returns only models
   // actually configured and available (OCPlatform gateway + local providers).
-  // Previously this hit /api/hermes-proxy/api/available-models which returned
+  // Previously this hit /api/claude-proxy/api/available-models which returned
   // every upstream provider model — flooding the picker with unusable options.
   const response = await fetch('/api/models')
   if (!response.ok) {
@@ -215,7 +215,7 @@ async function fetchModels(): Promise<{
       const provider =
         readModelText(record.provider) ||
         readModelText(record.owned_by) ||
-        (id.includes('/') ? id.split('/')[0] : 'hermes-agent')
+        (id.includes('/') ? id.split('/')[0] : 'claude-agent')
 
       return {
         ...record,
@@ -228,7 +228,7 @@ async function fetchModels(): Promise<{
           id,
       }
     })
-    .filter(isHermesCatalogEntry)
+    .filter(isClaudeCatalogEntry)
 
   const configuredProviders = Array.from(
     new Set(
@@ -255,13 +255,13 @@ async function fetchModelsForProvider(
   if (!normalizedProvider) return []
 
   const response = await fetch(
-    `/api/hermes-proxy/api/available-models?provider=${encodeURIComponent(normalizedProvider)}`,
+    `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(normalizedProvider)}`,
   )
   if (!response.ok) {
-    throw new Error(`Hermes models request failed (${response.status})`)
+    throw new Error(`Claude models request failed (${response.status})`)
   }
 
-  const payload = (await response.json()) as HermesAvailableModelsResponse
+  const payload = (await response.json()) as ClaudeAvailableModelsResponse
   return (payload.models || []).map((model) => ({
     id: model.id,
     name: model.id,
@@ -301,11 +301,11 @@ async function switchModel(
   // Switching to a cloud model — clear any local override
   setLocalModelOverride('')
 
-  // Write the model change to ~/.hermes/config.yaml via the webapi
+  // Write the model change to ~/.claude/config.yaml via the webapi
   const patch: Record<string, string> = { model: modelId }
   if (modelProvider) patch.provider = modelProvider
 
-  const response = await fetch('/api/hermes-proxy/api/config', {
+  const response = await fetch('/api/claude-proxy/api/config', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
@@ -318,7 +318,7 @@ async function switchModel(
   return {
     ok: true,
     resolved: {
-      modelProvider: modelProvider || 'hermes-agent',
+      modelProvider: modelProvider || 'claude-agent',
       model: modelId,
     },
   }
@@ -617,7 +617,7 @@ function normalizeDraftSessionKey(sessionKey?: string): string {
 }
 
 function toDraftStorageKey(sessionKey?: string): string {
-  return `hermes-draft-${normalizeDraftSessionKey(sessionKey)}`
+  return `claude-draft-${normalizeDraftSessionKey(sessionKey)}`
 }
 
 function readSlashCommandQuery(inputValue: string): string | null {
@@ -763,7 +763,7 @@ function ChatComposerComponent({
   const [internalThinkingLevel, setInternalThinkingLevel] =
     useState<ThinkingLevel>('low')
   const thinkingLevel = externalThinkingLevel ?? internalThinkingLevel
-  // Thinking toggle removed for Hermes (not supported) — keeping state for type compat
+  // Thinking toggle removed for Claude (not supported) — keeping state for type compat
   const _handleThinkingToggle = useCallback(() => {
     const next = nextThinkingLevel(thinkingLevel)
     if (onThinkingLevelChange) {
@@ -788,7 +788,7 @@ function ChatComposerComponent({
   const { pinned, isPinned, togglePin } = usePinnedModels()
 
   const modelsQuery = useQuery({
-    queryKey: ['hermes', 'models'],
+    queryKey: ['claude', 'models'],
     queryFn: fetchModels,
     refetchInterval: 60_000,
     retry: false,
@@ -803,7 +803,7 @@ function ChatComposerComponent({
   )
   const otherProviderModelsQuery = useQuery({
     queryKey: [
-      'hermes',
+      'claude',
       'models',
       'other-providers',
       otherProviders
@@ -831,7 +831,7 @@ function ChatComposerComponent({
     },
   })
   const currentModelQuery = useQuery({
-    queryKey: ['hermes', 'session-status-model'],
+    queryKey: ['claude', 'session-status-model'],
     queryFn: fetchCurrentModelFromStatus,
     refetchInterval: 30_000,
     retry: false,
@@ -946,9 +946,9 @@ function ChatComposerComponent({
 
   const currentModel = currentModelQuery.data ?? ''
 
-  // Auto-switch to hermes-agent model on mount (Hermes Workspace always uses Hermes)
-  // Removed: auto-switch to hermes-agent. The workspace respects the
-  // model/provider configured in ~/.hermes/config.yaml. Users switch
+  // Auto-switch to claude-agent model on mount (Claude Workspace always uses Claude)
+  // Removed: auto-switch to claude-agent. The workspace respects the
+  // model/provider configured in ~/.claude/config.yaml. Users switch
   // via the model selector or Settings page.
 
   // When model switches to Claude 4.6 and thinking is 'off', auto-upgrade to 'adaptive'
@@ -982,7 +982,7 @@ function ChatComposerComponent({
     return typeof first === 'string' ? first : first.id || first.name || ''
   }, [modelsQuery.data])
   const modelButtonLabel =
-    currentSelectedModel || currentModel || configuredModel || '⚕ Hermes Agent'
+    currentSelectedModel || currentModel || configuredModel || '⚕ Claude Agent'
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -2201,7 +2201,7 @@ function ChatComposerComponent({
                                   No models available
                                 </p>
                                 <p className="text-xs">
-                                  Check your Hermes provider configuration.
+                                  Check your Claude provider configuration.
                                 </p>
                               </div>
                             )
@@ -2427,7 +2427,7 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 )}
-                {/* Token counter — bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
+                {/* Token counter — bottom bar, mirrors Claude style, triggers at ~25 tokens */}
                 {value.length >= 100 && (
                   <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
                     ~{Math.ceil(value.length / 4)} tokens

@@ -30,15 +30,15 @@ type RemoteDefinition = {
 export const UPDATE_REMOTE_DEFINITIONS: Array<RemoteDefinition> = [
   {
     name: 'origin',
-    label: 'Hermes Workspace',
-    expectedRepo: 'hermes-workspace',
-    aliases: ['hermes-workspace', 'outsourc-e/hermes-workspace'],
+    label: 'Claude Workspace',
+    expectedRepo: 'claude-workspace',
+    aliases: ['claude-workspace', 'outsourc-e/claude-workspace'],
   },
   {
     name: 'upstream',
-    label: 'Hermes Agent',
-    expectedRepo: 'hermes-agent',
-    aliases: ['hermes-agent', 'NousResearch/hermes-agent'],
+    label: 'Claude Agent',
+    expectedRepo: 'claude-agent',
+    aliases: ['claude-agent', 'NousResearch/claude-agent'],
   },
 ]
 
@@ -127,7 +127,7 @@ function remoteStatus(definition: RemoteDefinition, currentHead: string | null):
   })
 }
 
-export const Route = createFileRoute('/api/hermes-update')({
+export const Route = createFileRoute('/api/claude-update')({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -144,7 +144,7 @@ export const Route = createFileRoute('/api/hermes-update')({
           ok: true,
           checkedAt: Date.now(),
           app: {
-            name: 'Hermes Workspace',
+            name: 'Claude Workspace',
             version: pkgVersion(),
             branch,
             currentHead,

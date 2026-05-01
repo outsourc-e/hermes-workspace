@@ -6,9 +6,9 @@ cd "$ROOT"
 
 PORT="${PORT:-3002}"
 RUNTIME_DIR="$ROOT/.runtime"
-PID_FILE="$RUNTIME_DIR/hermes-workspace.pid"
-LOG_FILE="$RUNTIME_DIR/hermes-workspace.log"
-BUILD_LOG_FILE="$RUNTIME_DIR/hermes-workspace.build.log"
+PID_FILE="$RUNTIME_DIR/claude-workspace.pid"
+LOG_FILE="$RUNTIME_DIR/claude-workspace.log"
+BUILD_LOG_FILE="$RUNTIME_DIR/claude-workspace.build.log"
 mkdir -p "$RUNTIME_DIR"
 
 stop_pid() {
@@ -37,11 +37,11 @@ for pid in $(lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true); do
   stop_pid "$pid"
 done
 
-echo "[stable] building Hermes Workspace..."
+echo "[stable] building Claude Workspace..."
 rm -rf dist
 pnpm build >"$BUILD_LOG_FILE" 2>&1
 
-echo "[stable] starting Hermes Workspace on port $PORT..."
+echo "[stable] starting Claude Workspace on port $PORT..."
 nohup env PORT="$PORT" NODE_OPTIONS="--max-old-space-size=2048" node server-entry.js >>"$LOG_FILE" 2>&1 &
 new_pid=$!
 echo "$new_pid" >"$PID_FILE"

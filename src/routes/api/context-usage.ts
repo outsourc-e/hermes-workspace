@@ -3,7 +3,7 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '@/server/auth-middleware'
 import {
   BEARER_TOKEN,
-  HERMES_API,
+  CLAUDE_API,
   dashboardFetch,
   ensureGatewayProbed,
   getCapabilities,
@@ -61,7 +61,7 @@ export const Route = createFileRoute('/api/context-usage')({
         const sessionId = url.searchParams.get('sessionId') || ''
 
         try {
-          // Step 1: Get session data from Hermes
+          // Step 1: Get session data from Claude
           let sessionData: Record<string, unknown> | null = null
 
           const capabilities = await ensureGatewayProbed()
@@ -76,7 +76,7 @@ export const Route = createFileRoute('/api/context-usage')({
                     },
                   )
                 : await fetch(
-                    `${HERMES_API}/api/sessions/${encodeURIComponent(sessionId)}`,
+                    `${CLAUDE_API}/api/sessions/${encodeURIComponent(sessionId)}`,
                     {
                       headers: authHeaders(),
                       signal: AbortSignal.timeout(3000),
@@ -102,7 +102,7 @@ export const Route = createFileRoute('/api/context-usage')({
                 ? await dashboardFetch('/api/sessions?limit=1', {
                     signal: AbortSignal.timeout(3000),
                   })
-                : await fetch(`${HERMES_API}/api/sessions?limit=1`, {
+                : await fetch(`${CLAUDE_API}/api/sessions?limit=1`, {
                     headers: authHeaders(),
                     signal: AbortSignal.timeout(3000),
                   })
@@ -177,7 +177,7 @@ export const Route = createFileRoute('/api/context-usage')({
                       },
                     )
                   : await fetch(
-                      `${HERMES_API}/api/sessions/${encodeURIComponent(targetSessionId)}/messages`,
+                      `${CLAUDE_API}/api/sessions/${encodeURIComponent(targetSessionId)}/messages`,
                       {
                         headers: authHeaders(),
                         signal: AbortSignal.timeout(5000),

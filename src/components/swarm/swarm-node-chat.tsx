@@ -26,7 +26,7 @@ type SwarmNodeChatProps = {
   onCollapsedChange?: (next: boolean) => void
 }
 
-const STORAGE_PREFIX = 'hermes-swarm-chat-v1:'
+const STORAGE_PREFIX = 'claude-swarm-chat-v1:'
 
 function loadHistory(workerId: string): Message[] {
   if (typeof window === 'undefined') return []
@@ -194,7 +194,7 @@ export function SwarmNodeChat({
           >
             {messages.length === 0 ? (
               <div className="px-2 py-4 text-center text-[11px] text-emerald-100/50">
-                Inline dispatch to {workerId}. Real replies come from its Hermes
+                Inline dispatch to {workerId}. Real replies come from its Claude
                 profile.
               </div>
             ) : (

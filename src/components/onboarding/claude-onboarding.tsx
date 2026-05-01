@@ -30,8 +30,8 @@ function stripProviderPrefix(model: string): string {
   return model
 }
 
-export const ONBOARDING_KEY = 'hermes-onboarding-complete'
-export const ONBOARDING_COMPLETE_EVENT = 'hermes:onboarding-complete'
+export const ONBOARDING_KEY = 'claude-onboarding-complete'
+export const ONBOARDING_COMPLETE_EVENT = 'claude:onboarding-complete'
 
 function dispatchOnboardingCompletionChanged(completed: boolean) {
   if (typeof window === 'undefined') return
@@ -56,7 +56,7 @@ type GatewayStatusResponse = {
     config?: boolean
     jobs?: boolean
   }
-  hermesUrl?: string
+  claudeUrl?: string
 }
 
 const PROVIDERS = [
@@ -130,7 +130,7 @@ function getEnhancedFeatureNames(
     .map((feature) => feature.label)
 }
 
-export function HermesOnboarding() {
+export function ClaudeOnboarding() {
   const [show, setShow] = useState(false)
   const [step, setStep] = useState<Step>('welcome')
   const [backendStatus, setBackendStatus] = useState<
@@ -178,7 +178,7 @@ export function HermesOnboarding() {
 
   const loadCurrentConfig = useCallback(async () => {
     try {
-      const res = await fetch('/api/hermes-config')
+      const res = await fetch('/api/claude-config')
       if (!res.ok) return
       const data = (await res.json()) as {
         activeModel?: string
@@ -240,7 +240,7 @@ export function HermesOnboarding() {
         setBackendStatus('ready')
         setBackendMessage(
           data.capabilities.sessions
-            ? 'Backend connected. Core chat works, and Hermes gateway enhancements are available.'
+            ? 'Backend connected. Core chat works, and Claude gateway enhancements are available.'
             : 'Backend connected. Core chat is ready.',
         )
         return
@@ -287,7 +287,7 @@ export function HermesOnboarding() {
         }
       }
 
-      const res = await fetch('/api/hermes-config', {
+      const res = await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -321,7 +321,7 @@ export function HermesOnboarding() {
     if (!canEditConfig || !selectedProvider) return true
 
     try {
-      const res = await fetch('/api/hermes-config', {
+      const res = await fetch('/api/claude-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -521,16 +521,16 @@ export function HermesOnboarding() {
           {step === 'welcome' && (
             <div className="space-y-4 text-center">
               <img
-                src="/hermes-avatar.webp"
-                alt="Hermes"
+                src="/claude-avatar.webp"
+                alt="Claude"
                 className="mx-auto size-20 rounded-2xl"
                 style={{
                   filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.3))',
                 }}
               />
-              <h2 className="text-xl font-bold">Welcome to Hermes Workspace</h2>
+              <h2 className="text-xl font-bold">Welcome to Claude Workspace</h2>
               <p className="text-sm" style={mutedStyle}>
-                Works with any OpenAI-compatible backend. Hermes gateway APIs
+                Works with any OpenAI-compatible backend. Claude gateway APIs
                 unlock sessions, memory, skills, and other extras automatically.
               </p>
               <button
@@ -553,7 +553,7 @@ export function HermesOnboarding() {
               <div className="text-4xl">🔌</div>
               <h2 className="text-lg font-bold">Connect Your Backend</h2>
               <p className="text-sm" style={mutedStyle}>
-                Start by verifying that Hermes Workspace can reach your
+                Start by verifying that Claude Workspace can reach your
                 OpenAI-compatible backend.
               </p>
 
@@ -579,7 +579,7 @@ export function HermesOnboarding() {
                   >
                     <p style={mutedStyle}>Backend URL</p>
                     <p className="mt-1 font-mono">
-                      {backendInfo?.hermesUrl || 'Configured automatically'}
+                      {backendInfo?.claudeUrl || 'Configured automatically'}
                     </p>
                   </div>
                 </div>
@@ -600,8 +600,8 @@ export function HermesOnboarding() {
                     </p>
                     <p className="mt-2" style={mutedStyle}>
                       Use any backend that exposes{' '}
-                      <code>/v1/chat/completions</code>. If you point Hermes
-                      Workspace at a Hermes gateway, enhanced features unlock
+                      <code>/v1/chat/completions</code>. If you point Claude
+                      Workspace at a Claude gateway, enhanced features unlock
                       automatically.
                     </p>
                     <div
@@ -614,7 +614,7 @@ export function HermesOnboarding() {
                       className="mt-2 rounded-lg px-3 py-2 font-mono text-[11px]"
                       style={{ background: 'rgba(0,0,0,0.2)' }}
                     >
-                      hermes --gateway
+                      claude --gateway
                     </div>
                   </div>
                 </div>
@@ -650,14 +650,14 @@ export function HermesOnboarding() {
               <p className="text-center text-xs" style={mutedStyle}>
                 {canEditConfig
                   ? 'Save provider settings here, then choose a model before testing chat.'
-                  : 'This backend manages provider settings outside Hermes Workspace. Confirm the model you expect to use, then test chat.'}
+                  : 'This backend manages provider settings outside Claude Workspace. Confirm the model you expect to use, then test chat.'}
               </p>
 
               <div className="rounded-xl p-3 text-xs" style={cardStyle}>
                 <p style={mutedStyle}>Backend mode</p>
                 <p className="mt-1">
                   {backendInfo?.capabilities?.sessions
-                    ? 'Hermes gateway detected'
+                    ? 'Claude gateway detected'
                     : 'Portable OpenAI-compatible backend'}
                 </p>
                 {configuredModel ? (
@@ -811,7 +811,7 @@ export function HermesOnboarding() {
                       className="rounded-lg px-3 py-2 font-mono text-xs"
                       style={{ background: 'rgba(0,0,0,0.2)' }}
                     >
-                      hermes auth login openai-codex
+                      claude auth login openai-codex
                     </div>
                     <p className="text-xs" style={mutedStyle}>
                       After the login flow completes, click below to refresh
@@ -978,7 +978,7 @@ export function HermesOnboarding() {
               <div className="text-4xl">🧪</div>
               <h2 className="text-lg font-bold">Test Chat</h2>
               <p className="text-sm" style={mutedStyle}>
-                Verify that core chat works first. Enhanced Hermes features are
+                Verify that core chat works first. Enhanced Claude features are
                 optional and appear automatically when supported.
               </p>
 
@@ -988,7 +988,7 @@ export function HermesOnboarding() {
               >
                 <p style={mutedStyle}>Backend</p>
                 <p className="mt-1 font-mono">
-                  {backendInfo?.hermesUrl || 'Configured automatically'}
+                  {backendInfo?.claudeUrl || 'Configured automatically'}
                 </p>
                 {selectedModel || configuredModel ? (
                   <p className="mt-2" style={mutedStyle}>
@@ -1060,7 +1060,7 @@ export function HermesOnboarding() {
                     ) : (
                       <p className="mt-2 text-xs text-yellow-400">
                         Confirm the backend is running and still reachable from
-                        Hermes Workspace.
+                        Claude Workspace.
                       </p>
                     )}
                   </div>
@@ -1098,8 +1098,8 @@ export function HermesOnboarding() {
               <p className="text-sm" style={mutedStyle}>
                 Core chat is set up.{' '}
                 {enhancedFeatures.length > 0
-                  ? 'This backend also exposes Hermes gateway enhancements.'
-                  : 'If you later connect a Hermes gateway, enhanced features unlock automatically.'}
+                  ? 'This backend also exposes Claude gateway enhancements.'
+                  : 'If you later connect a Claude gateway, enhanced features unlock automatically.'}
               </p>
               <div
                 className="grid grid-cols-3 gap-2 text-xs"

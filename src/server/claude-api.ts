@@ -1,13 +1,13 @@
 /**
- * Hermes FastAPI Client
+ * Claude FastAPI Client
  *
- * HTTP client for the Hermes FastAPI backend (default: http://127.0.0.1:8642).
- * Replaces legacy WebSocket connection for the Hermes Workspace fork.
+ * HTTP client for the Claude FastAPI backend (default: http://127.0.0.1:8642).
+ * Replaces legacy WebSocket connection for the Claude Workspace fork.
  */
 
 import {
   BEARER_TOKEN,
-  HERMES_API,
+  CLAUDE_API,
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   dashboardFetch,
   ensureGatewayProbed,
@@ -20,16 +20,16 @@ import {
   getSessionMessages as getDashboardSessionMessages,
   listSessions as listDashboardSessions,
   searchSessions as searchDashboardSessions,
-} from './hermes-dashboard-api'
+} from './claude-dashboard-api'
 
 const _authHeaders = (): Record<string, string> =>
   BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 
-console.log(`[hermes-api] Configured API: ${HERMES_API}`)
+console.log(`[claude-api] Configured API: ${CLAUDE_API}`)
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export type HermesSession = {
+export type ClaudeSession = {
   id: string
   source?: string
   user_id?: string | null
@@ -47,7 +47,7 @@ export type HermesSession = {
   preview?: string | null
 }
 
-export type HermesMessage = {
+export type ClaudeMessage = {
   id: number
   session_id: string
   role: string
@@ -60,7 +60,7 @@ export type HermesMessage = {
   finish_reason?: string | null
 }
 
-export type HermesConfig = {
+export type ClaudeConfig = {
   model?: string
   provider?: string
   [key: string]: unknown
@@ -68,56 +68,56 @@ export type HermesConfig = {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-async function hermesGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${HERMES_API}${path}`, { headers: _authHeaders() })
+async function claudeGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${CLAUDE_API}${path}`, { headers: _authHeaders() })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    throw new Error(`Hermes API ${path}: ${res.status} ${body}`)
+    throw new Error(`Claude API ${path}: ${res.status} ${body}`)
   }
   return res.json() as Promise<T>
 }
 
-async function hermesPost<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${HERMES_API}${path}`, {
+async function claudePost<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${CLAUDE_API}${path}`, {
     method: 'POST',
     headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Hermes API POST ${path}: ${res.status} ${text}`)
+    throw new Error(`Claude API POST ${path}: ${res.status} ${text}`)
   }
   return res.json() as Promise<T>
 }
 
-async function hermesPatch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${HERMES_API}${path}`, {
+async function claudePatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${CLAUDE_API}${path}`, {
     method: 'PATCH',
     headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Hermes API PATCH ${path}: ${res.status} ${text}`)
+    throw new Error(`Claude API PATCH ${path}: ${res.status} ${text}`)
   }
   return res.json() as Promise<T>
 }
 
-async function hermesDeleteReq(path: string): Promise<void> {
-  const res = await fetch(`${HERMES_API}${path}`, {
+async function claudeDeleteReq(path: string): Promise<void> {
+  const res = await fetch(`${CLAUDE_API}${path}`, {
     method: 'DELETE',
     headers: _authHeaders(),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Hermes API DELETE ${path}: ${res.status} ${text}`)
+    throw new Error(`Claude API DELETE ${path}: ${res.status} ${text}`)
   }
 }
 
 // ── Health ────────────────────────────────────────────────────────
 
 export async function checkHealth(): Promise<{ status: string }> {
-  return hermesGet('/health')
+  return claudeGet('/health')
 }
 
 // ── Sessions ─────────────────────────────────────────────────────
@@ -125,22 +125,22 @@ export async function checkHealth(): Promise<{ status: string }> {
 export async function listSessions(
   limit = 50,
   offset = 0,
-): Promise<Array<HermesSession>> {
+): Promise<Array<ClaudeSession>> {
   if (getCapabilities().dashboard.available) {
     const resp = await listDashboardSessions(limit, offset)
-    return resp.sessions as Array<HermesSession>
+    return resp.sessions as Array<ClaudeSession>
   }
-  const resp = await hermesGet<{ items: Array<HermesSession>; total: number }>(
+  const resp = await claudeGet<{ items: Array<ClaudeSession>; total: number }>(
     `/api/sessions?limit=${limit}&offset=${offset}`,
   )
   return resp.items
 }
 
-export async function getSession(sessionId: string): Promise<HermesSession> {
+export async function getSession(sessionId: string): Promise<ClaudeSession> {
   if (getCapabilities().dashboard.available) {
-    return getDashboardSession(sessionId) as Promise<HermesSession>
+    return getDashboardSession(sessionId) as Promise<ClaudeSession>
   }
-  const resp = await hermesGet<{ session: HermesSession }>(
+  const resp = await claudeGet<{ session: ClaudeSession }>(
     `/api/sessions/${sessionId}`,
   )
   return resp.session
@@ -150,8 +150,8 @@ export async function createSession(opts?: {
   id?: string
   title?: string
   model?: string
-}): Promise<HermesSession> {
-  const resp = await hermesPost<{ session: HermesSession }>(
+}): Promise<ClaudeSession> {
+  const resp = await claudePost<{ session: ClaudeSession }>(
     '/api/sessions',
     opts || {},
   )
@@ -161,8 +161,8 @@ export async function createSession(opts?: {
 export async function updateSession(
   sessionId: string,
   updates: { title?: string },
-): Promise<HermesSession> {
-  const resp = await hermesPatch<{ session: HermesSession }>(
+): Promise<ClaudeSession> {
+  const resp = await claudePatch<{ session: ClaudeSession }>(
     `/api/sessions/${sessionId}`,
     updates,
   )
@@ -174,17 +174,17 @@ export async function deleteSession(sessionId: string): Promise<void> {
     await deleteDashboardSession(sessionId)
     return
   }
-  return hermesDeleteReq(`/api/sessions/${sessionId}`)
+  return claudeDeleteReq(`/api/sessions/${sessionId}`)
 }
 
 export async function getMessages(
   sessionId: string,
-): Promise<Array<HermesMessage>> {
+): Promise<Array<ClaudeMessage>> {
   if (getCapabilities().dashboard.available) {
     const resp = await getDashboardSessionMessages(sessionId)
-    return resp.messages as Array<HermesMessage>
+    return resp.messages as Array<ClaudeMessage>
   }
-  const resp = await hermesGet<{ items: Array<HermesMessage>; total: number }>(
+  const resp = await claudeGet<{ items: Array<ClaudeMessage>; total: number }>(
     `/api/sessions/${sessionId}/messages`,
   )
   return resp.items
@@ -197,22 +197,22 @@ export async function searchSessions(
   if (getCapabilities().dashboard.available) {
     return searchDashboardSessions(query)
   }
-  return hermesGet(
+  return claudeGet(
     `/api/sessions/search?q=${encodeURIComponent(query)}&limit=${limit}`,
   )
 }
 
 export async function forkSession(
   sessionId: string,
-): Promise<{ session: HermesSession; forked_from: string }> {
-  return hermesPost(`/api/sessions/${sessionId}/fork`)
+): Promise<{ session: ClaudeSession; forked_from: string }> {
+  return claudePost(`/api/sessions/${sessionId}/fork`)
 }
 
-// ── Conversion helpers (Hermes → Chat format) ─────────────────
+// ── Conversion helpers (Claude → Chat format) ─────────────────
 
-/** Convert a HermesMessage to the ChatMessage format the frontend expects */
+/** Convert a ClaudeMessage to the ChatMessage format the frontend expects */
 export function toChatMessage(
-  msg: HermesMessage,
+  msg: ClaudeMessage,
   options?: { historyIndex?: number },
 ): Record<string, unknown> {
   // Accept either parsed arrays from FastAPI or legacy JSON strings.
@@ -291,9 +291,9 @@ export function toChatMessage(
   }
 }
 
-/** Convert a HermesSession to the session summary format the frontend expects */
+/** Convert a ClaudeSession to the session summary format the frontend expects */
 export function toSessionSummary(
-  session: HermesSession,
+  session: ClaudeSession,
 ): Record<string, unknown> {
   return {
     key: session.id,
@@ -337,7 +337,7 @@ type StreamChatOptions = {
 }
 
 /**
- * Send a chat message and stream SSE events from Hermes FastAPI.
+ * Send a chat message and stream SSE events from Claude FastAPI.
  * Returns a promise that resolves when the stream ends.
  */
 export async function streamChat(
@@ -351,7 +351,7 @@ export async function streamChat(
   opts: StreamChatOptions,
 ): Promise<void> {
   const res = await fetch(
-    `${HERMES_API}/api/sessions/${sessionId}/chat/stream`,
+    `${CLAUDE_API}/api/sessions/${sessionId}/chat/stream`,
     {
       method: 'POST',
       headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
@@ -362,7 +362,7 @@ export async function streamChat(
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Hermes chat stream: ${res.status} ${text}`)
+    throw new Error(`Claude chat stream: ${res.status} ${text}`)
   }
 
   const reader = res.body?.getReader()
@@ -406,7 +406,7 @@ export async function sendChat(
   const msg =
     typeof messageOrOpts === 'string' ? messageOrOpts : messageOrOpts.message
   const mdl = typeof messageOrOpts === 'string' ? model : messageOrOpts.model
-  return hermesPost(`/api/sessions/${sessionId}/chat`, {
+  return claudePost(`/api/sessions/${sessionId}/chat`, {
     message: msg,
     model: mdl,
   })
@@ -415,33 +415,33 @@ export async function sendChat(
 // ── Memory ───────────────────────────────────────────────────────
 
 export async function getMemory(): Promise<unknown> {
-  return hermesGet('/api/memory')
+  return claudeGet('/api/memory')
 }
 
 // ── Skills ───────────────────────────────────────────────────────
 
 export async function listSkills(): Promise<unknown> {
-  return hermesGet('/api/skills')
+  return claudeGet('/api/skills')
 }
 
 export async function getSkill(name: string): Promise<unknown> {
-  return hermesGet(`/api/skills/${encodeURIComponent(name)}`)
+  return claudeGet(`/api/skills/${encodeURIComponent(name)}`)
 }
 
 export async function getSkillCategories(): Promise<unknown> {
-  return hermesGet('/api/skills/categories')
+  return claudeGet('/api/skills/categories')
 }
 
 // ── Config ───────────────────────────────────────────────────────
 
-export async function getConfig(): Promise<HermesConfig> {
-  return hermesGet<HermesConfig>('/api/config')
+export async function getConfig(): Promise<ClaudeConfig> {
+  return claudeGet<ClaudeConfig>('/api/config')
 }
 
 export async function patchConfig(
   patch: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  return hermesPatch<Record<string, unknown>>('/api/config', patch)
+  return claudePatch<Record<string, unknown>>('/api/config', patch)
 }
 
 // ── Models ───────────────────────────────────────────────────────
@@ -450,14 +450,14 @@ export async function listModels(): Promise<{
   object: string
   data: Array<{ id: string; object: string }>
 }> {
-  return hermesGet('/v1/models')
+  return claudeGet('/v1/models')
 }
 
 // ── Connection check ─────────────────────────────────────────────
 
-export async function isHermesAvailable(): Promise<boolean> {
+export async function isClaudeAvailable(): Promise<boolean> {
   try {
-    const res = await fetch(`${HERMES_API}/health`, {
+    const res = await fetch(`${CLAUDE_API}/health`, {
       signal: AbortSignal.timeout(3000),
     })
     if (!res.ok) {
@@ -475,6 +475,6 @@ export async function isHermesAvailable(): Promise<boolean> {
 export {
   ensureGatewayProbed,
   getCapabilities as getGatewayCapabilities,
-  HERMES_API,
+  CLAUDE_API,
   SESSIONS_API_UNAVAILABLE_MESSAGE,
 }

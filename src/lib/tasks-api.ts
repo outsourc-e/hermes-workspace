@@ -1,9 +1,9 @@
-const BASE = '/api/hermes-tasks'
+const BASE = '/api/claude-tasks'
 
 export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
-export type HermesTask = {
+export type ClaudeTask = {
   id: string
   title: string
   description: string
@@ -43,7 +43,7 @@ export type AssigneesResponse = {
 }
 
 export async function fetchAssignees(): Promise<AssigneesResponse> {
-  const res = await fetch('/api/hermes-tasks-assignees')
+  const res = await fetch('/api/claude-tasks-assignees')
   if (!res.ok) return { assignees: [], humanReviewer: null }
   return res.json()
 }
@@ -53,7 +53,7 @@ export async function fetchTasks(params?: {
   assignee?: string
   priority?: TaskPriority
   include_done?: boolean
-}): Promise<Array<HermesTask>> {
+}): Promise<Array<ClaudeTask>> {
   const q = new URLSearchParams()
   if (params?.column) q.set('column', params.column)
   if (params?.assignee) q.set('assignee', params.assignee)
@@ -66,7 +66,7 @@ export async function fetchTasks(params?: {
   return data.tasks ?? []
 }
 
-export async function createTask(input: CreateTaskInput): Promise<HermesTask> {
+export async function createTask(input: CreateTaskInput): Promise<ClaudeTask> {
   const res = await fetch(BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -79,7 +79,7 @@ export async function createTask(input: CreateTaskInput): Promise<HermesTask> {
   return (await res.json()).task
 }
 
-export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<HermesTask> {
+export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<ClaudeTask> {
   const res = await fetch(`${BASE}/${taskId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -94,7 +94,7 @@ export async function deleteTask(taskId: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete task: ${res.status}`)
 }
 
-export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'user'): Promise<HermesTask> {
+export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'user'): Promise<ClaudeTask> {
   const res = await fetch(`${BASE}/${taskId}?action=move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -131,7 +131,7 @@ export const COLUMN_COLORS: Record<TaskColumn, string> = {
   done: '#22c55e',
 }
 
-export function isOverdue(task: HermesTask): boolean {
+export function isOverdue(task: ClaudeTask): boolean {
   if (!task.due_date) return false
   // Parse YYYY-MM-DD manually to avoid UTC-vs-local offset issues.
   // new Date("2026-04-02") parses as UTC midnight, which in EST is the

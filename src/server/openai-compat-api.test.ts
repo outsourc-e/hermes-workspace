@@ -40,9 +40,9 @@ describe('parseOpenAIStream', () => {
     ])
   })
 
-  it('emits synthetic tool events for Hermes tool progress frames', async () => {
+  it('emits synthetic tool events for Claude tool progress frames', async () => {
     const response = createStreamResponse([
-      'event: hermes.tool.progress\n',
+      'event: claude.tool.progress\n',
       'data: {"tool":"terminal","emoji":"💻","label":"ls -la"}\n\n',
       'data: [DONE]\n\n',
     ])
@@ -63,9 +63,9 @@ describe('parseOpenAIStream', () => {
 
   it('handles multiple tool events even when frames are split across transport chunks', async () => {
     const response = createStreamResponse([
-      'event: hermes.tool.progress\ndata: {"tool":"browser_get_images","emoji":"📖","la',
+      'event: claude.tool.progress\ndata: {"tool":"browser_get_images","emoji":"📖","la',
       'bel":"scan page"}\n\n',
-      'event: hermes.tool.progress\ndata: {"tool":"browser_console","emoji":"🔎","label":"inspect DOM"}\n\n',
+      'event: claude.tool.progress\ndata: {"tool":"browser_console","emoji":"🔎","label":"inspect DOM"}\n\n',
       'data: {"choices":[{"delta":{"content":"done"}}]}\n\n',
       'data: [DONE]\n\n',
     ])

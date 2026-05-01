@@ -8,7 +8,7 @@ export const Route = createFileRoute('/chat/')({
     try {
       const stored =
         typeof window !== 'undefined'
-          ? localStorage.getItem('hermes-last-session')
+          ? localStorage.getItem('claude-last-session')
           : null
       if (stored && stored !== 'main') lastSession = stored
     } catch {}

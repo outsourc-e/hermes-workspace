@@ -3,7 +3,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as YAML from 'yaml'
 import { z } from 'zod'
-import { getLocalBinDir, getProfilesDir } from './hermes-paths'
+import { getLocalBinDir, getProfilesDir } from './claude-paths'
 
 export const SwarmWorkerStateSchema = z.enum([
   'idle',
@@ -28,7 +28,7 @@ export const SwarmCheckpointStatusSchema = z.enum([
 
 export const SwarmTerminalKindSchema = z.enum(['tmux', 'log-tail', 'shell', 'none'])
 export const SwarmRuntimeSourceSchema = z.enum(['runtime.json', 'fallback'])
-export const SwarmTaskSourceSchema = z.enum(['runtime', 'hermes-api', 'plugin', 'inferred'])
+export const SwarmTaskSourceSchema = z.enum(['runtime', 'claude-api', 'plugin', 'inferred'])
 export const SwarmArtifactKindSchema = z.enum(['file', 'diff', 'patch', 'build', 'log', 'report', 'preview'])
 export const SwarmArtifactSourceSchema = z.enum(['runtime', 'workspace', 'plugin', 'inferred'])
 export const SwarmPreviewSourceSchema = z.enum(['detected-port', 'plugin', 'runtime'])
@@ -437,7 +437,7 @@ export function buildSwarmSessionMetadata(input: {
     sessionId: input.runtime.sessionId ?? input.tmuxSession ?? input.workerId,
     sessionTitle:
       input.runtime.sessionTitle ??
-      (input.tmuxSession ? `Hermes worker ${input.workerId}` : null),
+      (input.tmuxSession ? `Claude worker ${input.workerId}` : null),
     historySource:
       input.runtime.historySource === 'unavailable'
         ? inferSwarmHistorySource(input.profilePath)
@@ -539,9 +539,9 @@ export function getWorkspacePluginRoots(workspaceRoot = process.cwd()): Array<{
   root: string
   source: 'user' | 'project'
 }> {
-  const hermesHome = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes')
+  const claudeHome = process.env.CLAUDE_HOME || path.join(os.homedir(), '.claude')
   return [
-    { root: path.join(hermesHome, 'plugins'), source: 'user' },
-    { root: path.join(workspaceRoot, '.hermes', 'plugins'), source: 'project' },
+    { root: path.join(claudeHome, 'plugins'), source: 'user' },
+    { root: path.join(workspaceRoot, '.claude', 'plugins'), source: 'project' },
   ]
 }

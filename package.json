@@ -1,7 +1,7 @@
 {
-  "name": "hermes-workspace",
+  "name": "claude-workspace",
   "version": "2.0.0",
-  "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
+  "description": "Desktop workspace for Claude Agent — chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
   "private": true,
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
     "build": "vite build",
-    "start:all": "concurrently \"hermes gateway run\" \"pnpm dev\"",
+    "start:all": "concurrently \"claude gateway run\" \"pnpm dev\"",
     "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node .output/server/index.mjs",
     "start:dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
     "preview": "vite preview",

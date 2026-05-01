@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const POLL_INTERVAL_MS = 30_000
-const PREFERRED_PROVIDER_KEY = 'hermes-preferred-provider'
+const PREFERRED_PROVIDER_KEY = 'claude-preferred-provider'
 
 type UsageLine = {
   type: 'progress' | 'text' | 'badge'

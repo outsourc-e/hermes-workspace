@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { getHermesRoot, getWorkspaceHermesHome } from './hermes-paths'
+import { getClaudeRoot, getWorkspaceClaudeHome } from './claude-paths'
 import {
   SWARM_KANBAN_FILE,
   type CreateSwarmKanbanCardInput,
@@ -13,7 +13,7 @@ import {
   type UpdateSwarmKanbanCardInput,
 } from './swarm-kanban-store'
 
-export type KanbanBackendId = 'local' | 'hermes'
+export type KanbanBackendId = 'local' | 'claude'
 
 export type KanbanBackendMeta = {
   id: KanbanBackendId
@@ -31,7 +31,7 @@ type KanbanBackend = {
   update(cardId: string, updates: UpdateSwarmKanbanCardInput): SwarmKanbanCard | null
 }
 
-type HermesTaskRow = {
+type ClaudeTaskRow = {
   id: string
   title: string
   body?: string | null
@@ -41,7 +41,7 @@ type HermesTaskRow = {
   updated_at?: number | string | null
 }
 
-type HermesDetection = {
+type ClaudeDetection = {
   available: boolean
   cliPath?: string | null
   dbPath: string
@@ -54,41 +54,41 @@ function env(name: string): string | null {
   return value && value.trim() ? value.trim() : null
 }
 
-function hermesProfileRoot(): string {
-  return getWorkspaceHermesHome()
+function claudeProfileRoot(): string {
+  return getWorkspaceClaudeHome()
 }
 
-function hermesDbPath(): string {
-  return path.join(getHermesRoot(), 'kanban.db')
+function claudeDbPath(): string {
+  return path.join(getClaudeRoot(), 'kanban.db')
 }
 
-function hermesWorkspacePath(): string {
-  return path.join(getHermesRoot(), 'kanban')
+function claudeWorkspacePath(): string {
+  return path.join(getClaudeRoot(), 'kanban')
 }
 
-function hermesCliPath(): string | null {
+function claudeCliPath(): string | null {
   try {
-    const output = execFileSync('which', ['hermes'], { encoding: 'utf8', timeout: 5_000 }).trim()
+    const output = execFileSync('which', ['claude'], { encoding: 'utf8', timeout: 5_000 }).trim()
     return output || null
   } catch {
     return null
   }
 }
 
-function checkHermesCli(): { ok: boolean; path?: string | null; reason?: string } {
-  const cli = hermesCliPath()
-  if (!cli) return { ok: false, reason: 'hermes CLI not found on PATH' }
+function checkClaudeCli(): { ok: boolean; path?: string | null; reason?: string } {
+  const cli = claudeCliPath()
+  if (!cli) return { ok: false, reason: 'claude CLI not found on PATH' }
   try {
-    execFileSync(cli, ['--version'], { encoding: 'utf8', timeout: 10_000, env: { ...process.env, HERMES_HOME: hermesProfileRoot() } })
+    execFileSync(cli, ['--version'], { encoding: 'utf8', timeout: 10_000, env: { ...process.env, CLAUDE_HOME: claudeProfileRoot() } })
     return { ok: true, path: cli }
   } catch (error) {
     return { ok: false, path: cli, reason: error instanceof Error ? error.message : String(error) }
   }
 }
 
-function detectHermesKanban(): HermesDetection {
-  const dbPath = hermesDbPath()
-  const workspacePath = hermesWorkspacePath()
+function detectClaudeKanban(): ClaudeDetection {
+  const dbPath = claudeDbPath()
+  const workspacePath = claudeWorkspacePath()
   const hasDb = fs.existsSync(dbPath)
   const hasWorkspace = fs.existsSync(workspacePath)
 
@@ -98,17 +98,17 @@ function detectHermesKanban(): HermesDetection {
       cliPath: null,
       dbPath,
       workspacePath,
-      reason: 'Hermes Kanban storage not found; using the local Swarm Board fallback.',
+      reason: 'Claude Kanban storage not found; using the local Swarm Board fallback.',
     }
   }
 
-  const cli = checkHermesCli()
+  const cli = checkClaudeCli()
   return {
     available: true,
     cliPath: cli.ok ? cli.path ?? null : null,
     dbPath,
     workspacePath,
-    reason: cli.ok ? undefined : 'Hermes Kanban storage detected; CLI unavailable, using direct local storage access.',
+    reason: cli.ok ? undefined : 'Claude Kanban storage detected; CLI unavailable, using direct local storage access.',
   }
 }
 
@@ -123,8 +123,8 @@ function runSqlite(dbPath: string, sql: string): string {
   }).trim()
 }
 
-function readHermesTasks(): HermesTaskRow[] {
-  const detection = detectHermesKanban()
+function readClaudeTasks(): ClaudeTaskRow[] {
+  const detection = detectClaudeKanban()
   if (!detection.available) return []
   const query = [
     'select',
@@ -139,18 +139,18 @@ function readHermesTasks(): HermesTaskRow[] {
     'order by created_at desc, id desc;',
   ].join(' ')
   const raw = runSqlite(detection.dbPath, query)
-  const parsed = raw ? (JSON.parse(raw) as HermesTaskRow[]) : []
+  const parsed = raw ? (JSON.parse(raw) as ClaudeTaskRow[]) : []
   return Array.isArray(parsed) ? parsed : []
 }
 
-function readHermesTask(taskId: string): HermesTaskRow | null {
-  const detection = detectHermesKanban()
+function readClaudeTask(taskId: string): ClaudeTaskRow | null {
+  const detection = detectClaudeKanban()
   if (!detection.available) return null
   const raw = runSqlite(
     detection.dbPath,
     `select id, title, body, status, assignee, created_at, coalesce(last_heartbeat_at, completed_at, started_at, created_at) as updated_at from tasks where id = ${sqliteQuote(taskId)} limit 1;`,
   )
-  const parsed = raw ? (JSON.parse(raw) as HermesTaskRow[]) : []
+  const parsed = raw ? (JSON.parse(raw) as ClaudeTaskRow[]) : []
   return Array.isArray(parsed) && parsed[0] ? parsed[0] : null
 }
 
@@ -167,7 +167,7 @@ function normalizeTimestamp(value: unknown): number {
   return Date.now()
 }
 
-function mapHermesStatus(status: string | null | undefined): SwarmKanbanCard['status'] {
+function mapClaudeStatus(status: string | null | undefined): SwarmKanbanCard['status'] {
   switch ((status ?? '').toLowerCase()) {
     case 'queued':
     case 'todo':
@@ -211,7 +211,7 @@ function mapBoardStatus(status: SwarmKanbanCard['status'] | null | undefined): s
   }
 }
 
-function hermesTaskToCard(task: HermesTaskRow): SwarmKanbanCard {
+function claudeTaskToCard(task: ClaudeTaskRow): SwarmKanbanCard {
   const createdAt = normalizeTimestamp(task.created_at)
   const updatedAt = normalizeTimestamp(task.updated_at ?? task.created_at)
   return {
@@ -221,10 +221,10 @@ function hermesTaskToCard(task: HermesTaskRow): SwarmKanbanCard {
     acceptanceCriteria: [],
     assignedWorker: task.assignee ?? null,
     reviewer: null,
-    status: mapHermesStatus(task.status),
+    status: mapClaudeStatus(task.status),
     missionId: null,
     reportPath: null,
-    createdBy: 'hermes-kanban',
+    createdBy: 'claude-kanban',
     createdAt,
     updatedAt,
   }
@@ -252,26 +252,26 @@ const localBackend: KanbanBackend = {
   },
 }
 
-const hermesBackend: KanbanBackend = {
+const claudeBackend: KanbanBackend = {
   meta() {
-    const detection = detectHermesKanban()
+    const detection = detectClaudeKanban()
     return {
-      id: 'hermes',
-      label: 'Hermes Kanban',
+      id: 'claude',
+      label: 'Claude Kanban',
       detected: detection.available,
       writable: detection.available,
       path: fs.existsSync(detection.dbPath) ? detection.dbPath : null,
       details: detection.available
-        ? detection.reason ?? `Hermes Kanban storage detected (${detection.cliPath ?? 'direct sqlite'}, ${detection.dbPath})`
-        : detection.reason ?? 'Hermes Kanban not detected.',
+        ? detection.reason ?? `Claude Kanban storage detected (${detection.cliPath ?? 'direct sqlite'}, ${detection.dbPath})`
+        : detection.reason ?? 'Claude Kanban not detected.',
     }
   },
   list() {
-    return readHermesTasks().map(hermesTaskToCard)
+    return readClaudeTasks().map(claudeTaskToCard)
   },
   create(input) {
-    const detection = detectHermesKanban()
-    if (!detection.available) throw new Error(detection.reason ?? 'Hermes Kanban not detected')
+    const detection = detectClaudeKanban()
+    if (!detection.available) throw new Error(detection.reason ?? 'Claude Kanban not detected')
     const nowSeconds = Math.floor(Date.now() / 1000)
     const taskId = `t_${randomUUID().replace(/-/g, '').slice(0, 8)}`
     const status = mapBoardStatus(input.status ?? 'backlog')
@@ -294,12 +294,12 @@ const hermesBackend: KanbanBackend = {
       ');',
     ].join(' ')
     runSqlite(detection.dbPath, statements)
-    const created = readHermesTask(taskId)
-    if (!created) throw new Error(`Created Hermes task ${taskId} but could not read it back`)
-    return hermesTaskToCard(created)
+    const created = readClaudeTask(taskId)
+    if (!created) throw new Error(`Created Claude task ${taskId} but could not read it back`)
+    return claudeTaskToCard(created)
   },
   update(cardId, updates) {
-    const detection = detectHermesKanban()
+    const detection = detectClaudeKanban()
     if (!detection.available) return null
     const assignments: string[] = []
     if (typeof updates.title === 'string' && updates.title.trim()) assignments.push(`title = ${sqliteQuote(updates.title.trim())}`)
@@ -313,21 +313,21 @@ const hermesBackend: KanbanBackend = {
       if (status !== 'done') assignments.push('completed_at = NULL')
     }
     if (assignments.length === 0) {
-      const current = readHermesTask(cardId)
-      return current ? hermesTaskToCard(current) : null
+      const current = readClaudeTask(cardId)
+      return current ? claudeTaskToCard(current) : null
     }
     runSqlite(detection.dbPath, `update tasks set ${assignments.join(', ')} where id = ${sqliteQuote(cardId)};`)
-    const updated = readHermesTask(cardId)
-    return updated ? hermesTaskToCard(updated) : null
+    const updated = readClaudeTask(cardId)
+    return updated ? claudeTaskToCard(updated) : null
   },
 }
 
 export function resolveKanbanBackend(): KanbanBackend {
-  const preference = (env('HERMES_KANBAN_BACKEND') ?? 'auto').toLowerCase()
+  const preference = (env('CLAUDE_KANBAN_BACKEND') ?? 'auto').toLowerCase()
   if (preference === 'local') return localBackend
-  const hermesMeta = hermesBackend.meta()
-  if (preference === 'hermes') return hermesMeta.detected ? hermesBackend : localBackend
-  return hermesMeta.detected ? hermesBackend : localBackend
+  const claudeMeta = claudeBackend.meta()
+  if (preference === 'claude') return claudeMeta.detected ? claudeBackend : localBackend
+  return claudeMeta.detected ? claudeBackend : localBackend
 }
 
 export function getKanbanBackendMeta(): KanbanBackendMeta {

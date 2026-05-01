@@ -138,3 +138,6 @@ __pycache__/
 .env.bak
 .runtime/
 workspace-final-markdown-review.md
+
+# Local sibling projects (do not ship)
+skills-bundle/

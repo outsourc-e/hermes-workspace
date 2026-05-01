@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CANONICAL_REPO="/Users/aurora/hermes-workspace"
+CANONICAL_REPO="/Users/aurora/claude-workspace"
 FORBIDDEN_REPO="/Users/aurora/claude-workspace"
 
 CURRENT_DIR="$(pwd -P)"
@@ -26,12 +26,12 @@ fi
 REPO_NAME="$(python3 - <<'PY'
 import json
 from pathlib import Path
-pkg = json.loads(Path('/Users/aurora/hermes-workspace/package.json').read_text())
+pkg = json.loads(Path('/Users/aurora/claude-workspace/package.json').read_text())
 print(pkg.get('name', ''))
 PY
 )"
 
-if [[ "$REPO_NAME" != "hermes-workspace" ]]; then
+if [[ "$REPO_NAME" != "claude-workspace" ]]; then
   echo "ERROR: unexpected package name: $REPO_NAME"
   exit 1
 fi

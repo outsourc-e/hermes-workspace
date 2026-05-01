@@ -4,7 +4,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/outsourc-e/hermes-agent.git /app
+RUN git clone https://github.com/outsourc-e/claude-agent.git /app
 
 WORKDIR /app
 
@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -e .
 
 EXPOSE 8642
 
-CMD ["hermes", "gateway", "run"]
+CMD ["claude", "gateway", "run"]

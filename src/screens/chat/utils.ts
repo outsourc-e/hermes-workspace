@@ -47,7 +47,7 @@ function stripChannelPrefix(text: string): string {
 }
 
 /**
- * Strip Hermes system metadata from user messages.
+ * Strip Claude system metadata from user messages.
  * Removes [media attached: ...] blocks, image-send instructions,
  * and [Telegram/Signal/etc ...] headers, leaving just the user's text.
  */
@@ -276,7 +276,7 @@ export async function readError(res: Response): Promise<string> {
 }
 
 export const missingAuthMessage =
-  'Hermes Agent connection failed. Make sure Hermes is running and HERMES_API_URL is set correctly.'
+  'Claude Agent connection failed. Make sure Claude is running and CLAUDE_API_URL is set correctly.'
 
 export function isMissingAuth(message: string): boolean {
   return message.includes(missingAuthMessage)

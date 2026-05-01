@@ -70,8 +70,8 @@ export function ChatEmptyState({
         {/* Avatar in editorial frame, no glow — architectural restraint */}
         <div className="relative mb-6">
           <img
-            src="/hermes-avatar.webp"
-            alt="Hermes"
+            src="/claude-avatar.webp"
+            alt="Claude"
             className="relative size-20 rounded-md"
             style={{
               border: '1px solid var(--theme-border)',
@@ -86,7 +86,7 @@ export function ChatEmptyState({
           className="micro-label mb-2"
           style={{ color: 'var(--theme-muted)' }}
         >
-          Hermes Workspace
+          Claude Workspace
         </p>
 
         {/* Editorial display title */}

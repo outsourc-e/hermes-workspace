@@ -73,7 +73,7 @@ export function getConnectionErrorMessage(
     case 'gateway_auth_rejected':
     case 'clawsuite_auth_required':
       return {
-        title: 'Hermes Login Required',
+        title: 'Claude Login Required',
         description: 'This instance requires a password to access.',
         action: 'Enter your password to continue',
       }
@@ -82,12 +82,12 @@ export function getConnectionErrorMessage(
         title: 'Pair this device first',
         description:
           'This device is not paired with the gateway yet.',
-        action: 'Run `hermes pair` on the gateway machine, then reconnect.',
+        action: 'Run `claude pair` on the gateway machine, then reconnect.',
       }
     case 'gateway_unreachable':
       return {
         title: 'Gateway unreachable',
-        description: 'Hermes cannot reach the configured gateway.',
+        description: 'Claude cannot reach the configured gateway.',
         action: 'Check that the gateway is running and the URL is correct.',
       }
     case 'handshake_failed':

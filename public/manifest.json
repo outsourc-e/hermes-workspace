@@ -1,7 +1,7 @@
 {
-  "name": "Hermes Workspace",
-  "short_name": "Hermes",
-  "description": "Native web control surface for Hermes Agent",
+  "name": "Claude Workspace",
+  "short_name": "Claude",
+  "description": "Native web control surface for Claude Agent",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0E1A",
@@ -9,13 +9,13 @@
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/hermes-icon-192.png",
+      "src": "/claude-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/hermes-icon-512.png",
+      "src": "/claude-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

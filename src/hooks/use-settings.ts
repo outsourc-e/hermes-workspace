@@ -6,8 +6,8 @@ export type SettingsThemeMode = 'system' | 'light' | 'dark'
 export type AccentColor = 'orange' | 'purple' | 'blue' | 'green'
 
 export type StudioSettings = {
-  hermesUrl: string
-  hermesToken: string
+  claudeUrl: string
+  claudeToken: string
   theme: SettingsThemeMode
   accentColor: AccentColor
   editorFontSize: number
@@ -30,8 +30,8 @@ type SettingsState = {
 }
 
 export const defaultStudioSettings: StudioSettings = {
-  hermesUrl: '',
-  hermesToken: '',
+  claudeUrl: '',
+  claudeToken: '',
   theme: 'system',
   accentColor: 'blue',
   editorFontSize: 13,
@@ -65,7 +65,7 @@ export const useSettingsStore = create<SettingsState>()(
       }
     },
     {
-      name: 'hermes-settings',
+      name: 'claude-settings',
       skipHydration: true,
     },
   ),

@@ -308,7 +308,7 @@ export function KnowledgeBrowserScreen() {
   })
 
   const pages = listQuery.data?.pages ?? []
-  const knowledgeRoot = listQuery.data?.knowledgeRoot ?? '~/.hermes/knowledge/'
+  const knowledgeRoot = listQuery.data?.knowledgeRoot ?? '~/.claude/knowledge/'
   const knowledgeExists = listQuery.data?.exists ?? false
 
   const pageLookup = useMemo(() => {

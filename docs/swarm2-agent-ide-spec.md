@@ -7,18 +7,18 @@ Surface: `/swarm2`, plus shared agent surfaces in main workspace chat
 
 ## 1. Product Thesis
 
-Swarm2 is not a dashboard. Swarm2 is the control plane and IDE for **sub-Hermes agents**.
+Swarm2 is not a dashboard. Swarm2 is the control plane and IDE for **sub-Claude agents**.
 
-A user should be able to clone their main Hermes agent as many times as needed. Each clone has the same core access, context shape, skills, memory conventions, workspace tools, and project capabilities as the parent agent, but can run independently on a lane of work.
+A user should be able to clone their main Claude agent as many times as needed. Each clone has the same core access, context shape, skills, memory conventions, workspace tools, and project capabilities as the parent agent, but can run independently on a lane of work.
 
 This is materially different from spawning disposable subagents:
 
 - Subagents are ephemeral workers.
-- Sub-Hermes agents are persistent cloned operators.
+- Sub-Claude agents are persistent cloned operators.
 - Subagents perform a task.
-- Sub-Hermes agents own a lane/project and can run on autopilot.
+- Sub-Claude agents own a lane/project and can run on autopilot.
 - Subagents lose continuity unless wrapped carefully.
-- Sub-Hermes agents carry persistent profile state, runtime metadata, tasks, logs, sessions, skills, and project awareness.
+- Sub-Claude agents carry persistent profile state, runtime metadata, tasks, logs, sessions, skills, and project awareness.
 
 The swarm product promise:
 
@@ -49,9 +49,9 @@ The hub card should show:
 
 It should not consume the main content area with a full chat UI.
 
-### 2.2 Sub-Hermes Agent
+### 2.2 Sub-Claude Agent
 
-A swarm agent is a cloned Hermes profile with:
+A swarm agent is a cloned Claude profile with:
 
 - model/provider config
 - skills/tool access
@@ -170,7 +170,7 @@ Required:
 
 Task sources:
 
-- Hermes tasks API
+- Claude tasks API
 - worker runtime.json currentTask/state
 - optional project issue/PR metadata
 
@@ -261,12 +261,12 @@ Main workspace chat should get an agent sidebar inspired by Clawsuite.
 Required:
 
 - active cloned agents
-- CLI/ACP/sub-Hermes sessions
+- CLI/ACP/sub-Claude sessions
 - status/current task
 - latest output
 - issues/PRs solved
 - quick open into Swarm2 card/session/terminal/preview
-- Hermes-inspired avatars
+- Claude-inspired avatars
 
 Acceptance:
 
@@ -343,7 +343,7 @@ Returns:
 
 Worker cards should consume:
 
-- `GET /api/hermes-tasks?assignee=swarm4&include_done=false`
+- `GET /api/claude-tasks?assignee=swarm4&include_done=false`
 - or existing task endpoint equivalent
 
 ### 4.5 Project Preview API
@@ -437,7 +437,7 @@ Tabs:
 ### Phase 5 — Main workspace integration
 
 - Agent sidebar in main chat
-- Active cloned agents/sub-Hermes list
+- Active cloned agents/sub-Claude list
 - latest output/status
 - issues/PR solved summaries
 - jump into Swarm2 views
@@ -446,7 +446,7 @@ Tabs:
 
 Swarm2 is solid when:
 
-- User can clone multiple full Hermes agents and see them as persistent workers.
+- User can clone multiple full Claude agents and see them as persistent workers.
 - User can understand what every worker is doing without leaving `/swarm2`.
 - User can chat with any worker and see real recent messages.
 - User can see each worker's tasks and blockers.
@@ -490,12 +490,12 @@ Acceptance: one Swarm route, no duplicates, all swarm tests green, docs/README/n
 
 Execution contract for this mission:
 - Context, memory, and handoffs come from `/Users/aurora/.openclaw/workspace`
-- Swarm2 code, git, build, and tests run in `/Users/aurora/hermes-workspace`
+- Swarm2 code, git, build, and tests run in `/Users/aurora/claude-workspace`
 - Do not use legacy workspace aliases
 - Before any build/test/git loop, run:
 
 ```bash
-cd /Users/aurora/hermes-workspace &&
+cd /Users/aurora/claude-workspace &&
 pwd &&
 test -f package.json &&
 jq -r .name package.json
@@ -510,4 +510,4 @@ Start here:
 5. Make runtime view auto-populate active workers and attach/fallback cleanly.
 6. After new route-module changes, prefer a full dev-server restart over trusting hot reload.
 
-This turns `/swarm2` from a beautiful control surface into the first version of the actual sub-Hermes IDE.
+This turns `/swarm2` from a beautiful control surface into the first version of the actual sub-Claude IDE.

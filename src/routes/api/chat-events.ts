@@ -8,7 +8,7 @@ import {
 /**
  * SSE endpoint for chat events.
  *
- * Hermes does not expose a global browser-facing event stream, so the server
+ * Claude does not expose a global browser-facing event stream, so the server
  * keeps a local singleton bus of translated chat events and fans that out to
  * any browser SSE subscribers.
  */

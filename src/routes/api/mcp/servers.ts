@@ -2,11 +2,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
   BEARER_TOKEN,
-  HERMES_API,
+  CLAUDE_API,
   ensureGatewayProbed,
   getCapabilities,
 } from '../../../server/gateway-capabilities'
-import { getConfig } from '../../../server/hermes-dashboard-api'
+import { getConfig } from '../../../server/claude-dashboard-api'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
@@ -117,7 +117,7 @@ export const Route = createFileRoute('/api/mcp/servers')({
           if (capabilities.dashboard.available) {
             payload = await getConfig()
           } else {
-            const response = await fetch(`${HERMES_API}/api/config`, {
+            const response = await fetch(`${CLAUDE_API}/api/config`, {
               headers: authHeaders(),
             })
 
@@ -137,7 +137,7 @@ export const Route = createFileRoute('/api/mcp/servers')({
           return Response.json({
             servers: [],
             ok: false,
-            message: 'Could not reach Hermes config endpoint.',
+            message: 'Could not reach Claude config endpoint.',
           })
         }
       },

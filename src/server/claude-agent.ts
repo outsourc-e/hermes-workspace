@@ -3,12 +3,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 
-const HERMES_HEALTH_TIMEOUT_MS = 2_000
-const HERMES_START_PORT = 8642
+const CLAUDE_HEALTH_TIMEOUT_MS = 2_000
+const CLAUDE_START_PORT = 8642
 
-let startPromise: Promise<StartHermesAgentResult> | null = null
+let startPromise: Promise<StartClaudeAgentResult> | null = null
 
-export type StartHermesAgentResult =
+export type StartClaudeAgentResult =
   | {
       ok: true
       message: string
@@ -20,12 +20,12 @@ export type StartHermesAgentResult =
     }
 
 /**
- * Read ~/.hermes/.env and return key=value pairs as an object.
+ * Read ~/.claude/.env and return key=value pairs as an object.
  * Silently returns {} if the file doesn't exist or can't be parsed.
  */
-function readHermesEnv(): Record<string, string> {
+function readClaudeEnv(): Record<string, string> {
   const envPath = join(
-    process.env.HERMES_HOME ?? join(homedir(), '.hermes'),
+    process.env.CLAUDE_HOME ?? join(homedir(), '.claude'),
     '.env',
   )
   try {
@@ -53,21 +53,21 @@ function readHermesEnv(): Record<string, string> {
 }
 
 /** Same directory resolution logic as vite.config.ts. Kept in sync. */
-export function resolveHermesAgentDir(
+export function resolveClaudeAgentDir(
   env: Record<string, string | undefined> = process.env,
 ): string | null {
   const candidates: Array<string> = []
 
-  if (env.HERMES_AGENT_PATH?.trim()) {
-    candidates.push(env.HERMES_AGENT_PATH.trim())
+  if (env.CLAUDE_AGENT_PATH?.trim()) {
+    candidates.push(env.CLAUDE_AGENT_PATH.trim())
   }
 
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'),          // sibling (old README)
-    resolve(workspaceRoot, '..', 'hermes-agent'),    // one level up
-    resolve(homedir(), '.hermes', 'hermes-agent'),   // Nous installer default
-    resolve(homedir(), 'hermes-agent'),              // ~/hermes-agent
+    resolve(workspaceRoot, 'claude-agent'),          // sibling (old README)
+    resolve(workspaceRoot, '..', 'claude-agent'),    // one level up
+    resolve(homedir(), '.claude', 'claude-agent'),   // Nous installer default
+    resolve(homedir(), 'claude-agent'),              // ~/claude-agent
   )
 
   for (const candidate of candidates) {
@@ -77,11 +77,11 @@ export function resolveHermesAgentDir(
   return null
 }
 
-/** Find the `hermes` CLI binary installed by Nous's installer (or on PATH). */
-export function resolveHermesBinary(): string | null {
+/** Find the `claude` CLI binary installed by Nous's installer (or on PATH). */
+export function resolveClaudeBinary(): string | null {
   const candidates = [
-    resolve(homedir(), '.hermes', 'bin', 'hermes'),
-    resolve(homedir(), '.local', 'bin', 'hermes'),
+    resolve(homedir(), '.claude', 'bin', 'claude'),
+    resolve(homedir(), '.local', 'bin', 'claude'),
   ]
   for (const c of candidates) {
     if (existsSync(c)) return c
@@ -89,23 +89,23 @@ export function resolveHermesBinary(): string | null {
   return null
 }
 
-export function resolveHermesPython(agentDir: string): string {
+export function resolveClaudePython(agentDir: string): string {
   const venvPython = resolve(agentDir, '.venv', 'bin', 'python')
   if (existsSync(venvPython)) return venvPython
   const uvVenv = resolve(agentDir, 'venv', 'bin', 'python')
   if (existsSync(uvVenv)) return uvVenv
   // Nous installer ships its own uv-managed python alongside the binary
-  const nousPython = resolve(homedir(), '.hermes', 'venv', 'bin', 'python')
+  const nousPython = resolve(homedir(), '.claude', 'venv', 'bin', 'python')
   if (existsSync(nousPython)) return nousPython
   return 'python3'
 }
 
-export async function isHermesAgentHealthy(
-  port = HERMES_START_PORT,
+export async function isClaudeAgentHealthy(
+  port = CLAUDE_START_PORT,
 ): Promise<boolean> {
   try {
     const response = await fetch(`http://127.0.0.1:${port}/health`, {
-      signal: AbortSignal.timeout(HERMES_HEALTH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(CLAUDE_HEALTH_TIMEOUT_MS),
     })
     return response.ok
   } catch {
@@ -113,8 +113,8 @@ export async function isHermesAgentHealthy(
   }
 }
 
-export async function startHermesAgent(): Promise<StartHermesAgentResult> {
-  if (await isHermesAgentHealthy()) {
+export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
+  if (await isClaudeAgentHealthy()) {
     return { ok: true, message: 'already running' }
   }
 
@@ -124,23 +124,23 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
 
   startPromise = (async () => {
     try {
-      const hermesEnv = readHermesEnv()
-      const hermesBin = resolveHermesBinary()
-      const agentDir = resolveHermesAgentDir()
+      const claudeEnv = readClaudeEnv()
+      const claudeBin = resolveClaudeBinary()
+      const agentDir = resolveClaudeAgentDir()
 
-      // Prefer the `hermes gateway run` binary path (the Nous installer's
+      // Prefer the `claude gateway run` binary path (the Nous installer's
       // canonical entrypoint). Fall back to launching uvicorn against the
       // source tree if we only have a directory.
       let command: string
       let commandArgs: Array<string>
       let cwd: string | undefined
 
-      if (hermesBin) {
-        command = hermesBin
+      if (claudeBin) {
+        command = claudeBin
         commandArgs = ['gateway', 'run']
         cwd = agentDir ?? undefined
       } else if (agentDir) {
-        command = resolveHermesPython(agentDir)
+        command = resolveClaudePython(agentDir)
         commandArgs = [
           '-m',
           'uvicorn',
@@ -148,14 +148,14 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
           '--host',
           '0.0.0.0',
           '--port',
-          String(HERMES_START_PORT),
+          String(CLAUDE_START_PORT),
         ]
         cwd = agentDir
       } else {
         return {
           ok: false,
           error:
-            "hermes-agent not found. Run the installer: curl -fsSL https://hermes-workspace.com/install.sh | bash",
+            "claude-agent not found. Run the installer: curl -fsSL https://claude-workspace.com/install.sh | bash",
         }
       }
 
@@ -168,9 +168,9 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
           stdio: 'ignore',
           env: {
             ...process.env,
-            ...hermesEnv,
+            ...claudeEnv,
             PATH: [
-              resolve(homedir(), '.hermes', 'bin'),
+              resolve(homedir(), '.claude', 'bin'),
               resolve(homedir(), '.local', 'bin'),
               agentDir ? resolve(agentDir, '.venv', 'bin') : '',
               agentDir ? resolve(agentDir, 'venv', 'bin') : '',
@@ -184,7 +184,7 @@ export async function startHermesAgent(): Promise<StartHermesAgentResult> {
 
       for (let attempt = 0; attempt < 10; attempt += 1) {
         await new Promise((resolveAttempt) => setTimeout(resolveAttempt, 1_000))
-        if (await isHermesAgentHealthy()) {
+        if (await isClaudeAgentHealthy()) {
           return {
             ok: true,
             pid: child.pid,

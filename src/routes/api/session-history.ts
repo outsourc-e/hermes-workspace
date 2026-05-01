@@ -12,7 +12,7 @@ import {
   getGatewayCapabilities,
   getMessages,
   toChatMessage,
-} from '../../server/hermes-api'
+} from '../../server/claude-api'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '@/server/auth-middleware'
 import {

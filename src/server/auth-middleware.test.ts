@@ -17,7 +17,7 @@ afterEach(() => {
   delete process.env.COOKIE_SECURE
   delete process.env.NODE_ENV
   delete process.env.TRUST_PROXY
-  delete process.env.HERMES_PASSWORD
+  delete process.env.CLAUDE_PASSWORD
 })
 
 describe('createSessionCookie (#123)', () => {
@@ -25,7 +25,7 @@ describe('createSessionCookie (#123)', () => {
     process.env.NODE_ENV = 'development'
     const { createSessionCookie } = await import('./auth-middleware')
     const cookie = createSessionCookie('tok123')
-    expect(cookie).toMatch(/^hermes-auth=tok123/)
+    expect(cookie).toMatch(/^claude-auth=tok123/)
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Strict')
     expect(cookie).toContain('Path=/')

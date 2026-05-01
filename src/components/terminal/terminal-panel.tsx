@@ -23,7 +23,7 @@ const ACTIVE_TAB_KEY = 'terminal.active'
 const DEFAULT_HEIGHT = 360
 const MIN_HEIGHT = 300
 const MAX_HEIGHT = 480
-const DEFAULT_CWD = '~/.hermes'
+const DEFAULT_CWD = '~/.claude'
 
 type TerminalTabState = {
   id: string

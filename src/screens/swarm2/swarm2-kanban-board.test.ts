@@ -12,15 +12,15 @@ describe('Swarm2 Kanban backend presentation', () => {
 
   it('presents detected Kanban as the default shared board, not a backend demo', () => {
     expect(getKanbanBackendPresentation({
-      id: 'hermes',
-      label: 'Hermes Kanban',
+      id: 'claude',
+      label: 'Claude Kanban',
       detected: true,
       writable: true,
       details: 'Canonical storage detected',
       path: '/tmp/kanban.db',
     })).toMatchObject({
       badgeLabel: 'Shared board',
-      badgeTone: 'hermes',
+      badgeTone: 'claude',
       toastTitle: 'Board connected',
       toastBody: 'Cards and status changes are using the canonical Kanban store.',
       title: 'Canonical storage detected',

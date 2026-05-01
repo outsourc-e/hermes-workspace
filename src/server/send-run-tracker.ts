@@ -1,4 +1,4 @@
-const ACTIVE_RUNS_KEY = '__hermes_active_send_runs__' as const
+const ACTIVE_RUNS_KEY = '__claude_active_send_runs__' as const
 
 function getActiveRuns(): Set<string> {
   const globalValue = globalThis as typeof globalThis & {

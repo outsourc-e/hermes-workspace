@@ -1,12 +1,12 @@
 /**
- * Jobs API proxy — forwards to Hermes FastAPI /api/jobs
+ * Jobs API proxy — forwards to Claude FastAPI /api/jobs
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   BEARER_TOKEN,
-  HERMES_API,
-  HERMES_UPGRADE_INSTRUCTIONS,
+  CLAUDE_API,
+  CLAUDE_UPGRADE_INSTRUCTIONS,
   dashboardFetch,
   ensureGatewayProbed,
   getCapabilities,
@@ -17,7 +17,7 @@ function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 }
 
-export const Route = createFileRoute('/api/hermes-jobs')({
+export const Route = createFileRoute('/api/claude-jobs')({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -41,7 +41,7 @@ export const Route = createFileRoute('/api/hermes-jobs')({
         const params = url.searchParams.toString()
         const res = capabilities.dashboard.available
           ? await dashboardFetch(`/api/cron/jobs${params ? `?${params}` : ''}`)
-          : await fetch(`${HERMES_API}/api/jobs${params ? `?${params}` : ''}`, {
+          : await fetch(`${CLAUDE_API}/api/jobs${params ? `?${params}` : ''}`, {
               headers: authHeaders(),
             })
         return new Response(res.body, {
@@ -60,7 +60,7 @@ export const Route = createFileRoute('/api/hermes-jobs')({
           return new Response(
             JSON.stringify({
               ...createCapabilityUnavailablePayload('jobs', {
-                error: `Gateway does not support /api/jobs. ${HERMES_UPGRADE_INSTRUCTIONS}`,
+                error: `Gateway does not support /api/jobs. ${CLAUDE_UPGRADE_INSTRUCTIONS}`,
               }),
             }),
             { status: 503, headers: { 'Content-Type': 'application/json' } },
@@ -73,7 +73,7 @@ export const Route = createFileRoute('/api/hermes-jobs')({
               headers: { 'Content-Type': 'application/json' },
               body,
             })
-          : await fetch(`${HERMES_API}/api/jobs`, {
+          : await fetch(`${CLAUDE_API}/api/jobs`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...authHeaders() },
               body,

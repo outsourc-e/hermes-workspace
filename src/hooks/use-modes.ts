@@ -11,7 +11,7 @@ export interface Mode {
   preferredPremiumModel?: string
 }
 
-const STORAGE_KEY = 'hermes-modes'
+const STORAGE_KEY = 'claude-modes'
 
 function loadModes(): Array<Mode> {
   try {

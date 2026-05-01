@@ -28,7 +28,7 @@ type KanbanWorker = {
 }
 
 type KanbanBackendMeta = {
-  id: 'local' | 'hermes'
+  id: 'local' | 'claude'
   label: string
   detected: boolean
   writable: boolean
@@ -52,7 +52,7 @@ type Swarm2KanbanBoardProps = {
 
 type KanbanBackendPresentation = {
   badgeLabel: string
-  badgeTone: 'hermes' | 'local' | 'unknown'
+  badgeTone: 'claude' | 'local' | 'unknown'
   toastTitle: string
   toastBody: string
   title: string | undefined
@@ -64,14 +64,14 @@ export function getKanbanBackendPresentation(backend: KanbanBackendMeta | null |
       badgeLabel: 'Detecting board',
       badgeTone: 'unknown',
       toastTitle: 'Detecting Swarm Board backend',
-      toastBody: 'Checking Hermes Kanban before falling back locally.',
+      toastBody: 'Checking Claude Kanban before falling back locally.',
       title: undefined,
     }
   }
-  if (backend.id === 'hermes' && backend.detected) {
+  if (backend.id === 'claude' && backend.detected) {
     return {
       badgeLabel: 'Shared board',
-      badgeTone: 'hermes',
+      badgeTone: 'claude',
       toastTitle: 'Board connected',
       toastBody: 'Cards and status changes are using the canonical Kanban store.',
       title: backend.details ?? backend.path ?? 'Canonical Kanban store detected',
@@ -81,7 +81,7 @@ export function getKanbanBackendPresentation(backend: KanbanBackendMeta | null |
     badgeLabel: 'Local fallback',
     badgeTone: 'local',
     toastTitle: 'Using local Swarm Board',
-    toastBody: backend.details || 'Hermes Kanban is not available yet. Cards stay local and the board will switch automatically when Hermes storage is detected.',
+    toastBody: backend.details || 'Claude Kanban is not available yet. Cards stay local and the board will switch automatically when Claude storage is detected.',
     title: backend.details ?? backend.path ?? 'Local Swarm Board fallback',
   }
 }
@@ -264,7 +264,7 @@ export function Swarm2KanbanBoard({
           <span
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 font-medium',
-              backendPresentation.badgeTone === 'hermes'
+              backendPresentation.badgeTone === 'claude'
                 ? 'border-violet-400/40 bg-violet-500/10 text-violet-700'
                 : backendPresentation.badgeTone === 'local'
                   ? 'border-amber-400/40 bg-amber-500/10 text-amber-700'
@@ -275,7 +275,7 @@ export function Swarm2KanbanBoard({
           >
             <span className={cn(
               'h-1.5 w-1.5 rounded-full',
-              backendPresentation.badgeTone === 'hermes' ? 'bg-violet-500' : backendPresentation.badgeTone === 'local' ? 'bg-amber-500' : 'bg-[var(--theme-muted)]',
+              backendPresentation.badgeTone === 'claude' ? 'bg-violet-500' : backendPresentation.badgeTone === 'local' ? 'bg-amber-500' : 'bg-[var(--theme-muted)]',
             )} />
             {backendPresentation.badgeLabel}
           </span>
@@ -300,7 +300,7 @@ export function Swarm2KanbanBoard({
           <div className="flex items-start gap-3">
             <span className={cn(
               'mt-1 h-2 w-2 shrink-0 rounded-full',
-              backendToast.badgeTone === 'hermes' ? 'bg-violet-500' : backendToast.badgeTone === 'local' ? 'bg-amber-500' : 'bg-[var(--theme-muted)]',
+              backendToast.badgeTone === 'claude' ? 'bg-violet-500' : backendToast.badgeTone === 'local' ? 'bg-amber-500' : 'bg-[var(--theme-muted)]',
             )} />
             <div>
               <div className="font-semibold">{backendToast.toastTitle}</div>

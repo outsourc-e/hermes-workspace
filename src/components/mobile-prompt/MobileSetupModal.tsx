@@ -6,7 +6,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { writeTextToClipboard } from '@/lib/clipboard'
 
-const STORAGE_KEY_SEEN = 'hermes-mobile-setup-seen'
+const STORAGE_KEY_SEEN = 'claude-mobile-setup-seen'
 
 interface MobileSetupModalProps {
   isOpen: boolean
@@ -62,7 +62,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
   const steps = [
     {
       title: 'Install Tailscale on your desktop',
-      body: 'Install Tailscale on the machine running Hermes Workspace, then sign in.',
+      body: 'Install Tailscale on the machine running Claude Workspace, then sign in.',
       showTailscaleIcon: true,
       action: (
         <a
@@ -77,11 +77,11 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
     },
     {
       title: 'Keep your backend reachable',
-      body: 'Hermes Workspace can talk to any OpenAI-compatible backend on mobile too. Make sure both the workspace and backend stay reachable over Tailscale or your local network.',
+      body: 'Claude Workspace can talk to any OpenAI-compatible backend on mobile too. Make sure both the workspace and backend stay reachable over Tailscale or your local network.',
       showTailscaleIcon: false,
       action: (
         <div className="rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 text-sm text-primary-200">
-          Enhanced Hermes gateway APIs are optional. If core chat already works
+          Enhanced Claude gateway APIs are optional. If core chat already works
           on desktop, mobile access mainly depends on network reachability.
         </div>
       ),
@@ -112,7 +112,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       ),
     },
     {
-      title: 'Open Hermes Workspace on your phone',
+      title: 'Open Claude Workspace on your phone',
       body:
         networkUrl?.source === 'tailscale'
           ? 'Your Tailscale address. Open this on your phone browser to use the same workspace.'
@@ -221,8 +221,8 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
 
         <div className="mb-4 flex items-center gap-3 pr-10">
           <img
-            src="/hermes-avatar.webp"
-            alt="Hermes"
+            src="/claude-avatar.webp"
+            alt="Claude"
             className="size-9 rounded-xl"
           />
           <div className="flex-1">

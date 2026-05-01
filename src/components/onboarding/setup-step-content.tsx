@@ -20,7 +20,7 @@ type AuthCheckResponse = {
   error?: string
 }
 
-type HermesConfigResponse = {
+type ClaudeConfigResponse = {
   activeProvider?: string
   activeModel?: string
 }
@@ -51,8 +51,8 @@ export function ConnectionCheckStep({
       if (!connected) {
         setLastError(
           data.error === 'server_timeout'
-            ? 'Hermes Agent did not respond in time.'
-            : 'Hermes Agent is not reachable yet.',
+            ? 'Claude Agent did not respond in time.'
+            : 'Claude Agent is not reachable yet.',
         )
       }
     } catch (error) {
@@ -111,12 +111,12 @@ export function ConnectionCheckStep({
       {status === 'disconnected' && (
         <div className="mb-6 w-full rounded-2xl border border-red-200 bg-red-50 p-4 text-left">
           <p className="mb-3 text-sm font-medium text-red-700">
-            Make sure the Hermes HTTP API server is enabled:
+            Make sure the Claude HTTP API server is enabled:
           </p>
           <div className="space-y-2">
             <div>
               <p className="text-xs font-medium text-red-700 mb-1">
-                1. Enable the API server in <code>~/.hermes/.env</code>:
+                1. Enable the API server in <code>~/.claude/.env</code>:
               </p>
               <code className="block overflow-x-auto rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900">
                 API_SERVER_ENABLED=true
@@ -127,12 +127,12 @@ export function ConnectionCheckStep({
                 2. Restart the gateway:
               </p>
               <code className="block overflow-x-auto rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900">
-                cd hermes-agent && hermes --gateway
+                cd claude-agent && claude --gateway
               </code>
             </div>
           </div>
           <p className="mt-3 text-xs text-red-700">
-            Or point <code>HERMES_API_URL</code> at any OpenAI-compatible
+            Or point <code>CLAUDE_API_URL</code> at any OpenAI-compatible
             backend (Ollama, LiteLLM, vLLM, etc.).
           </p>
           {lastError && (
@@ -157,7 +157,7 @@ export function ModelConfigurationStep({
   setCanProceed,
 }: OnboardingStepComponentProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [config, setConfig] = useState<HermesConfigResponse | null>(null)
+  const [config, setConfig] = useState<ClaudeConfigResponse | null>(null)
 
   useEffect(() => {
     setCanProceed(true)
@@ -168,14 +168,14 @@ export function ModelConfigurationStep({
 
     async function loadConfig() {
       try {
-        const response = await fetch('/api/hermes-config', {
+        const response = await fetch('/api/claude-config', {
           signal: AbortSignal.timeout(5000),
         })
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`)
         }
 
-        const data = (await response.json()) as HermesConfigResponse
+        const data = (await response.json()) as ClaudeConfigResponse
         if (!cancelled) {
           setConfig(data)
           setStatus('ready')
@@ -213,7 +213,7 @@ export function ModelConfigurationStep({
       </h2>
 
       <p className="mb-6 max-w-md text-base leading-relaxed text-primary-600">
-        Core chat works with any OpenAI-compatible backend. Hermes gateway APIs
+        Core chat works with any OpenAI-compatible backend. Claude gateway APIs
         make provider and model setup editable from the workspace.
       </p>
 

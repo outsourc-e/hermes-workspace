@@ -1,4 +1,4 @@
-import { streamChat } from './hermes-api'
+import { streamChat } from './claude-api'
 import { resolveChatBackend } from './chat-mode'
 import { openaiChat } from './openai-compat-api'
 
@@ -16,19 +16,19 @@ export type UnifiedChatOptions = {
   attachments?: Array<Record<string, unknown>>
 }
 
-async function* streamHermesChat(
+async function* streamClaudeChat(
   messages: Array<ChatMessage>,
   options: UnifiedChatOptions,
 ): AsyncGenerator<string, void, void> {
   if (!options.sessionId) {
-    throw new Error('Hermes enhanced chat requires sessionId')
+    throw new Error('Claude enhanced chat requires sessionId')
   }
 
   const lastUserMessage = [...messages]
     .reverse()
     .find((message) => message.role === 'user')
   if (!lastUserMessage) {
-    throw new Error('Hermes enhanced chat requires a user message')
+    throw new Error('Claude enhanced chat requires a user message')
   }
 
   const queue: Array<string> = []
@@ -111,9 +111,9 @@ export async function sendChatUnified(
     })
   }
 
-  if (backend === 'hermes-enhanced') {
+  if (backend === 'claude-enhanced') {
     let text = ''
-    for await (const delta of streamHermesChat(messages, options)) {
+    for await (const delta of streamClaudeChat(messages, options)) {
       text += delta
     }
     return text
@@ -146,8 +146,8 @@ export async function streamChatUnified(
     return toStringStream()
   }
 
-  if (backend === 'hermes-enhanced') {
-    return streamHermesChat(messages, options)
+  if (backend === 'claude-enhanced') {
+    return streamClaudeChat(messages, options)
   }
 
   throw new Error('No chat backend available')

@@ -11,7 +11,7 @@ function isProfileHome(pathValue: string): boolean {
   return parts.length >= 3 && parts.at(-3) === 'profiles' && parts.at(-1) === 'home'
 }
 
-function hermesRootFromProfile(pathValue: string): string | null {
+function claudeRootFromProfile(pathValue: string): string | null {
   if (isProfilesChild(pathValue)) {
     return dirname(dirname(pathValue))
   }
@@ -21,38 +21,38 @@ function hermesRootFromProfile(pathValue: string): string | null {
   return null
 }
 
-export function getHermesRoot(): string {
-  const envHome = process.env.HERMES_HOME || process.env.CLAUDE_HOME
+export function getClaudeRoot(): string {
+  const envHome = process.env.CLAUDE_HOME || process.env.CLAUDE_HOME
   if (envHome) {
-    const profileRoot = hermesRootFromProfile(envHome)
+    const profileRoot = claudeRootFromProfile(envHome)
     if (profileRoot) return profileRoot
     return envHome
   }
 
   const osHome = homedir()
-  const profileRoot = hermesRootFromProfile(osHome)
+  const profileRoot = claudeRootFromProfile(osHome)
   if (profileRoot) return profileRoot
-  return join(osHome, '.hermes')
+  return join(osHome, '.claude')
 }
 
 export function getProfilesDir(): string {
-  return join(getHermesRoot(), 'profiles')
+  return join(getClaudeRoot(), 'profiles')
 }
 
-export function getWorkspaceHermesHome(): string {
-  return getHermesRoot()
+export function getWorkspaceClaudeHome(): string {
+  return getClaudeRoot()
 }
 
-export function getProfileHermesHome(profileId: string): string {
+export function getProfileClaudeHome(profileId: string): string {
   return join(getProfilesDir(), profileId)
 }
 
-export function getUserHomeForHermesRoot(): string {
-  const root = getHermesRoot()
-  if (root.endsWith(`${sep}.hermes`)) return dirname(root)
+export function getUserHomeForClaudeRoot(): string {
+  const root = getClaudeRoot()
+  if (root.endsWith(`${sep}.claude`)) return dirname(root)
   return homedir()
 }
 
 export function getLocalBinDir(): string {
-  return join(getUserHomeForHermesRoot(), '.local', 'bin')
+  return join(getUserHomeForClaudeRoot(), '.local', 'bin')
 }

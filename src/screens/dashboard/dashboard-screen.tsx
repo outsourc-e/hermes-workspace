@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { ReactNode } from 'react'
-import type { HermesSession } from '@/server/hermes-api'
+import type { ClaudeSession } from '@/server/claude-api'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
@@ -256,7 +256,7 @@ function ActivityChart({
   sessions,
   palette,
 }: {
-  sessions: Array<HermesSession>
+  sessions: Array<ClaudeSession>
   palette: ReturnType<typeof readDashboardPalette>
 }) {
   const chartData = useMemo(() => {
@@ -389,9 +389,9 @@ function ModelCard({ palette }: { palette: ReturnType<typeof readDashboardPalett
   const sessionsAvailable = useFeatureAvailable('sessions')
   const configAvailable = useFeatureAvailable('config')
   const configQuery = useQuery({
-    queryKey: ['hermes-config'],
+    queryKey: ['claude-config'],
     queryFn: async () => {
-      const res = await fetch('/api/hermes-config')
+      const res = await fetch('/api/claude-config')
       if (!res.ok) return null
       return res.json() as Promise<Record<string, unknown>>
     },
@@ -488,7 +488,7 @@ function ModelCard({ palette }: { palette: ReturnType<typeof readDashboardPalett
 function SkillsWidget({ palette }: { palette: ReturnType<typeof readDashboardPalette> }) {
   const skillsAvailable = useFeatureAvailable('skills')
   const skillsQuery = useQuery({
-    queryKey: ['hermes-skills'],
+    queryKey: ['claude-skills'],
     queryFn: async () => {
       const res = await fetch(
         '/api/skills?tab=installed&limit=8&summary=search',
@@ -613,7 +613,7 @@ function SessionRow({
   onClick,
   palette,
 }: {
-  session: HermesSession
+  session: ClaudeSession
   maxTokens: number
   onClick: () => void
   palette: ReturnType<typeof readDashboardPalette>
@@ -677,7 +677,7 @@ export function DashboardScreen() {
     // cache collisions with the chat sidebar which fetches fewer sessions
     // and overwrites the dashboard's larger dataset.
     // Also use the workspace proxy (/api/sessions) rather than the server-side
-    // listSessions() — the latter calls the gateway via HERMES_API which is
+    // listSessions() — the latter calls the gateway via CLAUDE_API which is
     // only available server-side and returns nothing when called from the client.
     queryKey: ['dashboard', 'sessions'],
     queryFn: async () => {
@@ -693,14 +693,14 @@ export function DashboardScreen() {
         tool_call_count: (s.tool_call_count as number | undefined) ?? 0,
         input_tokens: (s.tokenCount as number | undefined) ?? 0,
         output_tokens: 0,
-      })) as Array<HermesSession>
+      })) as Array<ClaudeSession>
     },
     staleTime: 10_000,
     refetchInterval: 30_000,
     enabled: sessionsAvailable,
   })
 
-  const sessions = (sessionsQuery.data ?? []) as HermesSession[]
+  const sessions = (sessionsQuery.data ?? []) as ClaudeSession[]
 
   const stats = useMemo(() => {
     let totalMessages = 0,
@@ -765,17 +765,17 @@ export function DashboardScreen() {
           aria-label="Toggle theme"
           onClick={() => {
             const LIGHT_DARK_PAIRS: Record<string, string> = {
-              'hermes-nous': 'hermes-nous-light',
-              'hermes-nous-light': 'hermes-nous',
-              'hermes-official': 'hermes-official-light',
-              'hermes-official-light': 'hermes-official',
-              'hermes-classic': 'hermes-classic-light',
-              'hermes-classic-light': 'hermes-classic',
-              'hermes-slate': 'hermes-slate-light',
-              'hermes-slate-light': 'hermes-slate',
+              'claude-nous': 'claude-nous-light',
+              'claude-nous-light': 'claude-nous',
+              'claude-official': 'claude-official-light',
+              'claude-official-light': 'claude-official',
+              'claude-classic': 'claude-classic-light',
+              'claude-classic-light': 'claude-classic',
+              'claude-slate': 'claude-slate-light',
+              'claude-slate-light': 'claude-slate',
             }
-            const cur = document.documentElement.getAttribute('data-theme') || 'hermes-official'
-            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'hermes-official-light' : 'hermes-official')
+            const cur = document.documentElement.getAttribute('data-theme') || 'claude-official'
+            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'claude-official-light' : 'claude-official')
             import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
             const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
             applyTheme(nextMode)
@@ -789,16 +789,16 @@ export function DashboardScreen() {
         </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
-      {/* ── Header: Hermes Logo + Quick Actions ── */}
+      {/* ── Header: Claude Logo + Quick Actions ── */}
       <div className="flex flex-col items-center gap-3 py-3">
         <img
-          src="/hermes-avatar.webp"
-          alt="Hermes"
+          src="/claude-avatar.webp"
+          alt="Claude"
           className="size-12 md:size-14 rounded-md border border-[var(--theme-border)]"
           style={{ padding: '3px', background: 'var(--theme-card)' }}
         />
         <p className="micro-label" style={{ color: 'var(--theme-muted)' }}>
-          Hermes Workspace
+          Claude Workspace
         </p>
         <div className="mt-1 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
           <QuickAction

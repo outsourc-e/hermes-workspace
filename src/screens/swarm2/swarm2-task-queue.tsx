@@ -42,7 +42,7 @@ type Swarm2TaskQueueProps = {
 const POLL_MS = 30_000
 
 async function fetchAssignedTasks(workerId: string): Promise<Array<WorkerTask>> {
-  const url = `/api/hermes-tasks?assignee=${encodeURIComponent(workerId)}&include_done=true`
+  const url = `/api/claude-tasks?assignee=${encodeURIComponent(workerId)}&include_done=true`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`tasks HTTP ${res.status}`)
   const data = (await res.json()) as TasksResponse
@@ -50,7 +50,7 @@ async function fetchAssignedTasks(workerId: string): Promise<Array<WorkerTask>> 
 }
 
 async function createWorkerTask(workerId: string, title: string, description = ''): Promise<WorkerTask> {
-  const res = await fetch('/api/hermes-tasks', {
+  const res = await fetch('/api/claude-tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

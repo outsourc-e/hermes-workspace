@@ -4,7 +4,7 @@ Canonical environment contract for Swarm / Swarm2 work.
 
 ## One true repo
 
-- **Swarm code, git, build, and tests run only in:** `/Users/aurora/hermes-workspace`
+- **Swarm code, git, build, and tests run only in:** `/Users/aurora/claude-workspace`
 - **Do not use:** `/Users/aurora/claude-workspace`
 
 If you detect `claude-workspace`, stop and switch to the canonical repo.
@@ -17,7 +17,7 @@ If you detect `claude-workspace`, stop and switch to the canonical repo.
 
 ## Worker runtime model
 
-- Workers are **Hermes profiles** under `~/.hermes/profiles/<workerId>`
+- Workers are **Claude profiles** under `~/.claude/profiles/<workerId>`
 - Wrappers are **canonical launch points** at `~/.local/bin/swarmN`
 - One persistent tmux session per worker, named **`swarm-<workerId>`**
 - `/swarm2` should attach to the same live session the worker is already using
@@ -42,20 +42,20 @@ Use:
 ## Default commands
 
 ```bash
-cd /Users/aurora/hermes-workspace && npm run build
-cd /Users/aurora/hermes-workspace && npm test -- src/screens/swarm2
-cd /Users/aurora/hermes-workspace && PORT=3002 npm run dev
+cd /Users/aurora/claude-workspace && npm run build
+cd /Users/aurora/claude-workspace && npm test -- src/screens/swarm2
+cd /Users/aurora/claude-workspace && PORT=3002 npm run dev
 ```
 
 ## Writable roots
 
-- `/Users/aurora/hermes-workspace`
+- `/Users/aurora/claude-workspace`
 - `/Users/aurora/.openclaw/workspace/memory`
 
 ## Read-only roots
 
 - `/Users/aurora/.openclaw/workspace`
-- `~/.hermes/profiles`
+- `~/.claude/profiles`
 - `~/.local/bin`
 
 ## Forbidden roots
@@ -69,5 +69,5 @@ If a choice is ambiguous, ask:
 > What is the one true process/session this worker is running in, and what is the one true repo for the UI surface?
 
 Answer:
-- process/session → live Hermes worker in tmux `swarm-<workerId>`
-- repo → `/Users/aurora/hermes-workspace`
+- process/session → live Claude worker in tmux `swarm-<workerId>`
+- repo → `/Users/aurora/claude-workspace`

@@ -1,21 +1,21 @@
-import { HERMES_API } from './gateway-capabilities'
+import { CLAUDE_API } from './gateway-capabilities'
 
 /** Optional bearer token for authenticated OpenAI-compatible endpoints (e.g. Codex OAuth). */
-const BEARER_TOKEN = process.env.HERMES_API_TOKEN || ''
+const BEARER_TOKEN = process.env.CLAUDE_API_TOKEN || ''
 
 /** Cached first available model from /v1/models — used as fallback when no model is specified. */
 let _cachedDefaultModel: string | null = null
 
 async function getDefaultModel(): Promise<string> {
   if (_cachedDefaultModel) return _cachedDefaultModel
-  if (process.env.HERMES_DEFAULT_MODEL) {
-    _cachedDefaultModel = process.env.HERMES_DEFAULT_MODEL
+  if (process.env.CLAUDE_DEFAULT_MODEL) {
+    _cachedDefaultModel = process.env.CLAUDE_DEFAULT_MODEL
     return _cachedDefaultModel
   }
   try {
     const headers: Record<string, string> = {}
     if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
-    const res = await fetch(`${HERMES_API}/v1/models`, {
+    const res = await fetch(`${CLAUDE_API}/v1/models`, {
       headers,
       signal: AbortSignal.timeout(3_000),
     })
@@ -103,7 +103,7 @@ function readRecord(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-function parseHermesToolProgressChunk(payload: string): StreamChunkType | null {
+function parseClaudeToolProgressChunk(payload: string): StreamChunkType | null {
   try {
     const parsed = JSON.parse(payload) as unknown
     const record = readRecord(parsed)
@@ -163,8 +163,8 @@ export async function* parseOpenAIStream(
       for (const payload of dataLines) {
         if (!payload || payload === '[DONE]') continue
 
-        if (eventName === 'hermes.tool.progress') {
-          const toolChunk = parseHermesToolProgressChunk(payload)
+        if (eventName === 'claude.tool.progress') {
+          const toolChunk = parseClaudeToolProgressChunk(payload)
           if (toolChunk) yield toolChunk
           continue
         }
@@ -215,12 +215,12 @@ export async function openaiChat(
   // Only send session header when authenticated — gateways without
   // API_SERVER_KEY reject this header with an auth error.
   if (options.sessionId && BEARER_TOKEN) {
-    headers['X-Hermes-Session-Id'] = options.sessionId
+    headers['X-Claude-Session-Id'] = options.sessionId
   }
 
   const endpoint = options.baseUrl
     ? `${options.baseUrl.replace(/\/+$/, '')}/chat/completions`
-    : `${HERMES_API}/v1/chat/completions`
+    : `${CLAUDE_API}/v1/chat/completions`
   const response = await fetch(endpoint, {
     method: 'POST',
     headers,

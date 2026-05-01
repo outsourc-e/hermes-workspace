@@ -7,7 +7,7 @@ import type { CallBackProps, Styles } from 'react-joyride'
 import { useSettingsStore } from '@/hooks/use-settings'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
 
-const TOUR_STORAGE_KEY = 'hermes-onboarding-completed'
+const TOUR_STORAGE_KEY = 'claude-onboarding-completed'
 
 // Accent color mapping to hex values
 const ACCENT_COLORS = {
@@ -45,11 +45,11 @@ export function OnboardingTour() {
       if (hasCompletedTour) return
 
       // Wait for setup wizard to finish before starting tour
-      const HERMES_SETUP_KEY = 'hermes-configured'
+      const CLAUDE_SETUP_KEY = 'claude-configured'
       const checkAndStart = () => {
-        const hermesConfigured =
-          localStorage.getItem(HERMES_SETUP_KEY) === 'true'
-        if (hermesConfigured) {
+        const claudeConfigured =
+          localStorage.getItem(CLAUDE_SETUP_KEY) === 'true'
+        if (claudeConfigured) {
           setRun(true)
           return true
         }

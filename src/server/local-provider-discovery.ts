@@ -6,7 +6,7 @@
  *
  * - Probes on first request + re-probes every 30s
  * - Merges discovered models into /api/models response
- * - Auto-writes custom_providers to ~/.hermes/config.yaml if not already configured
+ * - Auto-writes custom_providers to ~/.claude/config.yaml if not already configured
  */
 
 import fs from 'node:fs'
@@ -244,7 +244,7 @@ void ensureDiscovery()
 // -------------------------------------------------------------------
 
 const CONFIG_PATH = path.join(
-  process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
+  process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude'),
   'config.yaml',
 )
 

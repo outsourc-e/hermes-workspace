@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
-import { fetchHermesAuthStatus } from '@/lib/hermes-auth'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 
 const POLL_INTERVAL = 30_000
 
-type HermesHealthBannerProps = {
+type ClaudeHealthBannerProps = {
   enabled?: boolean
 }
 
-export function HermesHealthBanner({
+export function ClaudeHealthBanner({
   enabled = false,
-}: HermesHealthBannerProps) {
+}: ClaudeHealthBannerProps) {
   const [status, setStatus] = useState<'ok' | 'error' | 'checking'>('checking')
   const [lastError, setLastError] = useState<string | null>(null)
 
@@ -24,7 +24,7 @@ export function HermesHealthBanner({
 
     async function check() {
       try {
-        await fetchHermesAuthStatus()
+        await fetchClaudeAuthStatus()
         if (!cancelled) {
           setStatus('ok')
           setLastError(null)
@@ -56,12 +56,12 @@ export function HermesHealthBanner({
       }}
     >
       <span className="inline-block h-2 w-2 rounded-full bg-white/60 animate-pulse" />
-      <span>Hermes Agent unreachable{lastError ? ` — ${lastError}` : ''}</span>
+      <span>Claude Agent unreachable{lastError ? ` — ${lastError}` : ''}</span>
       <button
         type="button"
         onClick={() => {
           setStatus('checking')
-          fetchHermesAuthStatus()
+          fetchClaudeAuthStatus()
             .then(() => {
               setStatus('ok')
               setLastError(null)

@@ -16,7 +16,7 @@ export function BackendUnavailableState({ feature, description }: Props) {
         <div className="mt-4 space-y-2">
           <h2 className="text-lg font-semibold text-primary-900">{feature}</h2>
           <p className="text-sm leading-6 text-primary-600">
-            Not available on this backend. Connect to a Hermes gateway to unlock{' '}
+            Not available on this backend. Connect to a Claude gateway to unlock{' '}
             {feature}.
           </p>
           {description ? (

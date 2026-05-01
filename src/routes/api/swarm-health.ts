@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { getLocalBinDir, getProfilesDir } from '../../server/hermes-paths'
+import { getLocalBinDir, getProfilesDir } from '../../server/claude-paths'
 
 type WorkerHealth = {
   workerId: string
@@ -144,7 +144,7 @@ export const Route = createFileRoute('/api/swarm-health')({
         return json({
           checkedAt: Date.now(),
           workspaceModel,
-          hermesApiUrl: apiUrl,
+          claudeApiUrl: apiUrl,
           workers,
           summary: {
             totalWorkers: workers.length,

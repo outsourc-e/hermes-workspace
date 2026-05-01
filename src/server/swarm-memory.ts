@@ -57,7 +57,7 @@ export const SWARM_RUNTIME_ROOT = join(SWARM_CANONICAL_REPO, '.runtime')
 export const SWARM_PROJECT_CONTEXT_PATH = join(SWARM_SHARED_MEMORY_ROOT, 'PROJECT.md')
 
 function profileRoot(workerId: string): string {
-  return join(homedir(), '.hermes', 'profiles', workerId)
+  return join(homedir(), '.claude', 'profiles', workerId)
 }
 
 function profileFile(workerId: string, name: string): string {
@@ -574,7 +574,7 @@ export function buildSwarmStartupSnapshot(input: SwarmStartupSnapshotInput): Swa
   renderedSections.push('### Memory locations')
   renderedSections.push(
     [
-      `Profile root: ~/.hermes/profiles/${workerId}/  (MEMORY.md, SOUL.md, USER.md cloned from main)`,
+      `Profile root: ~/.claude/profiles/${workerId}/  (MEMORY.md, SOUL.md, USER.md cloned from main)`,
       `Swarm memory: ~/.ocplatform/profiles/${workerId}/memory/  (IDENTITY.md, missions/, episodes/, handoffs/)`,
       `Shared handoff: ${sharedHandoffPath}`,
       `Shared swarm memory: ${SWARM_SHARED_MEMORY_ROOT}`,

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Thin JSON wrapper around hermes skills search for the workspace API."""
+"""Thin JSON wrapper around claude skills search for the workspace API."""
 import json
 import sys
 import os
 
-sys.path.insert(0, os.path.expanduser("~/hermes-agent"))
+sys.path.insert(0, os.path.expanduser("~/claude-agent"))
 
 from tools.skills_hub import GitHubAuth, create_source_router, unified_search
 
@@ -33,7 +33,7 @@ def main():
             "tags": getattr(r, "tags", []),
             "source": getattr(r, "source_label", ""),
             "trust": getattr(r, "trust_level", "community"),
-            "installCommand": f"hermes skills install {getattr(r, 'identifier', r.name)}",
+            "installCommand": f"claude skills install {getattr(r, 'identifier', r.name)}",
             "installed": False,
         })
 

@@ -1,6 +1,6 @@
 import {
   dashboardFetch,
-  HERMES_DASHBOARD_URL,
+  CLAUDE_DASHBOARD_URL,
 } from './gateway-capabilities'
 
 export type DashboardSession = {
@@ -96,7 +96,7 @@ export type ToolsetInfo = {
 
 export type DashboardStatus = {
   version: string
-  hermes_home: string
+  claude_home: string
   gateway_running?: boolean
   gateway_state?: string | null
   gateway_pid?: number | null
@@ -109,7 +109,7 @@ async function dashboardJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await dashboardFetch(path, init)
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Hermes dashboard ${path}: ${res.status} ${text}`)
+    throw new Error(`Claude dashboard ${path}: ${res.status} ${text}`)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -360,4 +360,4 @@ export async function getStatus(): Promise<DashboardStatus> {
   return dashboardJson('/api/status')
 }
 
-export { HERMES_DASHBOARD_URL }
+export { CLAUDE_DASHBOARD_URL }
