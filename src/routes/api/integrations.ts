@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { detectHonchoIntegration } from '../../server/integration-detection'
+import {
+  detectByteroverIntegration,
+  detectHonchoIntegration,
+} from '../../server/integration-detection'
 
 export const Route = createFileRoute('/api/integrations')({
   server: {
@@ -16,6 +19,7 @@ export const Route = createFileRoute('/api/integrations')({
           checkedAt: Date.now(),
           integrations: {
             honcho: detectHonchoIntegration(),
+            byterover: detectByteroverIntegration(),
           },
         })
       },
