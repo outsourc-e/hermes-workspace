@@ -24,6 +24,7 @@ type RemoteStatus = {
   remoteHead: string | null
   currentHead: string | null
   updateAvailable: boolean
+  autoUpdateSupported: boolean
   error: string | null
 }
 
@@ -144,6 +145,14 @@ export function createRemoteStatus(input: {
     error = 'Unable to read remote HEAD.'
   }
 
+  const changed = Boolean(
+    repoMatches &&
+    input.currentHead &&
+    input.remoteHead &&
+    input.currentHead !== input.remoteHead,
+  )
+  const autoUpdateSupported = input.name === 'origin'
+
   return {
     name: input.name,
     label: input.label,
@@ -153,13 +162,12 @@ export function createRemoteStatus(input: {
     repoMatches,
     remoteHead: repoMatches ? input.remoteHead : null,
     currentHead: input.currentHead,
-    updateAvailable: Boolean(
-      repoMatches &&
-      input.currentHead &&
-      input.remoteHead &&
-      input.currentHead !== input.remoteHead,
-    ),
-    error,
+    updateAvailable: changed && autoUpdateSupported,
+    autoUpdateSupported,
+    error:
+      !autoUpdateSupported && changed
+        ? 'Upstream Hermes Agent changes require a manual sync/rebase; one-click fast-forward is disabled for this remote.'
+        : error,
   }
 }
 
@@ -269,10 +277,29 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
     const beforeMergeHead = git(['rev-parse', 'HEAD'])
     output.push(`Fetching ${definition.name}...`)
     output.push(gitOrThrow(['fetch', definition.name], 60_000))
-    output.push(`Fast-forwarding from ${definition.name}/${ref}...`)
-    output.push(
-      gitOrThrow(['merge', '--ff-only', `${definition.name}/${ref}`], 60_000),
+
+    if (definition.name !== 'origin') {
+      skipped.push({
+        name: definition.name,
+        reason:
+          'Manual upstream sync required. Hermes Agent upstream is not applied with one-click Workspace updates.',
+      })
+      continue
+    }
+
+    const remoteRef = `${definition.name}/${ref}`
+    const canFastForward = execFileSync(
+      'git',
+      ['merge-base', '--is-ancestor', 'HEAD', remoteRef],
+      {
+        cwd: process.cwd(),
+        stdio: 'ignore',
+      },
     )
+    void canFastForward
+
+    output.push(`Fast-forwarding from ${remoteRef}...`)
+    output.push(gitOrThrow(['merge', '--ff-only', remoteRef], 60_000))
     const afterMergeHead = git(['rev-parse', 'HEAD'])
     updated.push(definition.name)
     releaseNotes.push({
