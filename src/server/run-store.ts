@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import path from 'node:path'
+
+import { getHermesRoot } from './claude-paths'
 
 export type PersistedRunToolCall = {
   id: string
