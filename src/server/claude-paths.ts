@@ -11,7 +11,7 @@ function isProfileHome(pathValue: string): boolean {
   return parts.length >= 3 && parts.at(-3) === 'profiles' && parts.at(-1) === 'home'
 }
 
-function claudeRootFromProfile(pathValue: string): string | null {
+function hermesRootFromProfile(pathValue: string): string | null {
   if (isProfilesChild(pathValue)) {
     return dirname(dirname(pathValue))
   }
@@ -21,38 +21,44 @@ function claudeRootFromProfile(pathValue: string): string | null {
   return null
 }
 
-export function getClaudeRoot(): string {
-  const envHome = process.env.CLAUDE_HOME || process.env.CLAUDE_HOME
+export function getHermesRoot(): string {
+  const envHome = process.env.HERMES_HOME || process.env.CLAUDE_HOME
   if (envHome) {
-    const profileRoot = claudeRootFromProfile(envHome)
+    const profileRoot = hermesRootFromProfile(envHome)
     if (profileRoot) return profileRoot
     return envHome
   }
 
   const osHome = homedir()
-  const profileRoot = claudeRootFromProfile(osHome)
+  const profileRoot = hermesRootFromProfile(osHome)
   if (profileRoot) return profileRoot
-  return join(osHome, '.claude')
+  return join(osHome, '.hermes')
 }
 
 export function getProfilesDir(): string {
-  return join(getClaudeRoot(), 'profiles')
+  return join(getHermesRoot(), 'profiles')
 }
 
-export function getWorkspaceClaudeHome(): string {
-  return getClaudeRoot()
+export function getWorkspaceHermesHome(): string {
+  return getHermesRoot()
 }
 
-export function getProfileClaudeHome(profileId: string): string {
+export function getProfileHermesHome(profileId: string): string {
   return join(getProfilesDir(), profileId)
 }
 
-export function getUserHomeForClaudeRoot(): string {
-  const root = getClaudeRoot()
-  if (root.endsWith(`${sep}.claude`)) return dirname(root)
+export function getUserHomeForHermesRoot(): string {
+  const root = getHermesRoot()
+  if (root.endsWith(`${sep}.hermes`)) return dirname(root)
   return homedir()
 }
 
 export function getLocalBinDir(): string {
-  return join(getUserHomeForClaudeRoot(), '.local', 'bin')
+  return join(getUserHomeForHermesRoot(), '.local', 'bin')
 }
+
+// Legacy aliases for callers not yet renamed.
+export const getClaudeRoot = getHermesRoot
+export const getWorkspaceClaudeHome = getWorkspaceHermesHome
+export const getProfileClaudeHome = getProfileHermesHome
+export const getUserHomeForClaudeRoot = getUserHomeForHermesRoot

@@ -539,9 +539,9 @@ export function getWorkspacePluginRoots(workspaceRoot = process.cwd()): Array<{
   root: string
   source: 'user' | 'project'
 }> {
-  const claudeHome = process.env.CLAUDE_HOME || path.join(os.homedir(), '.claude')
+  const hermesHome = process.env.HERMES_HOME || process.env.CLAUDE_HOME || path.join(os.homedir(), '.hermes')
   return [
-    { root: path.join(claudeHome, 'plugins'), source: 'user' },
-    { root: path.join(workspaceRoot, '.claude', 'plugins'), source: 'project' },
+    { root: path.join(hermesHome, 'plugins'), source: 'user' },
+    { root: path.join(workspaceRoot, '.hermes', 'plugins'), source: 'project' },
   ]
 }

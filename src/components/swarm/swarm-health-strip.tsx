@@ -26,7 +26,8 @@ type WorkerHealth = {
 type HealthResponse = {
   checkedAt: number
   workspaceModel: string | null
-  claudeApiUrl: string | null
+  agentApiUrl?: string | null
+  claudeApiUrl?: string | null
   workers: WorkerHealth[]
   summary: {
     totalWorkers: number
@@ -107,7 +108,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
   }
 
   const workspaceModel = data?.workspaceModel ?? '—'
-  const apiUrl = data?.claudeApiUrl ?? '—'
+  const apiUrl = data?.agentApiUrl ?? data?.claudeApiUrl ?? '—'
   const totalAuthErrors = data?.summary.totalAuthErrors24h ?? 0
   const wrappersConfigured = data?.summary.wrappersConfigured ?? 0
   const totalWorkers = data?.summary.totalWorkers ?? 0

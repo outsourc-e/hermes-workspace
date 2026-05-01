@@ -1,13 +1,13 @@
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { getClaudeRoot, getProfilesDir, getLocalBinDir } from './claude-paths'
+import { getHermesRoot, getProfilesDir, getLocalBinDir } from './claude-paths'
 
-export const SWARM_CANONICAL_REPO = '/Users/aurora/claude-workspace'
-export const SWARM_MEMORY_ROOT = '/Users/aurora/.openclaw/workspace'
+export const SWARM_CANONICAL_REPO = resolve(process.cwd())
+export const SWARM_MEMORY_ROOT = join(homedir(), '.openclaw', 'workspace')
 export const SWARM_MEMORY_HANDOFFS = join(SWARM_MEMORY_ROOT, 'memory')
 export const SWARM_FORBIDDEN_PATHS = [
-  '/Users/aurora/claude-workspace',
+  join(homedir(), 'claude-workspace'),
 ]
 
 export type SwarmEnvironment = {
@@ -17,7 +17,7 @@ export type SwarmEnvironment = {
   memoryRootExists: boolean
   handoffsRoot: string
   handoffsRootExists: boolean
-  claudeRoot: string
+  hermesRoot: string
   profilesRoot: string
   localBinDir: string
   wrapperPattern: string
@@ -33,7 +33,7 @@ export type SwarmEnvironment = {
 }
 
 export function getSwarmEnvironment(): SwarmEnvironment {
-  const claudeRoot = getClaudeRoot()
+  const hermesRoot = getHermesRoot()
   const profilesRoot = getProfilesDir()
   const localBinDir = getLocalBinDir()
 
@@ -44,7 +44,7 @@ export function getSwarmEnvironment(): SwarmEnvironment {
     memoryRootExists: existsSync(SWARM_MEMORY_ROOT),
     handoffsRoot: SWARM_MEMORY_HANDOFFS,
     handoffsRootExists: existsSync(SWARM_MEMORY_HANDOFFS),
-    claudeRoot,
+    hermesRoot,
     profilesRoot,
     localBinDir,
     wrapperPattern: join(localBinDir, 'swarmN'),
@@ -78,9 +78,9 @@ export function getSwarmEnvironment(): SwarmEnvironment {
     forbiddenRoots: SWARM_FORBIDDEN_PATHS,
     notes: [
       'Swarm code, git, build, and tests run only in the canonical repo.',
-      'Do not use /Users/aurora/claude-workspace for Swarm work.',
-      'Worker profiles live under ~/.claude/profiles/<workerId> and wrappers under ~/.local/bin/swarmN.',
-      'Prefer live tmux-backed Claude sessions over one-shot subprocesses.',
+      'Do not use the legacy claude-workspace alias for Swarm work.',
+      'Worker profiles live under ~/.hermes/profiles/<workerId> and wrappers under ~/.local/bin/swarmN.',
+      'Prefer live tmux-backed Hermes sessions over one-shot subprocesses.',
       'Use the swarm APIs as the machine-readable source of worker/runtime truth.',
     ],
   }
