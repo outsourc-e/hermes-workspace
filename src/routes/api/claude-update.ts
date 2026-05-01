@@ -60,14 +60,24 @@ export const UPDATE_REMOTE_DEFINITIONS: Array<RemoteDefinition> = [
 
 function git(args: string[], timeout = 5000): string | null {
   try {
-    return execFileSync('git', args, { cwd: process.cwd(), encoding: 'utf8', timeout }).trim() || null
+    return (
+      execFileSync('git', args, {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        timeout,
+      }).trim() || null
+    )
   } catch {
     return null
   }
 }
 
-function gitOrThrow(args: string[], timeout = 30_000): string {
-  return execFileSync('git', args, {
+function execOrThrow(
+  command: string,
+  args: string[],
+  timeout = 30_000,
+): string {
+  return execFileSync(command, args, {
     cwd: process.cwd(),
     encoding: 'utf8',
     timeout,
@@ -75,23 +85,34 @@ function gitOrThrow(args: string[], timeout = 30_000): string {
   }).trim()
 }
 
+function gitOrThrow(args: string[], timeout = 30_000): string {
+  return execOrThrow('git', args, timeout)
+}
+
 function pkgVersion(): string {
   try {
-    const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version?: string }
+    const pkg = JSON.parse(
+      readFileSync(join(process.cwd(), 'package.json'), 'utf8'),
+    ) as { version?: string }
     return pkg.version ?? 'unknown'
   } catch {
     return 'unknown'
   }
 }
 
-export function remoteUrlMatchesExpectedRepo(url: string | null, aliases: Array<string>): boolean {
+export function remoteUrlMatchesExpectedRepo(
+  url: string | null,
+  aliases: Array<string>,
+): boolean {
   if (!url) return false
   const normalizedUrl = url
     .toLowerCase()
     .replace(/^git@github\.com:/, 'github.com/')
     .replace(/^https?:\/\//, '')
     .replace(/\.git$/, '')
-  return aliases.some((alias) => normalizedUrl.includes(alias.toLowerCase().replace(/\.git$/, '')))
+  return aliases.some((alias) =>
+    normalizedUrl.includes(alias.toLowerCase().replace(/\.git$/, '')),
+  )
 }
 
 export function createRemoteStatus(input: {
@@ -123,12 +144,20 @@ export function createRemoteStatus(input: {
     repoMatches,
     remoteHead: repoMatches ? input.remoteHead : null,
     currentHead: input.currentHead,
-    updateAvailable: Boolean(repoMatches && input.currentHead && input.remoteHead && input.currentHead !== input.remoteHead),
+    updateAvailable: Boolean(
+      repoMatches &&
+      input.currentHead &&
+      input.remoteHead &&
+      input.currentHead !== input.remoteHead,
+    ),
     error,
   }
 }
 
-function remoteStatus(definition: RemoteDefinition, currentHead: string | null): RemoteStatus {
+function remoteStatus(
+  definition: RemoteDefinition,
+  currentHead: string | null,
+): RemoteStatus {
   const url = git(['remote', 'get-url', definition.name])
   const repoMatches = remoteUrlMatchesExpectedRepo(url, definition.aliases)
   let remoteHead: string | null = null
@@ -160,16 +189,21 @@ export function normalizeUpdateTarget(value: unknown): UpdateTarget {
 
 function selectedDefinitions(target: UpdateTarget): Array<RemoteDefinition> {
   if (target === 'all') return UPDATE_REMOTE_DEFINITIONS
-  return UPDATE_REMOTE_DEFINITIONS.filter((definition) => definition.name === target)
+  return UPDATE_REMOTE_DEFINITIONS.filter(
+    (definition) => definition.name === target,
+  )
 }
 
-async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
+async function readJsonBody(
+  request: Request,
+): Promise<Record<string, unknown>> {
   return request.json().catch(() => ({})) as Promise<Record<string, unknown>>
 }
 
 function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']) || 'main'
-  const currentHead = git(['rev-parse', 'HEAD'])
+  const startHead = git(['rev-parse', 'HEAD'])
+  const currentHead = startHead
   const dirty = Boolean(git(['status', '--porcelain']))
 
   if (dirty) {
@@ -179,7 +213,8 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
       skipped: [],
       restartRequired: false,
       output: '',
-      error: 'Working tree has local changes. Commit, stash, or discard them before updating.',
+      error:
+        'Working tree has local changes. Commit, stash, or discard them before updating.',
     }
   }
 
@@ -190,11 +225,17 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
   for (const definition of selectedDefinitions(target)) {
     const status = remoteStatus(definition, currentHead)
     if (!status.repoMatches) {
-      skipped.push({ name: definition.name, reason: status.error || 'Remote does not match expected repo.' })
+      skipped.push({
+        name: definition.name,
+        reason: status.error || 'Remote does not match expected repo.',
+      })
       continue
     }
     if (!status.updateAvailable) {
-      skipped.push({ name: definition.name, reason: status.error || 'Already up to date.' })
+      skipped.push({
+        name: definition.name,
+        reason: status.error || 'Already up to date.',
+      })
       continue
     }
 
@@ -202,8 +243,44 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
     output.push(`Fetching ${definition.name}...`)
     output.push(gitOrThrow(['fetch', definition.name], 60_000))
     output.push(`Fast-forwarding from ${definition.name}/${ref}...`)
-    output.push(gitOrThrow(['merge', '--ff-only', `${definition.name}/${ref}`], 60_000))
+    output.push(
+      gitOrThrow(['merge', '--ff-only', `${definition.name}/${ref}`], 60_000),
+    )
     updated.push(definition.name)
+  }
+
+  if (updated.length > 0) {
+    const endHead = git(['rev-parse', 'HEAD'])
+    const changedFiles =
+      startHead && endHead
+        ? (git(['diff', '--name-only', startHead, endHead], 10_000)
+            ?.split('\n')
+            .filter(Boolean) ?? [])
+        : []
+    const dependenciesChanged = changedFiles.some(
+      (file) => file === 'package.json' || file === 'pnpm-lock.yaml',
+    )
+    const shouldVerifyBuild = changedFiles.some(
+      (file) =>
+        file.startsWith('src/') ||
+        file.startsWith('scripts/') ||
+        file === 'package.json' ||
+        file === 'pnpm-lock.yaml' ||
+        file.startsWith('vite') ||
+        file.startsWith('tsconfig'),
+    )
+
+    if (dependenciesChanged) {
+      output.push('Installing updated dependencies...')
+      output.push(
+        execOrThrow('pnpm', ['install', '--no-frozen-lockfile'], 180_000),
+      )
+    }
+
+    if (shouldVerifyBuild) {
+      output.push('Verifying updated Workspace build...')
+      output.push(execOrThrow('pnpm', ['build'], 240_000))
+    }
   }
 
   return {
@@ -226,7 +303,9 @@ export const Route = createFileRoute('/api/claude-update')({
         const currentHead = git(['rev-parse', 'HEAD'])
         const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'])
         const dirty = Boolean(git(['status', '--porcelain']))
-        const remotes = UPDATE_REMOTE_DEFINITIONS.map((definition) => remoteStatus(definition, currentHead))
+        const remotes = UPDATE_REMOTE_DEFINITIONS.map((definition) =>
+          remoteStatus(definition, currentHead),
+        )
 
         return json({
           ok: true,
@@ -262,7 +341,10 @@ export const Route = createFileRoute('/api/claude-update')({
           return json(result, { status: result.ok ? 200 : 409 })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            {
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            },
             { status: 500 },
           )
         }
