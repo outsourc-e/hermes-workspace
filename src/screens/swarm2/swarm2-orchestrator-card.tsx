@@ -264,9 +264,7 @@ export function Swarm2OrchestratorCard({
                 Ready {inboxCounts.ready}
               </span>
             </div>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-              Reviewer gate pinned to swarm6
-            </div>
+            {/* Reviewer gate text removed — reviewer routing should be derived from roster/config, not pinned in hero chrome. */}
           </div>
         </div>
 

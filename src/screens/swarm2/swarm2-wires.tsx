@@ -114,7 +114,7 @@ export function Swarm2Wires({
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-0"
+      className="pointer-events-none absolute inset-0 z-[2]"
       width={geom.width}
       height={geom.height}
       viewBox={`0 0 ${geom.width} ${geom.height}`}
@@ -122,13 +122,13 @@ export function Swarm2Wires({
     >
       <defs>
         <linearGradient id="swarm2-wire" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(251,191,36,0.42)" />
-          <stop offset="100%" stopColor="rgba(52,211,153,0.18)" />
+          <stop offset="0%" stopColor="rgba(251,191,36,0.62)" />
+          <stop offset="100%" stopColor="rgba(52,211,153,0.32)" />
         </linearGradient>
         <linearGradient id="swarm2-hot-wire" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(251,191,36,0.85)" />
-          <stop offset="50%" stopColor="rgba(245,158,11,0.65)" />
-          <stop offset="100%" stopColor="rgba(52,211,153,0.35)" />
+          <stop offset="0%" stopColor="rgba(251,191,36,0.98)" />
+          <stop offset="50%" stopColor="rgba(245,158,11,0.82)" />
+          <stop offset="100%" stopColor="rgba(52,211,153,0.52)" />
         </linearGradient>
         <style>{`
           @keyframes swarm2-flow {
@@ -157,21 +157,21 @@ export function Swarm2Wires({
               d={path}
               fill="none"
               stroke="url(#swarm2-wire)"
-              strokeWidth={isHot ? 1.8 : 1.2}
+              strokeWidth={isHot ? 2.2 : 1.5}
               strokeLinecap="round"
               strokeDasharray={isHot ? undefined : "5 10"}
-              opacity={isHot ? 0.68 : 0.5}
+              opacity={isHot ? 0.82 : 0.64}
             />
             {isHot ? (
               <path
                 d={path}
                 fill="none"
                 stroke="url(#swarm2-hot-wire)"
-                strokeWidth={1.6}
+                strokeWidth={1.9}
                 strokeLinecap="round"
                 strokeDasharray="6 14"
                 className="swarm2-wire-hot"
-                opacity={0.95}
+                opacity={1}
               />
             ) : null}
           </g>

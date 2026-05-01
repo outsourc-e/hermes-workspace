@@ -1469,7 +1469,9 @@ export function Swarm2Screen() {
                   Swarm
                 </h1>
                 <p className="truncate text-xs text-[var(--theme-muted-2)]">
-                  12-agent Hermes control plane for planning, routing, reports, and reviewer-gated execution.
+                  {members.length > 0
+                    ? `Detected ${members.length} worker${members.length === 1 ? '' : 's'} for planning, routing, reports, and reviewer-gated execution.`
+                    : 'Detected Hermes profiles and roster workers for planning, routing, reports, and reviewer-gated execution.'}
                 </p>
               </div>
             </div>
