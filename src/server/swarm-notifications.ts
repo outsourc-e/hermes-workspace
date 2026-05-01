@@ -50,7 +50,7 @@ function orchestratorPromptForCheckpoint(input: {
     lines.push(`Next: ${input.checkpoint.nextAction}`)
   }
   lines.push('')
-  lines.push(`Decide next action per /Users/aurora/.ocplatform/workspace/swarm-specs/projects/${input.workerId}.md and /Users/aurora/.ocplatform/workspace/swarm-specs/playbooks/auto-repair.yaml:`)
+  lines.push(`Decide next action per the swarm review spec for ${input.workerId} and the swarm auto-repair playbook:`)
   lines.push(`- DONE → mark mission complete, assign next from lane priority`)
   lines.push(`- HANDOFF → dispatch to named worker per next_action`)
   lines.push(`- BLOCKED → consult auto-repair.yaml; if not in playbook, escalate to Aurora (publish to '${MAIN_SESSION_KEY}')`)
@@ -154,10 +154,29 @@ export function publishSwarmCheckpointNotification(input: {
   const runtimePath = join(profilePath, 'runtime.json')
   const current = readRuntime(runtimePath)
   const currentRaw = typeof current.lastNotifiedCheckpointRaw === 'string' ? current.lastNotifiedCheckpointRaw : null
+  const currentSig = typeof current.lastNotifiedCheckpointSignature === 'string' ? current.lastNotifiedCheckpointSignature : null
   const checkpointRaw = input.checkpoint.raw?.trim() || ''
   const sessionKey = input.notifySessionKey?.trim() || (typeof current.notifySessionKey === 'string' && current.notifySessionKey.trim()) || MAIN_SESSION_KEY
 
-  if (checkpointRaw && currentRaw === checkpointRaw) {
+  // Build a checkpoint signature that includes state + status + raw + result, so dedupe
+  // doesn't suppress a notification when raw text is empty/recycled but the semantic
+  // state actually changed (e.g. worker went executing -> done with same scraped raw).
+  const checkpointSignature = [
+    input.checkpoint.stateLabel,
+    input.checkpoint.checkpointStatus ?? '',
+    input.checkpoint.result ?? '',
+    input.checkpoint.blocker ?? '',
+    input.checkpoint.nextAction ?? '',
+    checkpointRaw,
+  ].join('|')
+
+  if (currentSig && currentSig === checkpointSignature) {
+    return { published: false, sessionKey, route: 'noop' }
+  }
+  // Backwards-compat: if no signature was ever stored but raw matches AND nothing else
+  // could have changed (raw is non-empty + state matches a 'no progress' shape), still skip.
+  // Otherwise, fall through and publish.
+  if (!currentSig && checkpointRaw && currentRaw === checkpointRaw && (input.checkpoint.stateLabel === 'IN_PROGRESS' || !input.checkpoint.stateLabel)) {
     return { published: false, sessionKey, route: 'noop' }
   }
 
@@ -208,6 +227,7 @@ export function publishSwarmCheckpointNotification(input: {
     ...current,
     notifySessionKey: sessionKey,
     lastNotifiedCheckpointRaw: checkpointRaw || null,
+    lastNotifiedCheckpointSignature: checkpointSignature,
     lastNotifiedAt: new Date().toISOString(),
     lastCheckpointRoute: publishedToMain ? 'main' : 'orchestrator',
     lastOrchestratorSendOk: orchestratorResult.sent,

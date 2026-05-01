@@ -96,6 +96,47 @@ describe('swarm-notifications', () => {
     })
   })
 
+  it('does NOT silently noop when state/status changes even if raw is recycled', async () => {
+    const { mod } = await loadModule()
+    mkdirSync(join(tempRoot, 'swarm12'), { recursive: true })
+    const baseRaw = 'STATE: IN_PROGRESS\nRESULT: working'
+    const first = mod.publishSwarmCheckpointNotification({
+      workerId: 'swarm12',
+      checkpoint: {
+        stateLabel: 'IN_PROGRESS',
+        runtimeState: 'executing',
+        checkpointStatus: 'in_progress',
+        filesChanged: 'none',
+        commandsRun: 'none',
+        result: 'working',
+        blocker: null,
+        nextAction: 'continue',
+        raw: baseRaw,
+      },
+      notifySessionKey: 'qa-main',
+    })
+    expect(first.route).toBe('orchestrator')
+
+    // Same raw but checkpoint genuinely transitioned to DONE.
+    const second = mod.publishSwarmCheckpointNotification({
+      workerId: 'swarm12',
+      checkpoint: {
+        stateLabel: 'DONE',
+        runtimeState: 'idle',
+        checkpointStatus: 'done',
+        filesChanged: 'src/x.ts',
+        commandsRun: 'pnpm test',
+        result: 'done',
+        blocker: null,
+        nextAction: 'next thing',
+        raw: baseRaw,
+      },
+      notifySessionKey: 'qa-main',
+    })
+    // Must NOT be noop — semantic state changed.
+    expect(second.route).not.toBe('noop')
+  })
+
   it('escalates NEEDS_INPUT checkpoints to main session and to the orchestrator', async () => {
     const { mod, publishChatEvent } = await loadModule()
     const checkpoint = {
