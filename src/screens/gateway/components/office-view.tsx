@@ -546,7 +546,12 @@ export function OfficeView({
   })
 
   return (
-    <div className={cn('flex flex-col bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800', compact ? 'h-full' : 'min-h-[480px]')}>
+    <div className={cn(
+      'flex flex-col',
+      compact
+        ? 'h-full bg-gradient-to-b from-slate-100 via-slate-50 to-neutral-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900'
+        : 'min-h-[480px] bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800',
+    )}>
       {/* Header bar */}
       {hideHeader ? null : <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-neutral-200 bg-white/80 px-5 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -772,7 +777,7 @@ export function OfficeView({
           const isIdle = agent.status === 'idle' || agent.status === 'ready'
           const statusMeta = getAgentStatusMeta(agent.status)
           const speechLine = getSpeechLine(agent, tick + index * 7)
-          const showSpeech = Boolean(speechLine) && ((tick + index * 3) % 8 < 6)
+          const showSpeech = !compact && Boolean(speechLine) && agentRows.length <= 8 && ((tick + index * 3) % 8 < 6)
           const xPct = (pos.x / sceneW) * 100
           const yPct = (pos.y / sceneH) * 100
           const movementTransform = `translate(-50%, -50%)`
@@ -844,7 +849,7 @@ export function OfficeView({
                   <span className="size-1 animate-pulse rounded-full bg-emerald-500 [animation-delay:240ms]" />
                   <span className="ml-0.5">Working</span>
                 </span>
-              ) : isIdle && !pos.atDesk ? (
+              ) : isIdle && !pos.atDesk && !compact ? (
                 <span className="mt-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">
                   On break
                 </span>
@@ -852,7 +857,9 @@ export function OfficeView({
 
               {/* Name + model */}
               <span className="mt-1 max-w-full truncate text-[10px] font-semibold text-neutral-800 dark:text-white">{agent.name}</span>
-              <span className="max-w-full truncate text-xs text-neutral-500 dark:text-slate-400">{getOfficeModelLabel(agent.modelId)}</span>
+              {!compact ? (
+                <span className="max-w-full truncate text-xs text-neutral-500 dark:text-slate-400">{getOfficeModelLabel(agent.modelId)}</span>
+              ) : null}
             </button>
           )
         })}

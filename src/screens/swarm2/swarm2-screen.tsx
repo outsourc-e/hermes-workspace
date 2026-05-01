@@ -822,8 +822,6 @@ function ControlPlaneStage({
         />
         <div className="relative w-full pt-3">
           <div className={cn('relative z-10', viewMode === 'cards' ? 'block' : 'hidden')}>
-            <div className="mb-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-muted-2)]">
-            </div>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 min-[1680px]:grid-cols-3">
               {members.length === 0 ? (
                 <div className="col-span-full rounded-[1.5rem] border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-8 text-sm text-[var(--theme-muted)]">
@@ -1006,7 +1004,7 @@ export function Swarm2Screen() {
   const [newWorkerName, setNewWorkerName] = useState('')
   const [newWorkerRole, setNewWorkerRole] = useState('Builder')
   const [newWorkerSpecialty, setNewWorkerSpecialty] = useState('')
-  const [newWorkerModel, setNewWorkerModel] = useState('GPT-5.5')
+  const [newWorkerModel, setNewWorkerModel] = useState('')
   const [newWorkerMission, setNewWorkerMission] = useState('')
   // Worker IDs whose tmux session is currently being started/stopped via API.
   const [pendingTmux, setPendingTmux] = useState<Set<string>>(new Set())
@@ -1411,7 +1409,7 @@ export function Swarm2Screen() {
     setNewWorkerName(`Swarm${next}`)
     setNewWorkerRole('Builder')
     setNewWorkerSpecialty('')
-    setNewWorkerModel('GPT-5.5')
+    setNewWorkerModel('')
     setNewWorkerMission('')
     setAddSwarmError(null)
     setAddSwarmOpen(true)
@@ -1656,39 +1654,20 @@ export function Swarm2Screen() {
                   <span>Model</span>
                   <span className="text-[10px] text-[var(--theme-muted-2)]">{availableModels.length > 0 ? `${availableModels.length} available` : 'loading…'}</span>
                 </span>
-                <select
+                <input
                   value={newWorkerModel}
                   onChange={(e) => setNewWorkerModel(e.target.value)}
+                  list="swarm-add-models"
+                  placeholder={availableModels.length ? 'Search or pick a detected model…' : 'Loading detected models…'}
                   className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
-                >
-                  {availableModels.length === 0 ? (
-                    <option value={newWorkerModel}>{newWorkerModel || 'Loading models…'}</option>
-                  ) : (
-                    <>
-                      {/* Always include the current value if it's not in the available list (handles legacy / custom names) */}
-                      {!availableModels.some((m) => m.name === newWorkerModel || m.id === newWorkerModel) && newWorkerModel ? (
-                        <option value={newWorkerModel}>{newWorkerModel} (current)</option>
-                      ) : null}
-                      {/* Group by provider for readability */}
-                      {Array.from(
-                        availableModels.reduce((acc, m) => {
-                          const k = m.provider || 'other'
-                          if (!acc.has(k)) acc.set(k, [])
-                          acc.get(k)!.push(m)
-                          return acc
-                        }, new Map<string, Array<{ id: string; name: string; provider: string }>>()).entries(),
-                      ).map(([provider, models]) => (
-                        <optgroup key={provider} label={provider}>
-                          {models.map((m) => (
-                            <option key={m.id} value={m.name}>{m.name}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </>
-                  )}
-                </select>
+                />
+                <datalist id="swarm-add-models">
+                  {availableModels.map((m) => (
+                    <option key={m.id} value={m.name}>{m.provider}</option>
+                  ))}
+                </datalist>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                  Auto-detected from your Hermes config (/api/models). Includes Codex, Anthropic, OpenRouter, OLLAMA, LM Studio, and any custom providers you have configured.
+                  Searchable picker backed by /api/models, the same model source as chat. Start typing to see every detected model from the user’s Hermes config and local providers.
                 </p>
               </label>
               <label className="block text-sm md:col-span-2">
