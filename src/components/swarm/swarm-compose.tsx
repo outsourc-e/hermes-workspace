@@ -68,7 +68,7 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
         <div>
           <div className="text-sm font-semibold text-[var(--theme-text)]">Compose orchestration</div>
           <div className="mt-1 text-xs text-[var(--theme-muted)]">
-            Dispatched in parallel as <code className="rounded bg-[var(--theme-hover)] px-1 py-0.5">claude --print</code> against each agent's profile.
+            Dispatched in parallel against each agent profile with the configured worker runtime.
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">

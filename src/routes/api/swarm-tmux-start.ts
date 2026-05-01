@@ -9,7 +9,7 @@ import { isAuthenticated } from '../../server/auth-middleware'
 // Inlined to avoid SSR module-resolution races against freshly-written
 // helpers; mirrors `src/server/hermes-paths.ts` getProfilesDir().
 function getProfilesDir(): string {
-  const envHome = process.env.HERMES_HOME || process.env.CLAUDE_HOME
+  const envHome = process.env.CLAUDE_HOME
   if (envHome) {
     const parts = envHome.split('/').filter(Boolean)
     if (parts.length >= 2 && parts.at(-2) === 'profiles') {

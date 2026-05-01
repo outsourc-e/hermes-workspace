@@ -10,7 +10,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 
-type ClaudeTask = {
+type WorkerTask = {
   id: string
   title?: string | null
   description?: string | null
@@ -23,7 +23,7 @@ type ClaudeTask = {
 }
 
 type TasksResponse = {
-  tasks?: Array<ClaudeTask>
+  tasks?: Array<WorkerTask>
   ok?: boolean
 }
 
@@ -41,7 +41,7 @@ type Swarm2TaskQueueProps = {
 
 const POLL_MS = 30_000
 
-async function fetchAssignedTasks(workerId: string): Promise<Array<ClaudeTask>> {
+async function fetchAssignedTasks(workerId: string): Promise<Array<WorkerTask>> {
   const url = `/api/hermes-tasks?assignee=${encodeURIComponent(workerId)}&include_done=true`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`tasks HTTP ${res.status}`)
@@ -49,7 +49,7 @@ async function fetchAssignedTasks(workerId: string): Promise<Array<ClaudeTask>> 
   return Array.isArray(data.tasks) ? data.tasks : []
 }
 
-async function createWorkerTask(workerId: string, title: string, description = ''): Promise<ClaudeTask> {
+async function createWorkerTask(workerId: string, title: string, description = ''): Promise<WorkerTask> {
   const res = await fetch('/api/hermes-tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -66,7 +66,7 @@ async function createWorkerTask(workerId: string, title: string, description = '
     const text = await res.text().catch(() => '')
     throw new Error(text || `task create HTTP ${res.status}`)
   }
-  const data = (await res.json()) as { task?: ClaudeTask }
+  const data = (await res.json()) as { task?: WorkerTask }
   if (!data.task) throw new Error('task create returned no task')
   return data.task
 }

@@ -146,7 +146,7 @@ describe('kanban-backend', () => {
     expect(mod.listKanbanCards()[0]).toMatchObject({ id: 't_direct', status: 'ready' })
   })
 
-  it('resolves canonical Kanban paths from CLAUDE_HOME profile homes too', async () => {
+  it('resolves canonical Kanban paths from legacy profile-home env fallback too', async () => {
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.hermes/profiles/swarm5/home')
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.hermes/kanban.db',

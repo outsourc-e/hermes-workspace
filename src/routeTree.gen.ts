@@ -39,11 +39,13 @@ import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-s
 import { Route as ApiSwarmTmuxScrollRouteImport } from './routes/api/swarm-tmux-scroll'
 import { Route as ApiSwarmRuntimeRouteImport } from './routes/api/swarm-runtime'
 import { Route as ApiSwarmRosterRouteImport } from './routes/api/swarm-roster'
+import { Route as ApiSwarmReportsRouteImport } from './routes/api/swarm-reports'
 import { Route as ApiSwarmProjectRouteImport } from './routes/api/swarm-project'
 import { Route as ApiSwarmOrchestratorLoopRouteImport } from './routes/api/swarm-orchestrator-loop'
 import { Route as ApiSwarmMissionsRouteImport } from './routes/api/swarm-missions'
 import { Route as ApiSwarmMemoryRouteImport } from './routes/api/swarm-memory'
 import { Route as ApiSwarmLifecycleRouteImport } from './routes/api/swarm-lifecycle'
+import { Route as ApiSwarmKanbanRouteImport } from './routes/api/swarm-kanban'
 import { Route as ApiSwarmHealthRouteImport } from './routes/api/swarm-health'
 import { Route as ApiSwarmEnvironmentRouteImport } from './routes/api/swarm-environment'
 import { Route as ApiSwarmDispatchRouteImport } from './routes/api/swarm-dispatch'
@@ -67,7 +69,9 @@ import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
+import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiHermesUpdateRouteImport } from './routes/api/hermes-update'
 import { Route as ApiHermesTasksAssigneesRouteImport } from './routes/api/hermes-tasks-assignees'
 import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
 import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
@@ -270,6 +274,11 @@ const ApiSwarmRosterRoute = ApiSwarmRosterRouteImport.update({
   path: '/api/swarm-roster',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSwarmReportsRoute = ApiSwarmReportsRouteImport.update({
+  id: '/api/swarm-reports',
+  path: '/api/swarm-reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSwarmProjectRoute = ApiSwarmProjectRouteImport.update({
   id: '/api/swarm-project',
   path: '/api/swarm-project',
@@ -294,6 +303,11 @@ const ApiSwarmMemoryRoute = ApiSwarmMemoryRouteImport.update({
 const ApiSwarmLifecycleRoute = ApiSwarmLifecycleRouteImport.update({
   id: '/api/swarm-lifecycle',
   path: '/api/swarm-lifecycle',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmKanbanRoute = ApiSwarmKanbanRouteImport.update({
+  id: '/api/swarm-kanban',
+  path: '/api/swarm-kanban',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmHealthRoute = ApiSwarmHealthRouteImport.update({
@@ -411,9 +425,19 @@ const ApiLocalProvidersRoute = ApiLocalProvidersRouteImport.update({
   path: '/api/local-providers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIntegrationsRoute = ApiIntegrationsRouteImport.update({
+  id: '/api/integrations',
+  path: '/api/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHistoryRoute = ApiHistoryRouteImport.update({
   id: '/api/history',
   path: '/api/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHermesUpdateRoute = ApiHermesUpdateRouteImport.update({
+  id: '/api/hermes-update',
+  path: '/api/hermes-update',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHermesTasksAssigneesRoute = ApiHermesTasksAssigneesRouteImport.update({
@@ -707,7 +731,9 @@ export interface FileRoutesByFullPath {
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/hermes-tasks-assignees': typeof ApiHermesTasksAssigneesRoute
+  '/api/hermes-update': typeof ApiHermesUpdateRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
@@ -731,11 +757,13 @@ export interface FileRoutesByFullPath {
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
+  '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
   '/api/swarm-memory': typeof ApiSwarmMemoryRouteWithChildren
   '/api/swarm-missions': typeof ApiSwarmMissionsRoute
   '/api/swarm-orchestrator-loop': typeof ApiSwarmOrchestratorLoopRoute
   '/api/swarm-project': typeof ApiSwarmProjectRoute
+  '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
@@ -818,7 +846,9 @@ export interface FileRoutesByTo {
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/hermes-tasks-assignees': typeof ApiHermesTasksAssigneesRoute
+  '/api/hermes-update': typeof ApiHermesUpdateRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
@@ -842,11 +872,13 @@ export interface FileRoutesByTo {
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
+  '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
   '/api/swarm-memory': typeof ApiSwarmMemoryRouteWithChildren
   '/api/swarm-missions': typeof ApiSwarmMissionsRoute
   '/api/swarm-orchestrator-loop': typeof ApiSwarmOrchestratorLoopRoute
   '/api/swarm-project': typeof ApiSwarmProjectRoute
+  '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
@@ -931,7 +963,9 @@ export interface FileRoutesById {
   '/api/hermes-jobs': typeof ApiHermesJobsRouteWithChildren
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/hermes-tasks-assignees': typeof ApiHermesTasksAssigneesRoute
+  '/api/hermes-update': typeof ApiHermesUpdateRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
@@ -955,11 +989,13 @@ export interface FileRoutesById {
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
+  '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
   '/api/swarm-memory': typeof ApiSwarmMemoryRouteWithChildren
   '/api/swarm-missions': typeof ApiSwarmMissionsRoute
   '/api/swarm-orchestrator-loop': typeof ApiSwarmOrchestratorLoopRoute
   '/api/swarm-project': typeof ApiSwarmProjectRoute
+  '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
@@ -1045,7 +1081,9 @@ export interface FileRouteTypes {
     | '/api/hermes-jobs'
     | '/api/hermes-tasks'
     | '/api/hermes-tasks-assignees'
+    | '/api/hermes-update'
     | '/api/history'
+    | '/api/integrations'
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
@@ -1069,11 +1107,13 @@ export interface FileRouteTypes {
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
     | '/api/swarm-health'
+    | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
     | '/api/swarm-memory'
     | '/api/swarm-missions'
     | '/api/swarm-orchestrator-loop'
     | '/api/swarm-project'
+    | '/api/swarm-reports'
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-tmux-scroll'
@@ -1156,7 +1196,9 @@ export interface FileRouteTypes {
     | '/api/hermes-jobs'
     | '/api/hermes-tasks'
     | '/api/hermes-tasks-assignees'
+    | '/api/hermes-update'
     | '/api/history'
+    | '/api/integrations'
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
@@ -1180,11 +1222,13 @@ export interface FileRouteTypes {
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
     | '/api/swarm-health'
+    | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
     | '/api/swarm-memory'
     | '/api/swarm-missions'
     | '/api/swarm-orchestrator-loop'
     | '/api/swarm-project'
+    | '/api/swarm-reports'
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-tmux-scroll'
@@ -1268,7 +1312,9 @@ export interface FileRouteTypes {
     | '/api/hermes-jobs'
     | '/api/hermes-tasks'
     | '/api/hermes-tasks-assignees'
+    | '/api/hermes-update'
     | '/api/history'
+    | '/api/integrations'
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
@@ -1292,11 +1338,13 @@ export interface FileRouteTypes {
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
     | '/api/swarm-health'
+    | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
     | '/api/swarm-memory'
     | '/api/swarm-missions'
     | '/api/swarm-orchestrator-loop'
     | '/api/swarm-project'
+    | '/api/swarm-reports'
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-tmux-scroll'
@@ -1381,7 +1429,9 @@ export interface RootRouteChildren {
   ApiHermesJobsRoute: typeof ApiHermesJobsRouteWithChildren
   ApiHermesTasksRoute: typeof ApiHermesTasksRouteWithChildren
   ApiHermesTasksAssigneesRoute: typeof ApiHermesTasksAssigneesRoute
+  ApiHermesUpdateRoute: typeof ApiHermesUpdateRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
+  ApiIntegrationsRoute: typeof ApiIntegrationsRoute
   ApiLocalProvidersRoute: typeof ApiLocalProvidersRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
@@ -1405,11 +1455,13 @@ export interface RootRouteChildren {
   ApiSwarmDispatchRoute: typeof ApiSwarmDispatchRoute
   ApiSwarmEnvironmentRoute: typeof ApiSwarmEnvironmentRoute
   ApiSwarmHealthRoute: typeof ApiSwarmHealthRoute
+  ApiSwarmKanbanRoute: typeof ApiSwarmKanbanRoute
   ApiSwarmLifecycleRoute: typeof ApiSwarmLifecycleRoute
   ApiSwarmMemoryRoute: typeof ApiSwarmMemoryRouteWithChildren
   ApiSwarmMissionsRoute: typeof ApiSwarmMissionsRoute
   ApiSwarmOrchestratorLoopRoute: typeof ApiSwarmOrchestratorLoopRoute
   ApiSwarmProjectRoute: typeof ApiSwarmProjectRoute
+  ApiSwarmReportsRoute: typeof ApiSwarmReportsRoute
   ApiSwarmRosterRoute: typeof ApiSwarmRosterRoute
   ApiSwarmRuntimeRoute: typeof ApiSwarmRuntimeRoute
   ApiSwarmTmuxScrollRoute: typeof ApiSwarmTmuxScrollRoute
@@ -1655,6 +1707,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSwarmRosterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/swarm-reports': {
+      id: '/api/swarm-reports'
+      path: '/api/swarm-reports'
+      fullPath: '/api/swarm-reports'
+      preLoaderRoute: typeof ApiSwarmReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/swarm-project': {
       id: '/api/swarm-project'
       path: '/api/swarm-project'
@@ -1688,6 +1747,13 @@ declare module '@tanstack/react-router' {
       path: '/api/swarm-lifecycle'
       fullPath: '/api/swarm-lifecycle'
       preLoaderRoute: typeof ApiSwarmLifecycleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-kanban': {
+      id: '/api/swarm-kanban'
+      path: '/api/swarm-kanban'
+      fullPath: '/api/swarm-kanban'
+      preLoaderRoute: typeof ApiSwarmKanbanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-health': {
@@ -1851,11 +1917,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLocalProvidersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations': {
+      id: '/api/integrations'
+      path: '/api/integrations'
+      fullPath: '/api/integrations'
+      preLoaderRoute: typeof ApiIntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/history': {
       id: '/api/history'
       path: '/api/history'
       fullPath: '/api/history'
       preLoaderRoute: typeof ApiHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hermes-update': {
+      id: '/api/hermes-update'
+      path: '/api/hermes-update'
+      fullPath: '/api/hermes-update'
+      preLoaderRoute: typeof ApiHermesUpdateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/hermes-tasks-assignees': {
@@ -2367,7 +2447,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHermesJobsRoute: ApiHermesJobsRouteWithChildren,
   ApiHermesTasksRoute: ApiHermesTasksRouteWithChildren,
   ApiHermesTasksAssigneesRoute: ApiHermesTasksAssigneesRoute,
+  ApiHermesUpdateRoute: ApiHermesUpdateRoute,
   ApiHistoryRoute: ApiHistoryRoute,
+  ApiIntegrationsRoute: ApiIntegrationsRoute,
   ApiLocalProvidersRoute: ApiLocalProvidersRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,
@@ -2391,11 +2473,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmDispatchRoute: ApiSwarmDispatchRoute,
   ApiSwarmEnvironmentRoute: ApiSwarmEnvironmentRoute,
   ApiSwarmHealthRoute: ApiSwarmHealthRoute,
+  ApiSwarmKanbanRoute: ApiSwarmKanbanRoute,
   ApiSwarmLifecycleRoute: ApiSwarmLifecycleRoute,
   ApiSwarmMemoryRoute: ApiSwarmMemoryRouteWithChildren,
   ApiSwarmMissionsRoute: ApiSwarmMissionsRoute,
   ApiSwarmOrchestratorLoopRoute: ApiSwarmOrchestratorLoopRoute,
   ApiSwarmProjectRoute: ApiSwarmProjectRoute,
+  ApiSwarmReportsRoute: ApiSwarmReportsRoute,
   ApiSwarmRosterRoute: ApiSwarmRosterRoute,
   ApiSwarmRuntimeRoute: ApiSwarmRuntimeRoute,
   ApiSwarmTmuxScrollRoute: ApiSwarmTmuxScrollRoute,

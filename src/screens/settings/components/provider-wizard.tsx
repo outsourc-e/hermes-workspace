@@ -626,7 +626,7 @@ export function ProviderWizard({
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
                             'Run "hermes setup" in the terminal and select Anthropic → CLI Token. ' +
-                              'It will detect your Claude CLI credentials and import them automatically.',
+                              'It will detect compatible local credentials and import them automatically.',
                           )
                           setVerifyState('warning')
                           setStep('verify')

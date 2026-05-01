@@ -527,7 +527,7 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
     return { ok: false, error: started.error }
   }
 
-  // Give Hermes a moment to render its prompt before sending keys.
+  // Give the agent a moment to render its prompt before sending keys.
   await sleep(1200)
   return { ok: true, tmuxBin, sessionName }
 }
@@ -563,7 +563,7 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   }
 
   // Ensure we are sending a fresh prompt, not appending onto a partially typed
-  // line left in the Hermes TUI. Ctrl-U clears readline-style input in the
+  // line left in the agent TUI. Ctrl-U clears readline-style input in the
   // current prompt without disrupting the session.
   const cleared = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-u'])
   if (!cleared.ok) {
@@ -667,7 +667,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     const startedAt = Date.now()
     const wrapperPath = getWrapperPath(workerId)
 
-    // Prefer the persistent live Hermes session when available/startable.
+    // Prefer the persistent live agent session when available/startable.
     const liveResult = await sendPromptToLiveSession(workerId, prompt)
     if (liveResult) {
       markDispatchResult(workerId, liveResult)
