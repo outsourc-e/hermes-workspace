@@ -147,7 +147,7 @@ export function OnboardingWizard() {
                         {step.id === 'welcome' ? (
                           <img
                             src="/claude-avatar.webp"
-                            alt="Claude"
+                            alt="Project Agent"
                             className="size-16 rounded-2xl"
                           />
                         ) : (

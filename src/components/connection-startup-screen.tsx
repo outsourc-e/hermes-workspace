@@ -32,12 +32,12 @@ function getSetupSteps(
       note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
     },
     {
-      title: 'Optional: install Hermes Agent locally',
+      title: 'Optional: install Project Agent locally',
       command: `${pip} install hermes-agent`,
       note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
     },
     {
-      title: 'Set up Claude',
+      title: 'Set up your agent',
       command: 'claude setup',
       note: 'Pick your providers once; Claude stores them under ~/.claude',
     },
@@ -223,12 +223,12 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       <div className="flex w-full max-w-lg flex-col items-center text-center">
         <img
           src="/claude-avatar.webp"
-          alt="Claude"
+          alt="Project Agent"
           className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
         />
 
         <h1 className="text-[2rem] font-semibold tracking-tight text-white">
-          Hermes Workspace
+          Project Workspace
         </h1>
 
         {/* Connecting spinner */}
@@ -257,7 +257,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               Welcome! Let&apos;s connect your backend
             </p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace works with any OpenAI-compatible backend. Claude
+              Project Workspace works with any OpenAI-compatible backend. Claude
               gateway APIs unlock enhanced features automatically when they are
               available.
             </p>

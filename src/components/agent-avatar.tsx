@@ -143,7 +143,7 @@ function AgentAvatar({
           ) : (
             <img
               src="/claude-avatar.webp"
-              alt="Claude"
+              alt="Project Agent"
               className={cn(
                 getLogoSizeClassName(size),
                 iconClassName,

@@ -912,14 +912,14 @@ function ChatSidebarComponent({
               >
                 <img
                   src="/claude-avatar.webp"
-                  alt="Claude"
+                  alt="Project Agent"
                   className="size-6 rounded-lg"
                 />
                 <span
                   className="text-sm font-semibold tracking-tight"
                   style={{ color: 'var(--theme-text)' }}
                 >
-                  Hermes Workspace
+                  Project Workspace
                 </span>
               </Link>
             </motion.div>

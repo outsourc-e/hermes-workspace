@@ -71,7 +71,7 @@ export function ChatEmptyState({
         <div className="relative mb-6">
           <img
             src="/claude-avatar.webp"
-            alt="Claude"
+            alt="Project Agent"
             className="relative size-20 rounded-md"
             style={{
               border: '1px solid var(--theme-border)',
@@ -86,7 +86,7 @@ export function ChatEmptyState({
           className="micro-label mb-2"
           style={{ color: 'var(--theme-muted)' }}
         >
-          Hermes Workspace
+          Project Workspace
         </p>
 
         {/* Editorial display title */}

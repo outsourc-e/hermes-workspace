@@ -356,7 +356,7 @@ function ClaudeContent() {
   if (!configAvailable) {
     return (
       <BackendUnavailableState
-        feature="Hermes Agent Settings"
+        feature="Project Agent Settings"
         description={getUnavailableReason('config')}
       />
     )
@@ -1979,7 +1979,7 @@ export function SettingsDialog({
                 Settings
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Configure Hermes Workspace
+                Configure Project Workspace
               </DialogDescription>
             </div>
             <DialogClose

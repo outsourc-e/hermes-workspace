@@ -1,7 +1,7 @@
 {
-  "name": "Claude Workspace",
-  "short_name": "Claude",
-  "description": "Native web control surface for Claude Agent",
+  "name": "Project Workspace",
+  "short_name": "Project",
+  "description": "Native web control surface for Project Agent",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0E1A",
