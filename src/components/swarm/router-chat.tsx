@@ -15,7 +15,6 @@ import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 
 type Mode = 'auto' | 'manual' | 'broadcast'
-type QuickRoute = 'Research' | 'Builder' | 'Reviewer' | 'Docs' | 'Ops' | 'Best match' | 'Auto'
 
 type Assignment = { workerId: string; task: string; rationale: string; expectedOutput?: string; dependsOn?: Array<string>; reviewRequired?: boolean }
 type ParsedCheckpoint = {
@@ -71,7 +70,7 @@ function roleForMember(members: Array<CrewMember>, id: string): string {
 }
 
 
-const QUICK_ROUTES: Array<QuickRoute> = [
+const QUICK_ROUTES = [
   'Research',
   'Builder',
   'Reviewer',
@@ -99,7 +98,6 @@ export function RouterChat({
   const [prompt, setPrompt] = useState('')
   const [decomposing, setDecomposing] = useState(false)
   const [decomposeError, setDecomposeError] = useState<string | null>(null)
-  const [quickRoute, setQuickRoute] = useState<QuickRoute>('Auto')
   const [assignments, setAssignments] = useState<Array<Assignment>>([])
   const [unassigned, setUnassigned] = useState<Array<string>>([])
   const [dispatching, setDispatching] = useState(false)
@@ -118,13 +116,6 @@ export function RouterChat({
     setDecomposeError(null)
     setDispatchError(null)
   }, [seedKey, seedMode, seedPrompt])
-
-  function buildPromptWithRoute(basePrompt: string): string {
-    const clean = basePrompt.trim()
-    if (!clean) return clean
-    if (quickRoute === 'Auto' || quickRoute === 'Best match') return clean
-    return `Prefer the ${quickRoute.toLowerCase()} specialist for this work.\n\n${clean}`
-  }
 
   useEffect(() => {
     if (
@@ -184,7 +175,7 @@ export function RouterChat({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: buildPromptWithRoute(prompt),
+          prompt: prompt.trim(),
           workers: eligibleWorkers,
         }),
       })
@@ -244,17 +235,11 @@ export function RouterChat({
     setResults(null)
     setFollowUp(null)
     try {
-      const routedPlan = mode === 'auto'
-        ? plan.map((item) => ({
-            ...item,
-            task: buildPromptWithRoute(item.task),
-          }))
-        : plan
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          assignments: routedPlan,
+          assignments: plan,
           timeoutSeconds: 300,
           waitForCheckpoint: true,
           checkpointPollSeconds: 90,
@@ -339,7 +324,7 @@ export function RouterChat({
         <div className={cn(
           'grid gap-3 overflow-y-auto py-3',
           embedded
-            ? 'max-h-none px-3 lg:grid-cols-[1.2fr_minmax(280px,0.8fr)]'
+            ? 'max-h-none px-3'
             : 'max-h-[330px] px-5 lg:grid-cols-[1.35fr_minmax(280px,1fr)]',
         )}>
           <div className="flex flex-col gap-2">
@@ -357,26 +342,27 @@ export function RouterChat({
               }
               className="min-h-[8rem] resize-y rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)] focus:outline-none"
             />
-            <div className="flex flex-wrap items-center gap-2">
-              {QUICK_ROUTES.map((quick) => (
-                <button
-                  key={quick}
-                  type="button"
-                  onClick={() => {
-                    setMode('auto')
-                    setQuickRoute(quick)
-                  }}
-                  className={cn(
-                    'rounded-lg border px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors',
-                    quickRoute === quick
-                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                      : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
-                  )}
-                >
-                  {quick}
-                </button>
-              ))}
-            </div>
+            {!embedded ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {QUICK_ROUTES.map((quick) => (
+                  <button
+                    key={quick}
+                    type="button"
+                    onClick={() => {
+                      setMode('auto')
+                      setPrompt((cur) =>
+                        cur
+                          ? cur
+                          : `Use the ${quick.toLowerCase()} specialist for this:`,
+                      )
+                    }}
+                    className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                  >
+                    {quick}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               {embedded ? (
                 <div className="flex flex-wrap items-center gap-3">
@@ -385,9 +371,7 @@ export function RouterChat({
               ) : (
                 <div className="text-[11px] text-[var(--theme-muted)]">
                   {`${prompt.trim().length} chars · ${mode === 'auto'
-                    ? quickRoute === 'Auto' || quickRoute === 'Best match'
-                      ? 'auto-route by role'
-                      : `prefer ${quickRoute.toLowerCase()}`
+                    ? 'auto-route by role'
                     : mode === 'manual'
                       ? `→ ${selectedId ?? 'no target'}`
                       : `broadcast to ${roomIds.length || members.length}`}`}
@@ -448,75 +432,75 @@ export function RouterChat({
           </div>
 
           {!embedded ? (
-            <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                Routing plan
-              </div>
-              {assignments.length === 0 ? (
-                <div className="text-[12px] text-[var(--theme-muted-2)]">
-                  {mode === 'auto'
-                    ? 'Hit Auto decompose to see proposed routing here.'
-                    : mode === 'manual'
-                      ? 'Single target dispatch.'
-                      : 'Broadcast — no per-target plan needed.'}
-                </div>
-              ) : (
-                <ol className="max-h-72 space-y-1.5 overflow-y-auto pr-1 text-[12px]">
-                  {assignments.map((a, idx) => (
-                    <li
-                      key={`${a.workerId}-${idx}`}
-                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5"
-                    >
-                      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                        <span>
-                          → {a.workerId} · {roleForMember(members, a.workerId)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAssignments((c) => c.filter((_, i) => i !== idx))
-                          }
-                          className="text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"
-                        >
-                          remove
-                        </button>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={a.task}
-                        onChange={(e) =>
-                          setAssignments((c) =>
-                            c.map((entry, i) =>
-                              i === idx
-                                ? { ...entry, task: e.target.value }
-                                : entry,
-                            ),
-                          )
-                        }
-                        className="mt-1 w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[11px] text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none"
-                      />
-                      {a.rationale ? (
-                        <div className="mt-1 text-[10px] italic text-[var(--theme-muted-2)]">
-                          {a.rationale}
-                        </div>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {unassigned.length > 0 ? (
-                <div className="rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[11px] text-[var(--theme-text)]">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                    Unrouted notes
-                  </div>
-                  <ul className="list-disc pl-4">
-                    {unassigned.map((u, i) => (
-                      <li key={i}>{u}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+          <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+              Routing plan
             </div>
+            {assignments.length === 0 ? (
+              <div className="text-[12px] text-[var(--theme-muted-2)]">
+                {mode === 'auto'
+                  ? 'Hit Auto decompose to see proposed routing here.'
+                  : mode === 'manual'
+                    ? 'Single target dispatch.'
+                    : 'Broadcast — no per-target plan needed.'}
+              </div>
+            ) : (
+              <ol className="max-h-72 space-y-1.5 overflow-y-auto pr-1 text-[12px]">
+                {assignments.map((a, idx) => (
+                  <li
+                    key={`${a.workerId}-${idx}`}
+                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5"
+                  >
+                    <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                      <span>
+                        → {a.workerId} · {roleForMember(members, a.workerId)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAssignments((c) => c.filter((_, i) => i !== idx))
+                        }
+                        className="text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"
+                      >
+                        remove
+                      </button>
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={a.task}
+                      onChange={(e) =>
+                        setAssignments((c) =>
+                          c.map((entry, i) =>
+                            i === idx
+                              ? { ...entry, task: e.target.value }
+                              : entry,
+                          ),
+                        )
+                      }
+                      className="mt-1 w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[11px] text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none"
+                    />
+                    {a.rationale ? (
+                      <div className="mt-1 text-[10px] italic text-[var(--theme-muted-2)]">
+                        {a.rationale}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {unassigned.length > 0 ? (
+              <div className="rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[11px] text-[var(--theme-text)]">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                  Unrouted notes
+                </div>
+                <ul className="list-disc pl-4">
+                  {unassigned.map((u, i) => (
+                    <li key={i}>{u}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
           ) : null}
         </div>
 
