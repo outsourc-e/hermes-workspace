@@ -34,12 +34,21 @@ type RemoteDefinition = {
   aliases: Array<string>
 }
 
+type ReleaseNoteSection = {
+  name: RemoteName
+  label: string
+  from: string | null
+  to: string | null
+  commits: Array<string>
+}
+
 type UpdateResult = {
   ok: boolean
   updated: Array<RemoteName>
   skipped: Array<{ name: RemoteName; reason: string }>
   restartRequired: boolean
   output: string
+  releaseNotes: Array<ReleaseNoteSection>
   error?: string
 }
 
@@ -200,6 +209,21 @@ async function readJsonBody(
   return request.json().catch(() => ({})) as Promise<Record<string, unknown>>
 }
 
+function readCommitMessages(
+  from: string | null,
+  to: string | null,
+): Array<string> {
+  if (!from || !to || from === to) return []
+  const raw = git(['log', '--pretty=format:%s (%h)', `${from}..${to}`], 10_000)
+  return (
+    raw
+      ?.split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 12) ?? []
+  )
+}
+
 function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']) || 'main'
   const startHead = git(['rev-parse', 'HEAD'])
@@ -213,6 +237,7 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
       skipped: [],
       restartRequired: false,
       output: '',
+      releaseNotes: [],
       error:
         'Working tree has local changes. Commit, stash, or discard them before updating.',
     }
@@ -221,6 +246,7 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
   const updated: Array<RemoteName> = []
   const skipped: UpdateResult['skipped'] = []
   const output: Array<string> = []
+  const releaseNotes: Array<ReleaseNoteSection> = []
 
   for (const definition of selectedDefinitions(target)) {
     const status = remoteStatus(definition, currentHead)
@@ -240,13 +266,22 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
     }
 
     const ref = definition.name === 'origin' ? branch : 'HEAD'
+    const beforeMergeHead = git(['rev-parse', 'HEAD'])
     output.push(`Fetching ${definition.name}...`)
     output.push(gitOrThrow(['fetch', definition.name], 60_000))
     output.push(`Fast-forwarding from ${definition.name}/${ref}...`)
     output.push(
       gitOrThrow(['merge', '--ff-only', `${definition.name}/${ref}`], 60_000),
     )
+    const afterMergeHead = git(['rev-parse', 'HEAD'])
     updated.push(definition.name)
+    releaseNotes.push({
+      name: definition.name,
+      label: definition.label,
+      from: beforeMergeHead,
+      to: afterMergeHead,
+      commits: readCommitMessages(beforeMergeHead, afterMergeHead),
+    })
   }
 
   if (updated.length > 0) {
@@ -289,6 +324,7 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
     skipped,
     restartRequired: updated.length > 0,
     output: output.filter(Boolean).join('\n'),
+    releaseNotes,
   }
 }
 
