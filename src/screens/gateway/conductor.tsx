@@ -1,15 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  PlayIcon,
-  Rocket01Icon,
-  Search01Icon,
-  Settings01Icon,
-  TaskDone01Icon,
-} from '@hugeicons/core-free-icons'
+import { ArrowDown01Icon, ArrowRight01Icon, PlayIcon, Rocket01Icon, Search01Icon, Settings01Icon, TaskDone01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { OfficeView } from './components/office-view'
@@ -106,6 +98,27 @@ const QUICK_ACTIONS: Array<{
 const AGENT_NAMES = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift', 'Flux', 'Volt']
 const AGENT_EMOJIS = ['🤖', '⚡', '🔥', '🌊', '🌿', '💫', '🔮', '⭐']
 const BLENDED_COST_PER_MILLION_TOKENS = 5
+const CONDUCTOR_GOAL_DRAFT_STORAGE_KEY = 'conductor:goal-draft'
+
+function loadConductorGoalDraft(): string {
+  try {
+    return globalThis.localStorage?.getItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function persistConductorGoalDraft(value: string): void {
+  try {
+    if (value.trim()) {
+      globalThis.localStorage?.setItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY, value)
+    } else {
+      globalThis.localStorage?.removeItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY)
+    }
+  } catch {
+    // Ignore storage failures; the in-memory state still works.
+  }
+}
 
 function getAgentPersona(index: number) {
   return {
@@ -122,39 +135,19 @@ function formatUsd(value: number): string {
   return `$${value.toFixed(value >= 0.1 ? 2 : 3)}`
 }
 
-function MissionCostSection({
-  totalTokens,
-  workers,
-  expanded,
-  onToggle,
-}: {
-  totalTokens: number
-  workers: MissionCostWorker[]
-  expanded: boolean
-  onToggle: () => void
-}) {
+function MissionCostSection({ totalTokens, workers, expanded, onToggle }: { totalTokens: number; workers: MissionCostWorker[]; expanded: boolean; onToggle: () => void }) {
   const estimatedCost = estimateTokenCost(totalTokens)
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="flex w-full items-start justify-between gap-4 text-left"
-      >
+      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex w-full items-start justify-between gap-4 text-left">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Cost</p>
           <p className="mt-1 text-sm text-[var(--theme-muted-2)]">Approximate at $5 / 1M tokens blended from input/output pricing.</p>
         </div>
         <span className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-xs font-medium text-[var(--theme-text)]">
           {expanded ? 'Hide' : 'Show'}
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={16}
-            strokeWidth={1.7}
-            className={cn('transition-transform duration-200', expanded ? 'rotate-180' : 'rotate-0')}
-          />
+          <HugeiconsIcon icon={ArrowDown01Icon} size={16} strokeWidth={1.7} className={cn('transition-transform duration-200', expanded ? 'rotate-180' : 'rotate-0')} />
         </span>
       </button>
 
@@ -180,7 +173,9 @@ function MissionCostSection({
               <div className="divide-y divide-[var(--theme-border)]">
                 {workers.map((worker) => (
                   <div key={worker.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                    <span className="font-medium text-[var(--theme-text)]">{worker.personaEmoji} {worker.personaName}</span>
+                    <span className="font-medium text-[var(--theme-text)]">
+                      {worker.personaEmoji} {worker.personaName}
+                    </span>
                     <span className="min-w-0 flex-1 truncate text-[var(--theme-muted)]">{worker.label}</span>
                     <span className="text-xs text-[var(--theme-muted)]">{worker.totalTokens.toLocaleString()} tok</span>
                     <span className="min-w-[4.5rem] text-right font-medium text-[var(--theme-text)]">{formatUsd(estimateTokenCost(worker.totalTokens))}</span>
@@ -210,15 +205,7 @@ const WORKING_STEPS = [
   '🚀 Almost there…',
 ]
 
-function CyclingStatus({
-  steps,
-  intervalMs = 3000,
-  isPaused = false,
-}: {
-  steps: string[]
-  intervalMs?: number
-  isPaused?: boolean
-}) {
+function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { steps: string[]; intervalMs?: number; isPaused?: boolean }) {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
@@ -230,9 +217,7 @@ function CyclingStatus({
   if (isPaused) {
     return (
       <div className="flex items-center gap-3 py-3">
-        <div className="flex size-3.5 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/10 text-[9px] text-amber-300">
-          ||
-        </div>
+        <div className="flex size-3.5 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/10 text-[9px] text-amber-300">||</div>
         <p className="text-sm text-[var(--theme-muted)]">Paused</p>
       </div>
     )
@@ -354,27 +339,12 @@ function WorkerCard({
   const dot = getWorkerDot(worker.status)
   const persona = getAgentPersona(index)
   const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
-  const workerStartedAt =
-    typeof worker.raw.createdAt === 'string'
-      ? worker.raw.createdAt
-      : typeof worker.raw.startedAt === 'string'
-        ? worker.raw.startedAt
-        : conductor.missionStartedAt
+  const workerStartedAt = typeof worker.raw.createdAt === 'string' ? worker.raw.createdAt : typeof worker.raw.startedAt === 'string' ? worker.raw.startedAt : conductor.missionStartedAt
   const workerEndTime =
-    worker.status === 'complete' || worker.status === 'stale'
-      ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
-      : conductor.isPaused
-        ? conductor.pausedAtMs ?? now
-        : now
+    worker.status === 'complete' || worker.status === 'stale' ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime() : conductor.isPaused ? (conductor.pausedAtMs ?? now) : now
 
   return (
-    <div
-      key={worker.key}
-      className={cn(
-        'overflow-hidden rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3',
-        getWorkerBorderClass(worker.status),
-      )}
-    >
+    <div key={worker.key} className={cn('overflow-hidden rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3', getWorkerBorderClass(worker.status))}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -510,9 +480,7 @@ function groupModelsByProvider(models: AvailableModel[]) {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([provider, providerModels]) => ({
       provider,
-      models: [...providerModels].sort((a, b) =>
-        getModelDisplayName(a, a.id).localeCompare(getModelDisplayName(b, b.id)),
-      ),
+      models: [...providerModels].sort((a, b) => getModelDisplayName(a, a.id).localeCompare(getModelDisplayName(b, b.id))),
     }))
 }
 
@@ -595,9 +563,7 @@ function ModelSelectorDropdown({
           }}
           className={cn(
             'inline-flex min-h-[3rem] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-left text-sm text-[var(--theme-text)] shadow-[0_8px_24px_color-mix(in_srgb,var(--theme-shadow)_18%,transparent)] transition-colors',
-            disabled
-              ? 'cursor-not-allowed opacity-60'
-              : 'hover:border-[var(--theme-accent)] focus:border-[var(--theme-accent)]',
+            disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-[var(--theme-accent)] focus:border-[var(--theme-accent)]',
           )}
           aria-haspopup="listbox"
           aria-expanded={open}
@@ -605,21 +571,11 @@ function ModelSelectorDropdown({
         >
           <span className="inline-flex min-w-0 items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-text)]">
-              <span
-                className={cn(
-                  'size-2 rounded-full',
-                  value ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]',
-                )}
-              />
+              <span className={cn('size-2 rounded-full', value ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]')} />
               <span className="truncate">{getModelDisplayName(selectedModel, value)}</span>
             </span>
           </span>
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={16}
-            strokeWidth={1.8}
-            className={cn('shrink-0 text-[var(--theme-muted)] transition-transform', open && 'rotate-180')}
-          />
+          <HugeiconsIcon icon={ArrowDown01Icon} size={16} strokeWidth={1.8} className={cn('shrink-0 text-[var(--theme-muted)] transition-transform', open && 'rotate-180')} />
         </button>
 
         {open ? (
@@ -633,30 +589,19 @@ function ModelSelectorDropdown({
                 }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                  !value
-                    ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
-                    : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
+                  !value ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]' : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
                 )}
                 role="option"
                 aria-selected={!value}
               >
-                <span
-                  className={cn(
-                    'size-2 rounded-full',
-                    !value ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]',
-                  )}
-                />
+                <span className={cn('size-2 rounded-full', !value ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]')} />
                 <span className="min-w-0 flex-1 truncate">Default (auto)</span>
-                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
-                  Auto
-                </span>
+                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">Auto</span>
               </button>
 
               {groupedModels.map((group) => (
                 <div key={group.provider} className="mt-2 first:mt-3">
-                  <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
-                    {group.provider}
-                  </div>
+                  <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">{group.provider}</div>
                   <div className="space-y-1">
                     {group.models.map((model) => {
                       const modelId = model.id ?? ''
@@ -671,19 +616,12 @@ function ModelSelectorDropdown({
                           }}
                           className={cn(
                             'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                            active
-                              ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
-                              : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
+                            active ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]' : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
                           )}
                           role="option"
                           aria-selected={active}
                         >
-                          <span
-                            className={cn(
-                              'size-2 rounded-full',
-                              active ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]',
-                            )}
-                          />
+                          <span className={cn('size-2 rounded-full', active ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]')} />
                           <span className="min-w-0 flex-1 truncate">{getModelDisplayName(model, modelId)}</span>
                           <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
                             {group.provider}
@@ -773,7 +711,7 @@ function deriveSessionStatus(session: GatewaySession): 'running' | 'completed' |
 
 export function Conductor() {
   const conductor = useConductorGateway()
-  const [goalDraft, setGoalDraft] = useState('')
+  const [goalDraft, setGoalDraft] = useState(() => loadConductorGoalDraft())
   const [missionModalOpen, setMissionModalOpen] = useState(false)
   const [continueDraft, setContinueDraft] = useState('')
   const [continueModalOpen, setContinueModalOpen] = useState(false)
@@ -794,7 +732,10 @@ export function Conductor() {
     queryKey: ['conductor', 'models'],
     queryFn: async () => {
       const res = await fetch('/api/models')
-      const data = (await res.json()) as { ok?: boolean; models?: Array<{ id?: string; provider?: string; name?: string }> }
+      const data = (await res.json()) as {
+        ok?: boolean
+        models?: Array<{ id?: string; provider?: string; name?: string }>
+      }
       return data.models ?? []
     },
     enabled: settingsOpen,
@@ -825,9 +766,7 @@ export function Conductor() {
 
         if (cancelled) return
         setDirectoryBrowserPath(typeof data.root === 'string' && data.root.trim() ? data.root : directoryBrowserPath)
-        setDirectoryBrowserEntries(
-          Array.isArray(data.entries) ? data.entries.filter((entry) => entry?.type === 'folder') : [],
-        )
+        setDirectoryBrowserEntries(Array.isArray(data.entries) ? data.entries.filter((entry) => entry?.type === 'folder') : [])
       } catch (error) {
         if (cancelled) return
         setDirectoryBrowserEntries([])
@@ -853,16 +792,21 @@ export function Conductor() {
   }, [conductor.isPaused, conductor.phase])
 
   useEffect(() => {
+    persistConductorGoalDraft(goalDraft)
+  }, [goalDraft])
+
+  useEffect(() => {
     if (!conductor.isPaused) return
     setNow(conductor.pausedAtMs ?? Date.now())
   }, [conductor.isPaused, conductor.pausedAtMs])
-
 
   // Set body background to match Conductor theme so no gray shows behind keyboard/tab bar
   useEffect(() => {
     const prev = document.body.style.backgroundColor
     document.body.style.backgroundColor = 'var(--color-surface)'
-    return () => { document.body.style.backgroundColor = prev }
+    return () => {
+      document.body.style.backgroundColor = prev
+    }
   }, [])
 
   const phase: ConductorPhase = useMemo(() => {
@@ -875,6 +819,7 @@ export function Conductor() {
   const handleNewMission = () => {
     conductor.resetMission()
     setGoalDraft('')
+    persistConductorGoalDraft('')
     setMissionModalOpen(false)
     setContinueDraft('')
     setContinueModalOpen(false)
@@ -887,6 +832,8 @@ export function Conductor() {
     setMissionModalOpen(false)
     setContinueDraft('')
     await conductor.sendMission(trimmed)
+    persistConductorGoalDraft('')
+    setGoalDraft('')
   }
 
   const handleQuickActionSelect = (action: (typeof QUICK_ACTIONS)[number]) => {
@@ -906,9 +853,7 @@ export function Conductor() {
     const continuationSummarySource =
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
-      conductor.workers
-        .map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))
-        .find((output) => output.trim()) ??
+      conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).find((output) => output.trim()) ??
       conductor.streamText
 
     const combinedPrompt = [
@@ -999,9 +944,7 @@ export function Conductor() {
       const s = session as GatewaySession
       const updatedAt = typeof s.updatedAt === 'string' ? new Date(s.updatedAt).getTime() : typeof s.updatedAt === 'number' ? s.updatedAt : 0
       const statusText = `${s.status ?? ''} ${s.kind ?? ''}`.toLowerCase()
-      const status = /error|failed/.test(statusText) ? 'error' as const
-        : /pause/.test(statusText) ? 'paused' as const
-        : Date.now() - updatedAt < 120_000 ? 'active' as const : 'idle' as const
+      const status = /error|failed/.test(statusText) ? ('error' as const) : /pause/.test(statusText) ? ('paused' as const) : Date.now() - updatedAt < 120_000 ? ('active' as const) : ('idle' as const)
       return {
         id: s.key ?? `session-${i}`,
         name: OFFICE_NAMES[i % OFFICE_NAMES.length],
@@ -1055,10 +998,9 @@ export function Conductor() {
   }, [conductor.conductorSettings.workerModel, conductor.goal, conductor.isPaused, conductor.tasks, conductor.workerOutputs, conductor.workers])
 
   const completePhaseProjectPath = useMemo(() => {
-    const workerOutputTexts = [
-      ...Object.values(conductor.workerOutputs),
-      ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
-    ].filter(Boolean)
+    const workerOutputTexts = [...Object.values(conductor.workerOutputs), ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))].filter(
+      Boolean,
+    )
 
     for (const text of workerOutputTexts) {
       const extractedPath = extractProjectPath(text)
@@ -1077,14 +1019,9 @@ export function Conductor() {
     const candidates = buildProjectPathCandidates(conductor.workers, conductor.missionStartedAt)
     return candidates[0] ?? null
   }, [conductor.tasks, conductor.streamText, conductor.workerOutputs, conductor.workers, conductor.missionStartedAt])
-  const completePhaseOutputLabel = useMemo(
-    () => getOutputDisplayName(completePhaseProjectPath),
-    [completePhaseProjectPath],
-  )
+  const completePhaseOutputLabel = useMemo(() => getOutputDisplayName(completePhaseProjectPath), [completePhaseProjectPath])
 
-  const previewUrl = completePhaseProjectPath
-    ? `/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`
-    : null
+  const previewUrl = completePhaseProjectPath ? `/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}` : null
 
   const selectedHistoryOutputPath = useMemo(() => {
     const entry = conductor.selectedHistoryEntry
@@ -1099,13 +1036,8 @@ export function Conductor() {
     )
     return candidates[0] ?? null
   }, [conductor.selectedHistoryEntry])
-  const selectedHistoryOutputLabel = useMemo(
-    () => getOutputDisplayName(selectedHistoryOutputPath),
-    [selectedHistoryOutputPath],
-  )
-  const selectedHistoryPreviewUrl = selectedHistoryOutputPath
-    ? `/api/preview-file?path=${encodeURIComponent(`${selectedHistoryOutputPath}/index.html`)}`
-    : null
+  const selectedHistoryOutputLabel = useMemo(() => getOutputDisplayName(selectedHistoryOutputPath), [selectedHistoryOutputPath])
+  const selectedHistoryPreviewUrl = selectedHistoryOutputPath ? `/api/preview-file?path=${encodeURIComponent(`${selectedHistoryOutputPath}/index.html`)}` : null
 
   // Skip preview probe for history entries — /tmp files are ephemeral and won't exist later.
   // Only probe if the mission just completed (still in complete phase with matching output path).
@@ -1148,9 +1080,7 @@ export function Conductor() {
     const summarySource =
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
-      conductor.workers
-        .map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))
-        .find((output) => output.trim()) ??
+      conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).find((output) => output.trim()) ??
       conductor.streamText
     return truncateContinuationText(summarySource ?? '')
   }, [completeSummary, conductor.streamText, conductor.workerOutputs, conductor.workers])
@@ -1165,9 +1095,7 @@ export function Conductor() {
   const filteredSessions = (() => {
     const sessions = conductor.recentSessions
     if (activityFilter === 'all') return sessions
-    return sessions
-      .filter((session) => ((session.label as string) ?? '').startsWith('worker-'))
-      .filter((session) => deriveSessionStatus(session as GatewaySession) === activityFilter)
+    return sessions.filter((session) => ((session.label as string) ?? '').startsWith('worker-')).filter((session) => deriveSessionStatus(session as GatewaySession) === activityFilter)
   })()
   const activityItems: Array<MissionHistoryEntry | GatewaySession> = hasMissionHistory ? filteredHistory : filteredSessions
   const ACTIVITY_PAGE_SIZE = 3
@@ -1199,9 +1127,7 @@ export function Conductor() {
       const showHistoryOutputFallback = !!historyOutputText && (!selectedHistoryOutputPath || selectedHistoryPreview.unavailable)
       const historyStatusLabel = selectedHistoryEntry.status === 'completed' ? 'Complete' : 'Stopped'
       const historyStatusClasses =
-        selectedHistoryEntry.status === 'completed'
-          ? 'border border-emerald-400/35 bg-emerald-500/10 text-emerald-300'
-          : 'border border-red-400/35 bg-red-500/10 text-red-300'
+        selectedHistoryEntry.status === 'completed' ? 'border border-emerald-400/35 bg-emerald-500/10 text-emerald-300' : 'border border-red-400/35 bg-red-500/10 text-red-300'
 
       return (
         <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
@@ -1223,7 +1149,8 @@ export function Conductor() {
                     </p>
                     <h1 className="mt-2 text-xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-2xl">{selectedHistoryEntry.goal}</h1>
                     <p className="mt-2 text-xs text-[var(--theme-muted-2)]">
-                      {selectedHistoryEntry.workerCount}/{Math.max(selectedHistoryEntry.workerCount, 1)} workers finished · {formatDurationRange(selectedHistoryEntry.startedAt, selectedHistoryEntry.completedAt, now)} total elapsed
+                      {selectedHistoryEntry.workerCount}/{Math.max(selectedHistoryEntry.workerCount, 1)} workers finished ·{' '}
+                      {formatDurationRange(selectedHistoryEntry.startedAt, selectedHistoryEntry.completedAt, now)} total elapsed
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -1258,12 +1185,7 @@ export function Conductor() {
                     </a>
                   </div>
                   <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
-                    <iframe
-                      src={selectedHistoryPreviewUrl!}
-                      className="h-[clamp(280px,55vh,520px)] w-full"
-                      sandbox="allow-scripts allow-same-origin"
-                      title="Mission history output preview"
-                    />
+                    <iframe src={selectedHistoryPreviewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Mission history output preview" />
                   </div>
                 </section>
               ) : selectedHistoryOutputPath && selectedHistoryPreview.loading ? (
@@ -1274,7 +1196,9 @@ export function Conductor() {
                   </div>
                 </section>
               ) : selectedHistoryOutputPath && selectedHistoryPreview.unavailable ? (
-                showHistoryOutputFallback ? null : <p className="px-1 text-sm text-[var(--theme-muted)]">No preview available.</p>
+                showHistoryOutputFallback ? null : (
+                  <p className="px-1 text-sm text-[var(--theme-muted)]">No preview available.</p>
+                )
               ) : null}
 
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -1282,9 +1206,7 @@ export function Conductor() {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
                   </div>
-                  <span className={cn('rounded-full px-3 py-1 text-xs font-medium', historyStatusClasses)}>
-                    {historyStatusLabel}
-                  </span>
+                  <span className={cn('rounded-full px-3 py-1 text-xs font-medium', historyStatusClasses)}>{historyStatusLabel}</span>
                 </div>
                 <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                   {historySummary ? (
@@ -1298,9 +1220,13 @@ export function Conductor() {
                     {historyWorkerDetails.map((worker: MissionHistoryWorkerDetail, index) => (
                       <div key={`${selectedHistoryEntry.id}-worker-${index}`} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
                         <span className={cn('size-2 rounded-full', selectedHistoryEntry.status === 'completed' ? 'bg-emerald-400' : 'bg-red-400')} />
-                        <span className="font-medium text-[var(--theme-text)]">{worker.personaEmoji} {worker.personaName}</span>
+                        <span className="font-medium text-[var(--theme-text)]">
+                          {worker.personaEmoji} {worker.personaName}
+                        </span>
                         <span className="text-[var(--theme-muted)]">{worker.label}</span>
-                        <span className="ml-auto text-xs text-[var(--theme-muted)]">{getShortModelName(worker.model)} · {worker.totalTokens.toLocaleString()} tok</span>
+                        <span className="ml-auto text-xs text-[var(--theme-muted)]">
+                          {getShortModelName(worker.model)} · {worker.totalTokens.toLocaleString()} tok
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1331,7 +1257,8 @@ export function Conductor() {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output</p>
                       <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                        Preview unavailable{selectedHistoryOutputPath ? ` for ${selectedHistoryOutputLabel}` : ''}.
+                        Preview unavailable
+                        {selectedHistoryOutputPath ? ` for ${selectedHistoryOutputLabel}` : ''}.
                       </p>
                     </div>
                   </div>
@@ -1407,13 +1334,15 @@ export function Conductor() {
               />
             </section>
 
-            {(hasMissionHistory || conductor.recentSessions.length > 0) ? (
+            {hasMissionHistory || conductor.recentSessions.length > 0 ? (
               <section className="mt-6 w-full space-y-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Recent Missions</h2>
                   {activityTotalPages > 1 && (
                     <div className="ml-auto flex items-center gap-1.5">
-                      <span className="text-[10px] text-[var(--theme-muted-2)]">{safeActivityPage + 1}/{activityTotalPages}</span>
+                      <span className="text-[10px] text-[var(--theme-muted-2)]">
+                        {safeActivityPage + 1}/{activityTotalPages}
+                      </span>
                       <button
                         type="button"
                         disabled={safeActivityPage === 0}
@@ -1469,9 +1398,7 @@ export function Conductor() {
                               <span
                                 className={cn(
                                   'w-[76px] shrink-0 rounded-full border px-2 py-0.5 text-center text-[10px] font-medium uppercase tracking-[0.12em]',
-                                  entry.status === 'completed'
-                                    ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300'
-                                    : 'border-red-400/35 bg-red-500/10 text-red-300',
+                                  entry.status === 'completed' ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300' : 'border-red-400/35 bg-red-500/10 text-red-300',
                                 )}
                               >
                                 {entry.status === 'completed' ? 'Complete' : 'Failed'}
@@ -1496,18 +1423,10 @@ export function Conductor() {
                                   ? recentSession.createdAt
                                   : null
                           const sessionStatus = deriveSessionStatus(recentSession)
-                          const dotClass =
-                            sessionStatus === 'completed'
-                              ? 'bg-emerald-400'
-                              : sessionStatus === 'failed'
-                                ? 'bg-red-400'
-                                : 'bg-sky-400 animate-pulse'
+                          const dotClass = sessionStatus === 'completed' ? 'bg-emerald-400' : sessionStatus === 'failed' ? 'bg-red-400' : 'bg-sky-400 animate-pulse'
 
                           return (
-                            <div
-                              key={recentSession.key}
-                              className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm"
-                            >
+                            <div key={recentSession.key} className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm">
                               <span className="min-w-0 flex-1 truncate font-medium capitalize text-[var(--theme-text)]">{displayName}</span>
                               <span
                                 className={cn(
@@ -1531,7 +1450,8 @@ export function Conductor() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-[var(--theme-border)] px-4 py-6 text-center text-sm text-[var(--theme-muted)]">
-                    No {activityFilter === 'all' ? '' : `${activityFilter} `}{hasMissionHistory ? 'missions' : 'sessions'} found
+                    No {activityFilter === 'all' ? '' : `${activityFilter} `}
+                    {hasMissionHistory ? 'missions' : 'sessions'} found
                   </div>
                 )}
               </section>
@@ -1605,11 +1525,7 @@ export function Conductor() {
                   />
 
                   <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!goalDraft.trim() || conductor.isSending}
-                      className="rounded-full bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]"
-                    >
+                    <Button type="submit" disabled={!goalDraft.trim() || conductor.isSending} className="rounded-full bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]">
                       {conductor.isSending ? 'Launching...' : 'Launch Mission'}
                       <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
                     </Button>
@@ -1736,10 +1652,7 @@ export function Conductor() {
           )}
 
           {directoryBrowserOpen ? (
-            <div
-              className="fixed inset-0 z-[70] flex items-center justify-center bg-[color-mix(in_srgb,var(--theme-bg)_55%,transparent)] px-4 py-6 backdrop-blur-md"
-              onClick={closeDirectoryBrowser}
-            >
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[color-mix(in_srgb,var(--theme-bg)_55%,transparent)] px-4 py-6 backdrop-blur-md" onClick={closeDirectoryBrowser}>
               <div
                 className="w-full max-w-2xl rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-5 shadow-[0_24px_80px_var(--theme-shadow)] sm:p-6"
                 onClick={(event) => event.stopPropagation()}
@@ -1785,9 +1698,7 @@ export function Conductor() {
                               onClick={() => setDirectoryBrowserPath(crumb.path)}
                               className={cn(
                                 'rounded-md px-1.5 py-0.5 transition-colors',
-                                crumb.path === directoryBrowserPath
-                                  ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                                  : 'text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
+                                crumb.path === directoryBrowserPath ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]' : 'text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
                               )}
                             >
                               {crumb.label}
@@ -1806,9 +1717,7 @@ export function Conductor() {
                   </div>
 
                   {directoryBrowserError ? (
-                    <div className="rounded-2xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-4 py-3 text-sm text-[var(--theme-warning)]">
-                      {directoryBrowserError}
-                    </div>
+                    <div className="rounded-2xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-4 py-3 text-sm text-[var(--theme-warning)]">{directoryBrowserError}</div>
                   ) : null}
 
                   <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)]">
@@ -1842,9 +1751,7 @@ export function Conductor() {
                           ))}
                         </div>
                       ) : (
-                        <div className="px-4 py-10 text-center text-sm text-[var(--theme-muted)]">
-                          No folders found in this location.
-                        </div>
+                        <div className="px-4 py-10 text-center text-sm text-[var(--theme-muted)]">No folders found in this location.</div>
                       )}
                     </div>
                   </div>
@@ -1901,9 +1808,7 @@ export function Conductor() {
             <div className="space-y-2 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Decomposition</p>
               <h1 className="text-2xl font-semibold tracking-tight">{conductor.goal}</h1>
-              <p className="text-sm text-[var(--theme-muted-2)]">
-                The agent is breaking the mission into workers. Once they spawn, this view flips into the active board.
-              </p>
+              <p className="text-sm text-[var(--theme-muted-2)]">The agent is breaking the mission into workers. Once they spawn, this view flips into the active board.</p>
             </div>
 
             <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -1912,27 +1817,19 @@ export function Conductor() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Planning</p>
                   <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Analyzing your request and preparing agents</p>
                 </div>
-                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300 animate-pulse">
-                  Working
-                </span>
+                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300 animate-pulse">Working</span>
               </div>
               <div className="mt-4 min-h-[200px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                 {conductor.planText ? (
                   <div className="space-y-4">
-                    <Markdown className="max-h-[500px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">
-                      {conductor.planText.replace(/(.{20,}?)\1+/g, '$1')}
-                    </Markdown>
+                    <Markdown className="max-h-[500px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{conductor.planText.replace(/(.{20,}?)\1+/g, '$1')}</Markdown>
                     <PlanningIndicator />
                   </div>
                 ) : (
                   <PlanningIndicator />
                 )}
               </div>
-              {conductor.streamError && (
-                <div className="mt-4 rounded-2xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-600">
-                  {conductor.streamError}
-                </div>
-              )}
+              {conductor.streamError && <div className="mt-4 rounded-2xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-600">{conductor.streamError}</div>}
               {conductor.timeoutWarning && (
                 <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-5 py-3">
                   <p className="text-sm text-amber-700">⚠️ Planning is taking longer than expected...</p>
@@ -1947,14 +1844,9 @@ export function Conductor() {
               )}
               {conductor.tasks.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
-                    Identified Tasks ({conductor.tasks.length})
-                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Identified Tasks ({conductor.tasks.length})</p>
                   {conductor.tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-sm"
-                    >
+                    <div key={task.id} className="flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-sm">
                       <span className="size-2 rounded-full bg-zinc-500" />
                       <span className="text-[var(--theme-text)]">{task.title}</span>
                     </div>
@@ -1997,11 +1889,7 @@ export function Conductor() {
                     >
                       Retry Mission
                     </Button>
-                    <Button
-                      type="button"
-                      onClick={handleNewMission}
-                      className="rounded-xl bg-[var(--theme-accent)] px-4 text-white hover:bg-[var(--theme-accent-strong)]"
-                    >
+                    <Button type="button" onClick={handleNewMission} className="rounded-xl bg-[var(--theme-accent)] px-4 text-white hover:bg-[var(--theme-accent-strong)]">
                       New Mission
                     </Button>
                   </div>
@@ -2016,7 +1904,8 @@ export function Conductor() {
                   </p>
                   <h1 className="mt-2 text-xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-2xl">{conductor.goal}</h1>
                   <p className="mt-2 text-xs text-[var(--theme-muted-2)]">
-                    {completedWorkers}/{Math.max(totalWorkers, completedWorkers)} workers finished · {formatElapsedTime(conductor.missionStartedAt, conductor.completedAt ? new Date(conductor.completedAt).getTime() : now)} total elapsed
+                    {completedWorkers}/{Math.max(totalWorkers, completedWorkers)} workers finished ·{' '}
+                    {formatElapsedTime(conductor.missionStartedAt, conductor.completedAt ? new Date(conductor.completedAt).getTime() : now)} total elapsed
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -2029,11 +1918,7 @@ export function Conductor() {
                       Continue
                     </Button>
                   ) : null}
-                  <Button
-                    type="button"
-                    onClick={handleNewMission}
-                    className="rounded-xl bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]"
-                  >
+                  <Button type="button" onClick={handleNewMission} className="rounded-xl bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]">
                     New Mission
                   </Button>
                 </div>
@@ -2045,9 +1930,7 @@ export function Conductor() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
-                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                      {completePhaseProjectPath.split('/').pop() || 'index.html'}
-                    </p>
+                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{completePhaseProjectPath.split('/').pop() || 'index.html'}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <a
@@ -2068,12 +1951,7 @@ export function Conductor() {
                   </div>
                 </div>
                 <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
-                  <iframe
-                    src={previewUrl!}
-                    className="h-[clamp(280px,55vh,520px)] w-full"
-                    sandbox="allow-scripts allow-same-origin"
-                    title="Mission output preview"
-                  />
+                  <iframe src={previewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Mission output preview" />
                 </div>
               </section>
             ) : completePhaseProjectPath && previewState.loading && !conductor.streamError ? (
@@ -2086,38 +1964,41 @@ export function Conductor() {
             ) : null}
 
             {/* Worker output fallback — show when no iframe preview is available */}
-            {(!completePhaseProjectPath || previewState.unavailable) && (() => {
-              const outputSections = conductor.workers
-                .map((worker, index) => {
-                  const output = (conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).trim()
-                  if (!output) return null
-                  const persona = getAgentPersona(index)
-                  return { key: worker.key, persona, label: worker.label, output }
-                })
-                .filter((section): section is NonNullable<typeof section> => section !== null)
+            {(!completePhaseProjectPath || previewState.unavailable) &&
+              (() => {
+                const outputSections = conductor.workers
+                  .map((worker, index) => {
+                    const output = (conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).trim()
+                    if (!output) return null
+                    const persona = getAgentPersona(index)
+                    return {
+                      key: worker.key,
+                      persona,
+                      label: worker.label,
+                      output,
+                    }
+                  })
+                  .filter((section): section is NonNullable<typeof section> => section !== null)
 
-              const fallbackText = outputSections.length > 0
-                ? outputSections.map((s) => `### ${s.persona.emoji} ${s.persona.name} · ${s.label}\n\n${s.output}`).join('\n\n---\n\n')
-                : conductor.streamText.trim()
+                const fallbackText =
+                  outputSections.length > 0 ? outputSections.map((s) => `### ${s.persona.emoji} ${s.persona.name} · ${s.label}\n\n${s.output}`).join('\n\n---\n\n') : conductor.streamText.trim()
 
-              if (!fallbackText) return null
+                if (!fallbackText) return null
 
-              return (
-                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output</p>
-                      <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                        {completePhaseProjectPath ? `Preview unavailable for ${completePhaseOutputLabel}` : 'Agent work output'}
-                      </p>
+                return (
+                  <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output</p>
+                        <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{completePhaseProjectPath ? `Preview unavailable for ${completePhaseOutputLabel}` : 'Agent work output'}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
-                    <Markdown className="max-h-[600px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{fallbackText}</Markdown>
-                  </div>
-                </section>
-              )
-            })()}
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+                      <Markdown className="max-h-[600px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{fallbackText}</Markdown>
+                    </div>
+                  </section>
+                )
+              })()}
 
             {conductor.tasks.length > 1 && completedTaskOutputs.length > 0 && (
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -2129,10 +2010,7 @@ export function Conductor() {
                 </div>
                 <div className="mt-4 space-y-3">
                   {completedTaskOutputs.map((task) => (
-                    <div
-                      key={task.id}
-                      className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4"
-                    >
+                    <div key={task.id} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -2166,12 +2044,12 @@ export function Conductor() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
                 </div>
-                <span className={cn(
-                  'rounded-full px-3 py-1 text-xs font-medium',
-                  conductor.streamError
-                    ? 'border border-red-400/35 bg-red-500/10 text-red-300'
-                    : 'border border-emerald-400/35 bg-emerald-500/10 text-emerald-300',
-                )}>
+                <span
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-medium',
+                    conductor.streamError ? 'border border-red-400/35 bg-red-500/10 text-red-300' : 'border border-emerald-400/35 bg-emerald-500/10 text-emerald-300',
+                  )}
+                >
                   {conductor.streamError ? 'Stopped' : 'Complete'}
                 </span>
               </div>
@@ -2192,9 +2070,13 @@ export function Conductor() {
                     return (
                       <div key={worker.key} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
                         <span className="size-2 rounded-full bg-emerald-400" />
-                        <span className="font-medium text-[var(--theme-text)]">{persona.emoji} {persona.name}</span>
+                        <span className="font-medium text-[var(--theme-text)]">
+                          {persona.emoji} {persona.name}
+                        </span>
                         <span className="text-[var(--theme-muted)]">{worker.label}</span>
-                        <span className="ml-auto text-xs text-[var(--theme-muted)]">{shortModelName} · {worker.totalTokens.toLocaleString()} tok</span>
+                        <span className="ml-auto text-xs text-[var(--theme-muted)]">
+                          {shortModelName} · {worker.totalTokens.toLocaleString()} tok
+                        </span>
                       </div>
                     )
                   })}
@@ -2202,12 +2084,7 @@ export function Conductor() {
               )}
               {(totalTokens > 0 || completeMissionCostWorkers.length > 0) && (
                 <div className="mt-4">
-                  <MissionCostSection
-                    totalTokens={totalTokens}
-                    workers={completeMissionCostWorkers}
-                    expanded={completeCostExpanded}
-                    onToggle={() => setCompleteCostExpanded((current) => !current)}
-                  />
+                  <MissionCostSection totalTokens={totalTokens} workers={completeMissionCostWorkers} expanded={completeCostExpanded} onToggle={() => setCompleteCostExpanded((current) => !current)} />
                 </div>
               )}
               {conductor.streamText && completeSummary && (
@@ -2219,7 +2096,6 @@ export function Conductor() {
                 </details>
               )}
             </section>
-
           </div>
 
           {continueModalOpen ? (
@@ -2307,7 +2183,9 @@ export function Conductor() {
               <div className="mt-2 flex items-center justify-center gap-2 text-xs text-[var(--theme-muted)]">
                 <span>{formatElapsedMilliseconds(conductor.isPaused ? conductor.pausedElapsedMs : conductor.missionElapsedMs)}</span>
                 <span className="text-[var(--theme-border)]">·</span>
-                <span>{completedWorkers}/{Math.max(totalWorkers, 1)} complete</span>
+                <span>
+                  {completedWorkers}/{Math.max(totalWorkers, 1)} complete
+                </span>
                 <span className="text-[var(--theme-border)]">·</span>
                 <span>{activeWorkerCount} active</span>
               </div>
@@ -2381,15 +2259,7 @@ export function Conductor() {
             </section>
           )}
           <section className="h-[360px] overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
-            <OfficeView
-              agentRows={officeAgentRows}
-              missionRunning
-              onViewOutput={() => {}}
-              processType="parallel"
-              companyName="Conductor Office"
-              containerHeight={360}
-              hideHeader
-            />
+            <OfficeView agentRows={officeAgentRows} missionRunning onViewOutput={() => {}} processType="parallel" companyName="Conductor Office" containerHeight={360} hideHeader />
           </section>
 
           {conductor.tasks.length > 0 ? (
@@ -2400,14 +2270,7 @@ export function Conductor() {
                 </h2>
                 {conductor.tasks.map((task) => {
                   const isSelected = selectedTaskId === task.id
-                  const statusDot =
-                    task.status === 'complete'
-                      ? 'bg-emerald-400'
-                      : task.status === 'running'
-                        ? 'bg-sky-400 animate-pulse'
-                        : task.status === 'failed'
-                          ? 'bg-red-400'
-                          : 'bg-zinc-500'
+                  const statusDot = task.status === 'complete' ? 'bg-emerald-400' : task.status === 'running' ? 'bg-sky-400 animate-pulse' : task.status === 'failed' ? 'bg-red-400' : 'bg-zinc-500'
                   return (
                     <button
                       key={task.id}
@@ -2415,9 +2278,7 @@ export function Conductor() {
                       onClick={() => setSelectedTaskId(isSelected ? null : task.id)}
                       className={cn(
                         'w-full rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
-                        isSelected
-                          ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)]'
-                          : 'border-[var(--theme-border)] bg-[var(--theme-card)] hover:border-[var(--theme-accent)]',
+                        isSelected ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)]' : 'border-[var(--theme-border)] bg-[var(--theme-card)] hover:border-[var(--theme-accent)]',
                       )}
                     >
                       <div className="flex items-center gap-2">
@@ -2437,27 +2298,20 @@ export function Conductor() {
                 ) : null}
                 {(() => {
                   const selectedTask = selectedTaskId ? conductor.tasks.find((task) => task.id === selectedTaskId) : null
-                  const displayWorkers = selectedTask?.workerKey
-                    ? conductor.workers.filter((worker) => worker.key === selectedTask.workerKey)
-                    : conductor.workers
+                  const displayWorkers = selectedTask?.workerKey ? conductor.workers.filter((worker) => worker.key === selectedTask.workerKey) : conductor.workers
                   return (
                     <div className="grid gap-3 md:grid-cols-2">
                       {displayWorkers.map((worker, index) => {
-                        return (
-                          <WorkerCard
-                            key={worker.key}
-                            worker={worker}
-                            index={index}
-                            conductor={conductor}
-                            now={now}
-                          />
-                        )
+                        return <WorkerCard key={worker.key} worker={worker} index={index} conductor={conductor} now={now} />
                       })}
                       {displayWorkers.length === 0 && (
                         <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)] md:col-span-2">
-                          <div className="flex items-center justify-center gap-3">
-                            <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
-                            <span>Spawning workers…</span>
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="flex items-center justify-center gap-3">
+                              <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+                              <span>Spawning workers...</span>
+                            </div>
+                            {conductor.planText ? <p className="max-w-xl text-xs text-[var(--theme-muted-2)]">{conductor.planText}</p> : null}
                           </div>
                         </div>
                       )}
@@ -2470,28 +2324,22 @@ export function Conductor() {
             <div className="space-y-3">
               <div className="grid gap-3 md:grid-cols-2">
                 {conductor.workers.map((worker, index) => {
-                  return (
-                    <WorkerCard
-                      key={worker.key}
-                      worker={worker}
-                      index={index}
-                      conductor={conductor}
-                      now={now}
-                    />
-                  )
+                  return <WorkerCard key={worker.key} worker={worker} index={index} conductor={conductor} now={now} />
                 })}
                 {conductor.workers.length === 0 && (
                   <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)] md:col-span-2">
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
-                      <span>Spawning workers…</span>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+                        <span>Spawning workers...</span>
+                      </div>
+                      {conductor.planText ? <p className="max-w-xl text-xs text-[var(--theme-muted-2)]">{conductor.planText}</p> : null}
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-
         </div>
       </main>
     </div>

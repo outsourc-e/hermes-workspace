@@ -70,7 +70,7 @@ Working directory: {cwd}
 - Do NOT start servers or long-running processes
 - Do NOT modify files outside your working directory
 - Verify your own work before finishing — run the exit criteria commands yourself
-- Commit when done
+- Commit only if the mission explicitly allows commits; otherwise leave changes uncommitted and report them
 ```
 
 On retry, append:

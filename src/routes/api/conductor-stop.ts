@@ -2,7 +2,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-import { deleteSession, ensureGatewayProbed } from '../../server/claude-api'
+import { deleteSession } from '../../server/claude-api'
+import {
+  dashboardFetch,
+  ensureGatewayProbed,
+} from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/conductor-stop')({
   server: {
@@ -15,7 +19,6 @@ export const Route = createFileRoute('/api/conductor-stop')({
         if (csrfCheck) return csrfCheck
 
         try {
-          await ensureGatewayProbed()
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
           const sessionKeys = Array.isArray(body.sessionKeys)
             ? body.sessionKeys.filter(
@@ -23,8 +26,30 @@ export const Route = createFileRoute('/api/conductor-stop')({
                   typeof value === 'string' && value.trim().length > 0,
               )
             : []
+          const missionIds = Array.isArray(body.missionIds)
+            ? body.missionIds.filter(
+                (value): value is string =>
+                  typeof value === 'string' && value.trim().length > 0,
+              )
+            : []
 
           let deleted = 0
+          let stoppedMissions = 0
+          const capabilities = await ensureGatewayProbed()
+          if (capabilities.dashboard.available) {
+            for (const missionId of missionIds) {
+              try {
+                const res = await dashboardFetch(
+                  `/api/conductor/missions/${encodeURIComponent(missionId)}`,
+                  { method: 'DELETE' },
+                )
+                if (res.ok) stoppedMissions += 1
+              } catch {
+                // Ignore per-mission stop errors so session cleanup still runs.
+              }
+            }
+          }
+
           for (const sessionKey of sessionKeys) {
             try {
               await deleteSession(sessionKey)
@@ -34,7 +59,7 @@ export const Route = createFileRoute('/api/conductor-stop')({
             }
           }
 
-          return json({ ok: true, deleted })
+          return json({ ok: true, deleted, stoppedMissions })
         } catch (error) {
           return json(
             {
