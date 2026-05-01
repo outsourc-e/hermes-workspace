@@ -21,6 +21,24 @@
 
 ---
 
+## Swarm Mode
+
+Project Agent Swarm turns the workspace into a live control plane: unlimited Project Agents, 1 orchestrator, 0 humans manually dispatching.
+Persistent tmux workers keep context across tasks, rotate safely, and report proof-bearing checkpoints.
+Role-based dispatch routes builders, reviewers, docs, research, ops, triage, QA, and lab lanes without turning Eric into the task router.
+A byte-verified review gate protects release branches before PRs ship.
+Autonomous PR/issue lanes, lab experiments, and the repair playbook keep the machine moving while humans handle judgment.
+
+Start here: [docs/swarm/](./docs/swarm/)
+
+- **Orchestrator Chat** — ask the control plane for one task, a decomposed mission, or a full broadcast.
+- **Multi-Agent Control Plane** — see persistent Project Agents, roles, state, runtime, and routing wires in one surface.
+- **Kanban TaskBoard** — plan backlog, ready, running, review, blocked, and done lanes without leaving the workspace.
+- **Reports + Inbox** — review checkpoints, blockers, handoffs, and ready-for-human decisions.
+- **TUI View built in** — attach to tmux-backed workers or fall back to a live shell/log stream.
+
+---
+
 ## ✨ Features
 
 - 🤖 **Hermes Agent Integration** — Direct gateway connection with real-time SSE streaming
