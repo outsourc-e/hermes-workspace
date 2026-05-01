@@ -268,6 +268,16 @@ function RootLayout() {
 
     syncOnboardingCompletion()
 
+    void fetch('/api/connection-status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((status: { ok?: boolean; chatReady?: boolean; modelConfigured?: boolean } | null) => {
+        if (status?.ok || (status?.chatReady && status?.modelConfigured)) {
+          localStorage.setItem(ONBOARDING_KEY, 'true')
+          syncOnboardingCompletion()
+        }
+      })
+      .catch(() => undefined)
+
     const handleStorage = (event: StorageEvent) => {
       if (event.key && event.key !== ONBOARDING_KEY) return
       syncOnboardingCompletion()
