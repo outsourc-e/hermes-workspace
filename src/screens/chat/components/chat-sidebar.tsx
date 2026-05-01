@@ -815,14 +815,14 @@ function ChatSidebarComponent({
     {
       kind: 'link',
       to: '/operations',
-      icon: UserGroupIcon,
+      icon: UserMultipleIcon,
       label: 'Operations',
       active: isOperationsActive,
     },
     {
       kind: 'link',
       to: '/swarm',
-      icon: UserMultipleIcon,
+      icon: UserGroupIcon,
       label: 'Swarm',
       active: isSwarmActive,
     },

@@ -13,6 +13,7 @@ import {
   Rocket01Icon,
   Settings01Icon,
   UserGroupIcon,
+  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -62,7 +63,7 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
     id: 'operations',
     label: 'Operations',
-    icon: UserGroupIcon,
+    icon: UserMultipleIcon,
     to: '/operations',
     match: (p: string) => p.startsWith('/operations'),
   },
