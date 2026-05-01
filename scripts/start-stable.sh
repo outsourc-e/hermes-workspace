@@ -4,6 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Load workspace configuration before deriving runtime settings or building.
+# Services and non-interactive shells often do not export the .env values, which
+# can leave the stable launcher without Hermes API/dashboard tokens or URLs.
+if [[ -f "$ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env"
+  set +a
+fi
+
 PORT="${PORT:-3002}"
 RUNTIME_DIR="$ROOT/.runtime"
 PID_FILE="$RUNTIME_DIR/hermes-workspace.pid"
