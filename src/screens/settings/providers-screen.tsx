@@ -1121,7 +1121,7 @@ function ActiveModelCard({
         </p>
       ) : configQuery.error ? (
         <p className="mt-4 text-sm text-red-500">
-          Could not load config — is Claude Agent running?
+          Could not load config — is Hermes Agent running?
         </p>
       ) : (
         <div className="mt-5 space-y-4">

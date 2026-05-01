@@ -919,7 +919,7 @@ function ChatSidebarComponent({
                   className="text-sm font-semibold tracking-tight"
                   style={{ color: 'var(--theme-text)' }}
                 >
-                  Claude Workspace
+                  Hermes Workspace
                 </span>
               </Link>
             </motion.div>

@@ -28,13 +28,13 @@ function getSetupSteps(
   return [
     {
       title: 'Use any OpenAI-compatible backend',
-      command: 'Set CLAUDE_API_URL to your backend base URL',
+      command: 'Set HERMES_API_URL to your backend base URL',
       note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
     },
     {
-      title: 'Optional: install Claude Agent locally',
-      command: `${pip} install claude-agent`,
-      note: 'Vanilla claude-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
+      title: 'Optional: install Hermes Agent locally',
+      command: `${pip} install hermes-agent`,
+      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
     },
     {
       title: 'Set up Claude',
@@ -96,7 +96,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
     }, FAILURE_REVEAL_MS)
 
     // After a short grace period, fire /api/start-claude once silently.
-    // If claude-agent is installed and just not running, this brings it back
+    // If hermes-agent is installed and just not running, this brings it back
     // up without making the user click anything. The polling loop will see it.
     const fireSilentAutoStart = async () => {
       if (autoStartFired || isDone.current) return
@@ -171,7 +171,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
   const handleAutoStart = async () => {
     setServerStarting(true)
     setServerError(null)
-    setServerLog(['Looking for claude-agent...'])
+    setServerLog(['Looking for hermes-agent...'])
     try {
       const res = await fetch('/api/start-claude', {
         method: 'POST',
@@ -195,7 +195,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         return
       }
 
-      const msg = String(data.error || 'Could not find claude-agent')
+      const msg = String(data.error || 'Could not find hermes-agent')
       const hint = data.hint ? String(data.hint) : ''
       setServerLog([`Error: ${msg}`])
       if (hint) setServerLog((prev) => [...prev, `Hint: ${hint}`])
@@ -228,7 +228,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         />
 
         <h1 className="text-[2rem] font-semibold tracking-tight text-white">
-          Claude Workspace
+          Hermes Workspace
         </h1>
 
         {/* Connecting spinner */}
@@ -257,7 +257,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               Welcome! Let&apos;s connect your backend
             </p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Claude Workspace works with any OpenAI-compatible backend. Claude
+              Hermes Workspace works with any OpenAI-compatible backend. Claude
               gateway APIs unlock enhanced features automatically when they are
               available.
             </p>
@@ -360,12 +360,12 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                 <p className="text-xs font-medium text-white/50">
                   Point{' '}
                   <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">
-                    CLAUDE_API_URL
+                    HERMES_API_URL
                   </code>{' '}
                   at any OpenAI-compatible backend:
                 </p>
                 <pre className="mt-2 overflow-x-auto font-mono text-xs text-white/60">
-                  CLAUDE_API_URL=http://your-server:8642 pnpm dev
+                  HERMES_API_URL=http://your-server:8642 pnpm dev
                 </pre>
               </div>
             </div>

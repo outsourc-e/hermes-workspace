@@ -25,8 +25,8 @@ function classifyConnectionError(
   if (!normalizedError && !status) {
     return {
       title: 'Not connected',
-      description: "Claude Workspace can't reach Claude.",
-      action: 'Check that Claude is running, then try again.',
+      description: "Hermes Workspace can't reach Claude.",
+      action: 'Check that Hermes is running, then try again.',
     }
   }
 
@@ -51,7 +51,7 @@ function classifyConnectionError(
     return {
       title: 'Pairing required',
       description: "This device isn't paired with Claude yet.",
-      action: 'Check Claude Agent connection.',
+      action: 'Check Hermes Agent connection.',
     }
   }
 
@@ -73,7 +73,7 @@ function classifyConnectionError(
     return {
       title: 'Claude unreachable',
       description: "Can't connect to Claude at the configured URL.",
-      action: 'Make sure Claude is running and the URL is correct.',
+      action: 'Make sure Hermes is running and the URL is correct.',
     }
   }
 

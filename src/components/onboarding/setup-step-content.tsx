@@ -51,8 +51,8 @@ export function ConnectionCheckStep({
       if (!connected) {
         setLastError(
           data.error === 'server_timeout'
-            ? 'Claude Agent did not respond in time.'
-            : 'Claude Agent is not reachable yet.',
+            ? 'Hermes Agent did not respond in time.'
+            : 'Hermes Agent is not reachable yet.',
         )
       }
     } catch (error) {
@@ -132,7 +132,7 @@ export function ConnectionCheckStep({
             </div>
           </div>
           <p className="mt-3 text-xs text-red-700">
-            Or point <code>CLAUDE_API_URL</code> at any OpenAI-compatible
+            Or point <code>HERMES_API_URL</code> at any OpenAI-compatible
             backend (Ollama, LiteLLM, vLLM, etc.).
           </p>
           {lastError && (

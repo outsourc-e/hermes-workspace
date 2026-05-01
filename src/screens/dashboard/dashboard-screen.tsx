@@ -798,7 +798,7 @@ export function DashboardScreen() {
           style={{ padding: '3px', background: 'var(--theme-card)' }}
         />
         <p className="micro-label" style={{ color: 'var(--theme-muted)' }}>
-          Claude Workspace
+          Hermes Workspace
         </p>
         <div className="mt-1 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
           <QuickAction

@@ -32,8 +32,8 @@ export type OnboardingStep = {
 export const ONBOARDING_STEPS: Array<OnboardingStep> = [
   {
     id: 'welcome',
-    title: 'Welcome to Claude Workspace',
-    description: 'Your AI workspace powered by Claude Agent',
+    title: 'Welcome to Hermes Workspace',
+    description: 'Your AI workspace powered by Hermes Agent',
     icon: Home01Icon,
     iconBg: 'bg-orange-500',
     nextLabel: 'Get Started',
@@ -41,7 +41,7 @@ export const ONBOARDING_STEPS: Array<OnboardingStep> = [
   {
     id: 'connection-check',
     title: 'Connection Check',
-    description: 'Verify that Claude Agent is running before you begin.',
+    description: 'Verify that Hermes Agent is running before you begin.',
     icon: Plug01Icon,
     iconBg: 'bg-emerald-500',
     component: ConnectionCheckStep,
