@@ -360,8 +360,8 @@ export function Swarm2OrchestratorCard({
                   const isBlocked = agent.state === 'blocked'
                   const isReview = agent.state === 'reviewing'
                   return (
-                    <div key={agent.workerId} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2">
-                      <div className="flex items-center gap-2">
+                    <div key={agent.workerId} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5">
+                      <div className="flex items-start gap-2.5">
                         <div className="relative shrink-0">
                           <PixelAvatar
                             size={30}
@@ -372,12 +372,15 @@ export function Swarm2OrchestratorCard({
                           <span className={cn('absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-[var(--theme-card)]', isBlocked ? 'bg-red-500' : isReview ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse')} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[11px] font-semibold text-[var(--theme-text)]">{agent.workerName}</div>
-                          <div className="truncate text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">{agent.state}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="truncate text-[11px] font-semibold text-[var(--theme-text)]">{agent.workerName}</div>
+                            <div className="shrink-0 text-[9px] text-[var(--theme-muted)]">{agent.age}</div>
+                          </div>
+                          <div className="mt-0.5 truncate text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">{agent.state}</div>
                         </div>
                       </div>
-                      <div className="mt-1.5 truncate text-[10px] text-[var(--theme-muted-2)]" title={agent.task}>{agent.task}</div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--theme-bg)]">
+                      <div className="mt-2 line-clamp-3 text-[10px] leading-snug text-[var(--theme-muted-2)]" title={agent.task}>{agent.task}</div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--theme-bg)]">
                         <div className={cn('h-full rounded-full transition-all', isBlocked ? 'bg-red-500' : isReview ? 'bg-amber-500' : 'bg-[var(--theme-accent)]')} style={{ width: `${agent.progress}%` }} />
                       </div>
                     </div>

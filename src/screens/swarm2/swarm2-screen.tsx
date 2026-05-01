@@ -1460,7 +1460,7 @@ export function Swarm2Screen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-accent)] shadow-sm">
-                <HugeiconsIcon icon={CpuIcon} size={22} />
+                <HugeiconsIcon icon={MessageMultiple01Icon} size={22} />
               </div>
               <div className="min-w-0">
                 <h1 className="truncate text-base font-semibold text-primary-900">

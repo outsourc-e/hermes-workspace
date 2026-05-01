@@ -568,8 +568,7 @@ function ChatSidebarComponent({
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
-  const isSwarmActive = pathname === '/swarm'
-  const isSwarm2Active = pathname === '/swarm2'
+  const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
@@ -827,13 +826,7 @@ function ChatSidebarComponent({
       label: 'Swarm',
       active: isSwarmActive,
     },
-    {
-      kind: 'link',
-      to: '/swarm2',
-      icon: UserMultipleIcon,
-      label: 'Swarm2',
-      active: isSwarm2Active,
-    },
+
   ]
 
   const knowledgeItems: Array<NavItemDef> = [
