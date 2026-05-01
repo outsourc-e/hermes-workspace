@@ -4,8 +4,15 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 type RemoteName = 'origin' | 'upstream'
+type UpdateTarget = RemoteName | 'all'
 
 type RemoteStatus = {
   name: RemoteName
@@ -25,6 +32,15 @@ type RemoteDefinition = {
   label: string
   expectedRepo: string
   aliases: Array<string>
+}
+
+type UpdateResult = {
+  ok: boolean
+  updated: Array<RemoteName>
+  skipped: Array<{ name: RemoteName; reason: string }>
+  restartRequired: boolean
+  output: string
+  error?: string
 }
 
 export const UPDATE_REMOTE_DEFINITIONS: Array<RemoteDefinition> = [
@@ -48,6 +64,15 @@ function git(args: string[], timeout = 5000): string | null {
   } catch {
     return null
   }
+}
+
+function gitOrThrow(args: string[], timeout = 30_000): string {
+  return execFileSync('git', args, {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    timeout,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }).trim()
 }
 
 function pkgVersion(): string {
@@ -127,6 +152,69 @@ function remoteStatus(definition: RemoteDefinition, currentHead: string | null):
   })
 }
 
+export function normalizeUpdateTarget(value: unknown): UpdateTarget {
+  return value === 'origin' || value === 'upstream' || value === 'all'
+    ? value
+    : 'origin'
+}
+
+function selectedDefinitions(target: UpdateTarget): Array<RemoteDefinition> {
+  if (target === 'all') return UPDATE_REMOTE_DEFINITIONS
+  return UPDATE_REMOTE_DEFINITIONS.filter((definition) => definition.name === target)
+}
+
+async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
+  return request.json().catch(() => ({})) as Promise<Record<string, unknown>>
+}
+
+function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
+  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']) || 'main'
+  const currentHead = git(['rev-parse', 'HEAD'])
+  const dirty = Boolean(git(['status', '--porcelain']))
+
+  if (dirty) {
+    return {
+      ok: false,
+      updated: [],
+      skipped: [],
+      restartRequired: false,
+      output: '',
+      error: 'Working tree has local changes. Commit, stash, or discard them before updating.',
+    }
+  }
+
+  const updated: Array<RemoteName> = []
+  const skipped: UpdateResult['skipped'] = []
+  const output: Array<string> = []
+
+  for (const definition of selectedDefinitions(target)) {
+    const status = remoteStatus(definition, currentHead)
+    if (!status.repoMatches) {
+      skipped.push({ name: definition.name, reason: status.error || 'Remote does not match expected repo.' })
+      continue
+    }
+    if (!status.updateAvailable) {
+      skipped.push({ name: definition.name, reason: status.error || 'Already up to date.' })
+      continue
+    }
+
+    const ref = definition.name === 'origin' ? branch : 'HEAD'
+    output.push(`Fetching ${definition.name}...`)
+    output.push(gitOrThrow(['fetch', definition.name], 60_000))
+    output.push(`Fast-forwarding from ${definition.name}/${ref}...`)
+    output.push(gitOrThrow(['merge', '--ff-only', `${definition.name}/${ref}`], 60_000))
+    updated.push(definition.name)
+  }
+
+  return {
+    ok: true,
+    updated,
+    skipped,
+    restartRequired: updated.length > 0,
+    output: output.filter(Boolean).join('\n'),
+  }
+}
+
 export const Route = createFileRoute('/api/claude-update')({
   server: {
     handlers: {
@@ -154,6 +242,30 @@ export const Route = createFileRoute('/api/claude-update')({
           updateAvailable: remotes.some((remote) => remote.updateAvailable),
           manualConfirmRequired: true,
         })
+      },
+
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        const ip = getClientIp(request)
+        if (!rateLimit(`claude-update-post:${ip}`, 5, 60_000)) {
+          return rateLimitResponse()
+        }
+
+        try {
+          const body = await readJsonBody(request)
+          const target = normalizeUpdateTarget(body.target)
+          const result = applyFastForwardUpdate(target)
+          return json(result, { status: result.ok ? 200 : 409 })
+        } catch (err) {
+          return json(
+            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            { status: 500 },
+          )
+        }
       },
     },
   },

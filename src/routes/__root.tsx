@@ -15,6 +15,7 @@ import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrig
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
+import { HermesUpdateNotifier } from '@/components/hermes-update-notifier'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import {
@@ -351,6 +352,7 @@ function RootLayout() {
           </WorkspaceShell>
           <SearchModal />
           <KeyboardShortcutsModal />
+          <HermesUpdateNotifier />
           {rootSurfaceState.showPostOnboardingOverlays ? (
             <>
               <MobilePromptTrigger />
