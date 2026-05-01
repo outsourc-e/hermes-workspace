@@ -78,13 +78,7 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     to: '/jobs',
     match: (p) => p.startsWith('/jobs'),
   },
-  {
-    id: 'swarm2',
-    label: 'Swarm2',
-    icon: UserGroupIcon,
-    to: '/swarm2',
-    match: (p) => p.startsWith('/swarm2'),
-  },
+
   {
     id: 'memory',
     label: 'Memory',

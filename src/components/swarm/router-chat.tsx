@@ -447,75 +447,77 @@ export function RouterChat({
             ) : null}
           </div>
 
-          <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-              Routing plan
-            </div>
-            {assignments.length === 0 ? (
-              <div className="text-[12px] text-[var(--theme-muted-2)]">
-                {mode === 'auto'
-                  ? 'Hit Auto decompose to see proposed routing here.'
-                  : mode === 'manual'
-                    ? 'Single target dispatch.'
-                    : 'Broadcast — no per-target plan needed.'}
+          {!embedded ? (
+            <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                Routing plan
               </div>
-            ) : (
-              <ol className="max-h-72 space-y-1.5 overflow-y-auto pr-1 text-[12px]">
-                {assignments.map((a, idx) => (
-                  <li
-                    key={`${a.workerId}-${idx}`}
-                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5"
-                  >
-                    <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                      <span>
-                        → {a.workerId} · {roleForMember(members, a.workerId)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setAssignments((c) => c.filter((_, i) => i !== idx))
-                        }
-                        className="text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"
-                      >
-                        remove
-                      </button>
-                    </div>
-                    <textarea
-                      rows={4}
-                      value={a.task}
-                      onChange={(e) =>
-                        setAssignments((c) =>
-                          c.map((entry, i) =>
-                            i === idx
-                              ? { ...entry, task: e.target.value }
-                              : entry,
-                          ),
-                        )
-                      }
-                      className="mt-1 w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[11px] text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none"
-                    />
-                    {a.rationale ? (
-                      <div className="mt-1 text-[10px] italic text-[var(--theme-muted-2)]">
-                        {a.rationale}
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-            )}
-            {unassigned.length > 0 ? (
-              <div className="rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[11px] text-[var(--theme-text)]">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                  Unrouted notes
+              {assignments.length === 0 ? (
+                <div className="text-[12px] text-[var(--theme-muted-2)]">
+                  {mode === 'auto'
+                    ? 'Hit Auto decompose to see proposed routing here.'
+                    : mode === 'manual'
+                      ? 'Single target dispatch.'
+                      : 'Broadcast — no per-target plan needed.'}
                 </div>
-                <ul className="list-disc pl-4">
-                  {unassigned.map((u, i) => (
-                    <li key={i}>{u}</li>
+              ) : (
+                <ol className="max-h-72 space-y-1.5 overflow-y-auto pr-1 text-[12px]">
+                  {assignments.map((a, idx) => (
+                    <li
+                      key={`${a.workerId}-${idx}`}
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5"
+                    >
+                      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                        <span>
+                          → {a.workerId} · {roleForMember(members, a.workerId)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAssignments((c) => c.filter((_, i) => i !== idx))
+                          }
+                          className="text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"
+                        >
+                          remove
+                        </button>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={a.task}
+                        onChange={(e) =>
+                          setAssignments((c) =>
+                            c.map((entry, i) =>
+                              i === idx
+                                ? { ...entry, task: e.target.value }
+                                : entry,
+                            ),
+                          )
+                        }
+                        className="mt-1 w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[11px] text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none"
+                      />
+                      {a.rationale ? (
+                        <div className="mt-1 text-[10px] italic text-[var(--theme-muted-2)]">
+                          {a.rationale}
+                        </div>
+                      ) : null}
+                    </li>
                   ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
+                </ol>
+              )}
+              {unassigned.length > 0 ? (
+                <div className="rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[11px] text-[var(--theme-text)]">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                    Unrouted notes
+                  </div>
+                  <ul className="list-disc pl-4">
+                    {unassigned.map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {!embedded && results ? (

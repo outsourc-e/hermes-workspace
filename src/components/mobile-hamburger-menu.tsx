@@ -73,13 +73,7 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     to: '/swarm',
     match: (p: string) => p === '/swarm',
   },
-  {
-    id: 'swarm2',
-    label: 'Swarm2',
-    icon: UserGroupIcon,
-    to: '/swarm2',
-    match: (p: string) => p.startsWith('/swarm2'),
-  },
+
   {
     id: 'memory',
     label: 'Memory',
