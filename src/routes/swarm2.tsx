@@ -5,14 +5,14 @@ import { Swarm2Screen } from '@/screens/swarm2/swarm2-screen'
 export const Route = createFileRoute('/swarm2')({
   ssr: false,
   component: function Swarm2Route() {
-    usePageTitle('Swarm2')
+    usePageTitle('Swarm')
     return <Swarm2Screen />
   },
   errorComponent: function Swarm2Error({ error }) {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-primary-50 p-6 text-center">
         <h2 className="mb-3 text-xl font-semibold text-primary-900">
-          Failed to Load Swarm2
+          Failed to Load Swarm
         </h2>
         <p className="mb-4 max-w-md text-sm text-primary-600">
           {error instanceof Error
@@ -34,7 +34,7 @@ export const Route = createFileRoute('/swarm2')({
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <div className="mb-3 inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
-          <p className="text-sm text-primary-500">Loading Swarm2...</p>
+          <p className="text-sm text-primary-500">Loading Swarm...</p>
         </div>
       </div>
     )
