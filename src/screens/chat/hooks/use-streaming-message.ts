@@ -268,17 +268,22 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   ])
 
   useEffect(
-    function cleanupStreamingOnUnmount() {
+    function handOffAcceptedRunOnUnmount() {
       return function cleanup() {
-        if (eventSourceRef.current) {
-          eventSourceRef.current.abort()
-          eventSourceRef.current = null
-        }
-        finishedRef.current = true
-        resetActiveStreamState()
+        if (!eventSourceRef.current || finishedRef.current) return
+
+        // Abort only this browser reader. The server route keeps the upstream
+        // Hermes run alive after reader cancel, so another transport or history
+        // polling can be authoritative when Chat remounts.
+        eventSourceRef.current.abort()
+        eventSourceRef.current = null
+        lifecyclePhaseRef.current = 'handoff'
+        clearSendStreamRun()
+        clearHandoffTimer()
+        stopFrame()
       }
     },
-    [resetActiveStreamState],
+    [clearHandoffTimer, clearSendStreamRun, stopFrame],
   )
 
   const pushTargetText = useCallback(
@@ -780,7 +785,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (params.idempotencyKey && onMessageAccepted) {
           onMessageAccepted(
             activeSessionKeyRef.current,
-            activeSessionKeyRef.current,
+            resolvedFriendlyId,
             params.idempotencyKey,
           )
         }

@@ -39,6 +39,29 @@ function isExpiredPendingPayload(payload: { storedAt?: unknown }) {
   return Date.now() - payload.storedAt > PENDING_MESSAGE_MAX_AGE_MS
 }
 
+function toPendingSendPayload(
+  parsed: Record<string, unknown>,
+): PendingSendPayload | null {
+  const optimisticMessage = parsed.optimisticMessage
+  if (
+    typeof parsed.sessionKey !== 'string' ||
+    typeof parsed.friendlyId !== 'string' ||
+    typeof parsed.message !== 'string' ||
+    !optimisticMessage ||
+    typeof optimisticMessage !== 'object'
+  ) {
+    return null
+  }
+
+  return {
+    sessionKey: parsed.sessionKey,
+    friendlyId: parsed.friendlyId,
+    message: parsed.message,
+    attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
+    optimisticMessage: optimisticMessage as ChatMessage,
+  }
+}
+
 function writePendingSendToStorage(payload: PendingSendPayload) {
   if (!canUseLocalStorage()) return
 
@@ -57,6 +80,36 @@ function writePendingSendToStorage(payload: PendingSendPayload) {
   } catch {
     // Ignore storage write failures.
   }
+}
+
+function readPendingSendFromStorageByFriendlyId(
+  friendlyId: string,
+): PendingSendPayload | null {
+  if (!canUseLocalStorage() || !friendlyId) return null
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (!key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)) continue
+      const raw = window.localStorage.getItem(key)
+      if (!raw) continue
+      try {
+        const parsed = JSON.parse(raw) as PersistedPendingSendPayload
+        if (isExpiredPendingPayload(parsed)) {
+          window.localStorage.removeItem(key)
+          continue
+        }
+        if (parsed.friendlyId !== friendlyId) continue
+        return toPendingSendPayload(parsed)
+      } catch {
+        window.localStorage.removeItem(key)
+      }
+    }
+  } catch {
+    // Ignore storage read failures.
+  }
+
+  return null
 }
 
 function removePendingSendFromStorageByFriendlyId(friendlyId: string) {
@@ -130,20 +183,20 @@ export function readPendingMessage(
 
   try {
     const raw = window.localStorage.getItem(getPendingStorageKey(sessionKey))
-    if (!raw) return null
+    if (!raw) {
+      return friendlyId
+        ? readPendingSendFromStorageByFriendlyId(friendlyId)
+        : null
+    }
     const parsed = JSON.parse(raw) as PersistedPendingSendPayload
     if (isExpiredPendingPayload(parsed)) {
       window.localStorage.removeItem(getPendingStorageKey(sessionKey))
       return null
     }
-    if (friendlyId && parsed.friendlyId !== friendlyId) return null
-    return {
-      sessionKey: parsed.sessionKey,
-      friendlyId: parsed.friendlyId,
-      message: parsed.message,
-      attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
-      optimisticMessage: parsed.optimisticMessage,
+    if (friendlyId && parsed.friendlyId !== friendlyId) {
+      return readPendingSendFromStorageByFriendlyId(friendlyId)
     }
+    return toPendingSendPayload(parsed)
   } catch {
     try {
       window.localStorage.removeItem(getPendingStorageKey(sessionKey))

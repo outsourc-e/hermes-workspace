@@ -936,7 +936,22 @@ export const Route = createFileRoute('/api/send-stream')({
             }
           },
           cancel() {
-            closeStream()
+            // Reader cancellation happens when the user navigates away from Chat.
+            // Do not abort the upstream Hermes run; the UI can recover from
+            // session history / active-run polling when the user returns.
+            streamClosed = true
+            if (unregisterTimer) {
+              clearTimeout(unregisterTimer)
+              unregisterTimer = null
+            }
+            if (streamTimeoutTimer) {
+              clearTimeout(streamTimeoutTimer)
+              streamTimeoutTimer = null
+            }
+            if (activeRunId) {
+              unregisterActiveSendRun(activeRunId)
+              activeRunId = null
+            }
           },
         })
 
