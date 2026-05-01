@@ -15,6 +15,7 @@ import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 
 type Mode = 'auto' | 'manual' | 'broadcast'
+type QuickRoute = 'Research' | 'Builder' | 'Reviewer' | 'Docs' | 'Ops' | 'Best match' | 'Auto'
 
 type Assignment = { workerId: string; task: string; rationale: string; expectedOutput?: string; dependsOn?: Array<string>; reviewRequired?: boolean }
 type ParsedCheckpoint = {
@@ -70,7 +71,7 @@ function roleForMember(members: Array<CrewMember>, id: string): string {
 }
 
 
-const QUICK_ROUTES = [
+const QUICK_ROUTES: Array<QuickRoute> = [
   'Research',
   'Builder',
   'Reviewer',
@@ -98,6 +99,7 @@ export function RouterChat({
   const [prompt, setPrompt] = useState('')
   const [decomposing, setDecomposing] = useState(false)
   const [decomposeError, setDecomposeError] = useState<string | null>(null)
+  const [quickRoute, setQuickRoute] = useState<QuickRoute>('Auto')
   const [assignments, setAssignments] = useState<Array<Assignment>>([])
   const [unassigned, setUnassigned] = useState<Array<string>>([])
   const [dispatching, setDispatching] = useState(false)
@@ -116,6 +118,13 @@ export function RouterChat({
     setDecomposeError(null)
     setDispatchError(null)
   }, [seedKey, seedMode, seedPrompt])
+
+  function buildPromptWithRoute(basePrompt: string): string {
+    const clean = basePrompt.trim()
+    if (!clean) return clean
+    if (quickRoute === 'Auto' || quickRoute === 'Best match') return clean
+    return `Prefer the ${quickRoute.toLowerCase()} specialist for this work.\n\n${clean}`
+  }
 
   useEffect(() => {
     if (
@@ -175,7 +184,7 @@ export function RouterChat({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: prompt.trim(),
+          prompt: buildPromptWithRoute(prompt),
           workers: eligibleWorkers,
         }),
       })
@@ -235,11 +244,17 @@ export function RouterChat({
     setResults(null)
     setFollowUp(null)
     try {
+      const routedPlan = mode === 'auto'
+        ? plan.map((item) => ({
+            ...item,
+            task: buildPromptWithRoute(item.task),
+          }))
+        : plan
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          assignments: plan,
+          assignments: routedPlan,
           timeoutSeconds: 300,
           waitForCheckpoint: true,
           checkpointPollSeconds: 90,
@@ -324,7 +339,7 @@ export function RouterChat({
         <div className={cn(
           'grid gap-3 overflow-y-auto py-3',
           embedded
-            ? 'max-h-none px-3'
+            ? 'max-h-none px-3 lg:grid-cols-[1.2fr_minmax(280px,0.8fr)]'
             : 'max-h-[330px] px-5 lg:grid-cols-[1.35fr_minmax(280px,1fr)]',
         )}>
           <div className="flex flex-col gap-2">
@@ -342,27 +357,26 @@ export function RouterChat({
               }
               className="min-h-[8rem] resize-y rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)] focus:outline-none"
             />
-            {!embedded ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {QUICK_ROUTES.map((quick) => (
-                  <button
-                    key={quick}
-                    type="button"
-                    onClick={() => {
-                      setMode('auto')
-                      setPrompt((cur) =>
-                        cur
-                          ? cur
-                          : `Use the ${quick.toLowerCase()} specialist for this:`,
-                      )
-                    }}
-                    className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
-                  >
-                    {quick}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              {QUICK_ROUTES.map((quick) => (
+                <button
+                  key={quick}
+                  type="button"
+                  onClick={() => {
+                    setMode('auto')
+                    setQuickRoute(quick)
+                  }}
+                  className={cn(
+                    'rounded-lg border px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors',
+                    quickRoute === quick
+                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+                      : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
+                  )}
+                >
+                  {quick}
+                </button>
+              ))}
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               {embedded ? (
                 <div className="flex flex-wrap items-center gap-3">
@@ -371,7 +385,9 @@ export function RouterChat({
               ) : (
                 <div className="text-[11px] text-[var(--theme-muted)]">
                   {`${prompt.trim().length} chars · ${mode === 'auto'
-                    ? 'auto-route by role'
+                    ? quickRoute === 'Auto' || quickRoute === 'Best match'
+                      ? 'auto-route by role'
+                      : `prefer ${quickRoute.toLowerCase()}`
                     : mode === 'manual'
                       ? `→ ${selectedId ?? 'no target'}`
                       : `broadcast to ${roomIds.length || members.length}`}`}
@@ -431,7 +447,6 @@ export function RouterChat({
             ) : null}
           </div>
 
-          {!embedded ? (
           <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
             <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
               Routing plan
@@ -501,7 +516,6 @@ export function RouterChat({
               </div>
             ) : null}
           </div>
-          ) : null}
         </div>
 
         {!embedded && results ? (
