@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlarmClockIcon,
+  CpuIcon,
   MessageMultiple01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
@@ -988,18 +989,13 @@ export function Swarm2Screen() {
   const [addSwarmOpen, setAddSwarmOpen] = useState(false)
   const [addSwarmSaving, setAddSwarmSaving] = useState(false)
   const [addSwarmError, setAddSwarmError] = useState<string | null>(null)
-  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; provider: string }>>([])
-
-  useEffect(() => {
-    if (!addSwarmOpen) return
-    let cancelled = false
-    void fetchAvailableModels().then((models) => {
-      if (!cancelled) setAvailableModels(models)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [addSwarmOpen])
+  const modelsQuery = useQuery({
+    queryKey: ['swarm2', 'available-models'],
+    queryFn: fetchAvailableModels,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+  const availableModels = modelsQuery.data ?? []
   const [newWorkerId, setNewWorkerId] = useState('')
   const [newWorkerName, setNewWorkerName] = useState('')
   const [newWorkerRole, setNewWorkerRole] = useState('Builder')
@@ -1652,13 +1648,13 @@ export function Swarm2Screen() {
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 flex items-center justify-between text-[var(--theme-muted)]">
                   <span>Model</span>
-                  <span className="text-[10px] text-[var(--theme-muted-2)]">{availableModels.length > 0 ? `${availableModels.length} available` : 'loading…'}</span>
+                  <span className="text-[10px] text-[var(--theme-muted-2)]">{availableModels.length > 0 ? `${availableModels.length} available` : modelsQuery.isLoading ? 'loading…' : '0 found'}</span>
                 </span>
                 <input
                   value={newWorkerModel}
                   onChange={(e) => setNewWorkerModel(e.target.value)}
                   list="swarm-add-models"
-                  placeholder={availableModels.length ? 'Search or pick a detected model…' : 'Loading detected models…'}
+                  placeholder={availableModels.length ? 'Search or pick a detected model…' : modelsQuery.isLoading ? 'Loading detected models…' : 'No models detected'}
                   className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
                 />
                 <datalist id="swarm-add-models">
@@ -1667,7 +1663,7 @@ export function Swarm2Screen() {
                   ))}
                 </datalist>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                  Searchable picker backed by /api/models, the same model source as chat. Start typing to see every detected model from the user’s Hermes config and local providers.
+                  Searchable picker backed by /api/models, the same source as chat. {modelsQuery.isError ? 'Model discovery errored, so this is empty until refresh.' : 'Start typing to see every detected model from the user’s Hermes config and local providers.'}
                 </p>
               </label>
               <label className="block text-sm md:col-span-2">
