@@ -403,7 +403,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             } catch(e){}
 
             var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light'].includes(theme);
-            var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning Claude...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
+            var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning your agent...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
             var quip = quips[Math.floor(Math.random() * quips.length)];
 
             var d = document.createElement('div');
