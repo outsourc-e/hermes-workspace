@@ -1650,7 +1650,10 @@ export function Swarm2Screen() {
                 <input value={newWorkerName} onChange={(e) => setNewWorkerName(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder="e.g. Mirror, Builder" />
               </label>
               <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-[var(--theme-muted)]">Model</span>
+                <span className="mb-1 flex items-center justify-between text-[var(--theme-muted)]">
+                  <span>Model</span>
+                  <span className="text-[10px] text-[var(--theme-muted-2)]">{availableModels.length > 0 ? `${availableModels.length} available` : 'loading…'}</span>
+                </span>
                 <select
                   value={newWorkerModel}
                   onChange={(e) => setNewWorkerModel(e.target.value)}
@@ -1660,17 +1663,30 @@ export function Swarm2Screen() {
                     <option value={newWorkerModel}>{newWorkerModel || 'Loading models…'}</option>
                   ) : (
                     <>
+                      {/* Always include the current value if it's not in the available list (handles legacy / custom names) */}
                       {!availableModels.some((m) => m.name === newWorkerModel || m.id === newWorkerModel) && newWorkerModel ? (
                         <option value={newWorkerModel}>{newWorkerModel} (current)</option>
                       ) : null}
-                      {availableModels.map((m) => (
-                        <option key={m.id} value={m.name}>{m.name} · {m.provider}</option>
+                      {/* Group by provider for readability */}
+                      {Array.from(
+                        availableModels.reduce((acc, m) => {
+                          const k = m.provider || 'other'
+                          if (!acc.has(k)) acc.set(k, [])
+                          acc.get(k)!.push(m)
+                          return acc
+                        }, new Map<string, Array<{ id: string; name: string; provider: string }>>()).entries(),
+                      ).map(([provider, models]) => (
+                        <optgroup key={provider} label={provider}>
+                          {models.map((m) => (
+                            <option key={m.id} value={m.name}>{m.name}</option>
+                          ))}
+                        </optgroup>
                       ))}
                     </>
                   )}
                 </select>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                  Loaded from your Project Agent /api/models. Changes require restarting the worker session.
+                  Auto-detected from your Hermes config (/api/models). Includes Codex, Anthropic, OpenRouter, OLLAMA, LM Studio, and any custom providers you have configured.
                 </p>
               </label>
               <label className="block text-sm md:col-span-2">

@@ -471,7 +471,10 @@ export function OfficeView({
   }, [layoutPickerOpen])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setTick((t) => t + 1), 200)
+    // 500ms interval (was 200ms) — the office animations are subtle (drift, bob, walk),
+    // and 200ms x 12 agents was burning frames. 500ms is still fluid visually and
+    // halves the React reconcile + SVG repaint pressure.
+    const timer = window.setInterval(() => setTick((t) => t + 1), 500)
     return () => window.clearInterval(timer)
   }, [])
 

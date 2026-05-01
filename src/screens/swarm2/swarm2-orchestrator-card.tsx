@@ -356,12 +356,12 @@ export function Swarm2OrchestratorCard({
             </div>
 
             {swarmCardMode === 'office' ? (
-              <div className="h-[255px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
+              <div className="h-[360px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
                 <OfficeView
                   agentRows={officeAgents}
                   missionRunning={activeAgents.some((agent) => agent.state === 'working' || agent.state === 'reviewing')}
                   onViewOutput={() => undefined}
-                  containerHeight={255}
+                  containerHeight={360}
                   hideHeader
                 />
               </div>
