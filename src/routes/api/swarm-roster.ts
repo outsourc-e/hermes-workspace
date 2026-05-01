@@ -11,7 +11,7 @@ export const Route = createFileRoute('/api/swarm-roster')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        const ids = listSwarmWorkerIds({ swarmOnly: true })
+        const ids = listSwarmWorkerIds()
         return json({
           ok: true,
           path: SWARM_ROSTER_PATH,
@@ -30,7 +30,7 @@ export const Route = createFileRoute('/api/swarm-roster')({
           return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
         }
         try {
-          const ids = listSwarmWorkerIds({ swarmOnly: true })
+          const ids = listSwarmWorkerIds()
           const roster = upsertSwarmRosterWorker(body as never, ids)
           return json({ ok: true, path: SWARM_ROSTER_PATH, roster, savedAt: Date.now() })
         } catch (error) {

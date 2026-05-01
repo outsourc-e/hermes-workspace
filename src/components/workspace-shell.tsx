@@ -109,10 +109,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (path.startsWith('/files')) return 2
     if (path.startsWith('/terminal')) return 3
     if (path.startsWith('/jobs')) return 4
-    if (path.startsWith('/memory')) return 5
-    if (path.startsWith('/skills')) return 6
-    if (path.startsWith('/profiles')) return 7
-    if (path.startsWith('/settings')) return 8
+    if (path === '/swarm' || path.startsWith('/swarm2')) return 5
+    if (path.startsWith('/memory')) return 6
+    if (path.startsWith('/skills')) return 7
+    if (path.startsWith('/profiles')) return 8
+    if (path.startsWith('/settings')) return 9
     return -1
   }, [])
 

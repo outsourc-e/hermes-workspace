@@ -26,7 +26,7 @@ export const Route = createFileRoute('/api/swarm-lifecycle')({
         if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         const url = new URL(request.url)
         const requested = validWorkerId(url.searchParams.get('workerId'))
-        const ids = requested ? [requested] : listSwarmWorkerIds({ swarmOnly: true })
+        const ids = requested ? [requested] : listSwarmWorkerIds()
         return json({ ok: true, checkedAt: Date.now(), workers: ids.map((id) => getSwarmLifecycleStatus(id)) })
       },
       POST: async ({ request }) => {
@@ -36,7 +36,7 @@ export const Route = createFileRoute('/api/swarm-lifecycle')({
         const action = typeof body.action === 'string' ? body.action : ''
         const workerIdMaybe = validWorkerId(body.workerId)
         if (action === 'auto-sweep') {
-          const targets = workerIdMaybe ? [workerIdMaybe] : listSwarmWorkerIds({ swarmOnly: true })
+          const targets = workerIdMaybe ? [workerIdMaybe] : listSwarmWorkerIds()
           const sweep = await autoSweepLifecycle(targets)
           return json({ ok: true, action, sweep })
         }

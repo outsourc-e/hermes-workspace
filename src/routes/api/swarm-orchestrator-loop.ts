@@ -371,7 +371,7 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
         }
 
         const requested = validWorkerIds(body.workerIds)
-        const workerIds = requested.length ? requested : listSwarmWorkerIds({ swarmOnly: true })
+        const workerIds = requested.length ? requested : listSwarmWorkerIds()
         const staleMinutes = typeof body.staleMinutes === 'number' && Number.isFinite(body.staleMinutes)
           ? Math.max(1, Math.min(240, body.staleMinutes))
           : 10

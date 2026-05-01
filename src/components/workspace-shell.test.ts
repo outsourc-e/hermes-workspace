@@ -10,27 +10,20 @@ describe('workspace shell sidebar backdrop', () => {
   })
 })
 
-describe('swarm2 navigation exposure', () => {
-  it('exposes /swarm2 in the mobile hamburger menu without replacing /swarm', () => {
+describe('swarm2 navigation alias handling', () => {
+  it('keeps /swarm as the only user-visible swarm entry in the mobile hamburger menu', () => {
     const swarm = MOBILE_HAMBURGER_NAV_ITEMS.find((item) => item.id === 'swarm')
-    const swarm2 = MOBILE_HAMBURGER_NAV_ITEMS.find(
-      (item) => item.id === 'swarm2',
-    )
+    const swarm2 = MOBILE_HAMBURGER_NAV_ITEMS.find((item) => item.id === 'swarm2')
 
     expect(swarm?.to).toBe('/swarm')
-    expect(swarm2?.label).toBe('Swarm2')
-    expect(swarm2?.to).toBe('/swarm2')
-    expect(swarm2?.match('/swarm2')).toBe(true)
+    expect(swarm2).toBeUndefined()
   })
 
-  it('exposes /swarm2 in the mobile tab bar as its own route', () => {
+  it('keeps /swarm as the only user-visible swarm tab', () => {
+    const swarm = MOBILE_NAV_TABS.find((item) => item.id === 'swarm')
     const swarm2 = MOBILE_NAV_TABS.find((item) => item.id === 'swarm2')
 
-    expect(swarm2?.label).toBe('Swarm2')
-    expect(swarm2?.to).toBe('/swarm2')
-    expect(swarm2?.match('/swarm2')).toBe(true)
-    expect(
-      MOBILE_NAV_TABS.filter((item) => item.to === '/swarm2'),
-    ).toHaveLength(1)
+    expect(swarm?.to).toBe('/swarm')
+    expect(swarm2).toBeUndefined()
   })
 })
