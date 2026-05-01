@@ -37,6 +37,7 @@ vi.mock('node:os', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  delete process.env.HERMES_HOME
   delete process.env.CLAUDE_HOME
 })
 
@@ -51,7 +52,7 @@ describe('profiles-browser', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       existsSync.mockImplementation((p: string) => {
-        if (p === path.join('/home/testuser', '.claude', 'profiles', 'jarvis')) return true
+        if (p === path.join('/home/testuser', '.hermes', 'profiles', 'jarvis')) return true
         return false
       })
 
@@ -65,19 +66,19 @@ describe('profiles-browser', () => {
 
     it('clears active profile file when setting default', async () => {
       existsSync.mockImplementation((p: string) => {
-        if (p === path.join('/home/testuser', '.claude', 'active_profile')) return true
+        if (p === path.join('/home/testuser', '.hermes', 'active_profile')) return true
         return false
       })
 
       const mod = await loadMod()
       mod.setActiveProfile('default')
-      expect(unlinkSync).toHaveBeenCalledWith(path.join('/home/testuser', '.claude', 'active_profile'))
+      expect(unlinkSync).toHaveBeenCalledWith(path.join('/home/testuser', '.hermes', 'active_profile'))
     })
   })
 
   describe('updateProfileConfig', () => {
     it('deep-merges nested objects instead of overwriting', async () => {
-      const root = path.join('/home/testuser', '.claude')
+      const root = path.join('/home/testuser', '.hermes')
       const configPath = path.join(root, 'config.yaml')
       const existingYaml =
         'model:\n  default: gpt-4\n  provider: openai\n  extra: keep-me\ntopLevel: stay\n'
@@ -107,7 +108,7 @@ describe('profiles-browser', () => {
     })
 
     it('handles null as explicit deletion of keys', async () => {
-      const root = path.join('/home/testuser', '.claude')
+      const root = path.join('/home/testuser', '.hermes')
       const configPath = path.join(root, 'config.yaml')
       const existingYaml =
         'model:\n  default: gpt-4\n  provider: openai\napi_key: secret\n'

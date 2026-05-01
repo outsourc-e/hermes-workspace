@@ -19,13 +19,13 @@ describe('listProfiles', () => {
   })
 
   it('always includes the default profile even when a named profile is active', () => {
-    const claudeRoot = path.join(tempHome, '.claude')
-    const profilesRoot = path.join(claudeRoot, 'profiles')
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const profilesRoot = path.join(hermesRoot, 'profiles')
     const namedProfileRoot = path.join(profilesRoot, 'jarvis')
 
     fs.mkdirSync(namedProfileRoot, { recursive: true })
-    fs.writeFileSync(path.join(claudeRoot, 'active_profile'), 'jarvis\n', 'utf-8')
-    fs.writeFileSync(path.join(claudeRoot, 'config.yaml'), 'model: default-model\n', 'utf-8')
+    fs.writeFileSync(path.join(hermesRoot, 'active_profile'), 'jarvis\n', 'utf-8')
+    fs.writeFileSync(path.join(hermesRoot, 'config.yaml'), 'model: default-model\n', 'utf-8')
     fs.writeFileSync(path.join(namedProfileRoot, 'config.yaml'), 'model: named-model\n', 'utf-8')
 
     const profiles = listProfiles()
