@@ -51,8 +51,8 @@ export function ConnectionCheckStep({
       if (!connected) {
         setLastError(
           data.error === 'server_timeout'
-            ? 'Project Agent did not respond in time.'
-            : 'Project Agent is not reachable yet.',
+            ? 'Hermes Agent did not respond in time.'
+            : 'Hermes Agent is not reachable yet.',
         )
       }
     } catch (error) {

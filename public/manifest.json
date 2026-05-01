@@ -1,7 +1,7 @@
 {
-  "name": "Project Workspace",
-  "short_name": "Project",
-  "description": "Native web control surface for Project Agent",
+  "name": "Hermes Workspace",
+  "short_name": "Hermes",
+  "description": "Native web control surface for Hermes Agent",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0E1A",

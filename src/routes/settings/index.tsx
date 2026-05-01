@@ -1970,7 +1970,7 @@ function ConnectionSection() {
   return (
     <SettingsSection
       title="Connection"
-      description="Point the workspace at your Project Agent services. Useful for Tailscale, LAN, or remote-server setups (#101)."
+      description="Point the workspace at your Hermes Agent services. Useful for Tailscale, LAN, or remote-server setups (#101)."
       icon={Link01Icon}
     >
       <div className="text-xs text-primary-600">

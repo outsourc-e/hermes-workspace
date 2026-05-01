@@ -13,7 +13,7 @@ function AssistantAvatarComponent({ size = 28, className }: AvatarProps) {
   return (
     <img
       src="/claude-avatar.webp"
-      alt="Project Agent"
+      alt="Hermes Agent"
       className={cn('shrink-0', className)}
       style={{
         width: size,

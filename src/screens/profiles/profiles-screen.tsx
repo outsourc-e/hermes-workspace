@@ -608,7 +608,7 @@ export function ProfilesScreen() {
                     </div>
                   ) : allModels.length === 0 ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                      No models found. Make sure Project Agent is running and
+                      No models found. Make sure Hermes Agent is running and
                       has models configured.
                     </div>
                   ) : (

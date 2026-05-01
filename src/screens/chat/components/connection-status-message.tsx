@@ -25,7 +25,7 @@ function classifyConnectionError(
   if (!normalizedError && !status) {
     return {
       title: 'Not connected',
-      description: "Project Workspace can't reach Claude.",
+      description: "Hermes Workspace can't reach Hermes Agent.",
       action: 'Check that Hermes is running, then try again.',
     }
   }
@@ -51,7 +51,7 @@ function classifyConnectionError(
     return {
       title: 'Pairing required',
       description: "This device isn't paired with Claude yet.",
-      action: 'Check Project Agent connection.',
+      action: 'Check Hermes Agent connection.',
     }
   }
 
