@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { getHermesRoot } from './hermes-paths'
+import { getHermesRoot } from './claude-paths'
 
 export type PersistedRunToolCall = {
   id: string
@@ -32,10 +32,6 @@ export type PersistedRunState = {
   toolCalls: Array<PersistedRunToolCall>
   lifecycleEvents: Array<PersistedRunLifecycleEvent>
   errorMessage?: string
-}
-
-function getHermesRoot(): string {
-  return process.env.HERMES_HOME ?? path.join(homedir(), '.hermes')
 }
 
 const RUNS_ROOT = path.join(getHermesRoot(), 'webui-mvp', 'runs')
