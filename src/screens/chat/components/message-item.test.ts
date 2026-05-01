@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildInlineToolRenderPlan, compactInlineToolRenderPlan } from './message-item'
+import {
+  buildInlineToolRenderPlan,
+  compactInlineToolRenderPlan,
+  detectAssistantCorruptionWarning,
+} from './message-item'
 import type { ChatMessage } from '../types'
 
 describe('buildInlineToolRenderPlan', () => {
@@ -143,5 +147,31 @@ describe('compactInlineToolRenderPlan', () => {
         ],
       },
     ])
+  })
+})
+
+describe('detectAssistantCorruptionWarning', () => {
+  it('flags assistant messages that begin with raw user role text', () => {
+    const warning = detectAssistantCorruptionWarning(
+      'assistant',
+      'user\nNew reviews are fine...',
+    )
+
+    expect(warning?.kind).toBe('role-prefix')
+    expect(warning?.detail).toContain('Stored role is assistant')
+  })
+
+  it('does not flag real user messages with the same body text', () => {
+    expect(
+      detectAssistantCorruptionWarning('user', 'user\nNew reviews are fine...'),
+    ).toBeNull()
+  })
+
+  it('flags very large repeated divider loops', () => {
+    const text = `${'normal text\n'.repeat(2000)}${'----------\n'.repeat(25)}`
+
+    expect(detectAssistantCorruptionWarning('assistant', text)?.kind).toBe(
+      'divider-loop',
+    )
   })
 })

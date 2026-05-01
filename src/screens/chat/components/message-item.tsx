@@ -196,7 +196,9 @@ export function buildInlineToolRenderPlan(
     }
   }
 
-  const trailingSections = toolSections.filter((section) => !usedKeys.has(section.key))
+  const trailingSections = toolSections.filter(
+    (section) => !usedKeys.has(section.key),
+  )
   for (const section of trailingSections) {
     plan.push({ kind: 'tool', section })
   }
@@ -380,6 +382,43 @@ function normalizeStreamToolPhase(
     return 'error'
   }
   return 'running'
+}
+
+export type AssistantCorruptionWarning = {
+  kind: 'role-prefix' | 'divider-loop'
+  label: string
+  detail: string
+}
+
+export function detectAssistantCorruptionWarning(
+  role: string,
+  text: string,
+): AssistantCorruptionWarning | null {
+  if (role !== 'assistant') return null
+  const trimmed = text.trimStart()
+  const roleMatch = /^(user|assistant|system)\s*(?:\n|:)/i.exec(trimmed)
+  if (roleMatch) {
+    return {
+      kind: 'role-prefix',
+      label: 'Assistant output contains raw transcript role text',
+      detail: `Stored role is assistant, but the content begins with "${roleMatch[1]}". Treat this as generated text, not a real ${roleMatch[1]} turn.`,
+    }
+  }
+
+  if (text.length > 20_000) {
+    const dividerMatches =
+      text.match(/(?:^|\n)\s*(?:[-_=*]{8,}|[─━]{8,})\s*(?=\n|$)/g) ?? []
+    if (dividerMatches.length >= 20) {
+      return {
+        kind: 'divider-loop',
+        label: 'Assistant output looks corrupted',
+        detail:
+          'This very large assistant message contains repeated divider-like lines and may be a generation loop.',
+      }
+    }
+  }
+
+  return null
 }
 
 function readExecNotification(message: ChatMessage): ExecNotification | null {
@@ -1615,10 +1654,22 @@ function ToolCallGroup({
   }, [expandAll])
 
   if (toolSections.length > 1) {
-    const runningCount = toolSections.filter((section) => section.state === 'input-available' || section.state === 'input-streaming').length
-    const errorCount = toolSections.filter((section) => section.state === 'output-error').length
+    const runningCount = toolSections.filter(
+      (section) =>
+        section.state === 'input-available' ||
+        section.state === 'input-streaming',
+    ).length
+    const errorCount = toolSections.filter(
+      (section) => section.state === 'output-error',
+    ).length
     const doneCount = toolSections.length - runningCount - errorCount
-    const labels = Array.from(new Set(toolSections.map((section) => formatToolDisplayLabel(section.type, section.input))))
+    const labels = Array.from(
+      new Set(
+        toolSections.map((section) =>
+          formatToolDisplayLabel(section.type, section.input),
+        ),
+      ),
+    )
     const visibleLabels = labels.slice(0, 3).join(', ')
     const overflowLabel = labels.length > 3 ? ` +${labels.length - 3} more` : ''
     const statusLabel =
@@ -1635,7 +1686,9 @@ function ToolCallGroup({
           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-primary-600 hover:bg-primary-50/70"
           onClick={() => setOpen((value) => !value)}
         >
-          <span className="font-mono font-semibold text-ink">Tool activity</span>
+          <span className="font-mono font-semibold text-ink">
+            Tool activity
+          </span>
           <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] tabular-nums text-primary-600">
             {toolSections.length} calls
           </span>
@@ -1788,7 +1841,8 @@ function MessageItemComponent({
 
   // Simulate streaming is only active while words are still being revealed
   const displayWordCount = countWords(displayText)
-  const revealComplete = revealedWordCount >= displayWordCount && displayWordCount > 0
+  const revealComplete =
+    revealedWordCount >= displayWordCount && displayWordCount > 0
   const effectiveIsStreaming =
     remoteStreamingActive || (_simulateStreaming && !revealComplete)
   const assistantDisplayText = effectiveIsStreaming ? revealedText : displayText
@@ -2422,7 +2476,10 @@ function MessageItemComponent({
                 {compactInlineRenderPlan.map((item, index) =>
                   item.kind === 'tools' ? (
                     <ToolCallGroup
-                      key={item.sections.map((section) => section.key).join(':') || `tools-${index}`}
+                      key={
+                        item.sections.map((section) => section.key).join(':') ||
+                        `tools-${index}`
+                      }
                       toolSections={item.sections}
                       expandAll={expandAllToolSections}
                       isStreaming={effectiveIsStreaming}
@@ -2430,7 +2487,9 @@ function MessageItemComponent({
                   ) : item.text.trim().length > 0 ? (
                     <div key={`text-${index}`} className="relative">
                       {extractStandaloneMarkdownFence(item.text) ? (
-                        <MarkdownMessageCard content={extractStandaloneMarkdownFence(item.text)!} />
+                        <MarkdownMessageCard
+                          content={extractStandaloneMarkdownFence(item.text)!}
+                        />
                       ) : (
                         <MessageContent
                           markdown
@@ -2453,6 +2512,23 @@ function MessageItemComponent({
                 <span className="text-pretty">{displayText}</span>
               ) : hasRevealedText ? (
                 <div className="relative">
+                  {assistantCorruptionWarning ? (
+                    <div
+                      className="mb-3 rounded-xl border px-3 py-2 text-xs"
+                      style={{
+                        borderColor: 'rgba(245, 158, 11, 0.45)',
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        color: 'var(--chat-assistant-foreground)',
+                      }}
+                    >
+                      <div className="font-semibold">
+                        {assistantCorruptionWarning.label}
+                      </div>
+                      <div className="mt-1 opacity-80">
+                        {assistantCorruptionWarning.detail}
+                      </div>
+                    </div>
+                  ) : null}
                   {standaloneMarkdownDocument ? (
                     <MarkdownMessageCard content={standaloneMarkdownDocument} />
                   ) : (
@@ -2475,7 +2551,10 @@ function MessageItemComponent({
             {isUser && isQueued && (
               <span
                 className="self-end text-[10px]"
-                style={{ color: 'color-mix(in srgb, var(--chat-user-foreground) 60%, transparent)' }}
+                style={{
+                  color:
+                    'color-mix(in srgb, var(--chat-user-foreground) 60%, transparent)',
+                }}
               >
                 Sent
               </span>

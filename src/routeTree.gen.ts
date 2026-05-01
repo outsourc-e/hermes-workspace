@@ -71,7 +71,6 @@ import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
 import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
-import { Route as ApiHermesAgentUpdateRouteImport } from './routes/api/hermes-agent-update'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
@@ -90,6 +89,9 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
+import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
+import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
 import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
@@ -436,11 +438,6 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
   path: '/api/history',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHermesAgentUpdateRoute = ApiHermesAgentUpdateRouteImport.update({
-  id: '/api/hermes-agent-update',
-  path: '/api/hermes-agent-update',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   id: '/api/gateway-status',
   path: '/api/gateway-status',
@@ -529,6 +526,21 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
 const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   id: '/api/artifacts',
   path: '/api/artifacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
+  id: '/api/update/workspace',
+  path: '/api/update/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUpdateStatusRoute = ApiUpdateStatusRouteImport.update({
+  id: '/api/update/status',
+  path: '/api/update/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUpdateAgentRoute = ApiUpdateAgentRouteImport.update({
+  id: '/api/update/agent',
+  path: '/api/update/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmMemorySearchRoute = ApiSwarmMemorySearchRouteImport.update({
@@ -738,7 +750,6 @@ export interface FileRoutesByFullPath {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
-  '/api/hermes-agent-update': typeof ApiHermesAgentUpdateRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
@@ -818,6 +829,9 @@ export interface FileRoutesByFullPath {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/update/agent': typeof ApiUpdateAgentRoute
+  '/api/update/status': typeof ApiUpdateStatusRoute
+  '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -854,7 +868,6 @@ export interface FileRoutesByTo {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
-  '/api/hermes-agent-update': typeof ApiHermesAgentUpdateRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
@@ -934,6 +947,9 @@ export interface FileRoutesByTo {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/update/agent': typeof ApiUpdateAgentRoute
+  '/api/update/status': typeof ApiUpdateStatusRoute
+  '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -972,7 +988,6 @@ export interface FileRoutesById {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
-  '/api/hermes-agent-update': typeof ApiHermesAgentUpdateRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
@@ -1052,6 +1067,9 @@ export interface FileRoutesById {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/update/agent': typeof ApiUpdateAgentRoute
+  '/api/update/status': typeof ApiUpdateStatusRoute
+  '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -1091,7 +1109,6 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
-    | '/api/hermes-agent-update'
     | '/api/history'
     | '/api/integrations'
     | '/api/local-providers'
@@ -1171,6 +1188,9 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/update/agent'
+    | '/api/update/status'
+    | '/api/update/workspace'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   fileRoutesByTo: FileRoutesByTo
@@ -1207,7 +1227,6 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
-    | '/api/hermes-agent-update'
     | '/api/history'
     | '/api/integrations'
     | '/api/local-providers'
@@ -1287,6 +1306,9 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/update/agent'
+    | '/api/update/status'
+    | '/api/update/workspace'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   id:
@@ -1324,7 +1346,6 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
-    | '/api/hermes-agent-update'
     | '/api/history'
     | '/api/integrations'
     | '/api/local-providers'
@@ -1404,6 +1425,9 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/update/agent'
+    | '/api/update/status'
+    | '/api/update/workspace'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   fileRoutesById: FileRoutesById
@@ -1442,7 +1466,6 @@ export interface RootRouteChildren {
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
-  ApiHermesAgentUpdateRoute: typeof ApiHermesAgentUpdateRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiIntegrationsRoute: typeof ApiIntegrationsRoute
   ApiLocalProvidersRoute: typeof ApiLocalProvidersRoute
@@ -1506,6 +1529,9 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
+  ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
+  ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
+  ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1944,13 +1970,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hermes-agent-update': {
-      id: '/api/hermes-agent-update'
-      path: '/api/hermes-agent-update'
-      fullPath: '/api/hermes-agent-update'
-      preLoaderRoute: typeof ApiHermesAgentUpdateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/gateway-status': {
       id: '/api/gateway-status'
       path: '/api/gateway-status'
@@ -2075,6 +2094,27 @@ declare module '@tanstack/react-router' {
       path: '/api/artifacts'
       fullPath: '/api/artifacts'
       preLoaderRoute: typeof ApiArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/workspace': {
+      id: '/api/update/workspace'
+      path: '/api/update/workspace'
+      fullPath: '/api/update/workspace'
+      preLoaderRoute: typeof ApiUpdateWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/status': {
+      id: '/api/update/status'
+      path: '/api/update/status'
+      fullPath: '/api/update/status'
+      preLoaderRoute: typeof ApiUpdateStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/agent': {
+      id: '/api/update/agent'
+      path: '/api/update/agent'
+      fullPath: '/api/update/agent'
+      preLoaderRoute: typeof ApiUpdateAgentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-memory/search': {
@@ -2468,7 +2508,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
-  ApiHermesAgentUpdateRoute: ApiHermesAgentUpdateRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiIntegrationsRoute: ApiIntegrationsRoute,
   ApiLocalProvidersRoute: ApiLocalProvidersRoute,
@@ -2532,6 +2571,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
+  ApiUpdateAgentRoute: ApiUpdateAgentRoute,
+  ApiUpdateStatusRoute: ApiUpdateStatusRoute,
+  ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
