@@ -424,7 +424,7 @@ export function OfficeView({
   onNewMission,
   selectedOutputAgentId,
   activeTemplateName: _activeTemplateName,
-  companyName = 'Mission Control',
+  companyName = 'Swarm',
   agentTasks = {},
   remoteSessions = [],
   onViewRemoteOutput,
@@ -746,16 +746,20 @@ export function OfficeView({
           })}
         </svg>
 
-        {/* Office whiteboard */}
-        <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
-          <div className="rounded-md border border-neutral-300/90 bg-[#fdfdf8] px-4 py-2 shadow-[0_2px_8px_rgba(15,23,42,0.15)]">
-            <span className="block whitespace-nowrap text-center text-sm font-bold tracking-wide text-neutral-800 [font-family:'Bradley_Hand','Marker_Felt','Comic_Sans_MS',cursive]">
-              {companyName}
-            </span>
+        {/* Office whiteboard — hidden in compact mode (matches hideHeader semantics) */}
+        {!compact && !hideHeader ? (
+          <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+            <div className="rounded-md border border-neutral-300/90 bg-[#fdfdf8] px-4 py-2 shadow-[0_2px_8px_rgba(15,23,42,0.15)]">
+              <span className="block whitespace-nowrap text-center text-sm font-bold tracking-wide text-neutral-800 [font-family:'Bradley_Hand','Marker_Felt','Comic_Sans_MS',cursive]">
+                {companyName}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        {/* Agent avatars (HTML overlay for interactivity) */}
+        {/* Agent avatars (HTML overlay for interactivity)
+            Position scaling: SVG uses viewBox 0 0 sceneW sceneH and scales to fit container,
+            so we express positions as percentages of the scene to match the SVG's scale. */}
         {agentRows.map((agent, index) => {
           const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
           const pos = agentPositions[index]
@@ -766,7 +770,9 @@ export function OfficeView({
           const statusMeta = getAgentStatusMeta(agent.status)
           const speechLine = getSpeechLine(agent, tick + index * 7)
           const showSpeech = Boolean(speechLine) && ((tick + index * 3) % 8 < 6)
-          const movementTransform = `translate3d(${pos.x}px, ${pos.y}px, 0) translate(-50%, -50%)`
+          const xPct = (pos.x / sceneW) * 100
+          const yPct = (pos.y / sceneH) * 100
+          const movementTransform = `translate(-50%, -50%)`
 
           return (
             <button
@@ -778,10 +784,10 @@ export function OfficeView({
                 isSelected && 'ring-2 ring-accent-300/80',
               )}
               style={{
-                left: 0,
-                top: 0,
+                left: `${xPct}%`,
+                top: `${yPct}%`,
                 transform: movementTransform,
-                transition: 'transform 0.8s ease-in-out',
+                transition: 'left 0.8s ease-in-out, top 0.8s ease-in-out',
               }}
               title={`${agent.name} · ${statusMeta.label}`}
             >

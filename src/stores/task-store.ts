@@ -1,5 +1,5 @@
 /**
- * Task System Lite — Mission Control-inspired task management.
+ * Task System Lite — Swarm-inspired task management.
  * localStorage-backed, zero backend dependencies.
  */
 import { create } from 'zustand'
@@ -40,7 +40,7 @@ export const STATUS_ORDER: TaskStatus[] = [
 
 export const PRIORITY_ORDER: TaskPriority[] = ['P0', 'P1', 'P2', 'P3']
 
-/** Seed data from real Mission Control tasks */
+/** Seed data from real Swarm tasks */
 const SEED_TASKS: Task[] = []
 
 function normalizeTaskList(payload: unknown): Task[] {
