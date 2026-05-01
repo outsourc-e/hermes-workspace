@@ -91,7 +91,7 @@ const DISMISS_KEY = 'hermes-update-dismissed-heads'
 const AUTO_UPDATE_KEY = 'hermes-workspace-auto-update'
 const RELEASE_NOTES_KEY = 'hermes-update-release-notes'
 const RELEASE_NOTES_SEEN_KEY = 'hermes-update-release-notes-seen'
-const AGENT_DISMISS_KEY = 'hermes-agent-update-dismissed-head'
+const AGENT_DISMISS_KEY = 'hermes-agent-update-v2-dismissed-head'
 const AGENT_AUTO_UPDATE_KEY = 'hermes-agent-auto-update'
 
 function shortSha(value: string | null | undefined): string {
@@ -213,6 +213,9 @@ export function HermesUpdateNotifier() {
   )
   const isUpdating = phase === 'updating'
   const agentHeadsKey = agentData?.remote.remoteHead ?? ''
+  const agentManualCommand = agentData?.app.repoPath
+    ? `cd ${agentData.app.repoPath} && git status && hermes update`
+    : (agentData?.manualCommand ?? 'hermes update')
   const agentVisible = Boolean(
     agentData?.updateAvailable &&
     agentHeadsKey &&
@@ -270,6 +273,15 @@ export function HermesUpdateNotifier() {
     const next = !agentAutoUpdate
     setAgentAutoUpdate(next)
     localStorage.setItem(AGENT_AUTO_UPDATE_KEY, String(next))
+  }
+
+  async function copyAgentManualCommand() {
+    try {
+      await navigator.clipboard.writeText(agentManualCommand)
+      toast('Copied Hermes Agent manual update command.', { type: 'success' })
+    } catch {
+      toast(agentManualCommand, { type: 'info', duration: 9000 })
+    }
   }
 
   async function handleUpdate() {
