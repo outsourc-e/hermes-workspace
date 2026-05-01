@@ -39,7 +39,7 @@ type UpdateStatus = {
 }
 
 type ReleaseNoteSection = {
-  name: RemoteName
+  name: RemoteName | 'agent'
   label: string
   from: string | null
   to: string | null
@@ -61,11 +61,38 @@ type UpdateResult = {
   error?: string
 }
 
+type AgentUpdateStatus = {
+  ok: boolean
+  app: {
+    name: string
+    version: string
+    path: string | null
+    repoPath: string | null
+    branch: string | null
+    currentHead: string | null
+    dirty: boolean
+  }
+  remote: {
+    label: string
+    url: string | null
+    repoMatches: boolean
+    currentHead: string | null
+    remoteHead: string | null
+    updateAvailable: boolean
+    canUpdate: boolean
+    error: string | null
+  }
+  updateAvailable: boolean
+  manualCommand: string
+}
+
 const CHECK_INTERVAL_MS = 30 * 60 * 1000
 const DISMISS_KEY = 'hermes-update-dismissed-heads'
 const AUTO_UPDATE_KEY = 'hermes-workspace-auto-update'
 const RELEASE_NOTES_KEY = 'hermes-update-release-notes'
 const RELEASE_NOTES_SEEN_KEY = 'hermes-update-release-notes-seen'
+const AGENT_DISMISS_KEY = 'hermes-agent-update-dismissed-head'
+const AGENT_AUTO_UPDATE_KEY = 'hermes-agent-auto-update'
 
 function shortSha(value: string | null | undefined): string {
   return value ? value.slice(0, 7) : 'unknown'
@@ -128,6 +155,11 @@ export function HermesUpdateNotifier() {
   const [phase, setPhase] = useState<UpdatePhase>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [progress, setProgress] = useState(0)
+  const [agentDismissed, setAgentDismissed] = useState<string | null>(null)
+  const [agentAutoUpdate, setAgentAutoUpdate] = useState(false)
+  const [agentPhase, setAgentPhase] = useState<UpdatePhase>('idle')
+  const [agentErrorMsg, setAgentErrorMsg] = useState('')
+  const [agentProgress, setAgentProgress] = useState(0)
   const [releaseNotes, setReleaseNotes] = useState<StoredReleaseNotes | null>(
     null,
   )
@@ -136,6 +168,8 @@ export function HermesUpdateNotifier() {
     if (typeof window === 'undefined') return
     setDismissed(localStorage.getItem(DISMISS_KEY))
     setAutoUpdate(localStorage.getItem(AUTO_UPDATE_KEY) === 'true')
+    setAgentDismissed(localStorage.getItem(AGENT_DISMISS_KEY))
+    setAgentAutoUpdate(localStorage.getItem(AGENT_AUTO_UPDATE_KEY) === 'true')
     setReleaseNotes(readStoredReleaseNotes())
   }, [])
 
@@ -145,6 +179,18 @@ export function HermesUpdateNotifier() {
       const res = await fetch('/api/claude-update')
       if (!res.ok) return null
       return res.json() as Promise<UpdateStatus>
+    },
+    refetchInterval: CHECK_INTERVAL_MS,
+    staleTime: CHECK_INTERVAL_MS,
+    retry: false,
+  })
+
+  const { data: agentData } = useQuery({
+    queryKey: ['hermes-agent-update-check'],
+    queryFn: async () => {
+      const res = await fetch('/api/hermes-agent-update')
+      if (!res.ok) return null
+      return res.json() as Promise<AgentUpdateStatus>
     },
     refetchInterval: CHECK_INTERVAL_MS,
     staleTime: CHECK_INTERVAL_MS,
@@ -166,6 +212,14 @@ export function HermesUpdateNotifier() {
     phase !== 'done',
   )
   const isUpdating = phase === 'updating'
+  const agentHeadsKey = agentData?.remote.remoteHead ?? ''
+  const agentVisible = Boolean(
+    agentData?.updateAvailable &&
+    agentHeadsKey &&
+    agentDismissed !== agentHeadsKey &&
+    agentPhase !== 'done',
+  )
+  const agentIsUpdating = agentPhase === 'updating'
 
   useEffect(() => {
     if (!autoUpdate || !data?.updateAvailable || !visible || phase !== 'idle')
@@ -174,6 +228,25 @@ export function HermesUpdateNotifier() {
     void handleUpdate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoUpdate, data?.updateAvailable, data?.app.dirty, visible, phase])
+
+  useEffect(() => {
+    if (
+      !agentAutoUpdate ||
+      !agentData?.updateAvailable ||
+      !agentVisible ||
+      agentPhase !== 'idle'
+    )
+      return
+    if (!agentData.remote.canUpdate) return
+    void handleAgentUpdate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    agentAutoUpdate,
+    agentData?.updateAvailable,
+    agentData?.remote.canUpdate,
+    agentVisible,
+    agentPhase,
+  ])
 
   function handleDismiss() {
     if (!updateHeadsKey) return
@@ -185,6 +258,18 @@ export function HermesUpdateNotifier() {
     const next = !autoUpdate
     setAutoUpdate(next)
     localStorage.setItem(AUTO_UPDATE_KEY, String(next))
+  }
+
+  function handleAgentDismiss() {
+    if (!agentHeadsKey) return
+    localStorage.setItem(AGENT_DISMISS_KEY, agentHeadsKey)
+    setAgentDismissed(agentHeadsKey)
+  }
+
+  function toggleAgentAutoUpdate() {
+    const next = !agentAutoUpdate
+    setAgentAutoUpdate(next)
+    localStorage.setItem(AGENT_AUTO_UPDATE_KEY, String(next))
   }
 
   async function handleUpdate() {
@@ -225,8 +310,8 @@ export function HermesUpdateNotifier() {
       await queryClient.invalidateQueries({ queryKey: ['hermes-update-check'] })
       toast(
         result.restartRequired
-          ? 'Hermes update installed. Restart the Workspace process to run the new code.'
-          : 'Hermes is already up to date.',
+          ? 'Hermes Workspace update installed. Restart the Workspace process to run the new code.'
+          : 'Hermes Workspace is already up to date.',
         { type: 'success', duration: 7000 },
       )
     } catch (err) {
@@ -234,6 +319,59 @@ export function HermesUpdateNotifier() {
       setPhase('error')
       setProgress(0)
       setErrorMsg(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function handleAgentUpdate() {
+    setAgentPhase('updating')
+    setAgentErrorMsg('')
+    setAgentProgress(10)
+
+    const progressTimer = window.setInterval(() => {
+      setAgentProgress((value) => Math.min(value + 2, 88))
+    }, 600)
+
+    try {
+      const res = await fetch('/api/hermes-agent-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const result = (await res.json()) as UpdateResult
+      window.clearInterval(progressTimer)
+
+      if (!res.ok || !result.ok) {
+        setAgentPhase('error')
+        setAgentProgress(0)
+        setAgentErrorMsg(result.error || 'Hermes Agent update failed')
+        return
+      }
+
+      setAgentProgress(100)
+      setAgentPhase('done')
+      if (agentHeadsKey) {
+        localStorage.setItem(AGENT_DISMISS_KEY, agentHeadsKey)
+        setAgentDismissed(agentHeadsKey)
+      }
+      const storedNotes = result.releaseNotes?.length
+        ? storeReleaseNotes(result.releaseNotes)
+        : null
+      if (storedNotes) setReleaseNotes(storedNotes)
+      await queryClient.invalidateQueries({
+        queryKey: ['hermes-agent-update-check'],
+      })
+      toast(
+        'Hermes Agent update installed. Restart running agent/gateway processes to use it.',
+        {
+          type: 'success',
+          duration: 7000,
+        },
+      )
+    } catch (err) {
+      window.clearInterval(progressTimer)
+      setAgentPhase('error')
+      setAgentProgress(0)
+      setAgentErrorMsg(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -246,13 +384,172 @@ export function HermesUpdateNotifier() {
     <>
       <ReleaseNotesModal notes={releaseNotes} onClose={closeReleaseNotes} />
       <AnimatePresence>
-        {visible && data ? (
+        {agentVisible && agentData ? (
           <motion.div
             initial={{ opacity: 0, y: -40, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -40, scale: 0.96 }}
             transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
             className="fixed left-1/2 top-[calc(var(--titlebar-h,0px)+1rem)] z-[9998] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl shadow-2xl"
+            style={{
+              background: 'var(--theme-card)',
+              border: '1px solid var(--theme-border)',
+              color: 'var(--theme-text)',
+              boxShadow: 'var(--theme-shadow-3)',
+            }}
+          >
+            {agentIsUpdating ? (
+              <motion.div
+                className="h-0.5 origin-left"
+                style={{ background: 'var(--theme-accent)' }}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: agentProgress / 100 }}
+                transition={{ duration: 0.25 }}
+              />
+            ) : null}
+            <div className="flex items-center gap-3 px-5 py-3.5">
+              <div
+                className={cn(
+                  'flex size-9 shrink-0 items-center justify-center rounded-xl',
+                  agentPhase === 'error' ? 'bg-red-500/15' : '',
+                )}
+                style={
+                  agentPhase === 'idle' || agentPhase === 'updating'
+                    ? {
+                        background:
+                          'color-mix(in srgb, var(--theme-accent) 14%, transparent)',
+                      }
+                    : undefined
+                }
+              >
+                {agentIsUpdating ? (
+                  <HugeiconsIcon
+                    icon={Loading03Icon}
+                    size={18}
+                    strokeWidth={2}
+                    className="animate-spin"
+                    style={{ color: 'var(--theme-accent)' }}
+                  />
+                ) : (
+                  <HugeiconsIcon
+                    icon={ArrowUp02Icon}
+                    size={18}
+                    strokeWidth={2}
+                    style={{ color: 'var(--theme-accent)' }}
+                  />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: 'var(--theme-text)' }}
+                >
+                  {agentPhase === 'updating'
+                    ? 'Updating Hermes Agent...'
+                    : agentPhase === 'error'
+                      ? 'Hermes Agent update failed'
+                      : 'Hermes Agent update available'}
+                </p>
+                <p
+                  className="truncate text-xs"
+                  style={{ color: 'var(--theme-muted)' }}
+                >
+                  {agentPhase === 'error'
+                    ? agentErrorMsg
+                    : agentData.remote.error
+                      ? agentData.remote.error
+                      : `${shortSha(agentData.remote.currentHead)} → ${shortSha(agentData.remote.remoteHead)}`}
+                </p>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {(agentPhase === 'idle' || agentPhase === 'error') &&
+                agentData.remote.canUpdate ? (
+                  <button
+                    type="button"
+                    onClick={handleAgentUpdate}
+                    className="rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                    style={{ background: 'var(--theme-accent)' }}
+                  >
+                    {agentPhase === 'error' ? 'Retry' : 'Install'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleAgentDismiss}
+                  className="rounded-lg p-1.5 transition-colors hover:opacity-80"
+                  style={{ color: 'var(--theme-muted)' }}
+                  aria-label="Dismiss Hermes Agent update"
+                >
+                  <HugeiconsIcon
+                    icon={Cancel01Icon}
+                    size={14}
+                    strokeWidth={2}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {agentPhase === 'idle' || agentPhase === 'error' ? (
+              <div
+                className="flex items-center justify-between border-t px-5 py-2.5"
+                style={{ borderColor: 'var(--theme-border)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <HugeiconsIcon
+                    icon={Settings02Icon}
+                    size={14}
+                    strokeWidth={2}
+                    style={{ color: 'var(--theme-muted)' }}
+                  />
+                  <span
+                    className="text-xs"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
+                    Auto-update Agent when safe
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleAgentAutoUpdate}
+                  className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200"
+                  style={{
+                    background: agentAutoUpdate
+                      ? 'var(--theme-accent)'
+                      : 'var(--theme-card2)',
+                  }}
+                  role="switch"
+                  aria-checked={agentAutoUpdate}
+                >
+                  <span
+                    className={cn(
+                      'pointer-events-none mt-0.5 inline-block size-4 rounded-full bg-white shadow-sm transition-transform duration-200',
+                      agentAutoUpdate
+                        ? 'translate-x-[17px]'
+                        : 'translate-x-0.5',
+                    )}
+                  />
+                </button>
+              </div>
+            ) : null}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {visible && data ? (
+          <motion.div
+            initial={{ opacity: 0, y: -40, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -40, scale: 0.96 }}
+            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+            className={cn(
+              'fixed left-1/2 z-[9998] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl shadow-2xl',
+              agentVisible
+                ? 'top-[calc(var(--titlebar-h,0px)+7rem)]'
+                : 'top-[calc(var(--titlebar-h,0px)+1rem)]',
+            )}
             style={{
               background: 'var(--theme-card)',
               border: '1px solid var(--theme-border)',
@@ -321,10 +618,10 @@ export function HermesUpdateNotifier() {
                   style={{ color: 'var(--theme-text)' }}
                 >
                   {phase === 'updating'
-                    ? 'Updating Hermes...'
+                    ? 'Updating Hermes Workspace...'
                     : phase === 'error'
-                      ? 'Hermes update failed'
-                      : 'Hermes update available'}
+                      ? 'Hermes Workspace update failed'
+                      : 'Hermes Workspace update available'}
                 </p>
                 <p
                   className="truncate text-xs"
@@ -388,7 +685,7 @@ export function HermesUpdateNotifier() {
                     className="text-xs"
                     style={{ color: 'var(--theme-muted)' }}
                   >
-                    Auto-update Hermes when clean
+                    Auto-update Workspace when clean
                   </span>
                 </div>
                 <button

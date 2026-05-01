@@ -288,15 +288,18 @@ function applyFastForwardUpdate(target: UpdateTarget): UpdateResult {
     }
 
     const remoteRef = `${definition.name}/${ref}`
-    const canFastForward = execFileSync(
-      'git',
-      ['merge-base', '--is-ancestor', 'HEAD', remoteRef],
-      {
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', 'HEAD', remoteRef], {
         cwd: process.cwd(),
         stdio: 'ignore',
-      },
-    )
-    void canFastForward
+      })
+    } catch {
+      skipped.push({
+        name: definition.name,
+        reason: `${remoteRef} is not a fast-forward update. Manual rebase/merge required.`,
+      })
+      continue
+    }
 
     output.push(`Fast-forwarding from ${remoteRef}...`)
     output.push(gitOrThrow(['merge', '--ff-only', remoteRef], 60_000))
