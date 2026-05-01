@@ -144,7 +144,7 @@ export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Claude backend does not su
 const PROBE_TIMEOUT_MS = 3_000
 const PROBE_TTL_MS = 120_000
 const DASHBOARD_TOKEN_REGEX =
-  /window\.__CLAUDE_SESSION_TOKEN__\s*=\s*["'](.+?)["']/
+  /window\.__(?:CLAUDE|HERMES)_SESSION_TOKEN__\s*=\s*["'](.+?)["']/
 
 // ── Types ─────────────────────────────────────────────────────────
 
