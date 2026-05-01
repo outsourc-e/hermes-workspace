@@ -252,9 +252,11 @@ function RootLayout() {
     null,
   )
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+  const [mounted, setMounted] = useState(false)
   useApplyChatWidth()
 
   useEffect(() => {
+    setMounted(true)
     initializeSettingsAppearance()
 
     const syncOnboardingCompletion = () => {
@@ -332,8 +334,8 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
-      {rootSurfaceState.showLogin ? <LoginScreen /> : null}
-      {rootSurfaceState.showOnboarding ? <HermesOnboarding /> : null}
+      {mounted && rootSurfaceState.showLogin ? <LoginScreen /> : null}
+      {mounted && rootSurfaceState.showOnboarding ? <HermesOnboarding /> : null}
       {rootSurfaceState.showWorkspaceShell ? (
         <>
           <GlobalShortcutListener />
