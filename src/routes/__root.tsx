@@ -24,7 +24,7 @@ import {
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
-import { fetchHermesAuthStatus, type AuthStatus } from '@/lib/hermes-auth'
+import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
 import { getRootSurfaceState } from './-root-layout-state'
 
 
@@ -313,7 +313,7 @@ function RootLayout() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     let cancelled = false
-    fetchHermesAuthStatus()
+    fetchClaudeAuthStatus()
       .then((status) => {
         if (!cancelled) setAuthStatus(status)
       })
