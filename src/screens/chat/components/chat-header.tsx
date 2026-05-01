@@ -492,7 +492,7 @@ function ChatHeaderComponent({
                 }
               />
               <TooltipContent side="bottom">
-                Thinking: Adaptive — Claude reasons before responding
+                Thinking: Adaptive — Hermes reasons before responding
               </TooltipContent>
             </TooltipRoot>
           </TooltipProvider>

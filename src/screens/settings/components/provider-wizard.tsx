@@ -604,7 +604,7 @@ export function ProviderWizard({
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Claude Agent docs
+                            See the Hermes Agent docs
                           </a>{' '}
                           for setup instructions.
                         </p>
@@ -668,7 +668,7 @@ export function ProviderWizard({
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Claude Agent docs
+                            See the Hermes Agent docs
                           </a>{' '}
                           for CLI token setup instructions.
                         </p>

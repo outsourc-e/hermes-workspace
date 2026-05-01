@@ -1083,7 +1083,7 @@ function ClaudeConfigSection({
   if (loading) {
     return (
       <SettingsSection
-        title="Claude Agent"
+        title="Hermes Agent"
         description="Loading configuration..."
         icon={Settings02Icon}
       >
@@ -1098,12 +1098,12 @@ function ClaudeConfigSection({
   if (!data) {
     return (
       <SettingsSection
-        title="Claude Agent"
+        title="Hermes Agent"
         description="Could not load Claude configuration."
         icon={Settings02Icon}
       >
         <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
-          Make sure Claude Agent is running on localhost:8642
+          Make sure Hermes Agent is running on localhost:8642
         </p>
       </SettingsSection>
     )
@@ -1132,7 +1132,7 @@ function ClaudeConfigSection({
     <>
       <SettingsSection
         title="Model & Provider"
-        description="Configure the default AI model for Claude Agent."
+        description="Configure the default AI model for Hermes Agent."
         icon={SourceCodeSquareIcon}
       >
         <SettingsRow
@@ -1318,7 +1318,7 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="Memory"
-        description="Configure Claude Agent memory and user profiles."
+        description="Configure Hermes Agent memory and user profiles."
         icon={UserIcon}
       >
         <SettingsRow
@@ -1442,7 +1442,7 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="About"
-        description="Claude Agent runtime information."
+        description="Hermes Agent runtime information."
         icon={Notification03Icon}
       >
         <SettingsRow

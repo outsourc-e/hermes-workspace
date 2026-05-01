@@ -6,7 +6,7 @@ if [ -z "$ANTHROPIC_API_KEY" ]; then
   echo "Warning: ANTHROPIC_API_KEY not set. Export it or add to ~/.claude/.env"
 fi
 
-echo "Claude Agent (simple mode) — type your message, press Enter"
+echo "Hermes Agent (simple mode) — type your message, press Enter"
 echo "Type 'exit' to quit"
 echo "---"
 

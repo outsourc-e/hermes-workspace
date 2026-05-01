@@ -20,7 +20,7 @@ export async function fetchClaudeAuthStatus(
 
     throw error instanceof Error
       ? error
-      : new Error('Failed to connect to Claude Agent')
+      : new Error('Failed to connect to Hermes Agent')
   } finally {
     globalThis.clearTimeout(timeout)
   }
