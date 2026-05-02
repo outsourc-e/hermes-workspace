@@ -21,11 +21,34 @@ const KIND_ICONS: Record<string, string> = {
   cron: '⏰',
   cli: '⌨️',
   api: '🔌',
+  api_server: '🔌',
   telegram: '✈️',
   discord: '🎮',
   whatsapp: '🟢',
+  signal: '🔵',
+  imessage: '💬',
+  matrix: '#',
   workspace: '🧭',
+  local: '🧭',
   job: '📋',
+}
+
+/**
+ * Pick the best icon for a session row by combining `kind`, `source`,
+ * and a heuristic on the session key (cron sessions use the canonical
+ * `cron_<jobId>_<ts>` key format the agent confirmed).
+ */
+function sessionGlyph(
+  s: { kind: string; source: string | null; key: string },
+): string {
+  if (typeof s.key === 'string' && s.key.startsWith('cron_')) {
+    return KIND_ICONS.cron
+  }
+  const sourceKey = s.source?.toLowerCase()
+  if (sourceKey && KIND_ICONS[sourceKey]) return KIND_ICONS[sourceKey]
+  const kindKey = s.kind?.toLowerCase()
+  if (kindKey && KIND_ICONS[kindKey]) return KIND_ICONS[kindKey]
+  return KIND_ICONS.chat
 }
 
 function relativeTime(ms: number | null): string {
@@ -207,7 +230,7 @@ export function SessionsIntelligenceCard({
         <ul className="flex flex-col gap-1">
           {enriched.slice(0, 8).map(({ session: s, badges }) => {
             const isHighlight = s.key === highlightId
-            const icon = KIND_ICONS[s.kind] ?? KIND_ICONS[s.source ?? ''] ?? '💬'
+            const icon = sessionGlyph(s)
             return (
               <li key={s.key}>
                 <button

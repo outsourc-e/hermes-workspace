@@ -283,17 +283,46 @@ export function HeroMetrics({
         tone: 'var(--theme-success)',
         icon: '🔧',
       },
-      {
-        label: 'Cost',
-        value: formatCost(cost),
-        sub: useAnalytics
-          ? `${formatTokens(analytics!.reasoningTokens)} reasoning`
-          : 'unavailable',
-        delta: useAnalytics ? deltaPct(costCurr, costPrev) : null,
-        spark: useAnalytics ? dailyCost : undefined,
-        tone: 'var(--theme-warning)',
-        icon: '💰',
-      },
+      // Cost tile is the trickiest: codex / anthropic-oauth / minimax
+      // are subscription-included so dollar totals can read $0 for
+      // huge token volumes. The aggregator's `costLabel` tells us
+      // whether we should hide the dollar figure or qualify it.
+      ((): HeroTileProps => {
+        const label = useAnalytics ? analytics!.costLabel : 'unknown'
+        let displayValue: string
+        let sub: string
+        let showDelta = false
+        switch (label) {
+          case 'precise':
+            displayValue = formatCost(cost)
+            sub = `${formatTokens(analytics!.reasoningTokens)} reasoning`
+            showDelta = true
+            break
+          case 'partial':
+            displayValue = formatCost(cost)
+            sub = 'partial · some included'
+            showDelta = true
+            break
+          case 'included':
+            displayValue = 'Included'
+            sub = 'subscription · no dollar metric'
+            break
+          case 'unknown':
+          default:
+            displayValue = '—'
+            sub = 'cost unavailable'
+            break
+        }
+        return {
+          label: 'Cost',
+          value: displayValue,
+          sub,
+          delta: showDelta && useAnalytics ? deltaPct(costCurr, costPrev) : null,
+          spark: showDelta && useAnalytics ? dailyCost : undefined,
+          tone: 'var(--theme-warning)',
+          icon: '💰',
+        }
+      })(),
     ],
     [
       analytics,
