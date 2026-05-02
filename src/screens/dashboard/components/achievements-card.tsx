@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Cancel01Icon, Star02Icon } from '@hugeicons/core-free-icons'
+import { CancelIcon, Award01Icon } from '@hugeicons/core-free-icons'
 import type {
   DashboardAchievementUnlock,
   DashboardOverview,
@@ -133,7 +133,7 @@ export function AchievementsCard({
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <HugeiconsIcon
-              icon={Star02Icon}
+              icon={Award01Icon}
               size={14}
               strokeWidth={1.5}
               style={{ color: 'var(--theme-muted)' }}
@@ -208,7 +208,7 @@ export function AchievementsCard({
                 className="rounded p-1 hover:bg-[var(--theme-card)]/80"
               >
                 <HugeiconsIcon
-                  icon={Cancel01Icon}
+                  icon={CancelIcon}
                   size={16}
                   strokeWidth={1.5}
                   style={{ color: 'var(--theme-muted)' }}
