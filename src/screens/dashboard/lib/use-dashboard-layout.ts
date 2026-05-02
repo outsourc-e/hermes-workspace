@@ -15,7 +15,6 @@ export type WidgetId =
   | 'top_models'
   | 'sessions_intelligence'
   | 'logs_tail'
-  | 'attention'
   | 'skills_usage'
   | 'achievements'
   | 'mix_rhythm'
@@ -55,15 +54,9 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'logs_tail',
     label: 'Live logs',
-    description: 'Tail of the gateway log stream.',
+    description:
+      'Tail of the gateway log stream. Off by default in iter 006 — enable here when triaging.',
     column: 'main',
-    hideable: true,
-  },
-  {
-    id: 'attention',
-    label: 'Attention',
-    description: 'Cron, config, gateway warnings the operator should look at.',
-    column: 'rail',
     hideable: true,
   },
   {
@@ -93,30 +86,52 @@ type StoredLayout = {
   hidden: Array<WidgetId>
 }
 
+/**
+ * Iteration 006 default state: Logs Tail starts hidden because the
+ * marquee + Sessions Intelligence already cover most operator needs.
+ * Attention is no longer a widget id at all (it moved into OpsStrip).
+ */
+const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = ['logs_tail']
+
+/**
+ * Storage schema marker. We bumped from v1 → v2 when iteration 006
+ * removed the `attention` widget id and made `logs_tail` default-off,
+ * so existing localStorage entries with `attention` get migrated
+ * cleanly instead of silently re-hiding stale ids.
+ */
+const STORAGE_VERSION = 2
+
 function readLayout(): StoredLayout {
-  if (typeof window === 'undefined') return { hidden: [] }
+  if (typeof window === 'undefined') {
+    return { hidden: [...DEFAULT_HIDDEN] }
+  }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { hidden: [] }
-    const parsed = JSON.parse(raw) as StoredLayout
-    if (!Array.isArray(parsed.hidden)) return { hidden: [] }
-    const valid = new Set<WidgetId>(
-      WIDGET_CATALOG.map((w) => w.id),
-    )
-    return {
-      hidden: parsed.hidden.filter((id): id is WidgetId =>
-        valid.has(id as WidgetId),
-      ),
+    if (!raw) return { hidden: [...DEFAULT_HIDDEN] }
+    const parsed = JSON.parse(raw) as StoredLayout & {
+      version?: number
     }
+    const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
+    // First-time migration: if no version field or it's older than
+    // the current STORAGE_VERSION, drop unknown ids but keep the
+    // user's explicit hides so we don't surprise them.
+    const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
+    const filtered = incoming.filter((id): id is WidgetId =>
+      valid.has(id as WidgetId),
+    )
+    return { hidden: filtered }
   } catch {
-    return { hidden: [] }
+    return { hidden: [...DEFAULT_HIDDEN] }
   }
 }
 
 function writeLayout(layout: StoredLayout) {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...layout, version: STORAGE_VERSION }),
+    )
   } catch {
     /* quota / disabled storage — non-fatal */
   }
@@ -166,7 +181,13 @@ export function useDashboardLayout() {
     })
   }, [])
 
-  const reset = useCallback(() => setHidden(new Set()), [])
+  // Reset returns to the iteration-006 defaults rather than "show
+  // literally everything" so first-time users hitting Reset don't
+  // suddenly see Logs they never asked for.
+  const reset = useCallback(
+    () => setHidden(new Set(DEFAULT_HIDDEN)),
+    [],
+  )
 
   const isVisible = useCallback(
     (id: WidgetId) => !hidden.has(id),
