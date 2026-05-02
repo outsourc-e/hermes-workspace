@@ -1,5 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-headers'
+import {
+  collectSyntheticLiveToolEvents,
+  createSyntheticLiveToolTracker,
+} from './send-stream-live-tools'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
@@ -23,6 +27,7 @@ import {
   
   openaiChat
 } from '../../server/openai-compat-api'
+import { streamResponses } from '../../server/responses-api'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   createSession,
@@ -538,6 +543,169 @@ export const Route = createFileRoute('/api/send-stream')({
                       content: userContent,
                     },
                   ]
+                  // Vanilla Hermes Agent (>=v0.12.x) ships a structured
+                  // Responses-API streaming surface at POST /v1/responses
+                  // that carries full tool args + results, unlike the
+                  // /v1/chat/completions surface which only emits a thin
+                  // hermes.tool.progress lifecycle event. When the user
+                  // opts into the Responses path AND we're talking to the
+                  // local Hermes gateway (no localBaseUrl override), use
+                  // it so the TUI tool card can render INPUT JSON and
+                  // tool output text live during the run. Falls back
+                  // automatically on any error to the existing
+                  // openaiChat path.
+                  const useResponsesApi =
+                    process.env.HERMES_USE_RESPONSES === '1' && !localBaseUrl
+                  if (useResponsesApi) {
+                    let thinking = ''
+                    // Track tool calls by callId so a `tool.completed`
+                    // followed by `tool.output` can carry the full
+                    // arguments forward without losing them.
+                    const toolStateByCallId = new Map<
+                      string,
+                      {
+                        name: string
+                        args: Record<string, unknown> | string | null
+                      }
+                    >()
+                    try {
+                      const responsesStream = streamResponses({
+                        input: typeof message === 'string' ? message : '',
+                        conversationHistory: effectiveHistory,
+                        model:
+                          typeof body.model === 'string' ? body.model : undefined,
+                        sessionId: portableSessionKey,
+                        signal: abortController.signal,
+                      })
+                      for await (const ev of responsesStream) {
+                        if (ev.kind === 'text.delta') {
+                          accumulated += ev.delta
+                          persistActiveRun((runSessionKey, activeId) =>
+                            appendRunText(
+                              runSessionKey,
+                              activeId,
+                              accumulated,
+                              { replace: true },
+                            ),
+                          )
+                          sendEvent('chunk', {
+                            text: accumulated,
+                            fullReplace: true,
+                            sessionKey: portableSessionKey,
+                            runId,
+                          })
+                          continue
+                        }
+                        if (ev.kind === 'tool.started') {
+                          toolStateByCallId.set(ev.callId, {
+                            name: ev.name,
+                            args: ev.args,
+                          })
+                          const argsForCard =
+                            ev.args && typeof ev.args === 'object'
+                              ? (ev.args as Record<string, unknown>)
+                              : undefined
+                          persistActiveRun((runSessionKey, activeId) =>
+                            upsertRunToolCall(runSessionKey, activeId, {
+                              id: ev.callId,
+                              name: ev.name,
+                              phase: 'calling',
+                              args: argsForCard,
+                            }),
+                          )
+                          sendEvent('tool', {
+                            phase: 'calling',
+                            name: ev.name,
+                            toolCallId: ev.callId,
+                            args: argsForCard,
+                            sessionKey: portableSessionKey,
+                            runId,
+                          })
+                          continue
+                        }
+                        if (ev.kind === 'tool.completed') {
+                          // Mark as complete but keep the args+result we
+                          // accumulated so the card stays expandable.
+                          // Vanilla emits tool.completed BEFORE the
+                          // matching function_call_output, so we
+                          // intentionally do not flip phase to 'complete'
+                          // until the output arrives. Otherwise the card
+                          // briefly flashes "done" with no result text.
+                          continue
+                        }
+                        if (ev.kind === 'tool.output') {
+                          const state = toolStateByCallId.get(ev.callId)
+                          const argsForCard =
+                            state?.args && typeof state.args === 'object'
+                              ? (state.args as Record<string, unknown>)
+                              : undefined
+                          const name = state?.name || 'tool'
+                          persistActiveRun((runSessionKey, activeId) =>
+                            upsertRunToolCall(runSessionKey, activeId, {
+                              id: ev.callId,
+                              name,
+                              phase: 'complete',
+                              args: argsForCard,
+                              result: ev.output,
+                            }),
+                          )
+                          sendEvent('tool', {
+                            phase: 'complete',
+                            name,
+                            toolCallId: ev.callId,
+                            args: argsForCard,
+                            result: ev.output,
+                            sessionKey: portableSessionKey,
+                            runId,
+                          })
+                          continue
+                        }
+                        if (ev.kind === 'completed') {
+                          // Final terminal event — fall through to the
+                          // shared 'done' emit below.
+                          break
+                        }
+                        if (ev.kind === 'failed') {
+                          throw new Error(ev.error)
+                        }
+                      }
+                      appendLocalMessage(portableSessionKey, {
+                        id: crypto.randomUUID(),
+                        role: 'assistant',
+                        content: accumulated,
+                        timestamp: Date.now(),
+                      })
+                      touchLocalSession(portableSessionKey)
+                      persistActiveRun((runSessionKey, activeId) =>
+                        markRunStatus(runSessionKey, activeId, 'complete'),
+                      )
+                      sendEvent('done', {
+                        state: 'complete',
+                        sessionKey: portableSessionKey,
+                        runId,
+                        message: {
+                          role: 'assistant',
+                          content: [
+                            ...(thinking ? [{ type: 'thinking', thinking }] : []),
+                            { type: 'text', text: accumulated },
+                          ],
+                        },
+                      })
+                      closeStream()
+                      return
+                    } catch (err) {
+                      // Log and fall through to the openaiChat path so a
+                      // misconfigured /v1/responses surface (older agent,
+                      // CORS issue, network blip) doesn't break the chat.
+                      console.warn(
+                        '[send-stream] /v1/responses path failed, falling back to /v1/chat/completions:',
+                        err,
+                      )
+                      // Reset accumulated so the fallback starts clean.
+                      accumulated = ''
+                    }
+                  }
+
                   const stream = await openaiChat(portableMessages, {
                     model: localBaseUrl ? bareModel : (typeof body.model === 'string' ? body.model : undefined),
                     temperature:
@@ -564,18 +732,34 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       })
                     } else if (chunk.type === 'tool') {
+                      // Prefer the gateway's stable tool_call_id so 'running'
+                      // and 'completed' events for the same call collapse to
+                      // one card row. Fall back to a synthetic id only when
+                      // the upstream payload lacks one (older Hermes builds).
                       toolEventCount += 1
-                      const toolCallId = `${runId}:${chunk.name}:${toolEventCount}`
+                      const toolCallId =
+                        chunk.toolCallId ||
+                        `${runId}:${chunk.name}:${toolEventCount}`
+                      // Map upstream status -> internal phase. 'running'
+                      // arrives at tool start; 'completed' at finish.
+                      // Missing status (back-compat path) is treated as a
+                      // one-shot 'calling' to mirror the previous behavior.
+                      const phase =
+                        chunk.status === 'completed'
+                          ? 'complete'
+                          : chunk.status === 'running'
+                            ? 'calling'
+                            : 'start'
                       persistActiveRun((runSessionKey, activeId) =>
                         upsertRunToolCall(runSessionKey, activeId, {
                           id: toolCallId,
                           name: chunk.name || 'tool',
-                          phase: 'start',
+                          phase,
                           preview: chunk.label,
                         }),
                       )
                       sendEvent('tool', {
-                        phase: 'start',
+                        phase,
                         name: chunk.name,
                         toolCallId,
                         preview: chunk.label,
@@ -705,7 +889,7 @@ export const Route = createFileRoute('/api/send-stream')({
               // as soon as their tool_result message lands. The Workspace
               // chat-store dedupes by tool_call_id so this is safe alongside
               // any real live events that might arrive.
-              const seenLiveToolCallIds = new Set<string>()
+              const syntheticLiveToolTracker = createSyntheticLiveToolTracker()
               let liveRunActive = true
               const livePollIntervalMs = 800
               // Snapshot the session message count at run-start so the poller
@@ -746,92 +930,19 @@ export const Route = createFileRoute('/api/send-stream')({
                       )
                       continue
                     }
-                    // Within this run only, gather every assistant tool_call
-                    // and pair with the matching tool_result if present.
-                    const resultByCallId = new Map<
-                      string,
-                      { text: string; isError: boolean }
-                    >()
-                    const runToolCalls: Array<Record<string, unknown>> = []
-                    for (const m of msgs) {
-                      if (!m) continue
-                      if (m.role === 'tool' || m.role === 'tool_result') {
-                        const callId =
-                          readString(m.tool_call_id) ||
-                          readString(
-                            (m as Record<string, unknown>)
-                              .toolCallId as unknown,
-                          )
-                        if (!callId) continue
-                        const content = m.content
-                        let text = ''
-                        if (typeof content === 'string') {
-                          text = content
-                        } else if (Array.isArray(content)) {
-                          text = (content as Array<Record<string, unknown>>)
-                            .map((p) =>
-                              typeof p?.text === 'string'
-                                ? (p.text as string)
-                                : '',
-                            )
-                            .filter(Boolean)
-                            .join('\n')
-                        }
-                        const isErr =
-                          Boolean((m as Record<string, unknown>).is_error) ||
-                          Boolean((m as Record<string, unknown>).isError)
-                        resultByCallId.set(callId, { text, isError: isErr })
-                        continue
-                      }
-                      if (m.role === 'assistant') {
-                        const tcs = (m.tool_calls ??
-                          (m as Record<string, unknown>).toolCalls) as
-                          | Array<Record<string, unknown>>
-                          | undefined
-                        if (Array.isArray(tcs) && tcs.length > 0) {
-                          runToolCalls.push(...tcs)
-                        }
-                      }
-                    }
-                    if (runToolCalls.length === 0) {
+                    const syntheticEvents = collectSyntheticLiveToolEvents({
+                      messages: msgs,
+                      tracker: syntheticLiveToolTracker,
+                      sessionKey,
+                      runId: activeRunId ?? undefined,
+                    })
+                    if (syntheticEvents.length === 0) {
                       await new Promise((r) =>
                         setTimeout(r, livePollIntervalMs),
                       )
                       continue
                     }
-                    const lastAssistantToolCalls = runToolCalls
-                    for (const tc of lastAssistantToolCalls) {
-                      const tcRecord = tc as Record<string, unknown>
-                      const tcFn = readRecord(tcRecord.function)
-                      const id =
-                        readString(tcRecord.id) ||
-                        readString(tcRecord.tool_call_id) ||
-                        ''
-                      if (!id) continue
-                      // Only emit once per tool_call_id and only after the
-                      // tool's result message has actually landed (=> the
-                      // tool finished running).
-                      if (seenLiveToolCallIds.has(id)) continue
-                      const resultEntry = resultByCallId.get(id)
-                      if (!resultEntry) continue
-                      seenLiveToolCallIds.add(id)
-                      const name =
-                        readString(tcRecord.tool_name) ||
-                        readString(tcRecord.name) ||
-                        readString(tcFn?.name) ||
-                        'tool'
-                      const args = parseJsonIfPossible(
-                        tcFn?.arguments ?? tcRecord.arguments,
-                      )
-                      const synthetic = {
-                        phase: resultEntry.isError ? 'error' : 'complete',
-                        name,
-                        toolCallId: id,
-                        args,
-                        result: resultEntry.text,
-                        sessionKey,
-                        runId: activeRunId ?? undefined,
-                      }
+                    for (const synthetic of syntheticEvents) {
                       sendEvent('tool', synthetic)
                     }
                   } catch {
@@ -1275,72 +1386,13 @@ export const Route = createFileRoute('/api/send-stream')({
                                 ? rawToolCalls
                                 : []
 
-                            // Build a map of tool_call_id -> result text by
-                            // scanning the messages after the last assistant.
-                            const resultByCallId = new Map<string, string>()
-                            const errorByCallId = new Map<string, boolean>()
-                            for (
-                              let i = lastAssistantIndex + 1;
-                              i < recent.length;
-                              i++
-                            ) {
-                              const m = recent[i] as Record<string, unknown>
-                              if (
-                                !m ||
-                                (m.role !== 'tool' &&
-                                  m.role !== 'tool_result')
-                              ) {
-                                continue
-                              }
-                              const callId =
-                                readString(m.tool_call_id) ||
-                                readString((m as any).toolCallId) ||
-                                ''
-                              if (!callId) continue
-                              const content = m.content
-                              let text = ''
-                              if (typeof content === 'string') {
-                                text = content
-                              } else if (Array.isArray(content)) {
-                                text = content
-                                  .map((p: any) =>
-                                    typeof p?.text === 'string' ? p.text : '',
-                                  )
-                                  .filter(Boolean)
-                                  .join('\n')
-                              }
-                              resultByCallId.set(callId, text)
-                              const isErr =
-                                Boolean((m as any).is_error) ||
-                                Boolean((m as any).isError)
-                              if (isErr) errorByCallId.set(callId, true)
-                            }
-                            for (const tc of toolCalls) {
-                              const tcRecord = tc as Record<string, unknown>
-                              const tcFn = readRecord(tcRecord.function)
-                              const id =
-                                readString(tcRecord.id) ||
-                                readString(tcRecord.tool_call_id) ||
-                                `${runId || 'run'}:tool:${Math.random().toString(36).slice(2, 8)}`
-                              const name =
-                                readString(tcRecord.tool_name) ||
-                                readString(tcRecord.name) ||
-                                readString(tcFn?.name) ||
-                                'tool'
-                              const args = parseJsonIfPossible(
-                                tcFn?.arguments ?? tcRecord.arguments,
-                              )
-                              const resultText = resultByCallId.get(id) ?? ''
-                              const isErr = errorByCallId.get(id) === true
-                              const synthetic = {
-                                phase: isErr ? 'error' : 'complete',
-                                name,
-                                toolCallId: id,
-                                args,
-                                result: resultText,
-                                sessionKey: sessionKeyFromEvent,
-                                runId,
-                              }
+                            const syntheticEvents = collectSyntheticLiveToolEvents({
+                              messages: recent,
+                              tracker: syntheticLiveToolTracker,
+                              sessionKey: sessionKeyFromEvent,
+                              runId,
+                            })
+                            for (const synthetic of syntheticEvents) {
                               persistActiveRun(
                                 (runSessionKey, activeId) =>
                                   upsertRunToolCall(
