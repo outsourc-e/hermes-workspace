@@ -141,3 +141,7 @@ workspace-final-markdown-review.md
 
 # Local sibling projects (do not ship)
 skills-bundle/
+
+# Local agent artifacts (audit dumps, temporary playwright scripts)
+.hermes/
+.env.bak-*

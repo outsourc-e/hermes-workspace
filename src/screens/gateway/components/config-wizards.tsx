@@ -243,8 +243,8 @@ export const PROVIDER_COMMON_MODELS: Record<string, Array<{ value: string; label
     { value: 'fireworks/accounts/fireworks/models/qwen2p5-72b-instruct', label: 'Qwen 2.5 72B' },
   ],
   minimax: [
-    { value: 'minimax/MiniMax-M2.5', label: 'MiniMax M2.5' },
-    { value: 'minimax/MiniMax-M2.5-Lightning', label: 'MiniMax M2.5 Lightning' },
+    { value: 'minimax/MiniMax-M2.7', label: 'MiniMax M2.7' },
+    { value: 'minimax/MiniMax-M2.7-Lightning', label: 'MiniMax M2.7 Lightning' },
   ],
   xai: [
     { value: 'xai/grok-beta', label: 'Grok Beta' },

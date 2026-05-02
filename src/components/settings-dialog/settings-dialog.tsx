@@ -223,7 +223,7 @@ const PROVIDER_CARDS: Array<{
     id: 'minimax',
     name: 'MiniMax',
     logo: '/providers/minimax.png',
-    models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'],
+    models: ['MiniMax-M2.7', 'MiniMax-M2.7-Lightning'],
     authType: 'api_key',
     envKey: 'MINIMAX_API_KEY',
   },

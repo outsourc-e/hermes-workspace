@@ -21,7 +21,7 @@ export const MODEL_PRESETS = [
   { id: 'sonnet', label: 'Claude Sonnet 4.6', desc: 'Fast & capable — Anthropic' },
   { id: 'codex', label: 'GPT-5 Codex', desc: 'Code specialist — OpenAI' },
   { id: 'flash', label: 'Gemini 2.5 Flash', desc: 'Quick & cheap — Google' },
-  { id: 'minimax', label: 'MiniMax M2.5', desc: 'Cost efficient — MiniMax' },
+  { id: 'minimax', label: 'MiniMax M2.7', desc: 'Cost efficient — MiniMax' },
   { id: 'pc1-coder', label: 'PC1 Coder (97 TPS)', desc: 'Qwen3-Coder 30B · Local · RTX 4090' },
   { id: 'pc1-planner', label: 'PC1 Planner (175 TPS)', desc: 'Qwen3-30B Sonnet Distill MoE · Local · RTX 4090' },
   { id: 'pc1-critic', label: 'PC1 Critic (83 TPS)', desc: 'Qwen3-14B Opus Distill · Local · RTX 4090' },
