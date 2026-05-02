@@ -17,13 +17,20 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { dashboardFetch } from '../../../server/gateway-capabilities'
+import {
+  dashboardFetch,
+  gatewayFetch,
+} from '../../../server/gateway-capabilities'
 import {
   buildDashboardOverview,
   type DashboardFetcher,
 } from '../../../server/dashboard-aggregator'
 
 const overviewFetcher: DashboardFetcher = (path) => dashboardFetch(path)
+// Gateway fetcher hits the gateway URL (8645/8642), which is where
+// `/health/detailed` lives. The Hermes Agent confirmed `active_agents`
+// from this endpoint is the canonical “currently running” count.
+const overviewGatewayFetcher: DashboardFetcher = (path) => gatewayFetch(path)
 
 export const Route = createFileRoute('/api/dashboard/overview')({
   server: {
@@ -39,6 +46,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
           const logsLimit = Number(url.searchParams.get('logs') ?? '24')
           const overview = await buildDashboardOverview({
             fetcher: overviewFetcher,
+            gatewayFetcher: overviewGatewayFetcher,
             analyticsWindowDays: Number.isFinite(days) && days > 0 ? days : 30,
             achievementsLimit:
               Number.isFinite(limit) && limit > 0 ? Math.min(limit, 12) : 3,

@@ -14,6 +14,10 @@ import { TopModelsCard } from './components/top-models-card'
 import { LogsTailCard } from './components/logs-tail-card'
 import { AttentionCard } from './components/attention-card'
 import {
+  SessionsIntelligenceCard,
+  type SessionRowData,
+} from './components/sessions-intelligence-card'
+import {
   Area,
   AreaChart,
   CartesianGrid,
@@ -357,9 +361,11 @@ function ActivityChart({
 function SkillsWidget({
   palette,
   onOpen,
+  usage,
 }: {
   palette: ReturnType<typeof readDashboardPalette>
   onOpen: () => void
+  usage: DashboardOverview['skillsUsage']
 }) {
   const skillsAvailable = useFeatureAvailable('skills')
   const skillsQuery = useQuery({
@@ -386,10 +392,19 @@ function SkillsWidget({
   }
 
   // Summary view per Hermes Agent feedback: 'don’t enumerate, summarise.'
+  // Prefer real usage signal from /api/analytics/usage when present
+  // (counts what the agent *actually used*, not just what's installed).
   const installed = skills.length
   const enabled = skills.filter((s) => s.enabled !== false).length
-  const top = skills.find((s) => s.enabled !== false) ?? skills[0]
-  const topName = top ? String(top.name ?? '—') : '—'
+  const usedThisWindow = usage?.distinctSkills ?? null
+  const topUsed = usage?.topSkills?.[0]
+  const topInstalled =
+    skills.find((s) => s.enabled !== false) ?? skills[0]
+  const topName = topUsed?.skill
+    ? topUsed.skill
+    : topInstalled
+      ? String(topInstalled.name ?? '—')
+      : '—'
 
   return (
     <button
@@ -434,7 +449,9 @@ function SkillsWidget({
       >
         {installed === 0
           ? 'no skills installed'
-          : `${enabled} enabled · top: ${topName}`}
+          : usedThisWindow !== null && usedThisWindow > 0
+            ? `${enabled} enabled · ${usedThisWindow} used · top: ${topName}`
+            : `${enabled} enabled · top: ${topName}`}
       </div>
     </button>
   )
@@ -604,25 +621,82 @@ export function DashboardScreen() {
     queryKey: ['dashboard', 'sessions'],
     queryFn: async () => {
       const res = await fetch('/api/sessions?limit=200&offset=0')
-      if (!res.ok) return []
+      if (!res.ok) return [] as Array<Record<string, unknown>>
       const data = (await res.json()) as {
         sessions?: Array<Record<string, unknown>>
       }
-      return (data.sessions ?? []).map((s) => ({
-        id: (s.key ?? s.id) as string,
-        started_at: s.startedAt ? (s.startedAt as number) / 1000 : undefined,
-        message_count: (s.message_count as number | undefined) ?? 0,
-        tool_call_count: (s.tool_call_count as number | undefined) ?? 0,
-        input_tokens: (s.tokenCount as number | undefined) ?? 0,
-        output_tokens: 0,
-      })) as Array<ClaudeSession>
+      return data.sessions ?? []
     },
     staleTime: 10_000,
     refetchInterval: 30_000,
     enabled: sessionsAvailable,
   })
 
-  const sessions = (sessionsQuery.data ?? []) as ClaudeSession[]
+  // Raw rows from the sessions endpoint. Used both for hero stats
+  // (count/tokens) and for the SessionsIntelligenceCard below.
+  const rawSessions = (sessionsQuery.data ?? []) as Array<
+    Record<string, unknown>
+  >
+
+  // Adapter shape kept for the legacy fallbacks that still reference
+  // ClaudeSession (HeroMetrics fallback path, etc.).
+  const sessions = useMemo(
+    () =>
+      rawSessions.map((s) => ({
+        id: (s.key ?? s.id) as string,
+        started_at: s.startedAt ? (s.startedAt as number) / 1000 : undefined,
+        message_count: (s.message_count as number | undefined) ?? 0,
+        tool_call_count: (s.tool_call_count as number | undefined) ?? 0,
+        input_tokens: (s.tokenCount as number | undefined) ?? 0,
+        output_tokens: 0,
+      })) as Array<ClaudeSession>,
+    [rawSessions],
+  )
+
+  // Enriched rows for the Sessions Intelligence card. Keeps the rich
+  // fields (`derivedTitle`, `kind`, `status`, `source`, `updatedAt`,
+  // etc.) the legacy adapter dropped.
+  const sessionRows: Array<SessionRowData> = useMemo(
+    () =>
+      [...rawSessions]
+        .sort(
+          (a, b) =>
+            ((b.updatedAt as number | undefined) ??
+              (b.startedAt as number | undefined) ??
+              0) -
+            ((a.updatedAt as number | undefined) ??
+              (a.startedAt as number | undefined) ??
+              0),
+        )
+        .slice(0, 12)
+        .map((s) => ({
+          key: String(s.key ?? s.id ?? ''),
+          title:
+            (s.derivedTitle as string | undefined) ||
+            (s.title as string | undefined) ||
+            (s.preview as string | undefined) ||
+            String(s.key ?? ''),
+          kind: String(s.kind ?? 'chat'),
+          status: String(s.status ?? ''),
+          source: (s.source as string | undefined) ?? null,
+          model: (s.model as string | undefined) ?? null,
+          messageCount:
+            ((s.messageCount as number | undefined) ??
+              (s.message_count as number | undefined) ??
+              0),
+          toolCallCount:
+            ((s.toolCallCount as number | undefined) ??
+              (s.tool_call_count as number | undefined) ??
+              0),
+          tokenCount:
+            ((s.tokenCount as number | undefined) ??
+              (s.totalTokens as number | undefined) ??
+              0),
+          startedAt: (s.startedAt as number | undefined) ?? null,
+          updatedAt: (s.updatedAt as number | undefined) ?? null,
+        })),
+    [rawSessions],
+  )
 
   const stats = useMemo(() => {
     let totalMessages = 0,
@@ -842,8 +916,7 @@ export function DashboardScreen() {
         <div className="lg:col-span-8">
           <AnalyticsChartCard
             analytics={overview?.analytics ?? null}
-            cron={overview?.cron ?? null}
-            status={overview?.status ?? null}
+            insights={overview?.insights ?? []}
             period={period}
             onPeriodChange={setPeriod}
             loading={overviewQuery.isFetching}
@@ -854,14 +927,14 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      {/* ── Primary content: Activity chart + side rail ── */}
+      {/* ── Primary content: Sessions Intelligence (replaces 14d Activity) + side rail ── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         <div className="flex flex-col gap-3 lg:col-span-8">
           {sessionsAvailable ? (
-            <ActivityChart sessions={sessions} palette={palette} />
+            <SessionsIntelligenceCard sessions={sessionRows} />
           ) : (
             <UnavailableWidget
-              title="Activity"
+              title="Recent Sessions"
               description={getUnavailableReason('sessions')}
             />
           )}
@@ -877,61 +950,11 @@ export function DashboardScreen() {
           <SkillsWidget
             palette={palette}
             onOpen={() => navigate({ to: '/skills' })}
+            usage={overview?.skillsUsage ?? null}
           />
           <AchievementsCard achievements={overview?.achievements ?? null} />
         </div>
       </div>
-
-      {/* ── Recent Sessions (minimal) ── */}
-      {sessionsAvailable ? (
-        <GlassCard
-          title="Recent Sessions"
-          titleRight={
-            <button
-              type="button"
-              className="text-[10px] text-muted hover:text-neutral-300 transition-colors"
-              onClick={() =>
-                navigate({
-                  to: '/chat/$sessionKey',
-                  params: { sessionKey: 'main' },
-                })
-              }
-            >
-              View all →
-            </button>
-          }
-          accentColor={palette.accent}
-          noPadding
-        >
-          <div className="py-1">
-            {recentSessions.length === 0 ? (
-              <div className="text-xs text-neutral-400 py-8 text-center">
-                No sessions yet — start a chat!
-              </div>
-            ) : (
-              recentSessions.map((s) => (
-                <SessionRow
-                  key={s.id}
-                  session={s}
-                  maxTokens={maxTokens}
-                  palette={palette}
-                  onClick={() =>
-                    navigate({
-                      to: '/chat/$sessionKey',
-                      params: { sessionKey: s.id },
-                    })
-                  }
-                />
-              ))
-            )}
-          </div>
-        </GlassCard>
-      ) : (
-        <UnavailableWidget
-          title="Recent Sessions"
-          description={getUnavailableReason('sessions')}
-        />
-      )}
       </div>
     </div>
   )
