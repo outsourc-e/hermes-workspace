@@ -3,7 +3,15 @@ const { join } = require('path')
 const { existsSync } = require('fs')
 const { spawn, execSync } = require('child_process')
 const http = require('http')
-const { autoUpdater } = require('electron-updater')
+let autoUpdater = null
+try {
+  ;({ autoUpdater } = require('electron-updater'))
+} catch (error) {
+  console.warn(
+    '[hermes-workspace] electron-updater unavailable, disabling built-in updater:',
+    error?.message || error,
+  )
+}
 
 const APP_PORT = 3847
 const HERMES_GATEWAY_URL = 'http://127.0.0.1:8642/health'
@@ -35,6 +43,18 @@ function broadcastUpdateState() {
 }
 
 function configureAutoUpdater() {
+  if (!autoUpdater) {
+    updateState = {
+      ...updateState,
+      checking: false,
+      available: false,
+      downloaded: false,
+      error: 'built-in updater unavailable in this build',
+    }
+    broadcastUpdateState()
+    return
+  }
+
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
@@ -109,6 +129,9 @@ function configureAutoUpdater() {
 }
 
 async function checkForAppUpdates() {
+  if (!autoUpdater) {
+    return { ok: false, error: 'built-in updater unavailable in this build' }
+  }
   try {
     await autoUpdater.checkForUpdates()
     return { ok: true }
