@@ -1781,28 +1781,104 @@ function ChatMessageListComponent({
                 ) : null}
               </>
             )}
-            {showTypingIndicator ||
-            showResearchCard ||
-            isCompacting ||
-            liveToolActivity.length > 0 ||
-            (isStreaming && !streamingText) ||
-            (isStreaming && activeToolCalls.length > 0) ? (
+            {/* Bottom shimmer + branch TUI card. Hide as soon as the
+                streaming text starts arriving — the per-message TUI card
+                above the assistant bubble takes over from there to avoid
+                a duplicated activity surface. */}
+            {(showTypingIndicator ||
+              showResearchCard ||
+              isCompacting ||
+              liveToolActivity.length > 0 ||
+              (isStreaming && !streamingText) ||
+              (isStreaming && activeToolCalls.length > 0)) &&
+            !(
+              isStreaming &&
+              streamingText &&
+              streamingText.trim().length > 0
+            ) ? (
               <div
                 className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
                 role="status"
                 aria-live="polite"
               >
-                {/* TUI-style placeholder while streaming hasn't materialized a
-                    message yet. Replaces the legacy ThinkingBubble. */}
-                <div className="max-w-[var(--chat-content-max-width)]">
-                  <TuiActivityCard
-                    toolSections={[]}
-                    thinking={null}
-                    isStreaming={true}
-                    formatLabel={(name) => name}
-                    formatArg={() => null}
-                  />
-                </div>
+                <ThinkingBubble
+                  activeToolCalls={activeToolCalls}
+                  liveToolActivity={liveToolActivity}
+                  researchCard={researchCard}
+                  isCompacting={isCompacting}
+                />
+                {/* Branch from the thinking bubble: TUI activity card showing
+                    live tool calls underneath. Connector line + indent give
+                    it a tree-branch feel. */}
+                {activeToolCalls.length > 0 ? (
+                  <div className="flex max-w-[var(--chat-content-max-width)]">
+                    <div
+                      className="ml-[14px] mr-2 w-px shrink-0"
+                      style={{
+                        background:
+                          'linear-gradient(to bottom, color-mix(in srgb, var(--theme-accent) 35%, transparent), color-mix(in srgb, var(--theme-border) 60%, transparent))',
+                      }}
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1 pt-1">
+                      <TuiActivityCard
+                        toolSections={activeToolCalls.map((tc) => {
+                          const phase = tc.phase
+                          const state =
+                            phase === 'error' || phase === 'failed'
+                              ? ('output-error' as const)
+                              : phase === 'done' ||
+                                  phase === 'complete' ||
+                                  phase === 'completed' ||
+                                  phase === 'result'
+                                ? ('output-available' as const)
+                                : ('input-available' as const)
+                          const tcAny = tc as unknown as Record<
+                            string,
+                            unknown
+                          >
+                          return {
+                            key: tc.id,
+                            type: tc.name,
+                            input:
+                              tcAny.args &&
+                              typeof tcAny.args === 'object' &&
+                              !Array.isArray(tcAny.args)
+                                ? (tcAny.args as Record<string, unknown>)
+                                : undefined,
+                            preview:
+                              typeof tcAny.preview === 'string'
+                                ? (tcAny.preview as string)
+                                : undefined,
+                            outputText:
+                              typeof tcAny.result === 'string'
+                                ? (tcAny.result as string)
+                                : '',
+                            errorText:
+                              state === 'output-error'
+                                ? typeof tcAny.result === 'string'
+                                  ? (tcAny.result as string)
+                                  : 'Tool failed'
+                                : undefined,
+                            state,
+                          }
+                        })}
+                        thinking={null}
+                        isStreaming={true}
+                        formatLabel={(name) => name.replace(/_/g, ' ')}
+                        formatArg={(_name, args) => {
+                          if (!args) return null
+                          const first = Object.values(args).find(
+                            (v) => typeof v === 'string' && v.trim(),
+                          )
+                          return typeof first === 'string'
+                            ? first.trim()
+                            : null
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {notice && noticePosition === 'end' ? notice : null}

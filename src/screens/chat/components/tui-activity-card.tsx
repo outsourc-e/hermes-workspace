@@ -142,7 +142,7 @@ function ToolRow({
         type="button"
         onClick={() => canExpand && setOpen((v) => !v)}
         className={cn(
-          'group flex w-full items-baseline gap-2 px-2 py-0.5 text-left rounded-sm',
+          'group flex w-full items-baseline gap-2 px-3 py-1.5 text-left rounded-sm',
           canExpand && 'hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]',
           !canExpand && 'cursor-default',
         )}
@@ -190,7 +190,7 @@ function ToolRow({
       </button>
       {/* Output preview line — TUI-style ⎿ */}
       <div
-        className="flex items-baseline gap-1 px-2 pl-6 opacity-70"
+        className="flex items-baseline gap-1.5 px-3 pl-7 pb-0.5 opacity-70"
         style={{ color: isError ? 'var(--theme-danger, #ef4444)' : 'var(--theme-muted)' }}
       >
         <span className="shrink-0 leading-none opacity-50">⎿</span>
@@ -198,7 +198,7 @@ function ToolRow({
       </div>
       {open && canExpand ? (
         <div
-          className="mx-2 mt-1 mb-1 rounded border px-2 py-1.5 text-[11px]"
+          className="mx-3 mt-2 mb-1 rounded border px-3 py-2 text-[11px]"
           style={{
             background: 'var(--code-bg, color-mix(in srgb, var(--theme-card) 70%, transparent))',
             borderColor: 'var(--theme-border)',
@@ -273,7 +273,7 @@ function ThinkingRow({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-baseline gap-2 px-2 py-0.5 text-left rounded-sm hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]"
+        className="group flex w-full items-baseline gap-2 px-3 py-1.5 text-left rounded-sm hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]"
       >
         <span className="shrink-0 leading-none">💭</span>
         <span
@@ -299,7 +299,7 @@ function ThinkingRow({
         </span>
       </button>
       <div
-        className="flex items-baseline gap-1 px-2 pl-6 opacity-70"
+        className="flex items-baseline gap-1.5 px-3 pl-7 pb-0.5 opacity-70"
         style={{ color: 'var(--theme-muted)' }}
       >
         <span className="shrink-0 leading-none opacity-50">⎿</span>
@@ -307,7 +307,7 @@ function ThinkingRow({
       </div>
       {open ? (
         <div
-          className="mx-2 mt-1 mb-1 rounded border px-2 py-1.5 text-[11px]"
+          className="mx-3 mt-2 mb-1 rounded border px-3 py-2 text-[11px]"
           style={{
             background: 'var(--code-bg, color-mix(in srgb, var(--theme-card) 70%, transparent))',
             borderColor: 'var(--theme-border)',
@@ -375,7 +375,7 @@ function TuiActivityCardComponent({
       }}
     >
       <div
-        className="flex items-center gap-2 border-b px-3 py-1.5"
+        className="flex items-center gap-2 border-b px-4 py-2.5"
         style={{
           borderColor:
             'color-mix(in srgb, var(--theme-border) 70%, transparent)',
@@ -405,7 +405,7 @@ function TuiActivityCardComponent({
           />
         ) : null}
       </div>
-      <div className="flex flex-col py-1">
+      <div className="flex flex-col gap-1.5 px-2 py-3">
         {hasThinking ? (
           <ThinkingRow
             thinking={thinking!}
@@ -426,7 +426,7 @@ function TuiActivityCardComponent({
         ))}
         {isWorkingStub ? (
           <div
-            className="flex items-baseline gap-2 px-2 py-0.5 font-mono text-[12px] leading-relaxed"
+            className="flex items-baseline gap-2 px-3 py-1 font-mono text-[12px] leading-relaxed"
             style={{ color: 'var(--theme-muted)' }}
           >
             <span

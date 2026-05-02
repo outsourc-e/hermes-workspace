@@ -2247,22 +2247,19 @@ function MessageItemComponent({
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
       )}
     >
-      {/* TUI-style unified activity card: thinking + all tool calls in one place,
-          rendered ABOVE the assistant bubble. Replaces standalone thinking summary,
-          standalone tool menu, and inline tool groups inside the bubble.
-          Hermes Agent currently only emits tool.completed (post-run), so during
-          streaming we may show only a working stub; tool rows populate after the
-          run completes. */}
+      {/* Grouped tool card above the assistant bubble. Only show once there
+          is real assistant text in the bubble. While streaming with no text,
+          the legacy ThinkingBubble in chat-message-list owns the visual and
+          renders its own branched TuiActivityCard so we don't double up. */}
       {!isUser &&
-      (finalToolSections.length > 0 ||
-        (effectiveIsStreaming && (thinking || !hasText))) ? (
+      finalToolSections.length > 0 &&
+      (hasText || !effectiveIsStreaming) ? (
         <div className="w-full max-w-[var(--chat-content-max-width)] flex">
           <div className="w-6 shrink-0" aria-hidden />
           <div className="min-w-0 flex-1">
             <TuiActivityCard
               toolSections={finalToolSections}
-              thinking={thinking}
-              thinkingElapsedSeconds={thinkingElapsedSeconds}
+              thinking={null}
               isStreaming={effectiveIsStreaming}
               expandAll={expandAllToolSections}
               formatLabel={formatToolDisplayLabel}

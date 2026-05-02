@@ -481,6 +481,77 @@ export function moveHistoryMessages(
   queryClient.removeQueries({ queryKey: fromKey, exact: true })
 }
 
+export function reconcileSessionDraft(
+  queryClient: QueryClient,
+  fromFriendlyId: string,
+  fromSessionKey: string,
+  toFriendlyId: string,
+  toSessionKey: string,
+) {
+  queryClient.setQueryData(
+    chatQueryKeys.sessions,
+    function reconcile(existing: unknown) {
+      if (!Array.isArray(existing)) return existing
+      const sessions = existing as Array<SessionMeta>
+      const sourceIndex = sessions.findIndex((session) => {
+        return (
+          session.friendlyId === fromFriendlyId ||
+          session.key === fromSessionKey ||
+          session.key === fromFriendlyId
+        )
+      })
+
+      if (sourceIndex === -1) {
+        return sessions
+      }
+
+      const source = sessions[sourceIndex]
+      const targetIndex = sessions.findIndex((session, index) => {
+        if (index === sourceIndex) return false
+        return (
+          session.friendlyId === toFriendlyId ||
+          session.key === toSessionKey ||
+          session.key === toFriendlyId
+        )
+      })
+
+      if (targetIndex === -1) {
+        return sessions.map((session, index) => {
+          if (index !== sourceIndex) return session
+          return {
+            ...session,
+            key: toSessionKey,
+            friendlyId: toFriendlyId,
+          }
+        })
+      }
+
+      return sessions.flatMap((session, index) => {
+        if (index === sourceIndex) return []
+        if (index !== targetIndex) return [session]
+        return [
+          {
+            ...session,
+            key: toSessionKey,
+            friendlyId: toFriendlyId,
+            lastMessage: source.lastMessage ?? session.lastMessage,
+            updatedAt: Math.max(source.updatedAt ?? 0, session.updatedAt ?? 0) ||
+              session.updatedAt ||
+              source.updatedAt,
+            label: session.label ?? source.label,
+            title: session.title ?? source.title,
+            derivedTitle: session.derivedTitle ?? source.derivedTitle,
+            titleStatus:
+              session.titleStatus === 'idle' ? source.titleStatus : session.titleStatus,
+            titleSource: session.titleSource ?? source.titleSource,
+            titleError: session.titleError ?? source.titleError,
+          },
+        ]
+      })
+    },
+  )
+}
+
 export function updateSessionLastMessage(
   queryClient: QueryClient,
   sessionKey: string,

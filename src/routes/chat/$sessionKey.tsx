@@ -1,7 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { moveHistoryMessages } from '../../screens/chat/chat-queries'
+import {
+  moveHistoryMessages,
+  reconcileSessionDraft,
+} from '../../screens/chat/chat-queries'
 import { ErrorBoundary } from '@/components/error-boundary'
 
 const ChatScreen = lazy(async () => {
@@ -86,6 +89,13 @@ function ChatRoute() {
       const sourceFriendlyId = activeFriendlyId
       const sourceSessionKey = forcedSessionKey ?? activeFriendlyId
       moveHistoryMessages(
+        queryClient,
+        sourceFriendlyId,
+        sourceSessionKey,
+        payload.friendlyId,
+        payload.sessionKey,
+      )
+      reconcileSessionDraft(
         queryClient,
         sourceFriendlyId,
         sourceSessionKey,
