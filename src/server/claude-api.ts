@@ -392,6 +392,30 @@ export async function streamChat(
   let buffer = ''
   let currentEvent = ''
 
+  // Debug tap: when HERMES_TOOL_DEBUG=1, dump every raw SSE event to a file so
+  // we can inspect what vanilla Hermes Agent actually emits during tool calls
+  // (event names + data shapes) without changing any agent code.
+  const toolDebug = process.env.HERMES_TOOL_DEBUG === '1'
+  let toolDebugStream: NodeJS.WritableStream | null = null
+  if (toolDebug) {
+    try {
+      const fs = await import('node:fs')
+      const path = await import('node:path')
+      const os = await import('node:os')
+      const dir = path.join(os.tmpdir(), 'hermes-tool-debug')
+      fs.mkdirSync(dir, { recursive: true })
+      const file = path.join(
+        dir,
+        `sse-${sessionId}-${Date.now()}.log`,
+      )
+      toolDebugStream = fs.createWriteStream(file, { flags: 'a' })
+      console.log(`[claude-api][tool-debug] writing SSE dump to ${file}`)
+      toolDebugStream.write(`# session=${sessionId} ts=${new Date().toISOString()}\n`)
+    } catch (err) {
+      console.warn('[claude-api][tool-debug] failed to open dump file:', err)
+    }
+  }
+
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
@@ -403,9 +427,19 @@ export async function streamChat(
     for (const line of lines) {
       if (line.startsWith('event: ')) {
         currentEvent = line.slice(7).trim()
+        if (toolDebugStream) toolDebugStream.write(`event: ${currentEvent}\n`)
       } else if (line.startsWith('data: ')) {
         const dataStr = line.slice(6)
-        if (dataStr === '[DONE]') continue
+        if (dataStr === '[DONE]') {
+          if (toolDebugStream) toolDebugStream.write('data: [DONE]\n\n')
+          continue
+        }
+        if (toolDebugStream) {
+          // Truncate very long payloads so the dump stays human-readable.
+          const trimmed =
+            dataStr.length > 4000 ? dataStr.slice(0, 4000) + '...[trunc]' : dataStr
+          toolDebugStream.write(`data: ${trimmed}\n\n`)
+        }
         try {
           const data = JSON.parse(dataStr) as Record<string, unknown>
           await opts.onEvent({ event: currentEvent || 'message', data })
@@ -413,6 +447,13 @@ export async function streamChat(
           // skip malformed JSON
         }
       }
+    }
+  }
+  if (toolDebugStream) {
+    try {
+      toolDebugStream.end()
+    } catch {
+      // ignore close errors
     }
   }
 }
