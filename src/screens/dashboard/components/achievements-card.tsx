@@ -166,7 +166,7 @@ export function AchievementsCard({
             {achievements.totalUnlocked} unlocked · view all →
           </button>
         </div>
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1.5">
           {achievements.recentUnlocks.length === 0 ? (
             <div
               className="py-3 text-center text-[11px]"
@@ -175,8 +175,11 @@ export function AchievementsCard({
               No unlocks yet — keep working.
             </div>
           ) : (
+            // Render every unlock the aggregator returns so the card
+            // grows to consume vertical space (Eric's iter-007 ask).
+            // Default count is now 5 so the rail has more presence.
             achievements.recentUnlocks.map((unlock) => (
-              <AchievementRow key={unlock.id} unlock={unlock} compact />
+              <AchievementRow key={unlock.id} unlock={unlock} />
             ))
           )}
         </div>
