@@ -1121,23 +1121,39 @@ function ChatMessageListComponent({
       id: string
       name: string
       phase: 'calling' | 'running' | 'done' | 'error'
+      args?: unknown
+      preview?: string
+      result?: string
     }>
   >(() => {
     if (activeToolCalls.length > 0) {
-      return activeToolCalls.map((toolCall) => ({
-        id: toolCall.id,
-        name: toolCall.name,
-        phase:
-          toolCall.phase === 'complete' || toolCall.phase === 'completed'
-            ? 'done'
-            : toolCall.phase === 'start'
-              ? 'calling'
-              : toolCall.phase === 'failed'
-                ? 'error'
-                : toolCall.phase === 'calling' || toolCall.phase === 'running'
-                  ? toolCall.phase
-                  : 'calling',
-      }))
+      return activeToolCalls.map((toolCall) => {
+        const tcAny = toolCall as unknown as Record<string, unknown>
+        return {
+          id: toolCall.id,
+          name: toolCall.name,
+          phase:
+            toolCall.phase === 'complete' || toolCall.phase === 'completed'
+              ? 'done'
+              : toolCall.phase === 'start'
+                ? 'calling'
+                : toolCall.phase === 'failed' || toolCall.phase === 'error'
+                  ? 'error'
+                  : toolCall.phase === 'calling' ||
+                      toolCall.phase === 'running'
+                    ? toolCall.phase
+                    : 'calling',
+          args: tcAny.args,
+          preview:
+            typeof tcAny.preview === 'string'
+              ? (tcAny.preview as string)
+              : undefined,
+          result:
+            typeof tcAny.result === 'string'
+              ? (tcAny.result as string)
+              : undefined,
+        }
+      })
     }
 
     return liveToolActivity.map((entry, index) => ({
@@ -1233,7 +1249,8 @@ function ChatMessageListComponent({
     // while this wrapper is invisible.
     if (messageIsStreaming) {
       const hasStreamingActivity =
-        activeToolCalls.length > 0 ||
+        normalizedStreamingToolCalls.length > 0 ||
+        liveToolActivity.length > 0 ||
         lifecycleEvents.length > 0 ||
         Boolean(streamingThinking && streamingThinking.trim().length > 0)
       const isEmptyPlaceholder =
@@ -1807,10 +1824,11 @@ function ChatMessageListComponent({
                   researchCard={researchCard}
                   isCompacting={isCompacting}
                 />
-                {/* Branch from the thinking bubble: TUI activity card showing
-                    live tool calls underneath. Connector line + indent give
-                    it a tree-branch feel. */}
-                {activeToolCalls.length > 0 ? (
+                {/* Branch from the thinking bubble into a single compact
+                    TUI-style tool activity card. Use normalized streaming calls
+                    so the card appears for both structured tool events and the
+                    lighter live activity feed. */}
+                {normalizedStreamingToolCalls.length > 0 ? (
                   <div className="flex max-w-[var(--chat-content-max-width)]">
                     <div
                       className="ml-[14px] mr-2 w-px shrink-0"
@@ -1822,43 +1840,33 @@ function ChatMessageListComponent({
                     />
                     <div className="min-w-0 flex-1 pt-1">
                       <TuiActivityCard
-                        toolSections={activeToolCalls.map((tc) => {
+                        toolSections={normalizedStreamingToolCalls.map((tc) => {
                           const phase = tc.phase
                           const state =
-                            phase === 'error' || phase === 'failed'
+                            phase === 'error'
                               ? ('output-error' as const)
-                              : phase === 'done' ||
-                                  phase === 'complete' ||
-                                  phase === 'completed' ||
-                                  phase === 'result'
+                              : phase === 'done'
                                 ? ('output-available' as const)
-                                : ('input-available' as const)
-                          const tcAny = tc as unknown as Record<
-                            string,
-                            unknown
-                          >
+                                : phase === 'running'
+                                  ? ('input-streaming' as const)
+                                  : ('input-available' as const)
                           return {
                             key: tc.id,
                             type: tc.name,
                             input:
-                              tcAny.args &&
-                              typeof tcAny.args === 'object' &&
-                              !Array.isArray(tcAny.args)
-                                ? (tcAny.args as Record<string, unknown>)
+                              tc.args &&
+                              typeof tc.args === 'object' &&
+                              !Array.isArray(tc.args)
+                                ? (tc.args as Record<string, unknown>)
                                 : undefined,
-                            preview:
-                              typeof tcAny.preview === 'string'
-                                ? (tcAny.preview as string)
-                                : undefined,
+                            preview: tc.preview,
                             outputText:
-                              typeof tcAny.result === 'string'
-                                ? (tcAny.result as string)
+                              state === 'output-available'
+                                ? tc.result || ''
                                 : '',
                             errorText:
                               state === 'output-error'
-                                ? typeof tcAny.result === 'string'
-                                  ? (tcAny.result as string)
-                                  : 'Tool failed'
+                                ? tc.result || 'Tool failed'
                                 : undefined,
                             state,
                           }
