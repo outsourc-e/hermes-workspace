@@ -65,6 +65,12 @@ importers:
       motion:
         specifier: ^12.29.2
         version: 12.36.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      motion-dom:
+        specifier: ^12.36.0
+        version: 12.36.0
+      motion-utils:
+        specifier: ^12.36.0
+        version: 12.36.0
       playwright:
         specifier: ^1.58.2
         version: 1.58.2
