@@ -18,6 +18,7 @@ import {
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { ActiveModelKpi } from './components/active-model-kpi'
+import { AttentionMarquee } from './components/attention-marquee'
 import { WidgetShell } from './components/widget-shell'
 import { EditModePanel } from './components/edit-mode-panel'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
@@ -38,7 +39,20 @@ import { cn } from '@/lib/utils'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Moon02Icon, Sun02Icon } from '@hugeicons/core-free-icons'
+import {
+  Moon02Icon,
+  Sun02Icon,
+  BubbleChatAddIcon,
+  ConsoleIcon,
+  PuzzleIcon,
+  Edit02Icon,
+  CheckmarkCircle02Icon,
+  Settings02Icon,
+} from '@hugeicons/core-free-icons'
+
+// `IconSvgObject` isn't exported from @hugeicons/react; reuse the
+// inferred type from a real icon import for prop typing.
+type HugeIcon = typeof Settings02Icon
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -470,7 +484,7 @@ function SecondaryAction({
   disabled,
 }: {
   label: string
-  icon: string
+  icon: HugeIcon
   onClick: () => void
   disabled?: boolean
 }) {
@@ -479,13 +493,20 @@ function SecondaryAction({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors hover:bg-[var(--theme-card)]/80 disabled:cursor-not-allowed disabled:opacity-50"
+      className="group inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.015] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         borderColor: 'var(--theme-border)',
         color: 'var(--theme-muted)',
+        background:
+          'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 80%, transparent), transparent)',
       }}
     >
-      <span aria-hidden>{icon}</span>
+      <HugeiconsIcon
+        icon={icon}
+        size={14}
+        strokeWidth={1.6}
+        className="transition-colors group-hover:text-[var(--theme-accent)]"
+      />
       <span>{label}</span>
     </button>
   )
@@ -783,8 +804,10 @@ export function DashboardScreen() {
   const overviewQuery = useQuery<DashboardOverview>({
     queryKey: ['dashboard', 'overview', period],
     queryFn: async () => {
+      // achievements=5 (instead of 3) gives the Achievements rail
+      // card enough vertical mass to fill the gap below Top Models.
       const res = await fetch(
-        `/api/dashboard/overview?days=${period}`,
+        `/api/dashboard/overview?days=${period}&achievements=5`,
       )
       if (!res.ok) throw new Error(`overview ${res.status}`)
       return (await res.json()) as DashboardOverview
@@ -882,24 +905,36 @@ export function DashboardScreen() {
                 params: { sessionKey: 'new' },
               })
             }
-            className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.99]"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3.5 py-2 text-sm font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99]"
             style={{
-              background: `linear-gradient(135deg, ${palette.accent}22, ${palette.accentSecondary}22)`,
-              borderColor: 'color-mix(in srgb, var(--theme-accent) 40%, transparent)',
-              color: 'var(--theme-text)',
+              background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentSecondary})`,
+              color: 'var(--theme-on-accent, white)',
+              boxShadow: `0 6px 18px -8px ${palette.accent}aa, inset 0 1px 0 0 rgba(255,255,255,0.18)`,
             }}
           >
-            <span aria-hidden>💬</span>
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(255,255,255,0.15), transparent 60%)',
+              }}
+            />
+            <HugeiconsIcon
+              icon={BubbleChatAddIcon}
+              size={16}
+              strokeWidth={1.8}
+            />
             <span>New Chat</span>
           </button>
           <SecondaryAction
             label="Terminal"
-            icon="💻"
+            icon={ConsoleIcon}
             onClick={() => navigate({ to: '/terminal' })}
           />
           <SecondaryAction
             label="Skills"
-            icon="🧩"
+            icon={PuzzleIcon}
             onClick={() => navigate({ to: '/skills' })}
             disabled={!skillsAvailable}
           />
@@ -911,46 +946,62 @@ export function DashboardScreen() {
             aria-label={layout.editMode ? 'Done editing layout' : 'Edit layout'}
             title={layout.editMode ? 'Done editing layout' : 'Edit layout'}
             onClick={layout.toggleEdit}
-            className="flex size-9 items-center justify-center rounded-lg border transition-colors hover:bg-[var(--theme-card)]/80"
+            className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70"
             style={{
               borderColor: layout.editMode
                 ? 'var(--theme-accent)'
                 : 'var(--theme-border)',
               background: layout.editMode
                 ? 'color-mix(in srgb, var(--theme-accent) 14%, transparent)'
-                : 'transparent',
+                : 'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 80%, transparent), transparent)',
               color: layout.editMode
                 ? 'var(--theme-accent)'
                 : 'var(--theme-muted)',
             }}
           >
-            {layout.editMode ? '✓' : '✏️'}
+            <HugeiconsIcon
+              icon={layout.editMode ? CheckmarkCircle02Icon : Edit02Icon}
+              size={15}
+              strokeWidth={1.7}
+            />
           </button>
           <button
             type="button"
             aria-label="Settings"
             title="Settings"
             onClick={() => navigate({ to: '/settings', search: {} })}
-            className="flex size-9 items-center justify-center rounded-lg border transition-colors hover:bg-[var(--theme-card)]/80"
+            className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
             style={{
               borderColor: 'var(--theme-border)',
               color: 'var(--theme-muted)',
+              background:
+                'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 80%, transparent), transparent)',
             }}
           >
-            ⚙️
+            <HugeiconsIcon
+              icon={Settings02Icon}
+              size={15}
+              strokeWidth={1.7}
+            />
           </button>
         </div>
       </div>
 
-      {/* ── Ops strip (gateway + version drift + platforms + cron pulse).
-           Now also hosts the right-to-left Attention marquee per
-           Eric's iteration-006 ask, replacing the standalone
-           AttentionCard in the side rail. ── */}
+      {/* ── Attention marquee ──
+           Iteration 008: lifted *out* of the OpsStrip into its own
+           dedicated row above it. Fixed Eric's 'feels cluttered'
+           concern by giving the ticker its own visual chamber
+           (warning gradient, separated border) so it doesn't blend
+           into the gateway/version/cron line below it. */}
+      {(overview?.incidents?.length ?? 0) > 0 ? (
+        <AttentionMarquee overview={overview ?? null} />
+      ) : null}
+
+      {/* ── Ops strip (gateway + version drift + platforms + cron pulse). ── */}
       <OpsStrip
         status={overview?.status ?? null}
         cron={overview?.cron ?? null}
         platforms={overview?.platforms ?? []}
-        overview={overview ?? null}
       />
 
       {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
@@ -1033,8 +1084,11 @@ export function DashboardScreen() {
         {/* Side rail. Achievements is now first (sits beside Top Models
             visually since the rail is right of the chart row + sessions),
             then Skills, then the rhythm card. Mix & rhythm is the unique
-            chart in this column — keeping it. */}
-        <div className="flex flex-col gap-3 lg:col-span-4">
+            chart in this column — keeping it.
+            `min-h-full` + the trailing `flex-1` rhythm card together
+            stretch the rail to match Sessions Intelligence height so
+            we don't get the dangling gap Eric flagged in iter 007. */}
+        <div className="flex min-h-full flex-col gap-3 lg:col-span-4">
           <WidgetShell id="achievements" layout={layout}>
             <AchievementsCard
               achievements={overview?.achievements ?? null}
@@ -1047,12 +1101,18 @@ export function DashboardScreen() {
               onOpen={() => navigate({ to: '/skills' })}
             />
           </WidgetShell>
-          <WidgetShell id="mix_rhythm" layout={layout}>
-            <TokenMixHourCard
-              analytics={overview?.analytics ?? null}
-              sessions={sessionRows}
-            />
-          </WidgetShell>
+          {/* `flex-1` here pushes the rhythm card to consume any
+              remaining vertical space so the rail's bottom aligns
+              with Sessions Intelligence. The card itself uses
+              h-full + flex-1 to honor the stretch. */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <WidgetShell id="mix_rhythm" layout={layout}>
+              <TokenMixHourCard
+                analytics={overview?.analytics ?? null}
+                sessions={sessionRows}
+              />
+            </WidgetShell>
+          </div>
         </div>
       </div>
       </div>

@@ -101,7 +101,7 @@ export function TokenMixHourCard({
 
   return (
     <div
-      className="relative flex flex-col gap-3 overflow-hidden rounded-xl border p-3"
+      className="relative flex h-full flex-1 flex-col justify-between gap-3 overflow-hidden rounded-xl border p-3"
       style={{
         background:
           'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 92%, transparent))',

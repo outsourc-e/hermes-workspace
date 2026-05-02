@@ -1,7 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-import { AttentionMarquee } from './attention-marquee'
 
 function formatPulse(iso: string | null): string {
   if (!iso) return '—'
@@ -86,17 +85,10 @@ export function OpsStrip({
   status,
   cron,
   platforms,
-  overview,
 }: {
   status: DashboardOverview['status']
   cron: DashboardOverview['cron']
   platforms: DashboardOverview['platforms']
-  /**
-   * Full overview is needed for the embedded attention marquee.
-   * Optional so the strip remains usable as a standalone component
-   * elsewhere (e.g. in tests or smaller screens that omit incidents).
-   */
-  overview?: DashboardOverview | null
 }) {
   const navigate = useNavigate()
   if (!status) return null
@@ -115,18 +107,11 @@ export function OpsStrip({
 
   const next = cron ? formatNextRun(cron.nextRunAt) : null
 
-  const incidentCount = overview?.incidents?.length ?? 0
-
   return (
     <div
-      className="flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2"
+      className="flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4"
       style={{ borderColor: 'var(--theme-border)' }}
     >
-      {/* Top row: gateway state on the left, attention marquee in the
-          middle (only when there are incidents), platforms+cron on
-          the right. Falls back to a single-column stack on narrow
-          viewports. */}
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
       {/* Gateway block: state + version + active agents */}
       <div className="flex items-center gap-3 text-[11px]">
         <span className="flex items-center gap-2">
@@ -274,13 +259,6 @@ export function OpsStrip({
           )
         })() : null}
       </div>
-      </div>
-      {/* Attention marquee row — dedicated row when present so the
-          ticker has full width to breathe; collapses to nothing when
-          the gateway is all-clear. */}
-      {incidentCount > 0 && overview ? (
-        <AttentionMarquee overview={overview} />
-      ) : null}
     </div>
   )
 }
