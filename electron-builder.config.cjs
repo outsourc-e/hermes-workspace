@@ -1,7 +1,7 @@
 module.exports = {
   appId: 'com.hermesworkspace.app',
-  productName: 'Hermes Workspace',
-  copyright: 'Copyright © 2026 Hermes Workspace',
+  productName: 'hermes-workspace',
+  copyright: 'Copyright © 2026 hermes-workspace',
   icon: 'assets/icon.png',
   directories: {
     output: 'release',
@@ -45,6 +45,12 @@ module.exports = {
     perMachine: false,
     allowToChangeInstallationDirectory: false,
     deleteAppDataOnUninstall: false,
+  },
+  publish: {
+    provider: 'github',
+    owner: 'outsourc-e',
+    repo: 'hermes-workspace',
+    releaseType: 'release',
   },
   asar: false,
   compression: 'maximum',

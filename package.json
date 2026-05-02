@@ -1,7 +1,7 @@
 {
   "name": "hermes-workspace",
   "version": "2.1.3",
-  "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
+  "description": "Desktop workspace for Hermes Agent \u2014 chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
   "private": true,
@@ -89,6 +89,7 @@
     "web-vitals": "^5.1.0",
     "electron": "^40.8.2",
     "electron-builder": "^26.8.1",
-    "esbuild": "^0.27.0"
+    "esbuild": "^0.27.0",
+    "electron-updater": "^6.6.2"
   }
 }

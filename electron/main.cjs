@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
 const { join } = require('path')
 const { existsSync } = require('fs')
 const { spawn, execSync } = require('child_process')
 const http = require('http')
+const { autoUpdater } = require('electron-updater')
 
 const APP_PORT = 3847
 const HERMES_GATEWAY_URL = 'http://127.0.0.1:8642/health'
@@ -18,6 +19,109 @@ let installProcess = null
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) app.quit()
+
+let updateState = {
+  checking: false,
+  available: false,
+  downloaded: false,
+  error: null,
+  version: app.getVersion(),
+}
+
+function broadcastUpdateState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('desktop:update-state', updateState)
+  }
+}
+
+function configureAutoUpdater() {
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('checking-for-update', () => {
+    updateState = { ...updateState, checking: true, error: null }
+    broadcastUpdateState()
+  })
+  autoUpdater.on('update-available', async (info) => {
+    updateState = {
+      ...updateState,
+      checking: false,
+      available: true,
+      downloaded: false,
+      error: null,
+      latestVersion: info?.version || null,
+    }
+    broadcastUpdateState()
+    const result = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Download update', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update available',
+      message: `A new hermes-workspace version (${info?.version || 'latest'}) is available.`,
+      detail: 'Download and install it from inside the app?',
+    })
+    if (result.response === 0) {
+      await autoUpdater.downloadUpdate()
+    }
+  })
+  autoUpdater.on('update-not-available', () => {
+    updateState = {
+      ...updateState,
+      checking: false,
+      available: false,
+      downloaded: false,
+      error: null,
+    }
+    broadcastUpdateState()
+  })
+  autoUpdater.on('update-downloaded', async (info) => {
+    updateState = {
+      ...updateState,
+      checking: false,
+      available: true,
+      downloaded: true,
+      error: null,
+      latestVersion: info?.version || null,
+    }
+    broadcastUpdateState()
+    const result = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Install and restart', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update ready',
+      message: `hermes-workspace ${info?.version || ''} is ready to install.`,
+      detail: 'The app will restart to finish the update.',
+    })
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall()
+    }
+  })
+  autoUpdater.on('error', (error) => {
+    updateState = {
+      ...updateState,
+      checking: false,
+      error: error?.message || String(error),
+    }
+    broadcastUpdateState()
+  })
+}
+
+async function checkForAppUpdates() {
+  try {
+    await autoUpdater.checkForUpdates()
+    return { ok: true }
+  } catch (error) {
+    updateState = {
+      ...updateState,
+      checking: false,
+      error: error?.message || String(error),
+    }
+    broadcastUpdateState()
+    return { ok: false, error: updateState.error }
+  }
+}
 
 function checkHttp(url, timeoutMs = 2500) {
   return new Promise((resolve) => {
@@ -189,7 +293,7 @@ async function createWindow() {
     height: 940,
     minWidth: 980,
     minHeight: 680,
-    title: 'Hermes Workspace',
+    title: 'hermes-workspace',
     icon: existsSync(join(__dirname, '..', 'assets', 'icon.png'))
       ? join(__dirname, '..', 'assets', 'icon.png')
       : undefined,
@@ -217,6 +321,9 @@ async function createWindow() {
 
   await mainWindow.loadURL(getAppUrl())
   void ensureHermesBackend()
+  setTimeout(() => {
+    void checkForAppUpdates()
+  }, 15000)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -232,8 +339,11 @@ ipcMain.handle('desktop:open-logs', async () => {
   shell.openPath('/tmp')
   return { ok: true }
 })
+ipcMain.handle('desktop:update-check', async () => checkForAppUpdates())
+ipcMain.handle('desktop:update-state', async () => updateState)
 
 app.whenReady().then(async () => {
+  configureAutoUpdater()
   await createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow()
@@ -248,4 +358,4 @@ app.on('before-quit', () => {
   localServer?.kill()
 })
 
-app.setName('Hermes Workspace')
+app.setName('hermes-workspace')
