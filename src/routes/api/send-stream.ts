@@ -708,6 +708,20 @@ export const Route = createFileRoute('/api/send-stream')({
               const seenLiveToolCallIds = new Set<string>()
               let liveRunActive = true
               const livePollIntervalMs = 800
+              // Snapshot the session message count at run-start so the poller
+              // and the post-run backfill only consider messages persisted by
+              // THIS run. Without this, "the most recent assistant with
+              // tool_calls" can resolve to the previous turn, surfacing stale
+              // tool cards (off-by-one-turn bug).
+              let liveBaselineCount = 0
+              try {
+                const baseline = (await getSessionMessagesFromAgent(
+                  sessionKey,
+                )) as unknown as Array<Record<string, unknown>>
+                if (Array.isArray(baseline)) liveBaselineCount = baseline.length
+              } catch {
+                liveBaselineCount = 0
+              }
               const livePollerPromise = (async () => {
                 // Initial small delay so the agent has time to ingest the
                 // user message before we start asking for session state.
@@ -715,28 +729,39 @@ export const Route = createFileRoute('/api/send-stream')({
                 while (liveRunActive) {
                   if (!liveRunActive || streamClosed) break
                   try {
-                    const msgs = (await getSessionMessagesFromAgent(
+                    const allMsgs = (await getSessionMessagesFromAgent(
                       sessionKey,
                     )) as unknown as Array<Record<string, unknown>>
-                    if (!Array.isArray(msgs) || msgs.length === 0) continue
-                    // Find the most recent assistant message with tool_calls
-                    // and a map of tool_call_id -> result text.
+                    if (!Array.isArray(allMsgs) || allMsgs.length === 0) {
+                      await new Promise((r) =>
+                        setTimeout(r, livePollIntervalMs),
+                      )
+                      continue
+                    }
+                    // Only inspect messages added on or after this run started.
+                    const msgs = allMsgs.slice(liveBaselineCount)
+                    if (msgs.length === 0) {
+                      await new Promise((r) =>
+                        setTimeout(r, livePollIntervalMs),
+                      )
+                      continue
+                    }
+                    // Within this run only, gather every assistant tool_call
+                    // and pair with the matching tool_result if present.
                     const resultByCallId = new Map<
                       string,
                       { text: string; isError: boolean }
                     >()
-                    let lastAssistantToolCalls:
-                      | Array<Record<string, unknown>>
-                      | null = null
-                    for (let i = msgs.length - 1; i >= 0; i--) {
-                      const m = msgs[i] as Record<string, unknown>
-                      if (
-                        m &&
-                        (m.role === 'tool' || m.role === 'tool_result')
-                      ) {
+                    const runToolCalls: Array<Record<string, unknown>> = []
+                    for (const m of msgs) {
+                      if (!m) continue
+                      if (m.role === 'tool' || m.role === 'tool_result') {
                         const callId =
                           readString(m.tool_call_id) ||
-                          readString((m as Record<string, unknown>).toolCallId as unknown)
+                          readString(
+                            (m as Record<string, unknown>)
+                              .toolCallId as unknown,
+                          )
                         if (!callId) continue
                         const content = m.content
                         let text = ''
@@ -753,25 +778,28 @@ export const Route = createFileRoute('/api/send-stream')({
                             .join('\n')
                         }
                         const isErr =
-                          Boolean(
-                            (m as Record<string, unknown>).is_error,
-                          ) ||
+                          Boolean((m as Record<string, unknown>).is_error) ||
                           Boolean((m as Record<string, unknown>).isError)
                         resultByCallId.set(callId, { text, isError: isErr })
                         continue
                       }
-                      if (m && m.role === 'assistant') {
+                      if (m.role === 'assistant') {
                         const tcs = (m.tool_calls ??
                           (m as Record<string, unknown>).toolCalls) as
                           | Array<Record<string, unknown>>
                           | undefined
                         if (Array.isArray(tcs) && tcs.length > 0) {
-                          lastAssistantToolCalls = tcs
-                          break
+                          runToolCalls.push(...tcs)
                         }
                       }
                     }
-                    if (!lastAssistantToolCalls) continue
+                    if (runToolCalls.length === 0) {
+                      await new Promise((r) =>
+                        setTimeout(r, livePollIntervalMs),
+                      )
+                      continue
+                    }
+                    const lastAssistantToolCalls = runToolCalls
                     for (const tc of lastAssistantToolCalls) {
                       const tcRecord = tc as Record<string, unknown>
                       const tcFn = readRecord(tcRecord.function)
@@ -1214,9 +1242,18 @@ export const Route = createFileRoute('/api/send-stream')({
                           // this run; tool_calls are siblings on it. Also
                           // collect tool_result entries that immediately
                           // follow it so we can pair input/output.
-                          const recent = persistedMessages.slice(-12) as Array<
-                            Record<string, unknown>
-                          >
+                          // Use the per-run baseline so we never read tool
+                          // calls from a previous turn.
+                          const sliceFrom = Math.max(
+                            0,
+                            Math.min(
+                              liveBaselineCount,
+                              Math.max(0, persistedMessages.length - 1),
+                            ),
+                          )
+                          const recent = persistedMessages.slice(
+                            sliceFrom,
+                          ) as Array<Record<string, unknown>>
                           let lastAssistantIndex = -1
                           for (let i = recent.length - 1; i >= 0; i--) {
                             const m = recent[i] as Record<string, unknown>
