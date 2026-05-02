@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChatAttachment, ChatMessage } from '../types'
+import { readResolvedSessionHeaders } from '@/lib/send-stream-session-headers'
 import { useChatStore } from '@/stores/chat-store'
 import { pushActivity } from '@/components/inspector/activity-store'
 
@@ -392,6 +393,30 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     (event: string, data: unknown) => {
       const payload = data as Record<string, unknown>
 
+      // [DEBUG TUI] Log every SSE event so we can see whether tool.* events arrive
+      // from Hermes Agent through Workspace. Toggle off by setting
+      // localStorage.removeItem('hermes:debug:sse')
+      if (
+        typeof window !== 'undefined' &&
+        window.localStorage?.getItem('hermes:debug:sse') === '1'
+      ) {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[hermes-sse]',
+          event,
+          (payload?.name as string) || '',
+          (payload?.phase as string) || '',
+          payload,
+        )
+      }
+
+      // hb_signal/keepalive events from server: just mark activity, never let them
+      // surface as user-visible thinking or tool rows.
+      if (event === 'hb_signal' || event === 'heartbeat' || event === 'keepalive' || event === 'ping') {
+        markActivity()
+        return
+      }
+
       switch (event) {
         case 'started': {
           const resolvedSessionKey =
@@ -474,6 +499,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             (payload as { text?: string; thinking?: string }).text ??
             (payload as { thinking?: string }).thinking ??
             ''
+          // Drop server-side keepalive placeholders that came in as 'thinking'
+          // before the dedicated hb_signal event existed. These are not real
+          // model thinking and would otherwise pollute the TUI activity card.
+          const isKeepalivePlaceholder =
+            typeof thinking === 'string' &&
+            /^still\s+working[\.\u2026]*\s*$/i.test(thinking.trim())
+          if (isKeepalivePlaceholder) break
           if (thinking) {
             markActivity()
             thinkingRef.current = thinking
@@ -772,12 +804,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           throw new Error(errorText || 'Stream request failed')
         }
 
-        const resolvedSessionKey =
-          response.headers.get('x-claude-session-key')?.trim() ||
-          params.sessionKey
-        const resolvedFriendlyId =
-          response.headers.get('x-claude-friendly-id')?.trim() ||
-          resolvedSessionKey
+        const resolvedHeaders = readResolvedSessionHeaders(response.headers, {
+          sessionKey: params.sessionKey,
+          friendlyId: params.friendlyId || params.sessionKey,
+        })
+        const resolvedSessionKey = resolvedHeaders.sessionKey
+        const resolvedFriendlyId = resolvedHeaders.friendlyId
         if (resolvedSessionKey !== activeSessionKeyRef.current) {
           activeSessionKeyRef.current = resolvedSessionKey
           onSessionResolved?.({

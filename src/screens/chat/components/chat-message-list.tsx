@@ -11,6 +11,7 @@ import {
   textFromMessage,
 } from '../utils'
 import { MessageItem } from './message-item'
+import { TuiActivityCard } from './tui-activity-card'
 import { ScrollToBottomButton } from './scroll-to-bottom-button'
 import { ResearchCard } from './research-card'
 import type { ChatMessage } from '../types'
@@ -31,38 +32,6 @@ import { CHAT_OPEN_MESSAGE_SEARCH_EVENT } from '@/screens/chat/chat-events'
  *  Keep this short so tool pills appear immediately and the shimmer only
  *  bridges the gap until the first tool/text event arrives. */
 const THINKING_GRACE_PERIOD_MS = 300
-
-/** Map tool names to human-readable status strings */
-const TOOL_STATUS_MAP: Record<string, string> = {
-  memory_search: 'Searching memory…',
-  memory_get: 'Searching memory…',
-  web_search: 'Searching the web…',
-  web_fetch: 'Reading page…',
-  cron: 'Managing schedules…',
-  message: 'Sending message…',
-  gateway: 'Managing gateway…',
-  canvas: 'Rendering canvas…',
-  voice_call: 'Making call…',
-  pdf: 'Reading PDF…',
-  todo: 'Managing tasks…',
-  Read: 'Reading file…',
-  read: 'Reading file…',
-  Write: 'Writing file…',
-  write: 'Writing file…',
-  Edit: 'Writing file…',
-  edit: 'Writing file…',
-  exec: 'Running code…',
-  sessions_spawn: 'Spawning agent…',
-  sessions_history: 'Checking sessions…',
-  sessions_list: 'Checking sessions…',
-  browser: 'Browsing web…',
-  image: 'Analyzing image…',
-  tts: 'Generating audio…',
-}
-
-function getToolStatusLabel(toolName: string): string {
-  return TOOL_STATUS_MAP[toolName] ?? 'Working…'
-}
 
 const TOOL_EMOJIS: Record<string, string> = {
   web_search: '🔍',
@@ -218,41 +187,12 @@ type ThinkingBubbleProps = {
  * label that reflects what's actually happening (tool calls, etc.).
  */
 function ThinkingBubble({
-  activeToolCalls = [],
-  liveToolActivity = [],
+  activeToolCalls: _activeToolCalls = [],
+  liveToolActivity: _liveToolActivity = [],
   researchCard,
   isCompacting = false,
 }: ThinkingBubbleProps) {
-  const allTools = useMemo(
-    () =>
-      liveToolActivity.length > 0
-        ? liveToolActivity.map((t) => ({
-            name: t.name,
-            phase: 'calling' as const,
-          }))
-        : activeToolCalls.map((t) => ({ name: t.name, phase: t.phase })),
-    [activeToolCalls, liveToolActivity],
-  )
-
-  // Derive the most recent active tool name
-  const activeToolName = useMemo(() => {
-    // liveToolActivity is ordered newest-first
-    if (liveToolActivity.length > 0) return liveToolActivity[0].name
-    // activeToolCalls: prefer 'calling'/'start' phase, fall back to most recent
-    const calling = activeToolCalls.find(
-      (tc) => tc.phase === 'calling' || tc.phase === 'start',
-    )
-    if (calling) return calling.name
-    if (activeToolCalls.length > 0)
-      return activeToolCalls[activeToolCalls.length - 1].name
-    return null
-  }, [activeToolCalls, liveToolActivity])
-
-  const statusLabel = isCompacting
-    ? 'Compacting context...'
-    : activeToolName
-      ? getToolStatusLabel(activeToolName)
-      : 'Thinking…'
+  const statusLabel = isCompacting ? 'Compacting context...' : 'Thinking…'
 
   // Elapsed time counter — resets when the status label changes (new tool)
   const [elapsed, setElapsed] = useState(0)
@@ -294,9 +234,7 @@ function ThinkingBubble({
     return () => window.clearTimeout(swapTimer)
   }, [statusLabel])
 
-  // Keep the thinking bubble visible even when tools are active.
-  // If inline tool cards fail to render for a streaming message, this still
-  // gives the user a live indication of what tool is running.
+  // Keep the bottom thinking bubble visible while inline Hermes activity handles tool details.
 
   return (
     <div className="flex items-end gap-2">
@@ -399,33 +337,9 @@ function ThinkingBubble({
           {isStale ? (
             <span className="text-[11px] text-amber-500 dark:text-amber-400 animate-pulse">
               {isVeryStale
-                ? 'Still working… this is taking a while'
+                ? 'Still thinking… this is taking a while'
                 : 'Taking longer than usual…'}
             </span>
-          ) : null}
-
-          {activeToolName && !isCompacting ? (
-            <div
-              style={{
-                opacity: visible ? 1 : 0,
-                transition: 'opacity 300ms ease',
-              }}
-              className="flex flex-wrap gap-1.5"
-            >
-              {allTools.slice(0, 4).map((tool, index) => (
-                <span
-                  key={`${tool.name}-${tool.phase}-${index}`}
-                  className="inline-flex items-center rounded-full bg-primary-200/60 dark:bg-primary-800/30 px-2 py-0.5 text-[10px] font-mono text-primary-500 dark:text-primary-400 select-none"
-                >
-                  {tool.name}
-                </span>
-              ))}
-              {allTools.length > 4 ? (
-                <span className="inline-flex items-center rounded-full bg-primary-200/40 dark:bg-primary-800/20 px-2 py-0.5 text-[10px] text-primary-400 dark:text-primary-500 select-none">
-                  +{allTools.length - 4} more
-                </span>
-              ) : null}
-            </div>
           ) : null}
         </div>
 
@@ -1157,6 +1071,7 @@ function ChatMessageListComponent({
     const hasInThreadStreamingActivity =
       isStreaming &&
       (activeToolCalls.length > 0 ||
+        liveToolActivity.length > 0 ||
         lifecycleEvents.length > 0 ||
         Boolean(streamingThinking && streamingThinking.trim().length > 0))
     // Streaming-but-empty only needs the detached thinking bubble when the
@@ -1207,9 +1122,9 @@ function ChatMessageListComponent({
       name: string
       phase: 'calling' | 'running' | 'done' | 'error'
     }>
-  >(
-    () =>
-      activeToolCalls.map((toolCall) => ({
+  >(() => {
+    if (activeToolCalls.length > 0) {
+      return activeToolCalls.map((toolCall) => ({
         id: toolCall.id,
         name: toolCall.name,
         phase:
@@ -1222,9 +1137,15 @@ function ChatMessageListComponent({
                 : toolCall.phase === 'calling' || toolCall.phase === 'running'
                   ? toolCall.phase
                   : 'calling',
-      })),
-    [activeToolCalls],
-  )
+      }))
+    }
+
+    return liveToolActivity.map((entry, index) => ({
+      id: `live-${entry.name}-${index}`,
+      name: entry.name,
+      phase: 'running' as const,
+    }))
+  }, [activeToolCalls, liveToolActivity])
 
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
@@ -1871,12 +1792,17 @@ function ChatMessageListComponent({
                 role="status"
                 aria-live="polite"
               >
-                <ThinkingBubble
-                  activeToolCalls={activeToolCalls}
-                  liveToolActivity={liveToolActivity}
-                  researchCard={researchCard}
-                  isCompacting={isCompacting}
-                />
+                {/* TUI-style placeholder while streaming hasn't materialized a
+                    message yet. Replaces the legacy ThinkingBubble. */}
+                <div className="max-w-[var(--chat-content-max-width)]">
+                  <TuiActivityCard
+                    toolSections={[]}
+                    thinking={null}
+                    isStreaming={true}
+                    formatLabel={(name) => name}
+                    formatArg={() => null}
+                  />
+                </div>
               </div>
             ) : null}
             {notice && noticePosition === 'end' ? notice : null}

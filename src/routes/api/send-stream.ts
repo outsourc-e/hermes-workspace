@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-headers'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
@@ -27,6 +28,7 @@ import {
   createSession,
   ensureGatewayProbed,
   getGatewayCapabilities,
+  getMessages as getSessionMessagesFromAgent,
   listSessions,
   streamChat,
 } from '../../server/claude-api'
@@ -402,7 +404,12 @@ export const Route = createFileRoute('/api/send-stream')({
             heartbeatTimer = setInterval(() => {
               if (streamClosed) return
               if (Date.now() - lastClientEventAt < 10_000) return
-              sendEvent('thinking', { text: 'Still working…', sessionKey })
+              // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
+              // Use a dedicated hb_signal event (not 'thinking') so it does not
+              // pollute the TUI activity card with fake thinking text. Send a
+              // tiny SSE comment as the actual keepalive byte.
+              sendEvent('hb_signal', { sessionKey })
+              enqueueRaw(': keepalive\n\n')
             }, 10_000)
 
             closeStream = () => {
@@ -700,7 +707,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 },
                 {
                   signal: abortController.signal,
-                  onEvent({ event, data }) {
+                  async onEvent({ event, data }) {
                     const sessionKeyFromEvent =
                       typeof data.session_id === 'string' &&
                       data.session_id.trim()
@@ -1060,6 +1067,151 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
 
                     if (event === 'run.completed') {
+                      // Backfill tool calls from session history.
+                      // Hermes Agent currently does not stream tool.* events
+                      // reliably, but it persists tool calls on the assistant
+                      // message. Fetch the latest assistant message and emit
+                      // synthetic 'tool' events for each tool call so the
+                      // Workspace UI can render the Activity card.
+                      try {
+                        const sid =
+                          readString(data.session_id) ||
+                          sessionKeyFromEvent ||
+                          ''
+                        if (sid) {
+                          let persistedMessages: Array<
+                            Record<string, unknown>
+                          > = []
+                          try {
+                            persistedMessages =
+                              (await getSessionMessagesFromAgent(
+                                sid,
+                              )) as unknown as Array<Record<string, unknown>>
+                          } catch {
+                            persistedMessages = []
+                          }
+                          // Walk back to the most recent assistant message in
+                          // this run; tool_calls are siblings on it. Also
+                          // collect tool_result entries that immediately
+                          // follow it so we can pair input/output.
+                          const recent = persistedMessages.slice(-12) as Array<
+                            Record<string, unknown>
+                          >
+                          let lastAssistantIndex = -1
+                          for (let i = recent.length - 1; i >= 0; i--) {
+                            const m = recent[i] as Record<string, unknown>
+                            if (m && m.role === 'assistant') {
+                              lastAssistantIndex = i
+                              break
+                            }
+                          }
+                          if (lastAssistantIndex >= 0) {
+                            const lastAssistant = recent[
+                              lastAssistantIndex
+                            ] as Record<string, unknown>
+                            const rawToolCalls = (lastAssistant.tool_calls ??
+                              (lastAssistant as any).toolCalls) as
+                              | Array<Record<string, unknown>>
+                              | undefined
+                            const toolCalls =
+                              Array.isArray(rawToolCalls) && rawToolCalls.length
+                                ? rawToolCalls
+                                : []
+
+                            // Build a map of tool_call_id -> result text by
+                            // scanning the messages after the last assistant.
+                            const resultByCallId = new Map<string, string>()
+                            const errorByCallId = new Map<string, boolean>()
+                            for (
+                              let i = lastAssistantIndex + 1;
+                              i < recent.length;
+                              i++
+                            ) {
+                              const m = recent[i] as Record<string, unknown>
+                              if (
+                                !m ||
+                                (m.role !== 'tool' &&
+                                  m.role !== 'tool_result')
+                              ) {
+                                continue
+                              }
+                              const callId =
+                                readString(m.tool_call_id) ||
+                                readString((m as any).toolCallId) ||
+                                ''
+                              if (!callId) continue
+                              const content = m.content
+                              let text = ''
+                              if (typeof content === 'string') {
+                                text = content
+                              } else if (Array.isArray(content)) {
+                                text = content
+                                  .map((p: any) =>
+                                    typeof p?.text === 'string' ? p.text : '',
+                                  )
+                                  .filter(Boolean)
+                                  .join('\n')
+                              }
+                              resultByCallId.set(callId, text)
+                              const isErr =
+                                Boolean((m as any).is_error) ||
+                                Boolean((m as any).isError)
+                              if (isErr) errorByCallId.set(callId, true)
+                            }
+                            for (const tc of toolCalls) {
+                              const tcRecord = tc as Record<string, unknown>
+                              const tcFn = readRecord(tcRecord.function)
+                              const id =
+                                readString(tcRecord.id) ||
+                                readString(tcRecord.tool_call_id) ||
+                                `${runId || 'run'}:tool:${Math.random().toString(36).slice(2, 8)}`
+                              const name =
+                                readString(tcRecord.tool_name) ||
+                                readString(tcRecord.name) ||
+                                readString(tcFn?.name) ||
+                                'tool'
+                              const args = parseJsonIfPossible(
+                                tcFn?.arguments ?? tcRecord.arguments,
+                              )
+                              const resultText = resultByCallId.get(id) ?? ''
+                              const isErr = errorByCallId.get(id) === true
+                              const synthetic = {
+                                phase: isErr ? 'error' : 'complete',
+                                name,
+                                toolCallId: id,
+                                args,
+                                result: resultText,
+                                sessionKey: sessionKeyFromEvent,
+                                runId,
+                              }
+                              persistActiveRun(
+                                (runSessionKey, activeId) =>
+                                  upsertRunToolCall(
+                                    runSessionKey,
+                                    activeId,
+                                    {
+                                      id: synthetic.toolCallId,
+                                      name: synthetic.name,
+                                      phase: synthetic.phase,
+                                      args: synthetic.args,
+                                      result: synthetic.result,
+                                    },
+                                  ),
+                              )
+                              sendEvent('tool', synthetic)
+                              skipPublish ||
+                                publishChatEvent('tool', synthetic)
+                            }
+                          }
+                        }
+                      } catch (err) {
+                        // Backfill is best-effort; don't fail the run.
+                        console.warn(
+                          '[send-stream] tool backfill failed:',
+                          err,
+                        )
+                      }
+
                       const translated = {
                         state: 'complete',
                         sessionKey: sessionKeyFromEvent,
@@ -1127,8 +1279,10 @@ export const Route = createFileRoute('/api/send-stream')({
             'Cache-Control': 'no-cache, no-transform',
             Connection: 'keep-alive',
             'X-Accel-Buffering': 'no',
-            'X-Hermes-Session-Key': sessionKey,
-            'X-Hermes-Friendly-Id': resolvedFriendlyId,
+            ...buildResolvedSessionHeaders({
+              sessionKey,
+              friendlyId: resolvedFriendlyId,
+            }),
           },
         })
       },
