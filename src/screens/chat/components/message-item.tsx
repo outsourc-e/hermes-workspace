@@ -1829,6 +1829,10 @@ function MessageItemComponent({
   const effectiveIsStreaming =
     remoteStreamingActive || (_simulateStreaming && !revealComplete)
   const assistantDisplayText = effectiveIsStreaming ? revealedText : displayText
+  const assistantCorruptionWarning = useMemo(
+    () => detectAssistantCorruptionWarning(role, assistantDisplayText),
+    [role, assistantDisplayText],
+  )
   const standaloneMarkdownDocument = useMemo(
     () => extractStandaloneMarkdownFence(assistantDisplayText),
     [assistantDisplayText],

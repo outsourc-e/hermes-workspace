@@ -91,7 +91,19 @@ export async function buildRequestBody(
 
 export type StreamChunkType =
   | { type: 'content' | 'reasoning'; text: string }
-  | { type: 'tool'; name: string; label: string }
+  | {
+      type: 'tool'
+      name: string
+      label: string
+      toolCallId?: string
+      // Lifecycle phase from the upstream gateway. Vanilla Hermes Agent
+      // emits 'running' at tool start and 'completed' at tool finish via
+      // the `hermes.tool.progress` SSE event (#16588). Older builds that
+      // sent `claude.tool.progress` did not carry status — we treat
+      // missing/unknown values as a one-shot 'running' so existing flows
+      // keep working.
+      status?: 'running' | 'completed'
+    }
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -113,11 +125,28 @@ function parseClaudeToolProgressChunk(payload: string): StreamChunkType | null {
     const emoji = readString(record.emoji)
     const labelText = readString(record.label)
     const label = [emoji, labelText].filter(Boolean).join(' ').trim()
-    if (!label) return null
+    const toolCallId =
+      readString(record.toolCallId) ||
+      readString(record.tool_call_id) ||
+      undefined
+    const statusRaw = readString(record.status).toLowerCase()
+    const status =
+      statusRaw === 'running'
+        ? ('running' as const)
+        : statusRaw === 'completed' || statusRaw === 'complete'
+          ? ('completed' as const)
+          : undefined
+    // Accept the chunk as long as we have either a label OR a stable
+    // tool_call_id + status. Vanilla 'completed' events ship without
+    // emoji/label and would otherwise be dropped, leaving cards stuck
+    // in 'running'.
+    if (!label && !toolCallId) return null
     return {
       type: 'tool',
       name,
-      label,
+      label: label || name,
+      toolCallId,
+      status,
     }
   } catch {
     return null
@@ -163,7 +192,10 @@ export async function* parseOpenAIStream(
       for (const payload of dataLines) {
         if (!payload || payload === '[DONE]') continue
 
-        if (eventName === 'claude.tool.progress') {
+        if (
+          eventName === 'claude.tool.progress' ||
+          eventName === 'hermes.tool.progress'
+        ) {
           const toolChunk = parseClaudeToolProgressChunk(payload)
           if (toolChunk) yield toolChunk
           continue

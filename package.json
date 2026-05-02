@@ -1,11 +1,12 @@
 {
   "name": "hermes-workspace",
   "version": "2.1.3",
-  "description": "Desktop workspace for Hermes Agent \u2014 chat, orchestration, and multi-agent coding pipelines",
+  "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
   "private": true,
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
     "build": "vite build",
@@ -17,7 +18,12 @@
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix"
+    "check": "prettier --write . && eslint --fix",
+    "electron:dev": "NODE_ENV=development electron .",
+    "electron:build": "pnpm build && pnpm electron:bundle-server && electron-builder --config electron-builder.config.cjs",
+    "electron:build:mac": "pnpm build && pnpm electron:bundle-server && electron-builder --mac --config electron-builder.config.cjs",
+    "electron:build:win": "pnpm build && pnpm electron:bundle-server && electron-builder --win --config electron-builder.config.cjs",
+    "electron:bundle-server": "esbuild dist/server/server.js --bundle --platform=node --format=cjs --outfile=electron/server-bundle.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
@@ -59,7 +65,11 @@
     "xterm-addon-web-links": "^0.9.0",
     "yaml": "^2.8.2",
     "zod": "^3.25.76",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.11",
+    "framer-motion": "^12.36.0",
+    "motion-dom": "^12.36.0",
+    "motion-utils": "^12.36.0",
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.0",
@@ -77,6 +87,9 @@
     "typescript": "^5.7.2",
     "vite": "^7.3.2",
     "vitest": "^3.0.5",
-    "web-vitals": "^5.1.0"
+    "web-vitals": "^5.1.0",
+    "electron": "^40.8.2",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.27.0"
   }
 }
