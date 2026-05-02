@@ -696,7 +696,127 @@ export const Route = createFileRoute('/api/send-stream')({
               // directly to useStreamingMessage. Skip publishChatEvent to prevent
               // useRealtimeChatHistory from creating duplicate message bubbles.
               const skipPublish = true
-              await streamChat(
+
+              // Mid-run tool polling: vanilla Hermes Agent currently does not
+              // emit tool.* SSE events live (callback signature drift). Until
+              // upstream fixes that, we synthesize live tool events by polling
+              // the agent's session messages every ~1.5s during the run and
+              // emitting any new tool calls as event: tool with phase complete
+              // as soon as their tool_result message lands. The Workspace
+              // chat-store dedupes by tool_call_id so this is safe alongside
+              // any real live events that might arrive.
+              const seenLiveToolCallIds = new Set<string>()
+              let liveRunActive = true
+              const livePollIntervalMs = 800
+              const livePollerPromise = (async () => {
+                // Initial small delay so the agent has time to ingest the
+                // user message before we start asking for session state.
+                await new Promise((r) => setTimeout(r, 600))
+                while (liveRunActive) {
+                  if (!liveRunActive || streamClosed) break
+                  try {
+                    const msgs = (await getSessionMessagesFromAgent(
+                      sessionKey,
+                    )) as unknown as Array<Record<string, unknown>>
+                    if (!Array.isArray(msgs) || msgs.length === 0) continue
+                    // Find the most recent assistant message with tool_calls
+                    // and a map of tool_call_id -> result text.
+                    const resultByCallId = new Map<
+                      string,
+                      { text: string; isError: boolean }
+                    >()
+                    let lastAssistantToolCalls:
+                      | Array<Record<string, unknown>>
+                      | null = null
+                    for (let i = msgs.length - 1; i >= 0; i--) {
+                      const m = msgs[i] as Record<string, unknown>
+                      if (
+                        m &&
+                        (m.role === 'tool' || m.role === 'tool_result')
+                      ) {
+                        const callId =
+                          readString(m.tool_call_id) ||
+                          readString((m as Record<string, unknown>).toolCallId as unknown)
+                        if (!callId) continue
+                        const content = m.content
+                        let text = ''
+                        if (typeof content === 'string') {
+                          text = content
+                        } else if (Array.isArray(content)) {
+                          text = (content as Array<Record<string, unknown>>)
+                            .map((p) =>
+                              typeof p?.text === 'string'
+                                ? (p.text as string)
+                                : '',
+                            )
+                            .filter(Boolean)
+                            .join('\n')
+                        }
+                        const isErr =
+                          Boolean(
+                            (m as Record<string, unknown>).is_error,
+                          ) ||
+                          Boolean((m as Record<string, unknown>).isError)
+                        resultByCallId.set(callId, { text, isError: isErr })
+                        continue
+                      }
+                      if (m && m.role === 'assistant') {
+                        const tcs = (m.tool_calls ??
+                          (m as Record<string, unknown>).toolCalls) as
+                          | Array<Record<string, unknown>>
+                          | undefined
+                        if (Array.isArray(tcs) && tcs.length > 0) {
+                          lastAssistantToolCalls = tcs
+                          break
+                        }
+                      }
+                    }
+                    if (!lastAssistantToolCalls) continue
+                    for (const tc of lastAssistantToolCalls) {
+                      const tcRecord = tc as Record<string, unknown>
+                      const tcFn = readRecord(tcRecord.function)
+                      const id =
+                        readString(tcRecord.id) ||
+                        readString(tcRecord.tool_call_id) ||
+                        ''
+                      if (!id) continue
+                      // Only emit once per tool_call_id and only after the
+                      // tool's result message has actually landed (=> the
+                      // tool finished running).
+                      if (seenLiveToolCallIds.has(id)) continue
+                      const resultEntry = resultByCallId.get(id)
+                      if (!resultEntry) continue
+                      seenLiveToolCallIds.add(id)
+                      const name =
+                        readString(tcRecord.tool_name) ||
+                        readString(tcRecord.name) ||
+                        readString(tcFn?.name) ||
+                        'tool'
+                      const args = parseJsonIfPossible(
+                        tcFn?.arguments ?? tcRecord.arguments,
+                      )
+                      const synthetic = {
+                        phase: resultEntry.isError ? 'error' : 'complete',
+                        name,
+                        toolCallId: id,
+                        args,
+                        result: resultEntry.text,
+                        sessionKey,
+                        runId: activeRunId ?? undefined,
+                      }
+                      sendEvent('tool', synthetic)
+                    }
+                  } catch {
+                    // Best-effort polling; ignore transient errors.
+                  }
+                  await new Promise((r) =>
+                    setTimeout(r, livePollIntervalMs),
+                  )
+                }
+              })()
+
+              try {
+                await streamChat(
                 sessionKey,
                 {
                   message: getChatMessage(message, attachments),
@@ -1226,7 +1346,16 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   },
                 },
-              )
+                )
+              } finally {
+                // Stop the mid-run tool poller and let it drain.
+                liveRunActive = false
+                try {
+                  await livePollerPromise
+                } catch {
+                  // ignore
+                }
+              }
 
               // Set a timeout to close the stream if no completion event
               streamTimeoutTimer = setTimeout(() => {
