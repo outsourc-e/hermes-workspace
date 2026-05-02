@@ -13,6 +13,7 @@ module.exports = {
     'electron/main.cjs',
     'electron/preload.cjs',
     'electron/prod-server.cjs',
+    'electron/server-bundle.cjs',
     'assets/**/*',
     'public/**/*',
     'package.json',

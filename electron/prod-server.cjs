@@ -7,7 +7,14 @@ const portArg = process.argv.find(
 )
 const PORT = Number.parseInt(process.env.PORT || portArg || '3847', 10)
 const DIST_CLIENT = path.join(__dirname, '..', 'dist', 'client')
-const DIST_SERVER = path.join(__dirname, '..', 'dist', 'server', 'server.js')
+const BUNDLED_SERVER = path.join(__dirname, 'server-bundle.cjs')
+const UNBUNDLED_SERVER = path.join(
+  __dirname,
+  '..',
+  'dist',
+  'server',
+  'server.js',
+)
 
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -27,6 +34,15 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json',
 }
 
+async function loadServerBuild() {
+  if (fs.existsSync(BUNDLED_SERVER)) {
+    const bundled = require(BUNDLED_SERVER)
+    return bundled.default || bundled
+  }
+  const serverModule = await import(`file://${UNBUNDLED_SERVER}`)
+  return serverModule.default
+}
+
 async function main() {
   process.env.NODE_ENV = process.env.NODE_ENV || 'production'
   process.env.HERMES_WORKSPACE_DESKTOP =
@@ -36,8 +52,7 @@ async function main() {
   process.env.HERMES_DASHBOARD_URL =
     process.env.HERMES_DASHBOARD_URL || 'http://127.0.0.1:9119'
 
-  const serverModule = await import(`file://${DIST_SERVER}`)
-  const serverBuild = serverModule.default
+  const serverBuild = await loadServerBuild()
 
   const server = http.createServer(async (req, res) => {
     const url = req.url || '/'
@@ -66,11 +81,9 @@ async function main() {
         if (value)
           headers.set(key, Array.isArray(value) ? value.join(', ') : value)
       }
-
       const protocol = req.headers['x-forwarded-proto'] || 'http'
       const host = req.headers.host || `127.0.0.1:${PORT}`
       const fullUrl = `${protocol}://${host}${url}`
-
       const webRequest = new Request(fullUrl, {
         method: req.method,
         headers,
@@ -84,7 +97,6 @@ async function main() {
             : undefined,
         duplex: 'half',
       })
-
       const webResponse = await serverBuild.fetch(webRequest)
       const resHeaders = {}
       webResponse.headers.forEach((value, key) => {
@@ -95,7 +107,6 @@ async function main() {
         webResponse.statusText || '',
         resHeaders,
       )
-
       if (webResponse.body) {
         const reader = webResponse.body.getReader()
         while (true) {
