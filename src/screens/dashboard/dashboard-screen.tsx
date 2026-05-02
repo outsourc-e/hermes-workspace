@@ -6,8 +6,13 @@ import { OpsStrip } from './components/ops-strip'
 import { ModelInfoCard } from './components/model-info-card'
 import { AchievementsCard } from './components/achievements-card'
 import { HeroMetrics } from './components/hero-metrics'
-import { AnalyticsHeroCard } from './components/analytics-hero-card'
+import {
+  AnalyticsChartCard,
+  type AnalyticsPeriod,
+} from './components/analytics-chart-card'
+import { TopModelsCard } from './components/top-models-card'
 import { LogsTailCard } from './components/logs-tail-card'
+import { AttentionCard } from './components/attention-card'
 import {
   Area,
   AreaChart,
@@ -349,14 +354,18 @@ function ActivityChart({
 
 // ── Skills Widget ────────────────────────────────────────────────
 
-function SkillsWidget({ palette }: { palette: ReturnType<typeof readDashboardPalette> }) {
+function SkillsWidget({
+  palette,
+  onOpen,
+}: {
+  palette: ReturnType<typeof readDashboardPalette>
+  onOpen: () => void
+}) {
   const skillsAvailable = useFeatureAvailable('skills')
   const skillsQuery = useQuery({
     queryKey: ['claude-skills'],
     queryFn: async () => {
-      const res = await fetch(
-        '/api/skills?tab=installed&limit=8&summary=search',
-      )
+      const res = await fetch('/api/skills?tab=installed&limit=200&summary=search')
       if (!res.ok) return []
       const data = await res.json()
       return (data?.skills ?? []) as Array<Record<string, unknown>>
@@ -376,39 +385,88 @@ function SkillsWidget({ palette }: { palette: ReturnType<typeof readDashboardPal
     )
   }
 
+  // Summary view per Hermes Agent feedback: 'don’t enumerate, summarise.'
+  const installed = skills.length
+  const enabled = skills.filter((s) => s.enabled !== false).length
+  const top = skills.find((s) => s.enabled !== false) ?? skills[0]
+  const topName = top ? String(top.name ?? '—') : '—'
+
   return (
-    <GlassCard
-      title="Skills"
-      titleRight={
-        <span className="text-[10px] text-muted">
-          {skills.length} installed
-        </span>
-      }
-      accentColor={palette.warning}
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group relative flex w-full flex-col gap-1.5 overflow-hidden rounded-xl border px-4 py-3 text-left transition-colors hover:bg-[var(--theme-card)]/80"
+      style={{
+        background: 'var(--theme-card)',
+        borderColor: 'var(--theme-border)',
+      }}
     >
-      {skills.length === 0 ? (
-        <div className="text-xs text-neutral-400 py-4 text-center">
-          No skills installed
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {skills.slice(0, 6).map((skill, i) => (
-            <div
-              key={String(skill.name ?? i)}
-              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-[var(--theme-card2)] transition-colors"
-            >
-              <span className="text-xs">📦</span>
-              <span className="text-xs font-medium text-ink truncate flex-1">
-                {String(skill.name ?? 'Unnamed')}
-              </span>
-              {skill.enabled !== false && (
-                <span className="size-1.5 rounded-full bg-emerald-500/60" />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </GlassCard>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
+        style={{
+          background: `linear-gradient(90deg, ${palette.warning}, ${palette.warning}50, transparent)`,
+        }}
+      />
+      <div className="flex items-center justify-between">
+        <h3
+          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+          style={{ color: 'var(--theme-muted)' }}
+        >
+          Skills
+        </h3>
+        <span
+          className="font-mono text-[9px] uppercase tracking-[0.15em]"
+          style={{ color: 'var(--theme-muted)' }}
+        >
+          manage →
+        </span>
+      </div>
+      <div
+        className="font-mono text-2xl font-bold tabular-nums leading-none"
+        style={{ color: 'var(--theme-text)' }}
+      >
+        {installed}
+      </div>
+      <div
+        className="font-mono text-[10px] uppercase tracking-[0.1em]"
+        style={{ color: 'var(--theme-muted)' }}
+      >
+        {installed === 0
+          ? 'no skills installed'
+          : `${enabled} enabled · top: ${topName}`}
+      </div>
+    </button>
+  )
+}
+
+// ── Secondary action (smaller, monochrome) ─────────────────────
+
+function SecondaryAction({
+  label,
+  icon,
+  onClick,
+  disabled,
+}: {
+  label: string
+  icon: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors hover:bg-[var(--theme-card)]/80 disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        borderColor: 'var(--theme-border)',
+        color: 'var(--theme-muted)',
+      }}
+    >
+      <span aria-hidden>{icon}</span>
+      <span>{label}</span>
+    </button>
   )
 }
 
@@ -600,14 +658,34 @@ export function DashboardScreen() {
     return max
   }, [recentSessions])
 
+  // Period selector for analytics; persists across navigation via
+  // localStorage so refreshes don't reset the operator's preference.
+  const [period, setPeriod] = useState<AnalyticsPeriod>(() => {
+    if (typeof window === 'undefined') return 30
+    const stored = window.localStorage.getItem('dashboard.analyticsPeriod')
+    const n = Number(stored)
+    if (n === 7 || n === 14 || n === 30) return n
+    return 30
+  })
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(
+        'dashboard.analyticsPeriod',
+        String(period),
+      )
+    }
+  }, [period])
+
   // Aggregate dashboard overview — surfaces the data the native
   // Hermes dashboard exposes (status, platforms, cron, achievements,
   // model info, analytics) in a single round trip with per-section
   // graceful fallbacks. Each card renders only when its slice resolves.
   const overviewQuery = useQuery<DashboardOverview>({
-    queryKey: ['dashboard', 'overview'],
+    queryKey: ['dashboard', 'overview', period],
     queryFn: async () => {
-      const res = await fetch('/api/dashboard/overview')
+      const res = await fetch(
+        `/api/dashboard/overview?days=${period}`,
+      )
       if (!res.ok) throw new Error(`overview ${res.status}`)
       return (await res.json()) as DashboardOverview
     },
@@ -692,38 +770,52 @@ export function DashboardScreen() {
             </span>
           </div>
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-xl">
-          <QuickAction
-            label="New Chat"
-            icon="💬"
-            accentColor={palette.accent}
+        {/* Action row: hierarchy per Hermes Agent review.
+           New Chat is primary (full button + accent), Terminal +
+           Skills are secondary, Settings collapses to icon-only. */}
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:max-w-xl">
+          <button
+            type="button"
             onClick={() =>
               navigate({
                 to: '/chat/$sessionKey',
                 params: { sessionKey: 'new' },
               })
             }
-          />
-          <QuickAction
+            className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.99]"
+            style={{
+              background: `linear-gradient(135deg, ${palette.accent}22, ${palette.accentSecondary}22)`,
+              borderColor: 'color-mix(in srgb, var(--theme-accent) 40%, transparent)',
+              color: 'var(--theme-text)',
+            }}
+          >
+            <span aria-hidden>💬</span>
+            <span>New Chat</span>
+          </button>
+          <SecondaryAction
             label="Terminal"
             icon="💻"
-            accentColor={palette.success}
             onClick={() => navigate({ to: '/terminal' })}
           />
-          <QuickAction
+          <SecondaryAction
             label="Skills"
             icon="🧩"
-            accentColor={palette.warning}
             onClick={() => navigate({ to: '/skills' })}
             disabled={!skillsAvailable}
-            badge={!skillsAvailable ? 'Enhanced' : undefined}
           />
-          <QuickAction
-            label="Settings"
-            icon="⚙️"
-            accentColor={palette.accentSecondary}
+          <button
+            type="button"
+            aria-label="Settings"
+            title="Settings"
             onClick={() => navigate({ to: '/settings', search: {} })}
-          />
+            className="flex size-9 items-center justify-center rounded-lg border transition-colors hover:bg-[var(--theme-card)]/80"
+            style={{
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-muted)',
+            }}
+          >
+            ⚙️
+          </button>
         </div>
       </div>
 
@@ -745,8 +837,22 @@ export function DashboardScreen() {
         }}
       />
 
-      {/* ── Analytics hero (daily mix + top models, modal expand) ── */}
-      <AnalyticsHeroCard analytics={overview?.analytics ?? null} />
+      {/* ── Analytics chart (left) + Top models card (right) ── */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <AnalyticsChartCard
+            analytics={overview?.analytics ?? null}
+            cron={overview?.cron ?? null}
+            status={overview?.status ?? null}
+            period={period}
+            onPeriodChange={setPeriod}
+            loading={overviewQuery.isFetching}
+          />
+        </div>
+        <div className="lg:col-span-4">
+          <TopModelsCard analytics={overview?.analytics ?? null} />
+        </div>
+      </div>
 
       {/* ── Primary content: Activity chart + side rail ── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
@@ -762,11 +868,16 @@ export function DashboardScreen() {
           <LogsTailCard logs={overview?.logs ?? null} />
         </div>
         <div className="flex flex-col gap-3 lg:col-span-4">
+          <AttentionCard overview={overview} />
           <ModelInfoCard
             modelInfo={overview?.modelInfo ?? null}
+            analytics={overview?.analytics ?? null}
             palette={palette}
           />
-          <SkillsWidget palette={palette} />
+          <SkillsWidget
+            palette={palette}
+            onOpen={() => navigate({ to: '/skills' })}
+          />
           <AchievementsCard achievements={overview?.achievements ?? null} />
         </div>
       </div>
