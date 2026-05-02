@@ -11,7 +11,6 @@ import {
 } from './components/analytics-chart-card'
 import { TopModelsCard } from './components/top-models-card'
 import { LogsTailCard } from './components/logs-tail-card'
-import { AttentionCard } from './components/attention-card'
 import {
   SessionsIntelligenceCard,
   type SessionRowData,
@@ -943,11 +942,15 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      {/* ── Ops strip (gateway + version drift + platforms + cron pulse) ── */}
+      {/* ── Ops strip (gateway + version drift + platforms + cron pulse).
+           Now also hosts the right-to-left Attention marquee per
+           Eric's iteration-006 ask, replacing the standalone
+           AttentionCard in the side rail. ── */}
       <OpsStrip
         status={overview?.status ?? null}
         cron={overview?.cron ?? null}
         platforms={overview?.platforms ?? []}
+        overview={overview ?? null}
       />
 
       {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
@@ -1000,7 +1003,13 @@ export function DashboardScreen() {
         ) : null}
       </div>
 
-      {/* ── Primary content: Sessions Intelligence (replaces 14d Activity) + side rail ── */}
+      {/* ── Primary content: Sessions Intelligence (replaces 14d Activity) + side rail ──
+           Iteration 006 layout per Eric:
+           - Attention now rides the OpsStrip marquee, not the rail.
+           - Achievements moved up to sit beside Top Models would push the chart out
+             of place; instead it now lives at the *top* of the side rail since the
+             rail itself is right of the chart, which produces the same visual order.
+           - Logs default off; still toggleable from edit mode for power users. */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         <div className="flex flex-col gap-3 lg:col-span-8">
           {layout.isVisible('sessions_intelligence') ? (
@@ -1021,24 +1030,21 @@ export function DashboardScreen() {
             </WidgetShell>
           ) : null}
         </div>
-        {/* Side rail order per Eric's iteration-005 feedback:
-            Attention is always first; Skills + Achievements move up;
-            Active Model is now a hero KPI tile (not in the rail);
-            Token mix + Hour of day fuse into one rhythm card. */}
+        {/* Side rail. Achievements is now first (sits beside Top Models
+            visually since the rail is right of the chart row + sessions),
+            then Skills, then the rhythm card. Mix & rhythm is the unique
+            chart in this column — keeping it. */}
         <div className="flex flex-col gap-3 lg:col-span-4">
-          <WidgetShell id="attention" layout={layout}>
-            <AttentionCard overview={overview} />
+          <WidgetShell id="achievements" layout={layout}>
+            <AchievementsCard
+              achievements={overview?.achievements ?? null}
+            />
           </WidgetShell>
           <WidgetShell id="skills_usage" layout={layout}>
             <SkillsUsageCard
               usage={overview?.skillsUsage ?? null}
               installedCount={skillsInstalled}
               onOpen={() => navigate({ to: '/skills' })}
-            />
-          </WidgetShell>
-          <WidgetShell id="achievements" layout={layout}>
-            <AchievementsCard
-              achievements={overview?.achievements ?? null}
             />
           </WidgetShell>
           <WidgetShell id="mix_rhythm" layout={layout}>
