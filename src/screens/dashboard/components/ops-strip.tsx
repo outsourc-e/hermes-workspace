@@ -133,7 +133,8 @@ export function OpsStrip({
           className="font-mono uppercase tracking-[0.15em]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          · {status.activeAgents} active
+          · {status.activeAgents} active{' '}
+          {status.activeAgents === 1 ? 'run' : 'runs'}
         </span>
         {status.restartRequested ? (
           <span
@@ -163,7 +164,7 @@ export function OpsStrip({
             }}
             title={`Local config v${status.configVersion} · latest v${status.latestConfigVersion}`}
           >
-            config +{drift}
+            {drift} config diff{drift === 1 ? '' : 's'}
           </button>
         ) : null}
       </div>
@@ -195,34 +196,47 @@ export function OpsStrip({
           </div>
         ) : null}
 
-        {cron ? (
-          <button
-            type="button"
-            onClick={() => navigate({ to: '/jobs' })}
-            className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80"
-            style={{
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-muted)',
-            }}
-            title="Open cron jobs"
-          >
-            <span>cron</span>
-            <span style={{ color: 'var(--theme-text)' }}>{cron.total}</span>
-            {cron.paused > 0 ? (
-              <span style={{ color: 'var(--theme-warning)' }}>
-                · {cron.paused}p
-              </span>
-            ) : null}
-            {cron.running > 0 ? (
-              <span style={{ color: 'var(--theme-success)' }}>
-                · {cron.running}r
-              </span>
-            ) : null}
-            {next ? (
-              <span style={{ color: next.tone }}>· {next.text}</span>
-            ) : null}
-          </button>
-        ) : null}
+        {cron ? (() => {
+          const isStale = next?.text === 'stale'
+          const isWarn = next?.text === 'overdue' || isStale
+          return (
+            <button
+              type="button"
+              onClick={() => navigate({ to: '/jobs' })}
+              className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80"
+              style={{
+                borderColor: isWarn
+                  ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
+                  : 'var(--theme-border)',
+                background: isWarn
+                  ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
+                  : 'transparent',
+                color: 'var(--theme-muted)',
+              }}
+              title={
+                isStale
+                  ? 'Cron next-run is more than 7 days overdue'
+                  : 'Open cron jobs'
+              }
+            >
+              <span>cron</span>
+              <span style={{ color: 'var(--theme-text)' }}>{cron.total}</span>
+              {cron.paused > 0 ? (
+                <span style={{ color: 'var(--theme-warning)' }}>
+                  · {cron.paused} paused
+                </span>
+              ) : null}
+              {cron.running > 0 ? (
+                <span style={{ color: 'var(--theme-success)' }}>
+                  · {cron.running} running
+                </span>
+              ) : null}
+              {next ? (
+                <span style={{ color: next.tone }}>· {next.text}</span>
+              ) : null}
+            </button>
+          )
+        })() : null}
       </div>
     </div>
   )
