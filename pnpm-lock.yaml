@@ -56,6 +56,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      electron-updater:
+        specifier: ^6.6.2
+        version: 6.8.3
       framer-motion:
         specifier: ^12.36.0
         version: 12.36.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -168,9 +171,6 @@ importers:
       electron-builder:
         specifier: ^26.8.1
         version: 26.8.1(electron-builder-squirrel-windows@26.8.1)
-      electron-updater:
-        specifier: ^6.6.2
-        version: 6.8.3
       esbuild:
         specifier: ^0.27.0
         version: 0.27.7
