@@ -29,8 +29,9 @@ export function AnalyticsSummaryCard({
 }: {
   analytics: DashboardOverview['analytics']
 }) {
-  if (!analytics || analytics.topModels.length === 0) return null
-  const top = analytics.topModels[0]
+  if (!analytics) return null
+  const hasData = analytics.topModels.length > 0
+  const top = hasData ? analytics.topModels[0] : null
   const max = top?.tokens || 1
   return (
     <div
@@ -69,6 +70,14 @@ export function AnalyticsSummaryCard({
           ) : null}
         </div>
       </div>
+      {!hasData ? (
+        <div
+          className="flex items-center justify-center py-3 text-[11px]"
+          style={{ color: 'var(--theme-muted)' }}
+        >
+          No usage in the last {analytics.windowDays}d.
+        </div>
+      ) : null}
       <div className="space-y-1.5">
         {analytics.topModels.map((m) => {
           const widthPct = Math.max(2, Math.round((m.tokens / max) * 100))

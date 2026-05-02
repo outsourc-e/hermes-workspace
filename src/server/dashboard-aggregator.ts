@@ -30,6 +30,16 @@ export type DashboardStatusSection = {
   activeAgents: number
   restartRequested: boolean
   updatedAt: string | null
+  /** Gateway/dashboard semver. `null` when missing. */
+  version: string | null
+  /** Release date string from `/api/status`, raw value preserved. */
+  releaseDate: string | null
+  /** Current config schema version applied locally. */
+  configVersion: number | null
+  /** Latest config schema the dashboard knows about. */
+  latestConfigVersion: number | null
+  /** Resolved `HERMES_HOME` directory the dashboard reports. */
+  hermesHome: string | null
 }
 
 export type DashboardPlatformEntry = {
@@ -120,6 +130,14 @@ function readBoolean(value: unknown): boolean {
   return typeof value === 'boolean' ? value : false
 }
 
+function readOptionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function readOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+
 function normalizeStatus(raw: unknown): DashboardStatusSection | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
@@ -136,6 +154,11 @@ function normalizeStatus(raw: unknown): DashboardStatusSection | null {
         : typeof r.updated_at === 'string'
           ? r.updated_at
           : null,
+    version: readOptionalString(r.version),
+    releaseDate: readOptionalString(r.release_date),
+    configVersion: readOptionalNumber(r.config_version),
+    latestConfigVersion: readOptionalNumber(r.latest_config_version),
+    hermesHome: readOptionalString(r.hermes_home),
   }
 }
 

@@ -43,6 +43,11 @@ describe('buildDashboardOverview', () => {
         active_agents: 2,
         restart_requested: false,
         updated_at: '2026-05-02T19:00:00Z',
+        version: '0.12.0',
+        release_date: '2026.4.30',
+        config_version: 17,
+        latest_config_version: 23,
+        hermes_home: '/Users/aurora/.hermes',
         platforms: {
           api_server: {
             state: 'connected',
@@ -59,6 +64,11 @@ describe('buildDashboardOverview', () => {
     const overview = await buildDashboardOverview({ fetcher })
     expect(overview.status?.gatewayState).toBe('running')
     expect(overview.status?.activeAgents).toBe(2)
+    expect(overview.status?.version).toBe('0.12.0')
+    expect(overview.status?.releaseDate).toBe('2026.4.30')
+    expect(overview.status?.configVersion).toBe(17)
+    expect(overview.status?.latestConfigVersion).toBe(23)
+    expect(overview.status?.hermesHome).toBe('/Users/aurora/.hermes')
     expect(overview.platforms).toEqual([
       {
         name: 'api_server',
@@ -197,7 +207,11 @@ describe('buildDashboardOverview', () => {
   it('survives mixed-status inputs (some succeed, some fail)', async () => {
     const fetcher: DashboardFetcher = async (path) => {
       if (path.startsWith('/api/status')) {
-        return jsonResponse({ gateway_state: 'running', active_agents: 1, platforms: {} })
+        return jsonResponse({
+          gateway_state: 'running',
+          active_agents: 1,
+          platforms: {},
+        })
       }
       if (path.startsWith('/api/cron/jobs')) {
         return jsonResponse({ jobs: [{ id: 'a', status: 'scheduled' }] })
@@ -207,6 +221,8 @@ describe('buildDashboardOverview', () => {
     }
     const overview = await buildDashboardOverview({ fetcher })
     expect(overview.status?.gatewayState).toBe('running')
+    expect(overview.status?.version).toBeNull()
+    expect(overview.status?.configVersion).toBeNull()
     expect(overview.cron?.total).toBe(1)
     expect(overview.achievements).toBeNull()
     expect(overview.modelInfo).toBeNull()
