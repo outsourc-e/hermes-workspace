@@ -121,6 +121,7 @@ function getAppUrl() {
 
 function startLocalServer() {
   return new Promise((resolve, reject) => {
+    let resolved = false
     if (process.env.NODE_ENV === 'development') {
       localServerReady = true
       resolve()
@@ -134,6 +135,7 @@ function startLocalServer() {
         cwd: join(__dirname, '..'),
         env: {
           ...process.env,
+          ELECTRON_RUN_AS_NODE: '1',
           NODE_ENV: 'production',
           PORT: String(APP_PORT),
           HERMES_WORKSPACE_DESKTOP: '1',
@@ -149,13 +151,16 @@ function startLocalServer() {
       if (message && message.type === 'ready') {
         localServerReady = true
         localServerPort = message.port || APP_PORT
+        resolved = true
         cleanup()
         resolve()
       }
     }
     const onExit = (code) => {
       cleanup()
-      reject(new Error(`desktop server exited early (${code})`))
+      if (!resolved) {
+        reject(new Error(`desktop server exited early (${code})`))
+      }
     }
     const cleanup = () => {
       localServer?.off('message', onReady)
@@ -166,6 +171,13 @@ function startLocalServer() {
     localServer.on('exit', onExit)
     localServer.stdout?.on('data', (data) => console.log(String(data).trim()))
     localServer.stderr?.on('data', (data) => console.error(String(data).trim()))
+
+    setTimeout(() => {
+      if (!resolved) {
+        cleanup()
+        reject(new Error('desktop server startup timed out after 20s'))
+      }
+    }, 20_000)
   })
 }
 
