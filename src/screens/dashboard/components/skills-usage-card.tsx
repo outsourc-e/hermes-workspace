@@ -34,9 +34,10 @@ export function SkillsUsageCard({
         onOpen()
         navigate({ to: '/skills' })
       }}
-      className="group relative flex w-full flex-col gap-2 overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors hover:bg-[var(--theme-card)]/80"
+      className="group relative flex w-full flex-col gap-2 overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--theme-card)_85%,transparent)]"
       style={{
-        background: 'var(--theme-card)',
+        background:
+          'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 92%, transparent))',
         borderColor: 'var(--theme-border)',
       }}
     >
@@ -51,12 +52,12 @@ export function SkillsUsageCard({
       <div className="flex items-center justify-between">
         <h3
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-muted)' }}
+          style={{ color: 'var(--theme-text)' }}
         >
           Skills usage
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
+          className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors group-hover:text-[var(--theme-accent)]"
           style={{ color: 'var(--theme-muted)' }}
         >
           {hasUsage
