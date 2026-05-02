@@ -100,8 +100,123 @@ describe('buildDashboardOverview', () => {
       total: 3,
       paused: 1,
       running: 1,
+      failed: 0,
       nextRunAt: '2026-05-03T00:30:00.000Z',
+      recentFailures: [],
     })
+  })
+
+  it('detects failed cron jobs and surfaces them in incidents', async () => {
+    const fetcher = makeFetcher({
+      '/api/cron/jobs': {
+        jobs: [
+          {
+            id: 'a',
+            name: 'Daily roll-up',
+            state: 'scheduled',
+            last_status: 'failed',
+            last_error: 'connection refused',
+            last_run_at: '2026-05-02T03:00:00Z',
+            next_run_at: '2026-05-03T03:00:00Z',
+          },
+          { id: 'b', state: 'scheduled' },
+        ],
+      },
+    })
+    const overview = await buildDashboardOverview({ fetcher })
+    expect(overview.cron?.failed).toBe(1)
+    expect(overview.cron?.recentFailures).toHaveLength(1)
+    expect(overview.cron?.recentFailures[0]).toMatchObject({
+      id: 'a',
+      name: 'Daily roll-up',
+      lastError: 'connection refused',
+    })
+    const cronIncident = overview.incidents.find(
+      (i) => i.id === 'cron-fail-a',
+    )
+    expect(cronIncident?.severity).toBe('error')
+    expect(cronIncident?.detail).toBe('connection refused')
+  })
+
+  it('uses /health/detailed active_agents over /api/status active_sessions', async () => {
+    const fetcher = makeFetcher({
+      '/api/status': {
+        gateway_state: 'running',
+        active_sessions: 7,
+        platforms: {},
+      },
+    })
+    const gatewayFetcher: DashboardFetcher = async (p) => {
+      if (p === '/health/detailed') {
+        return jsonResponse({ active_agents: 2 })
+      }
+      return new Response('nope', { status: 404 })
+    }
+    const overview = await buildDashboardOverview({
+      fetcher,
+      gatewayFetcher,
+    })
+    expect(overview.status?.activeSessions).toBe(7)
+    expect(overview.status?.activeAgents).toBe(2)
+  })
+
+  it('parses skills usage and emits a top-skill insight', async () => {
+    const fetcher = makeFetcher({
+      '/api/analytics/usage': {
+        period_days: 30,
+        totals: {
+          total_input: 1_000_000,
+          total_output: 50_000,
+          total_sessions: 10,
+          total_api_calls: 50,
+        },
+        by_model: [
+          { model: 'gpt-5.4', input_tokens: 1_000_000, output_tokens: 50_000 },
+        ],
+        daily: Array.from({ length: 14 }).map((_, i) => ({
+          day: `2026-04-${String(18 + i).padStart(2, '0')}`,
+          input_tokens: 1_000,
+          output_tokens: 100,
+          cache_read_tokens: 500,
+          reasoning_tokens: 0,
+          sessions: 1,
+          api_calls: 1,
+          estimated_cost: 0,
+        })),
+        skills: {
+          summary: {
+            total_skill_loads: 283,
+            total_skill_edits: 5,
+            total_skill_actions: 288,
+            distinct_skills_used: 55,
+          },
+          top_skills: [
+            {
+              skill: 'systematic-debugging',
+              total_count: 39,
+              percentage: 13.5,
+              last_used_at: 1_777_698_307,
+            },
+            {
+              skill: 'test-driven-development',
+              total_count: 27,
+              percentage: 9.4,
+              last_used_at: 1_777_698_307,
+            },
+          ],
+        },
+      },
+    })
+    const overview = await buildDashboardOverview({ fetcher })
+    expect(overview.skillsUsage?.distinctSkills).toBe(55)
+    expect(overview.skillsUsage?.topSkills).toHaveLength(2)
+    expect(overview.skillsUsage?.topSkills[0].skill).toBe(
+      'systematic-debugging',
+    )
+    const skillInsight = overview.insights.find((i) =>
+      i.text.includes('systematic-debugging'),
+    )
+    expect(skillInsight).toBeTruthy()
   })
 
   it('limits and shapes recent achievement unlocks', async () => {
@@ -307,6 +422,7 @@ describe('buildDashboardOverview', () => {
         return jsonResponse({
           gateway_state: 'running',
           active_agents: 1,
+          active_sessions: 3,
           platforms: {},
         })
       }
@@ -318,6 +434,10 @@ describe('buildDashboardOverview', () => {
     }
     const overview = await buildDashboardOverview({ fetcher })
     expect(overview.status?.gatewayState).toBe('running')
+    // No /health/detailed fetcher provided → falls back to legacy
+    // active_agents on /api/status payload.
+    expect(overview.status?.activeAgents).toBe(1)
+    expect(overview.status?.activeSessions).toBe(3)
     expect(overview.status?.version).toBeNull()
     expect(overview.status?.configVersion).toBeNull()
     expect(overview.cron?.total).toBe(1)

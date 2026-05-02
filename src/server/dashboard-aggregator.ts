@@ -24,6 +24,39 @@ export type DashboardOverview = {
   modelInfo: DashboardModelInfoSection | null
   analytics: DashboardAnalyticsSection | null
   logs: DashboardLogsSection | null
+  /** Skills usage (counts + top skills) from the analytics window. */
+  skillsUsage: DashboardSkillsUsageSection | null
+  /** Pre-computed insight callouts the UI can render verbatim. */
+  insights: Array<DashboardInsight>
+  /** Aggregated triage list: failed crons + platform errors + log errors. */
+  incidents: Array<DashboardIncident>
+}
+
+export type DashboardSkillsUsageSection = {
+  totalLoads: number
+  totalEdits: number
+  totalActions: number
+  distinctSkills: number
+  topSkills: Array<{
+    skill: string
+    totalCount: number
+    percentage: number
+    lastUsedAt: number | null
+  }>
+}
+
+export type DashboardInsight = {
+  text: string
+  tone: 'info' | 'positive' | 'warn'
+}
+
+export type DashboardIncident = {
+  id: string
+  severity: 'info' | 'warn' | 'error'
+  source: 'cron' | 'platform' | 'log' | 'config' | 'gateway'
+  label: string
+  detail: string
+  href: string | null
 }
 
 export type DashboardLogsSection = {
@@ -38,9 +71,21 @@ export type DashboardLogsSection = {
 
 export type DashboardStatusSection = {
   gatewayState: string
+  /**
+   * **Heuristic** count from `/api/status`: sessions touched in the
+   * last 300s. Use `activeAgents` for "currently running".
+   */
+  activeSessions: number
+  /**
+   * Canonical "currently running" number from gateway runtime status
+   * (​`/health/detailed` -> `active_agents`). Falls back to legacy
+   * `active_sessions` when `/health/detailed` is unreachable.
+   */
   activeAgents: number
   restartRequested: boolean
   updatedAt: string | null
+  /** Last gateway runtime pulse — alias of `updatedAt` for clarity. */
+  lastHeartbeatAt: string | null
   /** Gateway/dashboard semver. `null` when missing. */
   version: string | null
   /** Release date string from `/api/status`, raw value preserved. */
@@ -64,7 +109,15 @@ export type DashboardCronSection = {
   total: number
   paused: number
   running: number
+  failed: number
   nextRunAt: string | null
+  /** Jobs whose `last_status` indicates a failure or whose tail-error is non-null. */
+  recentFailures: Array<{
+    id: string
+    name: string
+    lastError: string | null
+    lastRunAt: string | null
+  }>
 }
 
 export type DashboardAchievementUnlock = {
@@ -182,22 +235,41 @@ function readOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
 
-function normalizeStatus(raw: unknown): DashboardStatusSection | null {
+function normalizeStatus(
+  raw: unknown,
+  health: unknown,
+): DashboardStatusSection | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   const state = readString(r.gateway_state) || readString(r.state)
   if (!state) return null
+  // `/health/detailed` is the canonical source for currently-running
+  // agent count. Falls back to legacy fields when the gateway endpoint
+  // is missing/unreachable.
+  let activeAgents: number | null = null
+  if (health && typeof health === 'object') {
+    const h = health as Record<string, unknown>
+    if (typeof h.active_agents === 'number') {
+      activeAgents = h.active_agents
+    }
+  }
+  if (activeAgents === null && typeof r.active_agents === 'number') {
+    activeAgents = r.active_agents
+  }
+  if (activeAgents === null) activeAgents = 0
+  const updatedAt =
+    typeof r.gateway_updated_at === 'string'
+      ? r.gateway_updated_at
+      : typeof r.updated_at === 'string'
+        ? r.updated_at
+        : null
   return {
     gatewayState: state,
-    // The dashboard exposes `active_sessions`; older builds used `active_agents`.
-    activeAgents: readNumber(r.active_sessions ?? r.active_agents),
+    activeSessions: readNumber(r.active_sessions),
+    activeAgents,
     restartRequested: readBoolean(r.restart_requested),
-    updatedAt:
-      typeof r.gateway_updated_at === 'string'
-        ? r.gateway_updated_at
-        : typeof r.updated_at === 'string'
-          ? r.updated_at
-          : null,
+    updatedAt,
+    lastHeartbeatAt: updatedAt,
     version: readOptionalString(r.version),
     releaseDate: readOptionalString(r.release_date),
     configVersion: readOptionalNumber(r.config_version),
@@ -245,17 +317,39 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
 
   let paused = 0
   let running = 0
+  let failed = 0
   let nextRunMs: number | null = null
+  const recentFailures: DashboardCronSection['recentFailures'] = []
   for (const job of jobs) {
     if (!job || typeof job !== 'object') continue
-    const status = readString(job.status).toLowerCase()
-    if (status === 'paused') paused += 1
-    else if (status === 'running') running += 1
+    const j = job as Record<string, unknown>
+    const state = readString(j.state || j.status).toLowerCase()
+    if (state === 'paused') paused += 1
+    else if (state === 'running') running += 1
+    const lastStatus = readString(j.last_status).toLowerCase()
+    const lastError =
+      typeof j.last_error === 'string'
+        ? j.last_error
+        : typeof j.last_delivery_error === 'string'
+          ? (j.last_delivery_error as string)
+          : null
+    const isFailure =
+      lastStatus === 'failed' ||
+      lastStatus === 'error' ||
+      (lastError !== null && lastError.length > 0)
+    if (isFailure) {
+      failed += 1
+      const id = readString(j.id) || readString(j.name) || 'unknown'
+      const name = readString(j.name) || id
+      const lastRunAt =
+        typeof j.last_run_at === 'string' ? j.last_run_at : null
+      recentFailures.push({ id, name, lastError, lastRunAt })
+    }
     const candidates = [
-      typeof job.next_run_at === 'string' ? Date.parse(job.next_run_at) : NaN,
-      typeof job.next_run === 'string' ? Date.parse(job.next_run) : NaN,
-      typeof job.next_run_at === 'number'
-        ? (job.next_run_at as number) * 1000
+      typeof j.next_run_at === 'string' ? Date.parse(j.next_run_at) : NaN,
+      typeof j.next_run === 'string' ? Date.parse(j.next_run) : NaN,
+      typeof j.next_run_at === 'number'
+        ? (j.next_run_at as number) * 1000
         : NaN,
     ].filter((v) => Number.isFinite(v)) as Array<number>
     for (const ts of candidates) {
@@ -266,7 +360,9 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
     total: jobs.length,
     paused,
     running,
+    failed,
     nextRunAt: nextRunMs ? new Date(nextRunMs).toISOString() : null,
+    recentFailures: recentFailures.slice(0, 5),
   }
 }
 
@@ -332,6 +428,61 @@ function normalizeModelInfo(raw: unknown): DashboardModelInfoSection | null {
       r.capabilities && typeof r.capabilities === 'object'
         ? (r.capabilities as Record<string, unknown>)
         : null,
+  }
+}
+
+function normalizeSkillsUsage(
+  raw: unknown,
+): DashboardSkillsUsageSection | null {
+  if (!raw || typeof raw !== 'object') return null
+  // Native shape: analytics payload's `skills` field is an object with
+  // `summary` and `top_skills` per the Hermes Agent confirmation.
+  const skillsRaw = (raw as Record<string, unknown>).skills
+  if (!skillsRaw || typeof skillsRaw !== 'object') return null
+  const s = skillsRaw as Record<string, unknown>
+  const summary =
+    s.summary && typeof s.summary === 'object'
+      ? (s.summary as Record<string, unknown>)
+      : null
+  const topRaw = Array.isArray(s.top_skills) ? s.top_skills : []
+  const topSkills = topRaw
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null
+      const e = entry as Record<string, unknown>
+      const skill = readString(e.skill)
+      if (!skill) return null
+      return {
+        skill,
+        totalCount: readNumber(e.total_count),
+        percentage: readNumber(e.percentage),
+        lastUsedAt:
+          typeof e.last_used_at === 'number'
+            ? (e.last_used_at as number)
+            : null,
+      }
+    })
+    .filter(
+      (e): e is {
+        skill: string
+        totalCount: number
+        percentage: number
+        lastUsedAt: number | null
+      } => e !== null,
+    )
+    .sort((a, b) => b.totalCount - a.totalCount)
+    .slice(0, 5)
+  if (
+    !summary &&
+    topSkills.length === 0
+  ) {
+    return null
+  }
+  return {
+    totalLoads: readNumber(summary?.total_skill_loads),
+    totalEdits: readNumber(summary?.total_skill_edits),
+    totalActions: readNumber(summary?.total_skill_actions),
+    distinctSkills: readNumber(summary?.distinct_skills_used),
+    topSkills,
   }
 }
 
@@ -473,6 +624,229 @@ function normalizeAnalytics(
   }
 }
 
+function shortDate(day: string): string {
+  const ts = Date.parse(day)
+  if (!Number.isFinite(ts)) return day
+  return new Date(ts).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+function formatTokensCompact(n: number): string {
+  if (!n || n <= 0) return '0'
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
+/**
+ * Build server-side insight callouts so the UI can render them as-is.
+ * Per the Hermes Agent guidance, computing this in the aggregator keeps
+ * the UI dumb and lets us swap in a real anomaly endpoint later without
+ * touching components.
+ */
+function computeInsights(
+  analytics: DashboardAnalyticsSection | null,
+  cron: DashboardCronSection | null,
+  status: DashboardStatusSection | null,
+  skills: DashboardSkillsUsageSection | null,
+): Array<DashboardInsight> {
+  const out: Array<DashboardInsight> = []
+  if (!analytics || analytics.source !== 'analytics') return out
+  // 1. Peak day driver
+  if (analytics.daily.length >= 3) {
+    let peakIdx = 0
+    let peakVal = 0
+    for (let i = 0; i < analytics.daily.length; i += 1) {
+      const total =
+        analytics.daily[i].inputTokens + analytics.daily[i].outputTokens
+      if (total > peakVal) {
+        peakVal = total
+        peakIdx = i
+      }
+    }
+    if (peakVal > 0) {
+      const top = analytics.topModels[0]
+      const driver = top ? `, driven by ${top.id}` : ''
+      out.push({
+        tone: 'info',
+        text: `Usage peaked ${shortDate(analytics.daily[peakIdx].day)} (${formatTokensCompact(peakVal)} tokens)${driver}.`,
+      })
+    }
+  }
+  // 2. Cache delta
+  if (analytics.daily.length >= 14) {
+    const mid = Math.floor(analytics.daily.length / 2)
+    let prior = 0
+    let recent = 0
+    for (let i = 0; i < mid; i += 1) prior += analytics.daily[i].cacheReadTokens
+    for (let i = mid; i < analytics.daily.length; i += 1)
+      recent += analytics.daily[i].cacheReadTokens
+    if (prior > 0) {
+      const delta = ((recent - prior) / prior) * 100
+      if (Math.abs(delta) >= 5) {
+        out.push({
+          tone: delta > 0 ? 'positive' : 'warn',
+          text: `Cache reads ${delta > 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(0)}% vs prior period.`,
+        })
+      }
+    }
+  }
+  // 3. Operational pulse
+  const ops: Array<string> = []
+  if (cron && cron.failed > 0) {
+    ops.push(
+      `${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`,
+    )
+  }
+  if (cron && cron.nextRunAt) {
+    const nextMs = Date.parse(cron.nextRunAt)
+    if (Number.isFinite(nextMs) && nextMs - Date.now() < -7 * 86_400_000) {
+      ops.push(
+        `${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`,
+      )
+    }
+  }
+  if (
+    status &&
+    status.gatewayState === 'running' &&
+    status.activeAgents === 0
+  ) {
+    ops.push('no active runs')
+  }
+  if (status?.restartRequested) ops.push('restart pending')
+  if (ops.length > 0) {
+    out.push({
+      tone: ops.length >= 2 ? 'warn' : 'info',
+      text: ops.join(' · ') + '.',
+    })
+  }
+  // 4. Skills heat
+  if (skills && skills.distinctSkills > 0 && skills.topSkills[0]) {
+    const top = skills.topSkills[0]
+    out.push({
+      tone: 'info',
+      text: `Top skill: ${top.skill} (${top.totalCount} uses, ${top.percentage.toFixed(1)}% of skill activity).`,
+    })
+  }
+  return out.slice(0, 4)
+}
+
+function computeIncidents(
+  status: DashboardStatusSection | null,
+  platforms: Array<DashboardPlatformEntry>,
+  cron: DashboardCronSection | null,
+  logs: DashboardLogsSection | null,
+): Array<DashboardIncident> {
+  const out: Array<DashboardIncident> = []
+  // Cron failures
+  if (cron) {
+    for (const f of cron.recentFailures) {
+      out.push({
+        id: `cron-fail-${f.id}`,
+        severity: 'error',
+        source: 'cron',
+        label: `cron job failed: ${f.name}`,
+        detail: f.lastError || 'last_status indicates failure',
+        href: '/jobs',
+      })
+    }
+    if (cron.nextRunAt) {
+      const nextMs = Date.parse(cron.nextRunAt)
+      if (
+        Number.isFinite(nextMs) &&
+        nextMs - Date.now() < -7 * 86_400_000 &&
+        out.length < 5
+      ) {
+        out.push({
+          id: 'cron-stale',
+          severity: 'warn',
+          source: 'cron',
+          label: `${cron.total} cron job${cron.total === 1 ? '' : 's'} stale`,
+          detail: 'next scheduled run is more than 7 days overdue',
+          href: '/jobs',
+        })
+      }
+    }
+    if (cron.paused > 0) {
+      out.push({
+        id: 'cron-paused',
+        severity: 'warn',
+        source: 'cron',
+        label: `${cron.paused} cron job${cron.paused === 1 ? '' : 's'} paused`,
+        detail: 'resume from /jobs if these should be running',
+        href: '/jobs',
+      })
+    }
+  }
+  // Platform errors
+  for (const p of platforms) {
+    const s = p.state.toLowerCase()
+    if (s === 'error' || s === 'failed' || s === 'disconnected') {
+      out.push({
+        id: `platform-${p.name}`,
+        severity: 'error',
+        source: 'platform',
+        label: `${p.name} ${p.state}`,
+        detail: p.errorMessage || 'platform reports a non-connected state',
+        href: null,
+      })
+    }
+  }
+  // Config drift
+  if (
+    status &&
+    status.configVersion !== null &&
+    status.latestConfigVersion !== null &&
+    status.latestConfigVersion > status.configVersion
+  ) {
+    const diff = status.latestConfigVersion - status.configVersion
+    out.push({
+      id: 'config-drift',
+      severity: 'warn',
+      source: 'config',
+      label: `${diff} config diff${diff === 1 ? '' : 's'} pending`,
+      detail: `local v${status.configVersion} · latest v${status.latestConfigVersion}`,
+      href: '/settings',
+    })
+  }
+  // Restart pending
+  if (status?.restartRequested) {
+    out.push({
+      id: 'restart-pending',
+      severity: 'warn',
+      source: 'gateway',
+      label: 'restart pending',
+      detail: 'gateway flagged restart_requested',
+      href: null,
+    })
+  }
+  // Log-tail errors
+  if (logs && logs.errorCount > 0) {
+    out.push({
+      id: 'log-errors',
+      severity: 'error',
+      source: 'log',
+      label: `${logs.errorCount} log error${logs.errorCount === 1 ? '' : 's'} in tail`,
+      detail: 'recent agent log shows tracebacks or fatal errors',
+      href: null,
+    })
+  } else if (logs && logs.warnCount > 0) {
+    out.push({
+      id: 'log-warns',
+      severity: 'warn',
+      source: 'log',
+      label: `${logs.warnCount} log warning${logs.warnCount === 1 ? '' : 's'}`,
+      detail: 'recent agent log emitted warnings',
+      href: null,
+    })
+  }
+  return out
+}
+
 function normalizeLogs(
   raw: unknown,
   limit: number,
@@ -505,14 +879,25 @@ function normalizeLogs(
   }
 }
 
+export type BuildOverviewExtraFetchers = {
+  /**
+   * Optional fetcher for the gateway runtime endpoint (`/health/detailed`).
+   * Different host/port from the dashboard fetcher; lets the aggregator
+   * pick up the canonical `active_agents` value the Hermes Agent
+   * confirmed is the right “currently running” source.
+   */
+  gatewayFetcher?: DashboardFetcher
+}
+
 export async function buildDashboardOverview(
-  options: BuildOverviewOptions,
+  options: BuildOverviewOptions & BuildOverviewExtraFetchers,
 ): Promise<DashboardOverview> {
   const opts = { ...DEFAULT_OPTIONS, ...options }
   const { fetcher, analyticsWindowDays, achievementsLimit, logsLimit } = opts
 
   const [
     statusRaw,
+    healthRaw,
     cronRaw,
     achRecentRaw,
     achAllRaw,
@@ -521,6 +906,9 @@ export async function buildDashboardOverview(
     logsRaw,
   ] = await Promise.all([
     safeJson<unknown>(fetcher, '/api/status'),
+    options.gatewayFetcher
+      ? safeJson<unknown>(options.gatewayFetcher, '/health/detailed')
+      : Promise.resolve(null),
     safeJson<unknown>(fetcher, '/api/cron/jobs'),
     safeJson<unknown>(
       fetcher,
@@ -535,17 +923,29 @@ export async function buildDashboardOverview(
     safeJson<unknown>(fetcher, `/api/logs?lines=${logsLimit}`),
   ])
 
+  const status = normalizeStatus(statusRaw, healthRaw)
+  const platforms = normalizePlatforms(statusRaw)
+  const cron = normalizeCron(cronRaw)
+  const analytics = normalizeAnalytics(analyticsRaw, analyticsWindowDays)
+  const logs = normalizeLogs(logsRaw, logsLimit)
+  const skillsUsage = normalizeSkillsUsage(analyticsRaw)
+  const insights = computeInsights(analytics, cron, status, skillsUsage)
+  const incidents = computeIncidents(status, platforms, cron, logs)
+
   return {
-    status: normalizeStatus(statusRaw),
-    platforms: normalizePlatforms(statusRaw),
-    cron: normalizeCron(cronRaw),
+    status,
+    platforms,
+    cron,
     achievements: normalizeAchievements(
       achRecentRaw,
       achAllRaw,
       achievementsLimit,
     ),
     modelInfo: normalizeModelInfo(modelInfoRaw),
-    analytics: normalizeAnalytics(analyticsRaw, analyticsWindowDays),
-    logs: normalizeLogs(logsRaw, logsLimit),
+    analytics,
+    logs,
+    skillsUsage,
+    insights,
+    incidents,
   }
 }

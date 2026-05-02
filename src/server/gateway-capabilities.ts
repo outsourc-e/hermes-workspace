@@ -360,6 +360,26 @@ export async function dashboardFetch(
   return res
 }
 
+/**
+ * Lightweight fetch helper that targets the gateway base URL
+ * (`CLAUDE_API`, e.g. http://127.0.0.1:8645). Used for endpoints that
+ * live on the gateway runtime rather than the dashboard, like
+ * `/health/detailed`.
+ */
+export async function gatewayFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const url = /^https?:\/\//i.test(path)
+    ? path
+    : `${CLAUDE_API}${path.startsWith('/') ? path : `/${path}`}`
+  const headers = new Headers(init.headers)
+  for (const [k, v] of Object.entries(authHeaders())) {
+    if (!headers.has(k)) headers.set(k, v)
+  }
+  return fetch(url, { ...init, headers })
+}
+
 // ── Probing ───────────────────────────────────────────────────────
 
 async function probe(path: string): Promise<boolean> {

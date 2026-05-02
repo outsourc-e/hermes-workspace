@@ -17,7 +17,6 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'
-import { buildInsights } from '@/screens/dashboard/lib/insights'
 
 export type AnalyticsPeriod = 7 | 14 | 30
 
@@ -69,15 +68,13 @@ type ChartDatum = {
  */
 export function AnalyticsChartCard({
   analytics,
-  cron,
-  status,
+  insights,
   period,
   onPeriodChange,
   loading,
 }: {
   analytics: DashboardOverview['analytics']
-  cron: DashboardOverview['cron']
-  status: DashboardOverview['status']
+  insights: DashboardOverview['insights']
   period: AnalyticsPeriod
   onPeriodChange: (next: AnalyticsPeriod) => void
   loading?: boolean
@@ -98,11 +95,6 @@ export function AnalyticsChartCard({
       cost: d.estimatedCost,
     }))
   }, [analytics])
-
-  const insights = useMemo(
-    () => buildInsights(analytics, cron, status),
-    [analytics, cron, status],
-  )
 
   if (!analytics) return null
   const hasData = analytics.source === 'analytics' && data.length > 0
