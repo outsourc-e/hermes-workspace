@@ -21,13 +21,11 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import type { SessionMeta } from '@/screens/chat/types'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
-import { chatQueryKeys } from '@/screens/chat/chat-queries'
+import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
@@ -52,20 +50,8 @@ const TerminalWorkspace = lazy(() =>
   })),
 )
 
-type SessionsListResponse = Array<SessionMeta>
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
   'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
-
-async function fetchSessions(): Promise<SessionsListResponse> {
-  const res = await fetch('/api/sessions')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data = await res.json()
-  return Array.isArray(data?.sessions)
-    ? data.sessions
-    : Array.isArray(data)
-      ? data
-      : []
-}
 
 type WorkspaceShellProps = {
   children?: React.ReactNode
@@ -159,26 +145,19 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
 
-  // Sessions query — shared across sidebar and chat
-  const sessionsQuery = useQuery({
-    queryKey: chatQueryKeys.sessions,
-    queryFn: fetchSessions,
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+  const isNewChat = activeFriendlyId === 'new'
+
+  // Sessions state — shared semantic source for sidebar and chat header
+  const {
+    sessions,
+    sessionsLoading,
+    sessionsFetching,
+    sessionsError,
+    refetchSessions,
+  } = useChatSessions({
+    activeFriendlyId,
+    isNewChat,
   })
-
-  const sessions = sessionsQuery.data ?? []
-  const sessionsLoading = sessionsQuery.isLoading
-  const sessionsFetching = sessionsQuery.isFetching
-  const sessionsError = sessionsQuery.isError
-    ? sessionsQuery.error instanceof Error
-      ? sessionsQuery.error.message
-      : 'Failed to load sessions'
-    : null
-
-  const refetchSessions = useCallback(() => {
-    void sessionsQuery.refetch()
-  }, [sessionsQuery])
 
   const startNewChat = useCallback(() => {
     setCreatingSession(true)

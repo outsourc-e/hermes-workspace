@@ -350,7 +350,10 @@ export function toSessionSummary(
 
 type StreamChatOptions = {
   signal?: AbortSignal
-  onEvent: (payload: { event: string; data: Record<string, unknown> }) => void
+  onEvent: (payload: {
+    event: string
+    data: Record<string, unknown>
+  }) => void | Promise<void>
 }
 
 /**
@@ -405,7 +408,7 @@ export async function streamChat(
         if (dataStr === '[DONE]') continue
         try {
           const data = JSON.parse(dataStr) as Record<string, unknown>
-          opts.onEvent({ event: currentEvent || 'message', data })
+          await opts.onEvent({ event: currentEvent || 'message', data })
         } catch {
           // skip malformed JSON
         }
