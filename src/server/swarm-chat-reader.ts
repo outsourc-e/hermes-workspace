@@ -147,7 +147,6 @@ export function readWorkerMessages(profilePath: string, limit: number): SwarmCha
       sessionTitle: null,
       messages: [],
       ok: false,
-      error: `state.db missing at ${dbPath}`,
     }
   }
   try {
