@@ -72,7 +72,15 @@ Start here: [docs/swarm/](./docs/swarm/)
 
 ## 🚀 Quick Start
 
-### One-line install (recommended)
+Three paths — pick the one that matches you:
+
+| Path | Best for | Time |
+|---|---|---|
+| **🐳 [Docker Compose](#-docker-quickstart)** | Self-hosters, home labs, "give me a compose gig" | ~2 min |
+| **🌐 One-line install** | Local dev on macOS/Linux | ~3 min |
+| **🔌 Attach to existing `hermes-agent`** | You already run Hermes Agent | ~1 min |
+
+### One-line install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
@@ -372,14 +380,19 @@ Open `http://localhost:3000` and complete the onboarding.
 
 ### Building from source
 
-Want to hack on the workspace or the bundled agent Dockerfile? Use the dev overlay:
+Want to hack on the workspace and have local changes hot-built into the
+container? Use the dev overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-The base `docker-compose.yml` stays untouched — the overlay adds `build:` blocks
-that take priority over `image:`, so both services compile from local source.
+The base `docker-compose.yml` stays untouched — the overlay adds a `build:`
+block for the `hermes-workspace` service so the local repo is compiled
+instead of pulled. The Hermes Agent service still uses the canonical
+`nousresearch/hermes-agent:latest` image; if you need a custom agent
+build, tag it locally and override `image:` in your own
+`compose.override.yml`.
 
 ### Using a Pre-Built Image (Coolify / Easypanel / Dokploy / Unraid)
 

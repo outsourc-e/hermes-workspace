@@ -1,23 +1,26 @@
-# Hermes Workspace + Agent — Development Overlay
+# Hermes Workspace — Development Overlay
 #
-# Builds both services from source instead of pulling pre-built images.
-# Use when modifying the workspace or the bundled agent Dockerfile.
+# Builds the Workspace image from local source instead of pulling the
+# pre-built GHCR image. Use when iterating on Workspace code (server,
+# routes, UI) and you want changes to land in the container without
+# publishing a release first.
+#
+# The Hermes Agent service still uses the canonical upstream image
+# (nousresearch/hermes-agent:latest, ~750k pulls) — there is no need to
+# rebuild that locally, and doing so just couples the compose stack to
+# whatever vendored Python the workspace happens to ship. If you really
+# need a custom agent image, build/tag it separately and override the
+# `image:` field in your own .override.yml.
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
 # The base docker-compose.yml stays untouched for a regular install-and-run.
 # When this overlay is merged in, `build:` takes priority over `image:` for
-# each service, so source code is compiled locally and tagged with the
-# upstream image name.
+# the workspace service so local source is compiled instead of pulled.
 
 services:
-  hermes-agent:
-    build:
-      context: .
-      dockerfile: docker/agent/Dockerfile
-
   hermes-workspace:
     build:
       context: .
-      dockerfile: docker/workspace/Dockerfile
+      dockerfile: ./Dockerfile
