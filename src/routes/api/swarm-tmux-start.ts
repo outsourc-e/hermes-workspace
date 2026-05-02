@@ -5,6 +5,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { rosterByWorkerId } from '../../server/swarm-roster'
+import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
+import { syncSwarmProfileModel } from '../../server/swarm-profile-config'
 
 // Inlined to avoid SSR module-resolution races against freshly-written
 // helpers; mirrors `src/server/claude-paths.ts` getProfilesDir().
@@ -161,6 +164,39 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
           )
         }
 
+        // Sync the worker's profile config.yaml model section to the
+        // roster's `model:` label before we (re)attach tmux. Hermes Agent
+        // reads config.yaml on every invocation, and the wrapper does not
+        // pass `--model`, so this is the only way the roster value is
+        // honored. Best-effort: unrecognised labels (typos, custom
+        // models) are left as-is so a worker never gets wedged. See #236.
+        let modelSync: {
+          attempted: boolean
+          changed: boolean
+          target?: string
+          previous?: string
+          error?: string
+        } = { attempted: false, changed: false }
+        try {
+          const roster = rosterByWorkerId([workerId]).get(workerId)
+          const resolved = resolveSwarmModelLabel(roster?.model ?? null)
+          if (resolved) {
+            modelSync.attempted = true
+            const result = syncSwarmProfileModel(profilePath, resolved)
+            if (result.ok) {
+              modelSync.changed = result.changed
+              modelSync.target = `${resolved.provider}/${resolved.default}`
+              if (result.previous) {
+                modelSync.previous = `${result.previous.provider}/${result.previous.default}`
+              }
+            } else {
+              modelSync.error = result.error
+            }
+          }
+        } catch (err) {
+          modelSync.error = err instanceof Error ? err.message : String(err)
+        }
+
         const sessionName = `swarm-${workerId}`
         const alreadyRunning = await tmuxHasSession(tmuxBin, sessionName)
         if (alreadyRunning) {
@@ -170,6 +206,7 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
             alreadyRunning: true,
             started: false,
             tmuxBin,
+            modelSync,
           })
         }
 
@@ -194,6 +231,7 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
           started: true,
           tmuxBin,
           cwd,
+          modelSync,
         })
       },
     },

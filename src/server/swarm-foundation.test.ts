@@ -155,3 +155,97 @@ describe('parseSwarmPluginManifest', () => {
     }
   })
 })
+
+import { patchSwarmRuntimeFile, readSwarmRuntimeFile } from './swarm-foundation'
+
+describe('patchSwarmRuntimeFile', () => {
+  it('returns ok=false when the profile path does not exist', () => {
+    const tempDir = path.join(os.tmpdir(), `patch-runtime-missing-${Date.now()}`)
+    const result = patchSwarmRuntimeFile(tempDir, 'swarm9', { state: 'idle' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('profile path missing')
+  })
+
+  it('writes a fresh runtime.json when none exists', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-runtime-fresh-'))
+    try {
+      const result = patchSwarmRuntimeFile(tempDir, 'swarm9', {
+        state: 'idle',
+        phase: 'stopped',
+        currentTask: null,
+      })
+      expect(result.ok).toBe(true)
+      const { source, runtime } = readSwarmRuntimeFile(tempDir, 'swarm9', {
+        workspaceRoot: tempDir,
+      })
+      expect(source).toBe('runtime.json')
+      expect(runtime.state).toBe('idle')
+      expect(runtime.phase).toBe('stopped')
+      expect(runtime.currentTask).toBeNull()
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('preserves unrelated fields and only overwrites the patched ones', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-runtime-merge-'))
+    try {
+      const runtimePath = path.join(tempDir, 'runtime.json')
+      fs.writeFileSync(
+        runtimePath,
+        JSON.stringify({
+          workerId: 'swarm9',
+          state: 'blocked',
+          phase: 'blocked',
+          currentTask: 'old task',
+          blockedReason: 'legacy reason',
+          assignedTaskCount: 7,
+          customField: 'kept',
+        }) + '\n',
+        'utf8',
+      )
+
+      const result = patchSwarmRuntimeFile(tempDir, 'swarm9', {
+        state: 'idle',
+        phase: 'stopped',
+        currentTask: null,
+        blockedReason: null,
+      })
+      expect(result.ok).toBe(true)
+
+      const raw = JSON.parse(fs.readFileSync(runtimePath, 'utf8')) as Record<
+        string,
+        unknown
+      >
+      expect(raw.state).toBe('idle')
+      expect(raw.phase).toBe('stopped')
+      expect(raw.currentTask).toBeNull()
+      expect(raw.blockedReason).toBeNull()
+      expect(raw.assignedTaskCount).toBe(7)
+      expect(raw.customField).toBe('kept')
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('rewrites cleanly even when existing runtime.json is corrupt', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-runtime-corrupt-'))
+    try {
+      const runtimePath = path.join(tempDir, 'runtime.json')
+      fs.writeFileSync(runtimePath, '{ this is not json', 'utf8')
+
+      const result = patchSwarmRuntimeFile(tempDir, 'swarm9', {
+        state: 'idle',
+        phase: 'stopped',
+      })
+      expect(result.ok).toBe(true)
+      const { runtime } = readSwarmRuntimeFile(tempDir, 'swarm9', {
+        workspaceRoot: tempDir,
+      })
+      expect(runtime.state).toBe('idle')
+      expect(runtime.phase).toBe('stopped')
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+})

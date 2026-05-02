@@ -394,6 +394,61 @@ export function readSwarmRuntimeFile(
   }
 }
 
+/**
+ * Patch a worker's `runtime.json` in place.
+ *
+ * Reads the existing file (if any) so unspecified fields are preserved,
+ * applies the supplied partial update, and writes atomically. The runtime
+ * file is the source of truth for `lifecycle.state` / `phase` / `currentTask`
+ * etc that the Swarm UI renders, so it MUST be kept in sync with operations
+ * that change worker state out-of-band (for example: tmux kill from
+ * `swarm-tmux-stop`).
+ *
+ * Best-effort: if the profile directory is missing, do nothing. If the
+ * write fails, log the error but do not throw — callers are usually
+ * lifecycle hooks that should not fail because state.json bookkeeping
+ * could not persist.
+ */
+export function patchSwarmRuntimeFile(
+  profilePath: string,
+  workerId: string,
+  patch: Partial<SwarmRuntime>,
+): { ok: boolean; error?: string } {
+  if (!fs.existsSync(profilePath)) {
+    return { ok: false, error: `profile path missing: ${profilePath}` }
+  }
+  const runtimePath = path.join(profilePath, 'runtime.json')
+  let existing: Record<string, unknown> = {}
+  if (fs.existsSync(runtimePath)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(runtimePath, 'utf8')) as Record<
+        string,
+        unknown
+      >
+    } catch {
+      // Corrupt JSON: fall through and rewrite from scratch using the patch.
+      existing = {}
+    }
+  }
+  const merged = { ...existing, ...patch, workerId }
+  const tmpPath = `${runtimePath}.tmp-${process.pid}-${Date.now()}`
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(merged, null, 2) + '\n', 'utf8')
+    fs.renameSync(tmpPath, runtimePath)
+    return { ok: true }
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmpPath)
+    } catch {
+      // tmp may not exist if the write failed before creation
+    }
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
 export function listSwarmWorkerIds(options?: { swarmOnly?: boolean }): Array<string> {
   const profilesDir = getProfilesDir()
   if (!fs.existsSync(profilesDir)) return []

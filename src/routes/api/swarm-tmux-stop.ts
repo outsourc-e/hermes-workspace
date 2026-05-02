@@ -5,7 +5,10 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
-// (no profile path needed for stop; only the session name)
+import {
+  getSwarmProfilePath,
+  patchSwarmRuntimeFile,
+} from '../../server/swarm-foundation'
 
 /**
  * POST /api/swarm-tmux-stop
@@ -119,7 +122,32 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
           )
         }
 
-        return json({ workerId, sessionName, wasRunning: true, killed: true })
+        // Reconcile runtime.json so the Swarm UI doesn't show a 'stuck'
+        // worker (tmux gone, lifecycle still says running/blocked). Best
+        // effort — the kill already succeeded, so a write failure here
+        // should NOT fail the stop request. Reported in #235.
+        const profilePath = getSwarmProfilePath(workerId)
+        const stoppedAt = Date.now()
+        const patchResult = patchSwarmRuntimeFile(profilePath, workerId, {
+          state: 'idle',
+          phase: 'stopped',
+          currentTask: null,
+          activeTool: null,
+          needsHuman: false,
+          blockedReason: null,
+          checkpointStatus: 'none',
+          lastDispatchResult: 'Stopped via UI',
+          lastOutputAt: stoppedAt,
+        })
+
+        return json({
+          workerId,
+          sessionName,
+          wasRunning: true,
+          killed: true,
+          runtimePatched: patchResult.ok,
+          runtimePatchError: patchResult.ok ? undefined : patchResult.error,
+        })
       },
     },
   },
