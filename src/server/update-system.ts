@@ -345,6 +345,7 @@ function agentRepoPath(): string | null {
   const candidates = [
     process.env.HERMES_AGENT_REPO,
     join(homedir(), '.hermes', 'hermes-agent'),
+    join(homedir(), 'Projects', 'hermes-agent'),
     join(homedir(), 'hermes-agent'),
   ]
   for (const candidate of candidates) {
@@ -355,11 +356,14 @@ function agentRepoPath(): string | null {
 }
 
 export function readAgentUpdateStatus(): ProductUpdateStatus {
-  const version =
-    exec('hermes', ['--version'], { timeout: 10_000 })?.split('\n')[0] ??
-    'unknown'
-  const path = exec('which', ['hermes'])
   const repoPath = agentRepoPath()
+  const repoHermes = repoPath ? join(repoPath, 'venv', 'bin', 'hermes') : null
+  const path =
+    repoHermes && existsSync(repoHermes) ? repoHermes : exec('which', ['hermes'])
+  const version =
+    (path ? exec(path, ['--version'], { timeout: 10_000 }) : null)?.split(
+      '\n',
+    )[0] ?? 'unknown'
 
   if (!repoPath) {
     return {
