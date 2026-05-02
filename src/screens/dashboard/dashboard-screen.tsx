@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { OpsStrip } from './components/ops-strip'
-import { ModelInfoCard } from './components/model-info-card'
 import { AchievementsCard } from './components/achievements-card'
 import { HeroMetrics } from './components/hero-metrics'
 import {
@@ -18,8 +17,8 @@ import {
   type SessionRowData,
 } from './components/sessions-intelligence-card'
 import { SkillsUsageCard } from './components/skills-usage-card'
-import { TokenMixCard } from './components/token-mix-card'
-import { HourOfDayCard } from './components/hour-of-day-card'
+import { TokenMixHourCard } from './components/token-mix-hour-card'
+import { ActiveModelKpi } from './components/active-model-kpi'
 import {
   Area,
   AreaChart,
@@ -922,7 +921,7 @@ export function DashboardScreen() {
         platforms={overview?.platforms ?? []}
       />
 
-      {/* ── Hero Metrics (real analytics-backed KPIs with sparklines) ── */}
+      {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
       <HeroMetrics
         analytics={overview?.analytics ?? null}
         fallback={{
@@ -931,6 +930,12 @@ export function DashboardScreen() {
           toolCalls: stats.totalToolCalls,
           tokens: stats.totalTokens,
         }}
+        extraTile={
+          <ActiveModelKpi
+            modelInfo={overview?.modelInfo ?? null}
+            analytics={overview?.analytics ?? null}
+          />
+        }
       />
 
       {/* ── Analytics chart (left) + Top models card (right) ── */}
@@ -962,21 +967,22 @@ export function DashboardScreen() {
           )}
           <LogsTailCard logs={overview?.logs ?? null} />
         </div>
+        {/* Side rail order per Eric's iteration-005 feedback:
+            Attention is always first; Skills + Achievements move up;
+            Active Model is now a hero KPI tile (not in the rail);
+            Token mix + Hour of day fuse into one rhythm card. */}
         <div className="flex flex-col gap-3 lg:col-span-4">
           <AttentionCard overview={overview} />
-          <ModelInfoCard
-            modelInfo={overview?.modelInfo ?? null}
-            analytics={overview?.analytics ?? null}
-            palette={palette}
-          />
           <SkillsUsageCard
             usage={overview?.skillsUsage ?? null}
             installedCount={skillsInstalled}
             onOpen={() => navigate({ to: '/skills' })}
           />
-          <TokenMixCard analytics={overview?.analytics ?? null} />
-          <HourOfDayCard sessions={sessionRows} />
           <AchievementsCard achievements={overview?.achievements ?? null} />
+          <TokenMixHourCard
+            analytics={overview?.analytics ?? null}
+            sessions={sessionRows}
+          />
         </div>
       </div>
       </div>

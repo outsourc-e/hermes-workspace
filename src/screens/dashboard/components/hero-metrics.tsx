@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { ReactNode } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 function formatTokens(n: number): string {
@@ -14,15 +15,6 @@ function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return n.toLocaleString()
-}
-
-function formatCost(usd: number | null): string {
-  if (usd === null || usd === undefined) return '—'
-  if (usd <= 0) return '$0'
-  if (usd < 0.01) return '<$0.01'
-  if (usd < 1) return `$${usd.toFixed(3)}`
-  if (usd < 100) return `$${usd.toFixed(2)}`
-  return `$${Math.round(usd).toLocaleString()}`
 }
 
 function deltaPct(current: number, previous: number): number | null {
@@ -201,6 +193,7 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
 export function HeroMetrics({
   analytics,
   fallback,
+  extraTile,
 }: {
   analytics: DashboardOverview['analytics']
   fallback: {
@@ -209,6 +202,12 @@ export function HeroMetrics({
     toolCalls: number
     tokens: number
   }
+  /**
+   * Optional 4th tile slot. Iteration 005 swaps the legacy Cost tile
+   * for the live Active Model KPI; passing it as a slot keeps the
+   * hero row composable without coupling HeroMetrics to model data.
+   */
+  extraTile?: ReactNode
 }) {
   // Decide source: analytics is canonical when it has any usage; otherwise fall back.
   const useAnalytics = !!analytics && analytics.source === 'analytics'
@@ -218,9 +217,6 @@ export function HeroMetrics({
     : []
   const dailySessions = useAnalytics
     ? analytics!.daily.map((d) => d.sessions)
-    : []
-  const dailyCost = useAnalytics
-    ? analytics!.daily.map((d) => d.estimatedCost)
     : []
   const dailyCalls = useAnalytics
     ? analytics!.daily.map((d) => d.apiCalls)
@@ -237,7 +233,6 @@ export function HeroMetrics({
 
   const [sessCurr, sessPrev] = splitSum(dailySessions)
   const [tokCurr, tokPrev] = splitSum(dailyTokens)
-  const [costCurr, costPrev] = splitSum(dailyCost)
 
   const tokensTotal = useAnalytics
     ? analytics!.totalTokens
@@ -248,7 +243,6 @@ export function HeroMetrics({
   const apiCalls = useAnalytics
     ? analytics!.totalApiCalls
     : fallback.toolCalls
-  const cost = useAnalytics ? analytics!.estimatedCostUsd : null
 
   const window = useAnalytics ? `${analytics!.windowDays}d` : 'all time'
 
@@ -283,55 +277,12 @@ export function HeroMetrics({
         tone: 'var(--theme-success)',
         icon: '🔧',
       },
-      // Cost tile is the trickiest: codex / anthropic-oauth / minimax
-      // are subscription-included so dollar totals can read $0 for
-      // huge token volumes. The aggregator's `costLabel` tells us
-      // whether we should hide the dollar figure or qualify it.
-      ((): HeroTileProps => {
-        const label = useAnalytics ? analytics!.costLabel : 'unknown'
-        let displayValue: string
-        let sub: string
-        let showDelta = false
-        switch (label) {
-          case 'precise':
-            displayValue = formatCost(cost)
-            sub = `${formatTokens(analytics!.reasoningTokens)} reasoning`
-            showDelta = true
-            break
-          case 'partial':
-            displayValue = formatCost(cost)
-            sub = 'partial · some included'
-            showDelta = true
-            break
-          case 'included':
-            displayValue = 'Included'
-            sub = 'subscription · no dollar metric'
-            break
-          case 'unknown':
-          default:
-            displayValue = '—'
-            sub = 'cost unavailable'
-            break
-        }
-        return {
-          label: 'Cost',
-          value: displayValue,
-          sub,
-          delta: showDelta && useAnalytics ? deltaPct(costCurr, costPrev) : null,
-          spark: showDelta && useAnalytics ? dailyCost : undefined,
-          tone: 'var(--theme-warning)',
-          icon: '💰',
-        }
-      })(),
+
     ],
     [
       analytics,
       apiCalls,
-      cost,
-      costCurr,
-      costPrev,
       dailyCalls,
-      dailyCost,
       dailySessions,
       dailyTokens,
       sessCurr,
@@ -346,10 +297,11 @@ export function HeroMetrics({
   )
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {tiles.map((t) => (
         <HeroTile key={t.label} {...t} />
       ))}
+      {extraTile}
     </div>
   )
 }
