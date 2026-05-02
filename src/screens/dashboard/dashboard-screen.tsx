@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { SystemStatusStrip } from './components/system-status-strip'
+import { PlatformsCard } from './components/platforms-card'
+import { CronSummaryCard } from './components/cron-summary-card'
+import { AchievementsCard } from './components/achievements-card'
+import { AnalyticsSummaryCard } from './components/analytics-summary-card'
 import {
   Area,
   AreaChart,
@@ -736,7 +742,22 @@ export function DashboardScreen() {
     return max
   }, [recentSessions])
 
-  const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
+  // Aggregate dashboard overview — surfaces the data the native
+  // Hermes dashboard exposes (status, platforms, cron, achievements,
+  // model info, analytics) in a single round trip with per-section
+  // graceful fallbacks. Each card renders only when its slice resolves.
+  const overviewQuery = useQuery<DashboardOverview>({
+    queryKey: ['dashboard', 'overview'],
+    queryFn: async () => {
+      const res = await fetch('/api/dashboard/overview')
+      if (!res.ok) throw new Error(`overview ${res.status}`)
+      return (await res.json()) as DashboardOverview
+    },
+    staleTime: 5_000,
+    refetchInterval: 30_000,
+  })
+  const overview = overviewQuery.data ?? null
+
   const palette = useDashboardPalette()
 
   const updateSettings = useSettingsStore((state) => state.updateSettings)
@@ -835,6 +856,12 @@ export function DashboardScreen() {
         </div>
       </div>
 
+      {/* ── System Status (gateway + active agents) ── */}
+      <SystemStatusStrip status={overview?.status ?? null} />
+
+      {/* ── Cron summary (compact) ── */}
+      <CronSummaryCard cron={overview?.cron ?? null} />
+
       {/* ── Metrics Row ── */}
       {sessionsAvailable ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -859,7 +886,11 @@ export function DashboardScreen() {
           <MetricTile
             label="Tokens"
             value={formatNumber(stats.totalTokens)}
-            sub={costEstimate}
+            sub={
+              overview?.analytics?.estimatedCostUsd != null
+                ? `$${overview.analytics.estimatedCostUsd.toFixed(2)} · ${overview.analytics.windowDays}d`
+                : undefined
+            }
             icon="⚡"
             accentColor={palette.accentSecondary}
           />
@@ -889,6 +920,13 @@ export function DashboardScreen() {
         <div className="lg:col-span-3">
           <SkillsWidget palette={palette} />
         </div>
+      </div>
+
+      {/* ── Platforms + Analytics + Achievements (Hermes-native parity) ── */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <PlatformsCard platforms={overview?.platforms ?? []} />
+        <AnalyticsSummaryCard analytics={overview?.analytics ?? null} />
+        <AchievementsCard achievements={overview?.achievements ?? null} />
       </div>
 
       {/* ── Recent Sessions (minimal) ── */}
