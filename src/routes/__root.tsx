@@ -352,7 +352,7 @@ function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <Toaster />
       {mounted && rootSurfaceState.showLogin ? <LoginScreen /> : null}
-      {mounted && rootSurfaceState.showOnboarding ? <HermesOnboarding /> : null}
+      {mounted && rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
       {rootSurfaceState.showWorkspaceShell ? (
         <>
           <GlobalShortcutListener />

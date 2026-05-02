@@ -35862,16 +35862,16 @@ var init_esm5 = __esm({
   }
 });
 
-// dist/server/assets/_tanstack-start-manifest_v-Dp0WKoRS.js
-var tanstack_start_manifest_v_Dp0WKoRS_exports = {};
-__export(tanstack_start_manifest_v_Dp0WKoRS_exports, {
+// dist/server/assets/_tanstack-start-manifest_v-B53qh2mt.js
+var tanstack_start_manifest_v_B53qh2mt_exports = {};
+__export(tanstack_start_manifest_v_B53qh2mt_exports, {
   tsrStartManifest: () => tsrStartManifest
 });
 var tsrStartManifest;
-var init_tanstack_start_manifest_v_Dp0WKoRS = __esm({
-  "dist/server/assets/_tanstack-start-manifest_v-Dp0WKoRS.js"() {
+var init_tanstack_start_manifest_v_B53qh2mt = __esm({
+  "dist/server/assets/_tanstack-start-manifest_v-B53qh2mt.js"() {
     "use strict";
-    tsrStartManifest = () => ({ "routes": { "__root__": { "filePath": "/Users/aurora/hermes-workspace/src/routes/__root.tsx", "children": ["/", "/$", "/conductor", "/dashboard", "/files", "/jobs", "/memory", "/operations", "/profiles", "/settings", "/skills", "/swarm", "/swarm2", "/tasks", "/terminal", "/api/artifacts", "/api/auth", "/api/auth-check", "/api/chat-events", "/api/claude-config", "/api/claude-jobs", "/api/claude-tasks", "/api/claude-tasks-assignees", "/api/claude-update", "/api/conductor-spawn", "/api/conductor-stop", "/api/connection-settings", "/api/connection-status", "/api/context-usage", "/api/crew-status", "/api/events", "/api/files", "/api/gateway-status", "/api/history", "/api/integrations", "/api/local-providers", "/api/memory", "/api/models", "/api/paths", "/api/ping", "/api/plugins", "/api/preview-file", "/api/send", "/api/send-stream", "/api/session-history", "/api/session-send", "/api/session-status", "/api/sessions", "/api/skills", "/api/start-agent", "/api/start-claude", "/api/swarm-chat", "/api/swarm-checkpoint", "/api/swarm-decompose", "/api/swarm-direct-chat", "/api/swarm-dispatch", "/api/swarm-environment", "/api/swarm-health", "/api/swarm-kanban", "/api/swarm-lifecycle", "/api/swarm-memory", "/api/swarm-missions", "/api/swarm-orchestrator-loop", "/api/swarm-project", "/api/swarm-reports", "/api/swarm-roster", "/api/swarm-runtime", "/api/swarm-tmux-scroll", "/api/swarm-tmux-start", "/api/swarm-tmux-stop", "/api/terminal-close", "/api/terminal-input", "/api/terminal-resize", "/api/terminal-stream", "/api/workspace", "/chat/$sessionKey", "/chat/", "/api/claude-proxy/$", "/api/knowledge/config", "/api/knowledge/graph", "/api/knowledge/list", "/api/knowledge/read", "/api/knowledge/search", "/api/knowledge/sync", "/api/mcp/reload", "/api/mcp/servers", "/api/model/info", "/api/oauth/device-code", "/api/oauth/poll-token", "/api/profiles/activate", "/api/profiles/create", "/api/profiles/delete", "/api/profiles/list", "/api/profiles/read", "/api/profiles/rename", "/api/profiles/update", "/api/update/agent", "/api/update/status", "/api/update/workspace"], "preloads": ["/assets/main-DQNpWD65.js"] }, "/": { "filePath": "/Users/aurora/hermes-workspace/src/routes/index.tsx", "preloads": ["/assets/index-D_Wxvt_x.js"] }, "/$": { "filePath": "/Users/aurora/hermes-workspace/src/routes/$.tsx", "preloads": ["/assets/_-DdU_3aSZ.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/conductor": { "filePath": "/Users/aurora/hermes-workspace/src/routes/conductor.tsx", "preloads": ["/assets/conductor-CxGuah7U.js", "/assets/office-view-B2nBmn3k.js", "/assets/gateway-api-DT7ZDs8o.js"] }, "/dashboard": { "filePath": "/Users/aurora/hermes-workspace/src/routes/dashboard.tsx", "preloads": ["/assets/dashboard-Bhzflkp0.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/files": { "filePath": "/Users/aurora/hermes-workspace/src/routes/files.tsx", "preloads": ["/assets/files-ih7-3Cea.js", "/assets/files-2wvc0qsL.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/jobs": { "filePath": "/Users/aurora/hermes-workspace/src/routes/jobs.tsx", "preloads": ["/assets/jobs-D9kKZFxq.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/memory": { "filePath": "/Users/aurora/hermes-workspace/src/routes/memory.tsx", "preloads": ["/assets/memory-CC70nKHp.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/operations": { "filePath": "/Users/aurora/hermes-workspace/src/routes/operations.tsx", "preloads": ["/assets/operations-CxCqD_2N.js", "/assets/operations-Uo1hN0nD.js", "/assets/use-page-title-d1P7mpZK.js", "/assets/pixel-avatar-Cq8YX0M2.js", "/assets/gateway-api-DT7ZDs8o.js"] }, "/profiles": { "filePath": "/Users/aurora/hermes-workspace/src/routes/profiles.tsx", "preloads": ["/assets/profiles-DJ9LZuax.js", "/assets/use-page-title-d1P7mpZK.js", "/assets/use-crew-status-vj3RLn4G.js"] }, "/settings": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings.tsx", "children": ["/settings/mcp", "/settings/providers", "/settings/"], "preloads": ["/assets/settings-DJDDmtqQ.js"] }, "/skills": { "filePath": "/Users/aurora/hermes-workspace/src/routes/skills.tsx", "preloads": ["/assets/skills-CZzECco-.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/swarm": { "filePath": "/Users/aurora/hermes-workspace/src/routes/swarm.tsx", "preloads": ["/assets/swarm-COVD-01a.js", "/assets/swarm-BNziifBb.js", "/assets/use-page-title-d1P7mpZK.js", "/assets/swarm2-screen-Cm-CGDJU.js", "/assets/use-crew-status-vj3RLn4G.js", "/assets/pixel-avatar-Cq8YX0M2.js", "/assets/office-view-B2nBmn3k.js"] }, "/swarm2": { "filePath": "/Users/aurora/hermes-workspace/src/routes/swarm2.tsx", "preloads": ["/assets/swarm2-TsesJ4Eg.js", "/assets/swarm2-CO7FtNMR.js", "/assets/use-page-title-d1P7mpZK.js", "/assets/swarm2-screen-Cm-CGDJU.js", "/assets/use-crew-status-vj3RLn4G.js", "/assets/pixel-avatar-Cq8YX0M2.js", "/assets/office-view-B2nBmn3k.js"] }, "/tasks": { "filePath": "/Users/aurora/hermes-workspace/src/routes/tasks.tsx", "preloads": ["/assets/tasks-ISpAhvXD.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/terminal": { "filePath": "/Users/aurora/hermes-workspace/src/routes/terminal.tsx", "preloads": ["/assets/terminal-V7uWCYnJ.js", "/assets/terminal-bTxN6h_r.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/chat/$sessionKey": { "filePath": "/Users/aurora/hermes-workspace/src/routes/chat/$sessionKey.tsx", "preloads": ["/assets/_sessionKey-BNLLA1rh.js", "/assets/_sessionKey-et1bPg1u.js"] }, "/settings/mcp": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings/mcp.tsx", "preloads": ["/assets/mcp-wDTUEnLb.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/settings/providers": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings/providers.tsx", "preloads": ["/assets/providers-BOT-aA-C.js", "/assets/use-page-title-d1P7mpZK.js"] }, "/chat/": { "filePath": "/Users/aurora/hermes-workspace/src/routes/chat/index.tsx", "preloads": ["/assets/index-DLlBm66g.js"] }, "/settings/": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings/index.tsx", "preloads": ["/assets/index-BufKRB-E.js", "/assets/use-page-title-d1P7mpZK.js"] } }, "clientEntry": "/assets/main-DQNpWD65.js" });
+    tsrStartManifest = () => ({ "routes": { "__root__": { "filePath": "/Users/aurora/hermes-workspace/src/routes/__root.tsx", "children": ["/", "/$", "/conductor", "/dashboard", "/files", "/jobs", "/memory", "/operations", "/profiles", "/settings", "/skills", "/swarm", "/swarm2", "/tasks", "/terminal", "/api/artifacts", "/api/auth", "/api/auth-check", "/api/chat-events", "/api/claude-config", "/api/claude-jobs", "/api/claude-tasks", "/api/claude-tasks-assignees", "/api/claude-update", "/api/conductor-spawn", "/api/conductor-stop", "/api/connection-settings", "/api/connection-status", "/api/context-usage", "/api/crew-status", "/api/events", "/api/files", "/api/gateway-status", "/api/history", "/api/integrations", "/api/local-providers", "/api/memory", "/api/models", "/api/paths", "/api/ping", "/api/plugins", "/api/preview-file", "/api/send", "/api/send-stream", "/api/session-history", "/api/session-send", "/api/session-status", "/api/sessions", "/api/skills", "/api/start-agent", "/api/start-claude", "/api/swarm-chat", "/api/swarm-checkpoint", "/api/swarm-decompose", "/api/swarm-direct-chat", "/api/swarm-dispatch", "/api/swarm-environment", "/api/swarm-health", "/api/swarm-kanban", "/api/swarm-lifecycle", "/api/swarm-memory", "/api/swarm-missions", "/api/swarm-orchestrator-loop", "/api/swarm-project", "/api/swarm-reports", "/api/swarm-roster", "/api/swarm-runtime", "/api/swarm-tmux-scroll", "/api/swarm-tmux-start", "/api/swarm-tmux-stop", "/api/terminal-close", "/api/terminal-input", "/api/terminal-resize", "/api/terminal-stream", "/api/workspace", "/chat/$sessionKey", "/chat/", "/api/claude-proxy/$", "/api/knowledge/config", "/api/knowledge/graph", "/api/knowledge/list", "/api/knowledge/read", "/api/knowledge/search", "/api/knowledge/sync", "/api/mcp/reload", "/api/mcp/servers", "/api/model/info", "/api/oauth/device-code", "/api/oauth/poll-token", "/api/profiles/activate", "/api/profiles/create", "/api/profiles/delete", "/api/profiles/list", "/api/profiles/read", "/api/profiles/rename", "/api/profiles/update", "/api/update/agent", "/api/update/status", "/api/update/workspace"], "preloads": ["/assets/main-B76kdwmO.js"] }, "/": { "filePath": "/Users/aurora/hermes-workspace/src/routes/index.tsx", "preloads": ["/assets/index-D_Wxvt_x.js"] }, "/$": { "filePath": "/Users/aurora/hermes-workspace/src/routes/$.tsx", "preloads": ["/assets/_-PurrOUj5.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/conductor": { "filePath": "/Users/aurora/hermes-workspace/src/routes/conductor.tsx", "preloads": ["/assets/conductor-DVUx5oyH.js", "/assets/office-view-PTa0ZedL.js", "/assets/gateway-api-DT7ZDs8o.js"] }, "/dashboard": { "filePath": "/Users/aurora/hermes-workspace/src/routes/dashboard.tsx", "preloads": ["/assets/dashboard-DzPH9JoW.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/files": { "filePath": "/Users/aurora/hermes-workspace/src/routes/files.tsx", "preloads": ["/assets/files-BQQI3ONM.js", "/assets/files-m3dxNDuZ.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/jobs": { "filePath": "/Users/aurora/hermes-workspace/src/routes/jobs.tsx", "preloads": ["/assets/jobs-R54HJZd3.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/memory": { "filePath": "/Users/aurora/hermes-workspace/src/routes/memory.tsx", "preloads": ["/assets/memory-ZjkB4c8p.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/operations": { "filePath": "/Users/aurora/hermes-workspace/src/routes/operations.tsx", "preloads": ["/assets/operations-Doh4mFPO.js", "/assets/operations-BMHNJ0dc.js", "/assets/use-page-title-BrmzLNS3.js", "/assets/pixel-avatar-Da4f_fK-.js", "/assets/gateway-api-DT7ZDs8o.js"] }, "/profiles": { "filePath": "/Users/aurora/hermes-workspace/src/routes/profiles.tsx", "preloads": ["/assets/profiles-DP5MmZSe.js", "/assets/use-page-title-BrmzLNS3.js", "/assets/use-crew-status-Dgdc6T93.js"] }, "/settings": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings.tsx", "children": ["/settings/mcp", "/settings/providers", "/settings/"], "preloads": ["/assets/settings-sMXgW_Xf.js"] }, "/skills": { "filePath": "/Users/aurora/hermes-workspace/src/routes/skills.tsx", "preloads": ["/assets/skills-DsvMpRsW.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/swarm": { "filePath": "/Users/aurora/hermes-workspace/src/routes/swarm.tsx", "preloads": ["/assets/swarm-DeI-uqwW.js", "/assets/swarm-CEFqR9l_.js", "/assets/use-page-title-BrmzLNS3.js", "/assets/swarm2-screen-Bo4aSNuO.js", "/assets/use-crew-status-Dgdc6T93.js", "/assets/pixel-avatar-Da4f_fK-.js", "/assets/office-view-PTa0ZedL.js"] }, "/swarm2": { "filePath": "/Users/aurora/hermes-workspace/src/routes/swarm2.tsx", "preloads": ["/assets/swarm2-B5EDpLsS.js", "/assets/swarm2-BhiTnEfE.js", "/assets/use-page-title-BrmzLNS3.js", "/assets/swarm2-screen-Bo4aSNuO.js", "/assets/use-crew-status-Dgdc6T93.js", "/assets/pixel-avatar-Da4f_fK-.js", "/assets/office-view-PTa0ZedL.js"] }, "/tasks": { "filePath": "/Users/aurora/hermes-workspace/src/routes/tasks.tsx", "preloads": ["/assets/tasks-CvBRDK72.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/terminal": { "filePath": "/Users/aurora/hermes-workspace/src/routes/terminal.tsx", "preloads": ["/assets/terminal-BjOt06Sc.js", "/assets/terminal-DOjFwneg.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/chat/$sessionKey": { "filePath": "/Users/aurora/hermes-workspace/src/routes/chat/$sessionKey.tsx", "preloads": ["/assets/_sessionKey-D_pbbl0V.js", "/assets/_sessionKey-DWyemWYf.js"] }, "/settings/mcp": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings/mcp.tsx", "preloads": ["/assets/mcp-DNbDGcyJ.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/settings/providers": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings/providers.tsx", "preloads": ["/assets/providers-DtZhmWO7.js", "/assets/use-page-title-BrmzLNS3.js"] }, "/chat/": { "filePath": "/Users/aurora/hermes-workspace/src/routes/chat/index.tsx", "preloads": ["/assets/index-DLlBm66g.js"] }, "/settings/": { "filePath": "/Users/aurora/hermes-workspace/src/routes/settings/index.tsx", "preloads": ["/assets/index-DxYGLWxN.js", "/assets/use-page-title-BrmzLNS3.js"] } }, "clientEntry": "/assets/main-B76kdwmO.js" });
   }
 });
 
@@ -135368,9 +135368,9 @@ var require_xterm_addon_web_links = __commonJS({
   }
 });
 
-// dist/server/assets/terminal-workspace-BmOOuNxn.js
-var terminal_workspace_BmOOuNxn_exports = {};
-__export(terminal_workspace_BmOOuNxn_exports, {
+// dist/server/assets/terminal-workspace-BlWWS9F8.js
+var terminal_workspace_BlWWS9F8_exports = {};
+__export(terminal_workspace_BlWWS9F8_exports, {
   TerminalWorkspace: () => TerminalWorkspace
 });
 function DebugPanel({
@@ -136252,15 +136252,15 @@ function TerminalWorkspace({
   );
 }
 var import_jsx_runtime86, import_react37, import_react_dom6, import_yaml5, xtermLoaded, TerminalCtor, FitAddonCtor, WebLinksAddonCtor, DEFAULT_TERMINAL_CWD, TERMINAL_BG;
-var init_terminal_workspace_BmOOuNxn = __esm({
-  "dist/server/assets/terminal-workspace-BmOOuNxn.js"() {
+var init_terminal_workspace_BlWWS9F8 = __esm({
+  "dist/server/assets/terminal-workspace-BlWWS9F8.js"() {
     "use strict";
     import_jsx_runtime86 = __toESM(require_jsx_runtime(), 1);
     import_react37 = __toESM(require_react(), 1);
     init_esm6();
     init_esm7();
     init_react();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react_dom6 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
@@ -136272,18 +136272,18 @@ var init_terminal_workspace_BmOOuNxn = __esm({
   }
 });
 
-// dist/server/assets/terminal-D2yswMvn.js
-var terminal_D2yswMvn_exports = {};
-__export(terminal_D2yswMvn_exports, {
+// dist/server/assets/terminal-SsWdM02o.js
+var terminal_SsWdM02o_exports = {};
+__export(terminal_SsWdM02o_exports, {
   errorComponent: () => SplitErrorComponent
 });
 var import_jsx_runtime87, import_react40, SplitErrorComponent;
-var init_terminal_D2yswMvn = __esm({
-  "dist/server/assets/terminal-D2yswMvn.js"() {
+var init_terminal_SsWdM02o = __esm({
+  "dist/server/assets/terminal-SsWdM02o.js"() {
     "use strict";
     import_jsx_runtime87 = __toESM(require_jsx_runtime(), 1);
     import_react40 = __toESM(require_react(), 1);
-    (0, import_react40.lazy)(() => Promise.resolve().then(() => (init_terminal_workspace_BmOOuNxn(), terminal_workspace_BmOOuNxn_exports)).then((m5) => ({
+    (0, import_react40.lazy)(() => Promise.resolve().then(() => (init_terminal_workspace_BlWWS9F8(), terminal_workspace_BlWWS9F8_exports)).then((m5) => ({
       default: m5.TerminalWorkspace
     })));
     SplitErrorComponent = function TerminalError({
@@ -136316,9 +136316,9 @@ var init_use_page_title_DxzhUrGi = __esm({
   }
 });
 
-// dist/server/assets/terminal-CJEnQzM_.js
-var terminal_CJEnQzM_exports = {};
-__export(terminal_CJEnQzM_exports, {
+// dist/server/assets/terminal-DgW86kPi.js
+var terminal_DgW86kPi_exports = {};
+__export(terminal_DgW86kPi_exports, {
   component: () => TerminalRoute
 });
 function TerminalRoute() {
@@ -136326,20 +136326,20 @@ function TerminalRoute() {
   return null;
 }
 var import_react42;
-var init_terminal_CJEnQzM = __esm({
-  "dist/server/assets/terminal-CJEnQzM_.js"() {
+var init_terminal_DgW86kPi = __esm({
+  "dist/server/assets/terminal-DgW86kPi.js"() {
     "use strict";
     import_react42 = __toESM(require_react(), 1);
     init_use_page_title_DxzhUrGi();
-    (0, import_react42.lazy)(() => Promise.resolve().then(() => (init_terminal_workspace_BmOOuNxn(), terminal_workspace_BmOOuNxn_exports)).then((m5) => ({
+    (0, import_react42.lazy)(() => Promise.resolve().then(() => (init_terminal_workspace_BlWWS9F8(), terminal_workspace_BlWWS9F8_exports)).then((m5) => ({
       default: m5.TerminalWorkspace
     })));
   }
 });
 
-// dist/server/assets/tasks-D4c6HCNa.js
-var tasks_D4c6HCNa_exports = {};
-__export(tasks_D4c6HCNa_exports, {
+// dist/server/assets/tasks-Cm1nkjq3.js
+var tasks_Cm1nkjq3_exports = {};
+__export(tasks_Cm1nkjq3_exports, {
   component: () => TasksRoute
 });
 async function fetchAssignees() {
@@ -137030,8 +137030,8 @@ function TasksRoute() {
   return /* @__PURE__ */ (0, import_jsx_runtime88.jsx)(TasksScreen, {});
 }
 var import_jsx_runtime88, import_react43, import_react_dom7, import_yaml6, BASE, COLUMN_LABELS, COLUMN_ORDER, PRIORITY_COLORS, COLUMN_COLORS, QUERY_KEY, ASSIGNEES_KEY, TASKS_BOARD_HELP_TEXT;
-var init_tasks_D4c6HCNa = __esm({
-  "dist/server/assets/tasks-D4c6HCNa.js"() {
+var init_tasks_Cm1nkjq3 = __esm({
+  "dist/server/assets/tasks-Cm1nkjq3.js"() {
     "use strict";
     import_jsx_runtime88 = __toESM(require_jsx_runtime(), 1);
     init_use_page_title_DxzhUrGi();
@@ -137041,7 +137041,7 @@ var init_tasks_D4c6HCNa = __esm({
     init_react();
     init_esm6();
     init_esm7();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react_dom7 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
@@ -137147,7 +137147,7 @@ var init_use_crew_status_R2z_b9IQ = __esm({
   }
 });
 
-// dist/server/assets/pixel-avatar-od1ZMBZn.js
+// dist/server/assets/pixel-avatar-CoMpXY93.js
 function getProgressStrokeClassName(status) {
   if (status === "failed") return "text-red-400";
   if (status === "thinking") return "text-accent-400";
@@ -137407,16 +137407,16 @@ function PixelAvatar({
   );
 }
 var import_jsx_runtime90;
-var init_pixel_avatar_od1ZMBZn = __esm({
-  "dist/server/assets/pixel-avatar-od1ZMBZn.js"() {
+var init_pixel_avatar_CoMpXY93 = __esm({
+  "dist/server/assets/pixel-avatar-CoMpXY93.js"() {
     "use strict";
     import_jsx_runtime90 = __toESM(require_jsx_runtime(), 1);
     init_react();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
   }
 });
 
-// dist/server/assets/office-view-CSmMk_Ks.js
+// dist/server/assets/office-view-K8fUZzCY.js
 function normalizeAgentAvatarIndex(value, fallbackIndex = 0) {
   if (typeof value === "number" && Number.isFinite(value)) {
     const normalized = Math.trunc(value);
@@ -138282,12 +138282,12 @@ function OfficeView({
   ] });
 }
 var import_jsx_runtime91, import_react48, AGENT_AVATARS, AGENT_AVATAR_COUNT, LEGACY_AGENT_AVATAR_INDEX, AGENT_ACCENT_COLORS, OFFICE_MODEL_LABEL, GRID_DESK_POSITIONS, ROUNDTABLE_DESK_POSITIONS, WARROOM_DESK_POSITIONS, GRID_SOCIAL_SPOTS, ROUNDTABLE_SOCIAL_SPOTS, WARROOM_SOCIAL_SPOTS, DESK_POSITIONS_BY_TEMPLATE, SOCIAL_SPOTS_BY_TEMPLATE, LAYOUT_TEMPLATE_OPTIONS;
-var init_office_view_CSmMk_Ks = __esm({
-  "dist/server/assets/office-view-CSmMk_Ks.js"() {
+var init_office_view_K8fUZzCY = __esm({
+  "dist/server/assets/office-view-K8fUZzCY.js"() {
     "use strict";
     import_jsx_runtime91 = __toESM(require_jsx_runtime(), 1);
     import_react48 = __toESM(require_react(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     AGENT_AVATARS = ["\u{1F50D}", "\u270D\uFE0F", "\u{1F4DD}", "\u{1F9EA}", "\u{1F3A8}", "\u{1F4CA}", "\u{1F6E1}\uFE0F", "\u26A1", "\u{1F52C}", "\u{1F3AF}"];
     AGENT_AVATAR_COUNT = 10;
     LEGACY_AGENT_AVATAR_INDEX = new Map(
@@ -138393,7 +138393,7 @@ var init_office_view_CSmMk_Ks = __esm({
   }
 });
 
-// dist/server/assets/swarm2-screen-BXWrTlo5.js
+// dist/server/assets/swarm2-screen-CKsbsBFE.js
 function synthesizeFromChangedFiles(workerId, changedFiles) {
   return changedFiles.slice(0, 12).map((path3, index4) => {
     const cleaned = path3.replace(/\/$/, "");
@@ -143062,8 +143062,8 @@ function Swarm2Screen() {
   ] });
 }
 var import_jsx_runtime92, import_react49, POLL_INTERVAL_MS2, DEFAULT_LIMIT, POLL_MS, WORKER_COLORS, SETTINGS_STORAGE_PREFIX, ROLE_OPTIONS, MODEL_OPTIONS, AVATAR_OPTIONS, QUICK_ROUTES, ORCHESTRATOR_NAME_KEY, DEFAULT_NAME, AGENT_PAGE_SIZE, AGENT_LENSES, EMPTY_GEOM, LANES, LANE_TONE, STATE_FILTERS, xtermLoaded2, TerminalCtor2, FitAddonCtor2, WebLinksAddonCtor2, SwarmTerminal, SWARM2_ROOM_STORAGE_KEY, SWARM2_OPERATION_THEME, ROLE_PRESETS, ROLE_NAMES;
-var init_swarm2_screen_BXWrTlo5 = __esm({
-  "dist/server/assets/swarm2-screen-BXWrTlo5.js"() {
+var init_swarm2_screen_CKsbsBFE = __esm({
+  "dist/server/assets/swarm2-screen-CKsbsBFE.js"() {
     "use strict";
     import_jsx_runtime92 = __toESM(require_jsx_runtime(), 1);
     import_react49 = __toESM(require_react(), 1);
@@ -143071,9 +143071,9 @@ var init_swarm2_screen_BXWrTlo5 = __esm({
     init_esm6();
     init_esm7();
     init_use_crew_status_R2z_b9IQ();
-    init_pixel_avatar_od1ZMBZn();
-    init_router_D782sBjg();
-    init_office_view_CSmMk_Ks();
+    init_pixel_avatar_CoMpXY93();
+    init_router_Cj9uzHV0();
+    init_office_view_K8fUZzCY();
     POLL_INTERVAL_MS2 = 5e3;
     DEFAULT_LIMIT = 30;
     POLL_MS = 3e4;
@@ -143635,29 +143635,29 @@ var init_swarm2_screen_BXWrTlo5 = __esm({
   }
 });
 
-// dist/server/assets/swarm2-DC7DvsWU.js
-var swarm2_DC7DvsWU_exports = {};
-__export(swarm2_DC7DvsWU_exports, {
+// dist/server/assets/swarm2-DLyR2Rjf.js
+var swarm2_DLyR2Rjf_exports = {};
+__export(swarm2_DLyR2Rjf_exports, {
   component: () => SplitComponent
 });
 var import_jsx_runtime93, import_react51, import_react_dom8, import_yaml7, SplitComponent;
-var init_swarm2_DC7DvsWU = __esm({
-  "dist/server/assets/swarm2-DC7DvsWU.js"() {
+var init_swarm2_DLyR2Rjf = __esm({
+  "dist/server/assets/swarm2-DLyR2Rjf.js"() {
     "use strict";
     import_jsx_runtime93 = __toESM(require_jsx_runtime(), 1);
     init_use_page_title_DxzhUrGi();
-    init_swarm2_screen_BXWrTlo5();
+    init_swarm2_screen_CKsbsBFE();
     import_react51 = __toESM(require_react(), 1);
     init_esm6();
     init_use_crew_status_R2z_b9IQ();
-    init_pixel_avatar_od1ZMBZn();
-    init_router_D782sBjg();
+    init_pixel_avatar_CoMpXY93();
+    init_router_Cj9uzHV0();
     import_react_dom8 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
     init_marked_esm();
     import_yaml7 = __toESM(require_dist2(), 1);
-    init_office_view_CSmMk_Ks();
+    init_office_view_K8fUZzCY();
     SplitComponent = function Swarm2Route() {
       usePageTitle("Swarm");
       return /* @__PURE__ */ (0, import_jsx_runtime93.jsx)(Swarm2Screen, {});
@@ -143687,29 +143687,29 @@ var init_swarm_B_mpBx1j = __esm({
   }
 });
 
-// dist/server/assets/swarm-CkvqtzB0.js
-var swarm_CkvqtzB0_exports = {};
-__export(swarm_CkvqtzB0_exports, {
+// dist/server/assets/swarm-ChCuOQEm.js
+var swarm_ChCuOQEm_exports = {};
+__export(swarm_ChCuOQEm_exports, {
   component: () => SplitComponent2
 });
 var import_jsx_runtime95, import_react53, import_react_dom9, import_yaml8, SplitComponent2;
-var init_swarm_CkvqtzB0 = __esm({
-  "dist/server/assets/swarm-CkvqtzB0.js"() {
+var init_swarm_ChCuOQEm = __esm({
+  "dist/server/assets/swarm-ChCuOQEm.js"() {
     "use strict";
     import_jsx_runtime95 = __toESM(require_jsx_runtime(), 1);
     init_use_page_title_DxzhUrGi();
-    init_swarm2_screen_BXWrTlo5();
+    init_swarm2_screen_CKsbsBFE();
     import_react53 = __toESM(require_react(), 1);
     init_esm6();
     init_use_crew_status_R2z_b9IQ();
-    init_pixel_avatar_od1ZMBZn();
-    init_router_D782sBjg();
+    init_pixel_avatar_CoMpXY93();
+    init_router_Cj9uzHV0();
     import_react_dom9 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
     init_marked_esm();
     import_yaml8 = __toESM(require_dist2(), 1);
-    init_office_view_CSmMk_Ks();
+    init_office_view_K8fUZzCY();
     SplitComponent2 = function SwarmRoute() {
       usePageTitle("Swarm");
       return /* @__PURE__ */ (0, import_jsx_runtime95.jsx)(Swarm2Screen, {});
@@ -143717,9 +143717,9 @@ var init_swarm_CkvqtzB0 = __esm({
   }
 });
 
-// dist/server/assets/skills-Bynpdqg3.js
-var skills_Bynpdqg3_exports = {};
-__export(skills_Bynpdqg3_exports, {
+// dist/server/assets/skills-RIderI9J.js
+var skills_RIderI9J_exports = {};
+__export(skills_RIderI9J_exports, {
   component: () => SkillsRoute
 });
 function resolveSkillSearchTier(skill, query) {
@@ -144474,11 +144474,11 @@ function SkillsRoute() {
   return /* @__PURE__ */ (0, import_jsx_runtime96.jsx)(SkillsScreen, {});
 }
 var import_jsx_runtime96, import_react55, import_react_dom10, import_yaml9, PAGE_LIMIT, DEFAULT_CATEGORIES, SECURITY_BADGE;
-var init_skills_Bynpdqg3 = __esm({
-  "dist/server/assets/skills-Bynpdqg3.js"() {
+var init_skills_RIderI9J = __esm({
+  "dist/server/assets/skills-RIderI9J.js"() {
     "use strict";
     import_jsx_runtime96 = __toESM(require_jsx_runtime(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_use_page_title_DxzhUrGi();
     import_react55 = __toESM(require_react(), 1);
     init_modern2();
@@ -144548,9 +144548,9 @@ var init_settings_DExlyVWZ = __esm({
   }
 });
 
-// dist/server/assets/profiles-ComEyJgF.js
-var profiles_ComEyJgF_exports = {};
-__export(profiles_ComEyJgF_exports, {
+// dist/server/assets/profiles-DM_qxbxv.js
+var profiles_DM_qxbxv_exports = {};
+__export(profiles_DM_qxbxv_exports, {
   component: () => ProfilesRoute
 });
 async function readJson(url) {
@@ -145725,8 +145725,8 @@ function ProfilesRoute() {
   ] }) });
 }
 var import_jsx_runtime98, import_react58, import_react_dom11, import_yaml10;
-var init_profiles_ComEyJgF = __esm({
-  "dist/server/assets/profiles-ComEyJgF.js"() {
+var init_profiles_DM_qxbxv = __esm({
+  "dist/server/assets/profiles-DM_qxbxv.js"() {
     "use strict";
     import_jsx_runtime98 = __toESM(require_jsx_runtime(), 1);
     import_react58 = __toESM(require_react(), 1);
@@ -145734,7 +145734,7 @@ var init_profiles_ComEyJgF = __esm({
     init_modern2();
     init_esm6();
     init_esm7();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_esm5();
     init_use_crew_status_R2z_b9IQ();
     import_react_dom11 = __toESM(require_react_dom(), 1);
@@ -145871,9 +145871,9 @@ var init_gateway_api_D3EA1k_S = __esm({
   }
 });
 
-// dist/server/assets/operations-DDtUOc9i.js
-var operations_DDtUOc9i_exports = {};
-__export(operations_DDtUOc9i_exports, {
+// dist/server/assets/operations-DysBcEt2.js
+var operations_DysBcEt2_exports = {};
+__export(operations_DysBcEt2_exports, {
   component: () => SplitComponent4
 });
 function seedAgentPresets() {
@@ -148487,17 +148487,17 @@ function OperationsScreen() {
   );
 }
 var import_jsx_runtime100, import_react60, import_react_dom12, import_yaml11, AGENT_PRESETS, ChatScreen, ORCHESTRATOR_NAME_KEY2, DEFAULT_ORCHESTRATOR_NAME, PRESET_OPTIONS, DEFAULT_FILTERS, META_STORAGE_PREFIX, SETTINGS_STORAGE_KEY, COLOR_PALETTE, THEME_STYLE, SplitComponent4;
-var init_operations_DDtUOc9i = __esm({
-  "dist/server/assets/operations-DDtUOc9i.js"() {
+var init_operations_DysBcEt2 = __esm({
+  "dist/server/assets/operations-DysBcEt2.js"() {
     "use strict";
     import_jsx_runtime100 = __toESM(require_jsx_runtime(), 1);
     init_use_page_title_DxzhUrGi();
     import_react60 = __toESM(require_react(), 1);
     init_react();
     init_esm7();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_esm6();
-    init_pixel_avatar_od1ZMBZn();
+    init_pixel_avatar_CoMpXY93();
     init_modern2();
     init_gateway_api_D3EA1k_S();
     import_react_dom12 = __toESM(require_react_dom(), 1);
@@ -148617,7 +148617,7 @@ Output format: Signal cards with: Market, Direction (YES/NO), Materiality (0-1),
       }
     };
     ChatScreen = (0, import_react60.lazy)(
-      () => Promise.resolve().then(() => (init_router_D782sBjg(), router_D782sBjg_exports)).then((n2) => n2.Y).then((m5) => ({ default: m5.ChatScreen }))
+      () => Promise.resolve().then(() => (init_router_Cj9uzHV0(), router_Cj9uzHV0_exports)).then((n2) => n2.Y).then((m5) => ({ default: m5.ChatScreen }))
     );
     ORCHESTRATOR_NAME_KEY2 = "operations:orchestrator:name";
     DEFAULT_ORCHESTRATOR_NAME = "Main Agent";
@@ -148685,9 +148685,9 @@ Output format: Signal cards with: Market, Direction (YES/NO), Materiality (0-1),
   }
 });
 
-// dist/server/assets/memory-browser-screen-Cig_dX6i.js
-var memory_browser_screen_Cig_dX6i_exports = {};
-__export(memory_browser_screen_Cig_dX6i_exports, {
+// dist/server/assets/memory-browser-screen-Cfos6dz1.js
+var memory_browser_screen_Cfos6dz1_exports = {};
+__export(memory_browser_screen_Cfos6dz1_exports, {
   MemoryBrowserScreen: () => MemoryBrowserScreen
 });
 async function readJson2(url) {
@@ -149186,15 +149186,15 @@ function StateBox({ label, error: error2 }) {
   );
 }
 var import_jsx_runtime101, import_react64, import_react_dom13, import_yaml12;
-var init_memory_browser_screen_Cig_dX6i = __esm({
-  "dist/server/assets/memory-browser-screen-Cig_dX6i.js"() {
+var init_memory_browser_screen_Cfos6dz1 = __esm({
+  "dist/server/assets/memory-browser-screen-Cfos6dz1.js"() {
     "use strict";
     import_jsx_runtime101 = __toESM(require_jsx_runtime(), 1);
     init_esm6();
     init_esm7();
     init_modern2();
     import_react64 = __toESM(require_react(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react_dom13 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
@@ -149203,9 +149203,9 @@ var init_memory_browser_screen_Cig_dX6i = __esm({
   }
 });
 
-// dist/server/assets/knowledge-browser-screen-BK-sSugA.js
-var knowledge_browser_screen_BK_sSugA_exports = {};
-__export(knowledge_browser_screen_BK_sSugA_exports, {
+// dist/server/assets/knowledge-browser-screen-yT4clBLl.js
+var knowledge_browser_screen_yT4clBLl_exports = {};
+__export(knowledge_browser_screen_yT4clBLl_exports, {
   KnowledgeBrowserScreen: () => KnowledgeBrowserScreen
 });
 async function readJson3(url) {
@@ -150233,15 +150233,15 @@ function StateBox2({ label, error: error2 }) {
   );
 }
 var import_jsx_runtime102, import_react66, import_react_dom14, import_yaml13;
-var init_knowledge_browser_screen_BK_sSugA = __esm({
-  "dist/server/assets/knowledge-browser-screen-BK-sSugA.js"() {
+var init_knowledge_browser_screen_yT4clBLl = __esm({
+  "dist/server/assets/knowledge-browser-screen-yT4clBLl.js"() {
     "use strict";
     import_jsx_runtime102 = __toESM(require_jsx_runtime(), 1);
     init_esm6();
     init_esm7();
     init_modern2();
     import_react66 = __toESM(require_react(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react_dom14 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
@@ -150250,9 +150250,9 @@ var init_knowledge_browser_screen_BK_sSugA = __esm({
   }
 });
 
-// dist/server/assets/memory-LlpttdUM.js
-var memory_LlpttdUM_exports = {};
-__export(memory_LlpttdUM_exports, {
+// dist/server/assets/memory-CaXCTU2X.js
+var memory_CaXCTU2X_exports = {};
+__export(memory_CaXCTU2X_exports, {
   component: () => SplitComponent5
 });
 function RouteLoadingState({
@@ -150261,12 +150261,12 @@ function RouteLoadingState({
   return /* @__PURE__ */ (0, import_jsx_runtime103.jsx)("div", { className: "flex h-full min-h-[240px] items-center justify-center px-4 text-sm text-primary-500 dark:text-neutral-400", children: label });
 }
 var import_jsx_runtime103, import_react67, import_react_dom15, import_yaml14, MemoryBrowserScreen2, KnowledgeBrowserScreen2, SplitComponent5;
-var init_memory_LlpttdUM = __esm({
-  "dist/server/assets/memory-LlpttdUM.js"() {
+var init_memory_CaXCTU2X = __esm({
+  "dist/server/assets/memory-CaXCTU2X.js"() {
     "use strict";
     import_jsx_runtime103 = __toESM(require_jsx_runtime(), 1);
     import_react67 = __toESM(require_react(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_use_page_title_DxzhUrGi();
     init_esm6();
     import_react_dom15 = __toESM(require_react_dom(), 1);
@@ -150275,13 +150275,13 @@ var init_memory_LlpttdUM = __esm({
     init_marked_esm();
     import_yaml14 = __toESM(require_dist2(), 1);
     MemoryBrowserScreen2 = (0, import_react67.lazy)(async () => {
-      const module2 = await Promise.resolve().then(() => (init_memory_browser_screen_Cig_dX6i(), memory_browser_screen_Cig_dX6i_exports));
+      const module2 = await Promise.resolve().then(() => (init_memory_browser_screen_Cfos6dz1(), memory_browser_screen_Cfos6dz1_exports));
       return {
         default: module2.MemoryBrowserScreen
       };
     });
     KnowledgeBrowserScreen2 = (0, import_react67.lazy)(async () => {
-      const module2 = await Promise.resolve().then(() => (init_knowledge_browser_screen_BK_sSugA(), knowledge_browser_screen_BK_sSugA_exports));
+      const module2 = await Promise.resolve().then(() => (init_knowledge_browser_screen_yT4clBLl(), knowledge_browser_screen_yT4clBLl_exports));
       return {
         default: module2.KnowledgeBrowserScreen
       };
@@ -150302,9 +150302,9 @@ var init_memory_LlpttdUM = __esm({
   }
 });
 
-// dist/server/assets/jobs-D6DjTRrI.js
-var jobs_D6DjTRrI_exports = {};
-__export(jobs_D6DjTRrI_exports, {
+// dist/server/assets/jobs-BmVLkiMf.js
+var jobs_BmVLkiMf_exports = {};
+__export(jobs_BmVLkiMf_exports, {
   component: () => SplitComponent6
 });
 function getInitialState$1() {
@@ -151637,11 +151637,11 @@ function JobsScreen() {
   ] }) });
 }
 var import_jsx_runtime104, import_react69, import_react_dom16, import_yaml15, SCHEDULE_PRESETS$1, DELIVERY_OPTIONS$1, SCHEDULE_PRESETS, DELIVERY_OPTIONS, CLAUDE_API, QUERY_KEY3, SplitComponent6;
-var init_jobs_D6DjTRrI = __esm({
-  "dist/server/assets/jobs-D6DjTRrI.js"() {
+var init_jobs_BmVLkiMf = __esm({
+  "dist/server/assets/jobs-BmVLkiMf.js"() {
     "use strict";
     import_jsx_runtime104 = __toESM(require_jsx_runtime(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_use_page_title_DxzhUrGi();
     import_react69 = __toESM(require_react(), 1);
     init_modern2();
@@ -152490,9 +152490,9 @@ var require_dist3 = __commonJS({
   }
 });
 
-// dist/server/assets/files-6GxNdR1j.js
-var files_6GxNdR1j_exports = {};
-__export(files_6GxNdR1j_exports, {
+// dist/server/assets/files-DY-N6ais.js
+var files_DY_N6ais_exports = {};
+__export(files_DY_N6ais_exports, {
   component: () => FilesRoute
 });
 function FilesRoute() {
@@ -152548,8 +152548,8 @@ ${reference}
   ] }) });
 }
 var import_jsx_runtime106, import_react72, import_react73, import_react_dom17, import_yaml16, INITIAL_EDITOR_VALUE;
-var init_files_6GxNdR1j = __esm({
-  "dist/server/assets/files-6GxNdR1j.js"() {
+var init_files_DY_N6ais = __esm({
+  "dist/server/assets/files-DY-N6ais.js"() {
     "use strict";
     import_jsx_runtime106 = __toESM(require_jsx_runtime(), 1);
     import_react72 = __toESM(require_react(), 1);
@@ -152557,7 +152557,7 @@ var init_files_6GxNdR1j = __esm({
     init_esm6();
     init_esm7();
     init_use_page_title_DxzhUrGi();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react_dom17 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
@@ -207147,9 +207147,9 @@ var require_lib5 = __commonJS({
   }
 });
 
-// dist/server/assets/dashboard-D7foVSvc.js
-var dashboard_D7foVSvc_exports = {};
-__export(dashboard_D7foVSvc_exports, {
+// dist/server/assets/dashboard-C-vn1bB7.js
+var dashboard_C_vn1bB7_exports = {};
+__export(dashboard_C_vn1bB7_exports, {
   component: () => DashboardRoute
 });
 function timeAgo(ts) {
@@ -207778,7 +207778,7 @@ function DashboardScreen() {
             };
             const cur = document.documentElement.getAttribute("data-theme") || "claude-official";
             const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? "claude-official-light" : "claude-official");
-            Promise.resolve().then(() => (init_router_D782sBjg(), router_D782sBjg_exports)).then((n2) => n2.X).then(({ setTheme: setTheme2 }) => {
+            Promise.resolve().then(() => (init_router_Cj9uzHV0(), router_Cj9uzHV0_exports)).then((n2) => n2.X).then(({ setTheme: setTheme2 }) => {
               setTheme2(nextDataTheme);
             });
             const nextMode = nextDataTheme.endsWith("-light") ? "light" : "dark";
@@ -207951,8 +207951,8 @@ function DashboardRoute() {
   return /* @__PURE__ */ (0, import_jsx_runtime107.jsx)(DashboardScreen, {});
 }
 var import_jsx_runtime107, import_react75, import_recharts, import_react_dom18, import_yaml17;
-var init_dashboard_D7foVSvc = __esm({
-  "dist/server/assets/dashboard-D7foVSvc.js"() {
+var init_dashboard_C_vn1bB7 = __esm({
+  "dist/server/assets/dashboard-C-vn1bB7.js"() {
     "use strict";
     import_jsx_runtime107 = __toESM(require_jsx_runtime(), 1);
     init_use_page_title_DxzhUrGi();
@@ -207960,7 +207960,7 @@ var init_dashboard_D7foVSvc = __esm({
     init_esm5();
     import_react75 = __toESM(require_react(), 1);
     import_recharts = __toESM(require_lib5(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_esm6();
     init_esm7();
     import_react_dom18 = __toESM(require_react_dom(), 1);
@@ -207971,9 +207971,9 @@ var init_dashboard_D7foVSvc = __esm({
   }
 });
 
-// dist/server/assets/conductor-DgxQAXgw.js
-var conductor_DgxQAXgw_exports = {};
-__export(conductor_DgxQAXgw_exports, {
+// dist/server/assets/conductor-By6X7ppw.js
+var conductor_By6X7ppw_exports = {};
+__export(conductor_By6X7ppw_exports, {
   component: () => SplitComponent7
 });
 function getAgentPersona$1(index4) {
@@ -211161,16 +211161,16 @@ ${s.output}`).join("\n\n---\n\n") : conductor.streamText.trim();
   ] }) }) });
 }
 var import_jsx_runtime108, import_react77, import_react_dom19, import_yaml18, ACTIVE_MISSION_STORAGE_KEY, CONDUCTOR_SETTINGS_STORAGE_KEY, DEFAULT_CONDUCTOR_SETTINGS, HISTORY_STORAGE_KEY, MAX_HISTORY_ENTRIES, AGENT_NAMES$1, AGENT_EMOJIS$1, THEME_STYLE2, QUICK_ACTIONS, AGENT_NAMES, AGENT_EMOJIS, BLENDED_COST_PER_MILLION_TOKENS, CONDUCTOR_GOAL_DRAFT_STORAGE_KEY, PLANNING_STEPS, WORKING_STEPS, SplitComponent7;
-var init_conductor_DgxQAXgw = __esm({
-  "dist/server/assets/conductor-DgxQAXgw.js"() {
+var init_conductor_By6X7ppw = __esm({
+  "dist/server/assets/conductor-By6X7ppw.js"() {
     "use strict";
     import_jsx_runtime108 = __toESM(require_jsx_runtime(), 1);
     import_react77 = __toESM(require_react(), 1);
     init_modern2();
     init_esm6();
     init_esm7();
-    init_router_D782sBjg();
-    init_office_view_CSmMk_Ks();
+    init_router_Cj9uzHV0();
+    init_office_view_K8fUZzCY();
     init_gateway_api_D3EA1k_S();
     import_react_dom19 = __toESM(require_react_dom(), 1);
     init_dist();
@@ -211259,9 +211259,9 @@ var init_conductor_DgxQAXgw = __esm({
   }
 });
 
-// dist/server/assets/_-mjO19xs2.js
-var mjO19xs2_exports = {};
-__export(mjO19xs2_exports, {
+// dist/server/assets/_-BgJRnkWa.js
+var BgJRnkWa_exports = {};
+__export(BgJRnkWa_exports, {
   component: () => NotFoundPage
 });
 function NotFoundPage() {
@@ -211301,15 +211301,15 @@ function NotFoundPage() {
   ] }) });
 }
 var import_jsx_runtime109, import_react80, import_react_dom20, import_yaml19;
-var init_mjO19xs2 = __esm({
-  "dist/server/assets/_-mjO19xs2.js"() {
+var init_BgJRnkWa = __esm({
+  "dist/server/assets/_-BgJRnkWa.js"() {
     "use strict";
     import_jsx_runtime109 = __toESM(require_jsx_runtime(), 1);
     init_esm5();
     init_esm6();
     init_esm7();
     init_use_page_title_DxzhUrGi();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react80 = __toESM(require_react(), 1);
     import_react_dom20 = __toESM(require_react_dom(), 1);
     init_dist();
@@ -211334,9 +211334,9 @@ var init_index_CeOwHEgd = __esm({
   }
 });
 
-// dist/server/assets/index-Bce5eegV.js
-var index_Bce5eegV_exports = {};
-__export(index_Bce5eegV_exports, {
+// dist/server/assets/index--n2ldLY0.js
+var index_n2ldLY0_exports = {};
+__export(index_n2ldLY0_exports, {
   component: () => SettingsRoute
 });
 function PageThemeSwatch({
@@ -212094,14 +212094,14 @@ function ConnectionSection() {
   ] });
 }
 var import_jsx_runtime110, import_react82, import_react_dom21, import_yaml20, THEME_PREVIEWS;
-var init_index_Bce5eegV = __esm({
-  "dist/server/assets/index-Bce5eegV.js"() {
+var init_index_n2ldLY0 = __esm({
+  "dist/server/assets/index--n2ldLY0.js"() {
     "use strict";
     import_jsx_runtime110 = __toESM(require_jsx_runtime(), 1);
     init_esm6();
     init_esm7();
     import_react82 = __toESM(require_react(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_use_page_title_DxzhUrGi();
     import_react_dom21 = __toESM(require_react_dom(), 1);
     init_dist();
@@ -212185,18 +212185,18 @@ var init_index_Binn80vs = __esm({
   }
 });
 
-// dist/server/assets/providers-BJngL-CB.js
-var providers_BJngL_CB_exports = {};
-__export(providers_BJngL_CB_exports, {
+// dist/server/assets/providers-yfV4dGDs.js
+var providers_yfV4dGDs_exports = {};
+__export(providers_yfV4dGDs_exports, {
   component: () => SplitComponent10
 });
 var import_jsx_runtime111, import_react83, import_react_dom22, import_yaml21, SplitComponent10;
-var init_providers_BJngL_CB = __esm({
-  "dist/server/assets/providers-BJngL-CB.js"() {
+var init_providers_yfV4dGDs = __esm({
+  "dist/server/assets/providers-yfV4dGDs.js"() {
     "use strict";
     import_jsx_runtime111 = __toESM(require_jsx_runtime(), 1);
     init_use_page_title_DxzhUrGi();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react83 = __toESM(require_react(), 1);
     init_esm6();
     import_react_dom22 = __toESM(require_react_dom(), 1);
@@ -212211,9 +212211,9 @@ var init_providers_BJngL_CB = __esm({
   }
 });
 
-// dist/server/assets/mcp-KfURU4SQ.js
-var mcp_KfURU4SQ_exports = {};
-__export(mcp_KfURU4SQ_exports, {
+// dist/server/assets/mcp-CTAd3h3K.js
+var mcp_CTAd3h3K_exports = {};
+__export(mcp_CTAd3h3K_exports, {
   component: () => SplitComponent11
 });
 function recordToLines(value) {
@@ -212779,8 +212779,8 @@ function McpSettingsScreen() {
   ] });
 }
 var import_jsx_runtime112, import_react86, import_react_dom23, import_yaml22, EMPTY_DRAFT, SplitComponent11;
-var init_mcp_KfURU4SQ = __esm({
-  "dist/server/assets/mcp-KfURU4SQ.js"() {
+var init_mcp_CTAd3h3K = __esm({
+  "dist/server/assets/mcp-CTAd3h3K.js"() {
     "use strict";
     import_jsx_runtime112 = __toESM(require_jsx_runtime(), 1);
     init_use_page_title_DxzhUrGi();
@@ -212788,7 +212788,7 @@ var init_mcp_KfURU4SQ = __esm({
     init_esm6();
     init_esm5();
     import_react86 = __toESM(require_react(), 1);
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     import_react_dom23 = __toESM(require_react_dom(), 1);
     init_dist();
     init_clsx();
@@ -212840,9 +212840,9 @@ var init_sessionKey_7UVP78H7 = __esm({
   }
 });
 
-// dist/server/assets/_sessionKey-u0HJAo0A.js
-var sessionKey_u0HJAo0A_exports = {};
-__export(sessionKey_u0HJAo0A_exports, {
+// dist/server/assets/_sessionKey-Dio6h6ok.js
+var sessionKey_Dio6h6ok_exports = {};
+__export(sessionKey_Dio6h6ok_exports, {
   component: () => ChatRoute
 });
 function ChatRoute() {
@@ -212893,14 +212893,14 @@ function ChatRoute() {
   return /* @__PURE__ */ (0, import_jsx_runtime114.jsx)(ErrorBoundary, { children: /* @__PURE__ */ (0, import_jsx_runtime114.jsx)(import_react87.Suspense, { fallback: /* @__PURE__ */ (0, import_jsx_runtime114.jsx)("div", { className: "flex h-full items-center justify-center text-primary-400", children: "Loading chat\u2026" }), children: /* @__PURE__ */ (0, import_jsx_runtime114.jsx)(ChatScreen2, { activeFriendlyId, isNewChat, forcedSessionKey, onSessionResolved: isNewChat || activeFriendlyId === "main" ? handleSessionResolved : void 0 }) }) });
 }
 var import_jsx_runtime114, import_react87, import_react_dom24, import_yaml23, ChatScreen2;
-var init_sessionKey_u0HJAo0A = __esm({
-  "dist/server/assets/_sessionKey-u0HJAo0A.js"() {
+var init_sessionKey_Dio6h6ok = __esm({
+  "dist/server/assets/_sessionKey-Dio6h6ok.js"() {
     "use strict";
     import_jsx_runtime114 = __toESM(require_jsx_runtime(), 1);
     init_esm5();
     import_react87 = __toESM(require_react(), 1);
     init_modern2();
-    init_router_D782sBjg();
+    init_router_Cj9uzHV0();
     init_esm6();
     import_react_dom24 = __toESM(require_react_dom(), 1);
     init_dist();
@@ -212908,7 +212908,7 @@ var init_sessionKey_u0HJAo0A = __esm({
     init_marked_esm();
     import_yaml23 = __toESM(require_dist2(), 1);
     ChatScreen2 = (0, import_react87.lazy)(async () => {
-      const module2 = await Promise.resolve().then(() => (init_router_D782sBjg(), router_D782sBjg_exports)).then((n2) => n2.Y);
+      const module2 = await Promise.resolve().then(() => (init_router_Cj9uzHV0(), router_Cj9uzHV0_exports)).then((n2) => n2.Y);
       return {
         default: module2.ChatScreen
       };
@@ -212916,9 +212916,9 @@ var init_sessionKey_u0HJAo0A = __esm({
   }
 });
 
-// dist/server/assets/router-D782sBjg.js
-var router_D782sBjg_exports = {};
-__export(router_D782sBjg_exports, {
+// dist/server/assets/router-Cj9uzHV0.js
+var router_Cj9uzHV0_exports = {};
+__export(router_Cj9uzHV0_exports, {
   A: () => SettingsMobilePills,
   B: () => Button,
   C: () => setLocale,
@@ -216362,12 +216362,12 @@ async function patchConfig(patch2) {
   if (!res.ok) throw new Error(`Failed to save config: HTTP ${res.status}`);
   return res.json();
 }
-function stripProviderPrefix(model) {
+function stripProviderPrefix$1(model) {
   if (!model) return model;
   const slash = model.indexOf("/");
   if (slash === -1) return model;
   const prefix3 = model.slice(0, slash);
-  if (KNOWN_PROVIDER_PREFIXES.includes(prefix3)) {
+  if (KNOWN_PROVIDER_PREFIXES$1.includes(prefix3)) {
     return model.slice(slash + 1);
   }
   return model;
@@ -216850,10 +216850,10 @@ function ActiveModelCard({
   });
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const normalizedPrimaryModel = stripProviderPrefix(
+      const normalizedPrimaryModel = stripProviderPrefix$1(
         primaryConfig.model.trim()
       );
-      const normalizedFallbackModel = stripProviderPrefix(
+      const normalizedFallbackModel = stripProviderPrefix$1(
         fallbackConfig.model.trim()
       );
       const streamStaleTimeout = parseTimeoutInput(
@@ -236912,6 +236912,889 @@ function ReleaseNotes({
     }
   ) });
 }
+function stripProviderPrefix(model) {
+  if (!model) return model;
+  const slash = model.indexOf("/");
+  if (slash === -1) return model;
+  const prefix3 = model.slice(0, slash);
+  if (KNOWN_PROVIDER_PREFIXES.includes(prefix3)) {
+    return model.slice(slash + 1);
+  }
+  return model;
+}
+function dispatchOnboardingCompletionChanged(completed2) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(ONBOARDING_COMPLETE_EVENT, {
+      detail: { completed: completed2 }
+    })
+  );
+}
+function getEnhancedFeatureNames(capabilities2) {
+  if (!capabilities2) return [];
+  const features = [
+    { enabled: capabilities2.sessions, label: "Sessions" },
+    { enabled: capabilities2.skills, label: "Skills" },
+    { enabled: capabilities2.memory, label: "Memory" },
+    { enabled: capabilities2.config, label: "In-app config" },
+    { enabled: capabilities2.jobs, label: "Jobs" }
+  ];
+  return features.filter((feature) => feature.enabled).map((feature) => feature.label);
+}
+function ClaudeOnboarding() {
+  const [show, setShow] = (0, import_react89.useState)(false);
+  const [step, setStep] = (0, import_react89.useState)("welcome");
+  const [backendStatus, setBackendStatus] = (0, import_react89.useState)("idle");
+  const [backendInfo, setBackendInfo] = (0, import_react89.useState)(
+    null
+  );
+  const [backendMessage, setBackendMessage] = (0, import_react89.useState)("");
+  const [selectedProvider, setSelectedProvider] = (0, import_react89.useState)(null);
+  const [apiKey, setApiKey] = (0, import_react89.useState)("");
+  const [baseUrl, setBaseUrl] = (0, import_react89.useState)("");
+  const [saving, setSaving] = (0, import_react89.useState)(false);
+  const [saveError, setSaveError] = (0, import_react89.useState)("");
+  const [availableModels, setAvailableModels] = (0, import_react89.useState)([]);
+  const [selectedModel, setSelectedModel] = (0, import_react89.useState)("");
+  const [testStatus, setTestStatus] = (0, import_react89.useState)("idle");
+  const [testMessage, setTestMessage] = (0, import_react89.useState)("");
+  const [configuredModel, setConfiguredModel] = (0, import_react89.useState)("");
+  const [discoveredProviders, setDiscoveredProviders] = (0, import_react89.useState)([]);
+  const [oauthStep, setOauthStep] = (0, import_react89.useState)("idle");
+  const [oauthUserCode, setOauthUserCode] = (0, import_react89.useState)("");
+  const [oauthVerificationUrl, setOauthVerificationUrl] = (0, import_react89.useState)("");
+  const [oauthError, setOauthError] = (0, import_react89.useState)("");
+  const oauthPollRef = (0, import_react89.useRef)(null);
+  const provider = PROVIDERS$1.find((p3) => p3.id === selectedProvider);
+  const needsApiKey = provider?.authType === "api_key" || provider?.authType === "custom";
+  const needsBaseUrl = provider?.id === "ollama" || provider?.id === "atomic-chat" || provider?.authType === "custom";
+  const isOAuth = provider?.authType === "oauth";
+  const capabilities2 = backendInfo?.capabilities;
+  const canEditConfig = Boolean(capabilities2?.config);
+  const enhancedFeatures = getEnhancedFeatureNames(capabilities2);
+  const canFetchModels = Boolean(capabilities2?.models);
+  const backendSupportsChat = Boolean(capabilities2?.chatCompletions);
+  const loadCurrentConfig = (0, import_react89.useCallback)(async () => {
+    try {
+      const res = await fetch("/api/claude-config");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.activeModel) {
+        const normalizedModel = stripProviderPrefix(data.activeModel);
+        setConfiguredModel(normalizedModel);
+        setSelectedModel((current3) => current3 || normalizedModel);
+      }
+      if (data.activeProvider) {
+        setSelectedProvider((current3) => current3 || data.activeProvider || null);
+      }
+      if (data.providers) {
+        setDiscoveredProviders(data.providers);
+      }
+    } catch {
+    }
+  }, []);
+  const loadModels = (0, import_react89.useCallback)(async () => {
+    if (!canFetchModels) return;
+    try {
+      const modelsRes = await fetch("/api/models");
+      if (!modelsRes.ok) return;
+      const modelsData = await modelsRes.json();
+      const rawModels = modelsData.data || modelsData.models || [];
+      const models = rawModels.map((model) => typeof model.id === "string" ? model.id : "").filter(Boolean).slice(0, 20);
+      setAvailableModels(models);
+      setSelectedModel(
+        (current3) => current3 || stripProviderPrefix(models[0] || "")
+      );
+    } catch {
+      setAvailableModels([]);
+    }
+  }, [canFetchModels]);
+  const checkBackend = (0, import_react89.useCallback)(async () => {
+    setBackendStatus("checking");
+    setBackendMessage("");
+    try {
+      const res = await fetch("/api/gateway-status");
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setBackendInfo(data);
+      if (data.capabilities?.chatCompletions) {
+        setBackendStatus("ready");
+        setBackendMessage(
+          data.capabilities.sessions ? "Backend connected. Core chat works, and Hermes Agent gateway enhancements are available." : "Backend connected. Core chat is ready."
+        );
+        return;
+      }
+      if (data.capabilities?.health) {
+        setBackendStatus("error");
+        setBackendMessage(
+          "Backend is reachable, but /v1/chat/completions is not available yet."
+        );
+        return;
+      }
+      setBackendStatus("error");
+      setBackendMessage("No compatible backend detected yet.");
+    } catch (err) {
+      setBackendInfo(null);
+      setBackendStatus("error");
+      setBackendMessage(
+        err instanceof Error ? err.message : "Connection check failed"
+      );
+    }
+  }, []);
+  const saveProviderConfig = (0, import_react89.useCallback)(async () => {
+    if (!selectedProvider) return true;
+    if (!canEditConfig) return true;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const prov = PROVIDERS$1.find((p3) => p3.id === selectedProvider);
+      const body3 = {
+        config: { model: { provider: selectedProvider } }
+      };
+      if (prov?.envKey && apiKey) {
+        body3.env = { [prov.envKey]: apiKey };
+      }
+      if (baseUrl) {
+        body3.config = {
+          model: { provider: selectedProvider, base_url: baseUrl }
+        };
+      }
+      const res = await fetch("/api/claude-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body3)
+      });
+      if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+      await loadCurrentConfig();
+      await loadModels();
+      return true;
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    apiKey,
+    baseUrl,
+    canEditConfig,
+    loadCurrentConfig,
+    loadModels,
+    selectedProvider
+  ]);
+  const saveModelSelection = (0, import_react89.useCallback)(async () => {
+    const modelToSave = stripProviderPrefix(selectedModel || configuredModel);
+    if (!modelToSave) return true;
+    setConfiguredModel(modelToSave);
+    if (!canEditConfig || !selectedProvider) return true;
+    try {
+      const res = await fetch("/api/claude-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: {
+            model: { provider: selectedProvider, default: modelToSave }
+          }
+        })
+      });
+      if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+      return true;
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save model");
+      return false;
+    }
+  }, [canEditConfig, configuredModel, selectedModel, selectedProvider]);
+  const testConnection = (0, import_react89.useCallback)(async () => {
+    setTestStatus("testing");
+    setTestMessage("");
+    try {
+      const res = await fetch("/api/send-stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionKey: "new",
+          friendlyId: "new",
+          message: "Reply with one short sentence confirming the backend connection works."
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No stream returned");
+      const decoder = new TextDecoder();
+      let text8 = "";
+      for (; ; ) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        const matches3 = chunk.match(/(?:delta|text|content)":"([^"]+)"/g);
+        if (matches3) {
+          for (const match of matches3) {
+            text8 += match.replace(/.*":"/, "").replace(/"$/, "");
+          }
+        }
+      }
+      setTestMessage(text8.slice(0, 240) || "Chat test succeeded.");
+      setTestStatus("success");
+      void checkBackend();
+    } catch (err) {
+      setTestMessage(err instanceof Error ? err.message : "Connection failed");
+      setTestStatus("error");
+    }
+  }, [checkBackend]);
+  const startNousOAuth = (0, import_react89.useCallback)(async () => {
+    setOauthStep("loading");
+    setOauthError("");
+    try {
+      const res = await fetch("/api/oauth/device-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "nous" })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setOauthError(data.error || "Failed to start OAuth");
+        setOauthStep("error");
+        return;
+      }
+      setOauthUserCode(data.user_code || "");
+      setOauthVerificationUrl(data.verification_uri_complete || "");
+      setOauthStep("waiting");
+      if (data.verification_uri_complete) {
+        window.open(data.verification_uri_complete, "_blank");
+      }
+      const intervalMs = Math.max((data.interval || 5) * 1e3, 3e3);
+      oauthPollRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch("/api/oauth/poll-token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider: "nous",
+              deviceCode: data.device_code
+            })
+          });
+          const pollData = await pollRes.json();
+          if (pollData.status === "success") {
+            if (oauthPollRef.current) clearInterval(oauthPollRef.current);
+            setOauthStep("success");
+            await saveProviderConfig();
+            await loadModels();
+            return;
+          }
+          if (pollData.status === "error") {
+            if (oauthPollRef.current) clearInterval(oauthPollRef.current);
+            setOauthError(pollData.message || "Authentication failed");
+            setOauthStep("error");
+          }
+        } catch {
+        }
+      }, intervalMs);
+    } catch (err) {
+      setOauthError(
+        err instanceof Error ? err.message : "Failed to start OAuth"
+      );
+      setOauthStep("error");
+    }
+  }, [loadModels, saveProviderConfig]);
+  (0, import_react89.useEffect)(() => {
+    if (typeof window === "undefined") return;
+    if (!localStorage.getItem(ONBOARDING_KEY)) {
+      setShow(true);
+    }
+  }, []);
+  (0, import_react89.useEffect)(() => {
+    return () => {
+      if (oauthPollRef.current) clearInterval(oauthPollRef.current);
+    };
+  }, []);
+  (0, import_react89.useEffect)(() => {
+    if (oauthPollRef.current) clearInterval(oauthPollRef.current);
+    setOauthStep("idle");
+    setOauthUserCode("");
+    setOauthVerificationUrl("");
+    setOauthError("");
+  }, [selectedProvider]);
+  (0, import_react89.useEffect)(() => {
+    if (show) {
+      void loadCurrentConfig();
+    }
+  }, [loadCurrentConfig, show]);
+  const complete = (0, import_react89.useCallback)(() => {
+    localStorage.setItem(ONBOARDING_KEY, "true");
+    dispatchOnboardingCompletionChanged(true);
+    setShow(false);
+  }, []);
+  if (!show) return null;
+  const cardStyle = {
+    backgroundColor: "var(--theme-card)",
+    border: "1px solid var(--theme-border)",
+    color: "var(--theme-text)"
+  };
+  const mutedStyle = { color: "var(--theme-muted)" };
+  const inputStyle = {
+    backgroundColor: "var(--theme-bg)",
+    border: "1px solid var(--theme-border)",
+    color: "var(--theme-text)"
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+    "div",
+    {
+      className: "fixed inset-0 z-[99999] flex items-center justify-center px-4",
+      style: {
+        backgroundColor: "rgba(0,0,0,0.85)",
+        backdropFilter: "blur(12px)"
+      },
+      children: /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(AnimatePresence, { mode: "wait", children: /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+        motion.div,
+        {
+          initial: { opacity: 0, y: 20, scale: 0.97 },
+          animate: { opacity: 1, y: 0, scale: 1 },
+          exit: { opacity: 0, y: -20, scale: 0.97 },
+          transition: { duration: 0.25, ease: "easeOut" },
+          className: "w-full max-w-md rounded-2xl p-8",
+          style: cardStyle,
+          children: [
+            step === "welcome" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-4 text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                "img",
+                {
+                  src: "/claude-avatar.webp",
+                  alt: "Hermes Agent",
+                  className: "mx-auto size-20 rounded-2xl",
+                  style: {
+                    filter: "drop-shadow(0 8px 24px rgba(99,102,241,0.3))"
+                  }
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("h2", { className: "text-xl font-bold", children: "Welcome to Hermes Workspace" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-sm", style: mutedStyle, children: "Works with any OpenAI-compatible backend. Hermes Agent gateway APIs unlock sessions, memory, skills, and other extras automatically." }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                "button",
+                {
+                  onClick: () => {
+                    setStep("connect");
+                    void checkBackend();
+                  },
+                  className: "w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600",
+                  children: "Connect Backend"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("button", { onClick: complete, className: "text-xs", style: mutedStyle, children: "Skip setup" })
+            ] }),
+            step === "connect" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-4 text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "text-4xl", children: "\u{1F50C}" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("h2", { className: "text-lg font-bold", children: "Connect Your Backend" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-sm", style: mutedStyle, children: "Start by verifying that Hermes Workspace can reach your OpenAI-compatible backend." }),
+              backendStatus === "checking" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                "div",
+                {
+                  className: "flex items-center justify-center gap-2 text-sm",
+                  style: mutedStyle,
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "size-2 animate-pulse rounded-full bg-accent-500" }),
+                    "Checking backend capabilities..."
+                  ]
+                }
+              ),
+              backendStatus === "ready" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "flex items-center justify-center gap-2 text-sm text-green-500", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "size-2 rounded-full bg-green-500" }),
+                  backendMessage
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                  "div",
+                  {
+                    className: "rounded-xl p-3 text-left text-xs",
+                    style: cardStyle,
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { style: mutedStyle, children: "Backend URL" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mt-1 font-mono", children: backendInfo?.claudeUrl || "Configured automatically" })
+                    ]
+                  }
+                )
+              ] }),
+              backendStatus === "error" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "flex items-center justify-center gap-2 text-sm text-red-400", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "size-2 rounded-full bg-red-500" }),
+                  backendMessage
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                  "div",
+                  {
+                    className: "rounded-xl p-3 text-left text-xs",
+                    style: { ...cardStyle, borderColor: "var(--theme-border)" },
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "font-medium text-white", children: "Compatible backends" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("p", { className: "mt-2", style: mutedStyle, children: [
+                        "Use any backend that exposes",
+                        " ",
+                        /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("code", { children: "/v1/chat/completions" }),
+                        ". If you point Hermes Agent Workspace at a Hermes Agent gateway, enhanced features unlock automatically."
+                      ] }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                        "div",
+                        {
+                          className: "mt-3 rounded-lg px-3 py-2 font-mono text-[11px]",
+                          style: { background: "rgba(0,0,0,0.2)" },
+                          children: "pnpm dev"
+                        }
+                      ),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                        "div",
+                        {
+                          className: "mt-2 rounded-lg px-3 py-2 font-mono text-[11px]",
+                          style: { background: "rgba(0,0,0,0.2)" },
+                          children: "hermes --gateway"
+                        }
+                      )
+                    ]
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "flex gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "button",
+                  {
+                    onClick: () => void checkBackend(),
+                    className: "flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors",
+                    style: { borderColor: "var(--theme-border)" },
+                    children: "Retry"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "button",
+                  {
+                    onClick: () => {
+                      setStep("provider");
+                      void loadModels();
+                    },
+                    disabled: backendStatus !== "ready",
+                    className: "flex-1 rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50",
+                    children: "Continue"
+                  }
+                )
+              ] })
+            ] }),
+            step === "provider" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("h2", { className: "text-center text-lg font-bold", children: "Choose Provider and Model" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-center text-xs", style: mutedStyle, children: canEditConfig ? "Save provider settings here, then choose a model before testing chat." : "This backend manages provider settings outside Hermes Workspace. Confirm the model you expect to use, then test chat." }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "rounded-xl p-3 text-xs", style: cardStyle, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { style: mutedStyle, children: "Backend mode" }),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mt-1", children: backendInfo?.capabilities?.sessions ? "Hermes Agent gateway detected" : "Portable OpenAI-compatible backend" }),
+                configuredModel ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("p", { className: "mt-2", style: mutedStyle, children: [
+                  "Current model:",
+                  " ",
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "font-mono text-accent-400", children: configuredModel })
+                ] }) : null
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "grid max-h-56 grid-cols-1 gap-2 overflow-y-auto pr-1", children: (() => {
+                const seen = new Set(PROVIDERS$1.map((p3) => p3.id));
+                const merged = [
+                  ...PROVIDERS$1,
+                  ...discoveredProviders.filter((p3) => p3.id && !seen.has(p3.id)).map((p3) => ({
+                    id: p3.id,
+                    name: p3.name || p3.id,
+                    logo: "/providers/openai.png",
+                    desc: p3.configured ? "Configured provider" : "Custom provider",
+                    authType: "custom"
+                  }))
+                ];
+                return merged.map((p3) => /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                  "button",
+                  {
+                    onClick: () => {
+                      setSelectedProvider(p3.id);
+                      setApiKey("");
+                      setBaseUrl("");
+                      setSaveError("");
+                    },
+                    className: cn(
+                      "flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all",
+                      selectedProvider === p3.id ? "ring-2 ring-accent-500" : ""
+                    ),
+                    style: cardStyle,
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                        ProviderLogo,
+                        {
+                          provider: p3.id,
+                          size: 40,
+                          className: "shrink-0 rounded-xl"
+                        }
+                      ),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "min-w-0 flex-1", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "text-sm font-semibold", children: p3.name }),
+                        /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "text-xs", style: mutedStyle, children: p3.desc })
+                      ] }),
+                      selectedProvider === p3.id ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "ml-auto size-2.5 shrink-0 rounded-full bg-green-500" }) : null
+                    ]
+                  },
+                  p3.id
+                ));
+              })() }),
+              selectedProvider && isOAuth && selectedProvider === "nous" && canEditConfig && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                "div",
+                {
+                  className: "space-y-3 rounded-xl p-4 text-left",
+                  style: { ...cardStyle, borderColor: "var(--theme-border)" },
+                  children: [
+                    oauthStep === "idle" && /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                      "button",
+                      {
+                        onClick: startNousOAuth,
+                        className: "w-full rounded-lg bg-accent-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-600",
+                        children: "Connect with Nous Portal"
+                      }
+                    ),
+                    oauthStep === "loading" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                      "div",
+                      {
+                        className: "flex items-center justify-center gap-2 py-2 text-sm",
+                        style: mutedStyle,
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "size-2 animate-pulse rounded-full bg-accent-500" }),
+                          "Starting OAuth flow..."
+                        ]
+                      }
+                    ),
+                    oauthStep === "waiting" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-3", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                        "div",
+                        {
+                          className: "flex items-center gap-2 text-sm",
+                          style: mutedStyle,
+                          children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "size-2 animate-pulse rounded-full bg-yellow-400" }),
+                            "Waiting for approval..."
+                          ]
+                        }
+                      ),
+                      oauthUserCode ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-1 text-center", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-xs", style: mutedStyle, children: "Your code" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-2xl font-mono font-bold tracking-widest", children: oauthUserCode })
+                      ] }) : null,
+                      oauthVerificationUrl ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                        "button",
+                        {
+                          onClick: () => window.open(oauthVerificationUrl, "_blank"),
+                          className: "w-full rounded-lg border py-2 text-xs font-medium",
+                          style: { borderColor: "var(--theme-border)" },
+                          children: "Open Nous Portal \u2197"
+                        }
+                      ) : null
+                    ] }),
+                    oauthStep === "success" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "flex items-center gap-2 text-sm text-green-500", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { children: "\u2713" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { children: "Authenticated successfully." })
+                    ] }),
+                    oauthStep === "error" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-2", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-xs text-red-400", children: oauthError || "Authentication failed" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                        "button",
+                        {
+                          onClick: startNousOAuth,
+                          className: "w-full rounded-lg bg-accent-500 py-2 text-xs font-medium text-white",
+                          children: "Retry"
+                        }
+                      )
+                    ] })
+                  ]
+                }
+              ),
+              selectedProvider && isOAuth && selectedProvider === "openai-codex" && canEditConfig && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                "div",
+                {
+                  className: "space-y-2 rounded-xl p-4 text-left",
+                  style: { ...cardStyle, borderColor: "var(--theme-border)" },
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-sm font-medium", children: "Run in your terminal" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                      "div",
+                      {
+                        className: "rounded-lg px-3 py-2 font-mono text-xs",
+                        style: { background: "rgba(0,0,0,0.2)" },
+                        children: "claude auth login openai-codex"
+                      }
+                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-xs", style: mutedStyle, children: "After the login flow completes, click below to refresh provider settings." }),
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                      "button",
+                      {
+                        onClick: async () => {
+                          await saveProviderConfig();
+                          await loadModels();
+                        },
+                        className: "w-full rounded-lg bg-accent-500 py-2 text-xs font-medium text-white",
+                        children: "I've authenticated"
+                      }
+                    )
+                  ]
+                }
+              ),
+              selectedProvider && (needsApiKey || needsBaseUrl) && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-2 pt-1", children: [
+                needsBaseUrl ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                    "label",
+                    {
+                      className: "mb-1 block text-xs font-medium",
+                      style: mutedStyle,
+                      children: selectedProvider === "ollama" ? "Ollama URL" : selectedProvider === "atomic-chat" ? "Atomic Chat URL" : "Base URL"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                    "input",
+                    {
+                      type: "text",
+                      value: baseUrl,
+                      onChange: (e) => setBaseUrl(e.target.value),
+                      placeholder: selectedProvider === "ollama" ? "http://localhost:11434" : selectedProvider === "atomic-chat" ? "http://127.0.0.1:1337/v1" : "https://api.example.com/v1",
+                      className: "w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500",
+                      style: inputStyle
+                    }
+                  )
+                ] }) : null,
+                needsApiKey ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                    "label",
+                    {
+                      className: "mb-1 block text-xs font-medium",
+                      style: mutedStyle,
+                      children: "API Key"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                    "input",
+                    {
+                      type: "password",
+                      value: apiKey,
+                      onChange: (e) => setApiKey(e.target.value),
+                      placeholder: "sk-...",
+                      className: "w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500",
+                      style: inputStyle
+                    }
+                  )
+                ] }) : null
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "label",
+                  {
+                    className: "mb-1 block text-xs font-medium",
+                    style: mutedStyle,
+                    children: "Model"
+                  }
+                ),
+                availableModels.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "select",
+                  {
+                    value: selectedModel,
+                    onChange: (e) => setSelectedModel(stripProviderPrefix(e.target.value)),
+                    className: "w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500",
+                    style: inputStyle,
+                    children: availableModels.map((model) => /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("option", { value: model, children: stripProviderPrefix(model) }, model))
+                  }
+                ) : /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "input",
+                  {
+                    type: "text",
+                    value: selectedModel,
+                    onChange: (e) => setSelectedModel(e.target.value),
+                    placeholder: configuredModel || "gpt-4.1",
+                    className: "w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500",
+                    style: inputStyle
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mt-2 text-xs", style: mutedStyle, children: canFetchModels ? "Models were fetched from the backend when available." : "If your backend does not expose /v1/models, enter the model name manually." })
+              ] }),
+              !canEditConfig ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-200", children: "In-app provider editing is unavailable on this backend. That is optional. If the backend is already configured, continue to the chat test." }) : null,
+              saveError ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-xs text-red-400", children: saveError }) : null,
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "flex gap-2", children: [
+                selectedProvider && canEditConfig && (needsApiKey || needsBaseUrl) ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "button",
+                  {
+                    onClick: () => void saveProviderConfig(),
+                    disabled: saving || needsApiKey && !apiKey && !needsBaseUrl,
+                    className: "flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50",
+                    children: saving ? "Saving..." : "Save Settings"
+                  }
+                ) : null,
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "button",
+                  {
+                    onClick: async () => {
+                      let ok3 = true;
+                      if (selectedProvider && canEditConfig && (!isOAuth || oauthStep === "success")) {
+                        ok3 = await saveProviderConfig();
+                      }
+                      if (ok3) {
+                        ok3 = await saveModelSelection();
+                      }
+                      if (ok3) {
+                        setStep("test");
+                        setTestStatus("idle");
+                        setTestMessage("");
+                      }
+                    },
+                    disabled: !backendSupportsChat,
+                    className: "flex-1 rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50",
+                    children: "Continue \u2192"
+                  }
+                )
+              ] })
+            ] }),
+            step === "test" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-4 text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "text-4xl", children: "\u{1F9EA}" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("h2", { className: "text-lg font-bold", children: "Test Chat" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-sm", style: mutedStyle, children: "Verify that core chat works first. Enhanced Hermes Agent features are optional and appear automatically when supported." }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                "div",
+                {
+                  className: "rounded-xl p-3 text-left text-xs",
+                  style: cardStyle,
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { style: mutedStyle, children: "Backend" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mt-1 font-mono", children: backendInfo?.claudeUrl || "Configured automatically" }),
+                    selectedModel || configuredModel ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("p", { className: "mt-2", style: mutedStyle, children: [
+                      "Model:",
+                      " ",
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "font-mono text-accent-400", children: stripProviderPrefix(selectedModel || configuredModel) })
+                    ] }) : null
+                  ]
+                }
+              ),
+              testStatus === "idle" ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                "button",
+                {
+                  onClick: testConnection,
+                  className: "w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600",
+                  children: "Send Test Message"
+                }
+              ) : null,
+              testStatus === "testing" ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                "div",
+                {
+                  className: "flex items-center justify-center gap-2 text-sm",
+                  style: mutedStyle,
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "size-2 animate-pulse rounded-full bg-accent-500" }),
+                    "Waiting for the backend response..."
+                  ]
+                }
+              ) : null,
+              testStatus === "success" ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                  "div",
+                  {
+                    className: "rounded-xl p-3 text-left text-sm",
+                    style: cardStyle,
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { className: "font-medium text-green-500", children: "Assistant:" }),
+                      " ",
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("span", { children: testMessage })
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "button",
+                  {
+                    onClick: () => setStep("done"),
+                    className: "w-full rounded-xl bg-green-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-700",
+                    children: "Continue"
+                  }
+                )
+              ] }) : null,
+              testStatus === "error" ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "rounded-xl border border-red-500/30 bg-red-900/20 p-3 text-left text-sm", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mb-1 font-medium text-red-400", children: "Chat test failed" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "text-xs", style: mutedStyle, children: testMessage }),
+                  testMessage.includes("401") || testMessage.toLowerCase().includes("key") ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mt-2 text-xs text-yellow-400", children: "Check your provider credentials and account access." }) : testMessage.toLowerCase().includes("model") ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mt-2 text-xs text-yellow-400", children: "Confirm the selected model exists on this backend." }) : /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("p", { className: "mt-2 text-xs text-yellow-400", children: "Confirm the backend is running and still reachable from Hermes Workspace." })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "flex gap-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                    "button",
+                    {
+                      onClick: testConnection,
+                      className: "flex-1 rounded-lg bg-accent-500 py-2 text-xs font-medium text-white",
+                      children: "Retry"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                    "button",
+                    {
+                      onClick: () => setStep("provider"),
+                      className: "flex-1 rounded-lg border py-2 text-xs font-medium",
+                      style: { borderColor: "var(--theme-border)" },
+                      children: "\u2190 Back"
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                  "button",
+                  {
+                    onClick: () => setStep("done"),
+                    className: "mx-auto block text-xs",
+                    style: mutedStyle,
+                    children: "Skip for now"
+                  }
+                )
+              ] }) : null
+            ] }),
+            step === "done" && /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "space-y-4 text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "text-5xl", children: "\u{1F389}" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("h2", { className: "text-xl font-bold", children: "Workspace Ready" }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("p", { className: "text-sm", style: mutedStyle, children: [
+                "Core chat is set up.",
+                " ",
+                enhancedFeatures.length > 0 ? "This backend also exposes Hermes Agent gateway enhancements." : "If you later connect a Hermes Agent gateway, enhanced features unlock automatically."
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(
+                "div",
+                {
+                  className: "grid grid-cols-3 gap-2 text-xs",
+                  style: mutedStyle,
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "rounded-xl p-2", style: cardStyle, children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "mb-1 text-lg", children: "\u{1F4AC}" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { children: "Chat Ready" })
+                    ] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "rounded-xl p-2", style: cardStyle, children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "mb-1 text-lg", children: "\u{1F517}" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { children: enhancedFeatures.length > 0 ? "Enhanced" : "Portable" })
+                    ] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { className: "rounded-xl p-2", style: cardStyle, children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsx)("div", { className: "mb-1 text-lg", children: "\u{1F9E0}" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("div", { children: [
+                        enhancedFeatures.length > 0 ? enhancedFeatures.length : "Optional",
+                        " ",
+                        "Extras"
+                      ] })
+                    ] })
+                  ]
+                }
+              ),
+              enhancedFeatures.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)("p", { className: "text-xs", style: mutedStyle, children: [
+                "Available now: ",
+                enhancedFeatures.join(", "),
+                "."
+              ] }) : null,
+              /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(
+                "button",
+                {
+                  onClick: complete,
+                  className: "w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600",
+                  children: "Open Workspace"
+                }
+              )
+            ] })
+          ]
+        },
+        step
+      ) })
+    }
+  );
+}
 function getRootSurfaceState(onboardingComplete, authStatus = null) {
   if (authStatus?.authRequired && !authStatus.authenticated) {
     return {
@@ -237029,7 +237912,7 @@ function RootLayout() {
   return /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(QueryClientProvider, { client: queryClient, children: [
     /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(Toaster, {}),
     mounted && rootSurfaceState.showLogin ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(LoginScreen, {}) : null,
-    mounted && rootSurfaceState.showOnboarding ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(HermesOnboarding, {}) : null,
+    mounted && rootSurfaceState.showOnboarding ? /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(ClaudeOnboarding, {}) : null,
     rootSurfaceState.showWorkspaceShell ? /* @__PURE__ */ (0, import_jsx_runtime115.jsxs)(import_jsx_runtime115.Fragment, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(GlobalShortcutListener, {}),
       /* @__PURE__ */ (0, import_jsx_runtime115.jsx)(TerminalShortcutListener, {}),
@@ -245392,9 +246275,9 @@ function notSupported() {
     { status: 404, headers: { "Content-Type": "application/json" } }
   );
 }
-var import_jsx_runtime115, React232, import_react89, import_react_dom25, os, import_node_os, path2, import_node_path2, import_promises, import_node_crypto, fs, import_node_fs, import_node_child_process, import_node_url2, import_node_events, YAML, import_yaml24, import_node_util, import_meta, appCss, buttonVariants, SEARCH_MODAL_EVENTS, useSearchModal, REQUEST_TIMEOUT_MS, SESSIONS_STALE_TIME_MS, FILES_STALE_TIME_MS, SKILLS_STALE_TIME_MS, SEARCH_QUERY_GC_TIME_MS, MAX_SEARCH_FILES, SCOPE_TABS, RECENT_SEARCHES, RESULT_LIMITS, DEFAULT_PANEL_HEIGHT, MIN_PANEL_HEIGHT, useTerminalPanelStore, useWorkspaceStore, SIDEBAR_TOGGLE_EVENT, POLL_INTERVAL_MS$1, FAILURE_REVEAL_MS, AUTO_START_DELAY_MS, CHAT_OPEN_MESSAGE_SEARCH_EVENT, CHAT_RUN_COMMAND_EVENT, CHAT_PENDING_COMMAND_STORAGE_KEY, CHAT_OPEN_SETTINGS_EVENT, CHANNEL_PREFIX_REGEX, KNOWN_CHANNELS, missingAuthMessage, chatQueryKeys, pendingSend, pendingGeneration, PENDING_MESSAGE_STORAGE_PREFIX, PENDING_MESSAGE_MAX_AGE_MS, TOMBSTONE_TTL_MS, tombstones, STORAGE_KEY$5, persistedTitles, runtimeStates, listeners$1, loaded, cachedSnapshot, CLAUDE_CONFIG_PATH, PROVIDER_CATALOG, WIZARD_STEPS, AUTH_TYPE_ORDER, toastId, listeners, typeStyles, defaultIcons, FEATURE_LABELS, KNOWN_PROVIDER_PREFIXES, TAB_ORDER$1, MEMORY_PROVIDER_OPTIONS, MEMORY_FALLBACK_OPTIONS, SETTINGS, MODEL_PROVIDER_OPTIONS, MODEL_PRESETS, DEFAULT_STREAM_STALE_TIMEOUT_SECONDS, DEFAULT_STREAM_READ_TIMEOUT_SECONDS, MODEL_PROVIDER_VALUES, dayFormatter$1, timeFormatter$1, UUID_PATTERN, SessionItem, usePinnedSessionsStore, SidebarSessions, EN, ES, FR, ZH, RU, LOCALES, LOCALE_LABELS, STORAGE_KEY$4, THEMES, STORAGE_KEY$3, DEFAULT_THEME$1, THEME_SET, LIGHT_THEME_MAP, DARK_THEME_MAP, LIGHT_THEMES$1, theme, defaultStudioSettings, useSettingsStore, DEFAULT_CHAT_DISPLAY_NAME, useChatSettingsStore, AssistantAvatar, UserAvatar, D1, D2, D3, D4, D5, D6, D7, D8, PRESETS, BrailleSpinner, LIGHT_THEMES, SECTIONS, SETTINGS_CARD_CLASS, PROVIDER_CARDS, ENTERPRISE_THEME_FAMILIES, ENTERPRISE_THEMES, SettingsErrorBoundary, CONTENT_MAP, LAST_ROUTE_KEY, MemoizedChatSidebar, TAB_ORDER, EDGE_ZONE, LOCK_THRESHOLD, SWIPE_MIN_X, SWIPE_MAX_Y, SWIPE_MAX_TIME, useActivityStore, useInspectorStore, TABS, MOBILE_HAMBURGER_NAV_ITEMS, _setOpen, MemoizedChatHeader, LANGUAGE_ALIASES, highlighterPromise, TableRenderContext, INITIAL_COMPONENTS, MemoizedMarkdownBlock, Markdown2, WORDS_PER_TICK, TICK_INTERVAL_MS, STUCK_SENDING_THRESHOLD_MS, TOOL_DISPLAY_LABELS, TOOL_ICONS, MemoizedMessageItem, MotionButton, NEAR_BOTTOM_THRESHOLD$1, THINKING_GRACE_PERIOD_MS, TOOL_STATUS_MAP, NEAR_BOTTOM_THRESHOLD, HIDDEN_SYSTEM_USER_PREFIXES, MemoizedChatMessageList, SUGGESTIONS, PromptInputContext, globalPromptTarget, isGlobalListenerBound, Autocomplete, useAutocompleteFilter, CommandDialog, CommandDialogPortal, SLASH_COMMANDS, SlashCommandMenu, MOBILE_TAB_BAR_OFFSET, STORAGE_KEY$2, MODEL_SWITCH_BLOCKED_TOAST, LOCAL_PROVIDERS_SET, MAX_ATTACHMENT_FILE_SIZE, MAX_IMAGE_DIMENSION, IMAGE_QUALITY, MAX_TRANSPORT_IMAGE_SIZE, IMAGE_EXTENSION_TO_MIME, TEXT_EXTENSION_TO_MIME, MemoizedChatComposer, PORTABLE_HISTORY_STORAGE_KEY$1, PORTABLE_HISTORY_LIMIT, _streamingPersistTimer, createEmptyStreamingState, WAITING_TTL_MS, WAITING_STORAGE_PREFIX, realtimeMessageSequence, LIFECYCLE_PREFIX_EMOJIS, _restoredWaiting, useChatStore, PORTABLE_HISTORY_STORAGE_KEY, EMPTY_MESSAGES, EMPTY_TOOL_CALLS, EMPTY_LIFECYCLE_EVENTS, NOTES, STORAGE_KEY$1, DEFAULT_VOLUME, audioContext, prefs, ACTIVE_STATUSES, defaultChatUiState, chatUiQueryKey, MAX_TITLE_LENGTH, GENERIC_TITLE_PATTERNS, POLL_MS$1, STORAGE_KEY, THRESHOLDS, PreviewCard, POLL_MS2, EMPTY5, ContextBar, APPROVALS_KEY, QUEUED_WRAPPER_MARKER, QUEUED_HEADER_REGEX, QUEUED_MARKER_REGEX, LANGUAGE_MAP, ROOT_LABEL, TerminalWorkspace$1, MAX_VIEWPORT_RATIO, dayFormatter, timeFormatter, ContextAlertModal, AUTO_DISMISS_MS, externalPush, _localModelOverride, _noopSetActivity, commandHelpers, chatScreen, POLL_INTERVAL_MS3, FLASH_DURATION_MS, OPEN_THRESHOLD, CLOSE_THRESHOLD, CLOSE_DEBOUNCE_MS, SCREEN_GROUP_ORDER, TerminalWorkspace2, DESKTOP_SIDEBAR_BACKDROP_CLASS, STORAGE_KEY_SEEN, tourSteps, TOUR_STORAGE_KEY, ACCENT_COLORS, isMac2, MOD, SHORTCUT_GROUPS, CHECK_INTERVAL_MS, DISMISS_PREFIX, NOTES_KEY, NOTES_SEEN_KEY, ONBOARDING_KEY, ONBOARDING_COMPLETE_EVENT, ErrorBoundary, APP_CSP, THEME_STORAGE_KEY, DEFAULT_THEME, VALID_THEMES, themeScript, themeColorScript, Route$1R, queryClient, $$splitErrorComponentImporter$5, $$splitComponentImporter$j, Route$1Q, $$splitComponentImporter$i, searchSchema, Route$1P, $$splitErrorComponentImporter$4, $$splitComponentImporter$h, Route$1O, $$splitErrorComponentImporter$3, $$splitComponentImporter$g, Route$1N, $$splitComponentImporter$f, Route$1M, $$splitComponentImporter$e, Route$1L, $$splitComponentImporter$d, Route$1K, $$splitErrorComponentImporter$2, $$splitComponentImporter$c, Route$1J, $$splitComponentImporter$b, Route$1I, $$splitComponentImporter$a, Route$1H, $$splitErrorComponentImporter$1, $$splitComponentImporter$9, Route$1G, $$splitComponentImporter$8, Route$1F, $$splitComponentImporter$7, Route$1E, $$splitComponentImporter$6, Route$1D, $$splitComponentImporter$5, Route$1C, SETTINGS_NAV_ITEMS, $$splitComponentImporter$4, VALID_SECTION_IDS, Route$1B, $$splitComponentImporter$3, Route$1A, $$splitComponentImporter$2, Route$1z, $$splitComponentImporter$1, Route$1y, $$splitErrorComponentImporter, $$splitComponentImporter, Route$1x, STORE_FILE, TOKEN_TTL_MS, _tokens, initial, Route$1w, sessions, __dirname_resolved, PTY_HELPER, store$1, Route$1v, Route$1u, Route$1t, Route$1s, TMUX_BIN_CANDIDATES$4, Route$1r, TMUX_BIN_CANDIDATES$3, Route$1q, TMUX_BIN_CANDIDATES$2, Route$1p, getClaudeRoot$1, getWorkspaceClaudeHome, getProfileClaudeHome, SwarmWorkerStateSchema, SwarmCheckpointStatusSchema, SwarmTaskSourceSchema, SwarmArtifactKindSchema, SwarmArtifactSourceSchema, SwarmPreviewSourceSchema, SwarmPreviewStatusSchema, SwarmHistorySourceSchema, SwarmSessionTransportSchema, SwarmDispatchModeSchema, SwarmPluginScopeSchema, RuntimeTaskMetadataSchema, RuntimeArtifactMetadataSchema, RuntimePreviewMetadataSchema, RuntimeBoundarySchema, SwarmRuntimeSchema, SwarmPluginManifestSchema, SWARM_CANONICAL_REPO, SWARM_MEMORY_ROOT, SWARM_MEMORY_HANDOFFS, SWARM_FORBIDDEN_PATHS, SWARM_ROSTER_PATH, SwarmRosterWorkerSchema, SwarmRosterSchema, SwarmRosterUpsertSchema, SWARM_MODE_PATH, Route$1o, Route$1n, SWARM_MISSIONS_PATH, Route$1m, Route$1l, LABELS, STATE_MAP, PYTHON_SCRIPT, SWARM_SHARED_MEMORY_ROOT, SWARM_SHARED_HANDOFF_ROOT, ACTIVE_RUNS_KEY, BUS_KEY, ORCHESTRATOR_WORKER_ID, ORCHESTRATOR_TMUX_SESSION, MAIN_SESSION_KEY, Route$1k, Route$1j, MEMORY_KINDS, EVENT_TYPES, Route$1i, DEFAULT_POLICY, PYTHON_STATUS, Route$1h, SWARM_KANBAN_LANES, HERMES_HOME, SWARM_KANBAN_FILE, localBackend, claudeBackend, CreateCardSchema, UpdateCardSchema, Route$1g, Route$1f, Route$1e, MAX_PROMPT_CHARS, MAX_OUTPUT_CHARS$1, DEFAULT_TIMEOUT_S, MAX_TIMEOUT_S, TMUX_BIN_CANDIDATES$1, Route$1d, MAX_OUTPUT_CHARS, DEFAULT_LIMIT$1, DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, TMUX_BIN_CANDIDATES, Route$1c, _initialOverrides, CLAUDE_API2, CLAUDE_DASHBOARD_URL, CLAUDE_UPGRADE_INSTRUCTIONS, SESSIONS_API_UNAVAILABLE_MESSAGE, PROBE_TIMEOUT_MS$1, PROBE_TTL_MS$1, DASHBOARD_TOKEN_REGEX, capabilities, probePromise$1, lastProbeAt, lastLoggedSummary, dashboardTokenPromise, dashboardTokenCache, BEARER_TOKEN$1, DASHBOARD_BEARER_TOKEN, loggedHtmlScrapeFallback, OPTIONAL_APIS, SYSTEM, Route$1b, CheckpointBodySchema, Route$1a, MAX_LIMIT, DEFAULT_LIMIT2, Route$19, CLAUDE_HEALTH_TIMEOUT_MS, CLAUDE_START_PORT, startPromise, Route$18, Route$17, KNOWN_CATEGORIES, FEATURED_SKILLS, Route$16, _authHeaders, DATA_DIR$1, SESSIONS_FILE, MAX_MESSAGES_PER_SESSION, store, saveTimer, Route$15, SYNTHETIC_SESSION_KEYS, Route$14, Route$13, Route$12, RUNS_ROOT, LOCAL_PROVIDERS, PROBE_TTL_MS, PROBE_TIMEOUT_MS, discoveryState, lastProbeAll, probePromise, CONFIG_PATH$4, loggedWarnings, BEARER_TOKEN, _cachedDefaultModel, SEND_STREAM_RUN_TIMEOUT_MS, SESSION_BOOTSTRAP_KEYS, Route$11, Route$10, MAX_BYTES, MIME_BY_EXT, Route$$, Route$_, Route$Z, CLAUDE_HOME$4, Route$Y, CLAUDE_HOME$3, MODELS_PATH, CONFIG_PATH$3, DEFAULT_ACCEPTED_TIMEOUT_S, DEFAULT_HANDOFF_TIMEOUT_S, Route$X, Route$W, Route$V, HONCHO_ENV_KEYS, HONCHO_CONFIG_KEYS, BYTEROVER_ENV_KEYS, BYTEROVER_CONFIG_KEYS, Route$U, Route$T, Route$S, execFileAsync$1, WORKSPACE_ROOT, IGNORED_DIRS, MAX_DIRECTORY_DEPTH, MAX_DIRECTORY_ENTRIES, Route$R, Route$Q, Route$P, MODEL_CONTEXT_WINDOWS, CHARS_PER_TOKEN, Route$O, CONFIG_PATH$2, Route$N, Route$M, Route$L, cachedSkill, Route$K, UPDATE_REMOTE_DEFINITIONS, Route$J, CLAUDE_HOME$2, CONFIG_PATH$1, PROFILES_PATH, Route$I, CLAUDE_HOME$1, TASKS_FILE, Route$H, Route$G, CLAUDE_HOME, CONFIG_PATH, ENV_PATH, PROVIDERS, Route$F, Route$E, Route$D, AuthSchema, Route$C, DATA_DIR, INDEX_FILE, index3, Route$B, Route$A, Route$z, Route$y, Route$x, Route$w, Route$v, Route$u, execFileAsync, Route$t, Route$s, Route$r, Route$q, Route$p, Route$o, Route$n, Route$m, Route$l, BodySchema$1, Route$k, BodySchema, Route$j, Route$i, Route$h, Route$g, Route$f, Route$e, Route$d, RELOAD_PATHS, Route$c, DEFAULT_CONFIG, knowledgeConfig, GitHubKnowledgeProvider, Route$b, Route$a, Route$9, Route$8, Route$7, Route$6, Route$5, Route$4, Route$3, Route$2, Route$1, Route2, TerminalRoute2, TasksRoute2, Swarm2Route2, SwarmRoute2, SkillsRoute2, SettingsRoute2, ProfilesRoute2, OperationsRoute2, MemoryRoute2, JobsRoute2, FilesRoute2, DashboardRoute2, ConductorRoute, SplatRoute, IndexRoute2, SettingsIndexRoute, ChatIndexRoute2, SettingsProvidersRoute2, SettingsMcpRoute2, ChatSessionKeyRoute, ApiWorkspaceRoute, ApiTerminalStreamRoute, ApiTerminalResizeRoute, ApiTerminalInputRoute, ApiTerminalCloseRoute, ApiSwarmTmuxStopRoute, ApiSwarmTmuxStartRoute, ApiSwarmTmuxScrollRoute, ApiSwarmRuntimeRoute, ApiSwarmRosterRoute, ApiSwarmReportsRoute, ApiSwarmProjectRoute, ApiSwarmOrchestratorLoopRoute, ApiSwarmMissionsRoute, ApiSwarmMemoryRoute, ApiSwarmLifecycleRoute, ApiSwarmKanbanRoute, ApiSwarmHealthRoute, ApiSwarmEnvironmentRoute, ApiSwarmDispatchRoute, ApiSwarmDirectChatRoute, ApiSwarmDecomposeRoute, ApiSwarmCheckpointRoute, ApiSwarmChatRoute, ApiStartClaudeRoute, ApiStartAgentRoute, ApiSkillsRoute, ApiSessionsRoute, ApiSessionStatusRoute, ApiSessionSendRoute, ApiSessionHistoryRoute, ApiSendStreamRoute, ApiSendRoute, ApiPreviewFileRoute, ApiPluginsRoute, ApiPingRoute, ApiPathsRoute, ApiModelsRoute, ApiMemoryRoute, ApiLocalProvidersRoute, ApiIntegrationsRoute, ApiHistoryRoute, ApiGatewayStatusRoute, ApiFilesRoute, ApiEventsRoute, ApiCrewStatusRoute, ApiContextUsageRoute, ApiConnectionStatusRoute, ApiConnectionSettingsRoute, ApiConductorStopRoute, ApiConductorSpawnRoute, ApiClaudeUpdateRoute, ApiClaudeTasksAssigneesRoute, ApiClaudeTasksRoute, ApiClaudeJobsRoute, ApiClaudeConfigRoute, ApiChatEventsRoute, ApiAuthCheckRoute, ApiAuthRoute, ApiArtifactsRoute, ApiUpdateWorkspaceRoute, ApiUpdateStatusRoute, ApiUpdateAgentRoute, ApiSwarmMemorySearchRoute, ApiSkillsUninstallRoute, ApiSkillsToggleRoute, ApiSkillsInstallRoute, ApiSkillsHubSearchRoute, ApiSessionsSendRoute, ApiProfilesUpdateRoute, ApiProfilesRenameRoute, ApiProfilesReadRoute, ApiProfilesListRoute, ApiProfilesDeleteRoute, ApiProfilesCreateRoute, ApiProfilesActivateRoute, ApiOauthPollTokenRoute, ApiOauthDeviceCodeRoute, ApiModelInfoRoute, ApiMemoryWriteRoute, ApiMemorySearchRoute, ApiMemoryReadRoute, ApiMemoryListRoute, ApiMcpServersRoute, ApiMcpReloadRoute, ApiKnowledgeSyncRoute, ApiKnowledgeSearchRoute, ApiKnowledgeReadRoute, ApiKnowledgeListRoute, ApiKnowledgeGraphRoute, ApiKnowledgeConfigRoute, ApiClaudeTasksTaskIdRoute, ApiClaudeProxySplatRoute, ApiClaudeJobsJobIdRoute, ApiArtifactsArtifactIdRoute, ApiSessionsSessionKeyStatusRoute, ApiSessionsSessionKeyActiveRunRoute, SettingsRouteChildren, SettingsRouteWithChildren, ApiArtifactsRouteChildren, ApiArtifactsRouteWithChildren, ApiClaudeJobsRouteChildren, ApiClaudeJobsRouteWithChildren, ApiClaudeTasksRouteChildren, ApiClaudeTasksRouteWithChildren, ApiMemoryRouteChildren, ApiMemoryRouteWithChildren, ApiSessionsRouteChildren, ApiSessionsRouteWithChildren, ApiSkillsRouteChildren, ApiSkillsRouteWithChildren, ApiSwarmMemoryRouteChildren, ApiSwarmMemoryRouteWithChildren, rootRouteChildren, routeTree, getRouter, router;
-var init_router_D782sBjg = __esm({
-  "dist/server/assets/router-D782sBjg.js"() {
+var import_jsx_runtime115, React232, import_react89, import_react_dom25, os, import_node_os, path2, import_node_path2, import_promises, import_node_crypto, fs, import_node_fs, import_node_child_process, import_node_url2, import_node_events, YAML, import_yaml24, import_node_util, import_meta, appCss, buttonVariants, SEARCH_MODAL_EVENTS, useSearchModal, REQUEST_TIMEOUT_MS, SESSIONS_STALE_TIME_MS, FILES_STALE_TIME_MS, SKILLS_STALE_TIME_MS, SEARCH_QUERY_GC_TIME_MS, MAX_SEARCH_FILES, SCOPE_TABS, RECENT_SEARCHES, RESULT_LIMITS, DEFAULT_PANEL_HEIGHT, MIN_PANEL_HEIGHT, useTerminalPanelStore, useWorkspaceStore, SIDEBAR_TOGGLE_EVENT, POLL_INTERVAL_MS$1, FAILURE_REVEAL_MS, AUTO_START_DELAY_MS, CHAT_OPEN_MESSAGE_SEARCH_EVENT, CHAT_RUN_COMMAND_EVENT, CHAT_PENDING_COMMAND_STORAGE_KEY, CHAT_OPEN_SETTINGS_EVENT, CHANNEL_PREFIX_REGEX, KNOWN_CHANNELS, missingAuthMessage, chatQueryKeys, pendingSend, pendingGeneration, PENDING_MESSAGE_STORAGE_PREFIX, PENDING_MESSAGE_MAX_AGE_MS, TOMBSTONE_TTL_MS, tombstones, STORAGE_KEY$5, persistedTitles, runtimeStates, listeners$1, loaded, cachedSnapshot, CLAUDE_CONFIG_PATH, PROVIDER_CATALOG, WIZARD_STEPS, AUTH_TYPE_ORDER, toastId, listeners, typeStyles, defaultIcons, FEATURE_LABELS, KNOWN_PROVIDER_PREFIXES$1, TAB_ORDER$1, MEMORY_PROVIDER_OPTIONS, MEMORY_FALLBACK_OPTIONS, SETTINGS, MODEL_PROVIDER_OPTIONS, MODEL_PRESETS, DEFAULT_STREAM_STALE_TIMEOUT_SECONDS, DEFAULT_STREAM_READ_TIMEOUT_SECONDS, MODEL_PROVIDER_VALUES, dayFormatter$1, timeFormatter$1, UUID_PATTERN, SessionItem, usePinnedSessionsStore, SidebarSessions, EN, ES, FR, ZH, RU, LOCALES, LOCALE_LABELS, STORAGE_KEY$4, THEMES, STORAGE_KEY$3, DEFAULT_THEME$1, THEME_SET, LIGHT_THEME_MAP, DARK_THEME_MAP, LIGHT_THEMES$1, theme, defaultStudioSettings, useSettingsStore, DEFAULT_CHAT_DISPLAY_NAME, useChatSettingsStore, AssistantAvatar, UserAvatar, D1, D2, D3, D4, D5, D6, D7, D8, PRESETS, BrailleSpinner, LIGHT_THEMES, SECTIONS, SETTINGS_CARD_CLASS, PROVIDER_CARDS, ENTERPRISE_THEME_FAMILIES, ENTERPRISE_THEMES, SettingsErrorBoundary, CONTENT_MAP, LAST_ROUTE_KEY, MemoizedChatSidebar, TAB_ORDER, EDGE_ZONE, LOCK_THRESHOLD, SWIPE_MIN_X, SWIPE_MAX_Y, SWIPE_MAX_TIME, useActivityStore, useInspectorStore, TABS, MOBILE_HAMBURGER_NAV_ITEMS, _setOpen, MemoizedChatHeader, LANGUAGE_ALIASES, highlighterPromise, TableRenderContext, INITIAL_COMPONENTS, MemoizedMarkdownBlock, Markdown2, WORDS_PER_TICK, TICK_INTERVAL_MS, STUCK_SENDING_THRESHOLD_MS, TOOL_DISPLAY_LABELS, TOOL_ICONS, MemoizedMessageItem, MotionButton, NEAR_BOTTOM_THRESHOLD$1, THINKING_GRACE_PERIOD_MS, TOOL_STATUS_MAP, NEAR_BOTTOM_THRESHOLD, HIDDEN_SYSTEM_USER_PREFIXES, MemoizedChatMessageList, SUGGESTIONS, PromptInputContext, globalPromptTarget, isGlobalListenerBound, Autocomplete, useAutocompleteFilter, CommandDialog, CommandDialogPortal, SLASH_COMMANDS, SlashCommandMenu, MOBILE_TAB_BAR_OFFSET, STORAGE_KEY$2, MODEL_SWITCH_BLOCKED_TOAST, LOCAL_PROVIDERS_SET, MAX_ATTACHMENT_FILE_SIZE, MAX_IMAGE_DIMENSION, IMAGE_QUALITY, MAX_TRANSPORT_IMAGE_SIZE, IMAGE_EXTENSION_TO_MIME, TEXT_EXTENSION_TO_MIME, MemoizedChatComposer, PORTABLE_HISTORY_STORAGE_KEY$1, PORTABLE_HISTORY_LIMIT, _streamingPersistTimer, createEmptyStreamingState, WAITING_TTL_MS, WAITING_STORAGE_PREFIX, realtimeMessageSequence, LIFECYCLE_PREFIX_EMOJIS, _restoredWaiting, useChatStore, PORTABLE_HISTORY_STORAGE_KEY, EMPTY_MESSAGES, EMPTY_TOOL_CALLS, EMPTY_LIFECYCLE_EVENTS, NOTES, STORAGE_KEY$1, DEFAULT_VOLUME, audioContext, prefs, ACTIVE_STATUSES, defaultChatUiState, chatUiQueryKey, MAX_TITLE_LENGTH, GENERIC_TITLE_PATTERNS, POLL_MS$1, STORAGE_KEY, THRESHOLDS, PreviewCard, POLL_MS2, EMPTY5, ContextBar, APPROVALS_KEY, QUEUED_WRAPPER_MARKER, QUEUED_HEADER_REGEX, QUEUED_MARKER_REGEX, LANGUAGE_MAP, ROOT_LABEL, TerminalWorkspace$1, MAX_VIEWPORT_RATIO, dayFormatter, timeFormatter, ContextAlertModal, AUTO_DISMISS_MS, externalPush, _localModelOverride, _noopSetActivity, commandHelpers, chatScreen, POLL_INTERVAL_MS3, FLASH_DURATION_MS, OPEN_THRESHOLD, CLOSE_THRESHOLD, CLOSE_DEBOUNCE_MS, SCREEN_GROUP_ORDER, TerminalWorkspace2, DESKTOP_SIDEBAR_BACKDROP_CLASS, STORAGE_KEY_SEEN, tourSteps, TOUR_STORAGE_KEY, ACCENT_COLORS, isMac2, MOD, SHORTCUT_GROUPS, CHECK_INTERVAL_MS, DISMISS_PREFIX, NOTES_KEY, NOTES_SEEN_KEY, KNOWN_PROVIDER_PREFIXES, ONBOARDING_KEY, ONBOARDING_COMPLETE_EVENT, PROVIDERS$1, ErrorBoundary, APP_CSP, THEME_STORAGE_KEY, DEFAULT_THEME, VALID_THEMES, themeScript, themeColorScript, Route$1R, queryClient, $$splitErrorComponentImporter$5, $$splitComponentImporter$j, Route$1Q, $$splitComponentImporter$i, searchSchema, Route$1P, $$splitErrorComponentImporter$4, $$splitComponentImporter$h, Route$1O, $$splitErrorComponentImporter$3, $$splitComponentImporter$g, Route$1N, $$splitComponentImporter$f, Route$1M, $$splitComponentImporter$e, Route$1L, $$splitComponentImporter$d, Route$1K, $$splitErrorComponentImporter$2, $$splitComponentImporter$c, Route$1J, $$splitComponentImporter$b, Route$1I, $$splitComponentImporter$a, Route$1H, $$splitErrorComponentImporter$1, $$splitComponentImporter$9, Route$1G, $$splitComponentImporter$8, Route$1F, $$splitComponentImporter$7, Route$1E, $$splitComponentImporter$6, Route$1D, $$splitComponentImporter$5, Route$1C, SETTINGS_NAV_ITEMS, $$splitComponentImporter$4, VALID_SECTION_IDS, Route$1B, $$splitComponentImporter$3, Route$1A, $$splitComponentImporter$2, Route$1z, $$splitComponentImporter$1, Route$1y, $$splitErrorComponentImporter, $$splitComponentImporter, Route$1x, STORE_FILE, TOKEN_TTL_MS, _tokens, initial, Route$1w, sessions, __dirname_resolved, PTY_HELPER, store$1, Route$1v, Route$1u, Route$1t, Route$1s, TMUX_BIN_CANDIDATES$4, Route$1r, TMUX_BIN_CANDIDATES$3, Route$1q, TMUX_BIN_CANDIDATES$2, Route$1p, getClaudeRoot$1, getWorkspaceClaudeHome, getProfileClaudeHome, SwarmWorkerStateSchema, SwarmCheckpointStatusSchema, SwarmTaskSourceSchema, SwarmArtifactKindSchema, SwarmArtifactSourceSchema, SwarmPreviewSourceSchema, SwarmPreviewStatusSchema, SwarmHistorySourceSchema, SwarmSessionTransportSchema, SwarmDispatchModeSchema, SwarmPluginScopeSchema, RuntimeTaskMetadataSchema, RuntimeArtifactMetadataSchema, RuntimePreviewMetadataSchema, RuntimeBoundarySchema, SwarmRuntimeSchema, SwarmPluginManifestSchema, SWARM_CANONICAL_REPO, SWARM_MEMORY_ROOT, SWARM_MEMORY_HANDOFFS, SWARM_FORBIDDEN_PATHS, SWARM_ROSTER_PATH, SwarmRosterWorkerSchema, SwarmRosterSchema, SwarmRosterUpsertSchema, SWARM_MODE_PATH, Route$1o, Route$1n, SWARM_MISSIONS_PATH, Route$1m, Route$1l, LABELS, STATE_MAP, PYTHON_SCRIPT, SWARM_SHARED_MEMORY_ROOT, SWARM_SHARED_HANDOFF_ROOT, ACTIVE_RUNS_KEY, BUS_KEY, ORCHESTRATOR_WORKER_ID, ORCHESTRATOR_TMUX_SESSION, MAIN_SESSION_KEY, Route$1k, Route$1j, MEMORY_KINDS, EVENT_TYPES, Route$1i, DEFAULT_POLICY, PYTHON_STATUS, Route$1h, SWARM_KANBAN_LANES, HERMES_HOME, SWARM_KANBAN_FILE, localBackend, claudeBackend, CreateCardSchema, UpdateCardSchema, Route$1g, Route$1f, Route$1e, MAX_PROMPT_CHARS, MAX_OUTPUT_CHARS$1, DEFAULT_TIMEOUT_S, MAX_TIMEOUT_S, TMUX_BIN_CANDIDATES$1, Route$1d, MAX_OUTPUT_CHARS, DEFAULT_LIMIT$1, DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, TMUX_BIN_CANDIDATES, Route$1c, _initialOverrides, CLAUDE_API2, CLAUDE_DASHBOARD_URL, CLAUDE_UPGRADE_INSTRUCTIONS, SESSIONS_API_UNAVAILABLE_MESSAGE, PROBE_TIMEOUT_MS$1, PROBE_TTL_MS$1, DASHBOARD_TOKEN_REGEX, capabilities, probePromise$1, lastProbeAt, lastLoggedSummary, dashboardTokenPromise, dashboardTokenCache, BEARER_TOKEN$1, DASHBOARD_BEARER_TOKEN, loggedHtmlScrapeFallback, OPTIONAL_APIS, SYSTEM, Route$1b, CheckpointBodySchema, Route$1a, MAX_LIMIT, DEFAULT_LIMIT2, Route$19, CLAUDE_HEALTH_TIMEOUT_MS, CLAUDE_START_PORT, startPromise, Route$18, Route$17, KNOWN_CATEGORIES, FEATURED_SKILLS, Route$16, _authHeaders, DATA_DIR$1, SESSIONS_FILE, MAX_MESSAGES_PER_SESSION, store, saveTimer, Route$15, SYNTHETIC_SESSION_KEYS, Route$14, Route$13, Route$12, RUNS_ROOT, LOCAL_PROVIDERS, PROBE_TTL_MS, PROBE_TIMEOUT_MS, discoveryState, lastProbeAll, probePromise, CONFIG_PATH$4, loggedWarnings, BEARER_TOKEN, _cachedDefaultModel, SEND_STREAM_RUN_TIMEOUT_MS, SESSION_BOOTSTRAP_KEYS, Route$11, Route$10, MAX_BYTES, MIME_BY_EXT, Route$$, Route$_, Route$Z, CLAUDE_HOME$4, Route$Y, CLAUDE_HOME$3, MODELS_PATH, CONFIG_PATH$3, DEFAULT_ACCEPTED_TIMEOUT_S, DEFAULT_HANDOFF_TIMEOUT_S, Route$X, Route$W, Route$V, HONCHO_ENV_KEYS, HONCHO_CONFIG_KEYS, BYTEROVER_ENV_KEYS, BYTEROVER_CONFIG_KEYS, Route$U, Route$T, Route$S, execFileAsync$1, WORKSPACE_ROOT, IGNORED_DIRS, MAX_DIRECTORY_DEPTH, MAX_DIRECTORY_ENTRIES, Route$R, Route$Q, Route$P, MODEL_CONTEXT_WINDOWS, CHARS_PER_TOKEN, Route$O, CONFIG_PATH$2, Route$N, Route$M, Route$L, cachedSkill, Route$K, UPDATE_REMOTE_DEFINITIONS, Route$J, CLAUDE_HOME$2, CONFIG_PATH$1, PROFILES_PATH, Route$I, CLAUDE_HOME$1, TASKS_FILE, Route$H, Route$G, CLAUDE_HOME, CONFIG_PATH, ENV_PATH, PROVIDERS, Route$F, Route$E, Route$D, AuthSchema, Route$C, DATA_DIR, INDEX_FILE, index3, Route$B, Route$A, Route$z, Route$y, Route$x, Route$w, Route$v, Route$u, execFileAsync, Route$t, Route$s, Route$r, Route$q, Route$p, Route$o, Route$n, Route$m, Route$l, BodySchema$1, Route$k, BodySchema, Route$j, Route$i, Route$h, Route$g, Route$f, Route$e, Route$d, RELOAD_PATHS, Route$c, DEFAULT_CONFIG, knowledgeConfig, GitHubKnowledgeProvider, Route$b, Route$a, Route$9, Route$8, Route$7, Route$6, Route$5, Route$4, Route$3, Route$2, Route$1, Route2, TerminalRoute2, TasksRoute2, Swarm2Route2, SwarmRoute2, SkillsRoute2, SettingsRoute2, ProfilesRoute2, OperationsRoute2, MemoryRoute2, JobsRoute2, FilesRoute2, DashboardRoute2, ConductorRoute, SplatRoute, IndexRoute2, SettingsIndexRoute, ChatIndexRoute2, SettingsProvidersRoute2, SettingsMcpRoute2, ChatSessionKeyRoute, ApiWorkspaceRoute, ApiTerminalStreamRoute, ApiTerminalResizeRoute, ApiTerminalInputRoute, ApiTerminalCloseRoute, ApiSwarmTmuxStopRoute, ApiSwarmTmuxStartRoute, ApiSwarmTmuxScrollRoute, ApiSwarmRuntimeRoute, ApiSwarmRosterRoute, ApiSwarmReportsRoute, ApiSwarmProjectRoute, ApiSwarmOrchestratorLoopRoute, ApiSwarmMissionsRoute, ApiSwarmMemoryRoute, ApiSwarmLifecycleRoute, ApiSwarmKanbanRoute, ApiSwarmHealthRoute, ApiSwarmEnvironmentRoute, ApiSwarmDispatchRoute, ApiSwarmDirectChatRoute, ApiSwarmDecomposeRoute, ApiSwarmCheckpointRoute, ApiSwarmChatRoute, ApiStartClaudeRoute, ApiStartAgentRoute, ApiSkillsRoute, ApiSessionsRoute, ApiSessionStatusRoute, ApiSessionSendRoute, ApiSessionHistoryRoute, ApiSendStreamRoute, ApiSendRoute, ApiPreviewFileRoute, ApiPluginsRoute, ApiPingRoute, ApiPathsRoute, ApiModelsRoute, ApiMemoryRoute, ApiLocalProvidersRoute, ApiIntegrationsRoute, ApiHistoryRoute, ApiGatewayStatusRoute, ApiFilesRoute, ApiEventsRoute, ApiCrewStatusRoute, ApiContextUsageRoute, ApiConnectionStatusRoute, ApiConnectionSettingsRoute, ApiConductorStopRoute, ApiConductorSpawnRoute, ApiClaudeUpdateRoute, ApiClaudeTasksAssigneesRoute, ApiClaudeTasksRoute, ApiClaudeJobsRoute, ApiClaudeConfigRoute, ApiChatEventsRoute, ApiAuthCheckRoute, ApiAuthRoute, ApiArtifactsRoute, ApiUpdateWorkspaceRoute, ApiUpdateStatusRoute, ApiUpdateAgentRoute, ApiSwarmMemorySearchRoute, ApiSkillsUninstallRoute, ApiSkillsToggleRoute, ApiSkillsInstallRoute, ApiSkillsHubSearchRoute, ApiSessionsSendRoute, ApiProfilesUpdateRoute, ApiProfilesRenameRoute, ApiProfilesReadRoute, ApiProfilesListRoute, ApiProfilesDeleteRoute, ApiProfilesCreateRoute, ApiProfilesActivateRoute, ApiOauthPollTokenRoute, ApiOauthDeviceCodeRoute, ApiModelInfoRoute, ApiMemoryWriteRoute, ApiMemorySearchRoute, ApiMemoryReadRoute, ApiMemoryListRoute, ApiMcpServersRoute, ApiMcpReloadRoute, ApiKnowledgeSyncRoute, ApiKnowledgeSearchRoute, ApiKnowledgeReadRoute, ApiKnowledgeListRoute, ApiKnowledgeGraphRoute, ApiKnowledgeConfigRoute, ApiClaudeTasksTaskIdRoute, ApiClaudeProxySplatRoute, ApiClaudeJobsJobIdRoute, ApiArtifactsArtifactIdRoute, ApiSessionsSessionKeyStatusRoute, ApiSessionsSessionKeyActiveRunRoute, SettingsRouteChildren, SettingsRouteWithChildren, ApiArtifactsRouteChildren, ApiArtifactsRouteWithChildren, ApiClaudeJobsRouteChildren, ApiClaudeJobsRouteWithChildren, ApiClaudeTasksRouteChildren, ApiClaudeTasksRouteWithChildren, ApiMemoryRouteChildren, ApiMemoryRouteWithChildren, ApiSessionsRouteChildren, ApiSessionsRouteWithChildren, ApiSkillsRouteChildren, ApiSkillsRouteWithChildren, ApiSwarmMemoryRouteChildren, ApiSwarmMemoryRouteWithChildren, rootRouteChildren, routeTree, getRouter, router;
+var init_router_Cj9uzHV0 = __esm({
+  "dist/server/assets/router-Cj9uzHV0.js"() {
     "use strict";
     init_esm5();
     import_jsx_runtime115 = __toESM(require_jsx_runtime(), 1);
@@ -245445,7 +246328,7 @@ var init_router_D782sBjg = __esm({
     import_yaml24 = __toESM(require_dist2(), 1);
     import_node_util = require("node:util");
     import_meta = {};
-    appCss = "/assets/styles-BWIm8aPT.css";
+    appCss = "/assets/styles-D92LGV4Y.css";
     buttonVariants = cva(
       "relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0] select-none duration-150",
       {
@@ -245896,7 +246779,7 @@ var init_router_D782sBjg = __esm({
       config: "Configuration",
       jobs: "Jobs"
     };
-    KNOWN_PROVIDER_PREFIXES = [
+    KNOWN_PROVIDER_PREFIXES$1 = [
       "openrouter",
       "anthropic",
       "openai",
@@ -247955,7 +248838,7 @@ var init_router_D782sBjg = __esm({
     };
     ROOT_LABEL = "Workspace";
     TerminalWorkspace$1 = (0, import_react89.lazy)(
-      () => Promise.resolve().then(() => (init_terminal_workspace_BmOOuNxn(), terminal_workspace_BmOOuNxn_exports)).then((m5) => ({
+      () => Promise.resolve().then(() => (init_terminal_workspace_BlWWS9F8(), terminal_workspace_BlWWS9F8_exports)).then((m5) => ({
         default: m5.TerminalWorkspace
       }))
     );
@@ -248001,7 +248884,7 @@ var init_router_D782sBjg = __esm({
       "Slash Commands"
     ];
     TerminalWorkspace2 = (0, import_react89.lazy)(
-      () => Promise.resolve().then(() => (init_terminal_workspace_BmOOuNxn(), terminal_workspace_BmOOuNxn_exports)).then((m5) => ({
+      () => Promise.resolve().then(() => (init_terminal_workspace_BlWWS9F8(), terminal_workspace_BlWWS9F8_exports)).then((m5) => ({
         default: m5.TerminalWorkspace
       }))
     );
@@ -248140,8 +249023,74 @@ var init_router_D782sBjg = __esm({
     DISMISS_PREFIX = "hermes-update-v2-dismissed:";
     NOTES_KEY = "hermes-update-v2-release-notes";
     NOTES_SEEN_KEY = "hermes-update-v2-release-notes-seen";
+    KNOWN_PROVIDER_PREFIXES = [
+      "openrouter",
+      "anthropic",
+      "openai",
+      "openai-codex",
+      "nous",
+      "ollama",
+      "atomic-chat",
+      "zai",
+      "kimi-coding",
+      "minimax",
+      "minimax-cn"
+    ];
     ONBOARDING_KEY = "claude-onboarding-complete";
     ONBOARDING_COMPLETE_EVENT = "claude:onboarding-complete";
+    PROVIDERS$1 = [
+      {
+        id: "nous",
+        name: "Nous Portal",
+        logo: "/providers/nous.png",
+        desc: "Free via OAuth",
+        authType: "oauth"
+      },
+      {
+        id: "openai-codex",
+        name: "OpenAI Codex",
+        logo: "/providers/openai.png",
+        desc: "Free via ChatGPT Pro",
+        authType: "oauth"
+      },
+      {
+        id: "anthropic",
+        name: "Anthropic",
+        logo: "/providers/anthropic.png",
+        desc: "API key required",
+        authType: "api_key",
+        envKey: "ANTHROPIC_API_KEY"
+      },
+      {
+        id: "openrouter",
+        name: "OpenRouter",
+        logo: "/providers/openrouter.png",
+        desc: "API key required",
+        authType: "api_key",
+        envKey: "OPENROUTER_API_KEY"
+      },
+      {
+        id: "ollama",
+        name: "Ollama",
+        logo: "/providers/ollama.png",
+        desc: "Local models, no key needed",
+        authType: "none"
+      },
+      {
+        id: "atomic-chat",
+        name: "Atomic Chat",
+        logo: "/providers/atomic-chat.png",
+        desc: "Local LLMs via Atomic Chat desktop app",
+        authType: "none"
+      },
+      {
+        id: "custom",
+        name: "Custom (OpenAI-compat)",
+        logo: "/providers/openai.png",
+        desc: "Any OpenAI-compatible endpoint",
+        authType: "custom"
+      }
+    ];
     ErrorBoundary = class extends import_react89.Component {
       state = {
         error: null
@@ -248348,9 +249297,9 @@ var init_router_D782sBjg = __esm({
       }
     });
     queryClient = new QueryClient();
-    $$splitErrorComponentImporter$5 = () => Promise.resolve().then(() => (init_terminal_D2yswMvn(), terminal_D2yswMvn_exports));
-    $$splitComponentImporter$j = () => Promise.resolve().then(() => (init_terminal_CJEnQzM(), terminal_CJEnQzM_exports));
-    (0, import_react89.lazy)(() => Promise.resolve().then(() => (init_terminal_workspace_BmOOuNxn(), terminal_workspace_BmOOuNxn_exports)).then((m5) => ({
+    $$splitErrorComponentImporter$5 = () => Promise.resolve().then(() => (init_terminal_SsWdM02o(), terminal_SsWdM02o_exports));
+    $$splitComponentImporter$j = () => Promise.resolve().then(() => (init_terminal_DgW86kPi(), terminal_DgW86kPi_exports));
+    (0, import_react89.lazy)(() => Promise.resolve().then(() => (init_terminal_workspace_BlWWS9F8(), terminal_workspace_BlWWS9F8_exports)).then((m5) => ({
       default: m5.TerminalWorkspace
     })));
     Route$1Q = createFileRoute("/terminal")({
@@ -248358,7 +249307,7 @@ var init_router_D782sBjg = __esm({
       component: lazyRouteComponent($$splitComponentImporter$j, "component"),
       errorComponent: lazyRouteComponent($$splitErrorComponentImporter$5, "errorComponent")
     });
-    $$splitComponentImporter$i = () => Promise.resolve().then(() => (init_tasks_D4c6HCNa(), tasks_D4c6HCNa_exports));
+    $$splitComponentImporter$i = () => Promise.resolve().then(() => (init_tasks_Cm1nkjq3(), tasks_Cm1nkjq3_exports));
     searchSchema = external_exports.object({
       assignee: external_exports.string().optional()
     });
@@ -248368,7 +249317,7 @@ var init_router_D782sBjg = __esm({
       component: lazyRouteComponent($$splitComponentImporter$i, "component")
     });
     $$splitErrorComponentImporter$4 = () => Promise.resolve().then(() => (init_swarm2_B4_GKSK4(), swarm2_B4_GKSK4_exports));
-    $$splitComponentImporter$h = () => Promise.resolve().then(() => (init_swarm2_DC7DvsWU(), swarm2_DC7DvsWU_exports));
+    $$splitComponentImporter$h = () => Promise.resolve().then(() => (init_swarm2_DLyR2Rjf(), swarm2_DLyR2Rjf_exports));
     Route$1O = createFileRoute("/swarm2")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$h, "component"),
@@ -248381,7 +249330,7 @@ var init_router_D782sBjg = __esm({
       }
     });
     $$splitErrorComponentImporter$3 = () => Promise.resolve().then(() => (init_swarm_B_mpBx1j(), swarm_B_mpBx1j_exports));
-    $$splitComponentImporter$g = () => Promise.resolve().then(() => (init_swarm_CkvqtzB0(), swarm_CkvqtzB0_exports));
+    $$splitComponentImporter$g = () => Promise.resolve().then(() => (init_swarm_ChCuOQEm(), swarm_ChCuOQEm_exports));
     Route$1N = createFileRoute("/swarm")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$g, "component"),
@@ -248393,7 +249342,7 @@ var init_router_D782sBjg = __esm({
         ] }) });
       }
     });
-    $$splitComponentImporter$f = () => Promise.resolve().then(() => (init_skills_Bynpdqg3(), skills_Bynpdqg3_exports));
+    $$splitComponentImporter$f = () => Promise.resolve().then(() => (init_skills_RIderI9J(), skills_RIderI9J_exports));
     Route$1M = createFileRoute("/skills")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$f, "component")
@@ -248403,13 +249352,13 @@ var init_router_D782sBjg = __esm({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$e, "component")
     });
-    $$splitComponentImporter$d = () => Promise.resolve().then(() => (init_profiles_ComEyJgF(), profiles_ComEyJgF_exports));
+    $$splitComponentImporter$d = () => Promise.resolve().then(() => (init_profiles_DM_qxbxv(), profiles_DM_qxbxv_exports));
     Route$1K = createFileRoute("/profiles")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$d, "component")
     });
     $$splitErrorComponentImporter$2 = () => Promise.resolve().then(() => (init_operations_3owDm1nP(), operations_3owDm1nP_exports));
-    $$splitComponentImporter$c = () => Promise.resolve().then(() => (init_operations_DDtUOc9i(), operations_DDtUOc9i_exports));
+    $$splitComponentImporter$c = () => Promise.resolve().then(() => (init_operations_DysBcEt2(), operations_DysBcEt2_exports));
     Route$1J = createFileRoute("/operations")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$c, "component"),
@@ -248421,18 +249370,18 @@ var init_router_D782sBjg = __esm({
         ] }) });
       }
     });
-    $$splitComponentImporter$b = () => Promise.resolve().then(() => (init_memory_LlpttdUM(), memory_LlpttdUM_exports));
+    $$splitComponentImporter$b = () => Promise.resolve().then(() => (init_memory_CaXCTU2X(), memory_CaXCTU2X_exports));
     Route$1I = createFileRoute("/memory")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$b, "component")
     });
-    $$splitComponentImporter$a = () => Promise.resolve().then(() => (init_jobs_D6DjTRrI(), jobs_D6DjTRrI_exports));
+    $$splitComponentImporter$a = () => Promise.resolve().then(() => (init_jobs_BmVLkiMf(), jobs_BmVLkiMf_exports));
     Route$1H = createFileRoute("/jobs")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$a, "component")
     });
     $$splitErrorComponentImporter$1 = () => Promise.resolve().then(() => (init_files_BGh74Zbd(), files_BGh74Zbd_exports));
-    $$splitComponentImporter$9 = () => Promise.resolve().then(() => (init_files_6GxNdR1j(), files_6GxNdR1j_exports));
+    $$splitComponentImporter$9 = () => Promise.resolve().then(() => (init_files_DY_N6ais(), files_DY_N6ais_exports));
     Route$1G = createFileRoute("/files")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$9, "component"),
@@ -248444,16 +249393,16 @@ var init_router_D782sBjg = __esm({
         ] }) });
       }
     });
-    $$splitComponentImporter$8 = () => Promise.resolve().then(() => (init_dashboard_D7foVSvc(), dashboard_D7foVSvc_exports));
+    $$splitComponentImporter$8 = () => Promise.resolve().then(() => (init_dashboard_C_vn1bB7(), dashboard_C_vn1bB7_exports));
     Route$1F = createFileRoute("/dashboard")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$8, "component")
     });
-    $$splitComponentImporter$7 = () => Promise.resolve().then(() => (init_conductor_DgxQAXgw(), conductor_DgxQAXgw_exports));
+    $$splitComponentImporter$7 = () => Promise.resolve().then(() => (init_conductor_By6X7ppw(), conductor_By6X7ppw_exports));
     Route$1E = createFileRoute("/conductor")({
       component: lazyRouteComponent($$splitComponentImporter$7, "component")
     });
-    $$splitComponentImporter$6 = () => Promise.resolve().then(() => (init_mjO19xs2(), mjO19xs2_exports));
+    $$splitComponentImporter$6 = () => Promise.resolve().then(() => (init_BgJRnkWa(), BgJRnkWa_exports));
     Route$1D = createFileRoute("/$")({
       component: lazyRouteComponent($$splitComponentImporter$6, "component")
     });
@@ -248481,7 +249430,7 @@ var init_router_D782sBjg = __esm({
       { id: "mcp", label: "MCP Servers" },
       { id: "language", label: "Language" }
     ];
-    $$splitComponentImporter$4 = () => Promise.resolve().then(() => (init_index_Bce5eegV(), index_Bce5eegV_exports));
+    $$splitComponentImporter$4 = () => Promise.resolve().then(() => (init_index_n2ldLY0(), index_n2ldLY0_exports));
     VALID_SECTION_IDS = SETTINGS_NAV_ITEMS.map((item) => item.id);
     Route$1B = createFileRoute("/settings/")({
       ssr: false,
@@ -248517,18 +249466,18 @@ var init_router_D782sBjg = __esm({
       },
       component: lazyRouteComponent($$splitComponentImporter$3, "component")
     });
-    $$splitComponentImporter$2 = () => Promise.resolve().then(() => (init_providers_BJngL_CB(), providers_BJngL_CB_exports));
+    $$splitComponentImporter$2 = () => Promise.resolve().then(() => (init_providers_yfV4dGDs(), providers_yfV4dGDs_exports));
     Route$1z = createFileRoute("/settings/providers")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$2, "component")
     });
-    $$splitComponentImporter$1 = () => Promise.resolve().then(() => (init_mcp_KfURU4SQ(), mcp_KfURU4SQ_exports));
+    $$splitComponentImporter$1 = () => Promise.resolve().then(() => (init_mcp_CTAd3h3K(), mcp_CTAd3h3K_exports));
     Route$1y = createFileRoute("/settings/mcp")({
       ssr: false,
       component: lazyRouteComponent($$splitComponentImporter$1, "component")
     });
     $$splitErrorComponentImporter = () => Promise.resolve().then(() => (init_sessionKey_7UVP78H7(), sessionKey_7UVP78H7_exports));
-    $$splitComponentImporter = () => Promise.resolve().then(() => (init_sessionKey_u0HJAo0A(), sessionKey_u0HJAo0A_exports));
+    $$splitComponentImporter = () => Promise.resolve().then(() => (init_sessionKey_Dio6h6ok(), sessionKey_Dio6h6ok_exports));
     Route$1x = createFileRoute("/chat/$sessionKey")({
       component: lazyRouteComponent($$splitComponentImporter, "component"),
       // Disable SSR to prevent hydration mismatches from async data
@@ -259728,7 +260677,7 @@ function getResponse() {
   return event2.res;
 }
 async function getStartManifest(matchedRoutes) {
-  const { tsrStartManifest: tsrStartManifest2 } = await Promise.resolve().then(() => (init_tanstack_start_manifest_v_Dp0WKoRS(), tanstack_start_manifest_v_Dp0WKoRS_exports));
+  const { tsrStartManifest: tsrStartManifest2 } = await Promise.resolve().then(() => (init_tanstack_start_manifest_v_B53qh2mt(), tanstack_start_manifest_v_B53qh2mt_exports));
   const startManifest = tsrStartManifest2();
   const rootRoute = startManifest.routes[rootRouteId2] = startManifest.routes[rootRouteId2] || {};
   rootRoute.assets = rootRoute.assets || [];
@@ -260304,7 +261253,7 @@ var entriesPromise;
 var baseManifestPromise;
 var cachedFinalManifestPromise;
 async function loadEntries() {
-  const routerEntry = await Promise.resolve().then(() => (init_router_D782sBjg(), router_D782sBjg_exports)).then((n2) => n2.Z);
+  const routerEntry = await Promise.resolve().then(() => (init_router_Cj9uzHV0(), router_Cj9uzHV0_exports)).then((n2) => n2.Z);
   const startEntry = await Promise.resolve().then(() => (init_start_HYkvq4Ni(), start_HYkvq4Ni_exports));
   return { startEntry, routerEntry };
 }
