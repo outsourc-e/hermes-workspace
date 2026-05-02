@@ -5,7 +5,9 @@ import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { OpsStrip } from './components/ops-strip'
 import { ModelInfoCard } from './components/model-info-card'
 import { AchievementsCard } from './components/achievements-card'
-import { AnalyticsSummaryCard } from './components/analytics-summary-card'
+import { HeroMetrics } from './components/hero-metrics'
+import { AnalyticsHeroCard } from './components/analytics-hero-card'
+import { LogsTailCard } from './components/logs-tail-card'
 import {
   Area,
   AreaChart,
@@ -732,49 +734,22 @@ export function DashboardScreen() {
         platforms={overview?.platforms ?? []}
       />
 
-      {/* ── Metrics Row ── */}
-      {sessionsAvailable ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <MetricTile
-            label="Sessions"
-            value={formatNumber(stats.totalSessions)}
-            icon="💬"
-            accentColor={palette.accent}
-          />
-          <MetricTile
-            label="Messages"
-            value={formatNumber(stats.totalMessages)}
-            icon="✉️"
-            accentColor={palette.success}
-          />
-          <MetricTile
-            label="Tool Calls"
-            value={formatNumber(stats.totalToolCalls)}
-            icon="🔧"
-            accentColor={palette.warning}
-          />
-          <MetricTile
-            label="Tokens"
-            value={formatNumber(stats.totalTokens)}
-            sub={
-              overview?.analytics?.estimatedCostUsd != null
-                ? `$${overview.analytics.estimatedCostUsd.toFixed(2)} · ${overview.analytics.windowDays}d`
-                : undefined
-            }
-            icon="⚡"
-            accentColor={palette.accentSecondary}
-          />
-        </div>
-      ) : (
-        <UnavailableWidget
-          title="Workspace Analytics"
-          description={getUnavailableReason('sessions')}
-        />
-      )}
+      {/* ── Hero Metrics (real analytics-backed KPIs with sparklines) ── */}
+      <HeroMetrics
+        analytics={overview?.analytics ?? null}
+        fallback={{
+          sessions: stats.totalSessions,
+          messages: stats.totalMessages,
+          toolCalls: stats.totalToolCalls,
+          tokens: stats.totalTokens,
+        }}
+      />
 
-      {/* ── Primary content: Recent Sessions wide, side rail with Model/Skills/Achievements ── */}
+      {/* ── Analytics hero (daily mix + top models, modal expand) ── */}
+      <AnalyticsHeroCard analytics={overview?.analytics ?? null} />
+
+      {/* ── Primary content: Activity chart + side rail ── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        {/* Activity area */}
         <div className="flex flex-col gap-3 lg:col-span-8">
           {sessionsAvailable ? (
             <ActivityChart sessions={sessions} palette={palette} />
@@ -784,9 +759,8 @@ export function DashboardScreen() {
               description={getUnavailableReason('sessions')}
             />
           )}
-          <AnalyticsSummaryCard analytics={overview?.analytics ?? null} />
+          <LogsTailCard logs={overview?.logs ?? null} />
         </div>
-        {/* Side rail */}
         <div className="flex flex-col gap-3 lg:col-span-4">
           <ModelInfoCard
             modelInfo={overview?.modelInfo ?? null}

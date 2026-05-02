@@ -181,7 +181,83 @@ describe('buildDashboardOverview', () => {
     })
   })
 
-  it('sorts top models by tokens and limits to 3', async () => {
+  it('parses native Hermes analytics shape (totals + by_model + daily)', async () => {
+    const fetcher = makeFetcher({
+      '/api/analytics/usage': {
+        period_days: 30,
+        totals: {
+          total_input: 245_000_000,
+          total_output: 1_200_000,
+          total_cache_read: 184_000_000,
+          total_reasoning: 250_000,
+          total_estimated_cost: 0.05,
+          total_actual_cost: 0,
+          total_sessions: 788,
+          total_api_calls: 2760,
+        },
+        by_model: [
+          {
+            model: 'gpt-5.4',
+            input_tokens: 161_000_000,
+            output_tokens: 600_000,
+            estimated_cost: 0.02,
+            sessions: 113,
+            api_calls: 1370,
+          },
+          {
+            model: 'claude-opus-4-6',
+            input_tokens: 39_000_000,
+            output_tokens: 320_000,
+            estimated_cost: 0,
+            sessions: 507,
+            api_calls: 0,
+          },
+        ],
+        daily: [
+          {
+            day: '2026-04-18',
+            input_tokens: 38_000_000,
+            output_tokens: 86_000,
+            cache_read_tokens: 4_300_000,
+            reasoning_tokens: 18_000,
+            estimated_cost: 0,
+            sessions: 9,
+            api_calls: 0,
+          },
+          {
+            day: '2026-04-19',
+            input_tokens: 6_700_000,
+            output_tokens: 24_000,
+            cache_read_tokens: 1_100_000,
+            reasoning_tokens: 8_000,
+            estimated_cost: 0,
+            sessions: 4,
+            api_calls: 0,
+          },
+        ],
+      },
+    })
+    const overview = await buildDashboardOverview({ fetcher })
+    expect(overview.analytics?.source).toBe('analytics')
+    expect(overview.analytics?.inputTokens).toBe(245_000_000)
+    expect(overview.analytics?.cacheReadTokens).toBe(184_000_000)
+    expect(overview.analytics?.totalSessions).toBe(788)
+    expect(overview.analytics?.totalApiCalls).toBe(2760)
+    expect(overview.analytics?.totalTokens).toBe(245_000_000 + 1_200_000)
+    expect(overview.analytics?.estimatedCostUsd).toBe(0.05)
+    expect(overview.analytics?.topModels.map((m) => m.id)).toEqual([
+      'gpt-5.4',
+      'claude-opus-4-6',
+    ])
+    expect(overview.analytics?.daily).toHaveLength(2)
+    expect(overview.analytics?.daily[0]).toMatchObject({
+      day: '2026-04-18',
+      inputTokens: 38_000_000,
+      sessions: 9,
+    })
+  })
+
+  it('falls back to legacy analytics shape (top_models + total_tokens)', async () => {
     const fetcher = makeFetcher({
       '/api/analytics/usage': {
         total_tokens: 5_000_000,
@@ -201,7 +277,28 @@ describe('buildDashboardOverview', () => {
       'opus-4-7',
       'gpt-5.4',
       'sonnet-4-6',
+      'gpt-5.5',
     ])
+  })
+
+  it('parses log tail with error/warn detection', async () => {
+    const fetcher = makeFetcher({
+      '/api/logs': {
+        file: 'agent',
+        lines: [
+          'INFO  starting up\n',
+          'WARN  deprecated config key\n',
+          'ERROR  KeyboardInterrupt\n',
+          'Traceback (most recent call last):\n',
+          'INFO  recovered\n',
+        ],
+      },
+    })
+    const overview = await buildDashboardOverview({ fetcher, logsLimit: 10 })
+    expect(overview.logs?.file).toBe('agent')
+    expect(overview.logs?.lines).toHaveLength(5)
+    expect(overview.logs?.errorCount).toBe(2)
+    expect(overview.logs?.warnCount).toBe(1)
   })
 
   it('survives mixed-status inputs (some succeed, some fail)', async () => {

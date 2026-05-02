@@ -34,13 +34,18 @@ export const Route = createFileRoute('/api/dashboard/overview')({
         }
         try {
           const url = new URL(request.url)
-          const days = Number(url.searchParams.get('days') ?? '7')
+          const days = Number(url.searchParams.get('days') ?? '30')
           const limit = Number(url.searchParams.get('achievements') ?? '3')
+          const logsLimit = Number(url.searchParams.get('logs') ?? '24')
           const overview = await buildDashboardOverview({
             fetcher: overviewFetcher,
-            analyticsWindowDays: Number.isFinite(days) && days > 0 ? days : 7,
+            analyticsWindowDays: Number.isFinite(days) && days > 0 ? days : 30,
             achievementsLimit:
               Number.isFinite(limit) && limit > 0 ? Math.min(limit, 12) : 3,
+            logsLimit:
+              Number.isFinite(logsLimit) && logsLimit > 0
+                ? Math.min(logsLimit, 100)
+                : 24,
           })
           return json(overview, {
             headers: {
