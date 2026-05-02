@@ -19,6 +19,9 @@ import {
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { ActiveModelKpi } from './components/active-model-kpi'
+import { WidgetShell } from './components/widget-shell'
+import { EditModePanel } from './components/edit-mode-panel'
+import { useDashboardLayout } from './lib/use-dashboard-layout'
 import {
   Area,
   AreaChart,
@@ -753,6 +756,9 @@ export function DashboardScreen() {
   })
   const skillsInstalled = skillsCountQuery.data ?? 0
 
+  // Per-user widget visibility + edit-mode state (localStorage backed).
+  const layout = useDashboardLayout()
+
   // Period selector for analytics; persists across navigation via
   // localStorage so refreshes don't reset the operator's preference.
   const [period, setPeriod] = useState<AnalyticsPeriod>(() => {
@@ -898,6 +904,29 @@ export function DashboardScreen() {
             onClick={() => navigate({ to: '/skills' })}
             disabled={!skillsAvailable}
           />
+          {/* Edit toggle: enters "layout edit mode" where each widget
+              shows an X button and a banner appears for re-adding
+              hidden widgets. Persisted to localStorage. */}
+          <button
+            type="button"
+            aria-label={layout.editMode ? 'Done editing layout' : 'Edit layout'}
+            title={layout.editMode ? 'Done editing layout' : 'Edit layout'}
+            onClick={layout.toggleEdit}
+            className="flex size-9 items-center justify-center rounded-lg border transition-colors hover:bg-[var(--theme-card)]/80"
+            style={{
+              borderColor: layout.editMode
+                ? 'var(--theme-accent)'
+                : 'var(--theme-border)',
+              background: layout.editMode
+                ? 'color-mix(in srgb, var(--theme-accent) 14%, transparent)'
+                : 'transparent',
+              color: layout.editMode
+                ? 'var(--theme-accent)'
+                : 'var(--theme-muted)',
+            }}
+          >
+            {layout.editMode ? '✓' : '✏️'}
+          </button>
           <button
             type="button"
             aria-label="Settings"
@@ -938,51 +967,86 @@ export function DashboardScreen() {
         }
       />
 
+      {/* ── Edit-mode banner (only renders when toggled). ── */}
+      <EditModePanel layout={layout} />
+
       {/* ── Analytics chart (left) + Top models card (right) ── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        <div className="lg:col-span-8">
-          <AnalyticsChartCard
-            analytics={overview?.analytics ?? null}
-            insights={overview?.insights ?? []}
-            period={period}
-            onPeriodChange={setPeriod}
-            loading={overviewQuery.isFetching}
-          />
-        </div>
-        <div className="lg:col-span-4">
-          <TopModelsCard analytics={overview?.analytics ?? null} />
-        </div>
+        {layout.isVisible('analytics_chart') ? (
+          <div className="lg:col-span-8">
+            <WidgetShell id="analytics_chart" layout={layout}>
+              <AnalyticsChartCard
+                analytics={overview?.analytics ?? null}
+                insights={overview?.insights ?? []}
+                period={period}
+                onPeriodChange={setPeriod}
+                loading={overviewQuery.isFetching}
+              />
+            </WidgetShell>
+          </div>
+        ) : null}
+        {layout.isVisible('top_models') ? (
+          <div
+            className={
+              layout.isVisible('analytics_chart')
+                ? 'lg:col-span-4'
+                : 'lg:col-span-12'
+            }
+          >
+            <WidgetShell id="top_models" layout={layout}>
+              <TopModelsCard analytics={overview?.analytics ?? null} />
+            </WidgetShell>
+          </div>
+        ) : null}
       </div>
 
       {/* ── Primary content: Sessions Intelligence (replaces 14d Activity) + side rail ── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         <div className="flex flex-col gap-3 lg:col-span-8">
-          {sessionsAvailable ? (
-            <SessionsIntelligenceCard sessions={sessionRows} />
-          ) : (
-            <UnavailableWidget
-              title="Recent Sessions"
-              description={getUnavailableReason('sessions')}
-            />
-          )}
-          <LogsTailCard logs={overview?.logs ?? null} />
+          {layout.isVisible('sessions_intelligence') ? (
+            <WidgetShell id="sessions_intelligence" layout={layout}>
+              {sessionsAvailable ? (
+                <SessionsIntelligenceCard sessions={sessionRows} />
+              ) : (
+                <UnavailableWidget
+                  title="Recent Sessions"
+                  description={getUnavailableReason('sessions')}
+                />
+              )}
+            </WidgetShell>
+          ) : null}
+          {layout.isVisible('logs_tail') ? (
+            <WidgetShell id="logs_tail" layout={layout}>
+              <LogsTailCard logs={overview?.logs ?? null} />
+            </WidgetShell>
+          ) : null}
         </div>
         {/* Side rail order per Eric's iteration-005 feedback:
             Attention is always first; Skills + Achievements move up;
             Active Model is now a hero KPI tile (not in the rail);
             Token mix + Hour of day fuse into one rhythm card. */}
         <div className="flex flex-col gap-3 lg:col-span-4">
-          <AttentionCard overview={overview} />
-          <SkillsUsageCard
-            usage={overview?.skillsUsage ?? null}
-            installedCount={skillsInstalled}
-            onOpen={() => navigate({ to: '/skills' })}
-          />
-          <AchievementsCard achievements={overview?.achievements ?? null} />
-          <TokenMixHourCard
-            analytics={overview?.analytics ?? null}
-            sessions={sessionRows}
-          />
+          <WidgetShell id="attention" layout={layout}>
+            <AttentionCard overview={overview} />
+          </WidgetShell>
+          <WidgetShell id="skills_usage" layout={layout}>
+            <SkillsUsageCard
+              usage={overview?.skillsUsage ?? null}
+              installedCount={skillsInstalled}
+              onOpen={() => navigate({ to: '/skills' })}
+            />
+          </WidgetShell>
+          <WidgetShell id="achievements" layout={layout}>
+            <AchievementsCard
+              achievements={overview?.achievements ?? null}
+            />
+          </WidgetShell>
+          <WidgetShell id="mix_rhythm" layout={layout}>
+            <TokenMixHourCard
+              analytics={overview?.analytics ?? null}
+              sessions={sessionRows}
+            />
+          </WidgetShell>
         </div>
       </div>
       </div>

@@ -127,9 +127,21 @@ export function AchievementsCard({
   return (
     <>
       <div
-        className="rounded-md border bg-[var(--theme-card)]/40 p-3"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="relative overflow-hidden rounded-xl border p-3"
+        style={{
+          background:
+            'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 92%, transparent))',
+          borderColor: 'var(--theme-border)',
+        }}
       >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
+          style={{
+            background:
+              'linear-gradient(90deg, #facc15, color-mix(in srgb, #facc15 40%, transparent), transparent)',
+          }}
+        />
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <HugeiconsIcon
@@ -139,18 +151,20 @@ export function AchievementsCard({
               style={{ color: 'var(--theme-muted)' }}
             />
             <h3
-              className="text-[10px] font-semibold uppercase tracking-[0.15em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: 'var(--theme-text)' }}
             >
               Achievements
             </h3>
           </div>
-          <span
-            className="text-[10px] font-mono uppercase tracking-[0.15em]"
+          <button
+            type="button"
+            onClick={openModal}
+            className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:text-[var(--theme-accent)]"
             style={{ color: 'var(--theme-muted)' }}
           >
-            {achievements.totalUnlocked} unlocked
-          </span>
+            {achievements.totalUnlocked} unlocked · view all →
+          </button>
         </div>
         <div className="space-y-1">
           {achievements.recentUnlocks.length === 0 ? (
@@ -166,17 +180,6 @@ export function AchievementsCard({
             ))
           )}
         </div>
-        <button
-          type="button"
-          onClick={openModal}
-          className="mt-2 w-full rounded border py-1 text-[10px] font-mono uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
-          style={{
-            borderColor: 'var(--theme-border)',
-            color: 'var(--theme-muted)',
-          }}
-        >
-          View all →
-        </button>
       </div>
 
       {showAll ? (
