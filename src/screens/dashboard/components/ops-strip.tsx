@@ -2,6 +2,18 @@ import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
+function formatPulse(iso: string | null): string {
+  if (!iso) return '—'
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return '—'
+  const diff = Date.now() - ms
+  if (diff < 0) return 'just now'
+  if (diff < 60_000) return '<1m ago'
+  if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`
+  return `${Math.round(diff / 86_400_000)}d ago`
+}
+
 const PLATFORM_GLYPH: Record<string, string> = {
   api_server: '🌐',
   telegram: '✈️',
@@ -136,6 +148,15 @@ export function OpsStrip({
           · {status.activeAgents} active{' '}
           {status.activeAgents === 1 ? 'run' : 'runs'}
         </span>
+        {status.lastHeartbeatAt ? (
+          <span
+            className="font-mono text-[9px] uppercase tracking-[0.15em]"
+            style={{ color: 'var(--theme-muted)' }}
+            title={`Last gateway heartbeat: ${status.lastHeartbeatAt}`}
+          >
+            · pulse {formatPulse(status.lastHeartbeatAt)}
+          </span>
+        ) : null}
         {status.restartRequested ? (
           <span
             className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em]"

@@ -81,6 +81,25 @@ export function formatModelName(raw: string): string {
  *   (now - 3h)    → "3h ago"
  *   (now - 2d)    → "2d ago"
  */
+/**
+ * Strip namespace prefixes from a skill identifier.
+ *
+ * Hermes' analytics returns ids like:
+ *   `autonomous-ai-agents:hermes-agent`
+ *   `software-development:systematic-debugging`
+ *   `creative:hermes-promo-scene-collage`
+ *
+ * The colon-prefixed namespace is noise on the dashboard. Show the
+ * trailing segment so labels stay readable.
+ */
+export function formatSkillName(raw: string): string {
+  if (!raw) return '—'
+  const trimmed = raw.trim()
+  if (!trimmed.includes(':') && !trimmed.includes('/')) return trimmed
+  const segments = trimmed.split(/[:\/]/)
+  return segments[segments.length - 1] || trimmed
+}
+
 export function formatRelativeTime(timestampMs: number): string {
   if (!timestampMs || timestampMs <= 0) return 'just now'
   const diffMs = Math.max(0, Date.now() - timestampMs)

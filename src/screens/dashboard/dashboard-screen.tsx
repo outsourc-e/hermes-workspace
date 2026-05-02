@@ -17,6 +17,9 @@ import {
   SessionsIntelligenceCard,
   type SessionRowData,
 } from './components/sessions-intelligence-card'
+import { SkillsUsageCard } from './components/skills-usage-card'
+import { TokenMixCard } from './components/token-mix-card'
+import { HourOfDayCard } from './components/hour-of-day-card'
 import {
   Area,
   AreaChart,
@@ -732,6 +735,25 @@ export function DashboardScreen() {
     return max
   }, [recentSessions])
 
+  // Skills count for the SkillsUsageCard sub-text. Cheap query, used
+  // only for the "X of Y used" microcopy.
+  const skillsCountQuery = useQuery({
+    queryKey: ['dashboard', 'skills-count'],
+    queryFn: async () => {
+      const res = await fetch(
+        '/api/skills?tab=installed&limit=200&summary=search',
+      )
+      if (!res.ok) return 0
+      const data = (await res.json()) as {
+        skills?: Array<unknown>
+      }
+      return data.skills?.length ?? 0
+    },
+    staleTime: 60_000,
+    enabled: skillsAvailable,
+  })
+  const skillsInstalled = skillsCountQuery.data ?? 0
+
   // Period selector for analytics; persists across navigation via
   // localStorage so refreshes don't reset the operator's preference.
   const [period, setPeriod] = useState<AnalyticsPeriod>(() => {
@@ -947,11 +969,13 @@ export function DashboardScreen() {
             analytics={overview?.analytics ?? null}
             palette={palette}
           />
-          <SkillsWidget
-            palette={palette}
-            onOpen={() => navigate({ to: '/skills' })}
+          <SkillsUsageCard
             usage={overview?.skillsUsage ?? null}
+            installedCount={skillsInstalled}
+            onOpen={() => navigate({ to: '/skills' })}
           />
+          <TokenMixCard analytics={overview?.analytics ?? null} />
+          <HourOfDayCard sessions={sessionRows} />
           <AchievementsCard achievements={overview?.achievements ?? null} />
         </div>
       </div>

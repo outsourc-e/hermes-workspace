@@ -173,6 +173,24 @@ export type DashboardAnalyticsSection = {
     estimatedCost: number
   }>
   estimatedCostUsd: number | null
+  /**
+   * Cost-coverage trust label.
+   *
+   *  - `precise`        — every session in the window has a known
+   *                       priced model.
+   *  - `partial`        — some sessions priced, some included or
+   *                       unknown.
+   *  - `included`       — every session is on a subscription/included
+   *                       provider so the dollar number is
+   *                       structurally zero.
+   *  - `unknown`        — we have no signal at all.
+   *
+   * Computed in the aggregator from `by_model` cost per provider:
+   * codex / anthropic-oauth / minimax (subscription) vs explicit
+   * priced models. Workspace UIs should use `costLabel` instead of
+   * showing `estimatedCostUsd` as a precise dollar figure.
+   */
+  costLabel: 'precise' | 'partial' | 'included' | 'unknown'
   /** Source the totals came from. */
   source: 'analytics' | 'fallback' | 'unavailable'
 }
@@ -607,6 +625,55 @@ function normalizeAnalytics(
       } => entry !== null,
     )
 
+  // Cost-coverage trust label. The Hermes Agent confirmed that codex /
+  // anthropic-oauth / minimax sessions report cost 0 because they're
+  // subscription-included, not because they cost zero dollars. Showing
+  // a precise $0.052 with 247M tokens routed through OAuth providers is
+  // misleading. We classify sessions by provider into priced vs
+  // included buckets and surface a coherent label.
+  const SUBSCRIPTION_PROVIDER_PATTERNS = [
+    /(^|[\s\-:/])codex(\b|[-/])/i,
+    /anthropic[-_]?oauth/i,
+    /^claude-(opus|sonnet|haiku)/i, // anthropic OAuth distilled models
+    /minimax/i,
+    /ollama/i,
+    /lmstudio/i,
+    /^pc1-/i,
+    /^pc2-/i,
+  ]
+  const isSubscriptionLike = (modelId: string): boolean =>
+    SUBSCRIPTION_PROVIDER_PATTERNS.some((rx) => rx.test(modelId))
+
+  let pricedSessions = 0
+  let includedSessions = 0
+  for (const m of modelsRaw) {
+    if (!m || typeof m !== 'object') continue
+    const e = m as Record<string, unknown>
+    const id = readString(e.model) || readString(e.id)
+    if (!id) continue
+    const sessions = readNumber(e.sessions)
+    if (sessions <= 0) continue
+    const cost = readNumber(e.estimated_cost)
+    if (cost > 0) {
+      pricedSessions += sessions
+    } else if (isSubscriptionLike(id)) {
+      includedSessions += sessions
+    } else {
+      pricedSessions += sessions // unknown provider, optimistically count
+    }
+  }
+  let costLabel: DashboardAnalyticsSection['costLabel']
+  const totalSessionsLocal = pricedSessions + includedSessions
+  if (totalSessionsLocal === 0) {
+    costLabel = 'unknown'
+  } else if (includedSessions === 0) {
+    costLabel = 'precise'
+  } else if (pricedSessions === 0) {
+    costLabel = 'included'
+  } else {
+    costLabel = 'partial'
+  }
+
   const hasAny = totalTokens > 0 || topModels.length > 0 || daily.length > 0
   return {
     windowDays,
@@ -620,6 +687,7 @@ function normalizeAnalytics(
     topModels,
     daily,
     estimatedCostUsd: totalCost,
+    costLabel,
     source: hasAny ? 'analytics' : 'unavailable',
   }
 }
@@ -643,6 +711,28 @@ function formatTokensCompact(n: number): string {
 }
 
 /**
+ * Strip namespace prefix on a skill id (e.g.
+ * `autonomous-ai-agents:hermes-agent` -> `hermes-agent`). Mirrors the
+ * Workspace `formatSkillName` helper but lives here so the aggregator
+ * can produce already-pretty insight text.
+ */
+function shortSkillName(raw: string): string {
+  if (!raw) return raw
+  const segments = raw.split(/[:\/]/)
+  return segments[segments.length - 1] || raw
+}
+
+/**
+ * Strip provider prefix from model ids in insight text. Keeps the
+ * aggregator output presentation-ready instead of relying on each UI
+ * to re-format. Mirrors the front-end formatter for the common cases.
+ */
+function shortModelName(raw: string): string {
+  if (!raw) return raw
+  return raw.split('/').slice(-1)[0]
+}
+
+/**
  * Build server-side insight callouts so the UI can render them as-is.
  * Per the Hermes Agent guidance, computing this in the aggregator keeps
  * the UI dumb and lets us swap in a real anomaly endpoint later without
@@ -656,7 +746,9 @@ function computeInsights(
 ): Array<DashboardInsight> {
   const out: Array<DashboardInsight> = []
   if (!analytics || analytics.source !== 'analytics') return out
+
   // 1. Peak day driver
+  let peakIsToday = false
   if (analytics.daily.length >= 3) {
     let peakIdx = 0
     let peakVal = 0
@@ -670,13 +762,17 @@ function computeInsights(
     }
     if (peakVal > 0) {
       const top = analytics.topModels[0]
-      const driver = top ? `, driven by ${top.id}` : ''
+      const driver = top ? `, driven by ${shortModelName(top.id)}` : ''
+      const peakDay = analytics.daily[peakIdx].day
+      const todayIso = new Date().toISOString().slice(0, 10)
+      peakIsToday = peakDay === todayIso
       out.push({
         tone: 'info',
-        text: `Usage peaked ${shortDate(analytics.daily[peakIdx].day)} (${formatTokensCompact(peakVal)} tokens)${driver}.`,
+        text: `Usage peaked ${shortDate(peakDay)} (${formatTokensCompact(peakVal)} tokens)${driver}.`,
       })
     }
   }
+
   // 2. Cache delta
   if (analytics.daily.length >= 14) {
     const mid = Math.floor(analytics.daily.length / 2)
@@ -695,7 +791,10 @@ function computeInsights(
       }
     }
   }
-  // 3. Operational pulse
+
+  // 3. Operational pulse. Drop "no active runs" if we just told the
+  // operator usage peaked today — those two sentences contradict at a
+  // glance.
   const ops: Array<string> = []
   if (cron && cron.failed > 0) {
     ops.push(
@@ -711,6 +810,7 @@ function computeInsights(
     }
   }
   if (
+    !peakIsToday &&
     status &&
     status.gatewayState === 'running' &&
     status.activeAgents === 0
@@ -724,15 +824,20 @@ function computeInsights(
       text: ops.join(' · ') + '.',
     })
   }
-  // 4. Skills heat
+
+  // 4. Skills heat — only if we have at least one item AND the cron/op
+  // pulse line wasn't itself a warning (we don't want 3 warning lines
+  // when one info line conveys what's worth knowing).
   if (skills && skills.distinctSkills > 0 && skills.topSkills[0]) {
     const top = skills.topSkills[0]
     out.push({
       tone: 'info',
-      text: `Top skill: ${top.skill} (${top.totalCount} uses, ${top.percentage.toFixed(1)}% of skill activity).`,
+      text: `Top skill: ${shortSkillName(top.skill)} (${top.totalCount} uses, ${top.percentage.toFixed(1)}% of skill activity).`,
     })
   }
-  return out.slice(0, 4)
+
+  // Cap at 3 callouts (any more clutters the chart card).
+  return out.slice(0, 3)
 }
 
 function computeIncidents(
