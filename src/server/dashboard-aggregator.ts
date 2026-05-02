@@ -23,6 +23,17 @@ export type DashboardOverview = {
   achievements: DashboardAchievementsSection | null
   modelInfo: DashboardModelInfoSection | null
   analytics: DashboardAnalyticsSection | null
+  logs: DashboardLogsSection | null
+}
+
+export type DashboardLogsSection = {
+  /** Source file the dashboard returned (`agent`, `gateway`, etc.). */
+  file: string
+  /** Most recent N log lines, raw, including newlines. */
+  lines: Array<string>
+  /** Tally of obvious error/warning markers in the tail. */
+  errorCount: number
+  warnCount: number
 }
 
 export type DashboardStatusSection = {
@@ -81,8 +92,36 @@ export type DashboardModelInfoSection = {
 export type DashboardAnalyticsSection = {
   windowDays: number
   totalTokens: number
-  topModels: Array<{ id: string; tokens: number; calls: number }>
+  /** Sum of input tokens across the window, for cache/cost split UIs. */
+  inputTokens: number
+  /** Sum of output tokens. */
+  outputTokens: number
+  /** Cache-read tokens (often >> input on long sessions). */
+  cacheReadTokens: number
+  /** Reasoning/thinking tokens, when the model emits them. */
+  reasoningTokens: number
+  /** Total session count over the window. */
+  totalSessions: number
+  /** API call count over the window. */
+  totalApiCalls: number
+  topModels: Array<{ id: string; tokens: number; calls: number; cost: number; sessions: number }>
+  /**
+   * Per-day rollup for sparklines. ISO date string + tokens + sessions
+   * + cost per day. Always returned, even when empty.
+   */
+  daily: Array<{
+    day: string
+    inputTokens: number
+    outputTokens: number
+    cacheReadTokens: number
+    reasoningTokens: number
+    sessions: number
+    apiCalls: number
+    estimatedCost: number
+  }>
   estimatedCostUsd: number | null
+  /** Source the totals came from. */
+  source: 'analytics' | 'fallback' | 'unavailable'
 }
 
 export type DashboardFetcher = (path: string) => Promise<Response>
@@ -94,15 +133,20 @@ export type BuildOverviewOptions = {
    * base-URL handling stay in one place.
    */
   fetcher: DashboardFetcher
-  /** How many days of analytics to roll up. Default 7. */
+  /** How many days of analytics to roll up. Default 30 (matches native). */
   analyticsWindowDays?: number
   /** How many recent achievement unlocks to surface. Default 3. */
   achievementsLimit?: number
+  /** How many log tail lines to surface. Default 24. */
+  logsLimit?: number
 }
 
 const DEFAULT_OPTIONS = {
-  analyticsWindowDays: 7,
+  // 30 days matches the native Hermes dashboard's default analytics
+  // window and gives the sparkline enough breathing room.
+  analyticsWindowDays: 30,
   achievementsLimit: 3,
+  logsLimit: 24,
 }
 
 async function safeJson<T>(
@@ -297,35 +341,167 @@ function normalizeAnalytics(
 ): DashboardAnalyticsSection | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
-  const totalTokens = readNumber(r.total_tokens)
-  const modelsRaw =
-    Array.isArray(r.top_models) ? r.top_models : Array.isArray(r.models) ? r.models : []
+
+  // Native Hermes dashboard shape:
+  //   { daily: [...], by_model: [...], totals: {...}, period_days, skills }
+  // Older / synthetic shape may use total_tokens / top_models. Support both.
+  const totalsRaw =
+    r.totals && typeof r.totals === 'object'
+      ? (r.totals as Record<string, unknown>)
+      : null
+  const inputTokens = readNumber(
+    totalsRaw?.total_input ?? r.total_input ?? r.input_tokens,
+  )
+  const outputTokens = readNumber(
+    totalsRaw?.total_output ?? r.total_output ?? r.output_tokens,
+  )
+  const cacheReadTokens = readNumber(
+    totalsRaw?.total_cache_read ??
+      r.total_cache_read ??
+      r.cache_read_tokens,
+  )
+  const reasoningTokens = readNumber(
+    totalsRaw?.total_reasoning ?? r.total_reasoning ?? r.reasoning_tokens,
+  )
+  const totalSessions = readNumber(
+    totalsRaw?.total_sessions ?? r.total_sessions,
+  )
+  const totalApiCalls = readNumber(
+    totalsRaw?.total_api_calls ?? r.total_api_calls,
+  )
+  const totalCost = ((): number | null => {
+    const candidates = [
+      totalsRaw?.total_estimated_cost,
+      totalsRaw?.total_actual_cost,
+      r.estimated_cost_usd,
+      r.cost_usd,
+    ]
+    for (const c of candidates) {
+      if (typeof c === 'number' && Number.isFinite(c)) return c
+    }
+    return null
+  })()
+
+  // Sum input+output for the legacy `totalTokens` consumers; cache and
+  // reasoning are exposed separately for the rich UI.
+  const fallbackTotal = readNumber(r.total_tokens)
+  const totalTokens =
+    inputTokens + outputTokens > 0
+      ? inputTokens + outputTokens
+      : fallbackTotal
+
+  const modelsRaw = Array.isArray(r.by_model)
+    ? r.by_model
+    : Array.isArray(r.top_models)
+      ? r.top_models
+      : Array.isArray(r.models)
+        ? r.models
+        : []
   const topModels = modelsRaw
     .map((entry) => {
       if (!entry || typeof entry !== 'object') return null
       const e = entry as Record<string, unknown>
-      const id = readString(e.id) || readString(e.model)
+      const id = readString(e.model) || readString(e.id)
       if (!id) return null
+      const tokensIn = readNumber(e.input_tokens ?? e.tokens)
+      const tokensOut = readNumber(e.output_tokens)
       return {
         id,
-        tokens: readNumber(e.tokens),
-        calls: readNumber(e.calls ?? e.requests),
+        tokens: tokensIn + tokensOut > 0 ? tokensIn + tokensOut : readNumber(e.tokens),
+        calls: readNumber(e.api_calls ?? e.calls ?? e.requests),
+        cost: readNumber(e.estimated_cost ?? e.cost),
+        sessions: readNumber(e.sessions),
       }
     })
-    .filter((entry): entry is { id: string; tokens: number; calls: number } => entry !== null)
+    .filter(
+      (entry): entry is {
+        id: string
+        tokens: number
+        calls: number
+        cost: number
+        sessions: number
+      } => entry !== null,
+    )
     .sort((a, b) => b.tokens - a.tokens)
-    .slice(0, 3)
-  const estimatedCostUsd =
-    typeof r.estimated_cost_usd === 'number'
-      ? (r.estimated_cost_usd as number)
-      : typeof r.cost_usd === 'number'
-        ? (r.cost_usd as number)
-        : null
+    .slice(0, 5)
+
+  const dailyRaw = Array.isArray(r.daily) ? r.daily : []
+  const daily = dailyRaw
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null
+      const e = entry as Record<string, unknown>
+      const day = readString(e.day) || readString(e.date)
+      if (!day) return null
+      return {
+        day,
+        inputTokens: readNumber(e.input_tokens),
+        outputTokens: readNumber(e.output_tokens),
+        cacheReadTokens: readNumber(e.cache_read_tokens),
+        reasoningTokens: readNumber(e.reasoning_tokens),
+        sessions: readNumber(e.sessions),
+        apiCalls: readNumber(e.api_calls),
+        estimatedCost: readNumber(e.estimated_cost),
+      }
+    })
+    .filter(
+      (entry): entry is {
+        day: string
+        inputTokens: number
+        outputTokens: number
+        cacheReadTokens: number
+        reasoningTokens: number
+        sessions: number
+        apiCalls: number
+        estimatedCost: number
+      } => entry !== null,
+    )
+
+  const hasAny = totalTokens > 0 || topModels.length > 0 || daily.length > 0
   return {
     windowDays,
     totalTokens,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    reasoningTokens,
+    totalSessions,
+    totalApiCalls,
     topModels,
-    estimatedCostUsd,
+    daily,
+    estimatedCostUsd: totalCost,
+    source: hasAny ? 'analytics' : 'unavailable',
+  }
+}
+
+function normalizeLogs(
+  raw: unknown,
+  limit: number,
+): DashboardLogsSection | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const linesRaw = Array.isArray(r.lines) ? r.lines : null
+  if (!linesRaw) return null
+  const lines = linesRaw
+    .filter((entry): entry is string => typeof entry === 'string')
+    .slice(-limit)
+  let errorCount = 0
+  let warnCount = 0
+  for (const line of lines) {
+    const lower = line.toLowerCase()
+    if (
+      /\b(error|exception|traceback|failed|fatal)\b/.test(lower) ||
+      lower.includes('errno')
+    ) {
+      errorCount += 1
+    } else if (/\b(warn|warning|deprecated)\b/.test(lower)) {
+      warnCount += 1
+    }
+  }
+  return {
+    file: readString(r.file) || 'agent',
+    lines,
+    errorCount,
+    warnCount,
   }
 }
 
@@ -333,7 +509,7 @@ export async function buildDashboardOverview(
   options: BuildOverviewOptions,
 ): Promise<DashboardOverview> {
   const opts = { ...DEFAULT_OPTIONS, ...options }
-  const { fetcher, analyticsWindowDays, achievementsLimit } = opts
+  const { fetcher, analyticsWindowDays, achievementsLimit, logsLimit } = opts
 
   const [
     statusRaw,
@@ -342,6 +518,7 @@ export async function buildDashboardOverview(
     achAllRaw,
     modelInfoRaw,
     analyticsRaw,
+    logsRaw,
   ] = await Promise.all([
     safeJson<unknown>(fetcher, '/api/status'),
     safeJson<unknown>(fetcher, '/api/cron/jobs'),
@@ -351,7 +528,11 @@ export async function buildDashboardOverview(
     ),
     safeJson<unknown>(fetcher, '/api/plugins/hermes-achievements/achievements'),
     safeJson<unknown>(fetcher, '/api/model/info'),
-    safeJson<unknown>(fetcher, `/api/analytics/usage?days=${analyticsWindowDays}`),
+    safeJson<unknown>(
+      fetcher,
+      `/api/analytics/usage?days=${analyticsWindowDays}`,
+    ),
+    safeJson<unknown>(fetcher, `/api/logs?lines=${logsLimit}`),
   ])
 
   return {
@@ -365,5 +546,6 @@ export async function buildDashboardOverview(
     ),
     modelInfo: normalizeModelInfo(modelInfoRaw),
     analytics: normalizeAnalytics(analyticsRaw, analyticsWindowDays),
+    logs: normalizeLogs(logsRaw, logsLimit),
   }
 }
