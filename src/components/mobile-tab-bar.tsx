@@ -67,13 +67,6 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     match: (p) => p.startsWith('/playground'),
   },
   {
-    id: 'agora',
-    label: 'Agora',
-    icon: Building01Icon,
-    to: '/agora',
-    match: (p) => p.startsWith('/agora'),
-  },
-  {
     id: 'files',
     label: 'Files',
     icon: File01Icon,

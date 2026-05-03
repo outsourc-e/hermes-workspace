@@ -789,13 +789,6 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/agora',
-      icon: Building01Icon,
-      label: 'Agora',
-      active: isAgoraActive,
-    },
-    {
-      kind: 'link',
       to: '/files',
       icon: File01Icon,
       label: t('nav.files'),

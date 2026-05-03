@@ -1626,9 +1626,9 @@ function Scene({
       <Ground world={world} />
       <WorldDecor world={world} />
       <ScatteredScenery worldId={worldId} />
-      {/* Ambient atmosphere particles for cinematic feel */}
-      <Sparkles count={80} scale={[60, 8, 60]} size={3} speed={0.25} color={world.accent} opacity={0.6} />
-      <Sparkles count={40} scale={[30, 4, 30]} size={1.5} speed={0.6} color={'#ffffff'} opacity={0.35} />
+      {/* Ambient atmosphere particles — light-touch for performance */}
+      <Sparkles count={50} scale={[60, 8, 60]} size={2.5} speed={0.22} color={world.accent} opacity={0.55} />
+      <Sparkles count={20} scale={[30, 4, 30]} size={1.2} speed={0.5} color={'#ffffff'} opacity={0.3} />
 
       {/* NPCs per world */}
       {worldId === 'agora' && (
