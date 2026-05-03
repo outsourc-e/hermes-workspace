@@ -9,6 +9,10 @@ import {
   persistPendingMessage,
   readPendingMessage,
 } from '../pending-send'
+import {
+  clearRecoveryMessage,
+  readRecoveryMessage,
+} from '../../../stores/chat-store'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
 import type { PendingSendPayload } from '../pending-send'
 import type { QueryClient } from '@tanstack/react-query'
@@ -216,6 +220,38 @@ function hasConfirmedPendingMessage(
   })
 }
 
+/**
+ * Extract the best available string ID from a ChatMessage without type-unsafe
+ * `as any` casts. ChatMessage carries `[key: string]: unknown` so bracket
+ * access is perfectly legal and keeps TypeScript's narrowing intact.
+ */
+function extractMsgId(msg: ChatMessage): string {
+  const id =
+    msg['id'] ?? msg['message_id'] ?? msg['clientId'] ?? msg['client_id']
+  return typeof id === 'string' ? id : ''
+}
+
+/** Check whether a history array already contains an equivalent message. */
+function historyContainsMessage(
+  messages: Array<ChatMessage>,
+  candidate: ChatMessage,
+): boolean {
+  if (!candidate.role) return false
+  const candidateText = textFromMessage(candidate).trim()
+  const candidateId = extractMsgId(candidate)
+
+  return messages.some((msg) => {
+    if (msg.role !== candidate.role) return false
+    const msgId = extractMsgId(msg)
+    if (candidateId && msgId && candidateId === msgId) return true
+    if (candidateText) {
+      const msgText = textFromMessage(msg).trim()
+      if (msgText === candidateText) return true
+    }
+    return false
+  })
+}
+
 export function useChatHistory({
   activeFriendlyId,
   activeSessionKey,
@@ -297,25 +333,46 @@ export function useChatHistory({
       const cached = queryClient.getQueryData(historyKey)
       const optimisticMessages = Array.isArray((cached as any)?.messages)
         ? (cached as any).messages.filter((message: any) => {
-            if (message.status === 'sending') return true
-            if (message.__optimisticId) return true
-            return Boolean(message.clientId)
-          })
+          if (message.status === 'sending') return true
+          if (message.__optimisticId) return true
+          return Boolean(message.clientId)
+        })
         : []
 
       const serverData = await fetchHistory({
         sessionKey: sessionKeyForHistory,
         friendlyId: activeFriendlyId,
       })
-      if (!optimisticMessages.length) return serverData
+
+      let dataWithRecovery = serverData
+
+      // Merge recovery buffer: if the backend history hasn't caught up with a
+      // recently-streamed assistant message (e.g. after dev refresh), inject it
+      // so the message doesn't vanish from the UI.
+      if (typeof window !== 'undefined') {
+        const recoveryMessage = readRecoveryMessage(sessionKeyForHistory)
+        if (recoveryMessage) {
+          if (historyContainsMessage(serverData.messages, recoveryMessage)) {
+            clearRecoveryMessage(sessionKeyForHistory)
+          } else {
+            const mergedMessages = [...serverData.messages, recoveryMessage]
+            mergedMessages.sort(
+              (a, b) => getMessageTimestamp(a) - getMessageTimestamp(b),
+            )
+            dataWithRecovery = { ...serverData, messages: mergedMessages }
+          }
+        }
+      }
+
+      if (!optimisticMessages.length) return dataWithRecovery
 
       const merged = mergeOptimisticHistoryMessages(
-        serverData.messages,
+        dataWithRecovery.messages,
         optimisticMessages,
       )
 
       return {
-        ...serverData,
+        ...dataWithRecovery,
         messages: merged,
       }
     },
@@ -399,8 +456,8 @@ export function useChatHistory({
   const historyMessages = useMemo(() => {
     const messages = persistedPending
       ? mergeOptimisticHistoryMessages(rawHistoryMessages, [
-          persistedPending.optimisticMessage,
-        ])
+        persistedPending.optimisticMessage,
+      ])
       : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =
@@ -430,7 +487,7 @@ export function useChatHistory({
         const text = textFromMessage(msg)
         const execNotification = parseExecNotification(text)
         if (execNotification) {
-          ;(msg as any).__execNotification = execNotification
+          ; (msg as any).__execNotification = execNotification
           return true
         }
         if ((msg as any).__execNotification) {
@@ -444,7 +501,8 @@ export function useChatHistory({
         // they quote these phrases somewhere inside the text.
         if (text.startsWith('Pre-compaction memory flush')) return false
         if (text.startsWith('Store durable memories now')) return false
-        if (text.startsWith('Summarize this naturally for the user')) return false
+        if (text.startsWith('Summarize this naturally for the user'))
+          return false
         if (text.startsWith('APPEND new content only and do not overwrite'))
           return false
         if (
@@ -516,7 +574,7 @@ export function useChatHistory({
           filtered.splice(i, 1)
           i--
         } else {
-          ;(msg as any).__isNarration = true
+          ; (msg as any).__isNarration = true
         }
       }
     }
