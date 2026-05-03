@@ -404,6 +404,40 @@ function WorldDecor({ world }: { world: WorldDef }) {
   }
 }
 
+
+function NpcAccessories({ role = '', color }: { role?: string; color: string }) {
+  const isTrainer = role === 'trainer' || role === 'nike'
+  const isBanker = role === 'banker' || role === 'chronos'
+  const isRecruiter = role === 'recruiter' || role === 'athena'
+  const isTavern = role === 'tavernkeeper' || role === 'apollo'
+  const isShop = role === 'shopkeeper' || role === 'iris'
+  return (
+    <group>
+      {/* shoulder silhouette */}
+      {(isTrainer || isRecruiter || isBanker) && (
+        <>
+          <mesh castShadow position={[-0.36, 0.98, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={isTrainer ? '#94a3b8' : color} metalness={isTrainer ? 0.6 : 0.15} roughness={0.42} emissive={color} emissiveIntensity={0.12} /></mesh>
+          <mesh castShadow position={[0.36, 0.98, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={isTrainer ? '#94a3b8' : color} metalness={isTrainer ? 0.6 : 0.15} roughness={0.42} emissive={color} emissiveIntensity={0.12} /></mesh>
+        </>
+      )}
+      {/* cape/back panel, visible in orbit and screenshots */}
+      {(isRecruiter || isBanker || isTavern) && (
+        <mesh castShadow position={[0, 0.78, -0.2]} rotation={[0.18, 0, 0]}>
+          <planeGeometry args={[0.72, 0.9]} />
+          <meshStandardMaterial color={color} side={THREE.DoubleSide} roughness={0.6} emissive={color} emissiveIntensity={0.08} />
+        </mesh>
+      )}
+      {/* hats/crowns so roles read at distance */}
+      {isBanker && <mesh castShadow position={[0, 1.48, 0]}><cylinderGeometry args={[0.2, 0.24, 0.18, 12]} /><meshStandardMaterial color="#fbbf24" metalness={0.45} roughness={0.38} emissive="#fbbf24" emissiveIntensity={0.25} /></mesh>}
+      {isShop && <mesh castShadow position={[0, 1.45, 0]} rotation={[0, 0, 0.2]}><coneGeometry args={[0.28, 0.28, 8]} /><meshStandardMaterial color="#38bdf8" roughness={0.55} emissive="#38bdf8" emissiveIntensity={0.1} /></mesh>}
+      {isTavern && <mesh castShadow position={[0, 1.44, 0]}><torusGeometry args={[0.19, 0.025, 8, 24]} /><meshStandardMaterial color="#f59e0b" roughness={0.5} emissive="#f59e0b" emissiveIntensity={0.2} /></mesh>}
+      {/* weapons/tools */}
+      {isTrainer && <mesh castShadow position={[0.52, 0.82, 0.08]} rotation={[0.1, 0, -0.75]}><boxGeometry args={[0.05, 0.9, 0.05]} /><meshStandardMaterial color="#cbd5e1" metalness={0.6} roughness={0.35} /></mesh>}
+      {isShop && <mesh castShadow position={[-0.48, 0.72, 0.08]} rotation={[0, 0, 0.25]}><boxGeometry args={[0.16, 0.38, 0.08]} /><meshStandardMaterial color="#a16207" roughness={0.8} /></mesh>}
+    </group>
+  )
+}
+
 /* ── NPC billboard with proximity sensing ── */
 function NPC({
   position,
@@ -519,6 +553,7 @@ function NPC({
         <sphereGeometry args={[0.22, 16, 16]} />
         <meshStandardMaterial color="#fde68a" roughness={0.55} />
       </mesh>
+      <NpcAccessories role={npcId || avatar} color={color} />
       {/* portrait billboard slightly above head */}
       <Billboard position={[0, 1.55, 0]}>
         <mesh>
