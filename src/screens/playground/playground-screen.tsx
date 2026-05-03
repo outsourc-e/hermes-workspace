@@ -936,18 +936,9 @@ export function PlaygroundScreen() {
           onReset={rpg.resetRpg}
           worldAccent={WORLD_META[world].accent}
         />
-        <div className="pointer-events-none absolute left-1/2 top-3 z-[60] -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-[11px] uppercase tracking-[0.18em] text-white/70 backdrop-blur-xl">
-          {WORLD_META[world].name} · Click ground = walk · Click NPC = talk · WASD/arrows · Shift sprint · E talk · J journal · M map · T chat · [/] zoom
-        </div>
+        <PlaygroundHelpHud worldName={WORLD_META[world].name} />
         <PlaygroundOnboardingCard />
-        <button
-          onClick={() => setCustomizerOpen(true)}
-          className="pointer-events-auto fixed bottom-3 right-3 z-[70] rounded-xl border-2 border-cyan-300/50 bg-cyan-400/15 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
-          style={{ boxShadow: '0 0 14px rgba(34,211,238,0.35)' }}
-          title="Customize avatar (C)"
-        >
-          👤 Customize Avatar
-        </button>
+        <PlaygroundUtilityDock onCustomize={() => setCustomizerOpen(true)} />
       </div>
     </PlaygroundErrorBoundary>
   )
@@ -1070,6 +1061,60 @@ function PlaygroundOnboardingCard() {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function PlaygroundHelpHud({ worldName }: { worldName: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="pointer-events-auto fixed left-1/2 top-3 z-[60] flex -translate-x-1/2 items-center gap-2">
+      <div className="rounded-full border border-white/10 bg-black/55 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/85 backdrop-blur-xl">
+        {worldName}
+      </div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-[12px] font-bold text-white/80 hover:bg-white/10"
+        title="Show controls (?)"
+      >
+        ?
+      </button>
+      {open && (
+        <div className="rounded-xl border border-white/10 bg-black/85 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-white/80 backdrop-blur-xl">
+          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1–6 skills · E talk · J journal · M map · T chat · C customize
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PlaygroundUtilityDock({ onCustomize }: { onCustomize: () => void }) {
+  return (
+    <div className="pointer-events-auto fixed bottom-[78px] right-3 z-[70] flex flex-col gap-1.5">
+      <button
+        onClick={onCustomize}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
+        title="Customize avatar (C)"
+      >
+        👤
+      </button>
+      <button
+        onClick={() => {
+          try {
+            const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
+            if (!canvas) return
+            const url = canvas.toDataURL('image/png')
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `hermes-playground-${Date.now()}.png`
+            a.click()
+          } catch {}
+        }}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-white/80 backdrop-blur-xl hover:bg-white/10"
+        title="Capture frame (PNG)"
+      >
+        📸
+      </button>
     </div>
   )
 }

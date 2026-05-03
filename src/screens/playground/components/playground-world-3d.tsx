@@ -1820,32 +1820,13 @@ export function PlaygroundWorld3D({
           />
         </Suspense>
       </Canvas>
-      {/* Multiplayer status pill */}
-      <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 70, pointerEvents: 'none' }}>
-        <div style={{ padding: '3px 10px', borderRadius: 999, fontSize: 10, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', background: 'rgba(0,0,0,0.6)', color: '#fff', border: `1px solid ${myColor}`, boxShadow: `0 0 10px ${myColor}55`, whiteSpace: 'nowrap' }}>
-          {online ? 'Live' : 'Offline'} · {myName} · {Object.values(remotePlayers).filter((r) => r.world === worldId).length} nearby
+      {/* Multiplayer status — small chip top-right */}
+      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 70, pointerEvents: 'none' }}>
+        <div style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'rgba(0,0,0,0.55)', color: '#fff', border: `1px solid ${myColor}55`, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 999, background: myColor, boxShadow: `0 0 6px ${myColor}` }} />
+          {myName} · {Object.values(remotePlayers).filter((r) => r.world === worldId).length}
         </div>
       </div>
-      {/* Share/Capture frame button — hackathon GIF/PNG capture */}
-      <button
-        onClick={() => {
-          try {
-            const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
-            if (!canvas) return
-            const url = canvas.toDataURL('image/png')
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `hermes-playground-${Date.now()}.png`
-            a.click()
-          } catch (e) {
-            // ignore
-          }
-        }}
-        style={{ position: 'absolute', top: 8, right: 8, zIndex: 70, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', fontSize: 11, fontWeight: 700, cursor: 'pointer', backdropFilter: 'blur(6px)' }}
-        title="Capture this frame as PNG"
-      >
-        📸 Capture
-      </button>
     </div>
   )
 }
