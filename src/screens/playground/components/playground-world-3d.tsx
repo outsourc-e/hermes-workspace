@@ -1699,7 +1699,7 @@ export function PlaygroundWorld3D({
         camera={{ position: [10, 12, 10], fov: 45 }}
         dpr={[1, 1.5]}
         style={{ width: '100%', height: '100%' }}
-        gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'default', preserveDrawingBuffer: true }}
       >
         <Suspense fallback={null}>
           <EffectComposer enableNormalPass={false}>
@@ -1729,6 +1729,26 @@ export function PlaygroundWorld3D({
           {online ? 'Live' : 'Offline'} · {myName} · {Object.values(remotePlayers).filter((r) => r.world === worldId).length} nearby
         </div>
       </div>
+      {/* Share/Capture frame button — hackathon GIF/PNG capture */}
+      <button
+        onClick={() => {
+          try {
+            const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
+            if (!canvas) return
+            const url = canvas.toDataURL('image/png')
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `hermes-playground-${Date.now()}.png`
+            a.click()
+          } catch (e) {
+            // ignore
+          }
+        }}
+        style={{ position: 'absolute', top: 8, right: 8, zIndex: 70, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', fontSize: 11, fontWeight: 700, cursor: 'pointer', backdropFilter: 'blur(6px)' }}
+        title="Capture this frame as PNG"
+      >
+        📸 Capture
+      </button>
     </div>
   )
 }
