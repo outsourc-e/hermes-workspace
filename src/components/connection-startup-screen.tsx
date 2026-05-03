@@ -22,9 +22,6 @@ function detectPlatform(): Platform {
 function getSetupSteps(
   platform: Platform,
 ): Array<{ title: string; command: string; note?: string }> {
-  const pip = platform === 'windows' ? 'pip' : 'pip3'
-  const python = platform === 'windows' ? 'python' : 'python3'
-
   return [
     {
       title: 'Use any OpenAI-compatible backend',
@@ -33,12 +30,13 @@ function getSetupSteps(
     },
     {
       title: 'Optional: install Hermes Agent locally',
-      command: `${pip} install hermes-agent`,
+      command:
+        'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash',
       note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
     },
     {
       title: 'Set up your agent',
-      command: 'claude setup',
+      command: 'hermes setup',
       note: 'Pick your providers once; Hermes Agent stores them under ~/.hermes',
     },
     {

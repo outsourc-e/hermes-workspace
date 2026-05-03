@@ -45,7 +45,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
 
   // Priority 2: Environment variable
   const envWorkspace =
-    process.env.CLAUDE_WORKSPACE_DIR?.trim() ||
+    process.env.HERMES_WORKSPACE_DIR?.trim() ||
     process.env.CLAUDE_WORKSPACE_DIR?.trim()
   if (envWorkspace) {
     const isValid = await isValidDirectory(envWorkspace)
@@ -53,7 +53,7 @@ async function detectWorkspace(savedPath?: string): Promise<{
       return {
         path: envWorkspace,
         folderName: extractFolderName(envWorkspace),
-        source: 'claude',
+        source: 'env',
         isValid: true,
       }
     }

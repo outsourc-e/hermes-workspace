@@ -1,6 +1,6 @@
 /**
  * Hermes Config API — read/write ~/.hermes/config.yaml and ~/.hermes/.env
- * Gives the web UI the same config power as `claude setup`
+ * Gives the web UI the same config power as `hermes setup`
  */
 import fs from 'node:fs'
 import path from 'node:path'

@@ -86,7 +86,7 @@ Three paths — pick the one that matches you:
 curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
 ```
 
-This installs `hermes-agent` from PyPI, clones this repo, sets up `.env`, and installs deps. Then:
+This installs `hermes-agent` via Nous's official installer, clones this repo, sets up `.env`, and installs dependencies. Then:
 
 ```bash
 hermes gateway run                  # terminal 1
@@ -99,7 +99,7 @@ Open http://localhost:3000. That's it.
 
 ### Already running `hermes-agent`? Attach the workspace to it
 
-If you already have `hermes-agent` installed (via Nous's installer, `pip install`, systemd, Docker, etc.) and it's serving the gateway at `http://<host>:8642`, you don't need to reinstall anything — just point the workspace at it.
+If you already have `hermes-agent` installed (via Nous's official installer, a source checkout, systemd, Docker, or another existing setup) and it's serving the gateway at `http://<host>:8642`, you don't need to reinstall anything — just point the workspace at it.
 
 ```bash
 git clone https://github.com/outsourc-e/hermes-workspace.git
@@ -176,7 +176,7 @@ Example Hermes Agent gateway setup (from scratch):
 curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 
 # Configure a provider + start the gateway
-claude setup
+hermes setup
 hermes gateway run
 ```
 
@@ -226,7 +226,7 @@ HERMES_API_URL=http://127.0.0.1:8642
 
 # Optional: provider keys the Hermes Agent gateway can read at runtime.
 # You only need the key(s) for whichever provider(s) you actually use.
-# ANTHROPIC_API_KEY=sk-ant-...         # Claude
+# ANTHROPIC_API_KEY=***         # Anthropic
 # OPENAI_API_KEY=sk-...                # GPT / o-series
 # OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (incl. free models)
 # GOOGLE_API_KEY=AIza...               # Gemini
@@ -347,7 +347,7 @@ Edit `.env` and add **at least one** LLM provider key — whichever provider you
 
 ```env
 # Pick one (or more). You do NOT need all of these.
-ANTHROPIC_API_KEY=sk-ant-...           # Claude
+# ANTHROPIC_API_KEY=***         # Anthropic
 # OPENAI_API_KEY=sk-...                # GPT / o-series
 # OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (free models available)
 # GOOGLE_API_KEY=AIza...               # Gemini
@@ -370,7 +370,7 @@ This pulls two pre-built images and starts them:
 
 No local build. First run takes a minute to pull; subsequent starts are instant.
 Agent state (config, sessions, skills, memory, credentials) persists in the
-`claude-data` named volume, so containers can be recreated without data loss.
+legacy-named `claude-data` Docker volume, so containers can be recreated without data loss.
 
 ### Step 3: Access the Workspace
 
@@ -615,7 +615,7 @@ Your Hermes Agent gateway isn't running. Start it:
 hermes gateway run
 ```
 
-First-time run? Do `claude setup` first to pick a provider and model.
+First-time run? Do `hermes setup` first to pick a provider and model.
 
 ### Ollama: chat returns empty or model shows "Offline"
 
@@ -678,7 +678,7 @@ If using Docker Compose and getting auth errors:
    ```
    Look for: `[gateway] http://hermes-agent:8642 mode=...` — if it shows `mode=disconnected`, the agent isn't running correctly.
 
-### Docker: "claude webapi command not found"
+### Docker: older `claude webapi` docs are wrong
 
 The `claude webapi` command referenced in older docs doesn't exist. The correct command is:
 
