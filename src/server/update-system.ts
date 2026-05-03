@@ -395,9 +395,11 @@ export function readAgentUpdateStatus(): ProductUpdateStatus {
   const currentHead = git(['rev-parse', 'HEAD'], repoPath)
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], repoPath)
   const latestHead = repoMatches ? remoteHead(repoPath, 'origin') : null
+  const remoteRef = repoMatches ? `origin/${branch || 'main'}` : null
   const dirty = isDirty(repoPath)
   const updateAvailable = Boolean(
-    currentHead && latestHead && currentHead !== latestHead,
+    currentHead && latestHead && currentHead !== latestHead &&
+    remoteRef && canFastForward(repoPath, remoteRef),
   )
   const canUpdate = Boolean(repoMatches && updateAvailable && !dirty)
 
