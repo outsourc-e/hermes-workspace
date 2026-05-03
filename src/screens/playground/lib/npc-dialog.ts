@@ -303,4 +303,148 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       },
     ],
   },
+
+
+  shopkeeper: {
+    id: 'shopkeeper',
+    name: 'Dorian',
+    title: 'Quartermaster of the Market',
+    color: '#38bdf8',
+    opening:
+      'Welcome to the Agora market. Every real MMO hub needs a place where players understand value. Here, items are lessons made tangible.',
+    lore: [
+      'The market will eventually trade cosmetics, generated relics, guild banners, and agent-made artifacts. For now, I teach inventory and rewards.',
+      'A good product hub has economy, even before money. Reputation, tokens, badges, access, trust — those are currencies too.',
+    ],
+    choices: [
+      {
+        id: 'starter-kit',
+        label: '[Quest] Claim the builder starter kit',
+        reply:
+          'A token, a scroll, and a story. Not much by MMO standards, but enough to begin. Check your inventory on the right.',
+        grantItems: ['hermes-token', 'athena-scroll'],
+        grantSkillXp: { diplomacy: 20, promptcraft: 20 },
+      },
+      {
+        id: 'market-plan',
+        label: 'What will this market become?',
+        reply:
+          'A player economy for generated worlds: prompts as blueprints, skills as recipes, agents as companions, benchmarks as trophies.',
+      },
+    ],
+  },
+
+  trainer: {
+    id: 'trainer',
+    name: 'Leonidas',
+    title: 'Combat Trainer',
+    color: '#fb7185',
+    opening:
+      'Stand inside the training ring and learn the simple truth: a game needs verbs. Move, talk, fight, loot, level, return.',
+    lore: [
+      'Right now combat is a prototype. Next it gets range, cooldowns, enemy tells, deaths, respawn shrines, and rewards that feel earned.',
+      'The Arena is not about violence. It is a benchmark made visible — models as champions, prompts as weapons.',
+    ],
+    choices: [
+      {
+        id: 'training-drill',
+        label: '[Quest] Run the first combat drill',
+        reply:
+          'Good. You know the loop now. Take the Portal Key and try the Forge. A real game always gives the next door after the first lesson.',
+        completeQuest: 'first-worldsmith',
+        grantItems: ['portal-key'],
+        grantSkillXp: { engineering: 30, summoning: 20 },
+      },
+      {
+        id: 'skill-tip',
+        label: 'Teach me the hotbar',
+        reply:
+          'Press 1 through 6. Spend MP wisely. Cooldowns are still young, but soon they will define class identity.',
+      },
+    ],
+  },
+
+  banker: {
+    id: 'banker',
+    name: 'Midas',
+    title: 'Banker of Memory',
+    color: '#facc15',
+    opening:
+      'I do not store gold. I store continuity. A serious agent platform needs memory you can trust, inspect, and carry across sessions.',
+    lore: [
+      'Soon your Playground profile will persist: level, inventory, completed quests, unlocked worlds, cosmetics, guild identity.',
+      'Enterprise means continuity. If a world forgets you, it is a toy. If it remembers responsibly, it becomes infrastructure.',
+    ],
+    choices: [
+      {
+        id: 'memory-lesson',
+        label: 'Teach me about persistent memory',
+        reply:
+          'Short-term memory is a chat bubble. Long-term memory is a ledger. The Oracle reads ledgers. The Bank protects them.',
+        grantSkillXp: { oracle: 40, diplomacy: 10 },
+      },
+      {
+        id: 'bank-vault',
+        label: 'What goes in the vault?',
+        reply:
+          'Profiles, guild progress, agent companions, generated maps, and the history of what you built here.',
+      },
+    ],
+  },
+
+  recruiter: {
+    id: 'recruiter',
+    name: 'Cassia',
+    title: 'Guild Recruiter',
+    color: '#a78bfa',
+    opening:
+      'Solo builders ship features. Guilds ship worlds. The Playground becomes interesting when people organize around missions.',
+    lore: [
+      'A guild can be a team, a Discord, a startup, a model lab, or a swarm of agents. The UI should make that feel native.',
+      'When multiplayer lands, this dais becomes the party finder: invite, queue, quest, voice, run agents together.',
+    ],
+    choices: [
+      {
+        id: 'guild-charter',
+        label: '[Quest] Draft a guild charter',
+        reply:
+          'The charter is signed. Your first guild is theoretical, which is honestly how most startups begin. Take the XP.',
+        grantSkillXp: { diplomacy: 70, summoning: 30 },
+      },
+      {
+        id: 'multiplayer-plan',
+        label: 'How does multiplayer fit?',
+        reply:
+          'Presence first: position, chat, world, emotes. Then parties. Then shared quests. Then agents that can join the group as party members.',
+      },
+    ],
+  },
+
+  tavernkeeper: {
+    id: 'tavernkeeper',
+    name: 'Selene',
+    title: 'Tavern Keeper',
+    color: '#f59e0b',
+    opening:
+      'Every MMO hub needs a warm room where nobody is optimizing anything. Sit down. The next quest can wait thirty seconds.',
+    lore: [
+      'The tavern should become social glue: ambient chat, stories, music generation, voice rooms, screenshots, and launch parties.',
+      'You cannot fake community with dashboards alone. You need spaces where people linger without a task.',
+    ],
+    choices: [
+      {
+        id: 'rested-xp',
+        label: 'Ask for rested XP',
+        reply:
+          'Rested, restored, mildly over-caffeinated. Go build something expensive-looking.',
+        grantSkillXp: { diplomacy: 25, worldsmithing: 25 },
+      },
+      {
+        id: 'tavern-future',
+        label: 'What should the tavern become?',
+        reply:
+          'A creator lounge: voice, music, generated posters, build-in-public boards, live agent demos, and weird little rituals people remember.',
+      },
+    ],
+  },
 }

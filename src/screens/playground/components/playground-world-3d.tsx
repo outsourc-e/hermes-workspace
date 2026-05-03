@@ -868,6 +868,11 @@ const NPC_COLORS: Record<string, string> = {
   hermes: '#2dd4bf', // teal
   artemis: '#9ca3af',
   eros: '#f472b6',
+  shopkeeper: '#38bdf8',
+  trainer: '#fb7185',
+  banker: '#facc15',
+  recruiter: '#a78bfa',
+  tavernkeeper: '#f59e0b',
 }
 
 /* ── Bot player (waypoint walker with chat bubble) ── */
@@ -1050,6 +1055,11 @@ function Scene({
           <NPC npcId="apollo" position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" color={NPC_COLORS.apollo} playerRef={playerPos} onNearChange={onNpcNearChange} />
           <NPC npcId="iris" position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" color={NPC_COLORS.iris} playerRef={playerPos} onNearChange={onNpcNearChange} />
           <NPC npcId="nike" position={[6, 0, -4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="shopkeeper" position={[-3, 0, 9.5]} avatar="iris" name="Dorian · Quartermaster" color={NPC_COLORS.shopkeeper} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="trainer" position={[-12, 0, 5.7]} avatar="nike" name="Leonidas · Trainer" color={NPC_COLORS.trainer} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="banker" position={[15.3, 0, 7.5]} avatar="chronos" name="Midas · Banker" color={NPC_COLORS.banker} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="recruiter" position={[-1.2, 0, -15.5]} avatar="athena" name="Cassia · Recruiter" color={NPC_COLORS.recruiter} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="tavernkeeper" position={[2, 0, 15.5]} avatar="apollo" name="Selene · Tavern" color={NPC_COLORS.tavernkeeper} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
         </>
       )}
       {worldId === 'forge' && (
