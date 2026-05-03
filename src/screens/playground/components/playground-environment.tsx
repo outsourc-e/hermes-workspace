@@ -58,16 +58,58 @@ export function BroadleafTree({ position, scale = 1, color = '#2bbf6f' }: { posi
 }
 
 /* ── Bushes / grass tufts ── */
-export function GrassTuft({ position, color = '#3aa86a' }: { position: [number, number, number]; color?: string }) {
+export function GrassTuft({ position, color = '#3aa86a', variant = 'cluster' }: { position: [number, number, number]; color?: string; variant?: 'cluster' | 'spike' | 'fern' }) {
+  if (variant === 'spike') {
+    // Skinny tufts of grass blades
+    return (
+      <group position={position}>
+        {[0, 0.5, -0.5, 0.25, -0.25].map((angle, i) => (
+          <mesh key={i} castShadow position={[Math.sin(angle) * 0.08, 0.2, Math.cos(angle) * 0.08]} rotation={[0, angle, 0]}>
+            <coneGeometry args={[0.05, 0.42, 4]} />
+            <meshStandardMaterial color={color} roughness={0.95} />
+          </mesh>
+        ))}
+      </group>
+    )
+  }
+  if (variant === 'fern') {
+    return (
+      <group position={position}>
+        <mesh castShadow position={[0, 0.18, 0]}>
+          <coneGeometry args={[0.32, 0.45, 5]} />
+          <meshStandardMaterial color={color} roughness={0.9} flatShading />
+        </mesh>
+        <mesh castShadow position={[0.18, 0.14, 0.1]} rotation={[0.3, 0.4, 0]}>
+          <coneGeometry args={[0.18, 0.32, 5]} />
+          <meshStandardMaterial color={color} roughness={0.9} flatShading />
+        </mesh>
+        <mesh castShadow position={[-0.16, 0.13, -0.05]} rotation={[0.3, -0.4, 0]}>
+          <coneGeometry args={[0.18, 0.3, 5]} />
+          <meshStandardMaterial color={color} roughness={0.9} flatShading />
+        </mesh>
+      </group>
+    )
+  }
+  // cluster default — 3 stacked rough orbs with flat shading for low-poly look
   return (
     <group position={position}>
       {[0, 0.12, -0.12].map((dx, i) => (
         <mesh key={i} castShadow position={[dx, 0.18, dx * 0.5]}>
-          <sphereGeometry args={[0.18 + i * 0.04, 6, 6]} />
-          <meshStandardMaterial color={color} roughness={0.85} />
+          <dodecahedronGeometry args={[0.18 + i * 0.04, 0]} />
+          <meshStandardMaterial color={color} roughness={0.85} flatShading />
         </mesh>
       ))}
     </group>
+  )
+}
+
+/* ── Soft contact shadow disc (use under characters/props that float) ── */
+export function ContactShadow({ position, radius = 0.55, opacity = 0.45 }: { position: [number, number, number]; radius?: number; opacity?: number }) {
+  return (
+    <mesh position={[position[0], position[1] + 0.011, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+      <circleGeometry args={[radius, 16]} />
+      <meshBasicMaterial color="#000000" transparent opacity={opacity} depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -96,6 +138,47 @@ export function StoneArch({ position, color = '#d7c7a4' }: { position: [number, 
       <mesh castShadow position={[0, 2.2, 0]}>
         <boxGeometry args={[1.7, 0.28, 0.4]} />
         <meshStandardMaterial color={color} roughness={0.6} />
+      </mesh>
+    </group>
+  )
+}
+
+/* ── Static townsfolk silhouette (decoration, not interactive) ── */
+export function Townsfolk({ position, color = '#7c3aed', skin = '#f3d3a3', rotation = 0 }: { position: [number, number, number]; color?: string; skin?: string; rotation?: number }) {
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      {/* Body */}
+      <mesh castShadow position={[0, 0.55, 0]}>
+        <boxGeometry args={[0.5, 0.7, 0.32]} />
+        <meshStandardMaterial color={color} roughness={0.7} />
+      </mesh>
+      {/* Head */}
+      <mesh castShadow position={[0, 1.1, 0]}>
+        <sphereGeometry args={[0.22, 12, 12]} />
+        <meshStandardMaterial color={skin} roughness={0.7} />
+      </mesh>
+      {/* Hair cap */}
+      <mesh castShadow position={[0, 1.22, -0.04]}>
+        <sphereGeometry args={[0.23, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#3f2511" roughness={0.9} />
+      </mesh>
+      {/* Arms */}
+      <mesh castShadow position={[-0.35, 0.6, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.55, 6]} />
+        <meshStandardMaterial color={color} roughness={0.7} />
+      </mesh>
+      <mesh castShadow position={[0.35, 0.6, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.55, 6]} />
+        <meshStandardMaterial color={color} roughness={0.7} />
+      </mesh>
+      {/* Legs */}
+      <mesh castShadow position={[-0.13, 0.12, 0]}>
+        <cylinderGeometry args={[0.09, 0.09, 0.4, 6]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.85} />
+      </mesh>
+      <mesh castShadow position={[0.13, 0.12, 0]}>
+        <cylinderGeometry args={[0.09, 0.09, 0.4, 6]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.85} />
       </mesh>
     </group>
   )
@@ -145,7 +228,7 @@ export function MarketStall({ position, color = '#b45309', awningColor = '#dc262
 }
 
 /* ── Building (2-story shrine/villa) ── */
-export function Building({ position, color = '#e8d4a8', roofColor = '#b91c1c', accent = '#fbbf24' }: { position: [number, number, number]; color?: string; roofColor?: string; accent?: string }) {
+export function Building({ position, color = '#e8d4a8', roofColor = '#b91c1c', accent = '#fbbf24', sign }: { position: [number, number, number]; color?: string; roofColor?: string; accent?: string; sign?: string }) {
   return (
     <group position={position}>
       {/* Foundation */}
@@ -158,25 +241,79 @@ export function Building({ position, color = '#e8d4a8', roofColor = '#b91c1c', a
         <boxGeometry args={[3, 1.6, 1.8]} />
         <meshStandardMaterial color={color} roughness={0.65} />
       </mesh>
+      {/* Wall trim (timber framing) */}
+      <mesh position={[0, 2.18, 0]}>
+        <boxGeometry args={[3.05, 0.1, 1.85]} />
+        <meshStandardMaterial color="#3f2511" roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 0.62, 0]}>
+        <boxGeometry args={[3.05, 0.08, 1.85]} />
+        <meshStandardMaterial color="#3f2511" roughness={0.7} />
+      </mesh>
       {/* Roof */}
       <mesh castShadow position={[0, 2.55, 0]} rotation={[0, Math.PI / 4, 0]}>
         <coneGeometry args={[2, 0.9, 4]} />
         <meshStandardMaterial color={roofColor} roughness={0.6} />
+      </mesh>
+      {/* Roof eaves (overhang ring) */}
+      <mesh position={[0, 2.18, 0]}>
+        <boxGeometry args={[3.4, 0.06, 2.05]} />
+        <meshStandardMaterial color={roofColor} roughness={0.7} />
+      </mesh>
+      {/* Chimney */}
+      <mesh castShadow position={[0.9, 3, -0.4]}>
+        <boxGeometry args={[0.3, 0.9, 0.3]} />
+        <meshStandardMaterial color="#7c2d12" roughness={0.9} />
       </mesh>
       {/* Door */}
       <mesh position={[0, 1, 0.91]}>
         <boxGeometry args={[0.5, 0.9, 0.05]} />
         <meshStandardMaterial color="#3f2511" />
       </mesh>
+      {/* Door frame */}
+      <mesh position={[0, 1.45, 0.92]}>
+        <boxGeometry args={[0.62, 0.04, 0.02]} />
+        <meshStandardMaterial color="#3f2511" />
+      </mesh>
       {/* Window glow */}
       <mesh position={[-1.05, 1.5, 0.91]}>
-        <boxGeometry args={[0.4, 0.4, 0.05]} />
+        <boxGeometry args={[0.42, 0.42, 0.05]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.5} />
+      </mesh>
+      {/* Window cross */}
+      <mesh position={[-1.05, 1.5, 0.94]}>
+        <boxGeometry args={[0.42, 0.04, 0.01]} />
+        <meshStandardMaterial color="#3f2511" />
+      </mesh>
+      <mesh position={[-1.05, 1.5, 0.94]}>
+        <boxGeometry args={[0.04, 0.42, 0.01]} />
+        <meshStandardMaterial color="#3f2511" />
       </mesh>
       <mesh position={[1.05, 1.5, 0.91]}>
-        <boxGeometry args={[0.4, 0.4, 0.05]} />
+        <boxGeometry args={[0.42, 0.42, 0.05]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.5} />
       </mesh>
+      <mesh position={[1.05, 1.5, 0.94]}>
+        <boxGeometry args={[0.42, 0.04, 0.01]} />
+        <meshStandardMaterial color="#3f2511" />
+      </mesh>
+      <mesh position={[1.05, 1.5, 0.94]}>
+        <boxGeometry args={[0.04, 0.42, 0.01]} />
+        <meshStandardMaterial color="#3f2511" />
+      </mesh>
+      {/* Optional shop sign */}
+      {sign && (
+        <group position={[0, 2.05, 1.2]}>
+          <mesh castShadow rotation={[0.05, 0, 0]}>
+            <boxGeometry args={[1.4, 0.32, 0.06]} />
+            <meshStandardMaterial color="#3f2511" roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0, 0.04]} rotation={[0.05, 0, 0]}>
+            <planeGeometry args={[1.34, 0.26]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.4} />
+          </mesh>
+        </group>
+      )}
     </group>
   )
 }
@@ -408,12 +545,24 @@ export function ScatteredScenery({
       out.push({ type: 'building', pos: [-2, 0, -19], color: '#f3e1bb', roofColor: '#1d4ed8' })
       out.push({ type: 'building', pos: [2, 0, 18], color: '#f3e1bb', roofColor: '#b91c1c' })
 
-      // Market stalls clustered at the south path
-      const stallPositions: [number, number, number][] = [
-        [-3, 0, 11], [3, 0, 11], [-5, 0, 13.5], [5, 0, 13.5],
-        [-9, 0, -2], [9, 0, -2],
+      // Market street: stalls + merchants behind them
+      const stallSetup: { stall: [number, number, number]; merchant: [number, number, number]; mColor: string; mRot: number; awning: string }[] = [
+        { stall: [-3, 0, 11], merchant: [-3, 0, 11.7], mColor: '#7c3aed', mRot: Math.PI, awning: '#dc2626' },
+        { stall: [3, 0, 11], merchant: [3, 0, 11.7], mColor: '#0891b2', mRot: Math.PI, awning: '#1d4ed8' },
+        { stall: [-5, 0, 13.5], merchant: [-5, 0, 14.2], mColor: '#16a34a', mRot: Math.PI, awning: '#16a34a' },
+        { stall: [5, 0, 13.5], merchant: [5, 0, 14.2], mColor: '#dc2626', mRot: Math.PI, awning: '#7c2d12' },
+        { stall: [-9, 0, -2], merchant: [-9, 0, -1.3], mColor: '#7c2d12', mRot: 0, awning: '#dc2626' },
+        { stall: [9, 0, -2], merchant: [9, 0, -1.3], mColor: '#9333ea', mRot: 0, awning: '#22d3ee' },
       ]
-      for (const p of stallPositions) out.push({ type: 'stall', pos: p })
+      for (const s of stallSetup) {
+        out.push({ type: 'stall', pos: s.stall, awningColor: s.awning } as any)
+        out.push({ type: 'townsfolk', pos: s.merchant, color: s.mColor, rotation: s.mRot } as any)
+      }
+
+      // A couple of strolling townsfolk near the fountain for life
+      out.push({ type: 'townsfolk', pos: [-4.5, 0, 4.5], color: '#0ea5e9', rotation: 1.2 } as any)
+      out.push({ type: 'townsfolk', pos: [4.5, 0, -4], color: '#facc15', rotation: -2.1 } as any)
+      out.push({ type: 'townsfolk', pos: [3, 0, 6], color: '#a21caf', rotation: -0.8 } as any)
 
       // Lanterns ringing the fountain (ornamental)
       for (let i = 0; i < 8; i++) {
@@ -444,6 +593,13 @@ export function ScatteredScenery({
       out.push({ type: 'logs', pos: [8, 0, 7], rotation: -0.5 } as any)
       out.push({ type: 'rock', pos: [-9, 0, 9], scale: 0.9, color: '#6b7280' })
       out.push({ type: 'rock', pos: [10, 0, -9], scale: 1.1, color: '#5b6470' })
+
+      // Shop signs above some buildings (lightweight indicator of role)
+      out.push({ type: 'building', pos: [-13, 0, -15], color: '#e8d4a8', roofColor: '#b91c1c', sign: 'Smithy' } as any)
+      out.push({ type: 'building', pos: [13, 0, -15], color: '#f5deb3', roofColor: '#1d4ed8', sign: 'Apothecary' } as any)
+      out.push({ type: 'building', pos: [-17, 0, 9], color: '#deb887', roofColor: '#92400e', sign: 'Inn' } as any)
+      out.push({ type: 'building', pos: [17, 0, 9], color: '#e8d4a8', roofColor: '#b91c1c', sign: 'Bank' } as any)
+      // (the earlier 4 blank buildings remain so we have 6 total)
 
       // Original arch + banners
       out.push({ type: 'arch', pos: [0, 0, 18], color: '#d7c7a4' })
@@ -515,9 +671,11 @@ export function ScatteredScenery({
           case 'grass':
             return <GrassTuft key={i} position={it.pos} color={it.color} />
           case 'stall':
-            return <MarketStall key={i} position={it.pos} />
+            return <MarketStall key={i} position={it.pos} awningColor={it.awningColor} />
+          case 'townsfolk':
+            return <Townsfolk key={i} position={it.pos} color={it.color} rotation={it.rotation || 0} />
           case 'building':
-            return <Building key={i} position={it.pos} color={it.color} roofColor={it.roofColor} />
+            return <Building key={i} position={it.pos} color={it.color} roofColor={it.roofColor} sign={it.sign} />
           case 'lantern':
             return <Lantern key={i} position={it.pos} color={it.color} />
           case 'arch':
