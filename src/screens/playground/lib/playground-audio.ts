@@ -271,6 +271,14 @@ export const playgroundAudio = {
       connectTone(ctx, 783.99, 'sine', start + 0.24, 0.48, 0.06)
     })
   },
+  playPortalUnlock() {
+    void runSound((ctx, start) => {
+      connectWhoosh(ctx, start, 0.42, 320, 2400, 0.028)
+      connectTone(ctx, 392, 'triangle', start + 0.04, 0.16, 0.03)
+      connectTone(ctx, 587.33, 'sine', start + 0.18, 0.28, 0.04)
+      connectTone(ctx, 880, 'triangle', start + 0.3, 0.55, 0.045)
+    })
+  },
   playRewardPickup() {
     void runSound((ctx, start) => {
       connectTone(ctx, 880, 'sine', start, 0.12, 0.04)
@@ -288,6 +296,12 @@ export const playgroundAudio = {
       connectTone(ctx, 330, 'triangle', start, 0.18, 0.03)
       connectTone(ctx, 196, 'sawtooth', start + 0.12, 0.28, 0.035)
       connectWhoosh(ctx, start + 0.08, 0.5, 1400, 110, 0.03)
+    })
+  },
+  playLowHpWarning() {
+    void runSound((ctx, start) => {
+      connectTone(ctx, 220, 'sine', start, 0.18, 0.02)
+      connectTone(ctx, 196, 'triangle', start + 0.12, 0.32, 0.028)
     })
   },
   setAmbient(zone: AmbientZone) {

@@ -57,13 +57,37 @@ VITE_PLAYGROUND_WS_URL=ws://localhost:8787 pnpm dev
 
 ## Demo flow (60 seconds)
 
-1. Land on title → enter your builder name → "Enter the Agora"
-2. Click the ground to walk into the plaza
-3. Click Athena → automatically walks to her, opens dialog → take Athena's Scroll
-4. Walk into the Tavern doorway → meet Selene the Tavern Keeper, Apollo, Iris
-5. Exit, walk to Bank → talk to Midas about persistent agent memory
-6. Open the World Map (M) → travel to Forge → fight a rogue model
-7. Open second browser tab → see your other character walk and chat with you in real time
+1. Land on title, enter a builder name, tweak the avatar, then enter the Training Grounds.
+2. Walk to Athena, accept the Hermes Sigil, then open the kit and equip the Training Blade + Novice Cloak.
+3. Send one local chat message, then visit the Archive Podium to explain docs, memory, and iteration recall.
+4. Follow the quest tracker to the Forge Gate, ask Athena or Pan to build something, and trigger the tutorial-complete celebration.
+5. Step through the unlocked Forge Gate, show the short "Generating world..." payoff, then arrive in the Forge with ambient audio live.
+6. Attack the rogue model with Strike / Dash / Bolt and briefly show the low-HP pulse if you let it hit back.
+7. Open a second tab or device to show multiplayer presence, nearby builders, remote nameplate ping, and live chat.
+
+## Hackathon Submission
+
+Hermes Playground turns agent onboarding into a social RPG loop. Instead of reading a wall of docs, builders walk a shared world, meet Hermes-themed NPCs, learn movement, gear, chat, memory, and build rituals, then step through the Forge Gate into a live multiplayer builder realm. It frames Hermes Workspace as a place you inhabit, not just a tool you open.
+
+### 30-60 second demo script
+
+1. "This is Hermes Playground, our multiplayer onboarding RPG for the Nous Research × Kimi hackathon."
+2. "A new builder starts in the Training Grounds, learns the five-step loop, and gets guided by Athena, Iris, and Pan."
+3. "The quest tracker, journal, gear, chat, and docs/memory beats all map to real Hermes builder habits."
+4. "When the last tutorial step lands, the Forge Gate unlocks and we generate a world-intro line through the NPC route."
+5. "Now we’re in the Forge, where prompts become tools, combat becomes benchmark play, and other builders can meet you live in-zone."
+
+### Tweet draft
+
+Hermes Playground turns AI-agent onboarding into a multiplayer RPG: move, gear up, chat, learn docs + memory, then unlock the Forge and build live with friends nearby. Built for the @NousResearch × @Kimi_Moonshot hackathon. #HermesWorkspace #AIAgents
+
+### What to capture
+
+1. Title screen with personalized builder greeting, avatar customizer, and enter flow.
+2. Training Grounds with quest tracker, objective arrow, inventory/equip panel, and archive briefing modal.
+3. Tutorial-complete celebration modal followed by the Forge Gate unlocking with glow/particles.
+4. "Generating world..." overlay and first arrival in the Forge with ambient audio/combat visible.
+5. Two-player multiplayer moment showing nearby builders chip, live chat, and a remote nameplate ping.
 
 ## What's inside
 

@@ -16,10 +16,13 @@ type Props = {
   worlds: Array<{ id: PlaygroundWorldId; name: string; tagline: string; accent: string }>
   onSelectWorld: (world: PlaygroundWorldId) => void
   onReset?: () => void
+  onReplayTutorial?: () => void
   onOpenInventory?: () => void
   onEquipItem: (itemId: PlaygroundItemId) => void
   onUnequipSlot: (slot: EquipmentSlot) => void
   worldAccent: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
@@ -50,10 +53,13 @@ export function PlaygroundSidePanel({
   worlds,
   onSelectWorld,
   onReset,
+  onReplayTutorial,
   onOpenInventory,
   onEquipItem,
   onUnequipSlot,
   worldAccent,
+  open = true,
+  onOpenChange,
 }: Props) {
   const [tab, setTab] = useState<TabId>('inventory')
 
@@ -66,26 +72,35 @@ export function PlaygroundSidePanel({
   const tutorialStep = activeQuest?.id.startsWith('training-q')
     ? Number(activeQuest.id.slice(-1))
     : null
+  const trackerIcon = activeQuest ? iconForObjective(activeQuest.objectives.find((objective) => !progress?.completedObjectives.includes(objective.id))?.type) : '✓'
 
   return (
-    <>
+    <div className="pointer-events-none fixed inset-0 z-[75] md:inset-auto md:pointer-events-auto">
+      {open && <div className="absolute inset-0 bg-black/55 backdrop-blur-sm md:hidden" onClick={() => onOpenChange?.(false)} />}
       {activeQuest && (
         <div
-          className="pointer-events-auto fixed right-3 top-[210px] z-[70] w-[280px] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl"
+          className="pointer-events-auto fixed left-3 right-3 top-3 z-[76] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl md:left-auto md:right-3 md:top-[210px] md:w-[280px]"
           style={{ borderColor: `${worldAccent}55`, boxShadow: `0 0 16px ${worldAccent}33, 0 8px 22px rgba(0,0,0,.55)` }}
         >
           <div className="mb-1 flex items-center justify-between">
             <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/55">Quest Tracker</span>
             <span className="text-[9px] uppercase tracking-[0.12em] text-white/40">J for journal</span>
           </div>
-          <div className="text-[12px] font-bold leading-tight" style={{ color: worldAccent }}>
-            {activeQuest.title}
-          </div>
-          {tutorialStep && (
-            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-              Step {tutorialStep} of 5
+          <div className="flex items-start gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg">
+              {trackerIcon}
             </div>
-          )}
+            <div>
+              <div className="text-[12px] font-bold leading-tight" style={{ color: worldAccent }}>
+                {activeQuest.title}
+              </div>
+              {tutorialStep && (
+                <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+                  Step {tutorialStep} of 5
+                </div>
+              )}
+            </div>
+          </div>
           <div className="mt-1.5 space-y-1">
             {activeQuest.objectives.map((objective) => {
               const done = progress?.completedObjectives.includes(objective.id)
@@ -100,10 +115,21 @@ export function PlaygroundSidePanel({
         </div>
       )}
 
-      <div
-        className="pointer-events-auto fixed right-3 top-[388px] z-[70] w-[280px] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl"
-        style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.6)` }}
-      >
+      {(open || typeof window === 'undefined') && (
+        <div
+          className="pointer-events-auto fixed bottom-4 left-3 right-3 top-[122px] z-[76] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl md:bottom-auto md:left-auto md:right-3 md:top-[388px] md:block md:w-[280px]"
+          style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.6)` }}
+        >
+        <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 md:hidden">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Playground Menu</div>
+          <button
+            type="button"
+            onClick={() => onOpenChange?.(false)}
+            className="rounded-md border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/60"
+          >
+            Close
+          </button>
+        </div>
         <div className="flex items-center justify-between gap-1 border-b border-white/10 px-1.5 py-1.5">
           {TABS.map((entry) => (
             <button
@@ -143,11 +169,30 @@ export function PlaygroundSidePanel({
               onSelectWorld={onSelectWorld}
             />
           )}
-          {tab === 'settings' && <SettingsTab onReset={onReset} />}
+          {tab === 'settings' && <SettingsTab onReset={onReset} onReplayTutorial={onReplayTutorial} />}
         </div>
-      </div>
-    </>
+        </div>
+      )}
+    </div>
   )
+}
+
+function iconForObjective(type: string | undefined) {
+  switch (type) {
+    case 'visit_zone':
+      return '➜'
+    case 'equip_item':
+    case 'open_inventory':
+      return '🧥'
+    case 'send_chat':
+      return '💬'
+    case 'inspect_docs':
+      return '📚'
+    case 'build_prompt':
+      return '⚒'
+    default:
+      return '✦'
+  }
 }
 
 function InventoryTab({
@@ -337,7 +382,13 @@ function WorldsTab({
   )
 }
 
-function SettingsTab({ onReset }: { onReset?: () => void }) {
+function SettingsTab({
+  onReset,
+  onReplayTutorial,
+}: {
+  onReset?: () => void
+  onReplayTutorial?: () => void
+}) {
   return (
     <div className="space-y-2 text-[10px] text-white/70">
       <div>
@@ -354,6 +405,14 @@ function SettingsTab({ onReset }: { onReset?: () => void }) {
           className="rounded-lg border border-rose-400/35 bg-rose-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-500/20"
         >
           Reset local profile
+        </button>
+      )}
+      {onReplayTutorial && (
+        <button
+          onClick={onReplayTutorial}
+          className="w-full rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-100 hover:bg-cyan-400/20"
+        >
+          Replay tutorial
         </button>
       )}
     </div>

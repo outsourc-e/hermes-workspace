@@ -580,6 +580,7 @@ function NPC({
   name,
   color = '#a78bfa',
   drift = true,
+  highlight = false,
   npcId,
   playerRef,
   onNearChange,
@@ -590,6 +591,7 @@ function NPC({
   name: string
   color?: string
   drift?: boolean
+  highlight?: boolean
   npcId?: string
   playerRef?: React.MutableRefObject<THREE.Vector3>
   onNearChange?: (id: string | null) => void
@@ -719,6 +721,11 @@ function NPC({
           <span>{name}</span>
         </div>
       </Html>
+      {highlight && (
+        <Html position={[0, 2.95, 0]} center distanceFactor={8}>
+          <div style={{ color: '#fef08a', fontSize: 24, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow 1s ease-in-out infinite' }}>↓</div>
+        </Html>
+      )}
       {isNear && (
         <Html position={[0, 2.55, 0]} center distanceFactor={8}>
           <div style={{padding:'4px 10px',background:color,color:'#000',borderRadius:6,fontSize:11,fontWeight:800,whiteSpace:'nowrap',boxShadow:`0 0 12px ${color}`,letterSpacing:'0.1em',textTransform:'uppercase'}}>Press E to talk</div>
@@ -734,6 +741,7 @@ function Portal({
   color,
   label,
   locked = false,
+  highlight = false,
   onEnter,
   playerRef,
 }: {
@@ -741,14 +749,28 @@ function Portal({
   color: string
   label: string
   locked?: boolean
+  highlight?: boolean
   onEnter: () => void
   playerRef: React.MutableRefObject<THREE.Vector3>
 }) {
   const ringRef = useRef<THREE.Mesh>(null)
+  const unlockedAtRef = useRef<number | null>(locked ? null : Date.now())
+  const prevLockedRef = useRef(locked)
   const triggered = useRef(false)
   const center = useMemo(() => new THREE.Vector3(...position), [position])
-  useFrame((_, dt) => {
-    if (ringRef.current) ringRef.current.rotation.y += dt * 0.6
+  useEffect(() => {
+    if (prevLockedRef.current && !locked) {
+      unlockedAtRef.current = Date.now()
+    }
+    prevLockedRef.current = locked
+  }, [locked])
+  useFrame(({ clock }, dt) => {
+    const t = clock.getElapsedTime()
+    if (ringRef.current) {
+      ringRef.current.rotation.y += dt * (locked ? 0.45 : 0.85)
+      const pulse = locked ? 1 + Math.sin(t * 2.4) * 0.08 : 1 + Math.sin(t * 3.1) * 0.04
+      ringRef.current.scale.setScalar(pulse)
+    }
     const dist = playerRef.current.distanceTo(center)
     if (dist < 1.5 && !triggered.current && !locked) {
       triggered.current = true
@@ -760,9 +782,22 @@ function Portal({
     <group position={position}>
       <mesh ref={ringRef} position={[0, 1.2, 0]}>
         <torusGeometry args={[1.1, 0.08, 16, 64]} />
-        <meshStandardMaterial color={locked ? '#64748b' : color} emissive={locked ? '#1f2937' : color} emissiveIntensity={locked ? 0.45 : 2} />
+        <meshStandardMaterial color={locked ? '#64748b' : color} emissive={locked ? '#334155' : color} emissiveIntensity={locked ? 0.9 : 2.5} />
       </mesh>
-      {!locked && <pointLight position={[0, 1.2, 0]} color={color} intensity={4} distance={6} />}
+      {!locked && <pointLight position={[0, 1.2, 0]} color={color} intensity={4.8} distance={7} />}
+      {locked && <pointLight position={[0, 1.2, 0]} color="#64748b" intensity={1.2} distance={5} />}
+      {!locked && <Sparkles count={18} scale={[2.5, 2.5, 2.5]} size={2.4} speed={1.8} color={color} opacity={0.8} />}
+      {highlight && (
+        <Html position={[0, 3.4, 0]} center distanceFactor={8}>
+          <div style={{ color: '#fef08a', fontSize: 26, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow 1s ease-in-out infinite' }}>↓</div>
+        </Html>
+      )}
+      {!locked && unlockedAtRef.current && Date.now() - unlockedAtRef.current < 2200 && (
+        <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.8, 2.5, 48]} />
+          <meshBasicMaterial color={color} transparent opacity={0.42} />
+        </mesh>
+      )}
       <Html position={[0, 2.7, 0]} center distanceFactor={8}>
         <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color: locked ? '#cbd5e1' : color,borderRadius:4,fontSize:13,whiteSpace:'nowrap',fontWeight:600}}>{locked ? `${label} · locked` : label}</div>
       </Html>
@@ -775,12 +810,14 @@ function QuestZone({
   position,
   color,
   label,
+  highlight = false,
   onEnter,
   playerRef,
 }: {
   position: [number, number, number]
   color: string
   label: string
+  highlight?: boolean
   onEnter: () => void
   playerRef: React.MutableRefObject<THREE.Vector3>
 }) {
@@ -807,6 +844,11 @@ function QuestZone({
       <Html position={[0, 1.8, 0]} center distanceFactor={8}>
         <div style={{padding:'2px 6px',background:'rgba(0,0,0,0.6)',color,borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>✨ {label}</div>
       </Html>
+      {highlight && (
+        <Html position={[0, 2.65, 0]} center distanceFactor={8}>
+          <div style={{ color: '#fef08a', fontSize: 24, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow 1s ease-in-out infinite' }}>↓</div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -1408,6 +1450,13 @@ const INTERIORS: Record<InteriorId, { title: string; accent: string; keeper: str
   guild: { title: 'Builders’ Guild Hall', accent: '#a78bfa', keeper: 'Cassia · Recruiter', keeperNpc: 'recruiter', keeperAvatar: 'athena', keeperColor: '#a78bfa' },
 }
 
+function matchesObjectiveTarget(current: string | null, candidate: string) {
+  if (!current) return false
+  if (current === candidate) return true
+  if (current === 'build-demo') return candidate === 'build-demo' || candidate === 'athena' || candidate === 'pan'
+  return false
+}
+
 function DoorTrigger({
   position,
   label,
@@ -1642,7 +1691,17 @@ function RemotePlayer({ remote }: { remote: MpRemotePlayer }) {
   const ref = useRef<THREE.Group>(null)
   const target = useMemo(() => new THREE.Vector3(remote.x, remote.y, remote.z), [])
   const targetYaw = useRef(remote.yaw)
+  const [pinged, setPinged] = useState(false)
   useEffect(() => { target.set(remote.x, remote.y, remote.z); targetYaw.current = remote.yaw }, [remote.x, remote.y, remote.z, remote.yaw, target])
+  useEffect(() => {
+    const onPing = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== remote.id) return
+      setPinged(true)
+      window.setTimeout(() => setPinged(false), 2000)
+    }
+    window.addEventListener('hermes-playground-ping-remote', onPing)
+    return () => window.removeEventListener('hermes-playground-ping-remote', onPing)
+  }, [remote.id])
   useFrame(() => {
     if (!ref.current) return
     ref.current.position.lerp(target, 0.18)
@@ -1671,7 +1730,7 @@ function RemotePlayer({ remote }: { remote: MpRemotePlayer }) {
         <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial color={remote.color} side={THREE.DoubleSide} roughness={0.6} /></mesh>
       )}
       <Html position={[0, 1.95, 0]} center distanceFactor={8}>
-        <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'white',borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:`1px solid ${remote.color}`,boxShadow:`0 0 8px ${remote.color}55`}}>
+        <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'white',borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:`1px solid ${remote.color}`,boxShadow:`0 0 8px ${remote.color}55`,transform: pinged ? 'scale(1.08)' : 'scale(1)', transition: 'transform 180ms ease, box-shadow 180ms ease'}}>
           {remote.avatar?.portrait && (
             <img src={`/avatars/${remote.avatar.portrait}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:remote.color,objectFit:'cover',border:`1px solid ${remote.color}`}} />
           )}
@@ -1710,6 +1769,8 @@ function Scene({
   playerPos,
   playerYaw,
   remotePlayers,
+  objectiveTargetId,
+  objectivePulseKey,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
@@ -1732,6 +1793,8 @@ function Scene({
   playerPos: React.MutableRefObject<THREE.Vector3>
   playerYaw: React.MutableRefObject<number>
   remotePlayers: Record<string, MpRemotePlayer>
+  objectiveTargetId: string | null
+  objectivePulseKey: number
 }) {
   const bots = botsFor(worldId)
   const world = WORLDS_3D[worldId]
@@ -1739,7 +1802,20 @@ function Scene({
   const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
   const [interior, setInterior] = useState<InteriorId | null>(null)
   const [outsideSpawn, setOutsideSpawn] = useState<[number, number, number]>([0, 0, 6])
+  const [showObjectiveArrow, setShowObjectiveArrow] = useState(false)
   const pendingNpc = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!objectiveTargetId) {
+      setShowObjectiveArrow(false)
+      return
+    }
+    setShowObjectiveArrow(true)
+    const id = window.setTimeout(() => setShowObjectiveArrow(false), 5000)
+    return () => window.clearTimeout(id)
+  }, [objectivePulseKey, objectiveTargetId])
+
+  const isHighlighted = (target: string) => showObjectiveArrow && matchesObjectiveTarget(objectiveTargetId, target)
 
   const onClickNpc = (id: string, p: [number, number, number]) => {
     // Walk to ~1.6u in front of NPC then auto-open dialog
@@ -1825,11 +1901,11 @@ function Scene({
       {/* NPCs per world */}
       {worldId === 'training' && (
         <>
-          <NPC npcId="athena" position={[-10.5, 0, 7.2]} avatar="athena" name="Athena · Guide" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
-          <NPC npcId="iris" position={[6.2, 0, 0.4]} avatar="iris" name="Iris · Archivist" color={NPC_COLORS.iris} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
-          <NPC npcId="pan" position={[11.2, 0, -7.5]} avatar="pan" name="Pan · Forge Guide" color={NPC_COLORS.pan} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="athena" position={[-10.5, 0, 7.2]} avatar="athena" name="Athena · Guide" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} highlight={isHighlighted('athena')} />
+          <NPC npcId="iris" position={[6.2, 0, 0.4]} avatar="iris" name="Iris · Archivist" color={NPC_COLORS.iris} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} highlight={isHighlighted('archive-podium')} />
+          <NPC npcId="pan" position={[11.2, 0, -7.5]} avatar="pan" name="Pan · Forge Guide" color={NPC_COLORS.pan} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} highlight={isHighlighted('build-demo')} />
           <NPC npcId="nike" position={[-4.8, 0, -4.8]} avatar="nike" name="Leonidas · Trainer" color={NPC_COLORS.nike} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
-          <NPC npcId="shopkeeper" position={[-14.5, 0, -10.2]} avatar="iris" name="Dorian · Quartermaster" color={NPC_COLORS.shopkeeper} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="shopkeeper" position={[-14.5, 0, -10.2]} avatar="iris" name="Dorian · Quartermaster" color={NPC_COLORS.shopkeeper} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} highlight={isHighlighted('training-blade') || isHighlighted('novice-cloak') || isHighlighted('hermes-sigil')} />
         </>
       )}
       {worldId === 'agora' && (
@@ -1885,6 +1961,7 @@ function Scene({
         color={world.accent}
         label={portalLabel}
         locked={portalLocked}
+        highlight={isHighlighted('forge-gate')}
         onEnter={onPortal}
         playerRef={playerPos}
       />
@@ -1892,8 +1969,8 @@ function Scene({
       {/* Quest zones per world */}
       {worldId === 'training' && (
         <>
-          <QuestZone position={[6, 0, 0]} color="#a78bfa" label="Archive Podium" onEnter={() => onQuestZone('archive-podium')} playerRef={playerPos} />
-          <QuestZone position={[14, 0, -10]} color="#22d3ee" label="Forge Gate" onEnter={() => onQuestZone('forge-gate')} playerRef={playerPos} />
+          <QuestZone position={[6, 0, 0]} color="#a78bfa" label="Archive Podium" onEnter={() => onQuestZone('archive-podium')} playerRef={playerPos} highlight={isHighlighted('archive-podium')} />
+          <QuestZone position={[14, 0, -10]} color="#22d3ee" label="Forge Gate" onEnter={() => onQuestZone('forge-gate')} playerRef={playerPos} highlight={isHighlighted('forge-gate')} />
           <Monster
             position={[-4.8, 0.95, -4]}
             color="#f472b6"
@@ -1978,6 +2055,9 @@ export function PlaygroundWorld3D({
   onMonsterAttack,
   multiplayerName,
   onIncomingChat,
+  onRemotePlayersChange,
+  objectiveTargetId,
+  objectivePulseKey,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
@@ -1999,6 +2079,9 @@ export function PlaygroundWorld3D({
   onMonsterAttack: () => void
   multiplayerName?: string
   onIncomingChat?: (msg: IncomingChat) => void
+  onRemotePlayersChange?: (players: Record<string, MpRemotePlayer>) => void
+  objectiveTargetId?: string | null
+  objectivePulseKey?: number
 }) {
   const playerPos = useRef(new THREE.Vector3(0, 0, 6))
   const playerYaw = useRef(0)
@@ -2045,6 +2128,10 @@ export function PlaygroundWorld3D({
     }
   }, [sendChat, online, transport, myName, myColor, selfId, remotePlayers, serverCount])
 
+  useEffect(() => {
+    onRemotePlayersChange?.(remotePlayers)
+  }, [onRemotePlayersChange, remotePlayers])
+
   return (
     <div
       style={{
@@ -2055,6 +2142,12 @@ export function PlaygroundWorld3D({
         background: '#0b1720',
       }}
     >
+      <style>{`
+        @keyframes hermes-target-arrow {
+          0%, 100% { transform: translateY(0); opacity: 0.72; }
+          50% { transform: translateY(6px); opacity: 1; }
+        }
+      `}</style>
       <Canvas
         shadows
         camera={{ position: [10, 12, 10], fov: 45 }}
@@ -2090,6 +2183,8 @@ export function PlaygroundWorld3D({
             playerPos={playerPos}
             playerYaw={playerYaw}
             remotePlayers={remotePlayers}
+            objectiveTargetId={objectiveTargetId ?? null}
+            objectivePulseKey={objectivePulseKey ?? 0}
           />
         </Suspense>
       </Canvas>

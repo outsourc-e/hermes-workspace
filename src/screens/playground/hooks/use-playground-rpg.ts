@@ -56,6 +56,8 @@ const EMPTY_EQUIPPED = {
   artifact: null,
 } satisfies PlayerProfile['equipped']
 
+const STARTER_INVENTORY: PlaygroundItemId[] = ['hermes-sigil', 'training-blade', 'novice-cloak']
+
 function defaultQuestProgress(): Record<string, QuestProgressEntry> {
   return Object.fromEntries(
     PLAYGROUND_QUESTS.map((quest) => [
@@ -95,6 +97,25 @@ function defaultState(): PlaygroundRpgState {
     sp: 80,
     spMax: 80,
     defeats: 0,
+  }
+}
+
+function replayTutorialState(prev: PlaygroundRpgState): PlaygroundRpgState {
+  return {
+    ...prev,
+    unlockedWorlds: ['training', 'agora'],
+    completedQuests: [],
+    hp: prev.hpMax,
+    mp: prev.mpMax,
+    sp: prev.spMax,
+    playerProfile: {
+      ...prev.playerProfile,
+      equipped: { ...EMPTY_EQUIPPED },
+      inventory: [...STARTER_INVENTORY],
+      questProgress: defaultQuestProgress(),
+      titlesUnlocked: prev.playerProfile.titlesUnlocked.filter((title) => title !== 'Initiate Builder'),
+      lastZone: 'training',
+    },
   }
 }
 
@@ -512,6 +533,11 @@ export function usePlaygroundRpg() {
     setToasts([])
   }, [])
 
+  const replayTutorial = useCallback(() => {
+    setState((prev) => replayTutorialState(prev))
+    setToasts([])
+  }, [])
+
   return {
     state,
     activeQuest,
@@ -537,6 +563,7 @@ export function usePlaygroundRpg() {
     useMp,
     recordDefeat,
     resetRpg,
+    replayTutorial,
     toasts,
   }
 }

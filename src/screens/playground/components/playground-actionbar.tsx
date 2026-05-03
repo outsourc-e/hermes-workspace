@@ -98,7 +98,7 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
 
   return (
     <div
-      className="pointer-events-auto fixed bottom-3 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#08111d]/95 to-black/90 px-3 py-2 text-white shadow-2xl backdrop-blur-xl"
+      className="pointer-events-auto fixed bottom-3 left-1/2 z-[70] flex w-[min(94vw,420px)] -translate-x-1/2 items-center justify-center gap-2 rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#08111d]/95 to-black/90 px-3 py-2 text-white shadow-2xl backdrop-blur-xl md:w-auto"
       style={{ boxShadow: '0 0 26px rgba(56,189,248,.18), 0 14px 40px rgba(0,0,0,.6)' }}
     >
       <div className="mr-2 hidden flex-col gap-1 md:flex">

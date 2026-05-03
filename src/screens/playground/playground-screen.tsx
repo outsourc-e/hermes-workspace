@@ -15,6 +15,7 @@ import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
 import { botsFor } from './lib/playground-bots'
 import { itemById, PLAYGROUND_WORLDS, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
+import type { RemotePlayer } from './hooks/use-playground-multiplayer'
 
 const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = {
   training: { name: 'Training Grounds', accent: '#5eead4' },
@@ -24,6 +25,14 @@ const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = 
   oracle: { name: 'Oracle Temple', accent: '#a78bfa' },
   arena: { name: 'Benchmark Arena', accent: '#fb7185' },
 }
+
+const FORGE_INTRO_STORAGE_KEY = 'hermes-playground-forge-intro-seen'
+const FORGE_FALLBACK_FLAVOR =
+  'The Forge wakes with a lattice of cyan sparks as half-finished tools hum themselves into being around you.'
+
+type ForgeIntroState =
+  | { open: false; flavor: string; loading: false }
+  | { open: true; flavor: string; loading: boolean }
 
 class PlaygroundErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -60,15 +69,44 @@ export function PlaygroundScreen() {
   const [mapOpen, setMapOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [tutorialCompleteOpen, setTutorialCompleteOpen] = useState(false)
+  const [forgeIntro, setForgeIntro] = useState<ForgeIntroState>({ open: false, flavor: '', loading: false })
   const [transitioning, setTransitioning] = useState(false)
   const [monsterHp, setMonsterHp] = useState(44)
+  const [remotePlayers, setRemotePlayers] = useState<Record<string, RemotePlayer>>({})
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isNarrow, setIsNarrow] = useState(false)
+  const [objectivePulseKey, setObjectivePulseKey] = useState(0)
   const heardToastIds = useRef<Set<string>>(new Set())
+  const completedTutorialRef = useRef(false)
+  const lowHpArmedRef = useRef(true)
+  const forgeIntroSeenRef = useRef(false)
+  const objectiveSignatureRef = useRef<string>('')
   const monsterHpMax = 44
 
   const activeQuest = rpg.activeQuest
   const currentObjective = rpg.currentObjective
   const forgeUnlocked = rpg.state.unlockedWorlds.includes('forge')
   const monsterDefeated = rpg.state.completedQuests.includes('training-bonus-wisp')
+  const remotePlayersInZone = useMemo(
+    () => Object.values(remotePlayers).filter((player) => player.world === world),
+    [remotePlayers, world],
+  )
+  const lowHpThreshold = rpg.state.hpMax * 0.25
+  const lowHpRecoverThreshold = rpg.state.hpMax * 0.3
+  const lowHpActive = rpg.state.hp <= lowHpThreshold
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    forgeIntroSeenRef.current = window.localStorage.getItem(FORGE_INTRO_STORAGE_KEY) === '1'
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const sync = () => setIsNarrow(window.innerWidth < 760)
+    sync()
+    window.addEventListener('resize', sync)
+    return () => window.removeEventListener('resize', sync)
+  }, [])
 
   useEffect(() => {
     setWorld(rpg.state.playerProfile.lastZone)
@@ -83,10 +121,25 @@ export function PlaygroundScreen() {
   }, [monsterDefeated, world])
 
   useEffect(() => {
-    if (rpg.state.completedQuests.includes('training-q5')) {
+    const completed = rpg.state.completedQuests.includes('training-q5')
+    if (completed && !completedTutorialRef.current) {
+      completedTutorialRef.current = true
       setTutorialCompleteOpen(true)
+      playgroundAudio.playQuestComplete()
+      window.setTimeout(() => playgroundAudio.playPortalUnlock(), 120)
+    }
+    if (!completed) {
+      completedTutorialRef.current = false
     }
   }, [rpg.state.completedQuests])
+
+  useEffect(() => {
+    const signature = `${activeQuest?.id ?? 'done'}:${currentObjective?.id ?? 'idle'}`
+    if (signature !== objectiveSignatureRef.current) {
+      objectiveSignatureRef.current = signature
+      setObjectivePulseKey((value) => value + 1)
+    }
+  }, [activeQuest?.id, currentObjective?.id])
 
   useEffect(() => {
     for (const toast of rpg.toasts) {
@@ -96,6 +149,17 @@ export function PlaygroundScreen() {
       if (toast.kind === 'item') playgroundAudio.playRewardPickup()
     }
   }, [rpg.toasts])
+
+  useEffect(() => {
+    if (rpg.state.hp <= lowHpThreshold && lowHpArmedRef.current) {
+      lowHpArmedRef.current = false
+      playgroundAudio.playLowHpWarning()
+      return
+    }
+    if (rpg.state.hp > lowHpRecoverThreshold) {
+      lowHpArmedRef.current = true
+    }
+  }, [lowHpRecoverThreshold, lowHpThreshold, rpg.state.hp])
 
   useEffect(() => {
     if (!launched) {
@@ -275,6 +339,10 @@ export function PlaygroundScreen() {
 
   function handlePortal() {
     if (world === 'training' && !forgeUnlocked) return
+    if (world === 'training') {
+      void enterForgeFromTraining()
+      return
+    }
     const order: PlaygroundWorldId[] = ['training', 'forge', 'agora', 'grove', 'oracle', 'arena']
     const unlocked = order.filter((id) => rpg.state.unlockedWorlds.includes(id))
     const currentIndex = unlocked.indexOf(world)
@@ -297,11 +365,57 @@ export function PlaygroundScreen() {
     }
   }
 
+  async function enterForgeFromTraining() {
+    playgroundAudio.playPortalWhoosh()
+    setTransitioning(true)
+    const showIntro = !forgeIntroSeenRef.current
+    if (showIntro) {
+      setForgeIntro({ open: true, flavor: '', loading: true })
+      const flavor = await generateForgeFlavor()
+      setForgeIntro({ open: true, flavor, loading: false })
+    }
+    window.setTimeout(() => {
+      setWorld('forge')
+      rpg.setLastZone('forge')
+      if (showIntro) {
+        forgeIntroSeenRef.current = true
+        try { window.localStorage.setItem(FORGE_INTRO_STORAGE_KEY, '1') } catch {}
+      }
+      window.setTimeout(() => {
+        setTransitioning(false)
+        if (showIntro) {
+          window.setTimeout(() => setForgeIntro({ open: false, flavor: '', loading: false }), 1700)
+        }
+      }, 350)
+    }, showIntro ? 1650 : 280)
+  }
+
+  async function generateForgeFlavor() {
+    try {
+      const r = await fetch('/api/playground-npc', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          npcId: 'pan',
+          playerMessage:
+            'Give me a 1-2 sentence in-world world-generation line for a builder first entering the Forge through the Training Grounds gate. Focus on neon tools, prompts hardening into artifacts, and arrival energy.',
+          history: [],
+        }),
+      })
+      if (!r.ok) throw new Error(String(r.status))
+      const data = (await r.json()) as { reply?: string }
+      return data.reply?.trim() || FORGE_FALLBACK_FLAVOR
+    } catch {
+      return FORGE_FALLBACK_FLAVOR
+    }
+  }
+
   if (!launched) {
     return (
       <>
         <TitleScreen
           displayName={rpg.state.playerProfile.displayName}
+          tutorialComplete={rpg.state.completedQuests.includes('training-q5')}
           onChangeDisplayName={rpg.setDisplayName}
           onCustomize={() => setCustomizerOpen(true)}
           onEnter={() => setLaunched(true)}
@@ -342,6 +456,9 @@ export function PlaygroundScreen() {
             attackMonster(8 + Math.floor(Math.random() * 5))
           }}
           onIncomingChat={handleIncomingChat}
+          onRemotePlayersChange={setRemotePlayers}
+          objectiveTargetId={currentObjective?.target ?? null}
+          objectivePulseKey={objectivePulseKey}
         />
 
         <PlaygroundDialog
@@ -407,6 +524,7 @@ export function PlaygroundScreen() {
           toasts={rpg.toasts}
         />
         <PlaygroundOnlineChip accent={WORLD_META[world].accent} />
+        <NearbyBuildersChip players={remotePlayersInZone} />
         <PlaygroundSidePanel
           state={rpg.state}
           currentWorld={world}
@@ -415,11 +533,31 @@ export function PlaygroundScreen() {
             if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
           }}
           onReset={rpg.resetRpg}
+          onReplayTutorial={() => {
+            rpg.replayTutorial()
+            setTutorialCompleteOpen(false)
+            setArchiveOpen(false)
+            setJournalOpen(false)
+            setMapOpen(false)
+            setMobileMenuOpen(false)
+            setWorld('training')
+            try { window.localStorage.removeItem(FORGE_INTRO_STORAGE_KEY) } catch {}
+            forgeIntroSeenRef.current = false
+          }}
           onOpenInventory={rpg.openInventory}
           onEquipItem={rpg.equipItem}
           onUnequipSlot={rpg.unequipSlot}
           worldAccent={WORLD_META[world].accent}
+          open={!isNarrow || mobileMenuOpen}
+          onOpenChange={setMobileMenuOpen}
         />
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(true)}
+          className="pointer-events-auto fixed right-3 top-12 z-[72] rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white shadow-xl backdrop-blur-xl md:hidden"
+          >
+          Menu
+        </button>
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
         <PlaygroundUtilityDock
           audioMuted={audioMuted}
@@ -437,7 +575,17 @@ export function PlaygroundScreen() {
         <TutorialCompleteModal
           open={tutorialCompleteOpen}
           onClose={() => setTutorialCompleteOpen(false)}
+          onStepThroughForgeGate={() => {
+            setTutorialCompleteOpen(false)
+            if (world === 'training' && forgeUnlocked) {
+              void enterForgeFromTraining()
+              return
+            }
+            setWorld('training')
+          }}
         />
+        <ForgeArrivalOverlay open={forgeIntro.open} flavor={forgeIntro.flavor} loading={forgeIntro.loading} />
+        <LowHpOverlay active={lowHpActive} />
         <div
           className="pointer-events-none fixed inset-0 z-[95] transition-opacity duration-300"
           style={{
@@ -452,11 +600,13 @@ export function PlaygroundScreen() {
 
 function TitleScreen({
   displayName,
+  tutorialComplete,
   onChangeDisplayName,
   onCustomize,
   onEnter,
 }: {
   displayName: string
+  tutorialComplete: boolean
   onChangeDisplayName: (value: string) => void
   onCustomize: () => void
   onEnter: () => void
@@ -480,7 +630,11 @@ function TitleScreen({
               Hermes Playground
             </h1>
             <div className="mt-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
-              {displayName.trim().length === 0 ? 'Welcome, builder. What should we call you?' : 'Your agent MMO onboarding loop'}
+              {displayName.trim().length === 0
+                ? 'Welcome, builder. What should we call you?'
+                : tutorialComplete
+                  ? `Ready when you are, ${displayName}.`
+                  : `Ready when you are, ${displayName}.`}
             </div>
             <p className="mt-3 max-w-[640px] text-[15px] text-white/72">
               Enter the Training Grounds, meet Athena, equip your starter kit, learn chat and memory, then unlock the Forge Gate.
@@ -577,23 +731,118 @@ function ArchiveBriefingModal({
   )
 }
 
-function TutorialCompleteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function TutorialCompleteModal({
+  open,
+  onClose,
+  onStepThroughForgeGate,
+}: {
+  open: boolean
+  onClose: () => void
+  onStepThroughForgeGate: () => void
+}) {
   if (!open) return null
   return (
     <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-[520px] rounded-3xl border border-cyan-300/35 bg-[#070b14] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">Training Complete</div>
-        <div className="mt-1 text-xl font-extrabold">Forge Gate Unlocked</div>
+        <div className="mt-1 text-xl font-extrabold">Initiate Builder</div>
         <div className="mt-3 space-y-2 text-sm text-white/80">
-          <p>You earned the title <strong>Initiate Builder</strong>.</p>
-          <p>The Forge portal is now live. Walk through the gate or open the world map with `M` to continue.</p>
+          <p>You learned the full builder loop:</p>
+          <ul className="space-y-1 text-white/72">
+            <li>Movement through the grounds</li>
+            <li>Starter gear and loadout basics</li>
+            <li>Local chat and nearby builders</li>
+            <li>Docs, memory, and briefing recall</li>
+            <li>How Hermes turns prompts into builds</li>
+          </ul>
         </div>
-        <div className="mt-4 flex justify-end">
-          <button onClick={onClose} className="rounded-xl border border-cyan-300/40 bg-cyan-400/15 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-cyan-400/25">
-            Continue
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5">
+            Later
+          </button>
+          <button onClick={onStepThroughForgeGate} className="rounded-xl border border-cyan-300/40 bg-cyan-400/15 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-cyan-400/25">
+            Step through the Forge Gate
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ForgeArrivalOverlay({
+  open,
+  flavor,
+  loading,
+}: {
+  open: boolean
+  flavor: string
+  loading: boolean
+}) {
+  if (!open) return null
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[118] flex items-center justify-center bg-[#030712]/78 p-4 backdrop-blur-md">
+      <div className="w-full max-w-[560px] rounded-3xl border border-cyan-300/30 bg-[#07131a]/92 p-6 text-center text-white shadow-2xl">
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">Forge Gate</div>
+        <div className="mt-2 text-2xl font-extrabold text-cyan-100">Generating world...</div>
+        <div className="mt-4 text-sm text-white/76">
+          {loading ? 'Pan is hardening the first blueprint into a playable space.' : flavor}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NearbyBuildersChip({ players }: { players: RemotePlayer[] }) {
+  const [pingedId, setPingedId] = useState<string | null>(null)
+
+  if (players.length === 0) return null
+
+  return (
+    <div className="pointer-events-auto fixed right-3 top-14 z-[70] hidden w-[240px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block">
+      <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Builders Nearby</div>
+      <div className="space-y-1">
+        {players.map((player) => (
+          <button
+            key={player.id}
+            type="button"
+            onClick={() => {
+              setPingedId(player.id)
+              window.dispatchEvent(new CustomEvent('hermes-playground-ping-remote', { detail: player.id }))
+              window.setTimeout(() => setPingedId((current) => (current === player.id ? null : current)), 2000)
+            }}
+            className="flex w-full items-center justify-between rounded-xl border border-white/8 bg-white/5 px-2 py-1.5 text-left hover:bg-white/10"
+          >
+            <span className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ background: player.color, boxShadow: `0 0 10px ${player.color}` }} />
+              <span className="text-[11px] font-semibold">{player.name}</span>
+            </span>
+            <span className="text-[9px] uppercase tracking-[0.12em] text-white/40">
+              {pingedId === player.id ? 'pinged' : 'ping'}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LowHpOverlay({ active }: { active: boolean }) {
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 z-[90] transition-opacity duration-150"
+      style={{
+        opacity: active ? 1 : 0,
+        background:
+          'radial-gradient(circle at center, transparent 56%, rgba(127,29,29,0.16) 76%, rgba(153,27,27,0.32) 100%)',
+        animation: active ? 'hermes-low-hp-pulse 2.8s ease-in-out infinite' : 'none',
+      }}
+    >
+      <style>{`
+        @keyframes hermes-low-hp-pulse {
+          0%, 100% { opacity: 0.68; }
+          50% { opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }

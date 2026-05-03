@@ -24,7 +24,7 @@ export function PlaygroundHud({
   const { playerProfile } = state
   return (
     <>
-      <div className="pointer-events-auto fixed left-[92px] top-3 z-[70] flex max-w-[340px] flex-col items-start gap-2 md:left-[104px]">
+      <div className="pointer-events-auto fixed left-3 top-20 z-[70] flex max-w-[340px] flex-col items-start gap-2 md:left-[104px] md:top-3">
         <div
           className="rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/90 to-black/85 px-3 py-2 text-white shadow-2xl backdrop-blur-xl"
           style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
@@ -74,7 +74,7 @@ export function PlaygroundHud({
         </div>
       </div>
 
-      <div className="pointer-events-none fixed left-1/2 top-[96px] z-[80] flex max-h-[36vh] w-[min(92vw,440px)] -translate-x-1/2 flex-col gap-2 overflow-visible">
+      <div className="pointer-events-none fixed left-1/2 top-[154px] z-[80] flex max-h-[30vh] w-[min(92vw,440px)] -translate-x-1/2 flex-col gap-2 overflow-visible md:top-[96px] md:max-h-[36vh]">
         {toasts.map((toast) => (
           <div
             key={toast.id}
