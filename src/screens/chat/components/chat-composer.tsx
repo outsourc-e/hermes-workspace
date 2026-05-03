@@ -3,13 +3,14 @@ import {
   Add01Icon,
   ArrowDown01Icon,
   ArrowUp02Icon,
+  AttachmentIcon,
   Cancel01Icon,
   Delete01Icon,
   Mic01Icon,
   StopIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   memo,
   useCallback,
@@ -20,6 +21,12 @@ import {
   useRef,
   useState,
 } from 'react'
+import {
+  MODEL_SWITCH_BLOCKED_TOAST,
+  getZeroForkModelInfoFlags,
+  shouldBlockZeroForkModelSwitch,
+} from './chat-composer-model-switch'
+import { ContextBar } from './context-bar'
 import type { CSSProperties, Ref } from 'react'
 
 import type { ModelCatalogEntry, ModelSwitchResponse } from '@/lib/model-types'
@@ -37,6 +44,7 @@ import { SlashCommandMenu } from '@/components/slash-command-menu'
 import { useSettings } from '@/hooks/use-settings'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
+import { useSessionModelStore } from '@/stores/session-model-store'
 import { Button } from '@/components/ui/button'
 import { usePinnedModels } from '@/hooks/use-pinned-models'
 // import { ModeSelector } from '@/components/mode-selector'
@@ -45,10 +53,10 @@ import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 import { toast } from '@/components/ui/toast'
 import {
-  getZeroForkModelInfoFlags,
-  MODEL_SWITCH_BLOCKED_TOAST,
-  shouldBlockZeroForkModelSwitch,
-} from './chat-composer-model-switch'
+  SEARCH_MODAL_EVENTS,
+  emitSearchModalEvent,
+} from '@/hooks/use-search-modal'
+import { setLocalModelOverride } from '@/screens/chat/local-model-override'
 
 type ChatComposerAttachment = {
   id: string
@@ -60,7 +68,7 @@ type ChatComposerAttachment = {
   kind?: 'image' | 'file' | 'audio'
 }
 
-type ThinkingLevel = 'off' | 'low' | 'adaptive'
+type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
 
 type ChatComposerProps = {
   onSubmit: (
@@ -102,7 +110,8 @@ type ChatComposerHandle = {
 
 function nextThinkingLevel(level: ThinkingLevel): ThinkingLevel {
   if (level === 'off') return 'low'
-  if (level === 'low') return 'adaptive'
+  if (level === 'low') return 'medium'
+  if (level === 'medium') return 'high'
   return 'off'
 }
 
@@ -121,6 +130,33 @@ type SessionStatusApiResponse = {
 
 type GatewayStatusApiResponse = {
   mode?: string
+}
+
+type ProfileSummary = {
+  name: string
+  active?: boolean
+  model?: string
+  provider?: string
+  skillCount?: number
+}
+
+type ProfilesListResponse = {
+  profiles?: Array<ProfileSummary>
+  activeProfile?: string
+}
+
+type WorkspaceEntry = {
+  name: string
+  path: string
+}
+
+type WorkspaceDetectionResponse = {
+  path?: string
+  folderName?: string
+  source?: string
+  isValid?: boolean
+  workspaces?: Array<WorkspaceEntry>
+  last?: string
 }
 
 type ModelInfoApiResponse = {
@@ -262,14 +298,12 @@ async function fetchModelsForProvider(
   }
 
   const payload = (await response.json()) as ClaudeAvailableModelsResponse
-  return (payload.models || []).map((model) => ({
+  return payload.models.map((model) => ({
     id: model.id,
     name: model.id,
     provider: normalizedProvider,
   }))
 }
-
-import { setLocalModelOverride } from '../chat-screen'
 
 const LOCAL_PROVIDERS_SET = new Set(['ollama', 'atomic-chat'])
 
@@ -694,6 +728,53 @@ async function fetchModelInfo(): Promise<ModelInfoApiResponse | null> {
   return (await response.json()) as ModelInfoApiResponse
 }
 
+async function fetchProfiles(): Promise<ProfilesListResponse> {
+  const response = await fetch('/api/profiles/list')
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
+  }
+  return (await response.json()) as ProfilesListResponse
+}
+
+async function activateProfile(name: string): Promise<void> {
+  const response = await fetch('/api/profiles/activate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
+  }
+}
+
+async function fetchWorkspaceContext(): Promise<WorkspaceDetectionResponse> {
+  const response = await fetch('/api/workspace')
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
+  }
+  return (await response.json()) as WorkspaceDetectionResponse
+}
+
+function shortPathLabel(pathValue: string): string {
+  if (!pathValue) return 'Workspace'
+  const parts = pathValue.replace(/\\/g, '/').split('/').filter(Boolean)
+  return parts.at(-1) || pathValue
+}
+
+function thinkingLabel(level: ThinkingLevel): string {
+  if (level === 'off') return 'None'
+  if (level === 'low') return 'Low'
+  if (level === 'medium') return 'Medium'
+  return 'High'
+}
+
+function profileMeta(profile: ProfileSummary): string {
+  return [profile.model, profile.provider]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean)
+    .join(' · ')
+}
+
 function focusPromptTarget(target: HTMLTextAreaElement | null) {
   if (!target) return
   try {
@@ -720,6 +801,7 @@ function ChatComposerComponent({
   embedded = false,
   hideModelSelector = false,
 }: ChatComposerProps) {
+  const queryClient = useQueryClient()
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore(
     (s) => s.mobileComposerFocused,
@@ -745,12 +827,15 @@ function ChatComposerComponent({
   } | null>(null)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
   const { settings: composerSettings } = useSettings()
-  const chatNavMode = composerSettings.mobileChatNavMode ?? 'dock'
+  const chatNavMode = composerSettings.mobileChatNavMode
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
   })
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false)
+  const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false)
   const [isProviderSwitcherExpanded, setIsProviderSwitcherExpanded] =
     useState(false)
   const [isMobileActionsMenuOpen, setIsMobileActionsMenuOpen] = useState(false)
@@ -776,11 +861,14 @@ function ChatComposerComponent({
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
   const slashMenuRef = useRef<SlashCommandMenuHandle | null>(null)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
   const submittingRef = useRef(false)
   const pendingSubmitAfterAttachmentsRef = useRef(false)
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
+  const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
+  const thinkingMenuRef = useRef<HTMLDivElement | null>(null)
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
 
@@ -853,52 +941,80 @@ function ChatComposerComponent({
     [modelInfoQuery.data],
   )
 
+  const profilesQuery = useQuery({
+    queryKey: ['profiles', 'composer'],
+    queryFn: fetchProfiles,
+    retry: false,
+    staleTime: 15_000,
+  })
+  const workspaceContextQuery = useQuery({
+    queryKey: ['workspace', 'composer-context'],
+    queryFn: fetchWorkspaceContext,
+    retry: false,
+    staleTime: 30_000,
+  })
+  const profileActivateMutation = useMutation({
+    mutationFn: activateProfile,
+    onSuccess: async (_data, profileName) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profiles'] }),
+        queryClient.invalidateQueries({ queryKey: ['workspace'] }),
+        queryClient.invalidateQueries({ queryKey: ['claude', 'models'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['claude', 'session-status-model'],
+        }),
+      ])
+      setIsProfileMenuOpen(false)
+      toast(`Activated profile ${profileName}`)
+    },
+    onError: (error) => {
+      toast(
+        error instanceof Error ? error.message : 'Failed to activate profile',
+      )
+    },
+  })
+  const workspaceSelectMutation = useMutation({
+    mutationFn: async (workspace: { path: string; name?: string }) => {
+      const response = await fetch('/api/workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(workspace),
+      })
+      if (!response.ok) {
+        throw new Error(await readResponseError(response))
+      }
+      return (await response.json()) as WorkspaceDetectionResponse
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'composer-context'],
+      })
+      setIsWorkspaceMenuOpen(false)
+    },
+    onError: (error) => {
+      toast(
+        error instanceof Error ? error.message : 'Failed to switch workspace',
+      )
+    },
+  })
+
   // Phase 4.2: (pinned model tracking kept for future use)
   void modelsQuery.data
 
-  const modelSwitchMutation = useMutation({
-    mutationFn: async function doSwitchModel(payload: {
-      model: string
-      provider?: string
-      sessionKey?: string
-    }) {
-      return await switchModel(
-        payload.model,
-        payload.provider,
-        payload.sessionKey,
-      )
-    },
-    onSuccess: function onSuccess(payload: ModelSwitchResponse, variables) {
-      const provider = readText(payload.resolved?.modelProvider)
-      const model = readText(payload.resolved?.model)
-      const resolvedModel =
-        provider && model ? `${provider}/${model}` : model || variables.model
-      setModelNotice({
-        tone: 'success',
-        message: `Model switched to ${resolvedModel}`,
-      })
-      setIsModelMenuOpen(false)
-      void currentModelQuery.refetch()
-    },
-    onError: function onError(error, variables) {
-      const message = error instanceof Error ? error.message : String(error)
-      if (isTimeoutErrorMessage(message)) {
-        setModelNotice({
-          tone: 'error',
-          message: 'Request timed out',
-          retryModel: variables.model,
-          retryProvider: variables.provider,
-        })
-        return
-      }
-      setModelNotice({
-        tone: 'error',
-        message: message || 'Failed to switch model',
-        retryModel: variables.model,
-        retryProvider: variables.provider,
-      })
-    },
-  })
+  // Per-session model override, persisted to localStorage keyed by sessionKey.
+  // Drives both the composer label and the model passed to startStreaming.
+  // Replaces an earlier flow that PATCHed ~/.hermes/config.yaml — that path
+  // 404s and would clobber the global default for every channel anyway.
+  const persistedSessionModel = useSessionModelStore((s) =>
+    s.getModel(sessionKey),
+  )
+  const setPersistedSessionModel = useSessionModelStore((s) => s.setModel)
+
+  // Model switching is now per-session via the persistent store above.
+  // Previously this issued a PATCH /api/hermes-proxy/api/config to write to
+  // ~/.hermes/config.yaml — that endpoint 404s and would clobber the global
+  // default for every channel anyway. The mutation block + retry callback +
+  // dead onError handler were removed alongside it.
 
   const handleModelSelect = useCallback(
     function handleModelSelect(nextModel: string, provider?: string) {
@@ -919,30 +1035,57 @@ function ChatComposerComponent({
         return
       }
       setModelNotice(null)
-      setCurrentSelectedModel(getResolvedModelKey(model, provider))
-      modelSwitchMutation.mutate({
-        model,
-        provider,
-        sessionKey: normalizedSessionKey,
-      })
+      const resolved = getResolvedModelKey(model, provider)
+      // Per-session, browser-local persistence. No global config write —
+      // picking a model here only affects this chat. The actual model is
+      // passed on each request via the chat-completion `model` field.
+      if (normalizedSessionKey) {
+        setPersistedSessionModel(normalizedSessionKey, resolved)
+      }
+      setIsModelMenuOpen(false)
     },
     [
       gatewayModeQuery.data,
-      modelSwitchMutation,
       sessionKey,
+      setPersistedSessionModel,
       zeroForkModelInfoFlags,
     ],
   )
 
-  const retryModel = modelNotice?.retryModel ?? ''
-  const retryProvider = modelNotice?.retryProvider
-  const handleRetryModelSwitch = useCallback(
-    function handleRetryModelSwitch() {
-      if (!retryModel) return
-      handleModelSelect(retryModel, retryProvider)
+  const handleThinkingSelect = useCallback(
+    function handleThinkingSelect(level: ThinkingLevel) {
+      if (onThinkingLevelChange) {
+        onThinkingLevelChange(level)
+      } else {
+        setInternalThinkingLevel(level)
+      }
+      setIsThinkingMenuOpen(false)
     },
-    [handleModelSelect, retryModel, retryProvider],
+    [onThinkingLevelChange],
   )
+
+  const handleOpenWorkspaceManager = useCallback(() => {
+    setIsWorkspaceMenuOpen(false)
+    emitSearchModalEvent(SEARCH_MODAL_EVENTS.TOGGLE_FILE_EXPLORER)
+  }, [])
+
+  const activeProfileName =
+    profilesQuery.data?.activeProfile ||
+    profilesQuery.data?.profiles?.find((profile) => profile.active)?.name ||
+    'default'
+  const activeProfile = profilesQuery.data?.profiles?.find(
+    (profile) => profile.name === activeProfileName,
+  )
+  const workspaceEntries = workspaceContextQuery.data?.workspaces ?? []
+  const detectedWorkspacePath = workspaceContextQuery.data?.path ?? ''
+  const activeWorkspace = workspaceEntries.find(
+    (workspace) => workspace.path === detectedWorkspacePath,
+  )
+  const workspaceButtonLabel =
+    activeWorkspace?.name ||
+    workspaceContextQuery.data?.folderName ||
+    shortPathLabel(detectedWorkspacePath) ||
+    'Workspace'
 
   const currentModel = currentModelQuery.data ?? ''
 
@@ -951,28 +1094,25 @@ function ChatComposerComponent({
   // model/provider configured in ~/.hermes/config.yaml. Users switch
   // via the model selector or Settings page.
 
-  // When model switches to Claude 4.6 and thinking is 'off', auto-upgrade to 'adaptive'
+  // When model switches to Claude 4.6 and thinking is 'off', auto-upgrade to medium effort
   const prevModelRef = useRef('')
   useEffect(() => {
     if (!currentModel || currentModel === prevModelRef.current) return
     prevModelRef.current = currentModel
     if (isClaude46Model(currentModel) && thinkingLevel === 'off') {
       if (onThinkingLevelChange) {
-        onThinkingLevelChange('adaptive')
+        onThinkingLevelChange('medium')
       } else {
-        setInternalThinkingLevel('adaptive')
+        setInternalThinkingLevel('medium')
       }
     }
   }, [currentModel, thinkingLevel, onThinkingLevelChange])
 
-  const isModelSwitcherDisabled = disabled || modelSwitchMutation.isPending
+  const isModelSwitcherDisabled = disabled
   const draftStorageKey = useMemo(
     () => toDraftStorageKey(sessionKey),
     [sessionKey],
   )
-  const [currentSelectedModel, setCurrentSelectedModel] = useState<
-    string | null
-  >(null)
   // On new chat, currentModel is empty until a session is created.
   // Read the runtime model from the models query (first item is from the current provider).
   const configuredModel = useMemo(() => {
@@ -981,8 +1121,10 @@ function ChatComposerComponent({
     const first = models[0]
     return typeof first === 'string' ? first : first.id || first.name || ''
   }, [modelsQuery.data])
+  // Derive the label directly from the store so navigation between sessions
+  // updates without a render-window flash from a stale React-state mirror.
   const modelButtonLabel =
-    currentSelectedModel || currentModel || configuredModel || '⚕ Hermes Agent'
+    persistedSessionModel || currentModel || configuredModel || '⚕ Hermes Agent'
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1075,7 +1217,6 @@ function ChatComposerComponent({
     if (isMobileViewport) return
     // Only focus on focusKey change (session switch), not on every disabled toggle
     focusPrompt()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, isMobileViewport])
 
   useLayoutEffect(() => {
@@ -1094,19 +1235,36 @@ function ChatComposerComponent({
   }, [draftStorageKey])
 
   useEffect(() => {
-    if (!isModelMenuOpen) return
+    if (
+      !isModelMenuOpen &&
+      !isProfileMenuOpen &&
+      !isWorkspaceMenuOpen &&
+      !isThinkingMenuOpen
+    )
+      return
     function handleOutsideClick(event: MouseEvent) {
-      if (!modelSelectorRef.current) return
-      if (modelSelectorRef.current.contains(event.target as Node)) return
+      const target = event.target as Node
+      if (modelSelectorRef.current?.contains(target)) return
+      if (profileMenuRef.current?.contains(target)) return
+      if (workspaceMenuRef.current?.contains(target)) return
+      if (thinkingMenuRef.current?.contains(target)) return
       setIsModelMenuOpen(false)
       setIsProviderSwitcherExpanded(false)
+      setIsProfileMenuOpen(false)
+      setIsWorkspaceMenuOpen(false)
+      setIsThinkingMenuOpen(false)
     }
 
     document.addEventListener('mousedown', handleOutsideClick)
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick)
     }
-  }, [isModelMenuOpen])
+  }, [
+    isModelMenuOpen,
+    isProfileMenuOpen,
+    isWorkspaceMenuOpen,
+    isThinkingMenuOpen,
+  ])
 
   const persistDraft = useCallback(
     function persistDraft(nextValue: string) {
@@ -2084,7 +2242,7 @@ function ChatComposerComponent({
                         >
                           <span className="rounded-lg bg-orange-100 dark:bg-orange-900/30 p-1.5 text-orange-600 dark:text-orange-400">
                             <HugeiconsIcon
-                              icon={Add01Icon}
+                              icon={AttachmentIcon}
                               size={24}
                               strokeWidth={1.5}
                             />
@@ -2231,8 +2389,9 @@ function ChatComposerComponent({
                             const LOCAL_PROVIDER_IDS = ['ollama', 'atomic-chat']
                             const isLocal =
                               (typeof m !== 'string' &&
-                              (m as Record<string, unknown>).description ===
-                                'local') || LOCAL_PROVIDER_IDS.includes(mProvider)
+                                (m as Record<string, unknown>).description ===
+                                  'local') ||
+                              LOCAL_PROVIDER_IDS.includes(mProvider)
                             return {
                               id: mId,
                               name: mName,
@@ -2404,231 +2563,12 @@ function ChatComposerComponent({
                     onClick={handleOpenAttachmentPicker}
                   >
                     <HugeiconsIcon
-                      icon={Add01Icon}
+                      icon={AttachmentIcon}
                       size={20}
                       strokeWidth={1.5}
                     />
                   </Button>
                 </PromptInputAction>
-                {hasDraft && !isLoading && (
-                  <PromptInputAction tooltip="Clear draft">
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      className="rounded-lg text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-red-600"
-                      aria-label="Clear draft"
-                      onClick={handleClearDraft}
-                    >
-                      <HugeiconsIcon
-                        icon={Cancel01Icon}
-                        size={20}
-                        strokeWidth={1.5}
-                      />
-                    </Button>
-                  </PromptInputAction>
-                )}
-                {/* Token counter — bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
-                {value.length >= 100 && (
-                  <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
-                    ~{Math.ceil(value.length / 4)} tokens
-                  </span>
-                )}
-
-                {!hideModelSelector ? (
-                  <div
-                    className="ml-0.5 md:ml-1 flex min-w-0 items-center"
-                    ref={modelSelectorRef}
-                  >
-                  <button
-                    type="button"
-                    onClick={() => setIsModelMenuOpen((prev) => !prev)}
-                    disabled={isModelSwitcherDisabled}
-                    className="inline-flex h-7 max-w-[8rem] items-center rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 text-[11px] font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    title={modelButtonLabel}
-                  >
-                    <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
-                      {modelButtonLabel}
-                    </span>
-                  </button>
-                  {isModelMenuOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-[199]"
-                        onClick={() => setIsModelMenuOpen(false)}
-                      />
-                      <div className="absolute bottom-full left-0 mb-2 z-[200] min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                        <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
-                          {(() => {
-                            const allModels = modelsQuery.data?.models ?? []
-                            const defaultProvider =
-                              modelsQuery.data?.currentProvider ?? ''
-                            if (allModels.length === 0) {
-                              return (
-                                <div className="p-4 text-center text-sm text-neutral-500">
-                                  No models available
-                                </div>
-                              )
-                            }
-                            const parsed = allModels.map((m) => {
-                              const mId = String(
-                                typeof m === 'string'
-                                  ? m
-                                  : m.id || m.model || m.name || 'unknown',
-                              )
-                              const mName = String(
-                                typeof m === 'string'
-                                  ? m
-                                  : m.name ||
-                                      m.displayName ||
-                                      m.label ||
-                                      m.id ||
-                                      m.model ||
-                                      m,
-                              )
-                              const mProvider =
-                                typeof m === 'string'
-                                  ? defaultProvider
-                                  : ((m as Record<string, unknown>)
-                                      .provider as string) || defaultProvider
-                              const isLocal =
-                                typeof m !== 'string' &&
-                                (m as Record<string, unknown>).description ===
-                                  'local'
-                              return {
-                                id: mId,
-                                name: mName,
-                                provider: mProvider,
-                                isLocal,
-                              }
-                            })
-                            const pinnedEntries = parsed.filter((e) =>
-                              isPinned(e.id),
-                            )
-                            const unpinnedGroups = new Map<
-                              string,
-                              typeof parsed
-                            >()
-                            for (const entry of parsed) {
-                              if (isPinned(entry.id)) continue
-                              const group =
-                                unpinnedGroups.get(entry.provider) ?? []
-                              group.push(entry)
-                              unpinnedGroups.set(entry.provider, group)
-                            }
-                            const renderEntry = (entry: (typeof parsed)[0]) => {
-                              const isActive =
-                                entry.id === currentModel ||
-                                `${defaultProvider}/${entry.id}` ===
-                                  currentModel
-                              return (
-                                <div
-                                  key={entry.id}
-                                  className="group relative flex items-center"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleModelSelect(
-                                        entry.id,
-                                        entry.provider || undefined,
-                                      )
-                                      setIsModelMenuOpen(false)
-                                    }}
-                                    className={`flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
-                                      isActive
-                                        ? 'border-l-2 border-accent-500 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100'
-                                        : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/50'
-                                    }`}
-                                  >
-                                    <span className="flex-1 truncate">
-                                      {entry.name}
-                                    </span>
-                                    {entry.isLocal && (
-                                      <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700">
-                                        local
-                                      </span>
-                                    )}
-                                    {isActive && (
-                                      <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
-                                    )}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      togglePin(entry.id)
-                                    }}
-                                    className={`absolute right-2 rounded p-1 transition-opacity ${
-                                      isPinned(entry.id)
-                                        ? 'text-accent-500 opacity-80 hover:opacity-100'
-                                        : 'text-neutral-400 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-accent-500'
-                                    }`}
-                                    aria-label={
-                                      isPinned(entry.id)
-                                        ? `Unpin ${entry.name}`
-                                        : `Pin ${entry.name}`
-                                    }
-                                  >
-                                    <svg
-                                      width="12"
-                                      height="12"
-                                      viewBox="0 0 24 24"
-                                      fill={
-                                        isPinned(entry.id)
-                                          ? 'currentColor'
-                                          : 'none'
-                                      }
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                    >
-                                      <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              )
-                            }
-                            return (
-                              <>
-                                {pinnedEntries.length > 0 && (
-                                  <div className="mb-1 border-b border-neutral-200 dark:border-neutral-700 pb-1">
-                                    <div className="mb-1 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-                                      <svg
-                                        width="12"
-                                        height="12"
-                                        viewBox="0 0 24 24"
-                                        fill="currentColor"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        className="text-accent-500"
-                                      >
-                                        <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
-                                      </svg>
-                                      <span>Pinned</span>
-                                    </div>
-                                    {pinnedEntries.map(renderEntry)}
-                                  </div>
-                                )}
-                                {Array.from(unpinnedGroups.entries())
-                                  .sort((a, b) => a[0].localeCompare(b[0]))
-                                  .map(([provider, models]) => (
-                                    <div key={provider}>
-                                      <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
-                                        {provider}
-                                      </div>
-                                      {models.map(renderEntry)}
-                                    </div>
-                                  ))}
-                              </>
-                            )
-                          })()}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  </div>
-                ) : null}
-              </div>
-              <div className="ml-1 flex shrink-0 items-center gap-0.5 md:gap-1">
                 {voiceInput.isSupported || voiceRecorder.isSupported ? (
                   <PromptInputAction
                     tooltip={
@@ -2686,6 +2626,494 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 ) : null}
+                {hasDraft && !isLoading && (
+                  <PromptInputAction tooltip="Clear draft">
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="rounded-lg text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-red-600"
+                      aria-label="Clear draft"
+                      onClick={handleClearDraft}
+                    >
+                      <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                    </Button>
+                  </PromptInputAction>
+                )}
+                {/* Token counter — bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
+                {value.length >= 100 && (
+                  <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
+                    ~{Math.ceil(value.length / 4)} tokens
+                  </span>
+                )}
+
+                {!hideModelSelector ? (
+                  <>
+                    <div
+                      className="relative ml-0.5 flex min-w-0 items-center"
+                      ref={profileMenuRef}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileMenuOpen((open) => !open)
+                          setIsWorkspaceMenuOpen(false)
+                          setIsThinkingMenuOpen(false)
+                          setIsModelMenuOpen(false)
+                        }}
+                        disabled={disabled || profileActivateMutation.isPending}
+                        className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary-800/60"
+                        title={
+                          activeProfile
+                            ? `${activeProfile.name}${profileMeta(activeProfile) ? ` · ${profileMeta(activeProfile)}` : ''}`
+                            : activeProfileName
+                        }
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <span className="truncate">{activeProfileName}</span>
+                        <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                      </button>
+                      {isProfileMenuOpen && (
+                        <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                            Agent profile
+                          </div>
+                          {(profilesQuery.data?.profiles ?? []).map(
+                            (profile) => {
+                              const selected =
+                                profile.name === activeProfileName
+                              return (
+                                <button
+                                  key={profile.name}
+                                  type="button"
+                                  onClick={() => {
+                                    if (selected) {
+                                      setIsProfileMenuOpen(false)
+                                      return
+                                    }
+                                    profileActivateMutation.mutate(profile.name)
+                                  }}
+                                  className={cn(
+                                    'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                    selected
+                                      ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                  )}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span className="truncate font-medium">
+                                      {profile.name}
+                                    </span>
+                                    {selected ? (
+                                      <span className="text-[10px] text-accent-500">
+                                        active
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {profileMeta(profile) ? (
+                                    <span className="mt-0.5 max-w-[12rem] truncate text-[11px] text-neutral-500">
+                                      {profileMeta(profile)}
+                                    </span>
+                                  ) : null}
+                                </button>
+                              )
+                            },
+                          )}
+                          {profilesQuery.isError ? (
+                            <div className="px-3 py-2 text-xs text-red-500">
+                              Failed to load profiles
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+
+                    <div
+                      className="relative ml-0.5 hidden min-w-0 items-center sm:flex"
+                      ref={workspaceMenuRef}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsWorkspaceMenuOpen((open) => !open)
+                          setIsProfileMenuOpen(false)
+                          setIsThinkingMenuOpen(false)
+                          setIsModelMenuOpen(false)
+                        }}
+                        className="inline-flex h-8 max-w-[9rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                        title={detectedWorkspacePath || 'Workspace context'}
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span className="truncate">{workspaceButtonLabel}</span>
+                        <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                      </button>
+                      {isWorkspaceMenuOpen && (
+                        <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[19rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                            Workspace context
+                          </div>
+                          <div className="max-h-56 overflow-y-auto">
+                            {workspaceEntries.length > 0 ? (
+                              workspaceEntries.map((workspace) => {
+                                const selected =
+                                  workspace.path === detectedWorkspacePath
+                                return (
+                                  <button
+                                    key={workspace.path}
+                                    type="button"
+                                    onClick={() => {
+                                      if (selected) {
+                                        setIsWorkspaceMenuOpen(false)
+                                        return
+                                      }
+                                      workspaceSelectMutation.mutate(workspace)
+                                    }}
+                                    className={cn(
+                                      'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                      selected
+                                        ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                        : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                    )}
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <span className="truncate font-medium">
+                                        {workspace.name ||
+                                          shortPathLabel(workspace.path)}
+                                      </span>
+                                      {selected ? (
+                                        <span className="text-[10px] text-accent-500">
+                                          active
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                    <span className="mt-0.5 max-w-[16rem] truncate font-mono text-[11px] text-neutral-500">
+                                      {workspace.path}
+                                    </span>
+                                  </button>
+                                )
+                              })
+                            ) : (
+                              <div className="px-3 py-2 text-xs text-neutral-500">
+                                No valid workspaces detected
+                              </div>
+                            )}
+                          </div>
+                          {workspaceContextQuery.isError ? (
+                            <div className="px-3 py-2 text-xs text-red-500">
+                              Failed to load workspaces
+                            </div>
+                          ) : null}
+                          <div className="my-1 h-px bg-neutral-200 dark:bg-neutral-800" />
+                          <button
+                            type="button"
+                            onClick={handleOpenWorkspaceManager}
+                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60"
+                          >
+                            Show files sidebar…
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div
+                      className="relative ml-0.5 hidden min-w-0 items-center sm:flex"
+                      ref={thinkingMenuRef}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsThinkingMenuOpen((open) => !open)
+                          setIsProfileMenuOpen(false)
+                          setIsWorkspaceMenuOpen(false)
+                          setIsModelMenuOpen(false)
+                        }}
+                        className={cn(
+                          'inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60',
+                          thinkingLevel === 'off' && 'opacity-70',
+                        )}
+                        title={`Reasoning effort: ${thinkingLabel(thinkingLevel)}`}
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
+                          <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
+                        </svg>
+                        <span>{thinkingLabel(thinkingLevel)}</span>
+                        <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                      </button>
+                      {isThinkingMenuOpen && (
+                        <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[10rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                          {(
+                            [
+                              ['off', 'None'],
+                              ['low', 'Low'],
+                              ['medium', 'Medium'],
+                              ['high', 'High'],
+                            ] as Array<[ThinkingLevel, string]>
+                          ).map(([level, label]) => (
+                            <button
+                              key={level}
+                              type="button"
+                              onClick={() => handleThinkingSelect(level)}
+                              className={cn(
+                                'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                thinkingLevel === level
+                                  ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                  : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                              )}
+                            >
+                              <span>{label}</span>
+                              {thinkingLevel === level ? (
+                                <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+
+                {!hideModelSelector ? (
+                  <div
+                    className="relative ml-0.5 md:ml-1 flex min-w-0 items-center"
+                    ref={modelSelectorRef}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsModelMenuOpen((prev) => !prev)
+                        setIsProfileMenuOpen(false)
+                        setIsWorkspaceMenuOpen(false)
+                        setIsThinkingMenuOpen(false)
+                      }}
+                      disabled={isModelSwitcherDisabled}
+                      className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-primary-100/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      title={modelButtonLabel}
+                    >
+                      <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
+                        {modelButtonLabel}
+                      </span>
+                    </button>
+                    {isModelMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[199]"
+                          onClick={() => setIsModelMenuOpen(false)}
+                        />
+                        <div className="absolute bottom-full left-0 mb-2 z-[200] w-[min(28rem,calc(100vw-2rem))] min-w-[18rem] origin-bottom-left overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                          <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
+                            {(() => {
+                              const allModels = modelsQuery.data?.models ?? []
+                              const defaultProvider =
+                                modelsQuery.data?.currentProvider ?? ''
+                              if (allModels.length === 0) {
+                                return (
+                                  <div className="p-4 text-center text-sm text-neutral-500">
+                                    No models available
+                                  </div>
+                                )
+                              }
+                              const parsed = allModels.map((m) => {
+                                const mId = String(
+                                  typeof m === 'string'
+                                    ? m
+                                    : m.id || m.model || m.name || 'unknown',
+                                )
+                                const mName = String(
+                                  typeof m === 'string'
+                                    ? m
+                                    : m.name ||
+                                        m.displayName ||
+                                        m.label ||
+                                        m.id ||
+                                        m.model ||
+                                        m,
+                                )
+                                const mProvider =
+                                  typeof m === 'string'
+                                    ? defaultProvider
+                                    : ((m as Record<string, unknown>)
+                                        .provider as string) || defaultProvider
+                                const isLocal =
+                                  typeof m !== 'string' &&
+                                  (m as Record<string, unknown>).description ===
+                                    'local'
+                                return {
+                                  id: mId,
+                                  name: mName,
+                                  provider: mProvider,
+                                  isLocal,
+                                }
+                              })
+                              const pinnedEntries = parsed.filter((e) =>
+                                isPinned(e.id),
+                              )
+                              const unpinnedGroups = new Map<
+                                string,
+                                typeof parsed
+                              >()
+                              for (const entry of parsed) {
+                                if (isPinned(entry.id)) continue
+                                const group =
+                                  unpinnedGroups.get(entry.provider) ?? []
+                                group.push(entry)
+                                unpinnedGroups.set(entry.provider, group)
+                              }
+                              const renderEntry = (
+                                entry: (typeof parsed)[0],
+                              ) => {
+                                const isActive =
+                                  entry.id === currentModel ||
+                                  `${defaultProvider}/${entry.id}` ===
+                                    currentModel
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    className="group relative flex items-center"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleModelSelect(
+                                          entry.id,
+                                          entry.provider || undefined,
+                                        )
+                                        setIsModelMenuOpen(false)
+                                      }}
+                                      className={`flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
+                                        isActive
+                                          ? 'border-l-2 border-accent-500 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100'
+                                          : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/50'
+                                      }`}
+                                    >
+                                      <span className="flex-1 truncate">
+                                        {entry.name}
+                                      </span>
+                                      {entry.isLocal && (
+                                        <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700">
+                                          local
+                                        </span>
+                                      )}
+                                      {isActive && (
+                                        <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
+                                      )}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        togglePin(entry.id)
+                                      }}
+                                      className={`absolute right-2 rounded p-1 transition-opacity ${
+                                        isPinned(entry.id)
+                                          ? 'text-accent-500 opacity-80 hover:opacity-100'
+                                          : 'text-neutral-400 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-accent-500'
+                                      }`}
+                                      aria-label={
+                                        isPinned(entry.id)
+                                          ? `Unpin ${entry.name}`
+                                          : `Pin ${entry.name}`
+                                      }
+                                    >
+                                      <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 24 24"
+                                        fill={
+                                          isPinned(entry.id)
+                                            ? 'currentColor'
+                                            : 'none'
+                                        }
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                      >
+                                        <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                )
+                              }
+                              return (
+                                <>
+                                  {pinnedEntries.length > 0 && (
+                                    <div className="mb-1 border-b border-neutral-200 dark:border-neutral-700 pb-1">
+                                      <div className="mb-1 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                                        <svg
+                                          width="12"
+                                          height="12"
+                                          viewBox="0 0 24 24"
+                                          fill="currentColor"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          className="text-accent-500"
+                                        >
+                                          <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
+                                        </svg>
+                                        <span>Pinned</span>
+                                      </div>
+                                      {pinnedEntries.map(renderEntry)}
+                                    </div>
+                                  )}
+                                  {Array.from(unpinnedGroups.entries())
+                                    .sort((a, b) => a[0].localeCompare(b[0]))
+                                    .map(([provider, models]) => (
+                                      <div key={provider}>
+                                        <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
+                                          {provider}
+                                        </div>
+                                        {models.map(renderEntry)}
+                                      </div>
+                                    ))}
+                                </>
+                              )
+                            })()}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+              <div className="ml-1 flex shrink-0 items-center gap-0.5 md:gap-1">
+                <ContextBar compact sessionId={sessionKey} />
                 {isLoading ? (
                   <PromptInputAction tooltip="Stop generation">
                     <Button

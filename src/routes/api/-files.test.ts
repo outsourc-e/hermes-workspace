@@ -42,10 +42,7 @@ describe('ensureWorkspacePath (#121)', () => {
     // The new check (path.relative) correctly rejects it.
     const rel = path.relative(root, sibling)
     const escapes =
-      !rel ||
-      rel.startsWith('..') ||
-      rel === '..' ||
-      path.isAbsolute(rel)
+      !rel || rel.startsWith('..') || rel === '..' || path.isAbsolute(rel)
     expect(escapes).toBe(true)
   })
 
@@ -57,10 +54,7 @@ describe('ensureWorkspacePath (#121)', () => {
 
     const rel = path.relative(root, escape)
     expect(
-      !rel ||
-        rel.startsWith('..') ||
-        rel === '..' ||
-        path.isAbsolute(rel),
+      !rel || rel.startsWith('..') || rel === '..' || path.isAbsolute(rel),
     ).toBe(true)
   })
 
@@ -72,10 +66,7 @@ describe('ensureWorkspacePath (#121)', () => {
 
     const rel = path.relative(root, inside)
     expect(
-      !rel ||
-        rel.startsWith('..') ||
-        rel === '..' ||
-        path.isAbsolute(rel),
+      !rel || rel.startsWith('..') || rel === '..' || path.isAbsolute(rel),
     ).toBe(false)
   })
 

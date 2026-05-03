@@ -45,7 +45,11 @@ const TEXT_REWRITE_EXTENSIONS = new Set([
 ])
 
 function getHermesRoot(): string {
-  return process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
+  return (
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
+  )
 }
 
 function getClaudeRoot(): string {
@@ -95,9 +99,10 @@ function safeReadText(filePath: string): string {
 function readYamlConfig(configPath: string): Record<string, unknown> {
   if (!fs.existsSync(configPath)) return {}
   try {
-    return (
-      (YAML.parse(safeReadText(configPath)) as Record<string, unknown>) || {}
-    )
+    const parsed = YAML.parse(safeReadText(configPath)) as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {}
   } catch {
     return {}
   }
@@ -312,7 +317,6 @@ export function setActiveProfile(name: string): void {
   if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
   fs.mkdirSync(getClaudeRoot(), { recursive: true })
   fs.writeFileSync(getActiveProfilePath(), `${normalized}\n`, 'utf-8')
-  // eslint-disable-next-line no-console
   console.warn(
     `[profiles] Active profile set to "${normalized}". Restart the Hermes Agent gateway for this profile switch to take effect.`,
   )

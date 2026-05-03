@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  getZeroForkModelInfoFlags,
   MODEL_SWITCH_BLOCKED_TOAST,
+  getZeroForkModelInfoFlags,
   shouldBlockZeroForkModelSwitch,
 } from './chat-composer-model-switch'
 
