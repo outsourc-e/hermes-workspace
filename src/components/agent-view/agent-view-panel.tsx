@@ -832,9 +832,15 @@ export function AgentViewPanel() {
     <>
       {isDesktop ? (
         <motion.aside
-          initial={false}
-          animate={{ x: panelVisible ? 0 : panelWidth }}
-          transition={{ duration: 0.22, ease: 'easeInOut' }}
+          initial={{ x: panelWidth, opacity: 0 }}
+          animate={{
+            x: panelVisible ? 0 : panelWidth,
+            opacity: panelVisible ? 1 : 0,
+          }}
+          transition={{
+            x: { duration: 0.32, ease: [0.32, 0.72, 0.24, 1] },
+            opacity: { duration: 0.22, ease: 'easeOut' },
+          }}
           className={cn(
             'fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] z-40 w-72 bg-[color:var(--theme-sidebar,#060914)]/95 backdrop-blur-xl',
             panelVisible ? 'pointer-events-auto' : 'pointer-events-none',
