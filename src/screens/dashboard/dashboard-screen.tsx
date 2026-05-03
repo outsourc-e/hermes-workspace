@@ -905,23 +905,23 @@ export function DashboardScreen() {
               style={{ background: 'transparent' }}
             />
           </span>
-          <div className="flex flex-col leading-none">
+          {/* Iter 011: dropped the 'Operator console · vX.Y.Z'
+              eyebrow. The gateway version is already on the OpsStrip
+              (♦ GATEWAY V0.12.0), so the eyebrow was duplicating it.
+              Single bold lockup feels cleaner; vertical centering on
+              the lockup matches the height of the action cluster on
+              the right so they don't visually drift. */}
+          <div className="flex flex-col justify-center">
             <h1
               className="text-2xl font-bold tracking-tight"
               style={{
                 color: 'var(--theme-text)',
                 letterSpacing: '-0.015em',
+                lineHeight: 1.1,
               }}
             >
               Hermes Workspace
             </h1>
-            <span
-              className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em]"
-              style={{ color: 'var(--theme-muted)' }}
-            >
-              Operator console
-              {overview?.status?.version ? ` · v${overview.status.version}` : ''}
-            </span>
           </div>
         </div>
         {/* Action row: hierarchy per Hermes Agent review.
