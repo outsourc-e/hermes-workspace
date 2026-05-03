@@ -563,6 +563,7 @@ function ChatSidebarComponent({
   const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
+  const isPlaygroundActive = pathname === '/playground'
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
@@ -778,6 +779,13 @@ function ChatSidebarComponent({
       icon: MessageMultiple01Icon,
       label: t('nav.chat'),
       active: isChatActive,
+    },
+    {
+      kind: 'link',
+      to: '/playground',
+      icon: Rocket01Icon,
+      label: 'Playground',
+      active: isPlaygroundActive,
     },
     {
       kind: 'link',

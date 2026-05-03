@@ -16,6 +16,7 @@ import { Route as SwarmRouteImport } from './routes/swarm'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfilesRouteImport } from './routes/profiles'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as JobsRouteImport } from './routes/jobs'
@@ -163,6 +164,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ProfilesRoute = ProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OperationsRoute = OperationsRouteImport.update({
@@ -744,6 +750,7 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
+  '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -866,6 +873,7 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
+  '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
@@ -988,6 +996,7 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
+  '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1112,6 +1121,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/memory'
     | '/operations'
+    | '/playground'
     | '/profiles'
     | '/settings'
     | '/skills'
@@ -1234,6 +1244,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/memory'
     | '/operations'
+    | '/playground'
     | '/profiles'
     | '/skills'
     | '/swarm'
@@ -1355,6 +1366,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/memory'
     | '/operations'
+    | '/playground'
     | '/profiles'
     | '/settings'
     | '/skills'
@@ -1478,6 +1490,7 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
   OperationsRoute: typeof OperationsRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   ProfilesRoute: typeof ProfilesRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -1622,6 +1635,13 @@ declare module '@tanstack/react-router' {
       path: '/profiles'
       fullPath: '/profiles'
       preLoaderRoute: typeof ProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/operations': {
@@ -2544,6 +2564,7 @@ const rootRouteChildren: RootRouteChildren = {
   JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
   OperationsRoute: OperationsRoute,
+  PlaygroundRoute: PlaygroundRoute,
   ProfilesRoute: ProfilesRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
