@@ -1002,7 +1002,7 @@ export function DashboardScreen() {
             aria-label="Settings"
             title="Settings"
             onClick={() => navigate({ to: '/settings', search: {} })}
-            className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
+            className="hidden md:inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
             style={{
               borderColor: 'var(--theme-border)',
               color: 'var(--theme-muted)',
