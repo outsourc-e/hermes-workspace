@@ -1,17 +1,16 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTab, TabsPanel } from '@/components/ui/tabs'
 import { McpServerCard } from './components/mcp-server-card'
 import { McpServerDialog } from './components/mcp-server-dialog'
 import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
 import { useMcpCapabilityMode } from './hooks/use-mcp-capability-mode'
 import { useMcpServers } from './hooks/use-mcp-servers'
-import {  useMcpHub } from './hooks/use-mcp-hub'
+import { useMcpHub, type HubMcpEntry } from './hooks/use-mcp-hub'
 import { SourcesManagerDialog } from './components/sources-manager-dialog'
-import type {HubMcpEntry} from './hooks/use-mcp-hub';
 import type { McpClientInput, McpServer } from '@/types/mcp'
-import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
 
 type Tab = 'installed' | 'marketplace'
 
@@ -24,9 +23,7 @@ export function McpScreen() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<McpServer | McpClientInput | null>(
-    null,
-  )
+  const [editing, setEditing] = useState<McpServer | McpClientInput | null>(null)
   const [installEntry, setInstallEntry] = useState<HubMcpEntry | null>(null)
   const [sourcesOpen, setSourcesOpen] = useState(false)
 
@@ -94,6 +91,18 @@ export function McpScreen() {
         <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-3 backdrop-blur-xl sm:p-4">
           <Tabs value={tab} onValueChange={handleTabChange}>
             <div className="flex flex-wrap items-center gap-2">
+              <TabsList
+                className="rounded-xl border border-primary-200 bg-primary-100/60 p-1"
+                variant="default"
+              >
+                <TabsTab value="installed" className="min-w-[110px]">
+                  Installed
+                </TabsTab>
+                <TabsTab value="marketplace" className="min-w-[120px]">
+                  Marketplace
+                </TabsTab>
+              </TabsList>
+
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -118,18 +127,6 @@ export function McpScreen() {
                   ))}
                 </select>
               ) : null}
-
-              <TabsList
-                className="ml-auto rounded-xl border border-primary-200 bg-primary-100/60 p-1"
-                variant="default"
-              >
-                <TabsTab value="installed" className="min-w-[110px]">
-                  Installed
-                </TabsTab>
-                <TabsTab value="marketplace" className="min-w-[120px]">
-                  Marketplace
-                </TabsTab>
-              </TabsList>
             </div>
 
             <TabsPanel value="installed" className="pt-3">
@@ -147,9 +144,7 @@ export function McpScreen() {
                   <div className="text-xs text-primary-500">
                     Source: {hubQuery.data.source}
                   </div>
-                ) : (
-                  <div />
-                )}
+                ) : <div />}
                 <Button
                   variant="outline"
                   size="sm"
@@ -296,18 +291,15 @@ function EmptyCard({ title, description, tone = 'neutral' }: EmptyCardProps) {
 const TRUST_PILL: Record<string, { label: string; className: string }> = {
   official: {
     label: 'Official',
-    className:
-      'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
+    className: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
   },
   community: {
     label: 'Community',
-    className:
-      'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
+    className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
   },
   unverified: {
     label: 'Unverified',
-    className:
-      'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
+    className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
   },
 }
 
@@ -322,11 +314,7 @@ interface MarketplaceGridProps {
   onInstall: (entry: HubMcpEntry) => void
 }
 
-function MarketplaceGrid({
-  entries,
-  loading,
-  onInstall,
-}: MarketplaceGridProps) {
+function MarketplaceGrid({ entries, loading, onInstall }: MarketplaceGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -411,15 +399,9 @@ function MarketplaceGrid({
 
               <div className="mt-auto flex items-center justify-end gap-2 pt-2">
                 {entry.installed ? (
-                  <span className="text-xs text-primary-500">
-                    Already installed
-                  </span>
+                  <span className="text-xs text-primary-500">Already installed</span>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onInstall(entry)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => onInstall(entry)}>
                     Install
                   </Button>
                 )}

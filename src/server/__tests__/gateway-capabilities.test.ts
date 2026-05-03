@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { existsSync, readFileSync, writeFileSync, mkdirSync } = vi.hoisted(() => ({
   existsSync: vi.fn().mockReturnValue(false),
@@ -64,5 +64,41 @@ describe('gateway-capabilities', () => {
     const resolved = mod.getResolvedUrls()
     expect(resolved.gateway).toBe('http://127.0.0.1:8642')
     expect(resolved.source).toBe('default')
+  })
+
+  describe('isLocalhostDeployment', () => {
+    afterEach(() => {
+      delete process.env.HOST
+    })
+
+    it('returns true for default loopback URLs with no HOST', async () => {
+      const mod = await loadMod()
+      expect(mod.isLocalhostDeployment()).toBe(true)
+    })
+
+    it('returns false when HOST is bound to 0.0.0.0', async () => {
+      process.env.HOST = '0.0.0.0'
+      const mod = await loadMod()
+      expect(mod.isLocalhostDeployment()).toBe(false)
+    })
+
+    it('returns true when HOST is loopback', async () => {
+      process.env.HOST = '127.0.0.1'
+      const mod = await loadMod()
+      expect(mod.isLocalhostDeployment()).toBe(true)
+    })
+
+    it('returns false when gateway URL is rewritten to a non-loopback host', async () => {
+      const mod = await loadMod()
+      // Use the runtime setter to bypass env-var loading paths that the
+      // pre-existing CLAUDE_API_URL test (above) shows are not reliable in
+      // vitest's resetModules cycle.
+      mod.setGatewayUrl('http://10.0.0.5:8642')
+      try {
+        expect(mod.isLocalhostDeployment()).toBe(false)
+      } finally {
+        mod.setGatewayUrl(null as never)
+      }
+    })
   })
 })

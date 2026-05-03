@@ -7,6 +7,7 @@ import {
   CommandLineIcon,
   DashboardSquare01Icon,
   File01Icon,
+  McpServerIcon,
   PuzzleIcon,
   Settings01Icon,
   UserGroupIcon,
@@ -99,6 +100,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     icon: PuzzleIcon,
     to: '/skills',
     match: (p) => p.startsWith('/skills'),
+  },
+  {
+    id: 'mcp',
+    label: 'MCP',
+    icon: McpServerIcon,
+    to: '/mcp',
+    match: (p) => p.startsWith('/mcp'),
   },
   {
     id: 'profiles',

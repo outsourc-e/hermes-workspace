@@ -106,6 +106,16 @@ export function SearchModal() {
         },
       },
       {
+        id: 'qa-mcp',
+        emoji: '🔌',
+        label: 'MCP',
+        description: 'Manage MCP servers and presets',
+        onSelect: () => {
+          closeModal()
+          navigate({ to: '/mcp' })
+        },
+      },
+      {
         id: 'qa-memory',
         emoji: '🧠',
         label: 'Memory',

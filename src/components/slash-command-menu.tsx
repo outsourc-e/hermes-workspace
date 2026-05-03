@@ -36,6 +36,7 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/save', description: 'Save the current conversation' },
   { command: '/skills', description: 'Browse and manage skills' },
   { command: '/plugins', description: 'List installed plugins and their status' },
+  { command: '/mcp', description: 'Manage MCP servers' },
   { command: '/skin', description: 'Change the display theme' },
   { command: '/help', description: 'Show available commands' },
 ]

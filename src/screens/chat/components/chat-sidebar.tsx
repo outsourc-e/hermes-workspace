@@ -10,6 +10,7 @@ import {
   ComputerTerminal01Icon,
   DashboardSquare01Icon,
   File01Icon,
+  McpServerIcon,
   MessageMultiple01Icon,
   Moon02Icon,
   PencilEdit02Icon,
@@ -561,6 +562,7 @@ function ChatSidebarComponent({
     pathname === '/new' || pathname.startsWith('/chat/new')
   const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
+  const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
@@ -844,6 +846,13 @@ function ChatSidebarComponent({
       label: t('nav.skills'),
       active: isSkillsActive,
       dataTour: 'skills',
+    },
+    {
+      kind: 'link',
+      to: '/mcp',
+      icon: McpServerIcon,
+      label: 'MCP',
+      active: isMcpActive,
     },
     {
       kind: 'link',
