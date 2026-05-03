@@ -602,24 +602,6 @@ export function useAgentView(): AgentViewResult {
 
         if (isDisposed) return
 
-        // If gateway is live but classifier produced zero agents,
-        // fall back to demo data so the panel is visibly populated
-        // (Phase 1 of agent-view port — Hermes Workspace status vocabulary
-        // doesn't yet match running/queued/completed brackets).
-        if (
-          nextActiveAgents.length === 0 &&
-          nextQueuedAgents.length === 0 &&
-          nextHistoryAgents.length === 0
-        ) {
-          setActiveAgents(createDemoActiveAgents())
-          setQueuedAgents(createDemoQueue())
-          setHistoryAgents(createDemoHistory())
-          setIsDemoMode(true)
-          setIsLiveConnected(true)
-          setErrorMessage(null)
-          return
-        }
-
         setActiveAgents(dedupeById(nextActiveAgents))
         setQueuedAgents(dedupeById(nextQueuedAgents))
         setHistoryAgents(dedupeById(nextHistoryAgents).slice(0, 10))
@@ -629,10 +611,12 @@ export function useAgentView(): AgentViewResult {
       } catch (error) {
         if (isDisposed) return
 
-        setActiveAgents(createDemoActiveAgents())
-        setQueuedAgents(createDemoQueue())
-        setHistoryAgents(createDemoHistory())
-        setIsDemoMode(true)
+        // Gateway unreachable — leave the panel empty rather than show fake
+        // demo agents that look like real spawns. Show error message instead.
+        setActiveAgents([])
+        setQueuedAgents([])
+        setHistoryAgents([])
+        setIsDemoMode(false)
         setIsLiveConnected(false)
         setErrorMessage(
           error instanceof Error ? error.message : 'Gateway unavailable',
