@@ -354,18 +354,185 @@ function detectWebGL(): boolean {
   if (typeof document === 'undefined') return false
   try {
     const canvas = document.createElement('canvas')
-    return Boolean(
+    const context =
       canvas.getContext('webgl2') ||
-        canvas.getContext('webgl') ||
-        canvas.getContext('experimental-webgl'),
-    )
-  } catch {
+      canvas.getContext('webgl') ||
+      canvas.getContext('experimental-webgl')
+    if (!context) return false
+
+    // R3F can still blank the route if Three's renderer cannot bind the
+    // context (seen with SwiftShader / flaky GPU contexts). Smoke-test the
+    // exact renderer path before mounting Canvas.
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      powerPreference: 'default',
+      failIfMajorPerformanceCaveat: false,
+    })
+    renderer.setSize(16, 16, false)
+    renderer.render(new THREE.Scene(), new THREE.PerspectiveCamera())
+    renderer.forceContextLoss()
+    renderer.dispose()
+    return true
+  } catch (error) {
+    console.warn('Playground WebGL smoke test failed', error)
     return false
   }
 }
 
+function PlaygroundLiteWorld({
+  world,
+  setWorld,
+  quest,
+  setQuest,
+  input,
+  setInput,
+  companionLine,
+  setCompanionLine,
+}: {
+  world: PlaygroundWorld
+  setWorld: (world: PlaygroundWorld) => void
+  quest: QuestState
+  setQuest: (quest: QuestState) => void
+  input: string
+  setInput: (value: string) => void
+  companionLine: string
+  setCompanionLine: (value: string) => void
+}) {
+  const meta = WORLD_META[world]
+  const isForge = world === 'forge'
+
+  function askAthenaLite(text: string) {
+    const body = text.trim()
+    if (!body) return
+    setInput('')
+    if (/generate|build|world|forge|cyber/i.test(body)) {
+      setQuest('generated-world')
+      setCompanionLine('World generated: The Forge. Neon terminals, agent blacksmiths, and mission portals are ready. Click the portal to enter.')
+      return
+    }
+    setQuest(quest === 'start' ? 'met-athena' : quest)
+    setCompanionLine('Hermes Playground is an AI agent RPG: humans explore, agents follow, missions unlock, and worlds are generated from prompts.')
+  }
+
+  function enterPortalLite() {
+    setWorld(isForge ? 'agora' : 'forge')
+    setQuest('complete')
+    setCompanionLine(isForge ? 'Back in The Agora. Every portal can become another generated world.' : 'Welcome to The Forge. The generated world is live, without needing WebGL.')
+  }
+
+  return (
+    <div className="relative flex h-full min-h-[620px] flex-col overflow-hidden" style={{ background: meta.sky, color: 'white' }}>
+      <div className="absolute inset-0 opacity-60" style={{ background: `radial-gradient(circle at 50% 22%, ${meta.accent}55, transparent 34%), linear-gradient(180deg, transparent, #000 92%)` }} />
+      <div className="relative z-10 flex items-start justify-between gap-3 p-4">
+        <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-3 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-center gap-2">
+            <div className="text-lg font-semibold">Hermes Playground</div>
+            <span className="rounded bg-cyan-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">hackathon</span>
+          </div>
+          <div className="mt-1 text-xs text-white/65">GPU-safe world · AI agent RPG demo · {meta.name}</div>
+        </div>
+        <div className="w-[320px] rounded-2xl border border-white/10 bg-black/45 p-3 shadow-2xl backdrop-blur-xl">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">Mission</div>
+            <div className="text-[10px] uppercase tracking-[0.16em]" style={{ color: meta.accent }}>{meta.name}</div>
+          </div>
+          <div className="space-y-1.5 text-xs">
+            <MissionDone done>Enter Playground</MissionDone>
+            <MissionDone done={quest !== 'start'}>Talk to Athena</MissionDone>
+            <MissionDone done={quest === 'generated-world' || quest === 'complete'}>Generate a new world</MissionDone>
+            <MissionDone done={quest === 'complete'}>Enter the portal</MissionDone>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-6 pb-6">
+        <div
+          className="relative h-[430px] w-full overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl"
+          style={{
+            background: `radial-gradient(ellipse at 50% 52%, ${meta.accent}24, transparent 42%), linear-gradient(180deg, ${meta.ground}, #05070c)`,
+            perspective: 900,
+          }}
+        >
+          <div
+            className="absolute left-1/2 top-[58%] h-[520px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border"
+            style={{
+              transform: 'translate(-50%, -50%) rotateX(64deg)',
+              borderColor: `${meta.accent}55`,
+              background: `repeating-linear-gradient(90deg, transparent 0 44px, ${meta.accent}18 45px 46px), repeating-linear-gradient(0deg, transparent 0 44px, ${meta.accent}10 45px 46px)`,
+            }}
+          />
+
+          {(isForge ? [-280, -120, 120, 280] : [-320, -210, 210, 320]).map((x, i) => (
+            <div
+              key={x}
+              className="absolute rounded-t-lg border border-white/10"
+              style={{
+                left: `calc(50% + ${x}px)`,
+                top: isForge ? `${185 + (i % 2) * 55}px` : '120px',
+                width: isForge ? 90 : 42,
+                height: isForge ? 58 : 150,
+                transform: 'translateX(-50%)',
+                background: isForge ? `linear-gradient(180deg, ${meta.accent}66, #111827)` : 'linear-gradient(180deg, #f5e6c8, #8a7355)',
+                boxShadow: isForge ? `0 0 28px ${meta.accent}55` : '0 20px 40px rgba(0,0,0,.35)',
+              }}
+            />
+          ))}
+
+          <button
+            type="button"
+            onClick={enterPortalLite}
+            className="absolute left-[78%] top-[46%] flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs font-bold uppercase tracking-[0.18em] shadow-2xl transition-transform hover:scale-105"
+            style={{ borderColor: meta.accent, color: meta.accent, background: `${meta.accent}18`, boxShadow: `0 0 45px ${meta.accent}66` }}
+          >
+            Portal
+          </button>
+
+          <div className="absolute left-[48%] top-[60%] -translate-x-1/2 -translate-y-1/2 text-center">
+            <img src="/avatars/hermes.png" className="mx-auto h-24 w-24 rounded-full border-2 object-cover shadow-2xl" style={{ borderColor: meta.accent }} />
+            <div className="mt-2 rounded bg-black/55 px-2 py-1 text-xs">You</div>
+          </div>
+          <div className="absolute left-[38%] top-[55%] -translate-x-1/2 -translate-y-1/2 text-center">
+            <img src="/avatars/athena.png" className="mx-auto h-20 w-20 rounded-full border-2 border-purple-300 object-cover shadow-2xl" />
+            <div className="mt-2 rounded bg-black/55 px-2 py-1 text-xs">Athena · Agent</div>
+            {companionLine && (
+              <div className="absolute left-1/2 top-[-92px] w-[290px] -translate-x-1/2 rounded-xl border border-purple-300/30 bg-black/75 px-3 py-2 text-left text-xs leading-snug shadow-xl backdrop-blur">
+                {companionLine}
+              </div>
+            )}
+          </div>
+
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/45 px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/65 backdrop-blur-xl">
+            GPU-safe prototype · click portal · ask Athena
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 mx-auto mb-5 w-full max-w-3xl px-4">
+        <form
+          className="flex gap-2 rounded-2xl border border-white/10 bg-black/45 p-3 shadow-2xl backdrop-blur-xl"
+          onSubmit={(e) => {
+            e.preventDefault()
+            askAthenaLite(input)
+          }}
+        >
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask Athena… try: generate a cyberpunk forge world"
+            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/45"
+          />
+          <button className="rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] text-black" style={{ background: meta.accent }}>
+            Ask
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export function PlaygroundScreen() {
-  const [webglStatus, setWebglStatus] = useState<'idle' | 'supported' | 'unsupported'>('idle')
   const [launch3D, setLaunch3D] = useState(false)
   const [world, setWorld] = useState<PlaygroundWorld>('agora')
   const [quest, setQuest] = useState<QuestState>('start')
@@ -394,18 +561,15 @@ export function PlaygroundScreen() {
       : 'Back to The Agora. Every portal can become a generated world.')
   }
 
-  useEffect(() => {
-    if (!launch3D) return
-    setWebglStatus(detectWebGL() ? 'supported' : 'unsupported')
-  }, [launch3D])
-
   if (!launch3D) {
     return <PlaygroundFallback onLaunch3D={() => setLaunch3D(true)} />
   }
 
-  if (webglStatus !== 'supported') {
-    return <PlaygroundFallback onLaunch3D={() => setLaunch3D(true)} webglFailed />
-  }
+  // Hackathon-safe path: do not mount WebGL by default. Some browsers report
+  // WebGL support, then Three still kills the route while binding the renderer.
+  // This DOM/CSS world is reliable, screenshot-friendly, and keeps the story
+  // alive. True R3F/WebGL can come back behind a separate "Try WebGL" toggle.
+  return <PlaygroundLiteWorld world={world} setWorld={setWorld} quest={quest} setQuest={setQuest} input={input} setInput={setInput} companionLine={companionLine} setCompanionLine={setCompanionLine} />
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden" style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}>
