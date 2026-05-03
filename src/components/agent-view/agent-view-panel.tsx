@@ -375,7 +375,7 @@ function OrchestratorCard({
         )}
       >
         <div className="flex flex-col items-center gap-0.5">
-          <OrchestratorAvatar size={compact ? 32 : 52} />
+          <OrchestratorAvatar size={compact ? 40 : 88} />
           {!compact ? (
             <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-700">
               Main Agent
