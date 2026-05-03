@@ -684,11 +684,13 @@ function PlayerAndCamera({
   spawn = [0, 0, 6],
   positionRef,
   moveTargetRef,
+  bounds = { x: 28, z: 22 },
 }: {
   avatarId?: string
   spawn?: [number, number, number]
   positionRef: React.MutableRefObject<THREE.Vector3>
   moveTargetRef?: React.MutableRefObject<THREE.Vector3 | null>
+  bounds?: { x: number; z: number }
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const texture = useTexture(`/avatars/${avatarId}.png`)
@@ -761,8 +763,8 @@ function PlayerAndCamera({
     }
     isMoving.current = mx !== 0 || mz !== 0
     if (isMoving.current) {
-      positionRef.current.x = THREE.MathUtils.clamp(positionRef.current.x + mx, -28, 28)
-      positionRef.current.z = THREE.MathUtils.clamp(positionRef.current.z + mz, -22, 22)
+      positionRef.current.x = THREE.MathUtils.clamp(positionRef.current.x + mx, -bounds.x, bounds.x)
+      positionRef.current.z = THREE.MathUtils.clamp(positionRef.current.z + mz, -bounds.z, bounds.z)
       yaw.current = Math.atan2(mx, mz)
       bobT.current += delta * 8
     } else {
@@ -1065,6 +1067,192 @@ function BotPlayer({
   )
 }
 
+
+type InteriorId = 'tavern' | 'bank' | 'smithy'
+
+const INTERIORS: Record<InteriorId, { title: string; accent: string; keeper: string; keeperNpc: string; keeperAvatar: string; keeperColor: string }> = {
+  tavern: { title: 'The Signal & Satyr Tavern', accent: '#f59e0b', keeper: 'Selene · Tavern Keeper', keeperNpc: 'tavernkeeper', keeperAvatar: 'apollo', keeperColor: '#f59e0b' },
+  bank: { title: 'Midas Memory Bank', accent: '#facc15', keeper: 'Midas · Banker', keeperNpc: 'banker', keeperAvatar: 'chronos', keeperColor: '#facc15' },
+  smithy: { title: 'Promptforge Smithy', accent: '#fb7185', keeper: 'Leonidas · Trainer', keeperNpc: 'trainer', keeperAvatar: 'nike', keeperColor: '#fb7185' },
+}
+
+function DoorTrigger({
+  position,
+  label,
+  color,
+  playerRef,
+  onEnter,
+}: {
+  position: [number, number, number]
+  label: string
+  color: string
+  playerRef: React.MutableRefObject<THREE.Vector3>
+  onEnter: () => void
+}) {
+  const ref = useRef<THREE.Mesh>(null)
+  const triggered = useRef(false)
+  const center = useMemo(() => new THREE.Vector3(...position), [position])
+  useFrame(({ clock }) => {
+    if (ref.current) {
+      const s = 1 + Math.sin(clock.getElapsedTime() * 3) * 0.04
+      ref.current.scale.setScalar(s)
+    }
+    const dist = playerRef.current.distanceTo(center)
+    if (dist < 1.25 && !triggered.current) {
+      triggered.current = true
+      onEnter()
+      window.setTimeout(() => { triggered.current = false }, 1200)
+    }
+  })
+  return (
+    <group position={position}>
+      <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
+        <ringGeometry args={[0.72, 0.95, 28]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} transparent opacity={0.8} />
+      </mesh>
+      <Html position={[0, 1.5, 0]} center distanceFactor={8}>
+        <div style={{padding:'3px 8px',background:'rgba(0,0,0,0.75)',color,borderRadius:6,fontSize:11,fontWeight:800,whiteSpace:'nowrap',border:`1px solid ${color}`}}>Enter {label}</div>
+      </Html>
+    </group>
+  )
+}
+
+function InteriorScene({
+  id,
+  playerRef,
+  moveTargetRef,
+  onExit,
+  onNpcNearChange,
+}: {
+  id: InteriorId
+  playerRef: React.MutableRefObject<THREE.Vector3>
+  moveTargetRef: React.MutableRefObject<THREE.Vector3 | null>
+  onExit: () => void
+  onNpcNearChange: (npcId: string | null) => void
+}) {
+  const info = INTERIORS[id]
+  const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
+  return (
+    <>
+      <color attach="background" args={['#08070b']} />
+      <fog attach="fog" args={['#08070b', 18, 38]} />
+      <hemisphereLight intensity={0.35} color={'#fff1d0'} groundColor={'#251609'} />
+      <ambientLight intensity={0.42} color={'#f4c982'} />
+      <directionalLight castShadow position={[6, 10, 8]} intensity={1.1} color={'#ffe4b5'} shadow-mapSize={[1024, 1024]} />
+      <pointLight position={[0, 3, -2]} color={info.accent} intensity={2.1} distance={16} />
+
+      {/* click-to-walk interior floor catcher */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.007, 0]} onPointerDown={(e) => {
+        e.stopPropagation()
+        const x = THREE.MathUtils.clamp(e.point.x, -8, 8)
+        const z = THREE.MathUtils.clamp(e.point.z, -7, 7)
+        moveTargetRef.current = new THREE.Vector3(x, 0, z)
+        setPingPos([x, 0.05, z])
+        window.setTimeout(() => setPingPos(null), 700)
+      }}>
+        <planeGeometry args={[18, 16, 1, 1]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {pingPos && <mesh position={pingPos} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.45, 0.6, 32]} /><meshBasicMaterial color={info.accent} transparent opacity={0.85} /></mesh>}
+
+      <InteriorRoom id={id} accent={info.accent} />
+      <NPC npcId={info.keeperNpc} position={[0, 0, -3.8]} avatar={info.keeperAvatar} name={info.keeper} color={info.keeperColor} drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />
+      {id === 'tavern' && (
+        <>
+          <NPC npcId="apollo" position={[-4.5, 0, 1.5]} avatar="apollo" name="Apollo · Bard" color="#f59e0b" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />
+          <NPC npcId="iris" position={[4.5, 0, 1.2]} avatar="iris" name="Iris · Messenger" color="#22d3ee" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />
+        </>
+      )}
+      {id === 'bank' && <NPC npcId="chronos" position={[-4.5, 0, 1.2]} avatar="chronos" name="Chronos · Archivist" color="#facc15" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />}
+      {id === 'smithy' && <NPC npcId="pan" position={[4.4, 0, 1.3]} avatar="pan" name="Pan · Toolwright" color="#34d399" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />}
+
+      <ExitTrigger playerRef={playerRef} onExit={onExit} accent={info.accent} />
+      <Suspense fallback={null}>
+        <PlayerAndCamera positionRef={playerRef} spawn={[0, 0, 4.7]} moveTargetRef={moveTargetRef} bounds={{ x: 8, z: 7 }} />
+      </Suspense>
+      <Html position={[0, 4.2, -6.8]} center distanceFactor={10}>
+        <div style={{padding:'6px 12px',background:'rgba(0,0,0,0.78)',color:info.accent,border:`1px solid ${info.accent}`,borderRadius:10,fontSize:14,fontWeight:900,whiteSpace:'nowrap',letterSpacing:'0.08em',textTransform:'uppercase'}}>{info.title}</div>
+      </Html>
+    </>
+  )
+}
+
+function ExitTrigger({ playerRef, onExit, accent }: { playerRef: React.MutableRefObject<THREE.Vector3>; onExit: () => void; accent: string }) {
+  const triggered = useRef(false)
+  const center = useMemo(() => new THREE.Vector3(0, 0, 6.2), [])
+  useFrame(() => {
+    const dist = playerRef.current.distanceTo(center)
+    if (dist < 1.05 && !triggered.current) {
+      triggered.current = true
+      onExit()
+      window.setTimeout(() => { triggered.current = false }, 1200)
+    }
+  })
+  return (
+    <group position={[0, 0, 6.2]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+        <ringGeometry args={[0.7, 0.92, 32]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.6} transparent opacity={0.78} />
+      </mesh>
+      <Html position={[0, 1.25, 0]} center distanceFactor={8}><div style={{padding:'3px 8px',background:'rgba(0,0,0,0.75)',color:accent,borderRadius:6,fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>Exit to Agora</div></Html>
+    </group>
+  )
+}
+
+function InteriorRoom({ id, accent }: { id: InteriorId; accent: string }) {
+  const wallColor = id === 'bank' ? '#1f2937' : id === 'smithy' ? '#281512' : '#2b1d12'
+  const floorColor = id === 'bank' ? '#5b6470' : id === 'smithy' ? '#51301b' : '#6b4528'
+  return (
+    <group>
+      {/* floor + carpet */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}><planeGeometry args={[18, 16]} /><meshStandardMaterial color={floorColor} roughness={0.92} /></mesh>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}><planeGeometry args={[5.5, 9]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.06} roughness={0.7} transparent opacity={0.55} /></mesh>
+      {/* walls */}
+      <mesh receiveShadow castShadow position={[0, 2, -8]}><boxGeometry args={[18, 4, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.78} /></mesh>
+      <mesh receiveShadow castShadow position={[-9, 2, 0]}><boxGeometry args={[0.35, 4, 16]} /><meshStandardMaterial color={wallColor} roughness={0.78} /></mesh>
+      <mesh receiveShadow castShadow position={[9, 2, 0]}><boxGeometry args={[0.35, 4, 16]} /><meshStandardMaterial color={wallColor} roughness={0.78} /></mesh>
+      <mesh receiveShadow castShadow position={[0, 2, 8]}><boxGeometry args={[18, 4, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.78} /></mesh>
+      {/* open door cutout visual */}
+      <mesh position={[0, 1, 7.78]}><boxGeometry args={[2.2, 2.1, 0.08]} /><meshStandardMaterial color="#090909" emissive="#000" /></mesh>
+      {/* ceiling beams */}
+      {[-6, -3, 0, 3, 6].map((x) => <mesh key={x} castShadow position={[x, 3.92, 0]}><boxGeometry args={[0.22, 0.2, 16]} /><meshStandardMaterial color="#3f2511" roughness={0.8} /></mesh>)}
+
+      {id === 'tavern' && <TavernProps accent={accent} />}
+      {id === 'bank' && <BankProps accent={accent} />}
+      {id === 'smithy' && <SmithyProps accent={accent} />}
+    </group>
+  )
+}
+
+function TavernProps({ accent }: { accent: string }) {
+  return <group>
+    <mesh castShadow position={[0, 0.55, -5.8]}><boxGeometry args={[5.6, 1.1, 1]} /><meshStandardMaterial color="#7c4a1f" roughness={0.8} /></mesh>
+    {[-6, -3, 3, 6].map((x) => <group key={x} position={[x, 0, 2]}><mesh castShadow position={[0, 0.42, 0]}><boxGeometry args={[1.2, 0.18, 1.2]} /><meshStandardMaterial color="#7c4a1f" /></mesh><mesh castShadow position={[0, 0.22, 0]}><cylinderGeometry args={[0.12, 0.16, 0.44, 8]} /><meshStandardMaterial color="#3f2511" /></mesh><mesh castShadow position={[0.75, 0.42, 0.65]}><boxGeometry args={[0.32, 0.85, 0.32]} /><meshStandardMaterial color="#6b3a18" /></mesh></group>)}
+    <mesh castShadow position={[-6.8, 1.2, -6.8]}><boxGeometry args={[2.2, 2.2, 0.35]} /><meshStandardMaterial color="#2b1008" emissive="#ef4444" emissiveIntensity={0.25} /></mesh>
+    <pointLight position={[-6.8, 1.4, -6.4]} color="#f97316" intensity={2.2} distance={8} />
+    <mesh position={[0, 1.5, -7.7]}><boxGeometry args={[2.4, 0.5, 0.08]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.3} /></mesh>
+  </group>
+}
+
+function BankProps({ accent }: { accent: string }) {
+  return <group>
+    <mesh castShadow position={[0, 0.75, -5.8]}><boxGeometry args={[6.4, 1.5, 1]} /><meshStandardMaterial color="#374151" metalness={0.25} roughness={0.55} /></mesh>
+    {[-5.5, -3.5, 3.5, 5.5].map((x) => <mesh key={x} castShadow position={[x, 0.65, 1]}><boxGeometry args={[1, 1.3, 1]} /><meshStandardMaterial color="#111827" metalness={0.45} roughness={0.35} /></mesh>)}
+    <mesh castShadow position={[6.9, 1.4, -5.6]}><boxGeometry args={[1.4, 2.4, 0.5]} /><meshStandardMaterial color="#0f172a" metalness={0.55} roughness={0.35} emissive={accent} emissiveIntensity={0.05} /></mesh>
+    <mesh position={[6.9, 1.4, -5.28]}><circleGeometry args={[0.35, 24]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} /></mesh>
+  </group>
+}
+
+function SmithyProps({ accent }: { accent: string }) {
+  return <group>
+    <mesh castShadow position={[-4.8, 0.55, -4.8]}><boxGeometry args={[2.6, 1.1, 1.4]} /><meshStandardMaterial color="#7c2d12" roughness={0.75} emissive="#f97316" emissiveIntensity={0.18} /></mesh>
+    <pointLight position={[-4.8, 1.3, -4.8]} color="#fb923c" intensity={2.2} distance={8} />
+    <mesh castShadow position={[0, 0.45, -2.2]}><boxGeometry args={[1.35, 0.45, 0.9]} /><meshStandardMaterial color="#64748b" metalness={0.55} roughness={0.4} /></mesh>
+    <mesh castShadow position={[4.7, 0.8, -4.9]}><boxGeometry args={[2.8, 1.6, 0.8]} /><meshStandardMaterial color="#3f2511" roughness={0.85} /></mesh>
+    {[0, 1, 2].map((i) => <mesh key={i} castShadow position={[3.8 + i * 0.55, 1.75, -4.48]} rotation={[0, 0, -0.7]}><boxGeometry args={[0.08, 0.85, 0.08]} /><meshStandardMaterial color={accent} metalness={0.55} roughness={0.36} emissive={accent} emissiveIntensity={0.2} /></mesh>)}
+  </group>
+}
+
 /* ── Scene ── */
 function Scene({
   worldId,
@@ -1084,6 +1272,23 @@ function Scene({
   const playerPos = useRef(new THREE.Vector3(0, 0, 6))
   const moveTarget = useRef<THREE.Vector3 | null>(null)
   const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
+  const [interior, setInterior] = useState<InteriorId | null>(null)
+  const [outsideSpawn, setOutsideSpawn] = useState<[number, number, number]>([0, 0, 6])
+
+  if (interior) {
+    return (
+      <InteriorScene
+        id={interior}
+        playerRef={playerPos}
+        moveTargetRef={moveTarget}
+        onExit={() => {
+          moveTarget.current = null
+          setInterior(null)
+        }}
+        onNpcNearChange={onNpcNearChange}
+      />
+    )
+  }
 
   return (
     <>
@@ -1144,6 +1349,9 @@ function Scene({
           <NPC npcId="banker" position={[15.3, 0, 7.5]} avatar="chronos" name="Midas · Banker" color={NPC_COLORS.banker} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
           <NPC npcId="recruiter" position={[-1.2, 0, -15.5]} avatar="athena" name="Cassia · Recruiter" color={NPC_COLORS.recruiter} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
           <NPC npcId="tavernkeeper" position={[2, 0, 15.5]} avatar="apollo" name="Selene · Tavern" color={NPC_COLORS.tavernkeeper} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <DoorTrigger position={[2, 0, 16.4]} label="Tavern" color="#f59e0b" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([2, 0, 16.7]); setInterior('tavern') }} />
+          <DoorTrigger position={[15.7, 0, 8.5]} label="Bank" color="#facc15" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([15.7, 0, 8.8]); setInterior('bank') }} />
+          <DoorTrigger position={[-12.7, 0, -13.9]} label="Smithy" color="#fb7185" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([-12.7, 0, -13.5]); setInterior('smithy') }} />
         </>
       )}
       {worldId === 'forge' && (
@@ -1201,7 +1409,7 @@ function Scene({
       )}
 
       <Suspense fallback={null}>
-        <PlayerAndCamera positionRef={playerPos} spawn={[0, 0, 6]} moveTargetRef={moveTarget} />
+        <PlayerAndCamera positionRef={playerPos} spawn={outsideSpawn} moveTargetRef={moveTarget} />
       </Suspense>
 
       {/* Online bot players */}
