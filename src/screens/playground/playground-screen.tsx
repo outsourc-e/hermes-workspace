@@ -12,6 +12,7 @@ import { PlaygroundMinimap } from './components/playground-minimap'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
+import { PlaygroundCustomizer } from './components/playground-customizer'
 import { botsFor } from './lib/playground-bots'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import {
@@ -620,6 +621,7 @@ export function PlaygroundScreen() {
   const [dialogNpc, setDialogNpc] = useState<string | null>(null)
   const [nearbyNpc, setNearbyNpc] = useState<string | null>(null)
   const [journalOpen, setJournalOpen] = useState(false)
+  const [customizerOpen, setCustomizerOpen] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [transitioning, setTransitioning] = useState(false)
@@ -758,6 +760,7 @@ export function PlaygroundScreen() {
       }
       const k = e.key.toLowerCase()
       if (k === 'j') setJournalOpen((j) => !j)
+      if (k === 'c') setCustomizerOpen((c) => !c)
       if (k === 'm') setMapOpen((m) => !m)
       if (k === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
       if (k === 't') setChatCollapsed(false)
@@ -869,6 +872,7 @@ export function PlaygroundScreen() {
           onGrantSkillXp={(skills) => rpg.grantSkillXp(skills)}
         />
         <PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} />
+        <PlaygroundCustomizer open={customizerOpen} onClose={() => setCustomizerOpen(false)} />
         <PlaygroundMap
           open={mapOpen}
           onClose={() => setMapOpen(false)}
@@ -936,6 +940,14 @@ export function PlaygroundScreen() {
           {WORLD_META[world].name} · Click ground = walk · Click NPC = talk · WASD/arrows · Shift sprint · E talk · J journal · M map · T chat · [/] zoom
         </div>
         <PlaygroundOnboardingCard />
+        <button
+          onClick={() => setCustomizerOpen(true)}
+          className="pointer-events-auto fixed bottom-3 right-3 z-[70] rounded-xl border-2 border-cyan-300/50 bg-cyan-400/15 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
+          style={{ boxShadow: '0 0 14px rgba(34,211,238,0.35)' }}
+          title="Customize avatar (C)"
+        >
+          👤 Customize Avatar
+        </button>
       </div>
     </PlaygroundErrorBoundary>
   )

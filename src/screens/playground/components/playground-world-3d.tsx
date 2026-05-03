@@ -12,6 +12,21 @@ import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor, type BotProfile } from '../lib/playground-bots'
 import { ScatteredScenery } from './playground-environment'
 import { usePlaygroundMultiplayer, type RemotePlayer as MpRemotePlayer, type IncomingChat } from '../hooks/use-playground-multiplayer'
+import { loadAvatarConfig, type AvatarConfig } from '../lib/avatar-config'
+
+function useAvatarConfig() {
+  const [cfg, setCfg] = useState<AvatarConfig>(() => loadAvatarConfig())
+  useEffect(() => {
+    const update = () => setCfg(loadAvatarConfig())
+    window.addEventListener('hermes-playground-avatar-changed', update)
+    window.addEventListener('storage', update)
+    return () => {
+      window.removeEventListener('hermes-playground-avatar-changed', update)
+      window.removeEventListener('storage', update)
+    }
+  }, [])
+  return cfg
+}
 
 type DecorType = 'classical' | 'tech' | 'forest' | 'temple' | 'arena'
 
@@ -699,7 +714,7 @@ function useKeyboard() {
 
 /* ── Walking player + iso follow camera (no physics, simple kinematic) ── */
 function PlayerAndCamera({
-  avatarId = 'hermes',
+  avatarId,
   spawn = [0, 0, 6],
   positionRef,
   moveTargetRef,
@@ -713,8 +728,10 @@ function PlayerAndCamera({
   bounds?: { x: number; z: number }
   yawOutRef?: React.MutableRefObject<number>
 }) {
+  const cfg = useAvatarConfig()
+  const portraitId = avatarId || cfg.portrait || 'hermes'
   const groupRef = useRef<THREE.Group>(null)
-  const texture = useTexture(`/avatars/${avatarId}.png`)
+  const texture = useTexture(`/avatars/${portraitId}.png`)
   const keys = useKeyboard()
   const { camera } = useThree()
   const camIdeal = useMemo(() => new THREE.Vector3(), [])
@@ -866,13 +883,13 @@ function PlayerAndCamera({
       {/* Torso */}
       <mesh position={[0, 0.7, 0]} castShadow>
         <boxGeometry args={[0.5, 0.55, 0.34]} />
-        <meshStandardMaterial color="#2dd4bf" roughness={0.5} />
+        <meshStandardMaterial color={cfg.outfit} roughness={0.5} emissive={cfg.outfit} emissiveIntensity={0.08} />
       </mesh>
 
       {/* Belt accent */}
       <mesh position={[0, 0.46, 0]} castShadow>
         <boxGeometry args={[0.52, 0.06, 0.36]} />
-        <meshStandardMaterial color="#facc15" roughness={0.4} metalness={0.4} />
+        <meshStandardMaterial color={cfg.outfitAccent} roughness={0.4} metalness={0.4} />
       </mesh>
 
       {/* Arms */}
@@ -882,7 +899,7 @@ function PlayerAndCamera({
         castShadow
       >
         <boxGeometry args={[0.14, 0.5, 0.14]} />
-        <meshStandardMaterial color="#2dd4bf" roughness={0.5} />
+        <meshStandardMaterial color={cfg.outfit} roughness={0.5} />
       </mesh>
       <mesh
         position={[-0.34, 0.7, 0]}
@@ -890,82 +907,146 @@ function PlayerAndCamera({
         castShadow
       >
         <boxGeometry args={[0.14, 0.5, 0.14]} />
-        <meshStandardMaterial color="#2dd4bf" roughness={0.5} />
+        <meshStandardMaterial color={cfg.outfit} roughness={0.5} />
       </mesh>
 
       {/* Hands */}
       <mesh position={[0.34, 0.43, isMoving.current ? -swing * 0.18 : 0]} castShadow>
         <sphereGeometry args={[0.1, 12, 12]} />
-        <meshStandardMaterial color="#fcd34d" roughness={0.5} />
+        <meshStandardMaterial color={cfg.skin} roughness={0.5} />
       </mesh>
       <mesh position={[-0.34, 0.43, isMoving.current ? swing * 0.18 : 0]} castShadow>
         <sphereGeometry args={[0.1, 12, 12]} />
-        <meshStandardMaterial color="#fcd34d" roughness={0.5} />
+        <meshStandardMaterial color={cfg.skin} roughness={0.5} />
       </mesh>
 
       {/* Neck */}
       <mesh position={[0, 1.05, 0]} castShadow>
         <cylinderGeometry args={[0.09, 0.1, 0.1, 12]} />
-        <meshStandardMaterial color="#fcd34d" roughness={0.6} />
+        <meshStandardMaterial color={cfg.skin} roughness={0.6} />
       </mesh>
 
       {/* Head sphere base */}
       <mesh position={[0, 1.22, 0]} castShadow>
         <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial color="#fcd34d" roughness={0.55} />
+        <meshStandardMaterial color={cfg.skin} roughness={0.55} />
       </mesh>
 
       {/* Eyes */}
       <mesh position={[0.085, 1.24, 0.19]}>
         <sphereGeometry args={[0.025, 8, 8]} />
-        <meshStandardMaterial color="#0b1220" />
+        <meshStandardMaterial color={cfg.eyes} />
       </mesh>
       <mesh position={[-0.085, 1.24, 0.19]}>
         <sphereGeometry args={[0.025, 8, 8]} />
-        <meshStandardMaterial color="#0b1220" />
+        <meshStandardMaterial color={cfg.eyes} />
       </mesh>
-      {/* Hair */}
-      <mesh position={[0, 1.34, -0.02]} castShadow>
-        <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#3f2511" roughness={0.85} />
-      </mesh>
-      {/* Helmet/circlet (gold band) */}
-      <mesh position={[0, 1.28, 0]} castShadow>
-        <torusGeometry args={[0.225, 0.025, 8, 24]} />
-        <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
-      </mesh>
-      {/* Hermes wings on circlet (signature) */}
-      <mesh castShadow position={[0.18, 1.32, -0.02]} rotation={[0, 0, 0.6]}>
-        <coneGeometry args={[0.06, 0.18, 5]} />
-        <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
-      </mesh>
-      <mesh castShadow position={[-0.18, 1.32, -0.02]} rotation={[0, 0, -0.6]}>
-        <coneGeometry args={[0.06, 0.18, 5]} />
-        <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
-      </mesh>
+      {/* Hair styles */}
+      {cfg.hairStyle === 'short' && (
+        <mesh position={[0, 1.34, -0.02]} castShadow>
+          <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color={cfg.hair} roughness={0.85} />
+        </mesh>
+      )}
+      {cfg.hairStyle === 'cap' && (
+        <mesh position={[0, 1.36, -0.02]} castShadow>
+          <sphereGeometry args={[0.245, 14, 14, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+          <meshStandardMaterial color={cfg.hair} roughness={0.85} />
+        </mesh>
+      )}
+      {cfg.hairStyle === 'long' && (<>
+        <mesh position={[0, 1.34, -0.02]} castShadow>
+          <sphereGeometry args={[0.245, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color={cfg.hair} roughness={0.85} />
+        </mesh>
+        <mesh position={[0, 1.0, -0.18]} castShadow>
+          <boxGeometry args={[0.4, 0.45, 0.08]} />
+          <meshStandardMaterial color={cfg.hair} roughness={0.85} />
+        </mesh>
+      </>)}
+      {cfg.hairStyle === 'mohawk' && (
+        <mesh position={[0, 1.42, 0]} castShadow>
+          <boxGeometry args={[0.07, 0.18, 0.4]} />
+          <meshStandardMaterial color={cfg.hair} roughness={0.85} />
+        </mesh>
+      )}
+      {cfg.helmet === 'circlet' && (
+        <mesh position={[0, 1.28, 0]} castShadow>
+          <torusGeometry args={[0.225, 0.025, 8, 24]} />
+          <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
+        </mesh>
+      )}
+      {cfg.helmet === 'crown' && (<>
+        <mesh position={[0, 1.28, 0]} castShadow>
+          <torusGeometry args={[0.225, 0.025, 8, 24]} />
+          <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
+        </mesh>
+        {[0, Math.PI / 3, -Math.PI / 3, Math.PI * 2 / 3, -Math.PI * 2 / 3, Math.PI].map((a, i) => (
+          <mesh key={i} position={[Math.cos(a) * 0.225, 1.34, Math.sin(a) * 0.225]} castShadow>
+            <coneGeometry args={[0.025, 0.08, 4]} />
+            <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
+          </mesh>
+        ))}
+      </>)}
+      {cfg.helmet === 'cap' && (
+        <mesh position={[0, 1.4, -0.02]} castShadow>
+          <sphereGeometry args={[0.24, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+          <meshStandardMaterial color={cfg.outfit} roughness={0.55} emissive={cfg.outfit} emissiveIntensity={0.15} />
+        </mesh>
+      )}
+      {cfg.helmet === 'winged' && (<>
+        <mesh position={[0, 1.28, 0]} castShadow>
+          <torusGeometry args={[0.225, 0.025, 8, 24]} />
+          <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
+        </mesh>
+        <mesh castShadow position={[0.18, 1.32, -0.02]} rotation={[0, 0, 0.6]}>
+          <coneGeometry args={[0.06, 0.18, 5]} />
+          <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
+        </mesh>
+        <mesh castShadow position={[-0.18, 1.32, -0.02]} rotation={[0, 0, -0.6]}>
+          <coneGeometry args={[0.06, 0.18, 5]} />
+          <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
+        </mesh>
+      </>)}
       {/* Shoulder pads */}
       <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}>
         <boxGeometry args={[0.26, 0.14, 0.22]} />
-        <meshStandardMaterial color="#0e7490" metalness={0.55} roughness={0.4} emissive="#0891b2" emissiveIntensity={0.18} />
+        <meshStandardMaterial color={cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={cfg.outfitAccent} emissiveIntensity={0.18} />
       </mesh>
       <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}>
         <boxGeometry args={[0.26, 0.14, 0.22]} />
-        <meshStandardMaterial color="#0e7490" metalness={0.55} roughness={0.4} emissive="#0891b2" emissiveIntensity={0.18} />
+        <meshStandardMaterial color={cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={cfg.outfitAccent} emissiveIntensity={0.18} />
       </mesh>
-      {/* Cape */}
-      <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}>
-        <planeGeometry args={[0.78, 1]} />
-        <meshStandardMaterial color="#0891b2" side={THREE.DoubleSide} roughness={0.55} emissive="#0e7490" emissiveIntensity={0.18} />
-      </mesh>
-      {/* Sword on hip */}
-      <mesh castShadow position={[-0.32, 0.5, 0.05]} rotation={[0.05, 0, 1.45]}>
-        <boxGeometry args={[0.04, 0.85, 0.04]} />
-        <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.2} />
-      </mesh>
-      <mesh castShadow position={[-0.32, 0.13, 0.05]} rotation={[0, 0, 1.45]}>
-        <boxGeometry args={[0.16, 0.05, 0.07]} />
-        <meshStandardMaterial color="#7c2d12" roughness={0.85} />
-      </mesh>
+      {/* Cape (optional) */}
+      {cfg.cape !== 'transparent' && (
+        <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}>
+          <planeGeometry args={[0.78, 1]} />
+          <meshStandardMaterial color={cfg.cape} side={THREE.DoubleSide} roughness={0.55} emissive={cfg.cape} emissiveIntensity={0.12} />
+        </mesh>
+      )}
+      {/* Weapon */}
+      {cfg.weapon === 'sword' && (<>
+        <mesh castShadow position={[-0.32, 0.5, 0.05]} rotation={[0.05, 0, 1.45]}>
+          <boxGeometry args={[0.04, 0.85, 0.04]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.2} />
+        </mesh>
+        <mesh castShadow position={[-0.32, 0.13, 0.05]} rotation={[0, 0, 1.45]}>
+          <boxGeometry args={[0.16, 0.05, 0.07]} />
+          <meshStandardMaterial color="#7c2d12" roughness={0.85} />
+        </mesh>
+      </>)}
+      {cfg.weapon === 'staff' && (
+        <mesh castShadow position={[0.4, 0.85, 0.05]} rotation={[0, 0, -0.1]}>
+          <cylinderGeometry args={[0.04, 0.04, 1.7, 8]} />
+          <meshStandardMaterial color="#7c4a1f" roughness={0.7} emissive={cfg.outfitAccent} emissiveIntensity={0.18} />
+        </mesh>
+      )}
+      {cfg.weapon === 'bow' && (
+        <mesh castShadow position={[0.45, 0.7, 0.05]} rotation={[0, 0, -0.4]}>
+          <torusGeometry args={[0.45, 0.025, 8, 18, Math.PI]} />
+          <meshStandardMaterial color="#7c4a1f" roughness={0.7} />
+        </mesh>
+      )}
 
       {/* Avatar portrait billboard slightly above head */}
       <Billboard position={[0, 1.6, 0]}>
