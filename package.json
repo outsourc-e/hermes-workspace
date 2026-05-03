@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
+    "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",

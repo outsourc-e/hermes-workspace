@@ -79,12 +79,68 @@ export function usePlaygroundMultiplayer({
   const myName = name && name.trim().length > 0 ? name.trim() : `Builder-${selfId.slice(2, 6)}`
 
   const channelRef = useRef<BroadcastChannel | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
+  const wsOpenRef = useRef(false)
   const [remotePlayers, setRemotePlayers] = useState<Record<string, RemotePlayer>>({})
   const [online, setOnline] = useState(false)
+  const [transport, setTransport] = useState<'broadcast' | 'ws' | 'both'>('broadcast')
 
   // Stable refs to avoid re-subscribing
   const onChatRef = useRef(onChat)
   useEffect(() => { onChatRef.current = onChat }, [onChat])
+
+  // Open WebSocket transport (optional, controlled by VITE_PLAYGROUND_WS_URL)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const url = (import.meta as any).env?.VITE_PLAYGROUND_WS_URL as string | undefined
+    if (!url) return
+    let ws: WebSocket | null = null
+    let stop = false
+    let retry = 0
+    const open = () => {
+      if (stop) return
+      try {
+        ws = new WebSocket(url + (url.endsWith('/playground') ? '' : '/playground'))
+      } catch {
+        return
+      }
+      wsRef.current = ws
+      ws.addEventListener('open', () => {
+        wsOpenRef.current = true
+        retry = 0
+        setTransport((t) => (t === 'broadcast' ? 'both' : 'ws'))
+      })
+      ws.addEventListener('message', (ev) => {
+        let msg: Wire | { kind: 'hello' }
+        try { msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '') } catch { return }
+        if (!msg || !('kind' in msg)) return
+        if (msg.kind === 'hello') return
+        if (msg.kind === 'presence' && msg.id !== selfId) {
+          setRemotePlayers((prev) => ({ ...prev, [msg.id]: msg as RemotePlayer }))
+        } else if (msg.kind === 'leave' && msg.id !== selfId) {
+          setRemotePlayers((prev) => { const { [msg.id]: _, ...rest } = prev; return rest })
+        } else if (msg.kind === 'chat' && msg.id !== selfId) {
+          onChatRef.current?.(msg as ChatWire)
+        }
+      })
+      ws.addEventListener('close', () => {
+        wsOpenRef.current = false
+        wsRef.current = null
+        setTransport((t) => (t === 'both' ? 'broadcast' : t === 'ws' ? 'broadcast' : t))
+        if (!stop) {
+          retry = Math.min(8, retry + 1)
+          window.setTimeout(open, retry * 500)
+        }
+      })
+      ws.addEventListener('error', () => { try { ws?.close() } catch {} })
+    }
+    open()
+    return () => {
+      stop = true
+      try { ws?.close() } catch {}
+      wsRef.current = null
+    }
+  }, [selfId])
 
   // Open channel
   useEffect(() => {
@@ -146,6 +202,9 @@ export function usePlaygroundMultiplayer({
         ts: Date.now(),
       }
       try { ch.postMessage(wire) } catch {}
+      if (wsOpenRef.current && wsRef.current) {
+        try { wsRef.current.send(JSON.stringify(wire)) } catch {}
+      }
       const cutoff = Date.now() - STALE_AFTER_MS
       setRemotePlayers((prev) => {
         let dirty = false
@@ -173,6 +232,9 @@ export function usePlaygroundMultiplayer({
       ts: Date.now(),
     }
     try { ch.postMessage(wire) } catch {}
+    if (wsOpenRef.current && wsRef.current) {
+      try { wsRef.current.send(JSON.stringify(wire)) } catch {}
+    }
   }, [selfId, myName, myColor, world])
 
   return {
@@ -180,6 +242,7 @@ export function usePlaygroundMultiplayer({
     myName,
     myColor,
     online,
+    transport,
     remotePlayers,
     sendChat,
   }
