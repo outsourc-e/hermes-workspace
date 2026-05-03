@@ -165,11 +165,13 @@ function NPC({
   position,
   avatar,
   name,
+  color = '#a78bfa',
   drift = true,
 }: {
   position: [number, number, number]
   avatar: string
   name: string
+  color?: string
   drift?: boolean
 }) {
   const ref = useRef<THREE.Group>(null)
@@ -211,25 +213,53 @@ function NPC({
         <boxGeometry args={[0.18, 0.07, 0.28]} />
         <meshStandardMaterial color="#0f172a" roughness={0.7} />
       </mesh>
-      {/* torso (robe) */}
+      {/* torso (robe) — colored per NPC */}
       <mesh position={[0, 0.7, 0]} castShadow>
         <boxGeometry args={[0.5, 0.55, 0.32]} />
-        <meshStandardMaterial color="#475569" roughness={0.55} />
+        <meshStandardMaterial color={color} roughness={0.55} emissive={color} emissiveIntensity={0.15} />
+      </mesh>
+      {/* belt accent matching player */}
+      <mesh position={[0, 0.46, 0]} castShadow>
+        <boxGeometry args={[0.52, 0.05, 0.34]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.4} roughness={0.4} />
+      </mesh>
+      {/* arms */}
+      <mesh position={[0.32, 0.7, 0]} castShadow>
+        <boxGeometry args={[0.13, 0.5, 0.13]} />
+        <meshStandardMaterial color={color} roughness={0.55} />
+      </mesh>
+      <mesh position={[-0.32, 0.7, 0]} castShadow>
+        <boxGeometry args={[0.13, 0.5, 0.13]} />
+        <meshStandardMaterial color={color} roughness={0.55} />
+      </mesh>
+      {/* hands */}
+      <mesh position={[0.32, 0.43, 0]} castShadow>
+        <sphereGeometry args={[0.09, 12, 12]} />
+        <meshStandardMaterial color="#fde68a" roughness={0.5} />
+      </mesh>
+      <mesh position={[-0.32, 0.43, 0]} castShadow>
+        <sphereGeometry args={[0.09, 12, 12]} />
+        <meshStandardMaterial color="#fde68a" roughness={0.5} />
+      </mesh>
+      {/* neck */}
+      <mesh position={[0, 1.05, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.095, 0.1, 12]} />
+        <meshStandardMaterial color="#fde68a" roughness={0.55} />
       </mesh>
       {/* head sphere */}
-      <mesh position={[0, 1.15, 0]} castShadow>
+      <mesh position={[0, 1.22, 0]} castShadow>
         <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial color="#fcd34d" roughness={0.55} />
+        <meshStandardMaterial color="#fde68a" roughness={0.55} />
       </mesh>
-      {/* portrait billboard on head */}
-      <Billboard position={[0, 1.25, 0]}>
+      {/* portrait billboard slightly above head */}
+      <Billboard position={[0, 1.55, 0]}>
         <mesh>
-          <planeGeometry args={[0.55, 0.55]} />
+          <planeGeometry args={[0.7, 0.7]} />
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
-      <Html position={[0, 1.8, 0]} center distanceFactor={8}>
-        <div style={{padding:'2px 6px',background:'rgba(0,0,0,0.6)',color:'white',borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>{name}</div>
+      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
+        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color:'white',borderRadius:4,fontSize:11,fontWeight:600,whiteSpace:'nowrap',border:`1px solid ${color}`}}>{name}</div>
       </Html>
     </group>
   )
@@ -502,15 +532,15 @@ function PlayerAndCamera({
         <meshStandardMaterial color="#fcd34d" roughness={0.55} />
       </mesh>
 
-      {/* Avatar portrait billboard on the head */}
-      <Billboard position={[0, 1.32, 0]}>
+      {/* Avatar portrait billboard slightly above head */}
+      <Billboard position={[0, 1.55, 0]}>
         <mesh>
-          <planeGeometry args={[0.55, 0.55]} />
+          <planeGeometry args={[0.7, 0.7]} />
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
 
-      <Html position={[0, 1.95, 0]} center distanceFactor={8}>
+      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
         <div
           style={{
             padding: '2px 6px',
@@ -526,6 +556,19 @@ function PlayerAndCamera({
       </Html>
     </group>
   )
+}
+
+/* NPC color palette per persona */
+const NPC_COLORS: Record<string, string> = {
+  athena: '#a78bfa', // purple, Sage
+  apollo: '#f59e0b', // amber, Bard
+  iris: '#22d3ee', // cyan, Messenger
+  nike: '#fb7185', // rose, Champion
+  pan: '#34d399', // emerald, Hacker
+  chronos: '#facc15', // yellow, Architect
+  hermes: '#2dd4bf', // teal
+  artemis: '#9ca3af',
+  eros: '#f472b6',
 }
 
 /* ── Scene ── */
@@ -555,16 +598,16 @@ function Scene({
       {/* NPCs */}
       {worldId === 'agora' && (
         <>
-          <NPC position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" />
-          <NPC position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" />
-          <NPC position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" />
-          <NPC position={[6, 0, -4]} avatar="nike" name="Nike · Champion" />
+          <NPC position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" color={NPC_COLORS.athena} />
+          <NPC position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" color={NPC_COLORS.apollo} />
+          <NPC position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" color={NPC_COLORS.iris} />
+          <NPC position={[6, 0, -4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} />
         </>
       )}
       {worldId === 'forge' && (
         <>
-          <NPC position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" />
-          <NPC position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" />
+          <NPC position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" color={NPC_COLORS.pan} />
+          <NPC position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" color={NPC_COLORS.chronos} />
         </>
       )}
 
