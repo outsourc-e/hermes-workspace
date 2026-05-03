@@ -13,28 +13,29 @@ import { useAutocompleteFilter } from '@/components/ui/autocomplete'
 import { Command, CommandItem, CommandList } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 
-type SlashCommandDefinition = {
+export type SlashCommandDefinition = {
   command: string
   description: string
 }
 
-type SlashCommandMenuProps = {
+export type SlashCommandMenuProps = {
   open: boolean
   query: string
   onSelect: (command: SlashCommandDefinition) => void
 }
 
-type SlashCommandMenuHandle = {
+export type SlashCommandMenuHandle = {
   moveSelection: (step: number) => void
   selectActive: () => boolean
 }
 
-const SLASH_COMMANDS: Array<SlashCommandDefinition> = [
+export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/new', description: 'Start new session' },
   { command: '/clear', description: 'Clear screen and start fresh' },
   { command: '/model', description: 'Show or change the current model' },
   { command: '/save', description: 'Save the current conversation' },
   { command: '/skills', description: 'Browse and manage skills' },
+  { command: '/plugins', description: 'List installed plugins and their status' },
   { command: '/skin', description: 'Change the display theme' },
   { command: '/help', description: 'Show available commands' },
 ]
@@ -48,9 +49,9 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
 
   const filteredCommands = useMemo(() => {
     const normalizedQuery = query.trim()
-    if (!normalizedQuery) return SLASH_COMMANDS
+    if (!normalizedQuery) return DEFAULT_SLASH_COMMANDS
 
-    return SLASH_COMMANDS.filter((item) =>
+    return DEFAULT_SLASH_COMMANDS.filter((item) =>
       filter.contains(
         item,
         normalizedQuery,
