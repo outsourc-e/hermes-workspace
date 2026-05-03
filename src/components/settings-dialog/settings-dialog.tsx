@@ -252,6 +252,9 @@ function HermesContent() {
   )
   const [memEnabled, setMemEnabled] = useState(true)
   const [userProfileEnabled, setUserProfileEnabled] = useState(true)
+  const [customBaseUrl, setCustomBaseUrl] = useState('')
+  const [customApiKey, setCustomApiKey] = useState('')
+  const [savingCustom, setSavingCustom] = useState(false)
   const [localDiscovery, setLocalDiscovery] = useState<{
     providers: Array<{ id: string; name: string; online: boolean; modelCount: number; configured: boolean; needsRestart: boolean }>
     models: Array<{ id: string; name: string; provider: string }>
@@ -306,6 +309,11 @@ function HermesContent() {
             keys[p.envKeys[0]] = p.maskedKeys?.[p.envKeys[0]] || '••••'
         }
         setConfiguredKeys(keys)
+        // Load custom provider config (may be stored as 'custom' or legacy 'manifest')
+        const cfgProviders = (d.config?.providers as Record<string, any>) || {}
+        const customCfg = cfgProviders['custom'] || cfgProviders['manifest'] || {}
+        if (customCfg.base_url) setCustomBaseUrl(customCfg.base_url)
+        if (customCfg.api_key) setCustomApiKey(customCfg.api_key)
       })
       .catch(() => {})
   }, [])
@@ -480,6 +488,62 @@ function HermesContent() {
                 {model}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Custom OpenAI-compatible endpoint fields */}
+      {activeProvider === 'custom' && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
+            Custom Endpoint
+          </p>
+          <div className="space-y-2 rounded-xl px-3 py-2.5" style={cardStyle}>
+            <div>
+              <label className="mb-1 block text-xs font-medium" style={mutedStyle}>Base URL</label>
+              <input
+                type="url"
+                className="w-full rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-mono text-primary-900 outline-none focus:ring-2 focus:ring-accent-500"
+                placeholder="http://127.0.0.1:38238/v1"
+                value={customBaseUrl}
+                onChange={(e) => setCustomBaseUrl(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium" style={mutedStyle}>API Key</label>
+              <input
+                type="password"
+                className="w-full rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-mono text-primary-900 outline-none focus:ring-2 focus:ring-accent-500"
+                placeholder="sk-... or leave blank"
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={savingCustom || !customBaseUrl}
+              onClick={async () => {
+                setSavingCustom(true)
+                await save({
+                  config: {
+                    provider: 'custom',
+                    providers: {
+                      custom: {
+                        type: 'openai',
+                        base_url: customBaseUrl,
+                        api_key: customApiKey || 'none',
+                      },
+                    },
+                  },
+                })
+                setActiveProvider('custom')
+                setSavingCustom(false)
+              }}
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-50"
+              style={{ background: 'var(--theme-accent)', color: '#fff' }}
+            >
+              {savingCustom ? 'Saving…' : 'Save endpoint'}
+            </button>
           </div>
         </div>
       )}
