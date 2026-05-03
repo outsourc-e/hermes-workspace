@@ -990,6 +990,8 @@ const NPC_COLORS: Record<string, string> = {
   banker: '#facc15',
   recruiter: '#a78bfa',
   tavernkeeper: '#f59e0b',
+  innkeeper: '#86efac',
+  apothecary: '#f472b6',
 }
 
 /* ── Bot player (waypoint walker with chat bubble) ── */
@@ -1134,12 +1136,15 @@ function BotPlayer({
 }
 
 
-type InteriorId = 'tavern' | 'bank' | 'smithy'
+type InteriorId = 'tavern' | 'bank' | 'smithy' | 'inn' | 'apothecary' | 'guild'
 
 const INTERIORS: Record<InteriorId, { title: string; accent: string; keeper: string; keeperNpc: string; keeperAvatar: string; keeperColor: string }> = {
   tavern: { title: 'The Signal & Satyr Tavern', accent: '#f59e0b', keeper: 'Selene · Tavern Keeper', keeperNpc: 'tavernkeeper', keeperAvatar: 'apollo', keeperColor: '#f59e0b' },
   bank: { title: 'Midas Memory Bank', accent: '#facc15', keeper: 'Midas · Banker', keeperNpc: 'banker', keeperAvatar: 'chronos', keeperColor: '#facc15' },
   smithy: { title: 'Promptforge Smithy', accent: '#fb7185', keeper: 'Leonidas · Trainer', keeperNpc: 'trainer', keeperAvatar: 'nike', keeperColor: '#fb7185' },
+  inn: { title: 'Wayfarer Inn', accent: '#86efac', keeper: 'Hestia · Innkeeper', keeperNpc: 'innkeeper', keeperAvatar: 'athena', keeperColor: '#86efac' },
+  apothecary: { title: 'Eros’ Apothecary', accent: '#f472b6', keeper: 'Eros · Apothecary', keeperNpc: 'apothecary', keeperAvatar: 'eros', keeperColor: '#f472b6' },
+  guild: { title: 'Builders’ Guild Hall', accent: '#a78bfa', keeper: 'Cassia · Recruiter', keeperNpc: 'recruiter', keeperAvatar: 'athena', keeperColor: '#a78bfa' },
 }
 
 function DoorTrigger({
@@ -1231,6 +1236,12 @@ function InteriorScene({
       )}
       {id === 'bank' && <NPC npcId="chronos" position={[-4.5, 0, 1.2]} avatar="chronos" name="Chronos · Archivist" color="#facc15" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />}
       {id === 'smithy' && <NPC npcId="pan" position={[4.4, 0, 1.3]} avatar="pan" name="Pan · Toolwright" color="#34d399" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />}
+      {id === 'inn' && <NPC npcId="apollo" position={[4.4, 0, 1.5]} avatar="apollo" name="Apollo · Bard at Rest" color="#f59e0b" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />}
+      {id === 'apothecary' && <NPC npcId="chronos" position={[-4.4, 0, 1.5]} avatar="chronos" name="Chronos · Lab Notes" color="#facc15" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />}
+      {id === 'guild' && <>
+        <NPC npcId="nike" position={[-4.4, 0, 1.5]} avatar="nike" name="Nike · Raid Captain" color="#fb7185" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />
+        <NPC npcId="hermes" position={[4.4, 0, 1.5]} avatar="hermes" name="Hermes · Guildmaster" color="#2dd4bf" drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />
+      </>}
 
       <ExitTrigger playerRef={playerRef} onExit={onExit} accent={info.accent} />
       <Suspense fallback={null}>
@@ -1286,6 +1297,9 @@ function InteriorRoom({ id, accent }: { id: InteriorId; accent: string }) {
       {id === 'tavern' && <TavernProps accent={accent} />}
       {id === 'bank' && <BankProps accent={accent} />}
       {id === 'smithy' && <SmithyProps accent={accent} />}
+      {id === 'inn' && <InnProps accent={accent} />}
+      {id === 'apothecary' && <ApothecaryProps accent={accent} />}
+      {id === 'guild' && <GuildProps accent={accent} />}
     </group>
   )
 }
@@ -1316,6 +1330,50 @@ function SmithyProps({ accent }: { accent: string }) {
     <mesh castShadow position={[0, 0.45, -2.2]}><boxGeometry args={[1.35, 0.45, 0.9]} /><meshStandardMaterial color="#64748b" metalness={0.55} roughness={0.4} /></mesh>
     <mesh castShadow position={[4.7, 0.8, -4.9]}><boxGeometry args={[2.8, 1.6, 0.8]} /><meshStandardMaterial color="#3f2511" roughness={0.85} /></mesh>
     {[0, 1, 2].map((i) => <mesh key={i} castShadow position={[3.8 + i * 0.55, 1.75, -4.48]} rotation={[0, 0, -0.7]}><boxGeometry args={[0.08, 0.85, 0.08]} /><meshStandardMaterial color={accent} metalness={0.55} roughness={0.36} emissive={accent} emissiveIntensity={0.2} /></mesh>)}
+  </group>
+}
+
+function InnProps({ accent }: { accent: string }) {
+  return <group>
+    {/* fireplace */}
+    <mesh castShadow position={[-7, 1.2, -6.8]}><boxGeometry args={[2.4, 2.4, 0.4]} /><meshStandardMaterial color="#1f2937" emissive="#f97316" emissiveIntensity={0.35} /></mesh>
+    <pointLight position={[-7, 1.6, -6.4]} color="#fb923c" intensity={2.4} distance={9} />
+    {/* beds */}
+    {[-3, 0, 3].map((x) => <group key={x} position={[x, 0, -5]}>
+      <mesh castShadow position={[0, 0.3, 0]}><boxGeometry args={[1.6, 0.4, 0.9]} /><meshStandardMaterial color="#3f2511" roughness={0.85} /></mesh>
+      <mesh castShadow position={[0, 0.55, -0.05]}><boxGeometry args={[1.5, 0.18, 0.8]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.15} roughness={0.7} /></mesh>
+      <mesh castShadow position={[-0.6, 0.7, 0.05]}><boxGeometry args={[0.3, 0.18, 0.5]} /><meshStandardMaterial color="#fff7ed" /></mesh>
+    </group>)}
+    {/* counter */}
+    <mesh castShadow position={[6.4, 0.55, -5]}><boxGeometry args={[3.2, 1.1, 1]} /><meshStandardMaterial color="#7c4a1f" roughness={0.8} /></mesh>
+  </group>
+}
+
+function ApothecaryProps({ accent }: { accent: string }) {
+  return <group>
+    {/* shelves of vials */}
+    {[-6, -3, 3, 6].map((x) => <group key={x} position={[x, 0, -6]}>
+      <mesh castShadow position={[0, 1.1, 0]}><boxGeometry args={[1.4, 2.2, 0.5]} /><meshStandardMaterial color="#3f2511" roughness={0.85} /></mesh>
+      {[0.5, 1.05, 1.6].map((y, i) => <mesh key={i} castShadow position={[0, y, 0.28]}><boxGeometry args={[1.3, 0.05, 0.05]} /><meshStandardMaterial color="#7c4a1f" /></mesh>)}
+      {[0.6, 1.15, 1.7].map((y, i) => [-0.4, 0, 0.4].map((vx) => <mesh key={`${i}-${vx}`} castShadow position={[vx, y, 0.3]}><cylinderGeometry args={[0.07, 0.05, 0.22, 8]} /><meshStandardMaterial color={[`#86efac`, `#a78bfa`, `#22d3ee`, `#fbbf24`, `#f472b6`, `#fb7185`][(i + Math.abs(Math.floor(vx))) % 6]} emissive={accent} emissiveIntensity={0.45} transparent opacity={0.85} /></mesh>))}
+    </group>)}
+    {/* counter */}
+    <mesh castShadow position={[0, 0.55, -2.5]}><boxGeometry args={[5, 1.1, 0.9]} /><meshStandardMaterial color="#7c4a1f" roughness={0.8} /></mesh>
+    {/* hanging lantern */}
+    <pointLight position={[0, 3.4, 0]} color={accent} intensity={2.2} distance={9} />
+  </group>
+}
+
+function GuildProps({ accent }: { accent: string }) {
+  return <group>
+    {/* mission board */}
+    <mesh castShadow position={[0, 1.6, -7.6]}><boxGeometry args={[5, 2.2, 0.18]} /><meshStandardMaterial color="#3f2511" roughness={0.78} /></mesh>
+    {[[-2, 1.9], [0, 1.9], [2, 1.9], [-2, 0.9], [0, 0.9], [2, 0.9]].map(([x, y], i) => <mesh key={i} position={[x, y, -7.5]}><planeGeometry args={[1.4, 0.85]} /><meshStandardMaterial color="#fff7ed" emissive={accent} emissiveIntensity={0.18} /></mesh>)}
+    {/* raid table */}
+    <mesh castShadow position={[0, 0.7, 1]}><cylinderGeometry args={[2, 2, 0.18, 24]} /><meshStandardMaterial color="#7c4a1f" roughness={0.85} /></mesh>
+    <mesh position={[0, 0.81, 1]}><circleGeometry args={[1.85, 32]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.25} roughness={0.65} transparent opacity={0.7} /></mesh>
+    {/* chairs */}
+    {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a, i) => <mesh key={i} castShadow position={[Math.cos(a) * 2.6, 0.45, 1 + Math.sin(a) * 2.6]}><boxGeometry args={[0.7, 0.9, 0.7]} /><meshStandardMaterial color="#3f2511" roughness={0.85} /></mesh>)}
   </group>
 }
 
@@ -1460,6 +1518,9 @@ function Scene({
           <DoorTrigger position={[2, 0, 16.4]} label="Tavern" color="#f59e0b" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([2, 0, 16.7]); setInterior('tavern') }} />
           <DoorTrigger position={[15.7, 0, 8.5]} label="Bank" color="#facc15" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([15.7, 0, 8.8]); setInterior('bank') }} />
           <DoorTrigger position={[-12.7, 0, -13.9]} label="Smithy" color="#fb7185" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([-12.7, 0, -13.5]); setInterior('smithy') }} />
+          <DoorTrigger position={[-16.4, 0, 8.5]} label="Inn" color="#86efac" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([-16.4, 0, 8.8]); setInterior('inn') }} />
+          <DoorTrigger position={[12.7, 0, -13.9]} label="Apothecary" color="#f472b6" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([12.7, 0, -13.5]); setInterior('apothecary') }} />
+          <DoorTrigger position={[-1.2, 0, -19.2]} label="Guild Hall" color="#a78bfa" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([-1.2, 0, -18.7]); setInterior('guild') }} />
         </>
       )}
       {worldId === 'forge' && (

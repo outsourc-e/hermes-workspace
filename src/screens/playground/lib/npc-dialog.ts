@@ -447,4 +447,58 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       },
     ],
   },
+
+
+  innkeeper: {
+    id: 'innkeeper',
+    name: 'Hestia',
+    title: 'Innkeeper of the Wayfarer',
+    color: '#86efac',
+    opening:
+      'Beds are warm. Fireplace is mine. The Inn is where adventurers log out and where new builders log in. Stay a while.',
+    lore: [
+      'Inns in real MMOs were always the social anchor. Hermes Inn is the same — rest, parties, party finder, log-in lobby.',
+      'When persistence ships, this is where you save and resume your run.',
+    ],
+    choices: [
+      {
+        id: 'rest-up',
+        label: 'Rest by the fireplace',
+        reply: 'Take some restored stamina and a +XP buff for the next quest.',
+        grantSkillXp: { diplomacy: 25, oracle: 15 },
+      },
+      {
+        id: 'lore-inn',
+        label: 'What is this Inn for?',
+        reply: 'Login lobby, save point, party finder, and the place new builders meet veterans without pressure.',
+      },
+    ],
+  },
+
+  apothecary: {
+    id: 'apothecary',
+    name: 'Eros',
+    title: 'Apothecary of Prompts',
+    color: '#f472b6',
+    opening:
+      'Every potion is a prompt. Every shelf is a category. Pick one and I will distill it into something useful.',
+    lore: [
+      'Promptcraft is mixology. Right ingredient, right dose, right order.',
+      'The shelves here will eventually map to real Hermes skill packs.',
+    ],
+    choices: [
+      {
+        id: 'first-vial',
+        label: 'Buy a starter vial',
+        reply: 'Take this vial. Use it before a hard quest and your skill XP gain doubles.',
+        grantItems: ['oracle-crystal'],
+        grantSkillXp: { promptcraft: 40 },
+      },
+      {
+        id: 'lore-shelves',
+        label: 'What goes on these shelves?',
+        reply: 'Skill recipes, agent personas, prompt templates. The store catalogue maps to your real Hermes capabilities.',
+      },
+    ],
+  },
 }
