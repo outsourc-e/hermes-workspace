@@ -1252,7 +1252,7 @@ function ClaudeConfigSection({
         icon={CloudIcon}
       >
         {data.providers
-          .filter((p) => p.envKeys.length > 0)
+          .filter((p) => p.envKeys.length > 0 && p.id !== 'custom')
           .map((provider) => (
             <SettingsRow
               key={provider.id}
