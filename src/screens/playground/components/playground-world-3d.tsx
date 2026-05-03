@@ -934,6 +934,15 @@ function PlayerAndCamera({
         <torusGeometry args={[0.225, 0.025, 8, 24]} />
         <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
       </mesh>
+      {/* Hermes wings on circlet (signature) */}
+      <mesh castShadow position={[0.18, 1.32, -0.02]} rotation={[0, 0, 0.6]}>
+        <coneGeometry args={[0.06, 0.18, 5]} />
+        <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
+      </mesh>
+      <mesh castShadow position={[-0.18, 1.32, -0.02]} rotation={[0, 0, -0.6]}>
+        <coneGeometry args={[0.06, 0.18, 5]} />
+        <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
+      </mesh>
       {/* Shoulder pads */}
       <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}>
         <boxGeometry args={[0.26, 0.14, 0.22]} />
