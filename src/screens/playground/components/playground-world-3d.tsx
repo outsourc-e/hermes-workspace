@@ -3,7 +3,7 @@
  * NPCs, and clickable portal. Hackathon base for Hermes Playground.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard, Text, useTexture, Stars } from '@react-three/drei'
+import { Billboard, Html, useTexture } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
@@ -199,9 +199,9 @@ function NPC({
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
-      <Text position={[0, 1.7, 0]} fontSize={0.22} color="white" anchorX="center" outlineColor="#000" outlineWidth={0.02}>
-        {name}
-      </Text>
+      <Html position={[0, 1.7, 0]} center distanceFactor={8}>
+        <div style={{padding:'2px 6px',background:'rgba(0,0,0,0.6)',color:'white',borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>{name}</div>
+      </Html>
     </group>
   )
 }
@@ -239,9 +239,9 @@ function Portal({
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
       </mesh>
       <pointLight position={[0, 1.2, 0]} color={color} intensity={4} distance={6} />
-      <Text position={[0, 2.7, 0]} fontSize={0.28} color={color} anchorX="center" outlineColor="#000" outlineWidth={0.03}>
-        {label}
-      </Text>
+      <Html position={[0, 2.7, 0]} center distanceFactor={8}>
+        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color,borderRadius:4,fontSize:13,whiteSpace:'nowrap',fontWeight:600}}>{label}</div>
+      </Html>
     </group>
   )
 }
@@ -280,9 +280,9 @@ function QuestZone({
         <ringGeometry args={[1.2, 1.5, 32]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} transparent opacity={0.7} />
       </mesh>
-      <Text position={[0, 1.8, 0]} fontSize={0.22} color={color} anchorX="center" outlineColor="#000" outlineWidth={0.02}>
-        ✨ {label}
-      </Text>
+      <Html position={[0, 1.8, 0]} center distanceFactor={8}>
+        <div style={{padding:'2px 6px',background:'rgba(0,0,0,0.6)',color,borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>✨ {label}</div>
+      </Html>
     </group>
   )
 }
@@ -388,9 +388,9 @@ function PlayerAndCamera({
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
-      <Text position={[0, 2.1, 0]} fontSize={0.22} color="#a7f3d0" anchorX="center" outlineColor="#000" outlineWidth={0.02}>
-        You
-      </Text>
+      <Html position={[0, 2.1, 0]} center distanceFactor={8}>
+        <div style={{padding:'2px 6px',background:'rgba(0,0,0,0.6)',color:'#a7f3d0',borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>You</div>
+      </Html>
     </group>
   )
 }
@@ -412,7 +412,6 @@ function Scene({
     <>
       <color attach="background" args={[world.skyColor]} />
       <fog attach="fog" args={[world.skyColor, world.fogNear, world.fogFar]} />
-      <Stars radius={80} depth={40} count={1500} factor={4} saturation={0} fade speed={0.3} />
       <ambientLight intensity={0.7} color={world.ambient} />
       <directionalLight castShadow position={[10, 14, 6]} intensity={1.6} shadow-mapSize={[2048, 2048]} />
       <pointLight position={[0, 4, 0]} color={world.accent} intensity={2.5} distance={16} />
