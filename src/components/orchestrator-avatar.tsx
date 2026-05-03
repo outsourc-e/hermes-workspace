@@ -12,24 +12,26 @@ import { cn } from '@/lib/utils'
 /* ── Avatar types ─────────────────────────────────────── */
 
 export type AvatarStyle =
-  | 'lobster'
+  | 'hermes'
+  | 'owl'
   | 'hermes-cat'
   | 'robot'
   | 'ghost'
   | 'fox'
-  | 'owl'
+  | 'lobster'
   | 'octopus'
   | 'dragon'
   | 'panda'
 
 const AVATAR_OPTIONS: Array<{ id: AvatarStyle; label: string; emoji: string }> =
   [
-    { id: 'lobster', label: 'Lobster', emoji: '🦞' },
+    { id: 'hermes', label: 'Hermes', emoji: '🩽' },
+    { id: 'owl', label: 'Owl', emoji: '🦉' },
     { id: 'hermes-cat', label: 'Cat', emoji: '🐱' },
     { id: 'robot', label: 'Robot', emoji: '🤖' },
     { id: 'fox', label: 'Fox', emoji: '🦊' },
-    { id: 'owl', label: 'Owl', emoji: '🦉' },
     { id: 'ghost', label: 'Ghost', emoji: '👻' },
+    { id: 'lobster', label: 'Lobster', emoji: '🦞' },
     { id: 'octopus', label: 'Octopus', emoji: '🐙' },
     { id: 'dragon', label: 'Dragon', emoji: '🐉' },
     { id: 'panda', label: 'Panda', emoji: '🐼' },
@@ -44,7 +46,68 @@ function getStoredAvatar(): AvatarStyle {
   } catch {
     /* noop */
   }
-  return 'owl'
+  return 'hermes'
+}
+
+/* ── Hermes PNG avatar (custom anime art) ────────────── */
+
+function HermesPNG({
+  state,
+  size,
+}: {
+  state: OrchestratorState
+  size: number
+}) {
+  ensureStyles()
+  const animation = stateAnim(state)
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        position: 'relative',
+        animation,
+      }}
+    >
+      <img
+        src="/avatars/hermes.png"
+        alt="Hermes"
+        width={size}
+        height={size}
+        style={{
+          width: size,
+          height: size,
+          objectFit: 'cover',
+          borderRadius: '50%',
+          display: 'block',
+        }}
+        draggable={false}
+      />
+      {state === 'thinking' && (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 32 32"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+          }}
+        >
+          <circle
+            cx={16}
+            cy={16}
+            r={15}
+            fill="none"
+            stroke="#eab308"
+            strokeWidth={1.2}
+            strokeDasharray="4 4"
+            style={{ animation: 'oa-think-ring 2s linear infinite' }}
+          />
+        </svg>
+      )}
+    </div>
+  )
 }
 
 /* ── CSS keyframes ────────────────────────────────────── */
@@ -1320,6 +1383,7 @@ const AVATAR_RENDERERS: Record<
   AvatarStyle,
   React.FC<{ state: OrchestratorState; size: number }>
 > = {
+  hermes: HermesPNG,
   lobster: LobsterSVG,
   'hermes-cat': ClawCatSVG,
   robot: RobotSVG,
