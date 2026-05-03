@@ -832,17 +832,17 @@ export function AgentViewPanel() {
     <>
       {isDesktop ? (
         <motion.aside
-          initial={{ x: panelWidth, opacity: 0 }}
+          initial={false}
           animate={{
-            x: panelVisible ? 0 : panelWidth,
+            width: panelVisible ? panelWidth : 0,
             opacity: panelVisible ? 1 : 0,
           }}
           transition={{
-            x: { duration: 0.32, ease: [0.32, 0.72, 0.24, 1] },
+            width: { duration: 0.32, ease: [0.32, 0.72, 0.24, 1] },
             opacity: { duration: 0.22, ease: 'easeOut' },
           }}
           className={cn(
-            'fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] z-40 w-72 bg-[color:var(--theme-sidebar,#060914)]/95 backdrop-blur-xl',
+            'relative h-full shrink-0 overflow-hidden border-l border-primary-300/50 bg-[color:var(--theme-sidebar,#060914)]/92 backdrop-blur-xl',
             panelVisible ? 'pointer-events-auto' : 'pointer-events-none',
           )}
         >
@@ -928,7 +928,7 @@ export function AgentViewPanel() {
 
           </div>
 
-          <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
+          <ScrollAreaRoot className="h-[calc(100%-3.25rem)]">
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
                 {/* Main Agent Card (includes usage section) */}

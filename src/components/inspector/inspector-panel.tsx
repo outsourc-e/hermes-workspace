@@ -525,13 +525,13 @@ export function InspectorPanel() {
   return (
     <div
       className={cn(
-        'fixed right-0 top-0 h-full z-40 flex flex-col overflow-hidden transition-[width] duration-200',
+        'relative h-full shrink-0 overflow-hidden transition-[width] duration-200',
         isOpen ? 'w-[350px]' : 'w-0',
       )}
       style={{
         background: 'var(--theme-panel)',
-        borderLeft: '2px solid var(--theme-border)',
-        boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.2)',
+        borderLeft: '1px solid var(--theme-border)',
+        boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.12)',
       }}
     >
       {isOpen && (

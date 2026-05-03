@@ -2565,7 +2565,7 @@ export function ChatScreen({
             ? 'flex min-h-0 w-full flex-col'
             : isMobile
               ? 'flex flex-col'
-              : 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]',
+              : 'grid grid-cols-[auto_minmax(0,1fr)_auto_auto] grid-rows-[minmax(0,1fr)]',
         )}
       >
         {hideUi || compact || isFocusMode ? null : isMobile ? null : (
@@ -2578,8 +2578,7 @@ export function ChatScreen({
 
         <main
           className={cn(
-            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
-            'mr-0',
+            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-bottom] duration-200',
             (activeIsRealtimeStreaming || hasPendingGeneration()) &&
               'chat-streaming-glow',
           )}
@@ -2750,10 +2749,10 @@ export function ChatScreen({
             />
           ) : null}
         </main>
+        {!compact && !hideUi && !isMobile && !isFocusMode && <InspectorPanel />}
         {!compact && !isFocusMode && <AgentViewPanel />}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
-      <InspectorPanel />
 
       {suggestion && (
         <ModelSuggestionToast

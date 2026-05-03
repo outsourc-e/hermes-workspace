@@ -836,6 +836,7 @@ function ChatComposerComponent({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false)
   const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false)
+  const [isControlsMenuOpen, setIsControlsMenuOpen] = useState(false)
   const [isProviderSwitcherExpanded, setIsProviderSwitcherExpanded] =
     useState(false)
   const [isMobileActionsMenuOpen, setIsMobileActionsMenuOpen] = useState(false)
@@ -869,6 +870,7 @@ function ChatComposerComponent({
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
   const thinkingMenuRef = useRef<HTMLDivElement | null>(null)
+  const controlsMenuRef = useRef<HTMLDivElement | null>(null)
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
 
@@ -1239,15 +1241,18 @@ function ChatComposerComponent({
       !isModelMenuOpen &&
       !isProfileMenuOpen &&
       !isWorkspaceMenuOpen &&
-      !isThinkingMenuOpen
+      !isThinkingMenuOpen &&
+      !isControlsMenuOpen
     )
       return
     function handleOutsideClick(event: MouseEvent) {
       const target = event.target as Node
+      if (controlsMenuRef.current?.contains(target)) return
       if (modelSelectorRef.current?.contains(target)) return
       if (profileMenuRef.current?.contains(target)) return
       if (workspaceMenuRef.current?.contains(target)) return
       if (thinkingMenuRef.current?.contains(target)) return
+      setIsControlsMenuOpen(false)
       setIsModelMenuOpen(false)
       setIsProviderSwitcherExpanded(false)
       setIsProfileMenuOpen(false)
@@ -1264,6 +1269,7 @@ function ChatComposerComponent({
     isProfileMenuOpen,
     isWorkspaceMenuOpen,
     isThinkingMenuOpen,
+    isControlsMenuOpen,
   ])
 
   const persistDraft = useCallback(
@@ -2651,464 +2657,347 @@ function ChatComposerComponent({
                 )}
 
                 {!hideModelSelector ? (
-                  <>
-                    <div
-                      className="relative ml-0.5 flex min-w-0 items-center"
-                      ref={profileMenuRef}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsProfileMenuOpen((open) => !open)
-                          setIsWorkspaceMenuOpen(false)
-                          setIsThinkingMenuOpen(false)
-                          setIsModelMenuOpen(false)
-                        }}
-                        disabled={disabled || profileActivateMutation.isPending}
-                        className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary-800/60"
-                        title={
-                          activeProfile
-                            ? `${activeProfile.name}${profileMeta(activeProfile) ? ` · ${profileMeta(activeProfile)}` : ''}`
-                            : activeProfileName
-                        }
-                      >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
-                        </svg>
-                        <span className="truncate">{activeProfileName}</span>
-                        <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
-                      </button>
-                      {isProfileMenuOpen && (
-                        <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
-                          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
-                            Agent profile
-                          </div>
-                          {(profilesQuery.data?.profiles ?? []).map(
-                            (profile) => {
-                              const selected =
-                                profile.name === activeProfileName
-                              return (
-                                <button
-                                  key={profile.name}
-                                  type="button"
-                                  onClick={() => {
-                                    if (selected) {
-                                      setIsProfileMenuOpen(false)
-                                      return
-                                    }
-                                    profileActivateMutation.mutate(profile.name)
-                                  }}
-                                  className={cn(
-                                    'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                                    selected
-                                      ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
-                                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
-                                  )}
-                                >
-                                  <span className="flex items-center gap-2">
-                                    <span className="truncate font-medium">
-                                      {profile.name}
-                                    </span>
-                                    {selected ? (
-                                      <span className="text-[10px] text-accent-500">
-                                        active
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                  {profileMeta(profile) ? (
-                                    <span className="mt-0.5 max-w-[12rem] truncate text-[11px] text-neutral-500">
-                                      {profileMeta(profile)}
-                                    </span>
-                                  ) : null}
-                                </button>
-                              )
-                            },
-                          )}
-                          {profilesQuery.isError ? (
-                            <div className="px-3 py-2 text-xs text-red-500">
-                              Failed to load profiles
-                            </div>
-                          ) : null}
-                        </div>
-                      )}
-                    </div>
-
-                    <div
-                      className="relative ml-0.5 hidden min-w-0 items-center sm:flex"
-                      ref={workspaceMenuRef}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsWorkspaceMenuOpen((open) => !open)
-                          setIsProfileMenuOpen(false)
-                          setIsThinkingMenuOpen(false)
-                          setIsModelMenuOpen(false)
-                        }}
-                        className="inline-flex h-8 max-w-[9rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
-                        title={detectedWorkspacePath || 'Workspace context'}
-                      >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <span className="truncate">{workspaceButtonLabel}</span>
-                        <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
-                      </button>
-                      {isWorkspaceMenuOpen && (
-                        <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[19rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
-                          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
-                            Workspace context
-                          </div>
-                          <div className="max-h-56 overflow-y-auto">
-                            {workspaceEntries.length > 0 ? (
-                              workspaceEntries.map((workspace) => {
-                                const selected =
-                                  workspace.path === detectedWorkspacePath
-                                return (
-                                  <button
-                                    key={workspace.path}
-                                    type="button"
-                                    onClick={() => {
-                                      if (selected) {
-                                        setIsWorkspaceMenuOpen(false)
-                                        return
-                                      }
-                                      workspaceSelectMutation.mutate(workspace)
-                                    }}
-                                    className={cn(
-                                      'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                                      selected
-                                        ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
-                                        : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
-                                    )}
-                                  >
-                                    <span className="flex items-center gap-2">
-                                      <span className="truncate font-medium">
-                                        {workspace.name ||
-                                          shortPathLabel(workspace.path)}
-                                      </span>
-                                      {selected ? (
-                                        <span className="text-[10px] text-accent-500">
-                                          active
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    <span className="mt-0.5 max-w-[16rem] truncate font-mono text-[11px] text-neutral-500">
-                                      {workspace.path}
-                                    </span>
-                                  </button>
-                                )
-                              })
-                            ) : (
-                              <div className="px-3 py-2 text-xs text-neutral-500">
-                                No valid workspaces detected
-                              </div>
-                            )}
-                          </div>
-                          {workspaceContextQuery.isError ? (
-                            <div className="px-3 py-2 text-xs text-red-500">
-                              Failed to load workspaces
-                            </div>
-                          ) : null}
-                          <div className="my-1 h-px bg-neutral-200 dark:bg-neutral-800" />
-                          <button
-                            type="button"
-                            onClick={handleOpenWorkspaceManager}
-                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60"
-                          >
-                            Show files sidebar…
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div
-                      className="relative ml-0.5 hidden min-w-0 items-center sm:flex"
-                      ref={thinkingMenuRef}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsThinkingMenuOpen((open) => !open)
-                          setIsProfileMenuOpen(false)
-                          setIsWorkspaceMenuOpen(false)
-                          setIsModelMenuOpen(false)
-                        }}
-                        className={cn(
-                          'inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60',
-                          thinkingLevel === 'off' && 'opacity-70',
-                        )}
-                        title={`Reasoning effort: ${thinkingLabel(thinkingLevel)}`}
-                      >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
-                          <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
-                        </svg>
-                        <span>{thinkingLabel(thinkingLevel)}</span>
-                        <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
-                      </button>
-                      {isThinkingMenuOpen && (
-                        <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[10rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
-                          {(
-                            [
-                              ['off', 'None'],
-                              ['low', 'Low'],
-                              ['medium', 'Medium'],
-                              ['high', 'High'],
-                            ] as Array<[ThinkingLevel, string]>
-                          ).map(([level, label]) => (
-                            <button
-                              key={level}
-                              type="button"
-                              onClick={() => handleThinkingSelect(level)}
-                              className={cn(
-                                'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                                thinkingLevel === level
-                                  ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
-                                  : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
-                              )}
-                            >
-                              <span>{label}</span>
-                              {thinkingLevel === level ? (
-                                <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
-                              ) : null}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : null}
-
-                {!hideModelSelector ? (
                   <div
-                    className="relative ml-0.5 md:ml-1 flex min-w-0 items-center"
-                    ref={modelSelectorRef}
+                    className="relative ml-0.5 flex min-w-0 items-center"
+                    ref={controlsMenuRef}
                   >
                     <button
                       type="button"
                       onClick={() => {
-                        setIsModelMenuOpen((prev) => !prev)
+                        setIsControlsMenuOpen((open) => !open)
                         setIsProfileMenuOpen(false)
                         setIsWorkspaceMenuOpen(false)
                         setIsThinkingMenuOpen(false)
+                        setIsModelMenuOpen(false)
                       }}
-                      disabled={isModelSwitcherDisabled}
-                      className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-primary-100/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                      title={modelButtonLabel}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                      title="Chat controls"
                     >
-                      <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
-                        {modelButtonLabel}
-                      </span>
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <line x1="4" y1="6" x2="20" y2="6" />
+                        <line x1="4" y1="12" x2="20" y2="12" />
+                        <line x1="4" y1="18" x2="20" y2="18" />
+                        <circle cx="9" cy="6" r="2" fill="currentColor" stroke="none" />
+                        <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
+                        <circle cx="11" cy="18" r="2" fill="currentColor" stroke="none" />
+                      </svg>
+                      <span>Controls</span>
+                      <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
                     </button>
-                    {isModelMenuOpen && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-[199]"
-                          onClick={() => setIsModelMenuOpen(false)}
-                        />
-                        <div className="absolute bottom-full left-0 mb-2 z-[200] w-[min(28rem,calc(100vw-2rem))] min-w-[18rem] origin-bottom-left overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                          <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
-                            {(() => {
-                              const allModels = modelsQuery.data?.models ?? []
-                              const defaultProvider =
-                                modelsQuery.data?.currentProvider ?? ''
-                              if (allModels.length === 0) {
-                                return (
-                                  <div className="p-4 text-center text-sm text-neutral-500">
-                                    No models available
-                                  </div>
-                                )
+                    {isControlsMenuOpen ? (
+                      <div className="absolute bottom-full left-0 z-[190] mb-2 w-[min(32rem,calc(100vw-2rem))] min-w-[18rem] overflow-visible rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                        <div className="mb-2 px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                          Chat controls
+                        </div>
+                        <div className="flex flex-wrap items-start gap-2">
+                          <div
+                            className="relative flex min-w-0 items-center"
+                            ref={profileMenuRef}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsProfileMenuOpen((open) => !open)
+                                setIsWorkspaceMenuOpen(false)
+                                setIsThinkingMenuOpen(false)
+                                setIsModelMenuOpen(false)
+                              }}
+                              disabled={disabled || profileActivateMutation.isPending}
+                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary-800/60"
+                              title={
+                                activeProfile
+                                  ? `${activeProfile.name}${profileMeta(activeProfile) ? ` · ${profileMeta(activeProfile)}` : ''}`
+                                  : activeProfileName
                               }
-                              const parsed = allModels.map((m) => {
-                                const mId = String(
-                                  typeof m === 'string'
-                                    ? m
-                                    : m.id || m.model || m.name || 'unknown',
-                                )
-                                const mName = String(
-                                  typeof m === 'string'
-                                    ? m
-                                    : m.name ||
-                                        m.displayName ||
-                                        m.label ||
-                                        m.id ||
-                                        m.model ||
-                                        m,
-                                )
-                                const mProvider =
-                                  typeof m === 'string'
-                                    ? defaultProvider
-                                    : ((m as Record<string, unknown>)
-                                        .provider as string) || defaultProvider
-                                const isLocal =
-                                  typeof m !== 'string' &&
-                                  (m as Record<string, unknown>).description ===
-                                    'local'
-                                return {
-                                  id: mId,
-                                  name: mName,
-                                  provider: mProvider,
-                                  isLocal,
-                                }
-                              })
-                              const pinnedEntries = parsed.filter((e) =>
-                                isPinned(e.id),
-                              )
-                              const unpinnedGroups = new Map<
-                                string,
-                                typeof parsed
-                              >()
-                              for (const entry of parsed) {
-                                if (isPinned(entry.id)) continue
-                                const group =
-                                  unpinnedGroups.get(entry.provider) ?? []
-                                group.push(entry)
-                                unpinnedGroups.set(entry.provider, group)
-                              }
-                              const renderEntry = (
-                                entry: (typeof parsed)[0],
-                              ) => {
-                                const isActive =
-                                  entry.id === currentModel ||
-                                  `${defaultProvider}/${entry.id}` ===
-                                    currentModel
-                                return (
-                                  <div
-                                    key={entry.id}
-                                    className="group relative flex items-center"
-                                  >
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                              </svg>
+                              <span className="truncate">{activeProfileName}</span>
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                            </button>
+                            {isProfileMenuOpen && (
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                                  Agent profile
+                                </div>
+                                {(profilesQuery.data?.profiles ?? []).map((profile) => {
+                                  const selected = profile.name === activeProfileName
+                                  return (
                                     <button
+                                      key={profile.name}
                                       type="button"
                                       onClick={() => {
-                                        handleModelSelect(
-                                          entry.id,
-                                          entry.provider || undefined,
-                                        )
-                                        setIsModelMenuOpen(false)
-                                      }}
-                                      className={`flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
-                                        isActive
-                                          ? 'border-l-2 border-accent-500 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100'
-                                          : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/50'
-                                      }`}
-                                    >
-                                      <span className="flex-1 truncate">
-                                        {entry.name}
-                                      </span>
-                                      {entry.isLocal && (
-                                        <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700">
-                                          local
-                                        </span>
-                                      )}
-                                      {isActive && (
-                                        <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
-                                      )}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        togglePin(entry.id)
-                                      }}
-                                      className={`absolute right-2 rounded p-1 transition-opacity ${
-                                        isPinned(entry.id)
-                                          ? 'text-accent-500 opacity-80 hover:opacity-100'
-                                          : 'text-neutral-400 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-accent-500'
-                                      }`}
-                                      aria-label={
-                                        isPinned(entry.id)
-                                          ? `Unpin ${entry.name}`
-                                          : `Pin ${entry.name}`
-                                      }
-                                    >
-                                      <svg
-                                        width="12"
-                                        height="12"
-                                        viewBox="0 0 24 24"
-                                        fill={
-                                          isPinned(entry.id)
-                                            ? 'currentColor'
-                                            : 'none'
+                                        if (selected) {
+                                          setIsProfileMenuOpen(false)
+                                          return
                                         }
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                      >
-                                        <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
-                                      </svg>
+                                        profileActivateMutation.mutate(profile.name)
+                                      }}
+                                      className={cn(
+                                        'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                        selected
+                                          ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                          : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                      )}
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span className="truncate font-medium">{profile.name}</span>
+                                        {selected ? <span className="text-[10px] text-accent-500">active</span> : null}
+                                      </span>
+                                      {profileMeta(profile) ? <span className="mt-0.5 max-w-[12rem] truncate text-[11px] text-neutral-500">{profileMeta(profile)}</span> : null}
                                     </button>
+                                  )
+                                })}
+                                {profilesQuery.isError ? <div className="px-3 py-2 text-xs text-red-500">Failed to load profiles</div> : null}
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            className="relative flex min-w-0 items-center"
+                            ref={workspaceMenuRef}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsWorkspaceMenuOpen((open) => !open)
+                                setIsProfileMenuOpen(false)
+                                setIsThinkingMenuOpen(false)
+                                setIsModelMenuOpen(false)
+                              }}
+                              className="inline-flex h-8 max-w-[9rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                              title={detectedWorkspacePath || 'Workspace context'}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                              </svg>
+                              <span className="truncate">{workspaceButtonLabel}</span>
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                            </button>
+                            {isWorkspaceMenuOpen && (
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[19rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Workspace context</div>
+                                <div className="max-h-56 overflow-y-auto">
+                                  {workspaceEntries.length > 0 ? workspaceEntries.map((workspace) => {
+                                    const selected = workspace.path === detectedWorkspacePath
+                                    return (
+                                      <button
+                                        key={workspace.path}
+                                        type="button"
+                                        onClick={() => {
+                                          if (selected) {
+                                            setIsWorkspaceMenuOpen(false)
+                                            return
+                                          }
+                                          workspaceSelectMutation.mutate(workspace)
+                                        }}
+                                        className={cn(
+                                          'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                          selected
+                                            ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                            : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                        )}
+                                      >
+                                        <span className="flex items-center gap-2">
+                                          <span className="truncate font-medium">{workspace.name || shortPathLabel(workspace.path)}</span>
+                                          {selected ? <span className="text-[10px] text-accent-500">active</span> : null}
+                                        </span>
+                                        <span className="mt-0.5 max-w-[16rem] truncate font-mono text-[11px] text-neutral-500">{workspace.path}</span>
+                                      </button>
+                                    )
+                                  }) : <div className="px-3 py-2 text-xs text-neutral-500">No valid workspaces detected</div>}
+                                </div>
+                                {workspaceContextQuery.isError ? <div className="px-3 py-2 text-xs text-red-500">Failed to load workspaces</div> : null}
+                                <div className="my-1 h-px bg-neutral-200 dark:bg-neutral-800" />
+                                <button
+                                  type="button"
+                                  onClick={handleOpenWorkspaceManager}
+                                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60"
+                                >
+                                  Show files sidebar…
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            className="relative flex min-w-0 items-center"
+                            ref={thinkingMenuRef}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsThinkingMenuOpen((open) => !open)
+                                setIsProfileMenuOpen(false)
+                                setIsWorkspaceMenuOpen(false)
+                                setIsModelMenuOpen(false)
+                              }}
+                              className={cn(
+                                'inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60',
+                                thinkingLevel === 'off' && 'opacity-70',
+                              )}
+                              title={`Reasoning effort: ${thinkingLabel(thinkingLevel)}`}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
+                                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
+                              </svg>
+                              <span>{thinkingLabel(thinkingLevel)}</span>
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                            </button>
+                            {isThinkingMenuOpen && (
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[10rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                                {([
+                                  ['off', 'None'],
+                                  ['low', 'Low'],
+                                  ['medium', 'Medium'],
+                                  ['high', 'High'],
+                                ] as Array<[ThinkingLevel, string]>).map(([level, label]) => (
+                                  <button
+                                    key={level}
+                                    type="button"
+                                    onClick={() => handleThinkingSelect(level)}
+                                    className={cn(
+                                      'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                      thinkingLevel === level
+                                        ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                        : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                    )}
+                                  >
+                                    <span>{label}</span>
+                                    {thinkingLevel === level ? <span className="h-1.5 w-1.5 rounded-full bg-accent-500" /> : null}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            className="relative flex min-w-0 items-center"
+                            ref={modelSelectorRef}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsModelMenuOpen((prev) => !prev)
+                                setIsProfileMenuOpen(false)
+                                setIsWorkspaceMenuOpen(false)
+                                setIsThinkingMenuOpen(false)
+                              }}
+                              disabled={isModelSwitcherDisabled}
+                              className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-primary-100/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                              title={modelButtonLabel}
+                            >
+                              <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">{modelButtonLabel}</span>
+                            </button>
+                            {isModelMenuOpen && (
+                              <>
+                                <div className="fixed inset-0 z-[199]" onClick={() => setIsModelMenuOpen(false)} />
+                                <div className="absolute bottom-full left-0 mb-2 z-[200] w-[min(28rem,calc(100vw-2rem))] min-w-[18rem] origin-bottom-left overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                  <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
+                                    {(() => {
+                                      const allModels = modelsQuery.data?.models ?? []
+                                      const defaultProvider = modelsQuery.data?.currentProvider ?? ''
+                                      if (allModels.length === 0) {
+                                        return <div className="p-4 text-center text-sm text-neutral-500">No models available</div>
+                                      }
+                                      const parsed = allModels.map((m) => {
+                                        const mId = String(typeof m === 'string' ? m : m.id || m.model || m.name || 'unknown')
+                                        const mName = String(typeof m === 'string' ? m : m.name || m.displayName || m.label || m.id || m.model || m)
+                                        const mProvider = typeof m === 'string' ? defaultProvider : ((m as Record<string, unknown>).provider as string) || defaultProvider
+                                        const isLocal = typeof m !== 'string' && (m as Record<string, unknown>).description === 'local'
+                                        return { id: mId, name: mName, provider: mProvider, isLocal }
+                                      })
+                                      const pinnedEntries = parsed.filter((e) => isPinned(e.id))
+                                      const unpinnedGroups = new Map<string, typeof parsed>()
+                                      for (const entry of parsed) {
+                                        if (isPinned(entry.id)) continue
+                                        const group = unpinnedGroups.get(entry.provider) ?? []
+                                        group.push(entry)
+                                        unpinnedGroups.set(entry.provider, group)
+                                      }
+                                      const renderEntry = (entry: (typeof parsed)[0]) => {
+                                        const isActive = entry.id === currentModel || `${defaultProvider}/${entry.id}` === currentModel
+                                        return (
+                                          <div key={entry.id} className="group relative flex items-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleModelSelect(entry.id, entry.provider || undefined)
+                                                setIsModelMenuOpen(false)
+                                              }}
+                                              className={`flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
+                                                isActive
+                                                  ? 'border-l-2 border-accent-500 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100'
+                                                  : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/50'
+                                              }`}
+                                            >
+                                              <span className="flex-1 truncate">{entry.name}</span>
+                                              {entry.isLocal ? <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700">local</span> : null}
+                                              {isActive ? <span className="h-1.5 w-1.5 rounded-full bg-accent-500" /> : null}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                togglePin(entry.id)
+                                              }}
+                                              className={`absolute right-2 rounded p-1 transition-opacity ${
+                                                isPinned(entry.id)
+                                                  ? 'text-accent-500 opacity-80 hover:opacity-100'
+                                                  : 'text-neutral-400 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-accent-500'
+                                              }`}
+                                              aria-label={isPinned(entry.id) ? `Unpin ${entry.name}` : `Pin ${entry.name}`}
+                                            >
+                                              <svg width="12" height="12" viewBox="0 0 24 24" fill={isPinned(entry.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                                                <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
+                                              </svg>
+                                            </button>
+                                          </div>
+                                        )
+                                      }
+                                      return (
+                                        <>
+                                          {pinnedEntries.length > 0 ? (
+                                            <div className="mb-1 border-b border-neutral-200 pb-1 dark:border-neutral-700">
+                                              <div className="mb-1 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="text-accent-500">
+                                                  <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
+                                                </svg>
+                                                <span>Pinned</span>
+                                              </div>
+                                              {pinnedEntries.map(renderEntry)}
+                                            </div>
+                                          ) : null}
+                                          {Array.from(unpinnedGroups.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([provider, models]) => (
+                                            <div key={provider}>
+                                              <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400">{provider}</div>
+                                              {models.map(renderEntry)}
+                                            </div>
+                                          ))}
+                                        </>
+                                      )
+                                    })()}
                                   </div>
-                                )
-                              }
-                              return (
-                                <>
-                                  {pinnedEntries.length > 0 && (
-                                    <div className="mb-1 border-b border-neutral-200 dark:border-neutral-700 pb-1">
-                                      <div className="mb-1 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-                                        <svg
-                                          width="12"
-                                          height="12"
-                                          viewBox="0 0 24 24"
-                                          fill="currentColor"
-                                          stroke="currentColor"
-                                          strokeWidth="2"
-                                          className="text-accent-500"
-                                        >
-                                          <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
-                                        </svg>
-                                        <span>Pinned</span>
-                                      </div>
-                                      {pinnedEntries.map(renderEntry)}
-                                    </div>
-                                  )}
-                                  {Array.from(unpinnedGroups.entries())
-                                    .sort((a, b) => a[0].localeCompare(b[0]))
-                                    .map(([provider, models]) => (
-                                      <div key={provider}>
-                                        <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
-                                          {provider}
-                                        </div>
-                                        {models.map(renderEntry)}
-                                      </div>
-                                    ))}
-                                </>
-                              )
-                            })()}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
-                      </>
-                    )}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
