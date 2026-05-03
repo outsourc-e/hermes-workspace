@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { SearchModal } from '@/components/search/search-modal'
+import { UsageMeter } from '@/components/usage-meter'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import { WorkspaceShell } from '@/components/workspace-shell'
@@ -367,6 +368,9 @@ function RootLayout() {
             </ErrorBoundary>
           </WorkspaceShell>
           <SearchModal />
+          {/* UsageMeter must be mounted at root so the OPEN_USAGE event from
+              the search modal's Usage tile has a listener. See #258. */}
+          <UsageMeter />
           <KeyboardShortcutsModal />
           <UpdateCenterNotifier />
           {rootSurfaceState.showPostOnboardingOverlays ? (
