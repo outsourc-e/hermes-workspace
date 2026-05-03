@@ -9,4 +9,4 @@ class_name = "PlaygroundHub"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["PlaygroundHub"]
+new_sqlite_classes = ["PlaygroundHub"]

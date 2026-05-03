@@ -1,11 +1,21 @@
 /**
- * Live "agents online now" chip.
+ * Live "agents online now" chip with connection-state indicator.
  *
- * Polls VITE_PLAYGROUND_STATS_URL (e.g. CF Worker /stats endpoint) every 5s.
- * Falls back gracefully if no stats URL configured or endpoint unreachable.
+ * Strategy:
+ *   1. Prefer server-pushed count via `hermes-playground-count` CustomEvent
+ *      (emitted by the multiplayer hook on every server `count` message).
+ *      Zero polling, real-time.
+ *   2. Fall back to one /stats fetch on mount if no WS push has arrived in
+ *      ~3s (so the chip works on the title screen before a player has
+ *      connected to /playground).
+ *   3. Hide the chip if no VITE_PLAYGROUND_STATS_URL is configured AND
+ *      no live event ever arrives.
  *
- * Use as a floating HUD element to show real-time multiplayer presence
- * count for the demo / hackathon judges / pitch deck.
+ * Connection states (driven by the hook's `transport`):
+ *   - both:      green dot, "live"
+ *   - ws:        green dot, "live"
+ *   - broadcast: yellow dot, "local-only"
+ *   - offline:   red dot, "offline"
  */
 import { useEffect, useState } from 'react'
 
@@ -16,22 +26,45 @@ type Stats = {
   ts?: number
 }
 
+type Transport = 'offline' | 'broadcast' | 'ws' | 'both'
+
 const STATS_URL =
   (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_PLAYGROUND_STATS_URL) || ''
-const POLL_MS = 5000
 
 export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }) {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [transport, setTransport] = useState<Transport>('offline')
   const [reachable, setReachable] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (!STATS_URL) {
-      setReachable(false)
-      return
-    }
     let cancelled = false
 
-    const tick = async () => {
+    const onCount = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as Stats
+      if (!detail) return
+      setStats(detail)
+      setReachable(true)
+    }
+    const onTransport = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as Transport
+      if (detail) setTransport(detail)
+    }
+    window.addEventListener('hermes-playground-count', onCount)
+    window.addEventListener('hermes-playground-transport', onTransport)
+
+    // Pre-populate from window globals if hook fired before mount.
+    const cur = (window as any).__hermesPlaygroundLiveCount as Stats | undefined
+    if (cur) setStats(cur)
+    const curT = (window as any).__hermesPlaygroundLiveTransport as Transport | undefined
+    if (curT) setTransport(curT)
+
+    // Fallback: one-shot /stats fetch if no push arrives in 3s.
+    const fallbackId = window.setTimeout(async () => {
+      if (cancelled || stats) return
+      if (!STATS_URL) {
+        setReachable(false)
+        return
+      }
       try {
         const r = await fetch(STATS_URL, { cache: 'no-store' })
         if (!r.ok) throw new Error(String(r.status))
@@ -43,22 +76,47 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
         if (cancelled) return
         setReachable(false)
       }
-    }
+    }, 3000)
 
-    void tick()
-    const id = window.setInterval(tick, POLL_MS)
     return () => {
       cancelled = true
-      window.clearInterval(id)
+      window.clearTimeout(fallbackId)
+      window.removeEventListener('hermes-playground-count', onCount)
+      window.removeEventListener('hermes-playground-transport', onTransport)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Hide the chip entirely when no stats endpoint is configured. We don't
-  // want a stale "0 online" sitting on the HUD during local dev.
-  if (!STATS_URL || reachable === false) return null
+  // Hide entirely when no stats URL configured AND no WS event ever arrived.
+  if (!STATS_URL && !stats) return null
+  if (!stats && reachable === false) return null
 
   const n = stats?.online ?? 0
-  const dotColor = n > 0 ? accent : '#94a3b8'
+  const status: { color: string; label: string } = (() => {
+    switch (transport) {
+      case 'both':
+      case 'ws':
+        return { color: '#34d399', label: 'live' }
+      case 'broadcast':
+        return { color: '#facc15', label: 'local-only' }
+      case 'offline':
+      default:
+        return { color: '#94a3b8', label: 'offline' }
+    }
+  })()
+
+  const byWorldEntries = stats?.byWorld
+    ? Object.entries(stats.byWorld).filter(([, v]) => v > 0)
+    : []
+  const tooltip = [
+    stats?.peakToday ? `Peak today: ${stats.peakToday}` : null,
+    byWorldEntries.length
+      ? byWorldEntries.map(([w, v]) => `${w}: ${v}`).join(' · ')
+      : null,
+    `Status: ${status.label}`,
+  ]
+    .filter(Boolean)
+    .join(' \u2022 ')
 
   return (
     <div
@@ -67,19 +125,16 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
         right: 16,
         boxShadow: `0 0 12px ${accent}33, 0 8px 24px rgba(0,0,0,.5)`,
       }}
-      title={
-        stats?.peakToday
-          ? `Peak today: ${stats.peakToday}`
-          : 'Live multiplayer count'
-      }
+      title={tooltip}
     >
       <span
         style={{
           width: 8,
           height: 8,
           borderRadius: '50%',
-          background: dotColor,
-          boxShadow: `0 0 8px ${dotColor}`,
+          background: status.color,
+          boxShadow: `0 0 8px ${status.color}`,
+          animation: status.color === '#34d399' ? 'pulse-online 2s ease-in-out infinite' : undefined,
         }}
       />
       <span>
@@ -88,6 +143,12 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
       {stats?.peakToday && stats.peakToday > 0 && (
         <span className="text-white/45">· peak {stats.peakToday}</span>
       )}
+      <style>{`
+        @keyframes pulse-online {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.65; transform: scale(0.85); }
+        }
+      `}</style>
     </div>
   )
 }

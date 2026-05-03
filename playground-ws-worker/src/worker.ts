@@ -5,10 +5,17 @@
  * that mirrors the Node sidecar (`scripts/playground-ws.mjs`) protocol so
  * the client (`use-playground-multiplayer.ts`) connects unchanged.
  *
+ * v1 hardening (2026-05-03):
+ *   - World-scoped fan-out: only broadcast presence to clients in same world.
+ *   - Server pushes `count` events on changes (HUD doesn't need to poll).
+ *   - Per-socket rate limit: 30 msgs/sec token bucket (drop excess).
+ *   - Dedupe: skip relaying identical presence within 50ms per player.
+ *   - Stale prune at 5s (matches client).
+ *
  * Endpoints
  *   GET  /playground   — WebSocket upgrade (presence + chat fan-out)
  *   GET  /stats        — JSON { online, byWorld, peakToday, ts }
- *   GET  /health       — JSON { ok: true }
+ *   GET  /health       — JSON { ok: true, online, ts }
  */
 
 export interface Env {
@@ -19,30 +26,47 @@ interface PresenceMsg {
   kind: 'presence'
   id: string
   worldId?: string
+  world?: string
+  x?: number
+  y?: number
+  z?: number
+  yaw?: number
+  ts?: number
   [key: string]: unknown
 }
 
-const STALE_AFTER_MS = 6000
+const STALE_AFTER_MS = 5000
 const CHAT_RING_MAX = 50
+const PRESENCE_DEDUPE_MS = 50
+const RATE_BUCKET_CAP = 30 // msgs
+const RATE_REFILL_PER_SEC = 30
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url)
-    // Single global room for v0; partition by ?room= later if needed.
     const id = env.PLAYGROUND_HUB.idFromName('global')
     const stub = env.PLAYGROUND_HUB.get(id)
     return stub.fetch(request)
   },
 }
 
+interface SocketMeta {
+  playerId?: string
+  world?: string
+  bucket: number
+  bucketTs: number
+  lastPresenceTs: number
+}
+
 export class PlaygroundHub {
   state: DurableObjectState
   sockets = new Set<WebSocket>()
-  socketMeta = new WeakMap<WebSocket, { playerId?: string }>()
+  socketMeta = new WeakMap<WebSocket, SocketMeta>()
   presence = new Map<string, PresenceMsg & { ts: number }>()
   chatRing: any[] = []
   peakToday = 0
   peakDay = ''
+  // Sliding count for push notifications when set changes.
+  lastBroadcastCount = -1
 
   constructor(state: DurableObjectState) {
     this.state = state
@@ -53,7 +77,6 @@ export class PlaygroundHub {
         this.peakDay = stored.day
       }
     })
-    // Periodic prune for stale presence
     this.state.blockConcurrencyWhile(async () => {
       this.scheduleAlarm()
     })
@@ -73,18 +96,28 @@ export class PlaygroundHub {
 
   pruneStale() {
     const cutoff = Date.now() - STALE_AFTER_MS
+    let removed = false
     for (const [id, p] of this.presence) {
-      if (p.ts < cutoff) {
+      const ts = (p as any).ts
+      if (typeof ts === 'number' && ts < cutoff) {
         this.presence.delete(id)
-        this.broadcast(null, { kind: 'leave', id })
+        const world = (p.world || p.worldId) as string | undefined
+        this.broadcast(null, { kind: 'leave', id }, { world })
+        removed = true
       }
     }
+    if (removed) this.maybeBroadcastCount()
   }
 
-  broadcast(origin: WebSocket | null, data: any) {
+  worldOf(socket: WebSocket): string | undefined {
+    return this.socketMeta.get(socket)?.world
+  }
+
+  broadcast(origin: WebSocket | null, data: any, opts?: { world?: string }) {
     const payload = typeof data === 'string' ? data : JSON.stringify(data)
     for (const sock of this.sockets) {
       if (sock === origin) continue
+      if (opts?.world && this.worldOf(sock) && this.worldOf(sock) !== opts.world) continue
       try { sock.send(payload) } catch {}
     }
   }
@@ -99,25 +132,63 @@ export class PlaygroundHub {
       this.peakDay = today
       this.peakToday = 0
     }
-    if (this.sockets.size > this.peakToday) {
-      this.peakToday = this.sockets.size
+    const live = this.presence.size
+    if (live > this.peakToday) {
+      this.peakToday = live
       await this.state.storage.put('peak', { peak: this.peakToday, day: this.peakDay })
     }
   }
 
-  statsJson() {
-    const byWorld: Record<string, number> = {}
+  byWorld(): Record<string, number> {
+    const out: Record<string, number> = {}
     for (const p of this.presence.values()) {
-      const w = (p.worldId as string) || 'unknown'
-      byWorld[w] = (byWorld[w] || 0) + 1
+      const w = (p.world || p.worldId) as string | undefined
+      if (!w) continue
+      out[w] = (out[w] || 0) + 1
     }
+    return out
+  }
+
+  countMessage() {
+    return JSON.stringify({
+      kind: 'count',
+      online: this.presence.size,
+      byWorld: this.byWorld(),
+      peakToday: this.peakToday,
+      ts: Date.now(),
+    })
+  }
+
+  /** Push a count update to all sockets when the count actually changed. */
+  maybeBroadcastCount() {
+    const live = this.presence.size
+    if (live === this.lastBroadcastCount) return
+    this.lastBroadcastCount = live
+    const payload = this.countMessage()
+    for (const sock of this.sockets) {
+      try { sock.send(payload) } catch {}
+    }
+  }
+
+  statsJson() {
     return {
       online: this.presence.size,
-      byWorld,
+      byWorld: this.byWorld(),
       peakToday: this.peakToday,
       peakDay: this.peakDay,
       ts: Date.now(),
     }
+  }
+
+  // Token bucket: returns true if allowed, false if rate-limited.
+  spend(meta: SocketMeta): boolean {
+    const now = Date.now()
+    const dt = (now - meta.bucketTs) / 1000
+    meta.bucket = Math.min(RATE_BUCKET_CAP, meta.bucket + dt * RATE_REFILL_PER_SEC)
+    meta.bucketTs = now
+    if (meta.bucket < 1) return false
+    meta.bucket -= 1
+    return true
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -134,7 +205,7 @@ export class PlaygroundHub {
 
     if (url.pathname === '/health' || url.pathname === '/') {
       return Response.json(
-        { ok: true, online: this.sockets.size, ts: Date.now() },
+        { ok: true, online: this.presence.size, ts: Date.now() },
         { headers: cors },
       )
     }
@@ -162,13 +233,18 @@ export class PlaygroundHub {
   async handleSocket(socket: WebSocket) {
     socket.accept()
     this.sockets.add(socket)
-    this.socketMeta.set(socket, {})
-    await this.bumpPeak()
+    this.socketMeta.set(socket, {
+      bucket: RATE_BUCKET_CAP,
+      bucketTs: Date.now(),
+      lastPresenceTs: 0,
+    })
     await this.scheduleAlarm()
 
     try {
-      socket.send(JSON.stringify({ kind: 'hello', server: 'hermes.playground.cf-worker.v0', ts: Date.now() }))
-      // bootstrap snapshot
+      socket.send(JSON.stringify({ kind: 'hello', server: 'hermes.playground.cf-worker.v1', ts: Date.now() }))
+      // Send current count baseline immediately for HUD.
+      socket.send(this.countMessage())
+      // bootstrap presence snapshot
       for (const p of this.presence.values()) {
         try { socket.send(JSON.stringify(p)) } catch {}
       }
@@ -177,23 +253,45 @@ export class PlaygroundHub {
       }
     } catch {}
 
-    socket.addEventListener('message', (evt) => {
+    socket.addEventListener('message', async (evt) => {
+      const meta = this.socketMeta.get(socket)
+      if (!meta) return
+      if (!this.spend(meta)) return // dropped (rate limited)
       let msg: any
       try { msg = JSON.parse(typeof evt.data === 'string' ? evt.data : new TextDecoder().decode(evt.data as ArrayBuffer)) } catch { return }
       if (!msg || typeof msg.kind !== 'string') return
-      if (msg.kind === 'presence' && msg.id) {
-        const m = { ...msg, ts: Date.now() } as PresenceMsg & { ts: number }
-        this.presence.set(msg.id, m)
-        const meta = this.socketMeta.get(socket)
-        if (meta) meta.playerId = msg.id
-        this.broadcast(socket, msg)
-      } else if (msg.kind === 'chat' && msg.id) {
+
+      if (msg.kind === 'presence' && typeof msg.id === 'string') {
+        const now = Date.now()
+        if (now - meta.lastPresenceTs < PRESENCE_DEDUPE_MS) return
+        meta.lastPresenceTs = now
+        const world = (msg.world || msg.worldId) as string | undefined
+        meta.playerId = msg.id
+        meta.world = world
+        const wire: PresenceMsg & { ts: number } = { ...msg, ts: now }
+        const wasNew = !this.presence.has(msg.id)
+        this.presence.set(msg.id, wire)
+        if (wasNew) {
+          await this.bumpPeak()
+          this.maybeBroadcastCount()
+        }
+        // World-scoped fan-out
+        this.broadcast(socket, wire, { world })
+      } else if (msg.kind === 'chat' && typeof msg.id === 'string') {
+        // Truncate text defensively
+        if (typeof msg.text === 'string' && msg.text.length > 240) {
+          msg.text = msg.text.slice(0, 240)
+        }
         this.chatRing.push(msg)
         if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
-        this.broadcast(socket, msg)
-      } else if (msg.kind === 'leave' && msg.id) {
+        const world = (msg.world || msg.worldId) as string | undefined
+        this.broadcast(socket, msg, { world })
+      } else if (msg.kind === 'leave' && typeof msg.id === 'string') {
+        const prior = this.presence.get(msg.id)
+        const world = (prior?.world || prior?.worldId) as string | undefined
         this.presence.delete(msg.id)
-        this.broadcast(socket, msg)
+        this.broadcast(socket, msg, { world })
+        this.maybeBroadcastCount()
       }
     })
 
@@ -201,8 +299,11 @@ export class PlaygroundHub {
       this.sockets.delete(socket)
       const meta = this.socketMeta.get(socket)
       if (meta?.playerId && this.presence.has(meta.playerId)) {
+        const prior = this.presence.get(meta.playerId)
+        const world = (prior?.world || prior?.worldId) as string | undefined
         this.presence.delete(meta.playerId)
-        this.broadcast(null, { kind: 'leave', id: meta.playerId })
+        this.broadcast(null, { kind: 'leave', id: meta.playerId }, { world })
+        this.maybeBroadcastCount()
       }
     }
     socket.addEventListener('close', cleanup)

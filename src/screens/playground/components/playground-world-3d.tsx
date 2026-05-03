@@ -1738,12 +1738,14 @@ export function PlaygroundWorld3D({
   const positionForMp = useRef<{ x: number; y: number; z: number } | null>({ x: 0, y: 0, z: 6 })
   // Sync simple position object for multiplayer hook (it doesn't use THREE)
   useEffect(() => {
+    // Sample player position at presence cadence (~5Hz). The hook
+    // skip-sends when delta < epsilon, so this is cheap.
     const id = window.setInterval(() => {
       positionForMp.current = { x: playerPos.current.x, y: playerPos.current.y, z: playerPos.current.z }
-    }, 80)
+    }, 200)
     return () => window.clearInterval(id)
   }, [])
-  const { remotePlayers, online, sendChat, myName, myColor, selfId } = usePlaygroundMultiplayer({
+  const { remotePlayers, online, transport, serverCount, sendChat, myName, myColor, selfId } = usePlaygroundMultiplayer({
     world: worldId,
     interior: null,
     positionRef: positionForMp,
@@ -1751,15 +1753,30 @@ export function PlaygroundWorld3D({
     name: multiplayerName,
     onChat: onIncomingChat,
   })
-  // Expose sendChat globally so the screen-level chat panel can broadcast.
+  // Expose sendChat + multiplayer info globally so HUD/chat panel can read it.
   useEffect(() => {
     ;(window as any).__hermesPlaygroundSendChat = (text: string) => sendChat(text)
-    ;(window as any).__hermesPlaygroundMpInfo = () => ({ online, myName, myColor, selfId, remoteCount: Object.keys(remotePlayers).length })
+    ;(window as any).__hermesPlaygroundMpInfo = () => ({
+      online,
+      transport,
+      myName,
+      myColor,
+      selfId,
+      remoteCount: Object.keys(remotePlayers).length,
+      serverCount,
+    })
+    // Push live count for the HUD chip without polling /stats.
+    if (serverCount) {
+      ;(window as any).__hermesPlaygroundLiveCount = serverCount
+      window.dispatchEvent(new CustomEvent('hermes-playground-count', { detail: serverCount }))
+    }
+    ;(window as any).__hermesPlaygroundLiveTransport = transport
+    window.dispatchEvent(new CustomEvent('hermes-playground-transport', { detail: transport }))
     return () => {
       try { delete (window as any).__hermesPlaygroundSendChat } catch {}
       try { delete (window as any).__hermesPlaygroundMpInfo } catch {}
     }
-  }, [sendChat, online, myName, myColor, selfId, remotePlayers])
+  }, [sendChat, online, transport, myName, myColor, selfId, remotePlayers, serverCount])
 
   return (
     <div
