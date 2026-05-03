@@ -90,7 +90,7 @@ function getMiniAgentCardStatus(status: string): AgentCardStatus {
   return 'running'
 }
 
-const AGENT_NAME_KEY = 'clawsuite-agent-name'
+const AGENT_NAME_KEY = 'hermes-workspace-agent-name'
 
 function getStoredAgentName(): string {
   try {
@@ -114,7 +114,7 @@ const STATE_GLOW: Record<string, string> = {
 // ── Usage helpers (inline in OrchestratorCard) ─────────────────────────────
 
 const USAGE_POLL_MS = 30_000
-const PREFERRED_PROVIDER_KEY_OC = 'clawsuite-preferred-provider'
+const PREFERRED_PROVIDER_KEY_OC = 'hermes-workspace-preferred-provider'
 
 type OcUsageLine = {
   type: 'progress' | 'text' | 'badge'
@@ -397,7 +397,7 @@ function OrchestratorCard({
                 onChange={(e) => setEditValue(e.target.value)}
                 onBlur={commitEdit}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) commitEdit()
+                  if (e.key === 'Enter') commitEdit()
                   if (e.key === 'Escape') setIsEditing(false)
                 }}
                 placeholder="Agent name..."

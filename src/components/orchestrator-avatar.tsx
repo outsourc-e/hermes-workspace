@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 export type AvatarStyle =
   | 'lobster'
-  | 'claw-cat'
+  | 'hermes-cat'
   | 'robot'
   | 'ghost'
   | 'fox'
@@ -25,7 +25,7 @@ export type AvatarStyle =
 const AVATAR_OPTIONS: Array<{ id: AvatarStyle; label: string; emoji: string }> =
   [
     { id: 'lobster', label: 'Lobster', emoji: '🦞' },
-    { id: 'claw-cat', label: 'Cat', emoji: '🐱' },
+    { id: 'hermes-cat', label: 'Cat', emoji: '🐱' },
     { id: 'robot', label: 'Robot', emoji: '🤖' },
     { id: 'fox', label: 'Fox', emoji: '🦊' },
     { id: 'owl', label: 'Owl', emoji: '🦉' },
@@ -35,7 +35,7 @@ const AVATAR_OPTIONS: Array<{ id: AvatarStyle; label: string; emoji: string }> =
     { id: 'panda', label: 'Panda', emoji: '🐼' },
   ]
 
-const STORAGE_KEY = 'clawsuite-orchestrator-avatar'
+const STORAGE_KEY = 'hermes-workspace-orchestrator-avatar'
 
 function getStoredAvatar(): AvatarStyle {
   try {
@@ -92,7 +92,7 @@ function LobsterSVG({
 }) {
   ensureStyles()
   const ey = state === 'thinking' ? 8 : 9.5
-  const clawAnim =
+  const hermesAnim =
     state !== 'idle' ? 'oa-type 0.6s ease-in-out infinite' : 'none'
   const mouth =
     state === 'orchestrating'
@@ -202,7 +202,7 @@ function LobsterSVG({
       />
 
       {/* Claws — left */}
-      <g style={{ transformOrigin: '5px 14px', animation: clawAnim }}>
+      <g style={{ transformOrigin: '5px 14px', animation: hermesAnim }}>
         <path
           d="M9,13 Q6,11 4,13"
           fill="none"
@@ -230,7 +230,7 @@ function LobsterSVG({
       <g
         style={{
           transformOrigin: '27px 14px',
-          animation: clawAnim.replace('0.6s', '0.65s'),
+          animation: hermesAnim.replace('0.6s', '0.65s'),
         }}
       >
         <path
@@ -1321,7 +1321,7 @@ const AVATAR_RENDERERS: Record<
   React.FC<{ state: OrchestratorState; size: number }>
 > = {
   lobster: LobsterSVG,
-  'claw-cat': ClawCatSVG,
+  'hermes-cat': ClawCatSVG,
   robot: RobotSVG,
   fox: FoxSVG,
   owl: OwlSVG,

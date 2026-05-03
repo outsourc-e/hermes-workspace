@@ -88,6 +88,7 @@ import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
+import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
 import { InspectorPanel } from '@/components/inspector/inspector-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
@@ -2748,6 +2749,7 @@ export function ChatScreen({
             />
           ) : null}
         </main>
+        {!compact && !isFocusMode && <AgentViewPanel />}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
       <InspectorPanel />
