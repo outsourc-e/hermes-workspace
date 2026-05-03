@@ -836,11 +836,11 @@ export function AgentViewPanel() {
           animate={{ x: panelVisible ? 0 : panelWidth }}
           transition={{ duration: 0.22, ease: 'easeInOut' }}
           className={cn(
-            'fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] z-40 w-72 border-l border-primary-300/70 bg-primary-100/92 backdrop-blur-xl',
+            'fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] z-40 w-72 bg-[color:var(--theme-sidebar,#060914)]/95 backdrop-blur-xl',
             panelVisible ? 'pointer-events-auto' : 'pointer-events-none',
           )}
         >
-          <div className="border-b border-primary-300/70 px-3 py-2">
+          <div className="px-3 py-2">
             {/* Row 1: Count left | Title center | Actions right */}
             <div className="flex items-center justify-between">
               {/* Left — active agent count + live indicator */}
@@ -919,13 +919,7 @@ export function AgentViewPanel() {
                 </Button>
               </div>
             </div>
-            {/* Row 2: Stats */}
-            {activeCount > 0 || queuedAgents.length > 0 ? (
-              <p className="mt-1 text-[10px] text-primary-600 tabular-nums">
-                {activeCount} active · {queuedAgents.length} queued ·{' '}
-                {formatCost(totalCost)}
-              </p>
-            ) : null}
+
           </div>
 
           <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
@@ -935,7 +929,7 @@ export function AgentViewPanel() {
                 <OrchestratorCard compact={false} />
 
                 {/* Agents — agent cards — only show when there's something */}
-                {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
+                {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl bg-primary-200/15 p-1">
                   {/* Centered Agents pill */}
                   <div className="mb-1 flex justify-center">
                     <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
