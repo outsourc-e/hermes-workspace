@@ -221,6 +221,139 @@ export function Banner({ position, color = '#9333ea' }: { position: [number, num
   )
 }
 
+/* ── Flower ── */
+export function Flower({ position, color = '#fde68a' }: { position: [number, number, number]; color?: string }) {
+  return (
+    <group position={position}>
+      <mesh castShadow position={[0, 0.12, 0]}>
+        <cylinderGeometry args={[0.012, 0.012, 0.24, 5]} />
+        <meshStandardMaterial color="#22c55e" />
+      </mesh>
+      <mesh castShadow position={[0, 0.27, 0]}>
+        <sphereGeometry args={[0.07, 6, 6]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.25} roughness={0.6} />
+      </mesh>
+    </group>
+  )
+}
+
+/* ── Cluster of small flowers in random positions inside a tile ── */
+export function FlowerPatch({ position, count = 6, palette = ['#fde68a', '#fda4af', '#c4b5fd', '#fef3c7'], seed = 1 }: { position: [number, number, number]; count?: number; palette?: string[]; seed?: number }) {
+  const items = useMemo(() => {
+    const r = rng(seed * 17 + Math.floor(position[0] * 13) + Math.floor(position[2] * 7))
+    const out: { pos: [number, number, number]; color: string }[] = []
+    for (let i = 0; i < count; i++) {
+      const dx = (r() - 0.5) * 1.2
+      const dz = (r() - 0.5) * 1.2
+      out.push({ pos: [dx, 0, dz], color: palette[Math.floor(r() * palette.length)] })
+    }
+    return out
+  }, [count, palette, seed, position])
+  return (
+    <group position={position}>
+      {items.map((f, i) => (
+        <Flower key={i} position={f.pos} color={f.color} />
+      ))}
+    </group>
+  )
+}
+
+/* ── Log pile (small landscape filler) ── */
+export function LogPile({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh castShadow position={[0, 0.12, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.13, 0.13, 0.9, 10]} />
+        <meshStandardMaterial color="#7c4a1f" roughness={0.85} />
+      </mesh>
+      <mesh castShadow position={[0.04, 0.36, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.12, 0.12, 0.85, 10]} />
+        <meshStandardMaterial color="#6b3a18" roughness={0.85} />
+      </mesh>
+      <mesh castShadow position={[0.02, 0.58, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.1, 0.1, 0.7, 10]} />
+        <meshStandardMaterial color="#7c4a1f" roughness={0.85} />
+      </mesh>
+    </group>
+  )
+}
+
+/* ── Fountain (Agora centerpiece) ── */
+export function Fountain({ position, accent = '#7dd3fc' }: { position: [number, number, number]; accent?: string }) {
+  const splashRef = useRef<THREE.Mesh>(null)
+  useFrame(({ clock }) => {
+    if (!splashRef.current) return
+    const t = clock.getElapsedTime()
+    splashRef.current.scale.y = 1 + Math.sin(t * 3) * 0.08
+    splashRef.current.position.y = 1.55 + Math.sin(t * 2) * 0.04
+  })
+  return (
+    <group position={position}>
+      {/* Outer basin */}
+      <mesh receiveShadow castShadow position={[0, 0.18, 0]}>
+        <cylinderGeometry args={[1.7, 1.85, 0.36, 24]} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.7} />
+      </mesh>
+      {/* Water surface */}
+      <mesh position={[0, 0.37, 0]}>
+        <cylinderGeometry args={[1.55, 1.55, 0.06, 24]} />
+        <meshStandardMaterial color={accent} transparent opacity={0.78} emissive={accent} emissiveIntensity={0.35} roughness={0.15} metalness={0.3} />
+      </mesh>
+      {/* Mid pillar */}
+      <mesh castShadow position={[0, 0.78, 0]}>
+        <cylinderGeometry args={[0.45, 0.6, 0.9, 16]} />
+        <meshStandardMaterial color="#e5e7eb" roughness={0.6} />
+      </mesh>
+      <mesh castShadow position={[0, 1.28, 0]}>
+        <cylinderGeometry args={[0.85, 0.95, 0.18, 24]} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.6} />
+      </mesh>
+      <mesh castShadow position={[0, 1.55, 0]}>
+        <cylinderGeometry args={[0.22, 0.32, 0.5, 12]} />
+        <meshStandardMaterial color="#e5e7eb" roughness={0.55} />
+      </mesh>
+      {/* Splash plume (animated) */}
+      <mesh ref={splashRef} position={[0, 1.55, 0]}>
+        <coneGeometry args={[0.18, 0.55, 12, 1, true]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} transparent opacity={0.6} side={THREE.DoubleSide} />
+      </mesh>
+      <pointLight position={[0, 1.4, 0]} color={accent} intensity={1.4} distance={6} />
+    </group>
+  )
+}
+
+/* ── Path tile (dirt strip for roads) ── */
+export function PathStrip({ from, to, width = 1.4, color = '#8a6a3d' }: { from: [number, number]; to: [number, number]; width?: number; color?: string }) {
+  const dx = to[0] - from[0]
+  const dz = to[1] - from[1]
+  const len = Math.sqrt(dx * dx + dz * dz)
+  const angle = Math.atan2(dz, dx)
+  const cx = (from[0] + to[0]) / 2
+  const cz = (from[1] + to[1]) / 2
+  return (
+    <mesh receiveShadow position={[cx, 0.015, cz]} rotation={[-Math.PI / 2, 0, -angle]}>
+      <planeGeometry args={[len, width, 1, 1]} />
+      <meshStandardMaterial color={color} roughness={1} />
+    </mesh>
+  )
+}
+
+/* ── Round plaza tile (paved center) ── */
+export function PlazaDisc({ position, radius = 6, color = '#a98a5e' }: { position: [number, number, number]; radius?: number; color?: string }) {
+  return (
+    <group position={position}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+        <circleGeometry args={[radius, 48]} />
+        <meshStandardMaterial color={color} roughness={1} />
+      </mesh>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]}>
+        <ringGeometry args={[radius - 0.6, radius - 0.4, 64]} />
+        <meshStandardMaterial color="#5a4424" roughness={1} />
+      </mesh>
+    </group>
+  )
+}
+
 /* ── Scattered scenery cluster (auto-fills a world) ── */
 export function ScatteredScenery({
   worldId,
@@ -255,22 +388,67 @@ export function ScatteredScenery({
     }
 
     if (worldId === 'agora') {
-      // Marketplace + buildings + lanterns
-      out.push({ type: 'building', pos: [-12, 0, -16], color: '#e8d4a8' })
-      out.push({ type: 'building', pos: [12, 0, -16], color: '#f5deb3' })
-      out.push({ type: 'building', pos: [-16, 0, 8], color: '#deb887' })
-      out.push({ type: 'building', pos: [16, 0, 8], color: '#e8d4a8' })
-      for (let i = 0; i < 6; i++) {
-        const ang = (i / 6) * Math.PI * 2
-        out.push({ type: 'stall', pos: [Math.cos(ang) * 7, 0, Math.sin(ang) * 7] })
+      // Centerpiece fountain + paved plaza
+      out.push({ type: 'plaza', pos: [0, 0, 0], radius: 8, color: '#b89668' } as any)
+      out.push({ type: 'fountain', pos: [0, 0, 0], color: '#7dd3fc' })
+
+      // Dirt paths radiating to NPC zones / portal / arch
+      const pathTargets: [number, number][] = [
+        [12, -6], [-12, -6], [12, 6], [-12, 6], [0, 14], [0, -14],
+      ]
+      for (const t of pathTargets) {
+        out.push({ type: 'path', from: [0, 0], to: t, width: 1.6, color: '#9d7a4a' } as any)
       }
+
+      // Buildings around the plaza like a small town
+      out.push({ type: 'building', pos: [-13, 0, -15], color: '#e8d4a8', roofColor: '#b91c1c' })
+      out.push({ type: 'building', pos: [13, 0, -15], color: '#f5deb3', roofColor: '#1d4ed8' })
+      out.push({ type: 'building', pos: [-17, 0, 9], color: '#deb887', roofColor: '#92400e' })
+      out.push({ type: 'building', pos: [17, 0, 9], color: '#e8d4a8', roofColor: '#b91c1c' })
+      out.push({ type: 'building', pos: [-2, 0, -19], color: '#f3e1bb', roofColor: '#1d4ed8' })
+      out.push({ type: 'building', pos: [2, 0, 18], color: '#f3e1bb', roofColor: '#b91c1c' })
+
+      // Market stalls clustered at the south path
+      const stallPositions: [number, number, number][] = [
+        [-3, 0, 11], [3, 0, 11], [-5, 0, 13.5], [5, 0, 13.5],
+        [-9, 0, -2], [9, 0, -2],
+      ]
+      for (const p of stallPositions) out.push({ type: 'stall', pos: p })
+
+      // Lanterns ringing the fountain (ornamental)
       for (let i = 0; i < 8; i++) {
         const ang = (i / 8) * Math.PI * 2 + Math.PI / 8
-        out.push({ type: 'lantern', pos: [Math.cos(ang) * 4.5, 0, Math.sin(ang) * 4.5], color: '#fbbf24' })
+        out.push({ type: 'lantern', pos: [Math.cos(ang) * 5.5, 0, Math.sin(ang) * 5.5], color: '#fbbf24' })
       }
+
+      // Trees on the outer ring (green band that separates plaza from fog)
+      for (let i = 0; i < 26; i++) {
+        const ang = r() * Math.PI * 2
+        const rad = 18 + r() * 6
+        out.push({ type: r() < 0.5 ? 'pine' : 'broadleaf', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], scale: 0.8 + r() * 0.6, color: r() < 0.5 ? '#1f8b4f' : '#2bbf6f', glow: '#86efac' })
+      }
+      // Flowers and grass tufts in the green band, off the paths
+      for (let i = 0; i < 28; i++) {
+        const ang = r() * Math.PI * 2
+        const rad = 9.5 + r() * 7.5
+        out.push({ type: 'grass', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], color: '#3aa86a' })
+      }
+      for (let i = 0; i < 16; i++) {
+        const ang = r() * Math.PI * 2
+        const rad = 10 + r() * 7
+        out.push({ type: 'flowerpatch', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], count: 6 + Math.floor(r() * 5) } as any)
+      }
+
+      // A few rocks and a log pile for prop variety
+      out.push({ type: 'logs', pos: [-7, 0, -8], rotation: 0.3 } as any)
+      out.push({ type: 'logs', pos: [8, 0, 7], rotation: -0.5 } as any)
+      out.push({ type: 'rock', pos: [-9, 0, 9], scale: 0.9, color: '#6b7280' })
+      out.push({ type: 'rock', pos: [10, 0, -9], scale: 1.1, color: '#5b6470' })
+
+      // Original arch + banners
       out.push({ type: 'arch', pos: [0, 0, 18], color: '#d7c7a4' })
-      out.push({ type: 'banner', pos: [-10, 0, 0], color: '#a78bfa' })
-      out.push({ type: 'banner', pos: [10, 0, 0], color: '#22d3ee' })
+      out.push({ type: 'banner', pos: [-11, 0, 0], color: '#a78bfa' })
+      out.push({ type: 'banner', pos: [11, 0, 0], color: '#22d3ee' })
     }
 
     if (worldId === 'forge') {
@@ -284,8 +462,15 @@ export function ScatteredScenery({
     }
 
     if (worldId === 'grove') {
-      for (let i = 0; i < 35; i++) out.push({ type: 'pine', pos: maybeOnEdge(), scale: 0.7 + r() * 0.7, color: '#1f8b4f', glow: '#86efac' })
-      for (let i = 0; i < 12; i++) out.push({ type: 'broadleaf', pos: maybeOnEdge(), scale: 0.8 + r() * 0.5, color: '#2bbf6f' })
+      for (let i = 0; i < 38; i++) out.push({ type: 'pine', pos: maybeOnEdge(), scale: 0.7 + r() * 0.7, color: '#1f8b4f', glow: '#86efac' })
+      for (let i = 0; i < 16; i++) out.push({ type: 'broadleaf', pos: maybeOnEdge(), scale: 0.8 + r() * 0.5, color: '#2bbf6f' })
+      for (let i = 0; i < 18; i++) {
+        const ang = r() * Math.PI * 2
+        const rad = 8 + r() * 8
+        out.push({ type: 'flowerpatch', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], count: 5 + Math.floor(r() * 4), palette: ['#86efac', '#fde68a', '#a7f3d0', '#fef3c7'] } as any)
+      }
+      out.push({ type: 'logs', pos: [-5, 0, -3], rotation: 0.2 } as any)
+      out.push({ type: 'logs', pos: [4, 0, 5], rotation: -0.6 } as any)
       for (let i = 0; i < 8; i++) {
         const ang = (i / 8) * Math.PI * 2
         out.push({ type: 'lantern', pos: [Math.cos(ang) * 6, 0, Math.sin(ang) * 6], color: '#86efac' })
@@ -319,7 +504,7 @@ export function ScatteredScenery({
 
   return (
     <>
-      {items.map((it, i) => {
+      {items.map((it: any, i) => {
         switch (it.type) {
           case 'pine':
             return <PineTree key={i} position={it.pos} scale={it.scale} color={it.color} />
@@ -332,13 +517,23 @@ export function ScatteredScenery({
           case 'stall':
             return <MarketStall key={i} position={it.pos} />
           case 'building':
-            return <Building key={i} position={it.pos} color={it.color} roofColor={(it as any).roofColor} />
+            return <Building key={i} position={it.pos} color={it.color} roofColor={it.roofColor} />
           case 'lantern':
             return <Lantern key={i} position={it.pos} color={it.color} />
           case 'arch':
             return <StoneArch key={i} position={it.pos} color={it.color} />
           case 'banner':
             return <Banner key={i} position={it.pos} color={it.color} />
+          case 'fountain':
+            return <Fountain key={i} position={it.pos} accent={it.color} />
+          case 'flowerpatch':
+            return <FlowerPatch key={i} position={it.pos} count={it.count} palette={it.palette} seed={i} />
+          case 'logs':
+            return <LogPile key={i} position={it.pos} rotation={it.rotation || 0} />
+          case 'plaza':
+            return <PlazaDisc key={i} position={it.pos} radius={it.radius} color={it.color} />
+          case 'path':
+            return <PathStrip key={i} from={it.from} to={it.to} width={it.width} color={it.color} />
           default:
             return null
         }

@@ -30,13 +30,13 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
     id: 'agora',
     name: 'The Agora',
     accent: '#d9b35f',
-    groundColor: '#3a4a3f',
-    skyColor: '#0b1720',
-    ambient: '#26404a',
-    pillarColor: '#e8d4a8',
+    groundColor: '#5a8a4f',
+    skyColor: '#cfe7f0',
+    ambient: '#a8c8d8',
+    pillarColor: '#f3dcb0',
     pillarType: 'classical',
-    fogNear: 18,
-    fogFar: 60,
+    fogNear: 22,
+    fogFar: 70,
   },
   forge: {
     id: 'forge',
@@ -90,38 +90,38 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
 
 /* ── Ground ── */
 function Ground({ world }: { world: WorldDef }) {
-  // Procedural premium ground: layered radial vignette + animated grid
-  const ringRef = useRef<THREE.Mesh>(null)
-  useFrame(({ clock }) => {
-    if (!ringRef.current) return
-    const t = clock.getElapsedTime()
-    const m = ringRef.current.material as THREE.MeshStandardMaterial
-    if (m && 'emissiveIntensity' in m) {
-      m.emissiveIntensity = 0.25 + Math.sin(t * 1.2) * 0.12
+  const isAgora = world.id === 'agora'
+  // Build a subtle procedural grass color variation by jittering vertex colors
+  const grassGeo = useMemo(() => {
+    const g = new THREE.PlaneGeometry(120, 120, 80, 80)
+    const colors = new Float32Array(g.attributes.position.count * 3)
+    const base = new THREE.Color(world.groundColor)
+    for (let i = 0; i < g.attributes.position.count; i++) {
+      const c = base.clone()
+      const jitter = (Math.random() - 0.5) * 0.08
+      c.r = Math.max(0, Math.min(1, c.r + jitter * 0.6))
+      c.g = Math.max(0, Math.min(1, c.g + jitter))
+      c.b = Math.max(0, Math.min(1, c.b + jitter * 0.4))
+      colors[i * 3] = c.r
+      colors[i * 3 + 1] = c.g
+      colors[i * 3 + 2] = c.b
     }
-  })
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    return g
+  }, [world.groundColor])
   return (
     <group>
-      {/* Base plane */}
-      <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[80, 80, 1, 1]} />
-        <meshStandardMaterial color={world.groundColor} roughness={0.95} metalness={0.1} />
+      {/* Base grass / terrain */}
+      <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={grassGeo}>
+        <meshStandardMaterial vertexColors roughness={1} metalness={0} />
       </mesh>
-      {/* Tile pattern (multiple inner rings for depth) */}
-      <mesh ref={ringRef} position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[6, 9, 80]} />
-        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.3} transparent opacity={0.18} />
-      </mesh>
-      <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[10, 12, 80]} />
-        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.18} transparent opacity={0.1} />
-      </mesh>
-      {/* Outer fade vignette ring */}
-      <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[24, 38, 80]} />
-        <meshBasicMaterial color={world.skyColor} transparent opacity={0.55} />
-      </mesh>
-      <gridHelper args={[80, 40, world.accent, '#1a2331']} position={[0, 0.012, 0]} />
+      {/* Soft subtle accent ring far out, only for non-agora worlds */}
+      {!isAgora && (
+        <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[18, 24, 80]} />
+          <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.12} transparent opacity={0.08} />
+        </mesh>
+      )}
     </group>
   )
 }
@@ -1022,9 +1022,22 @@ function Scene({
     <>
       <color attach="background" args={[world.skyColor]} />
       <fog attach="fog" args={[world.skyColor, world.fogNear, world.fogFar]} />
-      <ambientLight intensity={0.7} color={world.ambient} />
-      <directionalLight castShadow position={[10, 14, 6]} intensity={1.6} shadow-mapSize={[2048, 2048]} />
-      <pointLight position={[0, 4, 0]} color={world.accent} intensity={2.5} distance={16} />
+      <hemisphereLight intensity={0.55} color={'#fff4d6'} groundColor={world.id === 'agora' ? '#3f6b3a' : world.ambient} />
+      <ambientLight intensity={0.35} color={world.ambient} />
+      <directionalLight
+        castShadow
+        position={[14, 18, 8]}
+        intensity={1.8}
+        color={'#fff1cc'}
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
+        shadow-camera-near={0.5}
+        shadow-camera-far={80}
+        shadow-bias={-0.0005}
+      />
 
       <Ground world={world} />
       <WorldDecor world={world} />
