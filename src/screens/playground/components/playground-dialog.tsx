@@ -110,9 +110,15 @@ export function PlaygroundDialog({
       setChatLog((p) => [...p, t])
     } catch (e: any) {
       if (e?.name === 'AbortError') return
+      // Never surface raw provider errors (401, JSON dumps, etc.) to the player.
+      const fallbackLines = [
+        `*${npc.name} pauses* — "The chronicle is silent. Speak with me through the scripted scrolls below."`,
+        `*${npc.name} cocks their head* — "Live agent dialog is offline. Try one of the prepared replies."`,
+        `*${npc.name} sighs* — "The aether between worlds is unstable. Let us speak in the old tongue — pick a reply."`,
+      ]
       const t: ChatTurn = {
         role: 'assistant',
-        content: `*${npc.name} pauses* — "The chronicle is silent. Try again later."`,
+        content: fallbackLines[Math.floor(Math.random() * fallbackLines.length)],
         ts: Date.now(),
         fallback: true,
       }
@@ -124,6 +130,8 @@ export function PlaygroundDialog({
   }
 
   const showChat = chatLog.length > 0 || askingLLM
+  const llmEnabled = (import.meta as any).env?.VITE_PLAYGROUND_LLM_CHAT === '1'
+  const offlineMode = !llmEnabled || chatLog.some((t) => t.fallback)
 
   return (
     <div
@@ -154,8 +162,15 @@ export function PlaygroundDialog({
           }}
         />
         <div className="flex-1">
-          <div className="text-base font-bold" style={{ color: npc.color }}>
-            {npc.name}
+          <div className="flex items-center gap-2">
+            <div className="text-base font-bold" style={{ color: npc.color }}>
+              {npc.name}
+            </div>
+            {offlineMode && (
+              <span className="rounded bg-amber-300/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-200">
+                scripted mode
+              </span>
+            )}
           </div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/55">
             {npc.title}
@@ -219,7 +234,8 @@ export function PlaygroundDialog({
         </div>
       )}
 
-      {/* Free-form input — the killer feature */}
+      {/* Free-form input — opt-in via VITE_PLAYGROUND_LLM_CHAT=1 */}
+      {llmEnabled && (
       <div className="border-t border-white/10 bg-black/45 p-2">
         <form
           onSubmit={(e) => {
@@ -250,6 +266,7 @@ export function PlaygroundDialog({
           </button>
         </form>
       </div>
+      )}
 
       {/* Choices footer */}
       <div className="border-t border-white/10 bg-black/40 p-3">

@@ -89,10 +89,37 @@ const PERSONAS: Record<string, NpcPersona> = {
   },
 }
 
-const FALLBACK = (npcId: string, msg: string): string => {
+const FALLBACK = (npcId: string, _msg: string): string => {
   const p = PERSONAS[npcId]
   if (!p) return 'The world is quiet for a moment. Try again later.'
-  return `*${p.name} considers your words carefully* — "I'd like to answer that, but the chronicle is offline. Speak with the gatekeeper, or try again in a moment."`
+  return `*${p.name} considers your words carefully* — "I'd like to answer that, but the chronicle is offline. Speak through the scripted scrolls, or try again in a moment."`
+}
+
+/**
+ * Detect provider error text leaking through as assistant content.
+ * Examples we never want to show players:
+ *   "Error code: 401 - {'error': ...}"
+ *   "401 invalid_request_error"
+ *   "Your authentication token has been invalidated"
+ *   "You've hit your usage limit"
+ */
+function looksLikeProviderError(text: string): boolean {
+  if (!text) return false
+  const t = text.trim()
+  if (t.length < 1 || t.length > 4000) return false
+  return (
+    /^error code:\s*\d+/i.test(t) ||
+    /\b(401|403|429|500|502|503)\b/.test(t) && /\b(error|invalid|authentication|token|rate.?limit|quota|usage)\b/i.test(t) ||
+    /token_invalidated/i.test(t) ||
+    /authentication[_\s]token/i.test(t) ||
+    /please try signing in again/i.test(t) ||
+    /usage limit/i.test(t) ||
+    /upgrade to pro/i.test(t) ||
+    /invalid_request_error/i.test(t) ||
+    /rate_limit_exceeded/i.test(t) ||
+    /^\{"error":/i.test(t) ||
+    /^\{'error':/i.test(t)
+  )
 }
 
 function systemPrompt(p: NpcPersona): string {
@@ -168,13 +195,17 @@ export const Route = createFileRoute('/api/playground-npc')({
           if (!trimmed) {
             return json({ reply: FALLBACK(npcId, playerMessage), ms: Date.now() - t0, fallback: true })
           }
+          // Detect provider error text leaking through as assistant content
+          // (some gateways wrap upstream auth/rate errors into the message body).
+          if (looksLikeProviderError(trimmed)) {
+            return json({ reply: FALLBACK(npcId, playerMessage), ms: Date.now() - t0, fallback: true })
+          }
           return json({ reply: trimmed, ms: Date.now() - t0 })
         } catch (e: any) {
           return json({
             reply: FALLBACK(npcId, playerMessage),
             ms: Date.now() - t0,
             fallback: true,
-            error: String(e?.message || e),
           })
         }
       },
