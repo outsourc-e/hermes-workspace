@@ -19,6 +19,8 @@ import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { ActiveModelKpi } from './components/active-model-kpi'
 import { AttentionMarquee } from './components/attention-marquee'
+import { CacheEfficiencyCard } from './components/cache-efficiency-card'
+import { ProviderMixCard } from './components/provider-mix-card'
 import { WidgetShell } from './components/widget-shell'
 import { EditModePanel } from './components/edit-mode-panel'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
@@ -1024,7 +1026,10 @@ export function DashboardScreen() {
       {/* ── Edit-mode banner (only renders when toggled). ── */}
       <EditModePanel layout={layout} />
 
-      {/* ── Analytics chart (left) + Top models card (right) ── */}
+      {/* ── Analytics chart (left) + Top models / Provider mix / Cache
+           efficiency stacked on the right. The right-side stack now
+           occupies the full vertical of the chart so we don't get the
+           floating-card empty-space Eric flagged in iter 008. ── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         {layout.isVisible('analytics_chart') ? (
           <div className="lg:col-span-8">
@@ -1039,17 +1044,33 @@ export function DashboardScreen() {
             </WidgetShell>
           </div>
         ) : null}
-        {layout.isVisible('top_models') ? (
+        {layout.isVisible('top_models') ||
+        layout.isVisible('provider_mix') ||
+        layout.isVisible('cache_efficiency') ? (
           <div
             className={
               layout.isVisible('analytics_chart')
-                ? 'lg:col-span-4'
-                : 'lg:col-span-12'
+                ? 'flex flex-col gap-3 lg:col-span-4'
+                : 'flex flex-col gap-3 lg:col-span-12'
             }
           >
-            <WidgetShell id="top_models" layout={layout}>
-              <TopModelsCard analytics={overview?.analytics ?? null} />
-            </WidgetShell>
+            {layout.isVisible('top_models') ? (
+              <WidgetShell id="top_models" layout={layout}>
+                <TopModelsCard analytics={overview?.analytics ?? null} />
+              </WidgetShell>
+            ) : null}
+            {layout.isVisible('provider_mix') ? (
+              <WidgetShell id="provider_mix" layout={layout}>
+                <ProviderMixCard analytics={overview?.analytics ?? null} />
+              </WidgetShell>
+            ) : null}
+            {layout.isVisible('cache_efficiency') ? (
+              <WidgetShell id="cache_efficiency" layout={layout}>
+                <CacheEfficiencyCard
+                  analytics={overview?.analytics ?? null}
+                />
+              </WidgetShell>
+            ) : null}
           </div>
         ) : null}
       </div>

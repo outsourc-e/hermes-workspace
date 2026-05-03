@@ -13,6 +13,8 @@ const STORAGE_KEY = 'dashboard.layout.v1'
 export type WidgetId =
   | 'analytics_chart'
   | 'top_models'
+  | 'provider_mix'
+  | 'cache_efficiency'
   | 'sessions_intelligence'
   | 'logs_tail'
   | 'skills_usage'
@@ -41,6 +43,22 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     id: 'top_models',
     label: 'Top models',
     description: 'Routing share by model in the analytics window.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'provider_mix',
+    label: 'Provider mix',
+    description:
+      'Token share by provider family (anthropic / openai / local / etc).',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'cache_efficiency',
+    label: 'Cache efficiency',
+    description:
+      'Cache-hit rate with daily sparkline. Higher = lower cost.',
     column: 'main',
     hideable: true,
   },
