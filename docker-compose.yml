@@ -92,7 +92,9 @@ services:
       # Workspace session password. REQUIRED when HOST is non-loopback (the
       # default for Docker images, so the container binds 0.0.0.0:3000).
       # Pick a strong secret. See #122.
-      CLAUDE_PASSWORD: ${CLAUDE_PASSWORD:-}
+      # HERMES_PASSWORD is preferred; CLAUDE_PASSWORD remains as a back-compat
+      # fallback for compose files that pre-date the rename.
+      HERMES_PASSWORD: ${HERMES_PASSWORD:-${CLAUDE_PASSWORD:-}}
       # Enable the Secure flag on session cookies when terminated behind
       # HTTPS (reverse proxy / Tailscale Funnel / Cloudflare Tunnel). See #123.
       COOKIE_SECURE: ${COOKIE_SECURE:-}

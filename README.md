@@ -1,6 +1,7 @@
 <div align="center">
 
 <img src="./public/claude-avatar.webp" alt="Hermes Workspace" width="80" style="border-radius: 16px" />
+<!-- avatar filename retained for cache stability — do not rename without coordinated cache-bust -->
 
 # Hermes Workspace
 
@@ -13,7 +14,7 @@
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
-> **v2 — zero-fork. Clone, don't fork.** Runs on vanilla [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) installed via Nous's own installer. No patches, no drift.
+> **v2 — zero-fork.** Clone, don't fork. Runs on vanilla [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) installed via Nous's own installer. Chat, sessions, memory, skills, jobs, MCP, terminal, dashboard, Agent View, and Operations are all in vanilla parity. **Conductor** currently requires an additional dashboard plugin not in upstream yet — the UI shows a clear placeholder when that endpoint isn't available ([#262](https://github.com/outsourc-e/hermes-workspace/issues/262)). Everything else works with zero patches.
 
 ![Hermes Workspace](./docs/screenshots/splash.png)
 
@@ -42,7 +43,7 @@ Start here: [docs/swarm/](./docs/swarm/)
 ## ✨ Features
 
 - 🤖 **Hermes Agent Integration** — Direct gateway connection with real-time SSE streaming
-- 🎨 **8-Theme System** — Official, Classic, Slate, Mono — each with light and dark variants
+- 🎨 **Theme System** — Hermes, Nous, Bronze, Slate, Mono — light and dark variants of each
 - 🔒 **Security Hardened** — Auth middleware on all API routes, CSP headers, exec approval prompts
 - 📱 **Mobile-First PWA** — Full feature parity on any device via Tailscale
 - ⚡ **Live SSE Streaming** — Real-time agent output with tool call rendering
@@ -233,7 +234,7 @@ HERMES_API_URL=http://127.0.0.1:8642
 # (Ollama / LM Studio / local servers don't need a key)
 
 # Optional: password-protect the web UI
-# CLAUDE_PASSWORD=your_password
+# HERMES_PASSWORD=your_password
 ```
 
 ---
@@ -560,7 +561,7 @@ Features pending cloud infrastructure:
 
 ### 🎨 Themes
 
-- 8 themes: Official, Classic, Slate, Mono — each with light and dark variants
+- Themes: Hermes, Nous, Bronze, Slate, Mono — each with light and dark variants
 - Theme persists across sessions
 - Full mobile dark mode support
 
@@ -570,18 +571,19 @@ Features pending cloud infrastructure:
 - CSP headers via meta tags
 - Path traversal prevention on file/memory routes (real-path boundary check, not string prefix)
 - Rate limiting on endpoints
-- Fail-closed startup guard: refuses to bind non-loopback without `CLAUDE_PASSWORD`
+- Fail-closed startup guard: refuses to bind non-loopback without `HERMES_PASSWORD`
 - Session cookies: `HttpOnly` + `SameSite=Strict` + `Secure` (in production)
 - Optional password protection for web UI
 
 **Key env vars for remote / Docker deployments:**
 
-- `CLAUDE_PASSWORD` — required whenever `HOST ≠ 127.0.0.1`
+- `HERMES_PASSWORD` — required whenever `HOST ≠ 127.0.0.1` (legacy `CLAUDE_PASSWORD` still honored as a fallback)
 - `COOKIE_SECURE=1` — force the `Secure` cookie flag when terminating HTTPS at a proxy
 - `COOKIE_SECURE=0` — disable the `Secure` flag for plain-HTTP LAN deployments (`HOST=0.0.0.0` without HTTPS); without this, browsers silently drop session cookies and login fails (#149)
 - `TRUST_PROXY=1` — trust `x-forwarded-for` / `x-real-ip` (only set behind a sanitizing reverse proxy)
 - `HERMES_DASHBOARD_TOKEN` — explicit bearer for dashboard API (preferred over the legacy HTML-scrape fallback)
-- `CLAUDE_ALLOW_INSECURE_REMOTE=1` — bypass the fail-closed guard (not recommended)
+- `HERMES_API_TOKEN` — bearer for the Hermes Agent gateway when started with `API_SERVER_KEY` (legacy `CLAUDE_API_TOKEN` still honored)
+- `HERMES_ALLOW_INSECURE_REMOTE=1` — bypass the fail-closed guard (not recommended)
 
 See `.env.example` for the full list. Credits to [@kiosvantra](https://github.com/kiosvantra) for the security audit surfacing #121–#125.
 
@@ -633,9 +635,11 @@ Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
 ### "Using upstream NousResearch/hermes-agent"
 
-v2+ runs on vanilla `hermes-agent` with full feature parity. The upstream ships all extended endpoints (sessions, memory, skills, config). **No fork required, ever.**
+v2+ runs on vanilla `hermes-agent`. **No fork required.** The upstream ships every endpoint the workspace needs for chat, sessions, memory, skills, config, jobs, MCP, terminal, and Agent View.
 
-If you're pinned to an older `hermes-agent` version and missing endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
+**One known exception:** **Conductor** uses a dashboard plugin that hasn't landed upstream yet. When the workspace detects the missing endpoint, the Conductor screen shows a clear "Upstream not ready" placeholder with a link to [issue #262](https://github.com/outsourc-e/hermes-workspace/issues/262) instead of failing mid-action. Everything else works.
+
+If you're pinned to an older `hermes-agent` version and missing core endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
 
 ### Docker: "Unauthorized" or "Connection refused" to hermes-agent
 
@@ -680,13 +684,14 @@ If using Docker Compose and getting auth errors:
 
 ### Docker: older `claude webapi` docs are wrong
 
-The `claude webapi` command referenced in older docs doesn't exist. The correct command is:
+The `claude webapi` command referenced in some pre-rename docs doesn't exist. The correct commands are:
 
 ```bash
-hermes --gateway   # Starts the FastAPI gateway server
+hermes gateway run    # FastAPI gateway on :8642
+hermes dashboard      # dashboard plugin on :9119 (sessions/skills/jobs/config)
 ```
 
-The Docker setup uses `hermes --gateway` automatically — no action needed if using `docker compose up`.
+The Docker setup runs both automatically — no action needed if using `docker compose up`.
 
 ---
 
