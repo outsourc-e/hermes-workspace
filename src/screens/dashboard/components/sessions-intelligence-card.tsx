@@ -176,7 +176,11 @@ export function SessionsIntelligenceCard({
 
   return (
     <div
-      className="relative flex flex-col gap-2 overflow-hidden rounded-xl border p-3"
+      // h-full + flex-1 lets the card stretch to consume remaining
+      // vertical space when the parent column is taller than the
+      // content (e.g. when the side rail extends below). Iter 013
+      // ask: 'make sessions intelligence longer to fill the gap'.
+      className="relative flex h-full flex-1 flex-col gap-2 overflow-hidden rounded-xl border p-3"
       style={{
         background:
           'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 90%, transparent))',
@@ -227,8 +231,12 @@ export function SessionsIntelligenceCard({
           No sessions yet — start a chat.
         </div>
       ) : (
-        <ul className="flex flex-col gap-1">
-          {enriched.slice(0, 8).map(({ session: s, badges }) => {
+        // Iter 013: bumped from 8 → 14 rows. The card is now the
+        // bottom anchor of the main column, so it has the room.
+        // Operators that want fewer can still toggle to a deep
+        // sessions route in iter N+1.
+        <ul className="flex flex-1 flex-col gap-1 overflow-hidden">
+          {enriched.slice(0, 14).map(({ session: s, badges }) => {
             const isHighlight = s.key === highlightId
             const icon = sessionGlyph(s)
             return (
