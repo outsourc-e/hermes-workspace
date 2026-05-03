@@ -834,61 +834,44 @@ export function DashboardScreen() {
   return (
     <div className="min-h-full">
       {/* Floating mobile nav: hamburger left, theme toggle right */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 grid grid-cols-[auto_1fr_auto] items-center px-2 h-12 bg-[var(--theme-bg)]/90 backdrop-blur-xl" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <button
           type="button"
           aria-label="Open navigation menu"
           onClick={openHamburgerMenu}
-          className="flex items-center justify-center w-10 h-10 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
+          className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
         >
           <svg width="20" height="16" viewBox="0 0 20 16" fill="none" className="opacity-70" style={{ color: 'var(--color-ink, #111)' }}>
             <path d="M1 1.5H19M1 8H19M1 14.5H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
-        <h1
-          className="text-center text-[15px] font-semibold tracking-tight truncate"
-          style={{ color: 'var(--theme-text)' }}
+        <button
+          type="button"
+          aria-label="Toggle theme"
+          onClick={() => {
+            const LIGHT_DARK_PAIRS: Record<string, string> = {
+              'claude-nous': 'claude-nous-light',
+              'claude-nous-light': 'claude-nous',
+              'claude-official': 'claude-official-light',
+              'claude-official-light': 'claude-official',
+              'claude-classic': 'claude-classic-light',
+              'claude-classic-light': 'claude-classic',
+              'claude-slate': 'claude-slate-light',
+              'claude-slate-light': 'claude-slate',
+            }
+            const cur = document.documentElement.getAttribute('data-theme') || 'claude-official'
+            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'claude-official-light' : 'claude-official')
+            import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
+            const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
+            applyTheme(nextMode)
+            updateSettings({ theme: nextMode })
+            setIsDark(nextMode === 'dark')
+          }}
+          className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
+          style={{ color: 'var(--theme-muted)' }}
         >
-          Hermes Workspace
-        </h1>
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            aria-label="Toggle theme"
-            onClick={() => {
-              const LIGHT_DARK_PAIRS: Record<string, string> = {
-                'claude-nous': 'claude-nous-light',
-                'claude-nous-light': 'claude-nous',
-                'claude-official': 'claude-official-light',
-                'claude-official-light': 'claude-official',
-                'claude-classic': 'claude-classic-light',
-                'claude-classic-light': 'claude-classic',
-                'claude-slate': 'claude-slate-light',
-                'claude-slate-light': 'claude-slate',
-              }
-              const cur = document.documentElement.getAttribute('data-theme') || 'claude-official'
-              const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'claude-official-light' : 'claude-official')
-              import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
-              const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
-              applyTheme(nextMode)
-              updateSettings({ theme: nextMode })
-              setIsDark(nextMode === 'dark')
-            }}
-            className="flex items-center justify-center w-10 h-10 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
-            style={{ color: 'var(--theme-muted)' }}
-          >
-            <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={18} strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
-            aria-label="Settings"
-            onClick={() => navigate({ to: '/settings', search: {} })}
-            className="flex items-center justify-center w-10 h-10 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
-            style={{ color: 'var(--theme-muted)' }}
-          >
-            <HugeiconsIcon icon={Settings02Icon} size={18} strokeWidth={1.5} />
-          </button>
-        </div>
+          <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={20} strokeWidth={1.5} />
+        </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
       {/* ── Header: brand lockup left, action cluster right.
@@ -901,7 +884,7 @@ export function DashboardScreen() {
            (not centered) on purpose: ops dashboards put brand left
            + actions right because that's the spatial hierarchy
            operators expect (Linear, Vercel, Datadog all do this). */}
-      <div className="hidden md:flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <span
             className="relative inline-flex shrink-0 items-center justify-center rounded-xl border"
