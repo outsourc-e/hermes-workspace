@@ -40,14 +40,22 @@ Start here: [docs/swarm/](./docs/swarm/)
 
 ---
 
-## ✨ Features
+## ✨ What's inside
 
-- 🤖 **Hermes Agent Integration** — Direct gateway connection with real-time SSE streaming
-- 🎨 **Theme System** — Hermes, Nous, Bronze, Slate, Mono — light and dark variants of each
-- 🔒 **Security Hardened** — Auth middleware on all API routes, CSP headers, exec approval prompts
-- 📱 **Mobile-First PWA** — Full feature parity on any device via Tailscale
-- ⚡ **Live SSE Streaming** — Real-time agent output with tool call rendering
-- 🧠 **Memory & Skills** — Browse, search, and edit agent memory; explore 2,000+ skills
+- 💬 **Chat** — Real-time SSE streaming, tool call rendering, multi-session, markdown + syntax highlighting
+- 🧠 **Memory** — Browse, search, and edit agent memory; markdown live editor
+- 🧩 **Skills** — Browse 2,000+ skills with origin badges, filters, source paths, marketplace
+- 🔌 **MCP** — Full /mcp page (catalog + marketplace + sources), or fallback to local config CRUD
+- 📁 **Files + Terminal** — Full workspace file browser with Monaco; cross-platform PTY terminal
+- 🎮 **Operations** — Multi-agent dashboard with profile presets (Sage/Trader/Builder/Scribe/Ops) and 'Needs setup' detection
+- 📡 **Conductor** — Mission dispatch + decomposition (requires upstream dashboard plugin, see [#262](https://github.com/outsourc-e/hermes-workspace/issues/262))
+- 👥 **Agent View** — Live agent panel in chat with avatar, queue, history, usage meter
+- 🐝 **Swarm Mode** — Persistent tmux-backed Hermes Agent workers with role-based dispatch
+- 🗄️ **Dashboard** — Aggregated overview: sessions, model mix, cost ledger, attention card, ops strip
+- 🎨 **Themes** — Hermes, Nous, Bronze, Slate, Mono (light + dark)
+- 🔒 **Security** — Auth middleware on every route, CSP, path-traversal guard, fail-closed remote bind
+- 📱 **PWA + Tailscale** — Install as a native-feeling app; access from any device on your tailnet
+- ⚙️ **Capability gates** — Features that need upstream endpoints (Conductor) show a clean placeholder instead of failing mid-action
 
 ---
 
@@ -196,28 +204,6 @@ pnpm dev                   # Starts on http://localhost:3000
 ```
 
 > **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes Agent APIs, advanced features appear automatically.
-
-### Agent W Managed Companion
-
-When Hermes Workspace is running behind Agent W's local HTTPS proxy, the
-managed companion entrypoint is:
-
-```bash
-https://localhost:4445/chat/new
-```
-
-For local validation from the workspace checkout:
-
-```bash
-pnpm exec tsc --noEmit
-pnpm test
-pnpm build
-pnpm smoke:managed
-```
-
-`pnpm smoke:managed` checks the managed `4445` surface and fails if the recent
-PM2 error log still contains the missing-asset/runtime signatures that show up
-when `dist` drifts under a live server process.
 
 #### Environment Variables
 
@@ -524,58 +510,21 @@ Features pending cloud infrastructure:
 
 ---
 
-## ✨ Features
+## 🔒 Security & deployment env vars
 
-### 💬 Chat
+Key safeguards — most are on by default, the env vars below are for remote / Docker deployments where you opt out of the loopback default.
 
-- Real-time SSE streaming with tool call rendering
-- Agent-authored artifact events surfaced in the inspector
-- Multi-session management with full history
-- Markdown + syntax highlighting
-- Chronological message ordering with merge dedup
-- Inspector panel for session activity, memory, and skills
+### Built-in safeguards
 
-### 🧠 Memory
-
-- Browse and edit agent memory files
-- Search across memory entries
-- Markdown preview with live editing
-
-### 🧩 Skills
-
-- Browse 2,000+ skills from the registry
-- View skill details, categories, and documentation
-- Skill management per session
-
-### 📁 Files
-
-- Full workspace file browser
-- Navigate directories, preview and edit files
-- Monaco editor integration
-
-### 💻 Terminal
-
-- Full PTY terminal with cross-platform support
-- Persistent shell sessions
-- Direct workspace access
-
-### 🎨 Themes
-
-- Themes: Hermes, Nous, Bronze, Slate, Mono — each with light and dark variants
-- Theme persists across sessions
-- Full mobile dark mode support
-
-### 🔒 Security
-
-- Auth middleware on all API routes
+- Auth middleware on every API route
 - CSP headers via meta tags
-- Path traversal prevention on file/memory routes (real-path boundary check, not string prefix)
+- Path-traversal prevention on file/memory routes (real-path boundary check, not string prefix)
 - Rate limiting on endpoints
 - Fail-closed startup guard: refuses to bind non-loopback without `HERMES_PASSWORD`
 - Session cookies: `HttpOnly` + `SameSite=Strict` + `Secure` (in production)
-- Optional password protection for web UI
+- Optional password protection for the web UI
 
-**Key env vars for remote / Docker deployments:**
+### Env vars for remote / Docker deployments
 
 - `HERMES_PASSWORD` — required whenever `HOST ≠ 127.0.0.1` (legacy `CLAUDE_PASSWORD` still honored as a fallback)
 - `COOKIE_SECURE=1` — force the `Secure` cookie flag when terminating HTTPS at a proxy
@@ -697,19 +646,36 @@ The Docker setup runs both automatically — no action needed if using `docker c
 
 ## 🗺️ Roadmap
 
-| Feature                       | Status            |
-| ----------------------------- | ----------------- |
-| Chat + SSE Streaming          | ✅ Shipped        |
-| Files + Terminal              | ✅ Shipped        |
-| Memory Browser                | ✅ Shipped        |
-| Skills Browser                | ✅ Shipped        |
-| Mobile PWA + Tailscale        | ✅ Shipped        |
-| 8-Theme System                | ✅ Shipped        |
-| Native Desktop App (Electron) | 🔨 In Development |
-| Model Switching & Config      | 🔨 In Development |
-| Chat Abort / Cancel           | 🔨 In Development |
-| Cloud / Hosted Version        | 🔜 Coming Soon    |
-| Team Collaboration            | 🔜 Coming Soon    |
+### Shipped ✅
+
+| Feature | What it does |
+|---|---|
+| Chat + SSE streaming | Live agent output with tool call rendering |
+| Files + Terminal | Full workspace file browser + cross-platform PTY |
+| Memory + Skills browsers | Edit memory, browse 2,000+ skills with marketplace |
+| Dashboard | Sessions, model mix, cost ledger, attention card |
+| Operations | Multi-agent management with preset personas |
+| Agent View | Live agent panel in chat |
+| Swarm Mode | Persistent tmux-backed worker pool with role dispatch |
+| MCP page | Full catalog + marketplace + sources |
+| Mobile PWA + Tailscale | Install as native-feeling app on any device |
+| Themes | Hermes / Nous / Bronze / Slate / Mono (light + dark) |
+| Capability gates | Graceful 'upstream not ready' placeholders |
+| Multi-provider | Anthropic, OpenAI, OpenRouter, Google, Ollama, LM Studio, vLLM, Atomic Chat |
+
+### In progress 🔨
+
+| Feature | Status |
+|---|---|
+| Conductor missions | Workspace UI is shipped; awaiting upstream dashboard plugin (see [#262](https://github.com/outsourc-e/hermes-workspace/issues/262)) |
+| Native Desktop App (Electron) | Spec'd; PWA install path works today |
+
+### Coming 🔜
+
+| Feature | Status |
+|---|---|
+| Cloud / Hosted version | Pending infra |
+| Team collaboration | Pending cloud + multi-tenant work |
 
 ---
 
