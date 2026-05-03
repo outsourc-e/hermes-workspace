@@ -1127,27 +1127,35 @@ export function DashboardScreen() {
              rail itself is right of the chart, which produces the same visual order.
            - Logs default off; still toggleable from edit mode for power users. */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        <div className="flex flex-col gap-3 lg:col-span-8">
-          {layout.isVisible('sessions_intelligence') ? (
-            <WidgetShell id="sessions_intelligence" layout={layout}>
-              {sessionsAvailable ? (
-                <SessionsIntelligenceCard sessions={sessionRows} />
-              ) : (
-                <UnavailableWidget
-                  title="Recent Sessions"
-                  description={getUnavailableReason('sessions')}
-                />
-              )}
+        {/* Iter 013 main column order: Operator Tip first (compact),
+            then Sessions Intelligence (the bottom anchor that grows
+            to fill the column to match the side rail height), then
+            optional Logs Tail at the bottom for power users in edit
+            mode. The column itself is `min-h-full flex` so the
+            child Sessions card's `flex-1` actually expands. */}
+        <div className="flex min-h-full flex-col gap-3 lg:col-span-8">
+          {layout.isVisible('operator_tip') ? (
+            <WidgetShell id="operator_tip" layout={layout}>
+              <OperatorTipCard overview={overview ?? null} />
             </WidgetShell>
+          ) : null}
+          {layout.isVisible('sessions_intelligence') ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <WidgetShell id="sessions_intelligence" layout={layout}>
+                {sessionsAvailable ? (
+                  <SessionsIntelligenceCard sessions={sessionRows} />
+                ) : (
+                  <UnavailableWidget
+                    title="Recent Sessions"
+                    description={getUnavailableReason('sessions')}
+                  />
+                )}
+              </WidgetShell>
+            </div>
           ) : null}
           {layout.isVisible('logs_tail') ? (
             <WidgetShell id="logs_tail" layout={layout}>
               <LogsTailCard logs={overview?.logs ?? null} />
-            </WidgetShell>
-          ) : null}
-          {layout.isVisible('operator_tip') ? (
-            <WidgetShell id="operator_tip" layout={layout}>
-              <OperatorTipCard overview={overview ?? null} />
             </WidgetShell>
           ) : null}
         </div>

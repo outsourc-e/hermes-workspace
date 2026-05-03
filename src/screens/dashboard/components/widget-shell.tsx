@@ -40,8 +40,11 @@ export function WidgetShell({
     return <>{children}</>
   }
 
+  // Use `h-full` on the edit-mode wrapper so children that opted
+  // into `flex-1`/`h-full` (e.g. Sessions Intelligence post iter 013)
+  // still expand correctly when the dashboard is in edit mode.
   return (
-    <div className="relative">
+    <div className="relative h-full">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 rounded-xl"
@@ -53,7 +56,7 @@ export function WidgetShell({
           borderRadius: 12,
         }}
       />
-      <div className="relative">{children}</div>
+      <div className="relative h-full">{children}</div>
       {canHide ? (
         <button
           type="button"
