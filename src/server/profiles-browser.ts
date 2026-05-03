@@ -169,9 +169,16 @@ export function listProfiles(): Array<ProfileSummary> {
     }
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue
       const name = entry.name
       const profilePath = path.join(profilesRoot, name)
+      if (!entry.isDirectory()) {
+        if (!entry.isSymbolicLink()) continue
+        try {
+          if (!fs.statSync(profilePath).isDirectory()) continue
+        } catch {
+          continue
+        }
+      }
       const configPath = path.join(profilePath, 'config.yaml')
       const envPath = path.join(profilePath, '.env')
       const skillsDir = path.join(profilePath, 'skills')
