@@ -89,7 +89,6 @@ import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
-import { InspectorPanel } from '@/components/inspector/inspector-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
@@ -2565,7 +2564,7 @@ export function ChatScreen({
             ? 'flex min-h-0 w-full flex-col'
             : isMobile
               ? 'flex flex-col'
-              : 'grid grid-cols-[auto_minmax(0,1fr)_auto_auto] grid-rows-[minmax(0,1fr)]',
+              : 'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[minmax(0,1fr)]',
         )}
       >
         {hideUi || compact || isFocusMode ? null : isMobile ? null : (
@@ -2749,7 +2748,6 @@ export function ChatScreen({
             />
           ) : null}
         </main>
-        {!compact && !hideUi && !isMobile && !isFocusMode && <InspectorPanel />}
         {!compact && !isFocusMode && <AgentViewPanel />}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}

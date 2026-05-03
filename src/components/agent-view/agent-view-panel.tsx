@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useNavigate } from '@tanstack/react-router'
 import {
   ArrowDown01Icon,
-  ArrowExpand01Icon,
   ArrowRight01Icon,
   BotIcon,
   Cancel01Icon,
@@ -44,6 +42,7 @@ import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { cn } from '@/lib/utils'
+import { InspectorPanel, InspectorToggleButton } from '@/components/inspector/inspector-panel'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
   const nodes = document.querySelectorAll<HTMLElement>(
@@ -103,7 +102,7 @@ function getStoredAgentName(): string {
 }
 
 const STATE_GLOW: Record<string, string> = {
-  idle: 'border-primary-300/70',
+  idle: 'border-primary-200/20',
   reading: 'border-blue-400/50 shadow-[0_0_8px_rgba(59,130,246,0.15)]',
   thinking: 'border-yellow-400/50 shadow-[0_0_8px_rgba(234,179,8,0.15)]',
   responding: 'border-emerald-400/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]',
@@ -401,7 +400,7 @@ function OrchestratorCard({
                   if (e.key === 'Escape') setIsEditing(false)
                 }}
                 placeholder="Agent name..."
-                className="w-24 rounded border border-primary-300/70 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-accent-400"
+                className="w-24 rounded border border-primary-200/25 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-accent-400"
                 maxLength={20}
               />
             ) : (
@@ -447,7 +446,7 @@ function OrchestratorCard({
 
       {/* ── Usage section ── */}
       {displayRows.length > 0 && (
-        <div className={cn('border-t border-primary-300/40 pt-2 space-y-1.5', compact ? 'mt-1.5 px-2' : 'mt-2 px-3')}>
+        <div className={cn('border-t border-primary-200/20 pt-2 space-y-1.5', compact ? 'mt-1.5 px-2' : 'mt-2 px-3')}>
           {/* Provider header row — centered */}
           <div className="flex w-full items-center justify-between">
             <div className="flex-1" />
@@ -602,7 +601,6 @@ export function AgentViewPanel() {
     cancelQueueTask,
     activeCount,
   } = useAgentView()
-  const navigate = useNavigate()
 
   // Transcript modal removed — View button now navigates to /agent-swarm
   const [selectedAgentChat, setSelectedAgentChat] = useState<{
@@ -842,7 +840,7 @@ export function AgentViewPanel() {
             opacity: { duration: 0.22, ease: 'easeOut' },
           }}
           className={cn(
-            'relative h-full shrink-0 overflow-hidden border-l border-primary-300/50 bg-[color:var(--theme-sidebar,#060914)]/92 backdrop-blur-xl',
+            'relative h-full shrink-0 overflow-hidden bg-[color:var(--theme-sidebar,#060914)]/92 backdrop-blur-xl',
             panelVisible ? 'pointer-events-auto' : 'pointer-events-none',
           )}
         >
@@ -855,8 +853,8 @@ export function AgentViewPanel() {
                   className={cn(
                     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums cursor-default',
                     activeCount > 0
-                      ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700'
-                      : 'border-primary-300/70 bg-primary-200/50 text-primary-700',
+                      ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-700'
+                      : 'border-primary-300/35 bg-primary-200/35 text-primary-700',
                   )}
                   title={`${activeCount} agent${activeCount !== 1 ? 's' : ''} running · ${historyAgents.length} in history · ${queuedAgents.length} queued`}
                 >
@@ -889,26 +887,9 @@ export function AgentViewPanel() {
                 Agent View
               </h2>
 
-              {/* Right — expand + close */}
+              {/* Right — inspector + close */}
               <div className="flex items-center gap-1">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={function handleExpandHub() {
-                    navigate({ to: '/conductor' })
-                    setTimeout(() => {
-                      setOpen(false)
-                    }, 0)
-                  }}
-                  aria-label="Open Conductor"
-                  title="Open Conductor"
-                >
-                  <HugeiconsIcon
-                    icon={ArrowExpand01Icon}
-                    size={16}
-                    strokeWidth={1.5}
-                  />
-                </Button>
+                <InspectorToggleButton />
                 <Button
                   size="icon-sm"
                   variant="ghost"
@@ -931,6 +912,8 @@ export function AgentViewPanel() {
           <ScrollAreaRoot className="h-[calc(100%-3.25rem)]">
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
+                <InspectorPanel embedded />
+
                 {/* Main Agent Card (includes usage section) */}
                 <OrchestratorCard compact={false} />
 

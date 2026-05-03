@@ -8,7 +8,7 @@
   --tabbar-h: 0px;
   /* Chat content max-width — controlled by Settings > Chat Display (see #89).
    * Keep 900px default to match prior layout; 'wide' = 1200px, 'full' = 100%. */
-  --chat-content-max-width: 1125px;
+  --chat-content-max-width: 900px;
 }
 
 [data-chat-width='wide'] {

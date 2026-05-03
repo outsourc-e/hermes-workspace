@@ -507,7 +507,7 @@ function LogsTab() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function InspectorPanel() {
+export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const isOpen = useInspectorStore((s) => s.isOpen)
   const memoryAvailable = useFeatureAvailable('memory')
   const skillsAvailable = useFeatureAvailable('skills')
@@ -522,19 +522,27 @@ export function InspectorPanel() {
     }
   }, [activeTab, memoryAvailable, skillsAvailable])
 
+  if (embedded && !isOpen) return null
+
   return (
     <div
       className={cn(
-        'relative h-full shrink-0 overflow-hidden transition-[width] duration-200',
-        isOpen ? 'w-[350px]' : 'w-0',
+        embedded
+          ? 'relative overflow-hidden rounded-2xl border border-primary-200/20 bg-primary-100/60 shadow-sm backdrop-blur-sm'
+          : 'relative h-full shrink-0 overflow-hidden transition-[width] duration-200',
+        !embedded && (isOpen ? 'w-[350px]' : 'w-0'),
       )}
-      style={{
-        background: 'var(--theme-panel)',
-        borderLeft: '1px solid var(--theme-border)',
-        boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.12)',
-      }}
+      style={
+        embedded
+          ? undefined
+          : {
+              background: 'var(--theme-panel)',
+              borderLeft: '1px solid var(--theme-border)',
+              boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.12)',
+            }
+      }
     >
-      {isOpen && (
+      {(embedded || isOpen) && (
         <>
           {/* Header */}
           <div
