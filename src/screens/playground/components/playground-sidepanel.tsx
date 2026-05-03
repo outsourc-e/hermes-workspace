@@ -1,17 +1,8 @@
-/**
- * RuneScape-style consolidated right side panel.
- * Tabs: Inventory · Skills · Quests · Worlds · Settings
- *
- * Replaces the scattered right-side cards with one panel + tab switcher,
- * matching OSRS / PlayROHAN conventions. Also exposes a compact quest
- * tracker pinned above for at-a-glance objectives.
- */
 import { useState } from 'react'
 import {
   itemById,
-  PLAYGROUND_ITEMS,
   PLAYGROUND_QUESTS,
-  PLAYGROUND_SKILLS,
+  type EquipmentSlot,
   type PlaygroundItemId,
   type PlaygroundWorldId,
 } from '../lib/playground-rpg'
@@ -25,6 +16,9 @@ type Props = {
   worlds: Array<{ id: PlaygroundWorldId; name: string; tagline: string; accent: string }>
   onSelectWorld: (world: PlaygroundWorldId) => void
   onReset?: () => void
+  onOpenInventory?: () => void
+  onEquipItem: (itemId: PlaygroundItemId) => void
+  onUnequipSlot: (slot: EquipmentSlot) => void
   worldAccent: string
 }
 
@@ -36,26 +30,38 @@ const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]
 
+const SLOT_LABELS: Array<{ slot: EquipmentSlot; label: string }> = [
+  { slot: 'weapon', label: 'Weapon' },
+  { slot: 'cloak', label: 'Cloak' },
+  { slot: 'head', label: 'Head' },
+  { slot: 'artifact', label: 'Artifact' },
+]
+
 export function PlaygroundSidePanel({
   state,
   currentWorld,
   worlds,
   onSelectWorld,
   onReset,
+  onOpenInventory,
+  onEquipItem,
+  onUnequipSlot,
   worldAccent,
 }: Props) {
   const [tab, setTab] = useState<TabId>('inventory')
 
   const activeQuest = PLAYGROUND_QUESTS.find(
-    (q) => !state.completedQuests.includes(q.id),
+    (quest) => !quest.optional && !state.completedQuests.includes(quest.id),
   )
+  const progress = activeQuest
+    ? state.playerProfile.questProgress[activeQuest.id]
+    : undefined
 
   return (
     <>
-      {/* Quest tracker pin (above panel) */}
       {activeQuest && (
         <div
-          className="pointer-events-auto fixed right-3 top-[210px] z-[70] w-[260px] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl"
+          className="pointer-events-auto fixed right-3 top-[210px] z-[70] w-[280px] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl"
           style={{ borderColor: `${worldAccent}55`, boxShadow: `0 0 16px ${worldAccent}33, 0 8px 22px rgba(0,0,0,.55)` }}
         >
           <div className="mb-1 flex items-center justify-between">
@@ -66,42 +72,52 @@ export function PlaygroundSidePanel({
             {activeQuest.title}
           </div>
           <div className="mt-1.5 space-y-1">
-            {activeQuest.objectives.map((o) => (
-              <div key={o.id} className="flex items-start gap-1.5 text-[10px] leading-tight text-white/80">
-                <span className="text-white/40">▢</span>
-                <span>{o.label}</span>
-              </div>
-            ))}
+            {activeQuest.objectives.map((objective) => {
+              const done = progress?.completedObjectives.includes(objective.id)
+              return (
+                <div key={objective.id} className="flex items-start gap-1.5 text-[10px] leading-tight text-white/80">
+                  <span className={done ? 'text-emerald-300' : 'text-white/40'}>{done ? '☑' : '▢'}</span>
+                  <span>{objective.label}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Right-side consolidated panel */}
       <div
-        className="pointer-events-auto fixed right-3 top-[378px] z-[70] w-[260px] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl"
+        className="pointer-events-auto fixed right-3 top-[388px] z-[70] w-[280px] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl"
         style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.6)` }}
       >
-        {/* Tabs */}
         <div className="flex items-center justify-between gap-1 border-b border-white/10 px-1.5 py-1.5">
-          {TABS.map((t) => (
+          {TABS.map((entry) => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
+              key={entry.id}
+              onClick={() => {
+                setTab(entry.id)
+                if (entry.id === 'inventory') onOpenInventory?.()
+              }}
               className="flex flex-1 flex-col items-center justify-center rounded-md py-1 text-[9px] font-bold uppercase tracking-[0.08em] transition-colors"
               style={{
-                color: tab === t.id ? worldAccent : 'rgba(255,255,255,0.55)',
-                background: tab === t.id ? `${worldAccent}1f` : 'transparent',
-                boxShadow: tab === t.id ? `inset 0 -2px 0 ${worldAccent}` : 'none',
+                color: tab === entry.id ? worldAccent : 'rgba(255,255,255,0.55)',
+                background: tab === entry.id ? `${worldAccent}1f` : 'transparent',
+                boxShadow: tab === entry.id ? `inset 0 -2px 0 ${worldAccent}` : 'none',
               }}
-              title={t.label}
+              title={entry.label}
             >
-              <span className="text-base leading-none">{t.icon}</span>
+              <span className="text-base leading-none">{entry.icon}</span>
             </button>
           ))}
         </div>
 
-        <div className="p-3 max-h-[420px] overflow-y-auto">
-          {tab === 'inventory' && <InventoryTab state={state} />}
+        <div className="max-h-[430px] overflow-y-auto p-3">
+          {tab === 'inventory' && (
+            <InventoryTab
+              state={state}
+              onEquipItem={onEquipItem}
+              onUnequipSlot={onUnequipSlot}
+            />
+          )}
           {tab === 'skills' && <SkillsTab state={state} />}
           {tab === 'quests' && <QuestsTab state={state} accent={worldAccent} />}
           {tab === 'worlds' && (
@@ -112,64 +128,109 @@ export function PlaygroundSidePanel({
               onSelectWorld={onSelectWorld}
             />
           )}
-          {tab === 'settings' && (
-            <SettingsTab onReset={onReset} />
-          )}
+          {tab === 'settings' && <SettingsTab onReset={onReset} />}
         </div>
       </div>
     </>
   )
 }
 
-function InventoryTab({ state }: { state: PlaygroundRpgState }) {
+function InventoryTab({
+  state,
+  onEquipItem,
+  onUnequipSlot,
+}: {
+  state: PlaygroundRpgState
+  onEquipItem: (itemId: PlaygroundItemId) => void
+  onUnequipSlot: (slot: EquipmentSlot) => void
+}) {
+  const inventory = state.playerProfile.inventory
+  const equipped = state.playerProfile.equipped
+
   return (
-    <div className="grid grid-cols-4 gap-2">
-      {Array.from({ length: 24 }).map((_, i) => {
-        const id = state.inventory[i] as PlaygroundItemId | undefined
-        const item = id ? itemById(id) : undefined
-        return (
-          <div
-            key={i}
-            title={item?.description ?? 'Empty slot'}
-            className="flex h-14 flex-col items-center justify-center rounded-lg border border-white/10 bg-black/35 text-center hover:border-white/30"
-          >
-            {item ? (
-              <>
-                <div className="text-xl leading-tight">{item.icon}</div>
-                <div className="max-w-[56px] truncate text-[8px] text-white/55">{item.name}</div>
-              </>
-            ) : (
-              <div className="text-white/15">＋</div>
-            )}
-          </div>
-        )
-      })}
+    <div className="space-y-3">
+      <div>
+        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/55">Equipped</div>
+        <div className="grid grid-cols-2 gap-2">
+          {SLOT_LABELS.map(({ slot, label }) => {
+            const item = equipped[slot] ? itemById(equipped[slot]!) : null
+            return (
+              <button
+                key={slot}
+                onClick={() => item && onUnequipSlot(slot)}
+                className="rounded-lg border border-white/10 bg-black/35 p-2 text-left"
+                title={item ? `Unequip ${item.name}` : `Empty ${label} slot`}
+              >
+                <div className="text-[9px] uppercase tracking-[0.12em] text-white/45">{label}</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-lg">{item?.icon || '＋'}</span>
+                  <div className="min-w-0">
+                    <div className="truncate text-[10px] font-semibold">{item?.name || 'Empty'}</div>
+                    <div className="text-[8px] text-white/45">{item?.stat ? `${item.stat.label} +${item.stat.value}` : 'Click item below to equip'}</div>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/55">Inventory</div>
+        <div className="grid grid-cols-4 gap-2">
+          {Array.from({ length: 24 }).map((_, index) => {
+            const id = inventory[index]
+            const item = id ? itemById(id) : undefined
+            const isEquipped = id ? Object.values(equipped).includes(id) : false
+            return (
+              <button
+                key={index}
+                type="button"
+                disabled={!id}
+                onClick={() => id && onEquipItem(id)}
+                title={item?.description ?? 'Empty slot'}
+                className="flex h-16 flex-col items-center justify-center rounded-lg border border-white/10 bg-black/35 text-center transition hover:border-white/30 disabled:cursor-default"
+              >
+                {item ? (
+                  <>
+                    <div className="text-xl leading-tight">{item.icon}</div>
+                    <div className="max-w-[56px] truncate text-[8px] text-white/75">{item.name}</div>
+                    <div className="text-[7px] uppercase tracking-[0.1em] text-white/45">
+                      {isEquipped ? 'Equipped' : item.slot ? 'Equip' : item.rarity}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-white/15">＋</div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
 
 function SkillsTab({ state }: { state: PlaygroundRpgState }) {
+  const entries = [
+    { label: 'Power', value: state.playerProfile.equipped.weapon ? itemById(state.playerProfile.equipped.weapon)?.stat?.value ?? 0 : 0, color: '#fb7185' },
+    { label: 'Guard', value: state.playerProfile.equipped.cloak ? itemById(state.playerProfile.equipped.cloak)?.stat?.value ?? 0 : 0, color: '#22d3ee' },
+    { label: 'Command', value: state.playerProfile.equipped.head ? itemById(state.playerProfile.equipped.head)?.stat?.value ?? 0 : 0, color: '#facc15' },
+    { label: 'Recall', value: state.playerProfile.equipped.artifact ? itemById(state.playerProfile.equipped.artifact)?.stat?.value ?? 0 : 0, color: '#a78bfa' },
+  ]
   return (
     <div className="grid grid-cols-2 gap-2">
-      {PLAYGROUND_SKILLS.map((skill) => {
-        const xp = state.skillXp[skill.id] ?? 0
-        const level = Math.floor(xp / 100) + 1
-        const inLevelXp = xp % 100
-        return (
-          <div key={skill.id} className="rounded-lg border border-white/10 bg-black/35 p-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-base">{skill.icon}</span>
-              <div className="flex-1">
-                <div className="text-[10px] font-bold leading-tight">{skill.name}</div>
-                <div className="text-[9px] text-white/45">Lv. {level}</div>
-              </div>
-            </div>
-            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-black/60">
-              <div className="h-full rounded-full bg-cyan-400" style={{ width: `${inLevelXp}%` }} />
-            </div>
+      {entries.map((entry) => (
+        <div key={entry.label} className="rounded-lg border border-white/10 bg-black/35 p-2">
+          <div className="text-[10px] font-bold leading-tight">{entry.label}</div>
+          <div className="mt-1 text-[18px] font-extrabold" style={{ color: entry.color }}>
+            +{entry.value}
           </div>
-        )
-      })}
+          <div className="mt-1 h-1 overflow-hidden rounded-full bg-black/60">
+            <div className="h-full rounded-full" style={{ width: `${Math.min(100, entry.value * 18)}%`, background: entry.color }} />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -177,11 +238,12 @@ function SkillsTab({ state }: { state: PlaygroundRpgState }) {
 function QuestsTab({ state, accent }: { state: PlaygroundRpgState; accent: string }) {
   return (
     <div className="space-y-2">
-      {PLAYGROUND_QUESTS.map((q) => {
-        const done = state.completedQuests.includes(q.id)
+      {PLAYGROUND_QUESTS.map((quest) => {
+        const done = state.completedQuests.includes(quest.id)
+        const progress = state.playerProfile.questProgress[quest.id]
         return (
           <div
-            key={q.id}
+            key={quest.id}
             className="rounded-lg border p-2"
             style={{
               borderColor: done ? '#10b98155' : `${accent}33`,
@@ -189,19 +251,22 @@ function QuestsTab({ state, accent }: { state: PlaygroundRpgState; accent: strin
             }}
           >
             <div className="flex items-center justify-between">
-              <div className="text-[10px] font-bold leading-tight">{q.title}</div>
+              <div className="text-[10px] font-bold leading-tight">{quest.title}</div>
               <div className="text-[9px]" style={{ color: done ? '#10b981' : accent }}>
-                {done ? 'DONE' : '...'}
+                {done ? 'DONE' : quest.optional ? 'BONUS' : '...'}
               </div>
             </div>
-            <div className="mt-0.5 text-[9px] leading-tight text-white/55">{q.chapter}</div>
+            <div className="mt-0.5 text-[9px] leading-tight text-white/55">{quest.chapter}</div>
             <div className="mt-1 space-y-0.5">
-              {q.objectives.map((o) => (
-                <div key={o.id} className="flex items-start gap-1.5 text-[9px] leading-tight text-white/70">
-                  <span className="text-white/40">{done ? '☑' : '▢'}</span>
-                  <span>{o.label}</span>
-                </div>
-              ))}
+              {quest.objectives.map((objective) => {
+                const complete = progress?.completedObjectives.includes(objective.id)
+                return (
+                  <div key={objective.id} className="flex items-start gap-1.5 text-[9px] leading-tight text-white/70">
+                    <span className="text-white/40">{complete ? '☑' : '▢'}</span>
+                    <span>{objective.label}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )
@@ -258,26 +323,19 @@ function SettingsTab({ onReset }: { onReset?: () => void }) {
       <div>
         <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/55">Controls</div>
         <ul className="mt-1 space-y-0.5">
-          <li>• Click ground = walk there</li>
-          <li>• WASD = move (camera-relative)</li>
-          <li>• Arrows = orbit camera</li>
-          <li>• Shift = sprint</li>
-          <li>• [ / ] = zoom</li>
-          <li>• E = talk · J = journal · M = map · T = chat</li>
-          <li>• 1-6 = action skills</li>
+          <li>WASD move · Shift sprint</li>
+          <li>E talk · T chat · J journal · M world map · C avatar</li>
+          <li>1 Strike · 2 Dash · 3 Bolt</li>
         </ul>
       </div>
       {onReset && (
         <button
           onClick={onReset}
-          className="mt-2 w-full rounded-md border border-rose-300/30 bg-rose-400/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-rose-200 hover:bg-rose-400/20"
+          className="rounded-lg border border-rose-400/35 bg-rose-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-500/20"
         >
-          Reset Progress
+          Reset local profile
         </button>
       )}
-      <div className="pt-1 text-[9px] text-white/40">
-        Multiplayer arrives next sprint. {PLAYGROUND_ITEMS.length} items / {PLAYGROUND_QUESTS.length} quests defined.
-      </div>
     </div>
   )
 }

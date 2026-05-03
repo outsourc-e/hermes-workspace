@@ -19,23 +19,26 @@ import {
 type Props = {
   open: boolean
   onClose: () => void
+  value?: AvatarConfig
+  onChange?: (cfg: AvatarConfig) => void
 }
 
 const HAIR_STYLES: Array<AvatarConfig['hairStyle']> = ['short', 'cap', 'long', 'mohawk', 'bald']
 const HELMETS: Array<AvatarConfig['helmet']> = ['winged', 'circlet', 'cap', 'crown', 'none']
 const WEAPONS: Array<AvatarConfig['weapon']> = ['sword', 'staff', 'bow', 'none']
 
-export function PlaygroundCustomizer({ open, onClose }: Props) {
-  const [cfg, setCfg] = useState<AvatarConfig>(() => loadAvatarConfig())
+export function PlaygroundCustomizer({ open, onClose, value, onChange }: Props) {
+  const [cfg, setCfg] = useState<AvatarConfig>(() => value ?? loadAvatarConfig())
 
   useEffect(() => {
-    if (open) setCfg(loadAvatarConfig())
-  }, [open])
+    if (open) setCfg(value ?? loadAvatarConfig())
+  }, [open, value])
 
   function update<K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) {
     const next = { ...cfg, [key]: value }
     setCfg(next)
     saveAvatarConfig(next)
+    onChange?.(next)
   }
 
   function loadPreset(name: string) {
@@ -43,6 +46,7 @@ export function PlaygroundCustomizer({ open, onClose }: Props) {
     if (!preset) return
     setCfg(preset)
     saveAvatarConfig(preset)
+    onChange?.(preset)
   }
 
   if (!open) return null
@@ -122,7 +126,11 @@ export function PlaygroundCustomizer({ open, onClose }: Props) {
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Saved automatically</div>
           <div className="flex gap-2">
             <button
-              onClick={() => { saveAvatarConfig(AVATAR_PRESETS.hermes); setCfg(AVATAR_PRESETS.hermes) }}
+              onClick={() => {
+                saveAvatarConfig(AVATAR_PRESETS.hermes)
+                setCfg(AVATAR_PRESETS.hermes)
+                onChange?.(AVATAR_PRESETS.hermes)
+              }}
               className="rounded-lg border border-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/75 hover:bg-white/5"
             >
               Reset

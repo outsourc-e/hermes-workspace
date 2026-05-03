@@ -1,38 +1,37 @@
-/**
- * Compact, RuneScape-style HUD: floating stat orbs (HP/MP/SP/XP) plus
- * a small player chip. The right-side rail is now owned by
- * PlaygroundSidePanel. The bottom skill strip lives there too.
- */
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
-import type { PlaygroundRpgState } from '../hooks/use-playground-rpg'
+import type { PlaygroundRpgState, RewardToast } from '../hooks/use-playground-rpg'
 
 type HudProps = {
   state: PlaygroundRpgState
   activeQuestTitle: string
+  objectiveLabel: string
+  objectiveHint?: string
   levelProgress: { current: number; needed: number; pct: number }
   currentWorld: PlaygroundWorldId
   worldAccent: string
-  lastReward?: string | null
+  toasts: RewardToast[]
 }
 
 export function PlaygroundHud({
   state,
   activeQuestTitle,
+  objectiveLabel,
+  objectiveHint,
   levelProgress,
   worldAccent,
-  lastReward,
+  toasts,
 }: HudProps) {
+  const { playerProfile } = state
   return (
     <>
-      {/* Player chip + stat orbs (top-left) */}
-      <div className="pointer-events-auto fixed left-[92px] top-3 z-[70] flex flex-col items-start gap-2 md:left-[104px]">
+      <div className="pointer-events-auto fixed left-[92px] top-3 z-[70] flex max-w-[340px] flex-col items-start gap-2 md:left-[104px]">
         <div
           className="rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/90 to-black/85 px-3 py-2 text-white shadow-2xl backdrop-blur-xl"
           style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
         >
           <div className="flex items-center gap-2">
             <div
-              className="flex h-9 w-9 items-center justify-center rounded-full border-2 text-xs font-bold"
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 text-xs font-bold"
               style={{
                 borderColor: worldAccent,
                 background: `${worldAccent}22`,
@@ -40,41 +39,70 @@ export function PlaygroundHud({
                 boxShadow: `0 0 10px ${worldAccent}66`,
               }}
             >
-              {state.level}
+              {playerProfile.level}
             </div>
             <div className="leading-tight">
-              <div className="text-[12px] font-bold">Worldsmith</div>
-              <div className="max-w-[180px] truncate text-[9px] uppercase tracking-[0.16em] text-white/45">
-                {activeQuestTitle}
+              <div className="text-[12px] font-bold">
+                {playerProfile.displayName || 'New Builder'}
+              </div>
+              <div className="max-w-[210px] truncate text-[9px] uppercase tracking-[0.16em] text-white/45">
+                {playerProfile.titlesUnlocked.at(-1) || 'Training Grounds'}
               </div>
             </div>
           </div>
+        </div>
+
+        <div
+          className="w-full rounded-2xl border border-white/10 bg-black/70 px-3 py-2 shadow-xl backdrop-blur-xl"
+          style={{ borderColor: `${worldAccent}33` }}
+        >
+          <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Current Objective</div>
+          <div className="mt-1 text-[13px] font-bold" style={{ color: worldAccent }}>
+            {activeQuestTitle}
+          </div>
+          <div className="mt-1 text-[11px] text-white/88">{objectiveLabel}</div>
+          {objectiveHint && (
+            <div className="mt-1 text-[10px] text-white/55">{objectiveHint}</div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           <Orb label="HP" v={state.hp} m={state.hpMax} color="#ef4444" />
           <Orb label="MP" v={state.mp} m={state.mpMax} color="#3b82f6" />
           <Orb label="SP" v={state.sp} m={state.spMax} color="#10b981" />
-          <Orb
-            label="XP"
-            v={levelProgress.current}
-            m={levelProgress.needed}
-            color="#22d3ee"
-            secondary={`${state.xp}`}
-          />
+          <Orb label="XP" v={levelProgress.current} m={levelProgress.needed} color="#22d3ee" secondary={`${playerProfile.xp}`} />
         </div>
-        {state.defeats > 0 && (
-          <div className="rounded-full border border-amber-300/30 bg-amber-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-amber-200">
-            ⚔ {state.defeats} slain
-          </div>
-        )}
       </div>
 
-      {lastReward && (
-        <div className="pointer-events-none fixed left-1/2 top-[86px] z-[80] -translate-x-1/2 rounded-2xl border border-emerald-300/30 bg-emerald-400/15 px-4 py-2 text-sm font-semibold text-emerald-100 shadow-2xl backdrop-blur-xl">
-          {lastReward}
-        </div>
-      )}
+      <div className="pointer-events-none fixed left-1/2 top-[86px] z-[80] flex w-[min(92vw,440px)] -translate-x-1/2 flex-col gap-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className="rounded-2xl border px-4 py-2 text-sm font-semibold text-white shadow-2xl backdrop-blur-xl"
+            style={{
+              borderColor:
+                toast.kind === 'title'
+                  ? 'rgba(250,204,21,.35)'
+                  : toast.kind === 'item'
+                    ? 'rgba(34,211,238,.35)'
+                    : toast.kind === 'quest'
+                      ? 'rgba(16,185,129,.35)'
+                      : 'rgba(255,255,255,.2)',
+              background:
+                toast.kind === 'title'
+                  ? 'rgba(250,204,21,.16)'
+                  : toast.kind === 'item'
+                    ? 'rgba(34,211,238,.16)'
+                    : toast.kind === 'quest'
+                      ? 'rgba(16,185,129,.16)'
+                      : 'rgba(255,255,255,.12)',
+            }}
+          >
+            <div className="text-[10px] uppercase tracking-[0.18em] text-white/70">{toast.title}</div>
+            <div>{toast.body}</div>
+          </div>
+        ))}
+      </div>
     </>
   )
 }
@@ -126,9 +154,7 @@ function Orb({
           {label}
         </div>
         <div className="text-[10px] font-bold leading-tight">{Math.round(v)}</div>
-        {secondary && (
-          <div className="text-[8px] font-bold leading-none text-white/50">{secondary}</div>
-        )}
+        {secondary && <div className="text-[8px] font-bold leading-none text-white/50">{secondary}</div>}
       </div>
     </div>
   )

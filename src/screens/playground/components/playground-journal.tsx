@@ -11,6 +11,7 @@ export function PlaygroundJournal({
   state: PlaygroundRpgState
 }) {
   if (!open) return null
+  const activeQuest = PLAYGROUND_QUESTS.find((quest) => !quest.optional && !state.completedQuests.includes(quest.id))
   const grouped = new Map<string, typeof PLAYGROUND_QUESTS>()
   for (const q of PLAYGROUND_QUESTS) {
     const list = grouped.get(q.chapter) ?? []
@@ -39,7 +40,8 @@ export function PlaygroundJournal({
               <div className="space-y-2">
                 {quests.map((q) => {
                   const done = state.completedQuests.includes(q.id)
-                  const active = state.activeQuestId === q.id
+                  const active = activeQuest?.id === q.id
+                  const progress = state.playerProfile.questProgress[q.id]
                   return (
                     <div
                       key={q.id}
@@ -62,7 +64,7 @@ export function PlaygroundJournal({
                       <div className="mt-2 space-y-1 text-[11px] text-white/55">
                         {q.objectives.map((o) => (
                           <div key={o.id} className="flex items-center gap-2">
-                            <span className="opacity-50">{done ? '✓' : '•'}</span>
+                            <span className="opacity-50">{progress?.completedObjectives.includes(o.id) ? '✓' : '•'}</span>
                             <span>{o.label}</span>
                           </div>
                         ))}

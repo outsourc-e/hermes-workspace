@@ -25,6 +25,24 @@ const COMMUNITY_NAMES = [
 ]
 
 export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
+  training: [
+    {
+      id: 'bot-training-1',
+      name: COMMUNITY_NAMES[11],
+      avatar: 'athena',
+      color: '#5eead4',
+      spawn: [-9, 0, 10],
+      lines: ['first run through Training Grounds', 'equipping the blade now', 'forge gate is almost open'],
+    },
+    {
+      id: 'bot-training-2',
+      name: COMMUNITY_NAMES[12],
+      avatar: 'pan',
+      color: '#34d399',
+      spawn: [10, 0, -7],
+      lines: ['small scopes ship', 'archive podium has the docs loop', 'the wisp is easy with Bolt'],
+    },
+  ],
   agora: [
     {
       id: 'bot-agora-1',

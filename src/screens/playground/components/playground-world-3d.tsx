@@ -70,7 +70,7 @@ function useAvatarConfig() {
   return cfg
 }
 
-type DecorType = 'classical' | 'tech' | 'forest' | 'temple' | 'arena'
+type DecorType = 'training' | 'classical' | 'tech' | 'forest' | 'temple' | 'arena'
 
 type WorldDef = {
   id: PlaygroundWorldId
@@ -86,6 +86,18 @@ type WorldDef = {
 }
 
 const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
+  training: {
+    id: 'training',
+    name: 'Training Grounds',
+    accent: '#5eead4',
+    groundColor: '#16362d',
+    skyColor: '#07131a',
+    ambient: '#183d34',
+    pillarColor: '#99f6e4',
+    pillarType: 'training',
+    fogNear: 20,
+    fogFar: 60,
+  },
   agora: {
     id: 'agora',
     name: 'The Agora',
@@ -453,9 +465,72 @@ function ArenaDecor({ world }: { world: WorldDef }) {
   )
 }
 
+function TrainingDecor({ world }: { world: WorldDef }) {
+  const labels = [
+    { text: 'Arrival Circle', pos: [-11, 2.4, 8] as [number, number, number] },
+    { text: 'Trainer’s Ring', pos: [-5, 2.4, -4] as [number, number, number] },
+    { text: 'Quartermaster Tent', pos: [-14, 2.4, -10] as [number, number, number] },
+    { text: 'Archive Podium', pos: [6, 2.4, 0] as [number, number, number] },
+    { text: 'Forge Gate', pos: [14, 2.6, -10] as [number, number, number] },
+  ]
+
+  return (
+    <>
+      <mesh position={[-11, 0.05, 8]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[2.4, 3.4, 72]} />
+        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.5} />
+      </mesh>
+      <mesh position={[-5, 0.04, -4]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[3, 4.6, 72]} />
+        <meshStandardMaterial color="#fb7185" emissive="#fb7185" emissiveIntensity={0.45} />
+      </mesh>
+      <group position={[-14, 0, -10]}>
+        <mesh castShadow position={[0, 2.2, 0]}>
+          <coneGeometry args={[3.2, 4.2, 4]} />
+          <meshStandardMaterial color="#1d4ed8" roughness={0.7} emissive="#22d3ee" emissiveIntensity={0.12} />
+        </mesh>
+        <mesh castShadow position={[0, 0.75, 0]}>
+          <cylinderGeometry args={[0.18, 0.18, 1.5, 8]} />
+          <meshStandardMaterial color="#d1d5db" roughness={0.8} />
+        </mesh>
+      </group>
+      <group position={[6, 0, 0]}>
+        <mesh castShadow position={[0, 0.6, 0]}>
+          <cylinderGeometry args={[1.2, 1.6, 1.2, 18]} />
+          <meshStandardMaterial color="#312e81" roughness={0.55} emissive="#a78bfa" emissiveIntensity={0.16} />
+        </mesh>
+        <mesh castShadow position={[0, 1.35, 0]}>
+          <boxGeometry args={[1.9, 0.2, 1.2]} />
+          <meshStandardMaterial color="#c4b5fd" emissive="#a78bfa" emissiveIntensity={0.4} />
+        </mesh>
+      </group>
+      <group position={[14, 0, -10]}>
+        <mesh castShadow position={[0, 2.3, 0]}>
+          <torusGeometry args={[2.2, 0.18, 18, 64]} />
+          <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={1.4} />
+        </mesh>
+        {[-2.8, 2.8].map((x) => (
+          <mesh key={x} castShadow position={[x, 1.5, 0]}>
+            <boxGeometry args={[0.7, 3, 0.7]} />
+            <meshStandardMaterial color="#0f172a" emissive="#22d3ee" emissiveIntensity={0.25} />
+          </mesh>
+        ))}
+      </group>
+      {labels.map((label) => (
+        <Html key={label.text} position={label.pos} center distanceFactor={12}>
+          <div style={{ padding: '4px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.7)', color: 'white', border: `1px solid ${world.accent}`, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            {label.text}
+          </div>
+        </Html>
+      ))}
+    </>
+  )
+}
+
 /* ── Decor router ── */
 function WorldDecor({ world }: { world: WorldDef }) {
   switch (world.pillarType) {
+    case 'training': return <TrainingDecor world={world} />
     case 'classical': return <ClassicalPillars world={world} />
     case 'tech': return <TechPillars world={world} />
     case 'forest': return <ForestDecor world={world} />
@@ -658,12 +733,14 @@ function Portal({
   position,
   color,
   label,
+  locked = false,
   onEnter,
   playerRef,
 }: {
   position: [number, number, number]
   color: string
   label: string
+  locked?: boolean
   onEnter: () => void
   playerRef: React.MutableRefObject<THREE.Vector3>
 }) {
@@ -673,7 +750,7 @@ function Portal({
   useFrame((_, dt) => {
     if (ringRef.current) ringRef.current.rotation.y += dt * 0.6
     const dist = playerRef.current.distanceTo(center)
-    if (dist < 1.5 && !triggered.current) {
+    if (dist < 1.5 && !triggered.current && !locked) {
       triggered.current = true
       onEnter()
       window.setTimeout(() => { triggered.current = false }, 1200)
@@ -683,11 +760,11 @@ function Portal({
     <group position={position}>
       <mesh ref={ringRef} position={[0, 1.2, 0]}>
         <torusGeometry args={[1.1, 0.08, 16, 64]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
+        <meshStandardMaterial color={locked ? '#64748b' : color} emissive={locked ? '#1f2937' : color} emissiveIntensity={locked ? 0.45 : 2} />
       </mesh>
-      <pointLight position={[0, 1.2, 0]} color={color} intensity={4} distance={6} />
+      {!locked && <pointLight position={[0, 1.2, 0]} color={color} intensity={4} distance={6} />}
       <Html position={[0, 2.7, 0]} center distanceFactor={8}>
-        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color,borderRadius:4,fontSize:13,whiteSpace:'nowrap',fontWeight:600}}>{label}</div>
+        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color: locked ? '#cbd5e1' : color,borderRadius:4,fontSize:13,whiteSpace:'nowrap',fontWeight:600}}>{locked ? `${label} · locked` : label}</div>
       </Html>
     </group>
   )
@@ -761,6 +838,12 @@ function useKeyboard() {
 /* ── Walking player + iso follow camera (no physics, simple kinematic) ── */
 function PlayerAndCamera({
   avatarId,
+  avatarConfig,
+  displayName = 'You',
+  gearAccent,
+  gearCape,
+  gearWeapon,
+  gearHelmet,
   spawn = [0, 0, 6],
   positionRef,
   moveTargetRef,
@@ -768,13 +851,20 @@ function PlayerAndCamera({
   yawOutRef,
 }: {
   avatarId?: string
+  avatarConfig?: AvatarConfig
+  displayName?: string
+  gearAccent?: string
+  gearCape?: string
+  gearWeapon?: AvatarConfig['weapon']
+  gearHelmet?: AvatarConfig['helmet']
   spawn?: [number, number, number]
   positionRef: React.MutableRefObject<THREE.Vector3>
   moveTargetRef?: React.MutableRefObject<THREE.Vector3 | null>
   bounds?: { x: number; z: number }
   yawOutRef?: React.MutableRefObject<number>
 }) {
-  const cfg = useAvatarConfig()
+  const storedCfg = useAvatarConfig()
+  const cfg = avatarConfig ?? storedCfg
   const portraitId = avatarId || cfg.portrait || 'hermes'
   const groupRef = useRef<THREE.Group>(null)
   const keys = useKeyboard()
@@ -787,6 +877,15 @@ function PlayerAndCamera({
   const camDistance = useRef(13)
   const isMoving = useRef(false)
   const bobT = useRef(0)
+  const dashUntil = useRef(0)
+
+  useEffect(() => {
+    const onDash = () => {
+      dashUntil.current = Date.now() + 900
+    }
+    window.addEventListener('hermes-playground-dash', onDash)
+    return () => window.removeEventListener('hermes-playground-dash', onDash)
+  }, [])
 
   // Initial spawn position — runs ONCE per mount, ignoring spawn-array identity
   // changes from parent re-renders (those caused snap-back to origin).
@@ -817,7 +916,8 @@ function PlayerAndCamera({
     if (k.has('d')) dx += 1
     const wasdMoving = dx !== 0 || dz !== 0
     if (wasdMoving && moveTargetRef) moveTargetRef.current = null // WASD cancels click-to-walk
-    const speed = (k.has('shift') ? 9 : 5) * delta
+    const dashBoost = dashUntil.current > Date.now() ? 1.95 : 1
+    const speed = (k.has('shift') ? 9 : 5) * dashBoost * delta
 
     let mx = 0
     let mz = 0
@@ -934,7 +1034,7 @@ function PlayerAndCamera({
       {/* Belt accent */}
       <mesh position={[0, 0.46, 0]} castShadow>
         <boxGeometry args={[0.52, 0.06, 0.36]} />
-        <meshStandardMaterial color={cfg.outfitAccent} roughness={0.4} metalness={0.4} />
+        <meshStandardMaterial color={gearAccent || cfg.outfitAccent} roughness={0.4} metalness={0.4} />
       </mesh>
 
       {/* Arms */}
@@ -1015,13 +1115,13 @@ function PlayerAndCamera({
           <meshStandardMaterial color={cfg.hair} roughness={0.85} />
         </mesh>
       )}
-      {cfg.helmet === 'circlet' && (
+      {(gearHelmet || cfg.helmet) === 'circlet' && (
         <mesh position={[0, 1.28, 0]} castShadow>
           <torusGeometry args={[0.225, 0.025, 8, 24]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
         </mesh>
       )}
-      {cfg.helmet === 'crown' && (<>
+      {(gearHelmet || cfg.helmet) === 'crown' && (<>
         <mesh position={[0, 1.28, 0]} castShadow>
           <torusGeometry args={[0.225, 0.025, 8, 24]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
@@ -1033,13 +1133,13 @@ function PlayerAndCamera({
           </mesh>
         ))}
       </>)}
-      {cfg.helmet === 'cap' && (
+      {(gearHelmet || cfg.helmet) === 'cap' && (
         <mesh position={[0, 1.4, -0.02]} castShadow>
           <sphereGeometry args={[0.24, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
           <meshStandardMaterial color={cfg.outfit} roughness={0.55} emissive={cfg.outfit} emissiveIntensity={0.15} />
         </mesh>
       )}
-      {cfg.helmet === 'winged' && (<>
+      {(gearHelmet || cfg.helmet) === 'winged' && (<>
         <mesh position={[0, 1.28, 0]} castShadow>
           <torusGeometry args={[0.225, 0.025, 8, 24]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
@@ -1056,21 +1156,21 @@ function PlayerAndCamera({
       {/* Shoulder pads */}
       <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}>
         <boxGeometry args={[0.26, 0.14, 0.22]} />
-        <meshStandardMaterial color={cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={cfg.outfitAccent} emissiveIntensity={0.18} />
+        <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
       </mesh>
       <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}>
         <boxGeometry args={[0.26, 0.14, 0.22]} />
-        <meshStandardMaterial color={cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={cfg.outfitAccent} emissiveIntensity={0.18} />
+        <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
       </mesh>
       {/* Cape (optional) */}
-      {cfg.cape !== 'transparent' && (
+      {(gearCape || cfg.cape) !== 'transparent' && (
         <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}>
           <planeGeometry args={[0.78, 1]} />
-          <meshStandardMaterial color={cfg.cape} side={THREE.DoubleSide} roughness={0.55} emissive={cfg.cape} emissiveIntensity={0.12} />
+          <meshStandardMaterial color={gearCape || cfg.cape} side={THREE.DoubleSide} roughness={0.55} emissive={gearCape || cfg.cape} emissiveIntensity={0.12} />
         </mesh>
       )}
       {/* Weapon */}
-      {cfg.weapon === 'sword' && (<>
+      {(gearWeapon || cfg.weapon) === 'sword' && (<>
         <mesh castShadow position={[-0.32, 0.5, 0.05]} rotation={[0.05, 0, 1.45]}>
           <boxGeometry args={[0.04, 0.85, 0.04]} />
           <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.2} />
@@ -1080,13 +1180,13 @@ function PlayerAndCamera({
           <meshStandardMaterial color="#7c2d12" roughness={0.85} />
         </mesh>
       </>)}
-      {cfg.weapon === 'staff' && (
+      {(gearWeapon || cfg.weapon) === 'staff' && (
         <mesh castShadow position={[0.4, 0.85, 0.05]} rotation={[0, 0, -0.1]}>
           <cylinderGeometry args={[0.04, 0.04, 1.7, 8]} />
-          <meshStandardMaterial color="#7c4a1f" roughness={0.7} emissive={cfg.outfitAccent} emissiveIntensity={0.18} />
+          <meshStandardMaterial color="#7c4a1f" roughness={0.7} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
         </mesh>
       )}
-      {cfg.weapon === 'bow' && (
+      {(gearWeapon || cfg.weapon) === 'bow' && (
         <mesh castShadow position={[0.45, 0.7, 0.05]} rotation={[0, 0, -0.4]}>
           <torusGeometry args={[0.45, 0.025, 8, 18, Math.PI]} />
           <meshStandardMaterial color="#7c4a1f" roughness={0.7} />
@@ -1096,8 +1196,8 @@ function PlayerAndCamera({
       {/* nameplate w/ portrait chip — "You" */}
       <Html position={[0, 1.95, 0]} center distanceFactor={8}>
         <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'#a7f3d0',borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:'1px solid #34d39955',boxShadow:'0 0 8px #34d39933'}}>
-          <img src={`/avatars/${portraitId}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:cfg.outfitAccent,objectFit:'cover',border:'1px solid #34d399'}} />
-          <span>You</span>
+          <img src={`/avatars/${portraitId}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:gearAccent || cfg.outfitAccent,objectFit:'cover',border:'1px solid #34d399'}} />
+          <span>{displayName}</span>
         </div>
       </Html>
     </group>
@@ -1558,6 +1658,18 @@ function Scene({
   onQuestZone,
   onNpcNearChange,
   botBubbles,
+  playerName,
+  playerAvatar,
+  playerAccent,
+  playerCape,
+  playerWeapon,
+  playerHelmet,
+  portalLabel,
+  portalLocked,
+  monsterHp,
+  monsterHpMax,
+  monsterDefeated,
+  onMonsterAttack,
   playerPos,
   playerYaw,
   remotePlayers,
@@ -1567,6 +1679,18 @@ function Scene({
   onQuestZone: (id: string) => void
   onNpcNearChange: (npcId: string | null) => void
   botBubbles: Record<string, string>
+  playerName: string
+  playerAvatar: AvatarConfig
+  playerAccent?: string
+  playerCape?: string
+  playerWeapon?: AvatarConfig['weapon']
+  playerHelmet?: AvatarConfig['helmet']
+  portalLabel: string
+  portalLocked?: boolean
+  monsterHp: number
+  monsterHpMax: number
+  monsterDefeated: boolean
+  onMonsterAttack: () => void
   playerPos: React.MutableRefObject<THREE.Vector3>
   playerYaw: React.MutableRefObject<number>
   remotePlayers: Record<string, MpRemotePlayer>
@@ -1661,6 +1785,15 @@ function Scene({
       <Sparkles count={20} scale={[30, 4, 30]} size={1.2} speed={0.5} color={'#ffffff'} opacity={0.3} />
 
       {/* NPCs per world */}
+      {worldId === 'training' && (
+        <>
+          <NPC npcId="athena" position={[-10.5, 0, 7.2]} avatar="athena" name="Athena · Guide" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="iris" position={[6.2, 0, 0.4]} avatar="iris" name="Iris · Archivist" color={NPC_COLORS.iris} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="pan" position={[11.2, 0, -7.5]} avatar="pan" name="Pan · Forge Guide" color={NPC_COLORS.pan} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="nike" position={[-4.8, 0, -4.8]} avatar="nike" name="Leonidas · Trainer" color={NPC_COLORS.nike} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="shopkeeper" position={[-14.5, 0, -10.2]} avatar="iris" name="Dorian · Quartermaster" color={NPC_COLORS.shopkeeper} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+        </>
+      )}
       {worldId === 'agora' && (
         <>
           <NPC npcId="athena" position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
@@ -1710,14 +1843,29 @@ function Scene({
 
       {/* Portal: routes to next unlocked world */}
       <Portal
-        position={[10, 0, -2]}
+        position={worldId === 'training' ? [14, 0, -10] : [10, 0, -2]}
         color={world.accent}
-        label="✨ Portal"
+        label={portalLabel}
+        locked={portalLocked}
         onEnter={onPortal}
         playerRef={playerPos}
       />
 
       {/* Quest zones per world */}
+      {worldId === 'training' && (
+        <>
+          <QuestZone position={[6, 0, 0]} color="#a78bfa" label="Archive Podium" onEnter={() => onQuestZone('archive-podium')} playerRef={playerPos} />
+          <QuestZone position={[14, 0, -10]} color="#22d3ee" label="Forge Gate" onEnter={() => onQuestZone('forge-gate')} playerRef={playerPos} />
+          <Monster
+            position={[-4.8, 0.95, -4]}
+            color="#f472b6"
+            hp={monsterHp}
+            hpMax={monsterHpMax}
+            defeated={monsterDefeated}
+            onAttack={onMonsterAttack}
+          />
+        </>
+      )}
       {worldId === 'agora' && (
         <QuestZone position={[-8, 0, -3]} color="#facc15" label="Athena's Scroll" onEnter={() => onQuestZone('awakening-agora')} playerRef={playerPos} />
       )}
@@ -1735,7 +1883,19 @@ function Scene({
       )}
 
       <Suspense fallback={null}>
-        <PlayerAndCamera positionRef={playerPos} spawn={outsideSpawn} moveTargetRef={moveTarget} yawOutRef={playerYaw} />
+        <PlayerAndCamera
+          key={worldId}
+          positionRef={playerPos}
+          spawn={worldId === 'training' ? [-11, 0, 10.5] : outsideSpawn}
+          moveTargetRef={moveTarget}
+          yawOutRef={playerYaw}
+          avatarConfig={playerAvatar}
+          displayName={playerName}
+          gearAccent={playerAccent}
+          gearCape={playerCape}
+          gearWeapon={playerWeapon}
+          gearHelmet={playerHelmet}
+        />
       </Suspense>
 
       {/* Real remote players */}
@@ -1764,6 +1924,14 @@ export function PlaygroundWorld3D({
   onQuestZone,
   onNpcNearChange,
   botBubbles,
+  playerName,
+  playerAvatar,
+  playerAccent,
+  playerCape,
+  playerWeapon,
+  playerHelmet,
+  portalLabel,
+  portalLocked,
   monsterHp,
   monsterHpMax,
   monsterDefeated,
@@ -1776,6 +1944,14 @@ export function PlaygroundWorld3D({
   onQuestZone: (id: string) => void
   onNpcNearChange: (npcId: string | null) => void
   botBubbles: Record<string, string>
+  playerName: string
+  playerAvatar: AvatarConfig
+  playerAccent?: string
+  playerCape?: string
+  playerWeapon?: AvatarConfig['weapon']
+  playerHelmet?: AvatarConfig['helmet']
+  portalLabel: string
+  portalLocked?: boolean
   monsterHp: number
   monsterHpMax: number
   monsterDefeated: boolean
@@ -1857,6 +2033,14 @@ export function PlaygroundWorld3D({
             onQuestZone={onQuestZone}
             onNpcNearChange={onNpcNearChange}
             botBubbles={botBubbles}
+            playerName={playerName}
+            playerAvatar={playerAvatar}
+            playerAccent={playerAccent}
+            playerCape={playerCape}
+            playerWeapon={playerWeapon}
+            playerHelmet={playerHelmet}
+            portalLabel={portalLabel}
+            portalLocked={portalLocked}
             monsterHp={monsterHp}
             monsterHpMax={monsterHpMax}
             monsterDefeated={monsterDefeated}

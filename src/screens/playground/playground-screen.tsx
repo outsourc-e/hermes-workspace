@@ -1,317 +1,31 @@
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard, Float, Html, Sparkles, Stars, Text, useTexture } from '@react-three/drei'
-import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import * as THREE from 'three'
-import { PlaygroundHud } from './components/playground-hud'
-import { PlaygroundOnlineChip } from './components/playground-online-chip'
-import { PlaygroundWorld3D } from './components/playground-world-3d'
+import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { PlaygroundActionBar } from './components/playground-actionbar'
+import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
+import { PlaygroundCustomizer } from './components/playground-customizer'
 import { PlaygroundDialog } from './components/playground-dialog'
+import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
+import { PlaygroundHud } from './components/playground-hud'
 import { PlaygroundJournal } from './components/playground-journal'
 import { PlaygroundMap } from './components/playground-map'
-import { PlaygroundActionBar } from './components/playground-actionbar'
 import { PlaygroundMinimap } from './components/playground-minimap'
-import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
+import { PlaygroundOnlineChip } from './components/playground-online-chip'
 import { PlaygroundSidePanel } from './components/playground-sidepanel'
-import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
-import { PlaygroundCustomizer } from './components/playground-customizer'
-import { botsFor } from './lib/playground-bots'
+import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
-import {
-  PLAYGROUND_WORLDS,
-  type PlaygroundWorldId,
-  type PlaygroundQuest,
-} from './lib/playground-rpg'
+import { botsFor } from './lib/playground-bots'
+import { itemById, PLAYGROUND_WORLDS, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
 
-type PlaygroundWorld = PlaygroundWorldId
-type QuestState = 'start' | 'met-athena' | 'generated-world' | 'complete'
-
-type PlayerApi = {
-  position: THREE.Vector3
-}
-
-const WORLD_META: Record<PlaygroundWorld, {
-  name: string
-  subtitle: string
-  accent: string
-  ground: string
-  sky: string
-  prompt: string
-}> = {
-  agora: {
-    name: 'The Agora',
-    subtitle: 'Marble lobby for humans and their agents',
-    accent: '#d9b35f',
-    ground: '#24352f',
-    sky: '#0b1720',
-    prompt: 'Greek marble plaza, agent citizens, moonlit teal sky',
-  },
-  forge: {
-    name: 'The Forge',
-    subtitle: 'Generated cyberpunk builder world',
-    accent: '#22d3ee',
-    ground: '#151827',
-    sky: '#060712',
-    prompt: 'Cyberpunk forge, neon code rivers, agent blacksmiths, mission terminals',
-  },
-  grove: {
-    name: 'The Grove',
-    subtitle: 'Living forest for music, rituals, and community quests',
-    accent: '#34d399',
-    ground: '#143025',
-    sky: '#06150f',
-    prompt: 'Bioluminescent forest grove, agent druids, music rituals',
-  },
-  oracle: {
-    name: 'Oracle Temple',
-    subtitle: 'Archive world for lore, memory, and search quests',
-    accent: '#a78bfa',
-    ground: '#1f1b35',
-    sky: '#080714',
-    prompt: 'Quiet oracle archive, floating crystals, agent librarians',
-  },
-  arena: {
-    name: 'Benchmark Arena',
-    subtitle: 'Model combat world for prompt duels and eval battles',
-    accent: '#fb7185',
-    ground: '#35181f',
-    sky: '#16070a',
-    prompt: 'Gladiator arena for AI model duels, neon scoreboards',
-  },
-}
-
-function useKeyboard() {
-  const keys = useRef(new Set<string>())
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
-      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
-      keys.current.add(e.key.toLowerCase())
-    }
-    const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase())
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    return () => {
-      window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-    }
-  }, [])
-  return keys
-}
-
-function FollowCamera({ target }: { target: React.MutableRefObject<PlayerApi> }) {
-  const { camera } = useThree()
-  const ideal = useMemo(() => new THREE.Vector3(), [])
-  const look = useMemo(() => new THREE.Vector3(), [])
-  useFrame(() => {
-    const p = target.current.position
-    ideal.set(p.x + 7, p.y + 7, p.z + 9)
-    camera.position.lerp(ideal, 0.08)
-    look.set(p.x, p.y + 1.2, p.z)
-    camera.lookAt(look)
-  })
-  return null
-}
-
-function Player({ api }: { api: React.MutableRefObject<PlayerApi> }) {
-  const group = useRef<THREE.Group>(null)
-  const keys = useKeyboard()
-  const texture = useTexture('/avatars/hermes.png')
-
-  useFrame((_, delta) => {
-    const k = keys.current
-    const move = new THREE.Vector3()
-    if (k.has('w') || k.has('arrowup')) move.z -= 1
-    if (k.has('s') || k.has('arrowdown')) move.z += 1
-    if (k.has('a') || k.has('arrowleft')) move.x -= 1
-    if (k.has('d') || k.has('arrowright')) move.x += 1
-    if (move.lengthSq() > 0) {
-      move.normalize().multiplyScalar((k.has('shift') ? 7 : 4) * delta)
-      api.current.position.add(move)
-      api.current.position.x = THREE.MathUtils.clamp(api.current.position.x, -18, 18)
-      api.current.position.z = THREE.MathUtils.clamp(api.current.position.z, -14, 14)
-      if (group.current) group.current.rotation.y = Math.atan2(move.x, move.z)
-    }
-    if (group.current) group.current.position.copy(api.current.position)
-  })
-
-  return (
-    <group ref={group} position={[0, 0, 4]}>
-      <mesh castShadow position={[0, 0.55, 0]}>
-        <capsuleGeometry args={[0.38, 0.72, 8, 16]} />
-        <meshStandardMaterial color="#2dd4bf" roughness={0.55} metalness={0.1} />
-      </mesh>
-      <Billboard position={[0, 1.45, 0]} follow lockX={false} lockY={false} lockZ={false}>
-        <mesh>
-          <planeGeometry args={[1.05, 1.05]} />
-          <meshBasicMaterial map={texture} transparent toneMapped={false} />
-        </mesh>
-      </Billboard>
-      <Text position={[0, 2.25, 0]} fontSize={0.22} color="white" anchorX="center" anchorY="middle" outlineColor="#000" outlineWidth={0.02}>
-        You
-      </Text>
-    </group>
-  )
-}
-
-function AgentCompanion({
-  player,
-  line,
-}: {
-  player: React.MutableRefObject<PlayerApi>
-  line: string
-}) {
-  const group = useRef<THREE.Group>(null)
-  const texture = useTexture('/avatars/athena.png')
-  useFrame((_, delta) => {
-    if (!group.current) return
-    const p = player.current.position
-    const target = new THREE.Vector3(p.x - 1.8, 0, p.z + 1.8)
-    group.current.position.lerp(target, Math.min(1, delta * 2.5))
-  })
-  return (
-    <Float speed={1.4} rotationIntensity={0.06} floatIntensity={0.18}>
-      <group ref={group} position={[-2, 0, 6]}>
-        <mesh castShadow position={[0, 0.48, 0]}>
-          <cylinderGeometry args={[0.32, 0.44, 0.9, 16]} />
-          <meshStandardMaterial color="#c084fc" roughness={0.45} emissive="#3b0764" emissiveIntensity={0.18} />
-        </mesh>
-        <Billboard position={[0, 1.3, 0]}>
-          <mesh>
-            <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial map={texture} transparent toneMapped={false} />
-          </mesh>
-        </Billboard>
-        <Sparkles count={28} scale={[1.4, 1.4, 1.4]} size={2} speed={0.35} color="#d8b4fe" />
-        <Text position={[0, 2.12, 0]} fontSize={0.2} color="#f5e8ff" anchorX="center" anchorY="middle" outlineColor="#000" outlineWidth={0.02}>
-          Athena · Agent
-        </Text>
-        {line && (
-          <Html position={[0, 2.55, 0]} center transform distanceFactor={8}>
-            <div className="max-w-[260px] rounded-xl border border-purple-300/30 bg-black/75 px-3 py-2 text-xs leading-snug text-white shadow-xl backdrop-blur">
-              {line}
-            </div>
-          </Html>
-        )}
-      </group>
-    </Float>
-  )
-}
-
-function Portal({ world, onEnter }: { world: PlaygroundWorld; onEnter: () => void }) {
-  const meta = WORLD_META[world]
-  const ref = useRef<THREE.Mesh>(null)
-  useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.y += delta * 0.7
-  })
-  return (
-    <group position={[12, 0, -8]}>
-      <mesh ref={ref} onClick={onEnter}>
-        <torusGeometry args={[1.05, 0.06, 16, 80]} />
-        <meshStandardMaterial color={meta.accent} emissive={meta.accent} emissiveIntensity={1.2} />
-      </mesh>
-      <Sparkles count={80} scale={[2.2, 2.8, 2.2]} size={4} speed={0.7} color={meta.accent} />
-      <Text position={[0, 1.7, 0]} fontSize={0.22} color={meta.accent} anchorX="center" anchorY="middle" outlineColor="#000" outlineWidth={0.02}>
-        Portal
-      </Text>
-    </group>
-  )
-}
-
-function TempleAgora({ accent }: { accent: string }) {
-  const pillars = [-12, -8, -4, 4, 8, 12]
-  return (
-    <>
-      {pillars.map((x) => (
-        <group key={`north-${x}`} position={[x, 0, -11]}>
-          <mesh castShadow position={[0, 1.5, 0]}>
-            <cylinderGeometry args={[0.35, 0.45, 3, 20]} />
-            <meshStandardMaterial color="#d7c7a4" roughness={0.6} />
-          </mesh>
-          <mesh castShadow position={[0, 3.1, 0]}>
-            <boxGeometry args={[1.2, 0.22, 1.2]} />
-            <meshStandardMaterial color="#f5e6c8" />
-          </mesh>
-        </group>
-      ))}
-      <mesh receiveShadow position={[0, 0.04, -11]}>
-        <boxGeometry args={[28, 0.08, 2.6]} />
-        <meshStandardMaterial color="#514634" />
-      </mesh>
-      <mesh receiveShadow position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[3.2, 3.5, 72]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.18} />
-      </mesh>
-    </>
-  )
-}
-
-function ForgeWorld({ accent }: { accent: string }) {
-  return (
-    <>
-      {[-10, -4, 4, 10].map((x, i) => (
-        <group key={x} position={[x, 0, -8 + (i % 2) * 4]}>
-          <mesh castShadow position={[0, 0.7, 0]}>
-            <boxGeometry args={[2.2, 1.4, 2.2]} />
-            <meshStandardMaterial color="#20263a" emissive={accent} emissiveIntensity={0.18} roughness={0.35} />
-          </mesh>
-          <mesh position={[0, 1.55, 0]}>
-            <boxGeometry args={[1.4, 0.08, 1.4]} />
-            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.8} />
-          </mesh>
-        </group>
-      ))}
-      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[4.2, 4.45, 72]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.65} />
-      </mesh>
-    </>
-  )
-}
-
-function PlaygroundScene({
-  world,
-  companionLine,
-  onEnterPortal,
-}: {
-  world: PlaygroundWorld
-  companionLine: string
-  onEnterPortal: () => void
-}) {
-  const player = useRef<PlayerApi>({ position: new THREE.Vector3(0, 0, 4) })
-  const meta = WORLD_META[world]
-  return (
-    <>
-      <color attach="background" args={[meta.sky]} />
-      <fog attach="fog" args={[meta.sky, 12, 46]} />
-      <Stars radius={70} depth={35} count={1800} factor={4} saturation={0} fade speed={0.4} />
-      <ambientLight intensity={0.55} />
-      <directionalLight castShadow position={[7, 12, 5]} intensity={1.55} shadow-mapSize={[2048, 2048]} />
-      <pointLight position={[0, 4, 0]} color={meta.accent} intensity={2.4} distance={14} />
-
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
-        <planeGeometry args={[42, 32, 24, 24]} />
-        <meshStandardMaterial color={meta.ground} roughness={0.82} metalness={0.05} />
-      </mesh>
-      <gridHelper args={[42, 42, meta.accent, '#1f2937']} position={[0, 0.01, 0]} />
-
-      {world === 'agora' ? <TempleAgora accent={meta.accent} /> : <ForgeWorld accent={meta.accent} />}
-      <Portal world={world === 'agora' ? 'forge' : 'agora'} onEnter={onEnterPortal} />
-      <Player api={player} />
-      <AgentCompanion player={player} line={companionLine} />
-      <FollowCamera target={player} />
-
-      <Text position={[0, 4.1, -11.2]} fontSize={0.55} color={meta.accent} anchorX="center" anchorY="middle" outlineColor="#000" outlineWidth={0.03}>
-        {meta.name}
-      </Text>
-      <Text position={[0, 3.45, -11.2]} fontSize={0.22} color="#e5e7eb" anchorX="center" anchorY="middle" outlineColor="#000" outlineWidth={0.02}>
-        {meta.subtitle}
-      </Text>
-    </>
-  )
+const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = {
+  training: { name: 'Training Grounds', accent: '#5eead4' },
+  agora: { name: 'Agora Commons', accent: '#d9b35f' },
+  forge: { name: 'The Forge', accent: '#22d3ee' },
+  grove: { name: 'The Grove', accent: '#34d399' },
+  oracle: { name: 'Oracle Temple', accent: '#a78bfa' },
+  arena: { name: 'Benchmark Arena', accent: '#fb7185' },
 }
 
 class PlaygroundErrorBoundary extends Component<
-  { children: ReactNode; fallback?: ReactNode },
+  { children: ReactNode; fallback: ReactNode },
   { hasError: boolean }
 > {
   state = { hasError: false }
@@ -321,372 +35,56 @@ class PlaygroundErrorBoundary extends Component<
   }
 
   componentDidCatch(error: unknown) {
-    console.error('Playground WebGL render failed', error)
+    console.error('Playground render failed', error)
   }
 
   render() {
-    if (this.state.hasError) return this.props.fallback ?? <PlaygroundFallback />
+    if (this.state.hasError) return this.props.fallback
     return this.props.children
   }
 }
 
-function PlaygroundFallback({ onLaunch3D, webglFailed = false }: { onLaunch3D?: () => void; webglFailed?: boolean }) {
-  const [builderName, setBuilderName] = useState(() => {
-    if (typeof window === 'undefined') return ''
-    return window.localStorage.getItem('hermes-playground-builder-name') || ''
-  })
-  function launch() {
-    try { window.localStorage.setItem('hermes-playground-builder-name', builderName.trim()) } catch {}
-    onLaunch3D?.()
-  }
-  return (
-    <div
-      className="flex h-full min-h-[520px] items-center justify-center p-6"
-      style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}
-    >
-      <div className="w-full max-w-4xl overflow-hidden rounded-3xl border shadow-2xl" style={{ borderColor: 'var(--theme-border)', background: '#070b14' }}>
-        <div className="relative h-[320px] overflow-hidden">
-          <PlaygroundHeroCanvas />
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-            <div className="mb-2 rounded-full border border-cyan-300/40 bg-black/45 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/85 backdrop-blur-sm">Hermes Playground · v0</div>
-            <div className="text-4xl font-extrabold tracking-tight" style={{ textShadow: '0 0 28px rgba(34,211,238,0.55)' }}>
-              The agent MMO
-            </div>
-            <div className="mt-1 max-w-[520px] text-center text-[13px] text-white/70">
-              Walk into the Agora. Talk to Hermes Agent NPCs. Run quests. Meet other builders. Travel five worlds.
-            </div>
-          </div>
-        </div>
-        <div className="p-5 text-white">
-          {webglFailed && (
-            <p className="mb-3 rounded-xl border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100">
-              Your browser couldn’t create a WebGL context. Open in Chrome with hardware acceleration on, or try Agora Lite below.
-            </p>
-          )}
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <label className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">Builder name</label>
-            <input
-              value={builderName}
-              onChange={(e) => setBuilderName(e.target.value)}
-              placeholder="Your handle"
-              maxLength={24}
-              className="min-w-[200px] flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-cyan-400/60 focus:outline-none"
-            />
-          </div>
-          <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ 5 worlds, 6 enterable buildings, 14+ NPCs</div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ Quests, skills, inventory, journal</div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ Click-to-walk + click-to-talk</div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ Multiplayer presence (open in 2 tabs)</div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {onLaunch3D && (
-              <button
-                type="button"
-                onClick={launch}
-                className="inline-flex rounded-xl border-2 border-cyan-300/60 bg-cyan-400/15 px-5 py-2.5 text-sm font-extrabold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
-                style={{ boxShadow: '0 0 22px rgba(34,211,238,.35)' }}
-              >
-                Enter the Agora
-              </button>
-            )}
-            <a href="/agora" className="inline-flex rounded-xl border border-white/20 px-5 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/5">
-              Agora Lite (2D)
-            </a>
-          </div>
-          <div className="mt-4 text-[10px] uppercase tracking-[0.18em] text-white/40">
-            Click ground = walk · Click NPC = talk · WASD/arrows · Shift sprint · 1–6 skills
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function detectWebGL(): boolean {
-  if (typeof document === 'undefined') return false
-  try {
-    const canvas = document.createElement('canvas')
-    const context =
-      canvas.getContext('webgl2') ||
-      canvas.getContext('webgl') ||
-      canvas.getContext('experimental-webgl')
-    if (!context) return false
-
-    // R3F can still blank the route if Three's renderer cannot bind the
-    // context (seen with SwiftShader / flaky GPU contexts). Smoke-test the
-    // exact renderer path before mounting Canvas.
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: false,
-      powerPreference: 'default',
-      failIfMajorPerformanceCaveat: false,
-    })
-    renderer.setSize(16, 16, false)
-    renderer.render(new THREE.Scene(), new THREE.PerspectiveCamera())
-    renderer.forceContextLoss()
-    renderer.dispose()
-    return true
-  } catch (error) {
-    console.warn('Playground WebGL smoke test failed', error)
-    return false
-  }
-}
-
-function PlaygroundLiteWorld({
-  world,
-  setWorld,
-  quest,
-  setQuest,
-  input,
-  setInput,
-  companionLine,
-  setCompanionLine,
-  rpgState,
-  activeQuest,
-  levelProgress,
-  lastReward,
-  completeQuest,
-  resetRpg,
-}: {
-  world: PlaygroundWorld
-  setWorld: (world: PlaygroundWorld) => void
-  quest: QuestState
-  setQuest: (quest: QuestState) => void
-  input: string
-  setInput: (value: string) => void
-  companionLine: string
-  setCompanionLine: (value: string) => void
-  rpgState: ReturnType<typeof usePlaygroundRpg>['state']
-  activeQuest: PlaygroundQuest
-  levelProgress: ReturnType<typeof usePlaygroundRpg>['levelProgress']
-  lastReward: string | null
-  completeQuest: ReturnType<typeof usePlaygroundRpg>['completeQuest']
-  resetRpg: ReturnType<typeof usePlaygroundRpg>['resetRpg']
-}) {
-  const meta = WORLD_META[world]
-  const isForge = world === 'forge'
-
-  function askAthenaLite(text: string) {
-    const body = text.trim()
-    if (!body) return
-    setInput('')
-    if (/generate|build|world|forge|cyber/i.test(body)) {
-      setQuest('generated-world')
-      if (activeQuest.id === 'awakening-agora') completeQuest(activeQuest)
-      else if (activeQuest.id === 'first-worldsmith') completeQuest(activeQuest)
-      setCompanionLine('World generated: The Forge. Neon terminals, agent blacksmiths, and mission portals are ready. Click the portal to enter. Rewards unlocked in your inventory.')
-      return
-    }
-    setQuest(quest === 'start' ? 'met-athena' : quest)
-    if (activeQuest.id === 'awakening-agora') completeQuest(activeQuest)
-    setCompanionLine('Hermes Playground is an AI agent RPG: humans explore, agents follow, missions unlock, and worlds are generated from prompts.')
-  }
-
-  function enterPortalLite() {
-    setWorld(isForge ? 'agora' : 'forge')
-    setQuest('complete')
-    if (!isForge && activeQuest.id === 'enter-forge') completeQuest(activeQuest)
-    setCompanionLine(isForge ? 'Back in The Agora. Every portal can become another generated world.' : 'Welcome to The Forge. The generated world is live, without needing WebGL. Forge Shard recovered.')
-  }
-
-  return (
-    <div className="relative flex h-full min-h-[720px] flex-col overflow-hidden" style={{ background: meta.sky, color: 'white' }}>
-      <PlaygroundHud
-        state={rpgState}
-        activeQuestTitle={activeQuest.title}
-        levelProgress={levelProgress}
-        currentWorld={world}
-        worlds={PLAYGROUND_WORLDS}
-        onSelectWorld={(next) => {
-          if (rpgState.unlockedWorlds.includes(next)) setWorld(next)
-        }}
-        onReset={resetRpg}
-        lastReward={lastReward}
-      />
-      <PlaygroundOnlineChip accent={meta.accent} />
-      <div className="absolute inset-0 opacity-60" style={{ background: `radial-gradient(circle at 50% 22%, ${meta.accent}55, transparent 34%), linear-gradient(180deg, transparent, #000 92%)` }} />
-      <div className="relative z-10 flex items-start justify-between gap-3 p-4">
-        <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-3 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            <div className="text-lg font-semibold">Hermes Playground</div>
-            <span className="rounded bg-cyan-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">hackathon</span>
-          </div>
-          <div className="mt-1 text-xs text-white/65">GPU-safe world · AI agent RPG demo · {meta.name}</div>
-        </div>
-        <div className="w-[320px] rounded-2xl border border-white/10 bg-black/45 p-3 shadow-2xl backdrop-blur-xl">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">Mission</div>
-            <div className="text-[10px] uppercase tracking-[0.16em]" style={{ color: meta.accent }}>{meta.name}</div>
-          </div>
-          <div className="space-y-1.5 text-xs">
-            <MissionDone done>Enter Playground</MissionDone>
-            <MissionDone done={quest !== 'start'}>Talk to Athena</MissionDone>
-            <MissionDone done={quest === 'generated-world' || quest === 'complete'}>Generate a new world</MissionDone>
-            <MissionDone done={quest === 'complete'}>Enter the portal</MissionDone>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-6 pb-6">
-        <div
-          className="relative h-[430px] w-full overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl"
-          style={{
-            background: `radial-gradient(ellipse at 50% 52%, ${meta.accent}24, transparent 42%), linear-gradient(180deg, ${meta.ground}, #05070c)`,
-            perspective: 900,
-          }}
-        >
-          <div
-            className="absolute left-1/2 top-[58%] h-[520px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border"
-            style={{
-              transform: 'translate(-50%, -50%) rotateX(64deg)',
-              borderColor: `${meta.accent}55`,
-              background: `repeating-linear-gradient(90deg, transparent 0 44px, ${meta.accent}18 45px 46px), repeating-linear-gradient(0deg, transparent 0 44px, ${meta.accent}10 45px 46px)`,
-            }}
-          />
-
-          {(isForge ? [-280, -120, 120, 280] : [-320, -210, 210, 320]).map((x, i) => (
-            <div
-              key={x}
-              className="absolute rounded-t-lg border border-white/10"
-              style={{
-                left: `calc(50% + ${x}px)`,
-                top: isForge ? `${185 + (i % 2) * 55}px` : '120px',
-                width: isForge ? 90 : 42,
-                height: isForge ? 58 : 150,
-                transform: 'translateX(-50%)',
-                background: isForge ? `linear-gradient(180deg, ${meta.accent}66, #111827)` : 'linear-gradient(180deg, #f5e6c8, #8a7355)',
-                boxShadow: isForge ? `0 0 28px ${meta.accent}55` : '0 20px 40px rgba(0,0,0,.35)',
-              }}
-            />
-          ))}
-
-          <button
-            type="button"
-            onClick={enterPortalLite}
-            className="absolute left-[78%] top-[46%] flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs font-bold uppercase tracking-[0.18em] shadow-2xl transition-transform hover:scale-105"
-            style={{ borderColor: meta.accent, color: meta.accent, background: `${meta.accent}18`, boxShadow: `0 0 45px ${meta.accent}66` }}
-          >
-            Portal
-          </button>
-
-          <div className="absolute left-[48%] top-[60%] -translate-x-1/2 -translate-y-1/2 text-center">
-            <img src="/avatars/hermes.png" className="mx-auto h-24 w-24 rounded-full border-2 object-cover shadow-2xl" style={{ borderColor: meta.accent }} />
-            <div className="mt-2 rounded bg-black/55 px-2 py-1 text-xs">You</div>
-          </div>
-          <div className="absolute left-[38%] top-[55%] -translate-x-1/2 -translate-y-1/2 text-center">
-            <img src="/avatars/athena.png" className="mx-auto h-20 w-20 rounded-full border-2 border-purple-300 object-cover shadow-2xl" />
-            <div className="mt-2 rounded bg-black/55 px-2 py-1 text-xs">Athena · Agent</div>
-            {companionLine && (
-              <div className="absolute left-1/2 top-[-92px] w-[290px] -translate-x-1/2 rounded-xl border border-purple-300/30 bg-black/75 px-3 py-2 text-left text-xs leading-snug shadow-xl backdrop-blur">
-                {companionLine}
-              </div>
-            )}
-          </div>
-
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/45 px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/65 backdrop-blur-xl">
-            GPU-safe prototype · click portal · ask Athena
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 mx-auto mb-5 w-full max-w-3xl px-4">
-        <form
-          className="flex gap-2 rounded-2xl border border-white/10 bg-black/45 p-3 shadow-2xl backdrop-blur-xl"
-          onSubmit={(e) => {
-            e.preventDefault()
-            askAthenaLite(input)
-          }}
-        >
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask Athena… try: generate a cyberpunk forge world"
-            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/45"
-          />
-          <button className="rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] text-black" style={{ background: meta.accent }}>
-            Ask
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 export function PlaygroundScreen() {
-  const [launch3D, setLaunch3D] = useState(false)
-  const [world, setWorld] = useState<PlaygroundWorld>('agora')
-  const [quest, setQuest] = useState<QuestState>('start')
-  const [input, setInput] = useState('')
-  const [companionLine, setCompanionLine] = useState('Welcome to Hermes Playground. I am Athena, your agent companion. Ask me to generate a world.')
+  const rpg = usePlaygroundRpg()
+  const [launched, setLaunched] = useState(false)
+  const [world, setWorld] = useState<PlaygroundWorldId>(rpg.state.playerProfile.lastZone)
   const [dialogNpc, setDialogNpc] = useState<string | null>(null)
   const [nearbyNpc, setNearbyNpc] = useState<string | null>(null)
   const [journalOpen, setJournalOpen] = useState(false)
   const [customizerOpen, setCustomizerOpen] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [transitioning, setTransitioning] = useState(false)
   const [botBubbles, setBotBubbles] = useState<Record<string, string>>({})
   const [mapOpen, setMapOpen] = useState(false)
-  const [monsterHp, setMonsterHp] = useState(60)
-  const [monsterDefeated, setMonsterDefeated] = useState(false)
-  const monsterHpMax = 60
-  const rpg = usePlaygroundRpg()
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [tutorialCompleteOpen, setTutorialCompleteOpen] = useState(false)
+  const [transitioning, setTransitioning] = useState(false)
+  const [monsterHp, setMonsterHp] = useState(44)
+  const monsterHpMax = 44
 
-  // Reset monster on world change
+  const activeQuest = rpg.activeQuest
+  const currentObjective = rpg.currentObjective
+  const forgeUnlocked = rpg.state.unlockedWorlds.includes('forge')
+  const monsterDefeated = rpg.state.completedQuests.includes('training-bonus-wisp')
+
   useEffect(() => {
-    setMonsterHp(monsterHpMax)
-    setMonsterDefeated(false)
-  }, [world])
+    setWorld(rpg.state.playerProfile.lastZone)
+  }, [rpg.state.playerProfile.lastZone])
 
-  function attackMonster(dmg: number, takeBack = true) {
-    if (monsterDefeated) return false
-    if (takeBack) {
-      const playerDmg = Math.floor(Math.random() * 5) + 1
-      rpg.damagePlayer(playerDmg)
+  useEffect(() => {
+    rpg.setLastZone(world)
+  }, [rpg, world])
+
+  useEffect(() => {
+    if (!monsterDefeated) setMonsterHp(monsterHpMax)
+  }, [monsterDefeated, world])
+
+  useEffect(() => {
+    if (rpg.state.completedQuests.includes('training-q5')) {
+      setTutorialCompleteOpen(true)
     }
-    setMonsterHp((hp) => {
-      const next = Math.max(0, hp - dmg)
-      if (next <= 0 && !monsterDefeated) {
-        setMonsterDefeated(true)
-        rpg.recordDefeat(40)
-      }
-      return next
-    })
-    return true
-  }
+  }, [rpg.state.completedQuests])
 
-  function handleMonsterAttack() {
-    attackMonster(10 + Math.floor(Math.random() * 8))
-  }
-
-  function handleCast(skillId: string): boolean {
-    switch (skillId) {
-      case 'strike':
-        return attackMonster(8 + Math.floor(Math.random() * 6))
-      case 'heal':
-        if (!rpg.useMp(12)) return false
-        rpg.damagePlayer(-35) // negative damage = heal
-        return true
-      case 'sprint':
-        if (!rpg.useMp(8)) return false
-        return true
-      case 'spell':
-        if (!rpg.useMp(18)) return false
-        return attackMonster(22 + Math.floor(Math.random() * 8), false)
-      case 'shield':
-        if (!rpg.useMp(14)) return false
-        return true
-      case 'summon':
-        if (!rpg.useMp(25)) return false
-        return true
-      default:
-        return false
-    }
-  }
-
-  // Ambient bot chatter — every 6-14s a bot in current world says something
   useEffect(() => {
     let cancelled = false
     function tick() {
@@ -722,173 +120,230 @@ export function PlaygroundScreen() {
     }
   }, [world])
 
-  function sendChat(body: string) {
-    setMessages((prev) =>
-      [...prev, {
-        id: `${Date.now()}-${Math.random()}`,
-        authorId: 'self',
-        authorName: 'You',
-        body,
-        ts: Date.now(),
-        color: '#a7f3d0',
-      }].slice(-40),
-    )
-    // Broadcast to other browser tabs / multiplayer (best-effort)
-    try { (window as any).__hermesPlaygroundSendChat?.(body) } catch {}
-  }
-  // Expose dialog opener so click-to-talk in 3D scene can auto-open dialog on arrival
   useEffect(() => {
     ;(window as any).__hermesPlaygroundOpenDialog = (id: string) => setDialogNpc(id)
     return () => { try { delete (window as any).__hermesPlaygroundOpenDialog } catch {} }
   }, [])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        if (event.key === 'Escape') target.blur()
+        return
+      }
+      const key = event.key.toLowerCase()
+      if (key === 'j') setJournalOpen((value) => !value)
+      if (key === 'c') setCustomizerOpen((value) => !value)
+      if (key === 'm') setMapOpen((value) => !value)
+      if (key === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
+      if (key === 't') setChatCollapsed(false)
+      if (event.key === 'Escape') {
+        setJournalOpen(false)
+        setDialogNpc(null)
+        setMapOpen(false)
+        setArchiveOpen(false)
+        setTutorialCompleteOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [dialogNpc, nearbyNpc])
+
+  const equippedVisuals = useMemo(() => {
+    const weapon = rpg.state.playerProfile.equipped.weapon ? itemById(rpg.state.playerProfile.equipped.weapon) : null
+    const cloak = rpg.state.playerProfile.equipped.cloak ? itemById(rpg.state.playerProfile.equipped.cloak) : null
+    const head = rpg.state.playerProfile.equipped.head ? itemById(rpg.state.playerProfile.equipped.head) : null
+    const artifact = rpg.state.playerProfile.equipped.artifact ? itemById(rpg.state.playerProfile.equipped.artifact) : null
+    return {
+      accent: artifact?.accent || head?.accent || weapon?.accent || rpg.state.playerProfile.avatarConfig.outfitAccent,
+      cape: cloak?.accent || rpg.state.playerProfile.avatarConfig.cape,
+      weapon:
+        weapon?.id === 'training-blade'
+          ? 'sword'
+          : rpg.state.playerProfile.avatarConfig.weapon,
+      helmet:
+        head?.id === 'initiate-circlet'
+          ? 'circlet'
+          : rpg.state.playerProfile.avatarConfig.helmet,
+    } as const
+  }, [rpg.state.playerProfile])
+
+  function addChatMessage(message: ChatMessage) {
+    setMessages((prev) => [...prev, message].slice(-40))
+  }
+
+  function sendChat(body: string) {
+    addChatMessage({
+      id: `${Date.now()}-${Math.random()}`,
+      authorId: 'self',
+      authorName: rpg.state.playerProfile.displayName || 'You',
+      body,
+      ts: Date.now(),
+      color: '#a7f3d0',
+    })
+    rpg.markObjective('training-q3', 'send-local-chat')
+    try { (window as any).__hermesPlaygroundSendChat?.(body) } catch {}
+  }
+
   function handleIncomingChat(msg: { id: string; name: string; color: string; text: string; ts: number }) {
-    setMessages((prev) => [...prev, {
+    addChatMessage({
       id: `${msg.ts}-${msg.id}`,
       authorId: msg.id,
       authorName: msg.name,
       body: msg.text,
       ts: msg.ts,
       color: msg.color,
-    }].slice(-40))
+    })
   }
 
-  // J = journal, E = talk, M = map, T = focus chat, Esc = close anything
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
-        if (e.key === 'Escape') (t as HTMLElement).blur()
-        return
-      }
-      const k = e.key.toLowerCase()
-      if (k === 'j') setJournalOpen((j) => !j)
-      if (k === 'c') setCustomizerOpen((c) => !c)
-      if (k === 'm') setMapOpen((m) => !m)
-      if (k === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
-      if (k === 't') setChatCollapsed(false)
-      if (e.key === 'Escape') {
-        setJournalOpen(false)
-        setDialogNpc(null)
-        setMapOpen(false)
-      }
+  function attackMonster(damage: number, costBacklash = true) {
+    if (world !== 'training' || monsterDefeated) return false
+    if (costBacklash) {
+      const playerDamage = Math.floor(Math.random() * 4) + 1
+      rpg.damagePlayer(playerDamage)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [nearbyNpc, dialogNpc])
-  const meta = WORLD_META[world]
+    setMonsterHp((current) => {
+      const next = Math.max(0, current - damage)
+      if (next === 0) {
+        rpg.markObjective('training-bonus-wisp', 'defeat-wisp')
+        rpg.recordDefeat(35, 'wisp-core')
+        rpg.markObjective('training-bonus-wisp', 'collect-core')
+      }
+      return next
+    })
+    return true
+  }
 
-  function askAthena(text: string) {
-    const body = text.trim()
-    if (!body) return
-    setInput('')
-    if (/generate|build|world|forge|cyber/i.test(body)) {
-      setQuest('generated-world')
-      setCompanionLine('I generated The Forge: neon code rivers, mission terminals, and agent blacksmiths. Walk through the portal to enter it.')
+  function handleCast(actionId: string) {
+    switch (actionId) {
+      case 'strike':
+        return attackMonster(10 + Math.floor(Math.random() * 4))
+      case 'dash':
+        if (!rpg.useMp(8)) return false
+        window.dispatchEvent(new CustomEvent('hermes-playground-dash'))
+        return true
+      case 'bolt':
+        if (!rpg.useMp(15)) return false
+        return attackMonster(18 + Math.floor(Math.random() * 6), false)
+      default:
+        return false
+    }
+  }
+
+  function handleQuestZone(id: string) {
+    if (id === 'archive-podium') {
+      rpg.markObjective('training-q4', 'visit-archive')
+      setArchiveOpen(true)
       return
     }
-    setQuest((q) => (q === 'start' ? 'met-athena' : q))
-    setCompanionLine('This is the first AI agent RPG world: humans explore, agents follow, missions emerge, and worlds are generated from prompts.')
+    if (id === 'forge-gate') {
+      rpg.markObjective('training-q5', 'visit-forge-gate')
+      return
+    }
+    if (['grove-ritual', 'oracle-riddle', 'arena-duel'].includes(id)) {
+      rpg.completeQuestById(id)
+    }
   }
 
-  function enterPortal() {
-    setWorld((w) => (w === 'agora' ? 'forge' : 'agora'))
-    setQuest('complete')
-    setCompanionLine(world === 'agora'
-      ? 'Welcome to The Forge. Your generated world is live. Next: multiplayer, voice, and quests.'
-      : 'Back to The Agora. Every portal can become a generated world.')
+  function handlePortal() {
+    if (world === 'training' && !forgeUnlocked) return
+    const order: PlaygroundWorldId[] = ['training', 'forge', 'agora', 'grove', 'oracle', 'arena']
+    const unlocked = order.filter((id) => rpg.state.unlockedWorlds.includes(id))
+    const currentIndex = unlocked.indexOf(world)
+    const next = unlocked[(currentIndex + 1) % unlocked.length] ?? world
+    setTransitioning(true)
+    window.setTimeout(() => {
+      setWorld(next)
+      window.setTimeout(() => setTransitioning(false), 350)
+    }, 280)
   }
 
-  if (!launch3D) {
-    return <PlaygroundFallback onLaunch3D={() => setLaunch3D(true)} />
+  function onDialogChoice(npcId: string, choiceId: string) {
+    if (npcId === 'athena' && choiceId === 'training-sigil') {
+      rpg.markObjective('training-q1', 'speak-athena')
+      rpg.markObjective('training-q1', 'claim-sigil')
+    }
+    if ((npcId === 'athena' && choiceId === 'training-build') || (npcId === 'pan' && choiceId === 'forge-demo')) {
+      rpg.markObjective('training-q5', 'build-something')
+    }
   }
 
-  // Always try the real 3D world first. If R3F throws, the error boundary
-  // swaps in the GPU-safe Lite world. Previously we pre-gated on WebGL
-  // detection but that was over-eager and showed Lite even when the browser
-  // could render Three.
+  if (!launched) {
+    return (
+      <>
+        <TitleScreen
+          displayName={rpg.state.playerProfile.displayName}
+          onChangeDisplayName={rpg.setDisplayName}
+          onCustomize={() => setCustomizerOpen(true)}
+          onEnter={() => setLaunched(true)}
+        />
+        <PlaygroundCustomizer
+          open={customizerOpen}
+          onClose={() => setCustomizerOpen(false)}
+          value={rpg.state.playerProfile.avatarConfig}
+          onChange={rpg.setAvatarConfig}
+        />
+      </>
+    )
+  }
+
   return (
-    <PlaygroundErrorBoundary fallback={
-      <PlaygroundLiteWorld
-        world={world}
-        setWorld={setWorld}
-        quest={quest}
-        setQuest={setQuest}
-        input={input}
-        setInput={setInput}
-        companionLine={companionLine}
-        setCompanionLine={setCompanionLine}
-        rpgState={rpg.state}
-        activeQuest={rpg.activeQuest}
-        levelProgress={rpg.levelProgress}
-        lastReward={rpg.lastReward}
-        completeQuest={rpg.completeQuest}
-        resetRpg={rpg.resetRpg}
-      />
-    }>
-      <div
-        className="relative overflow-hidden"
-        style={{ width: '100%', height: '100vh', minHeight: 640, background: '#0b1720', color: 'white' }}
-      >
+    <PlaygroundErrorBoundary fallback={<RouteFallback />}>
+      <div className="relative overflow-hidden" style={{ width: '100%', height: '100vh', minHeight: 640, background: '#07131a', color: 'white' }}>
         <PlaygroundWorld3D
           worldId={world}
-          onPortal={() => {
-            const order: PlaygroundWorldId[] = ['agora', 'forge', 'grove', 'oracle', 'arena']
-            const unlocked = order.filter((w) => rpg.state.unlockedWorlds.includes(w))
-            const currentIndex = unlocked.indexOf(world)
-            let next: PlaygroundWorldId
-            if (unlocked.length <= 1) {
-              rpg.unlockWorld('forge')
-              next = 'forge'
-            } else {
-              next = unlocked[(currentIndex + 1) % unlocked.length]
-            }
-            setTransitioning(true)
-            window.setTimeout(() => {
-              setWorld(next)
-              const enterQuestId = `enter-${next}`
-              if (rpg.activeQuest && (rpg.activeQuest.id === enterQuestId || (rpg.activeQuest.id === 'enter-forge' && next === 'forge'))) {
-                rpg.completeQuest(rpg.activeQuest)
-              }
-              window.setTimeout(() => setTransitioning(false), 350)
-            }, 350)
-          }}
-          onQuestZone={(questId) => {
-            const q = rpg.activeQuest
-            if (q && q.id === questId) rpg.completeQuest(q)
-          }}
-          onNpcNearChange={(id) => setNearbyNpc(id)}
+          onPortal={handlePortal}
+          onQuestZone={handleQuestZone}
+          onNpcNearChange={setNearbyNpc}
           botBubbles={botBubbles}
-          onIncomingChat={handleIncomingChat}
-          multiplayerName={(typeof window !== 'undefined' ? window.localStorage.getItem('hermes-playground-builder-name') : '') || undefined}
+          playerName={rpg.state.playerProfile.displayName || 'Builder'}
+          playerAvatar={rpg.state.playerProfile.avatarConfig}
+          playerAccent={equippedVisuals.accent}
+          playerCape={equippedVisuals.cape}
+          playerWeapon={equippedVisuals.weapon}
+          playerHelmet={equippedVisuals.helmet}
+          portalLabel={world === 'training' ? 'Forge Gate' : 'World Portal'}
+          portalLocked={world === 'training' && !forgeUnlocked}
+          multiplayerName={rpg.state.playerProfile.displayName || undefined}
           monsterHp={monsterHp}
           monsterHpMax={monsterHpMax}
           monsterDefeated={monsterDefeated}
-          onMonsterAttack={handleMonsterAttack}
+          onMonsterAttack={() => {
+            attackMonster(8 + Math.floor(Math.random() * 5))
+          }}
+          onIncomingChat={handleIncomingChat}
         />
+
         <PlaygroundDialog
           npcId={dialogNpc}
-          activeQuest={rpg.activeQuest}
+          activeQuest={activeQuest ?? null}
           onClose={() => setDialogNpc(null)}
-          onCompleteQuest={(qid) => rpg.completeQuestById(qid)}
+          onCompleteQuest={(questId) => rpg.completeQuestById(questId)}
           onGrantItems={(items) => rpg.grantItems(items)}
           onGrantSkillXp={(skills) => rpg.grantSkillXp(skills)}
+          onChoice={onDialogChoice}
         />
         <PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} />
-        <PlaygroundCustomizer open={customizerOpen} onClose={() => setCustomizerOpen(false)} />
+        <PlaygroundCustomizer
+          open={customizerOpen}
+          onClose={() => setCustomizerOpen(false)}
+          value={rpg.state.playerProfile.avatarConfig}
+          onChange={rpg.setAvatarConfig}
+        />
         <PlaygroundMap
           open={mapOpen}
           onClose={() => setMapOpen(false)}
           currentWorld={world}
           unlocked={rpg.state.unlockedWorlds}
           onTravel={(id) => {
-            if (rpg.state.unlockedWorlds.includes(id)) {
-              setTransitioning(true)
-              window.setTimeout(() => {
-                setWorld(id)
-                setMapOpen(false)
-                window.setTimeout(() => setTransitioning(false), 350)
-              }, 350)
-            }
+            if (!rpg.state.unlockedWorlds.includes(id)) return
+            setTransitioning(true)
+            window.setTimeout(() => {
+              setWorld(id)
+              setMapOpen(false)
+              window.setTimeout(() => setTransitioning(false), 350)
+            }, 280)
           }}
         />
         <PlaygroundChat
@@ -896,7 +351,7 @@ export function PlaygroundScreen() {
           messages={messages}
           onSend={sendChat}
           collapsed={chatCollapsed}
-          onToggle={() => setChatCollapsed((c) => !c)}
+          onToggle={() => setChatCollapsed((value) => !value)}
         />
         <PlaygroundActionBar
           onCast={handleCast}
@@ -912,21 +367,15 @@ export function PlaygroundScreen() {
           worldName={WORLD_META[world].name}
           worldAccent={WORLD_META[world].accent}
         />
-        {/* Cinematic world transition fade */}
-        <div
-          className="pointer-events-none fixed inset-0 z-[95] transition-opacity duration-300"
-          style={{
-            background: 'radial-gradient(circle at center, transparent 20%, #000 80%)',
-            opacity: transitioning ? 1 : 0,
-          }}
-        />
         <PlaygroundHud
           state={rpg.state}
-          activeQuestTitle={rpg.activeQuest.title}
+          activeQuestTitle={activeQuest?.title ?? 'Training Complete'}
+          objectiveLabel={currentObjective?.label ?? 'Forge Gate unlocked. Keep exploring the Playground.'}
+          objectiveHint={currentObjective?.hint}
           levelProgress={rpg.levelProgress}
           currentWorld={world}
           worldAccent={WORLD_META[world].accent}
-          lastReward={rpg.lastReward}
+          toasts={rpg.toasts}
         />
         <PlaygroundOnlineChip accent={WORLD_META[world].accent} />
         <PlaygroundSidePanel
@@ -937,84 +386,114 @@ export function PlaygroundScreen() {
             if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
           }}
           onReset={rpg.resetRpg}
+          onOpenInventory={rpg.openInventory}
+          onEquipItem={rpg.equipItem}
+          onUnequipSlot={rpg.unequipSlot}
           worldAccent={WORLD_META[world].accent}
         />
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
-        <PlaygroundOnboardingCard />
         <PlaygroundUtilityDock onCustomize={() => setCustomizerOpen(true)} />
+        <ArchiveBriefingModal
+          open={archiveOpen}
+          onClose={() => setArchiveOpen(false)}
+          onAcknowledge={() => {
+            rpg.markObjective('training-q4', 'inspect-memory')
+            setArchiveOpen(false)
+          }}
+        />
+        <TutorialCompleteModal
+          open={tutorialCompleteOpen}
+          onClose={() => setTutorialCompleteOpen(false)}
+        />
+        <div
+          className="pointer-events-none fixed inset-0 z-[95] transition-opacity duration-300"
+          style={{
+            background: 'radial-gradient(circle at center, transparent 20%, #000 80%)',
+            opacity: transitioning ? 1 : 0,
+          }}
+        />
       </div>
     </PlaygroundErrorBoundary>
   )
+}
 
-  // Legacy R3F embedded path (kept for reference, unreachable due to early return above).
-  // eslint-disable-next-line @typescript-eslint/no-unreachable
+function TitleScreen({
+  displayName,
+  onChangeDisplayName,
+  onCustomize,
+  onEnter,
+}: {
+  displayName: string
+  onChangeDisplayName: (value: string) => void
+  onCustomize: () => void
+  onEnter: () => void
+}) {
+  const canEnter = displayName.trim().length > 0
   return (
-    <div className="relative h-full min-h-0 overflow-hidden" style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}>
-      <PlaygroundErrorBoundary>
-        <Canvas
-          shadows
-          camera={{ position: [7, 7, 10], fov: 48 }}
-          dpr={[1, 1.5]}
-          fallback={<PlaygroundFallback />}
-          gl={{
-            antialias: true,
-            alpha: false,
-            powerPreference: 'default',
-            failIfMajorPerformanceCaveat: false,
-          }}
-        >
-          <PlaygroundScene world={world} companionLine={companionLine} onEnterPortal={enterPortal} />
-        </Canvas>
-      </PlaygroundErrorBoundary>
-
-      <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="pointer-events-auto rounded-2xl border border-white/10 bg-black/45 px-4 py-3 text-white shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center gap-2">
-              <div className="text-lg font-semibold">Hermes Playground</div>
-              <span className="rounded bg-cyan-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">hackathon</span>
+    <div className="flex min-h-screen items-center justify-center bg-[#050b12] p-6 text-white">
+      <div className="w-full max-w-5xl overflow-hidden rounded-[28px] border border-cyan-300/20 bg-[#070b14] shadow-2xl">
+        <div className="relative h-[340px] overflow-hidden">
+          <PlaygroundHeroCanvas />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div className="mb-3 rounded-full border border-cyan-300/35 bg-black/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/85 backdrop-blur-sm">
+              Hermes Playground · Nous Research × Kimi
             </div>
-            <div className="mt-1 text-xs text-white/65">Nous × Kimi entry · first open-world AI agent RPG</div>
-          </div>
-
-          <div className="pointer-events-auto w-[320px] rounded-2xl border border-white/10 bg-black/45 p-3 text-white shadow-2xl backdrop-blur-xl">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">Mission</div>
-              <div className="text-[10px] uppercase tracking-[0.16em]" style={{ color: meta.accent }}>{meta.name}</div>
-            </div>
-            <div className="space-y-1.5 text-xs">
-              <MissionDone done>Enter Playground</MissionDone>
-              <MissionDone done={quest !== 'start'}>Talk to Athena</MissionDone>
-              <MissionDone done={quest === 'generated-world' || quest === 'complete'}>Generate a new world</MissionDone>
-              <MissionDone done={quest === 'complete'}>Enter the portal</MissionDone>
-            </div>
+            <h1 className="text-5xl font-black tracking-tight" style={{ textShadow: '0 0 28px rgba(34,211,238,0.55)' }}>
+              Hermes Playground
+            </h1>
+            <p className="mt-3 max-w-[640px] text-[15px] text-white/72">
+              Enter the Training Grounds, meet Athena, equip your starter kit, learn chat and memory, then unlock the Forge Gate.
+            </p>
           </div>
         </div>
 
-        <div className="flex items-end justify-between gap-4">
-          <div className="pointer-events-auto max-w-[520px] rounded-2xl border border-white/10 bg-black/45 p-3 text-white shadow-2xl backdrop-blur-xl">
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/60">Athena · Agent Companion</div>
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault()
-                askAthena(input)
-              }}
-            >
+        <div className="grid gap-6 p-6 lg:grid-cols-[1.3fr_0.7fr]">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Display Name</div>
               <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask Athena… try: generate a cyberpunk forge world"
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/45"
+                value={displayName}
+                onChange={(event) => onChangeDisplayName(event.target.value.slice(0, 24))}
+                placeholder="Builder handle"
+                maxLength={24}
+                className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-3 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-cyan-400/60"
               />
-              <button className="rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] text-black" style={{ background: meta.accent }}>
-                Ask
-              </button>
-            </form>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={onCustomize}
+                  className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-white/5"
+                >
+                  Customize Avatar
+                </button>
+                <button
+                  type="button"
+                  onClick={onEnter}
+                  disabled={!canEnter}
+                  className="rounded-xl border-2 border-cyan-300/60 bg-cyan-400/15 px-5 py-2 text-sm font-extrabold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
+                  style={{ boxShadow: '0 0 22px rgba(34,211,238,.35)' }}
+                >
+                  Enter Training Grounds
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <FeatureCard>Display-name-only entry</FeatureCard>
+              <FeatureCard>Avatar customizer before launch</FeatureCard>
+              <FeatureCard>Training tutorial, gear, chat, memory, build loop</FeatureCard>
+              <FeatureCard>Action bar, minimap, quest tracker, and multiplayer presence</FeatureCard>
+            </div>
           </div>
 
-          <div className="pointer-events-auto rounded-full border border-white/10 bg-black/45 px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/65 backdrop-blur-xl">
-            WASD / arrows move · shift sprint · click portal
+          <div className="rounded-2xl border border-white/10 bg-black/35 p-4 text-sm text-white/80">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/70">Starter Route</div>
+            <ol className="mt-3 space-y-2 text-[13px]">
+              <li>1. Arrival Circle → meet Athena and claim the Hermes Sigil.</li>
+              <li>2. Quartermaster kit → equip the Training Blade and Novice Cloak.</li>
+              <li>3. Send one local chat message.</li>
+              <li>4. Visit the Archive Podium for docs and memory guidance.</li>
+              <li>5. Reach the Forge Gate and complete a placeholder build ritual.</li>
+            </ol>
           </div>
         </div>
       </div>
@@ -1022,45 +501,55 @@ export function PlaygroundScreen() {
   )
 }
 
-function MissionDone({ done, children }: { done?: boolean; children: React.ReactNode }) {
+function FeatureCard({ children }: { children: ReactNode }) {
+  return <div className="rounded-xl border border-white/10 bg-white/5 p-3">{children}</div>
+}
+
+function ArchiveBriefingModal({
+  open,
+  onClose,
+  onAcknowledge,
+}: {
+  open: boolean
+  onClose: () => void
+  onAcknowledge: () => void
+}) {
+  if (!open) return null
   return (
-    <div className="flex items-center gap-2">
-      <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${done ? 'bg-emerald-400 text-black' : 'bg-white/10 text-white/40'}`}>
-        {done ? '✓' : '•'}
-      </span>
-      <span className={done ? 'text-white' : 'text-white/55'}>{children}</span>
+    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-[560px] rounded-3xl border border-violet-300/30 bg-[#070b14] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/80">Archive Podium</div>
+        <div className="mt-1 text-xl font-extrabold">Docs and Memory Loop</div>
+        <div className="mt-4 space-y-3 text-sm text-white/80">
+          <p><strong>Docs:</strong> `docs/playground/README.md` explains the worlds, systems, and multiplayer wiring.</p>
+          <p><strong>Memory:</strong> Hermes saves project intent in `memory/goals/...` so the next iteration starts with context instead of drift.</p>
+          <p><strong>Builder habit:</strong> read the spec, inspect the state shape, ship the smallest slice, then verify with a clean build.</p>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5">Close</button>
+          <button onClick={onAcknowledge} className="rounded-xl border border-violet-300/40 bg-violet-400/15 px-4 py-2 text-sm font-bold text-violet-100 hover:bg-violet-400/25">
+            Mark Briefing Read
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
-function PlaygroundOnboardingCard() {
-  const KEY = 'hermes-playground-onboarded-v1'
-  const [open, setOpen] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return !window.localStorage.getItem(KEY)
-  })
+function TutorialCompleteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/55 backdrop-blur-md">
-      <div className="w-[92vw] max-w-[520px] overflow-hidden rounded-3xl border-2 border-cyan-300/40 bg-[#070b14] text-white shadow-2xl"
-        style={{ boxShadow: '0 0 36px rgba(34,211,238,.35), 0 18px 54px rgba(0,0,0,.7)' }}
-      >
-        <div className="border-b border-white/10 bg-gradient-to-r from-cyan-500/15 via-transparent to-violet-500/15 px-5 py-3">
-          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">Hermes Playground · v0</div>
-          <div className="text-base font-extrabold">A multiplayer agent world</div>
+    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-[520px] rounded-3xl border border-cyan-300/35 bg-[#070b14] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">Training Complete</div>
+        <div className="mt-1 text-xl font-extrabold">Forge Gate Unlocked</div>
+        <div className="mt-3 space-y-2 text-sm text-white/80">
+          <p>You earned the title <strong>Initiate Builder</strong>.</p>
+          <p>The Forge portal is now live. Walk through the gate or open the world map with `M` to continue.</p>
         </div>
-        <div className="space-y-2.5 p-5 text-[13px] leading-snug text-white/85">
-          <p>Walk around the Agora and meet Hermes Agent NPCs. Click the ground to walk, click an NPC to talk to them.</p>
-          <p>Enter buildings (Tavern, Bank, Smithy, Inn, Apothecary, Guild). Run quests. Visit the other 4 worlds via portal or world map (M).</p>
-          <p>Open this world in another browser window or tab — you’ll see each other and chat in real time. WebSocket multiplayer auto-connects when the server is online.</p>
-        </div>
-        <div className="flex items-center justify-between gap-2 border-t border-white/10 bg-black/40 px-5 py-3">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Click NPC = talk · Click ground = walk · WASD = move</div>
-          <button
-            onClick={() => { try { window.localStorage.setItem(KEY, '1') } catch {}; setOpen(false) }}
-            className="rounded-lg border border-cyan-400/50 bg-cyan-400/15 px-4 py-1.5 text-[12px] font-bold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
-          >
-            Enter the Agora
+        <div className="mt-4 flex justify-end">
+          <button onClick={onClose} className="rounded-xl border border-cyan-300/40 bg-cyan-400/15 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-cyan-400/25">
+            Continue
           </button>
         </div>
       </div>
@@ -1076,15 +565,15 @@ function PlaygroundHelpHud({ worldName }: { worldName: string }) {
         {worldName}
       </div>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((value) => !value)}
         className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-[12px] font-bold text-white/80 hover:bg-white/10"
-        title="Show controls (?)"
+        title="Show controls"
       >
         ?
       </button>
       {open && (
         <div className="rounded-xl border border-white/10 bg-black/85 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-white/80 backdrop-blur-xl">
-          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1–6 skills · E talk · J journal · M map · T chat · C customize
+          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1 Strike · 2 Dash · 3 Bolt · E talk · J journal · M map · T chat
         </div>
       )}
     </div>
@@ -1101,23 +590,20 @@ function PlaygroundUtilityDock({ onCustomize }: { onCustomize: () => void }) {
       >
         👤
       </button>
-      <button
-        onClick={() => {
-          try {
-            const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
-            if (!canvas) return
-            const url = canvas.toDataURL('image/png')
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `hermes-playground-${Date.now()}.png`
-            a.click()
-          } catch {}
-        }}
-        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-white/80 backdrop-blur-xl hover:bg-white/10"
-        title="Capture frame (PNG)"
-      >
-        📸
-      </button>
+    </div>
+  )
+}
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#050b12] p-6 text-white">
+      <div className="max-w-[520px] rounded-3xl border border-amber-300/25 bg-[#070b14] p-5 shadow-2xl">
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200/80">Hermes Playground</div>
+        <div className="mt-1 text-xl font-extrabold">Route fallback active</div>
+        <p className="mt-3 text-sm text-white/75">
+          The 3D route failed to render in this browser context. Reload the page or open `/agora` for the lightweight fallback.
+        </p>
+      </div>
     </div>
   )
 }

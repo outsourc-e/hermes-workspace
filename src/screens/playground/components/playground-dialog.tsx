@@ -13,6 +13,7 @@ type Props = {
   onGrantItems: (items: PlaygroundItemId[]) => void
   onGrantSkillXp: (skillXp: Partial<Record<PlaygroundSkillId, number>>) => void
   activeQuest: PlaygroundQuest | null
+  onChoice?: (npcId: string, choiceId: string) => void
 }
 
 type ChatTurn = { role: 'user' | 'assistant'; content: string; ts: number; fallback?: boolean }
@@ -24,6 +25,7 @@ export function PlaygroundDialog({
   onGrantItems,
   onGrantSkillXp,
   activeQuest,
+  onChoice,
 }: Props) {
   const [reply, setReply] = useState<string | null>(null)
   const [loreIdx, setLoreIdx] = useState(0)
@@ -57,6 +59,7 @@ export function PlaygroundDialog({
   function handleChoice(c: DialogChoice) {
     setReply(c.reply)
     setShowLore(false)
+    onChoice?.(npcId, c.id)
     if (c.completeQuest) onCompleteQuest(c.completeQuest)
     if (c.grantItems?.length) onGrantItems(c.grantItems)
     if (c.grantSkillXp) onGrantSkillXp(c.grantSkillXp)
@@ -74,7 +77,7 @@ export function PlaygroundDialog({
   function isQuestRelated(c: DialogChoice) {
     if (!activeQuest) return false
     if (c.completeQuest === activeQuest.id) return true
-    return false
+    return /quest|build|sigil|scroll|archive|kit/i.test(c.label)
   }
 
   async function askLLM() {

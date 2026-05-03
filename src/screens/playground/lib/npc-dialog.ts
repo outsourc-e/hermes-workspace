@@ -46,24 +46,28 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
   athena: {
     id: 'athena',
     name: 'Athena',
-    title: 'Sage of the Agora',
+    title: 'Guide of the Training Grounds',
     color: '#a78bfa',
     opening:
-      'Welcome, builder. I am Athena. The Agora is where humans and agents first meet. You stand at the start of a new kind of network.',
+      'Welcome, builder. I am Athena. These Training Grounds teach the Hermes loop: move, equip, speak, remember, and build.',
     lore: [
-      'Long before Hermes Workspace, agents were tools — typed at, prompted, shut. We invited them into a world instead.',
-      'The Agora is the lobby. Past it lie generated worlds: the Forge, the Grove, the Oracle Temple, and the Arena where models duel.',
-      'I am scripted for this hackathon. Soon a real Hermes agent will speak through me — same voice, deeper memory.',
+      'Long before Hermes Workspace, agents were tools. We invited them into a world instead.',
+      'Start here, then walk through the Forge Gate when you are ready to build with Hermes for real.',
+      'I am scripted for this hackathon. Soon a real Hermes agent will speak through me with deeper memory.',
     ],
     choices: [
       {
-        id: 'accept-scroll',
-        label: '[Quest] Accept Athena’s Scroll',
+        id: 'training-sigil',
+        label: '[Quest] Receive the Hermes Sigil',
         reply:
-          'Take this scroll. It teaches the first ritual: ask the Forge a prompt and the world will rise from it. Walk through the portal to begin.',
-        completeQuest: 'awakening-agora',
-        grantItems: ['athena-scroll', 'hermes-token'],
-        grantSkillXp: { promptcraft: 30, summoning: 20 },
+          'Take the Hermes Sigil, your Training Blade, and your Novice Cloak. Open your kit, equip them, and meet me again at the Forge Gate.',
+      },
+      {
+        id: 'training-build',
+        label: '[Quest] Build a tiny prototype',
+        reply:
+          'Excellent. Let us build a tiny prototype: a quest tracker, a portal, a training arena, anything small and real. The Forge answers builders who ship.',
+        grantSkillXp: { worldsmithing: 20, engineering: 20 },
       },
       {
         id: 'lore-hermes',
@@ -183,6 +187,13 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
           'Take this glowing leaf. Sing to it later and a song will answer.',
         grantItems: ['grove-leaf'],
         grantSkillXp: { worldsmithing: 20, oracle: 20 },
+      },
+      {
+        id: 'forge-demo',
+        label: '[Build] Forge a demo tool',
+        reply:
+          'Name the thing you want to make and the Forge will start from there. Builder loops should stay small, concrete, and shippable.',
+        grantSkillXp: { engineering: 25, worldsmithing: 15 },
       },
       {
         id: 'lore-forge',

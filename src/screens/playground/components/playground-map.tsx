@@ -9,6 +9,7 @@ type Props = {
 }
 
 const WORLD_LAYOUT: Record<PlaygroundWorldId, { x: number; y: number; lore: string }> = {
+  training: { x: 34, y: 58, lore: 'Starter zone. Arrival Circle, Trainer’s Ring, Archive Podium, and the Forge Gate.' },
   agora: { x: 50, y: 50, lore: 'Starting plaza. Marble pillars, agent citizens, the first portal.' },
   forge: { x: 78, y: 38, lore: 'Generated cyberpunk workshop. Where prompts harden into tools.' },
   grove: { x: 20, y: 35, lore: 'Bioluminescent forest. Music, rituals, community quests.' },
@@ -17,6 +18,8 @@ const WORLD_LAYOUT: Record<PlaygroundWorldId, { x: number; y: number; lore: stri
 }
 
 const PATHS: Array<[PlaygroundWorldId, PlaygroundWorldId]> = [
+  ['training', 'agora'],
+  ['training', 'forge'],
   ['agora', 'forge'],
   ['agora', 'grove'],
   ['agora', 'oracle'],

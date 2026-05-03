@@ -2,6 +2,11 @@ import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor } from '../lib/playground-bots'
 
 const NPC_POSITIONS: Record<PlaygroundWorldId, Array<{ x: number; z: number; color: string }>> = {
+  training: [
+    { x: -9, z: 7, color: '#a78bfa' },
+    { x: -3, z: 0, color: '#22d3ee' },
+    { x: 8, z: -4, color: '#f59e0b' },
+  ],
   agora: [
     { x: -5, z: 2, color: '#a78bfa' },
     { x: 5, z: 3, color: '#f59e0b' },
@@ -29,7 +34,14 @@ const NPC_POSITIONS: Record<PlaygroundWorldId, Array<{ x: number; z: number; col
   ],
 }
 
-const PORTAL_POSITION = { x: 10, z: -2 }
+const PORTAL_POSITION: Record<PlaygroundWorldId, { x: number; z: number }> = {
+  training: { x: 14, z: -10 },
+  agora: { x: 10, z: -2 },
+  forge: { x: 10, z: -2 },
+  grove: { x: 10, z: -2 },
+  oracle: { x: 10, z: -2 },
+  arena: { x: 10, z: -2 },
+}
 
 type Props = {
   worldId: PlaygroundWorldId
@@ -99,8 +111,8 @@ export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
         <div
           className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border"
           style={{
-            left: map(PORTAL_POSITION.x),
-            top: map(PORTAL_POSITION.z),
+            left: map(PORTAL_POSITION[worldId].x),
+            top: map(PORTAL_POSITION[worldId].z),
             width: 10,
             height: 10,
             borderColor: worldAccent,

@@ -1,12 +1,14 @@
+import type { AvatarConfig } from './avatar-config'
+
 /**
  * Hermes Playground RPG data model.
  *
- * Hackathon MVP: data-driven RuneScape/Sims-style progression layered on
- * the GPU-safe Playground world. Later, generated world manifests can append
- * to these registries without changing renderer code.
+ * Training Grounds is the new first-run loop for the Nous Research x Kimi
+ * creative hackathon build. Legacy worlds and items remain additive.
  */
 
-export type PlaygroundWorldId = 'agora' | 'forge' | 'grove' | 'oracle' | 'arena'
+export type PlaygroundWorldId = 'training' | 'agora' | 'forge' | 'grove' | 'oracle' | 'arena'
+
 export type PlaygroundSkillId =
   | 'promptcraft'
   | 'worldsmithing'
@@ -15,7 +17,15 @@ export type PlaygroundSkillId =
   | 'oracle'
   | 'diplomacy'
 
+export type EquipmentSlot = 'weapon' | 'cloak' | 'head' | 'artifact'
+
 export type PlaygroundItemId =
+  | 'hermes-sigil'
+  | 'training-blade'
+  | 'novice-cloak'
+  | 'initiate-circlet'
+  | 'archive-lens'
+  | 'wisp-core'
   | 'hermes-token'
   | 'athena-scroll'
   | 'forge-shard'
@@ -28,22 +38,25 @@ export type PlaygroundItemId =
   | 'oracle-riddle'
 
 export type QuestObjectiveType =
-  | 'talk_to_athena'
-  | 'generate_world'
-  | 'enter_world'
-  | 'open_world_map'
-  | 'collect_item'
-  | 'use_skill'
-  | 'visit_zone'
   | 'talk_to_npc'
-  | 'duel_npc'
+  | 'collect_item'
+  | 'visit_zone'
+  | 'open_inventory'
+  | 'equip_item'
+  | 'send_chat'
+  | 'inspect_docs'
+  | 'build_prompt'
+  | 'defeat_enemy'
+  | 'enter_world'
   | 'gather_song'
+  | 'duel_npc'
 
 export type QuestObjective = {
   id: string
   type: QuestObjectiveType
   label: string
   target?: string
+  hint?: string
 }
 
 export type QuestReward = {
@@ -51,6 +64,7 @@ export type QuestReward = {
   items?: PlaygroundItemId[]
   skillXp?: Partial<Record<PlaygroundSkillId, number>>
   unlockWorlds?: PlaygroundWorldId[]
+  title?: string
 }
 
 export type PlaygroundQuest = {
@@ -60,6 +74,7 @@ export type PlaygroundQuest = {
   description: string
   objectives: QuestObjective[]
   reward: QuestReward
+  optional?: boolean
 }
 
 export type PlaygroundWorld = {
@@ -85,21 +100,50 @@ export type PlaygroundItem = {
   icon: string
   rarity: 'common' | 'rare' | 'epic' | 'legendary'
   description: string
+  slot?: EquipmentSlot
+  accent?: string
+  stat?: { label: string; value: number }
+}
+
+export type EquippedItems = Record<EquipmentSlot, PlaygroundItemId | null>
+
+export type QuestProgressEntry = {
+  completedObjectives: string[]
+  completed: boolean
+}
+
+export type PlayerProfile = {
+  displayName: string
+  avatarConfig: AvatarConfig
+  equipped: EquippedItems
+  inventory: PlaygroundItemId[]
+  questProgress: Record<string, QuestProgressEntry>
+  level: number
+  xp: number
+  titlesUnlocked: string[]
+  lastZone: PlaygroundWorldId
 }
 
 export const PLAYGROUND_WORLDS: PlaygroundWorld[] = [
   {
+    id: 'training',
+    name: 'Training Grounds',
+    tagline: 'Starter zone',
+    description: 'Arrival circle, trainers, archives, and the locked Forge Gate for first-time builders.',
+    accent: '#5eead4',
+  },
+  {
     id: 'agora',
-    name: 'The Agora',
-    tagline: 'Starting realm',
-    description: 'The central plaza where humans and agents first meet.',
+    name: 'Agora Commons',
+    tagline: 'Social hub',
+    description: 'The shared plaza where humans and agents mingle.',
     accent: '#d9b35f',
   },
   {
     id: 'forge',
     name: 'The Forge',
-    tagline: 'Generated world',
-    description: 'A neon builder realm where prompts harden into tools.',
+    tagline: 'Builder realm',
+    description: 'A neon builder world where prompts harden into tools.',
     accent: '#22d3ee',
     lockedByDefault: true,
     requiredItem: 'portal-key',
@@ -138,7 +182,7 @@ export const PLAYGROUND_SKILLS: PlaygroundSkill[] = [
     id: 'promptcraft',
     name: 'Promptcraft',
     icon: '📜',
-    description: 'Shape agent behavior with scrolls, rituals, and reusable prompt patterns.',
+    description: 'Shape agent behavior with clear instructions and reusable rituals.',
   },
   {
     id: 'worldsmithing',
@@ -173,6 +217,66 @@ export const PLAYGROUND_SKILLS: PlaygroundSkill[] = [
 ]
 
 export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
+  {
+    id: 'hermes-sigil',
+    name: 'Hermes Sigil',
+    icon: '🜂',
+    rarity: 'rare',
+    description: 'A starter sigil that marks you as a builder entering the Training Grounds.',
+    slot: 'artifact',
+    accent: '#5eead4',
+    stat: { label: 'Prompt Focus', value: 4 },
+  },
+  {
+    id: 'training-blade',
+    name: 'Training Blade',
+    icon: '🗡️',
+    rarity: 'common',
+    description: 'A lightweight practice blade tuned for first combat drills.',
+    slot: 'weapon',
+    accent: '#fb7185',
+    stat: { label: 'Power', value: 3 },
+  },
+  {
+    id: 'novice-cloak',
+    name: 'Novice Cloak',
+    icon: '🧥',
+    rarity: 'common',
+    description: 'A teal field cloak stitched for new worldsmiths.',
+    slot: 'cloak',
+    accent: '#22d3ee',
+    stat: { label: 'Guard', value: 2 },
+  },
+  {
+    id: 'initiate-circlet',
+    name: 'Initiate Circlet',
+    icon: '👑',
+    rarity: 'rare',
+    description: 'A thin gold circlet awarded to builders who finish the first loop.',
+    slot: 'head',
+    accent: '#facc15',
+    stat: { label: 'Command', value: 2 },
+  },
+  {
+    id: 'archive-lens',
+    name: 'Archive Lens',
+    icon: '🔎',
+    rarity: 'rare',
+    description: 'Helps you see memory, docs, and hidden links between tools.',
+    slot: 'artifact',
+    accent: '#a78bfa',
+    stat: { label: 'Recall', value: 5 },
+  },
+  {
+    id: 'wisp-core',
+    name: 'Wisp Core',
+    icon: '🫧',
+    rarity: 'rare',
+    description: 'A tiny core left behind by a defeated Glitch Wisp.',
+    slot: 'artifact',
+    accent: '#f472b6',
+    stat: { label: 'Burst', value: 4 },
+  },
   {
     id: 'hermes-token',
     name: 'Hermes Token',
@@ -234,7 +338,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
     name: "Oracle's Riddle",
     icon: '🤔',
     rarity: 'epic',
-    description: 'Sealed scroll of an unsolvable question. Maybe the answer is in the Grove.',
+    description: 'A sealed scroll of an unsolved question.',
   },
   {
     id: 'arena-medal',
@@ -247,50 +351,156 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
 
 export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
   {
-    id: 'awakening-agora',
-    chapter: 'Chapter I — Awakening the Agora',
-    title: 'Awakening the Agora',
-    description: 'Meet Athena and initialize your agent companion.',
+    id: 'training-q1',
+    chapter: 'Training Grounds Tutorial',
+    title: 'Move and Speak',
+    description: 'Walk to Athena at the Arrival Circle and accept the Hermes Sigil.',
     objectives: [
-      { id: 'talk-athena', type: 'talk_to_athena', label: 'Talk to Athena' },
-      { id: 'collect-scroll', type: 'collect_item', label: "Receive Athena's Scroll", target: 'athena-scroll' },
+      {
+        id: 'speak-athena',
+        type: 'talk_to_npc',
+        label: 'Walk to Athena and speak with her',
+        target: 'athena',
+        hint: 'Athena waits by the Arrival Circle.',
+      },
+      {
+        id: 'claim-sigil',
+        type: 'collect_item',
+        label: 'Receive the Hermes Sigil',
+        target: 'hermes-sigil',
+      },
     ],
     reward: {
-      xp: 50,
-      items: ['hermes-token', 'athena-scroll'],
-      skillXp: { promptcraft: 40, summoning: 20 },
+      xp: 40,
+      items: ['hermes-sigil', 'training-blade', 'novice-cloak'],
+      skillXp: { promptcraft: 20, summoning: 10 },
     },
   },
   {
-    id: 'first-worldsmith',
-    chapter: 'Chapter I — Awakening the Agora',
-    title: 'The First Worldsmith',
-    description: 'Ask Athena to generate a new world from a prompt.',
+    id: 'training-q2',
+    chapter: 'Training Grounds Tutorial',
+    title: 'Open Your Kit',
+    description: 'Open your inventory and equip the starter blade and cloak.',
     objectives: [
-      { id: 'generate-forge', type: 'generate_world', label: 'Generate The Forge', target: 'forge' },
-      { id: 'receive-key', type: 'collect_item', label: 'Claim the Portal Key', target: 'portal-key' },
+      {
+        id: 'open-kit',
+        type: 'open_inventory',
+        label: 'Open your kit panel',
+        hint: 'Use the inventory tab on the right.',
+      },
+      {
+        id: 'equip-blade',
+        type: 'equip_item',
+        label: 'Equip the Training Blade',
+        target: 'training-blade',
+      },
+      {
+        id: 'equip-cloak',
+        type: 'equip_item',
+        label: 'Equip the Novice Cloak',
+        target: 'novice-cloak',
+      },
     ],
     reward: {
-      xp: 80,
-      items: ['portal-key'],
-      skillXp: { worldsmithing: 80, promptcraft: 30 },
+      xp: 60,
+      skillXp: { engineering: 20, worldsmithing: 20 },
+    },
+  },
+  {
+    id: 'training-q3',
+    chapter: 'Training Grounds Tutorial',
+    title: 'Learn Chat and Community',
+    description: 'Send one local chat message to the builders around you.',
+    objectives: [
+      {
+        id: 'send-local-chat',
+        type: 'send_chat',
+        label: 'Send one local chat message',
+        hint: 'Press T or use the top chat panel.',
+      },
+    ],
+    reward: {
+      xp: 75,
+      skillXp: { diplomacy: 35 },
+    },
+  },
+  {
+    id: 'training-q4',
+    chapter: 'Training Grounds Tutorial',
+    title: 'Learn Memory and Docs',
+    description: 'Visit the Archive Podium and inspect the docs and memory guidance.',
+    objectives: [
+      {
+        id: 'visit-archive',
+        type: 'visit_zone',
+        label: 'Visit the Archive Podium',
+        target: 'archive-podium',
+        hint: 'Follow the violet lights near the podium.',
+      },
+      {
+        id: 'inspect-memory',
+        type: 'inspect_docs',
+        label: 'Open the docs and memory briefing',
+      },
+    ],
+    reward: {
+      xp: 90,
+      items: ['archive-lens'],
+      skillXp: { oracle: 45, promptcraft: 15 },
+    },
+  },
+  {
+    id: 'training-q5',
+    chapter: 'Training Grounds Tutorial',
+    title: 'Build with Hermes',
+    description: 'Travel to the Forge Gate and ask Athena to build something with you.',
+    objectives: [
+      {
+        id: 'visit-forge-gate',
+        type: 'visit_zone',
+        label: 'Travel to the Forge Gate',
+        target: 'forge-gate',
+        hint: 'The gate is locked until you finish this ritual.',
+      },
+      {
+        id: 'build-something',
+        type: 'build_prompt',
+        label: 'Ask Athena or the Forge Guide to build something',
+        target: 'build-demo',
+      },
+    ],
+    reward: {
+      xp: 140,
+      items: ['initiate-circlet', 'portal-key'],
       unlockWorlds: ['forge'],
+      title: 'Initiate Builder',
+      skillXp: { worldsmithing: 55, engineering: 45 },
     },
   },
   {
-    id: 'enter-forge',
-    chapter: 'Chapter I — Awakening the Agora',
-    title: 'Enter the Forge',
-    description: 'Step through the portal into the generated builder realm.',
+    id: 'training-bonus-wisp',
+    chapter: 'Training Grounds Bonus',
+    title: 'Clear the Glitch Wisp',
+    description: 'Defeat the unstable wisp haunting the Trainer’s Ring.',
+    optional: true,
     objectives: [
-      { id: 'enter-forge-world', type: 'enter_world', label: 'Enter The Forge', target: 'forge' },
-      { id: 'forge-shard', type: 'collect_item', label: 'Recover a Forge Shard', target: 'forge-shard' },
+      {
+        id: 'defeat-wisp',
+        type: 'defeat_enemy',
+        label: 'Defeat the Glitch Wisp',
+        target: 'glitch-wisp',
+      },
+      {
+        id: 'collect-core',
+        type: 'collect_item',
+        label: 'Collect the Wisp Core',
+        target: 'wisp-core',
+      },
     ],
     reward: {
-      xp: 120,
-      items: ['forge-shard'],
-      skillXp: { engineering: 60, worldsmithing: 60 },
-      unlockWorlds: ['grove'],
+      xp: 55,
+      items: ['wisp-core'],
+      skillXp: { engineering: 20 },
     },
   },
   {
@@ -311,12 +521,12 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
   },
   {
     id: 'oracle-riddle',
-    chapter: 'Chapter III — Oracle\'s Riddle',
-    title: "Oracle's Riddle",
-    description: 'Visit the Oracle Temple and accept a Riddle from Athena the Oracle.',
+    chapter: 'Chapter III — Oracle’s Riddle',
+    title: 'Oracle’s Riddle',
+    description: 'Visit the Oracle Temple and accept a riddle from Athena the Oracle.',
     objectives: [
       { id: 'enter-oracle', type: 'enter_world', label: 'Enter the Oracle Temple', target: 'oracle' },
-      { id: 'riddle', type: 'collect_item', label: "Receive Oracle's Riddle", target: 'oracle-riddle' },
+      { id: 'riddle', type: 'collect_item', label: 'Receive Oracle’s Riddle', target: 'oracle-riddle' },
     ],
     reward: {
       xp: 200,
@@ -353,4 +563,8 @@ export function worldById(id: PlaygroundWorldId) {
 
 export function questById(id: string) {
   return PLAYGROUND_QUESTS.find((quest) => quest.id === id)
+}
+
+export function isItemEquippable(itemId: PlaygroundItemId) {
+  return Boolean(itemById(itemId)?.slot)
 }
