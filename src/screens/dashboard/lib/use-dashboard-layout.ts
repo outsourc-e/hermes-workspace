@@ -15,6 +15,8 @@ export type WidgetId =
   | 'top_models'
   | 'provider_mix'
   | 'cache_efficiency'
+  | 'velocity'
+  | 'cost_ledger'
   | 'sessions_intelligence'
   | 'logs_tail'
   | 'skills_usage'
@@ -63,6 +65,22 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     hideable: true,
   },
   {
+    id: 'velocity',
+    label: 'Velocity',
+    description:
+      'Sessions/day average + delta vs prior period + sparkline.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'cost_ledger',
+    label: 'Cost ledger',
+    description:
+      'Per-model cost split between paid providers and subscription/local.',
+    column: 'main',
+    hideable: true,
+  },
+  {
     id: 'sessions_intelligence',
     label: 'Sessions intelligence',
     description: 'Recent sessions with token / tool / status badges.',
@@ -105,11 +123,19 @@ type StoredLayout = {
 }
 
 /**
- * Iteration 006 default state: Logs Tail starts hidden because the
- * marquee + Sessions Intelligence already cover most operator needs.
+ * Iteration 010 defaults:
+ * - Logs Tail still off (triage tool, not a default).
+ * - Provider Mix off (Eric's call: kept Cache only).
+ * - Velocity, Cost Ledger off (live in the menu so the picker
+ *   actually has interesting opt-in widgets).
  * Attention is no longer a widget id at all (it moved into OpsStrip).
  */
-const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = ['logs_tail']
+const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = [
+  'logs_tail',
+  'provider_mix',
+  'velocity',
+  'cost_ledger',
+]
 
 /**
  * Storage schema marker. We bumped from v1 → v2 when iteration 006
@@ -117,7 +143,7 @@ const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = ['logs_tail']
  * so existing localStorage entries with `attention` get migrated
  * cleanly instead of silently re-hiding stale ids.
  */
-const STORAGE_VERSION = 2
+const STORAGE_VERSION = 3
 
 function readLayout(): StoredLayout {
   if (typeof window === 'undefined') {
@@ -130,13 +156,22 @@ function readLayout(): StoredLayout {
       version?: number
     }
     const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
-    // First-time migration: if no version field or it's older than
-    // the current STORAGE_VERSION, drop unknown ids but keep the
-    // user's explicit hides so we don't surprise them.
     const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
     const filtered = incoming.filter((id): id is WidgetId =>
       valid.has(id as WidgetId),
     )
+    // Schema migration: when we introduce new widgets that should be
+    // off-by-default, bump STORAGE_VERSION and union the prior user
+    // hides with the new defaults so existing installs don't suddenly
+    // sprout widgets they never asked for. Returning users keep every
+    // explicit hide they had, plus the newly default-hidden widgets
+    // become hidden until they opt in via the edit menu.
+    const storedVersion = parsed.version ?? 0
+    if (storedVersion < STORAGE_VERSION) {
+      const merged = new Set<WidgetId>(filtered)
+      for (const id of DEFAULT_HIDDEN) merged.add(id)
+      return { hidden: Array.from(merged) }
+    }
     return { hidden: filtered }
   } catch {
     return { hidden: [...DEFAULT_HIDDEN] }

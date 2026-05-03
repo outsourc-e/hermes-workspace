@@ -21,6 +21,8 @@ import { ActiveModelKpi } from './components/active-model-kpi'
 import { AttentionMarquee } from './components/attention-marquee'
 import { CacheEfficiencyCard } from './components/cache-efficiency-card'
 import { ProviderMixCard } from './components/provider-mix-card'
+import { VelocityCard } from './components/velocity-card'
+import { CostLedgerCard } from './components/cost-ledger-card'
 import { WidgetShell } from './components/widget-shell'
 import { EditModePanel } from './components/edit-mode-panel'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
@@ -871,27 +873,54 @@ export function DashboardScreen() {
         </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
-      {/* ── Header: Title + inline Quick Actions (no centered hero) ── */}
+      {/* ── Header: brand lockup left, action cluster right.
+           Iteration 010: dropped redundant "Dashboard" eyebrow (the
+           page IS the dashboard); promoted "Hermes Workspace" to
+           the primary heading at a larger weight. Logo bumped from
+           36px → 44px and gets a soft accent glow + ring so the
+           lockup commands the left side instead of feeling like
+           filler before the action cluster. Kept anchored left
+           (not centered) on purpose: ops dashboards put brand left
+           + actions right because that's the spatial hierarchy
+           operators expect (Linear, Vercel, Datadog all do this). */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
-          <img
-            src="/claude-avatar.webp"
-            alt="Hermes Agent"
-            className="size-9 rounded-md border border-[var(--theme-border)]"
-            style={{ padding: '2px', background: 'var(--theme-card)' }}
-          />
-          <div className="flex flex-col">
+          <span
+            className="relative inline-flex shrink-0 items-center justify-center rounded-xl border"
+            style={{
+              width: 44,
+              height: 44,
+              borderColor:
+                'color-mix(in srgb, var(--theme-accent) 35%, var(--theme-border))',
+              background:
+                'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 14%, var(--theme-card)), var(--theme-card))',
+              boxShadow:
+                '0 0 0 4px color-mix(in srgb, var(--theme-accent) 6%, transparent)',
+            }}
+          >
+            <img
+              src="/claude-avatar.webp"
+              alt="Hermes Workspace logo"
+              className="size-8 rounded-md"
+              style={{ background: 'transparent' }}
+            />
+          </span>
+          <div className="flex flex-col leading-none">
             <h1
-              className="text-base font-semibold tracking-tight"
-              style={{ color: 'var(--theme-text)' }}
-            >
-              Dashboard
-            </h1>
-            <span
-              className="font-mono text-[10px] uppercase tracking-[0.15em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-2xl font-bold tracking-tight"
+              style={{
+                color: 'var(--theme-text)',
+                letterSpacing: '-0.015em',
+              }}
             >
               Hermes Workspace
+            </h1>
+            <span
+              className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em]"
+              style={{ color: 'var(--theme-muted)' }}
+            >
+              Operator console
+              {overview?.status?.version ? ` · v${overview.status.version}` : ''}
             </span>
           </div>
         </div>
@@ -1046,7 +1075,9 @@ export function DashboardScreen() {
         ) : null}
         {layout.isVisible('top_models') ||
         layout.isVisible('provider_mix') ||
-        layout.isVisible('cache_efficiency') ? (
+        layout.isVisible('cache_efficiency') ||
+        layout.isVisible('velocity') ||
+        layout.isVisible('cost_ledger') ? (
           <div
             className={
               layout.isVisible('analytics_chart')
@@ -1059,14 +1090,26 @@ export function DashboardScreen() {
                 <TopModelsCard analytics={overview?.analytics ?? null} />
               </WidgetShell>
             ) : null}
+            {layout.isVisible('cache_efficiency') ? (
+              <WidgetShell id="cache_efficiency" layout={layout}>
+                <CacheEfficiencyCard
+                  analytics={overview?.analytics ?? null}
+                />
+              </WidgetShell>
+            ) : null}
             {layout.isVisible('provider_mix') ? (
               <WidgetShell id="provider_mix" layout={layout}>
                 <ProviderMixCard analytics={overview?.analytics ?? null} />
               </WidgetShell>
             ) : null}
-            {layout.isVisible('cache_efficiency') ? (
-              <WidgetShell id="cache_efficiency" layout={layout}>
-                <CacheEfficiencyCard
+            {layout.isVisible('velocity') ? (
+              <WidgetShell id="velocity" layout={layout}>
+                <VelocityCard analytics={overview?.analytics ?? null} />
+              </WidgetShell>
+            ) : null}
+            {layout.isVisible('cost_ledger') ? (
+              <WidgetShell id="cost_ledger" layout={layout}>
+                <CostLedgerCard
                   analytics={overview?.analytics ?? null}
                 />
               </WidgetShell>
