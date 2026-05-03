@@ -52,7 +52,7 @@ type ProviderUsage = {
   status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
   message?: string
   plan?: string
-  lines: Array<UsageLine>
+  lines: UsageLine[]
   updatedAt: number
 }
 
@@ -321,7 +321,7 @@ export function UsageDetailsModal({
         <div>
           <DialogTitle>Usage Overview</DialogTitle>
           <DialogDescription>
-            Live usage from your Hermes session and connected providers.
+            Live usage from your gateway session and connected providers.
           </DialogDescription>
         </div>
         <DialogClose className="text-primary-700">Close</DialogClose>
@@ -387,8 +387,7 @@ export function UsageDetailsModal({
               <div className="grid gap-2">
                 {usage.models.length === 0 ? (
                   <div className="text-sm text-primary-500">
-                    No model usage reported yet. Send a message to start
-                    tracking usage here.
+                    No model usage reported yet. Send a message to start tracking usage here.
                   </div>
                 ) : (
                   usage.models.map((model) => (
@@ -419,8 +418,7 @@ export function UsageDetailsModal({
               <div className="grid gap-2">
                 {usage.sessions.length === 0 ? (
                   <div className="text-sm text-primary-500">
-                    No sessions reported yet. Start a chat to see session
-                    history here.
+                    No sessions reported yet. Start a chat to see session history here.
                   </div>
                 ) : (
                   usage.sessions.map((session) => (
@@ -489,12 +487,10 @@ export function UsageDetailsModal({
               {providerUsage.length === 0 ? (
                 <div className="rounded-2xl border border-primary-200 bg-white/70 p-6 text-center">
                   <div className="text-sm font-medium text-primary-700">
-                    No providers connected. Add a provider in Settings to start
-                    chatting.
+                    No providers connected. Add a provider in Settings to start chatting.
                   </div>
                   <div className="mt-1 text-xs text-primary-500">
-                    Open Settings -{'>'} Providers to connect Hermes CLI or add
-                    an API key.
+                    Open Settings -{'>'} Providers to connect Claude CLI or add an API key.
                   </div>
                 </div>
               ) : (

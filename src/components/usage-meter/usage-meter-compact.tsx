@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const POLL_INTERVAL_MS = 30_000
-const PREFERRED_PROVIDER_KEY = 'claude-preferred-provider'
+const PREFERRED_PROVIDER_KEY = 'clawsuite-preferred-provider'
 
 type UsageLine = {
   type: 'progress' | 'text' | 'badge'
@@ -70,10 +70,7 @@ function readPercent(value: unknown): number {
 }
 
 function parseContextPercent(payload: unknown): number {
-  const root =
-    payload && typeof payload === 'object'
-      ? (payload as Record<string, unknown>)
-      : {}
+  const root = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
   const usage =
     (root.today as Record<string, unknown> | undefined) ??
     (root.usage as Record<string, unknown> | undefined) ??
@@ -81,9 +78,9 @@ function parseContextPercent(payload: unknown): number {
     (root.totals as Record<string, unknown> | undefined) ??
     root
   return readPercent(
-    usage?.contextPercent ??
-      usage?.context_percent ??
-      usage?.context ??
+    (usage as Record<string, unknown>)?.contextPercent ??
+      (usage as Record<string, unknown>)?.context_percent ??
+      (usage as Record<string, unknown>)?.context ??
       root?.contextPercent ??
       root?.context_percent,
   )
@@ -126,14 +123,10 @@ type UsageRow = {
 
 export function UsageMeterCompact() {
   const [contextPct, setContextPct] = useState<number | null>(null)
-  const [progressRows, setProgressRows] = useState<Array<UsageRow>>([])
+  const [progressRows, setProgressRows] = useState<UsageRow[]>([])
   const [providerLabel, setProviderLabel] = useState<string | null>(null)
-  const [preferredProvider, setPreferredProvider] = useState<string | null>(
-    getStoredPreferredProvider,
-  )
-  const [allProviders, setAllProviders] = useState<Array<ProviderUsageEntry>>(
-    [],
-  )
+  const [preferredProvider, setPreferredProvider] = useState<string | null>(getStoredPreferredProvider)
+  const [allProviders, setAllProviders] = useState<ProviderUsageEntry[]>([])
   const [expanded, setExpanded] = useState(true)
   // Flash state: animate provider name on change
   const [providerFlash, setProviderFlash] = useState(false)
@@ -142,17 +135,14 @@ export function UsageMeterCompact() {
   // ── Derived primary provider ─────────────────────────────────────────────
 
   const getPrimary = useCallback(
-    (providers: Array<ProviderUsageEntry>, preferred: string | null) => {
+    (providers: ProviderUsageEntry[], preferred: string | null) => {
       if (preferred) {
         const match = providers.find(
-          (p) =>
-            p.provider === preferred && p.status === 'ok' && p.lines.length > 0,
+          (p) => p.provider === preferred && p.status === 'ok' && p.lines.length > 0,
         )
         if (match) return match
       }
-      return (
-        providers.find((p) => p.status === 'ok' && p.lines.length > 0) ?? null
-      )
+      return providers.find((p) => p.status === 'ok' && p.lines.length > 0) ?? null
     },
     [],
   )
@@ -160,13 +150,9 @@ export function UsageMeterCompact() {
   // ── Cycle to next provider ───────────────────────────────────────────────
 
   const cycleProvider = useCallback(() => {
-    const okProviders = allProviders.filter(
-      (p) => p.status === 'ok' && p.lines.length > 0,
-    )
+    const okProviders = allProviders.filter((p) => p.status === 'ok' && p.lines.length > 0)
     if (okProviders.length < 2) return
-    const currentIdx = okProviders.findIndex(
-      (p) => p.provider === preferredProvider,
-    )
+    const currentIdx = okProviders.findIndex((p) => p.provider === preferredProvider)
     const nextIdx = (currentIdx + 1) % okProviders.length
     const next = okProviders[nextIdx]
     if (!next) return
@@ -182,11 +168,11 @@ export function UsageMeterCompact() {
   // ── Update display rows when provider changes ────────────────────────────
 
   const updateDisplayFromProviders = useCallback(
-    (providers: Array<ProviderUsageEntry>, preferred: string | null) => {
+    (providers: ProviderUsageEntry[], preferred: string | null) => {
       const primary = getPrimary(providers, preferred)
       if (!primary) return
 
-      const rows: Array<UsageRow> = primary.lines
+      const rows: UsageRow[] = primary.lines
         .filter((l) => l.type === 'progress' && l.used !== undefined)
         .slice(0, 2)
         .map((l) => ({
@@ -257,12 +243,9 @@ export function UsageMeterCompact() {
 
   useEffect(() => {
     void fetchProvider(preferredProvider)
-    const id = window.setInterval(
-      () => fetchProvider(preferredProvider),
-      POLL_INTERVAL_MS,
-    )
+    const id = window.setInterval(() => fetchProvider(preferredProvider), POLL_INTERVAL_MS)
     return () => window.clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchProvider])
 
   // Cleanup flash timer on unmount
@@ -278,13 +261,13 @@ export function UsageMeterCompact() {
 
   // Build the rows to display: session context row + all provider progress rows
   const ctxRow: UsageRow = { label: 'Ctx', pct: contextPct, resetHint: null }
-  const allRows: Array<UsageRow> =
-    progressRows.length > 0 ? progressRows : [ctxRow]
+  const allRows: UsageRow[] =
+    progressRows.length > 0
+      ? progressRows
+      : [ctxRow]
 
   const headerLabel = providerLabel ? `Usage · ${providerLabel}` : 'Usage'
-  const canCycle =
-    allProviders.filter((p) => p.status === 'ok' && p.lines.length > 0).length >
-    1
+  const canCycle = allProviders.filter((p) => p.status === 'ok' && p.lines.length > 0).length > 1
 
   return (
     <div className="space-y-0 px-1">
@@ -305,7 +288,9 @@ export function UsageMeterCompact() {
           aria-label={canCycle ? 'Cycle provider' : undefined}
         >
           <span>{headerLabel}</span>
-          {canCycle && <span className="text-[8px] opacity-60">↻</span>}
+          {canCycle && (
+            <span className="text-[8px] opacity-60">↻</span>
+          )}
         </button>
 
         {/* Collapse chevron */}
@@ -337,10 +322,7 @@ export function UsageMeterCompact() {
               </div>
               <div className="h-1 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700">
                 <div
-                  className={cn(
-                    'h-full rounded-full transition-all',
-                    barColor(row.pct),
-                  )}
+                  className={cn('h-full rounded-full transition-all', barColor(row.pct))}
                   style={{ width: `${row.pct}%` }}
                 />
               </div>
