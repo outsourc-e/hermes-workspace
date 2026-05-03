@@ -26,12 +26,31 @@ pnpm dev
 # open http://localhost:3001/playground in two browser tabs
 ```
 
-For real cross-device multiplayer:
+For real cross-device multiplayer (no setup, hosted hub):
+
+```bash
+# Just run pnpm dev. The .env already wires VITE_PLAYGROUND_WS_URL to a
+# Cloudflare Worker + Durable Object hub at:
+#   wss://hermes-playground-ws.myaurora-agi.workers.dev/playground
+# Open /playground in two devices on different networks — they'll meet there.
+pnpm dev
+```
+
+Want your own hub?
+
+```bash
+cd playground-ws-worker
+pnpm install
+pnpm wrangler login
+pnpm deploy   # → wss://hermes-playground-ws.<your-subdomain>.workers.dev
+# Then set VITE_PLAYGROUND_WS_URL + VITE_PLAYGROUND_STATS_URL in .env.production.
+```
+
+Local sidecar (no cloud):
 
 ```bash
 # terminal A
 pnpm playground:ws            # ws://localhost:8787
-
 # terminal B
 VITE_PLAYGROUND_WS_URL=ws://localhost:8787 pnpm dev
 ```
@@ -56,7 +75,8 @@ VITE_PLAYGROUND_WS_URL=ws://localhost:8787 pnpm dev
 | **Skills** | Promptcraft, Worldsmithing, Summoning, Engineering, Oracle, Diplomacy |
 | **Items** | 10+ collectible quest artifacts |
 | **Quests** | Multi-chapter campaign through every world |
-| **Multiplayer** | Same-tab via BroadcastChannel + cross-device via WebSocket sidecar |
+| **Multiplayer** | BroadcastChannel (same-machine) + WebSocket (any-device) via Cloudflare Worker + Durable Object hub. World-scoped fan-out, server-pushed live counts, 5 Hz presence with skip-when-still, token-bucket rate limit. |
+| **LLM dialog** | Free-form chat with each NPC — type into the dialog box, gets persona-wrapped LLM reply via `/api/playground-npc`. Falls back gracefully if the gateway is offline. |
 
 ## Controls
 
