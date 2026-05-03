@@ -4,6 +4,7 @@ import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import * as THREE from 'three'
 import { PlaygroundHud } from './components/playground-hud'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
+import { PlaygroundDialog } from './components/playground-dialog'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import {
   PLAYGROUND_WORLDS,
@@ -598,6 +599,7 @@ export function PlaygroundScreen() {
   const [quest, setQuest] = useState<QuestState>('start')
   const [input, setInput] = useState('')
   const [companionLine, setCompanionLine] = useState('Welcome to Hermes Playground. I am Athena, your agent companion. Ask me to generate a world.')
+  const [dialogNpc, setDialogNpc] = useState<string | null>(null)
   const rpg = usePlaygroundRpg()
   const meta = WORLD_META[world]
 
@@ -678,7 +680,9 @@ export function PlaygroundScreen() {
             const q = rpg.activeQuest
             if (q && q.id === questId) rpg.completeQuest(q)
           }}
+          onNpcNear={(id) => setDialogNpc(id)}
         />
+        <PlaygroundDialog npcId={dialogNpc} onClose={() => setDialogNpc(null)} />
         <PlaygroundHud
           state={rpg.state}
           activeQuestTitle={rpg.activeQuest.title}

@@ -315,31 +315,51 @@ function WorldDecor({ world }: { world: WorldDef }) {
   }
 }
 
-/* ── NPC billboard ── */
+/* ── NPC billboard with proximity sensing ── */
 function NPC({
   position,
   avatar,
   name,
   color = '#a78bfa',
   drift = true,
+  npcId,
+  playerRef,
+  onNear,
 }: {
   position: [number, number, number]
   avatar: string
   name: string
   color?: string
   drift?: boolean
+  npcId?: string
+  playerRef?: React.MutableRefObject<THREE.Vector3>
+  onNear?: (id: string) => void
 }) {
   const ref = useRef<THREE.Group>(null)
   const base = useMemo(() => new THREE.Vector3(...position), [position])
   const phase = useMemo(() => Math.random() * Math.PI * 2, [])
   const texture = useTexture(`/avatars/${avatar}.png`)
 
+  const lastNear = useRef(false)
   useFrame(({ clock }) => {
     if (!ref.current) return
     if (drift) {
       const t = clock.getElapsedTime() + phase
       ref.current.position.x = base.x + Math.sin(t * 0.4) * 1.2
       ref.current.position.z = base.z + Math.cos(t * 0.3) * 1.2
+    }
+    if (npcId && playerRef && onNear) {
+      const dist = Math.hypot(
+        playerRef.current.x - ref.current.position.x,
+        playerRef.current.z - ref.current.position.z,
+      )
+      const near = dist < 2.4
+      if (near && !lastNear.current) {
+        lastNear.current = true
+        onNear(npcId)
+      } else if (!near && lastNear.current) {
+        lastNear.current = false
+      }
     }
   })
 
@@ -731,10 +751,12 @@ function Scene({
   worldId,
   onPortal,
   onQuestZone,
+  onNpcNear,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
   onQuestZone: (id: string) => void
+  onNpcNear: (npcId: string) => void
 }) {
   const world = WORLDS_3D[worldId]
   const playerPos = useRef(new THREE.Vector3(0, 0, 6))
@@ -753,37 +775,37 @@ function Scene({
       {/* NPCs per world */}
       {worldId === 'agora' && (
         <>
-          <NPC position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" color={NPC_COLORS.athena} />
-          <NPC position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" color={NPC_COLORS.apollo} />
-          <NPC position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" color={NPC_COLORS.iris} />
-          <NPC position={[6, 0, -4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} />
+          <NPC npcId="athena" position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" color={NPC_COLORS.athena} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="apollo" position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" color={NPC_COLORS.apollo} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="iris" position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" color={NPC_COLORS.iris} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="nike" position={[6, 0, -4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} playerRef={playerPos} onNear={onNpcNear} />
         </>
       )}
       {worldId === 'forge' && (
         <>
-          <NPC position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" color={NPC_COLORS.pan} />
-          <NPC position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" color={NPC_COLORS.chronos} />
+          <NPC npcId="pan" position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" color={NPC_COLORS.pan} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="chronos" position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" color={NPC_COLORS.chronos} playerRef={playerPos} onNear={onNpcNear} />
         </>
       )}
       {worldId === 'grove' && (
         <>
-          <NPC position={[-4, 0, 1]} avatar="pan" name="Pan · Druid" color={NPC_COLORS.pan} />
-          <NPC position={[4, 0, 0]} avatar="apollo" name="Apollo · Songkeeper" color={NPC_COLORS.apollo} />
-          <NPC position={[0, 0, -5]} avatar="artemis" name="Artemis · Tracker" color={NPC_COLORS.artemis} />
+          <NPC npcId="pan" position={[-4, 0, 1]} avatar="pan" name="Pan · Druid" color={NPC_COLORS.pan} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="apollo" position={[4, 0, 0]} avatar="apollo" name="Apollo · Songkeeper" color={NPC_COLORS.apollo} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="artemis" position={[0, 0, -5]} avatar="artemis" name="Artemis · Tracker" color={NPC_COLORS.artemis} playerRef={playerPos} onNear={onNpcNear} />
         </>
       )}
       {worldId === 'oracle' && (
         <>
-          <NPC position={[-3, 0, -2]} avatar="athena" name="Athena · Oracle" color={NPC_COLORS.athena} />
-          <NPC position={[3, 0, -2]} avatar="chronos" name="Chronos · Archivist" color={NPC_COLORS.chronos} />
-          <NPC position={[0, 0, 4]} avatar="eros" name="Eros · Whisperer" color={NPC_COLORS.eros} />
+          <NPC npcId="athena" position={[-3, 0, -2]} avatar="athena" name="Athena · Oracle" color={NPC_COLORS.athena} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="chronos" position={[3, 0, -2]} avatar="chronos" name="Chronos · Archivist" color={NPC_COLORS.chronos} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="eros" position={[0, 0, 4]} avatar="eros" name="Eros · Whisperer" color={NPC_COLORS.eros} playerRef={playerPos} onNear={onNpcNear} />
         </>
       )}
       {worldId === 'arena' && (
         <>
-          <NPC position={[-3, 0, 4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} />
-          <NPC position={[3, 0, 4]} avatar="hermes" name="Hermes · Referee" color={NPC_COLORS.hermes} />
-          <NPC position={[0, 0, -5]} avatar="chronos" name="Chronos · Bookmaker" color={NPC_COLORS.chronos} />
+          <NPC npcId="nike" position={[-3, 0, 4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="hermes" position={[3, 0, 4]} avatar="hermes" name="Hermes · Referee" color={NPC_COLORS.hermes} playerRef={playerPos} onNear={onNpcNear} />
+          <NPC npcId="chronos" position={[0, 0, -5]} avatar="chronos" name="Chronos · Bookmaker" color={NPC_COLORS.chronos} playerRef={playerPos} onNear={onNpcNear} />
         </>
       )}
 
@@ -825,10 +847,12 @@ export function PlaygroundWorld3D({
   worldId,
   onPortal,
   onQuestZone,
+  onNpcNear,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
   onQuestZone: (id: string) => void
+  onNpcNear: (npcId: string) => void
 }) {
   return (
     <div
@@ -848,7 +872,7 @@ export function PlaygroundWorld3D({
         gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
       >
         <Suspense fallback={null}>
-          <Scene worldId={worldId} onPortal={onPortal} onQuestZone={onQuestZone} />
+          <Scene worldId={worldId} onPortal={onPortal} onQuestZone={onQuestZone} onNpcNear={onNpcNear} />
         </Suspense>
       </Canvas>
     </div>
