@@ -606,6 +606,7 @@ export function PlaygroundScreen() {
   const [journalOpen, setJournalOpen] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [transitioning, setTransitioning] = useState(false)
   const [botBubbles, setBotBubbles] = useState<Record<string, string>>({})
   const rpg = usePlaygroundRpg()
 
@@ -732,7 +733,6 @@ export function PlaygroundScreen() {
             const order: PlaygroundWorldId[] = ['agora', 'forge', 'grove', 'oracle', 'arena']
             const unlocked = order.filter((w) => rpg.state.unlockedWorlds.includes(w))
             const currentIndex = unlocked.indexOf(world)
-            // Cycle to next unlocked world, or unlock+enter Forge if only Agora is unlocked
             let next: PlaygroundWorldId
             if (unlocked.length <= 1) {
               rpg.unlockWorld('forge')
@@ -740,12 +740,15 @@ export function PlaygroundScreen() {
             } else {
               next = unlocked[(currentIndex + 1) % unlocked.length]
             }
-            setWorld(next)
-            // Auto-complete enter-* quests on entry
-            const enterQuestId = `enter-${next}`
-            if (rpg.activeQuest && (rpg.activeQuest.id === enterQuestId || rpg.activeQuest.id === 'enter-forge' && next === 'forge')) {
-              rpg.completeQuest(rpg.activeQuest)
-            }
+            setTransitioning(true)
+            window.setTimeout(() => {
+              setWorld(next)
+              const enterQuestId = `enter-${next}`
+              if (rpg.activeQuest && (rpg.activeQuest.id === enterQuestId || (rpg.activeQuest.id === 'enter-forge' && next === 'forge'))) {
+                rpg.completeQuest(rpg.activeQuest)
+              }
+              window.setTimeout(() => setTransitioning(false), 350)
+            }, 350)
           }}
           onQuestZone={(questId) => {
             const q = rpg.activeQuest
@@ -762,6 +765,14 @@ export function PlaygroundScreen() {
           onSend={sendChat}
           collapsed={chatCollapsed}
           onToggle={() => setChatCollapsed((c) => !c)}
+        />
+        {/* Cinematic world transition fade */}
+        <div
+          className="pointer-events-none fixed inset-0 z-[95] transition-opacity duration-300"
+          style={{
+            background: 'radial-gradient(circle at center, transparent 20%, #000 80%)',
+            opacity: transitioning ? 1 : 0,
+          }}
         />
         <PlaygroundHud
           state={rpg.state}
