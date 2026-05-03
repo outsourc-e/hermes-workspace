@@ -287,7 +287,7 @@ class PlaygroundErrorBoundary extends Component<
   }
 }
 
-function PlaygroundFallback() {
+function PlaygroundFallback({ onLaunch3D, webglFailed = false }: { onLaunch3D?: () => void; webglFailed?: boolean }) {
   return (
     <div
       className="flex h-full min-h-[520px] items-center justify-center p-6"
@@ -319,8 +319,9 @@ function PlaygroundFallback() {
             <span className="rounded bg-cyan-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">hackathon</span>
           </div>
           <p className="text-sm opacity-75">
-            The 3D renderer failed to create a WebGL context in this browser, so this fallback keeps the demo alive.
-            Agora still works, and the 3D scene will load once WebGL/GPU acceleration is available.
+            {webglFailed
+              ? 'The 3D renderer could not create a WebGL context in this browser, so this fallback keeps the demo alive. Agora still works, and the 3D scene can load once WebGL/GPU acceleration is available.'
+              : 'Hackathon demo shell is live. Launch the 3D world when WebGL is available, or use Agora Lite as the reliable 2D multiplayer fallback.'}
           </p>
           <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
             <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ AI agent RPG concept</div>
@@ -328,9 +329,21 @@ function PlaygroundFallback() {
             <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Missions + generated worlds</div>
             <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Agora fallback ready</div>
           </div>
-          <a href="/agora" className="mt-5 inline-flex rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--theme-accent)', color: 'var(--theme-bg)' }}>
-            Open Agora Lite
-          </a>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {onLaunch3D && (
+              <button
+                type="button"
+                onClick={onLaunch3D}
+                className="inline-flex rounded-xl px-4 py-2 text-sm font-semibold"
+                style={{ background: 'var(--theme-accent)', color: 'var(--theme-bg)' }}
+              >
+                Launch 3D World
+              </button>
+            )}
+            <a href="/agora" className="inline-flex rounded-xl border px-4 py-2 text-sm font-semibold" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
+              Open Agora Lite
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -352,7 +365,8 @@ function detectWebGL(): boolean {
 }
 
 export function PlaygroundScreen() {
-  const [webglStatus, setWebglStatus] = useState<'checking' | 'supported' | 'unsupported'>('checking')
+  const [webglStatus, setWebglStatus] = useState<'idle' | 'supported' | 'unsupported'>('idle')
+  const [launch3D, setLaunch3D] = useState(false)
   const [world, setWorld] = useState<PlaygroundWorld>('agora')
   const [quest, setQuest] = useState<QuestState>('start')
   const [input, setInput] = useState('')
@@ -381,11 +395,16 @@ export function PlaygroundScreen() {
   }
 
   useEffect(() => {
+    if (!launch3D) return
     setWebglStatus(detectWebGL() ? 'supported' : 'unsupported')
-  }, [])
+  }, [launch3D])
+
+  if (!launch3D) {
+    return <PlaygroundFallback onLaunch3D={() => setLaunch3D(true)} />
+  }
 
   if (webglStatus !== 'supported') {
-    return <PlaygroundFallback />
+    return <PlaygroundFallback onLaunch3D={() => setLaunch3D(true)} webglFailed />
   }
 
   return (
