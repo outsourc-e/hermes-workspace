@@ -56,7 +56,7 @@ type AgentViewState = {
   setHistoryOpen: (isOpen: boolean) => void
 }
 
-const PANEL_WIDTH_PX = 320
+const PANEL_WIDTH_PX = 288
 const MIN_DESKTOP_WIDTH = 1024
 const REFRESH_INTERVAL_MS = 5000
 
