@@ -603,6 +603,7 @@ export function PlaygroundScreen() {
   const [input, setInput] = useState('')
   const [companionLine, setCompanionLine] = useState('Welcome to Hermes Playground. I am Athena, your agent companion. Ask me to generate a world.')
   const [dialogNpc, setDialogNpc] = useState<string | null>(null)
+  const [nearbyNpc, setNearbyNpc] = useState<string | null>(null)
   const [journalOpen, setJournalOpen] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -659,12 +660,13 @@ export function PlaygroundScreen() {
     )
   }
 
-  // J key toggles journal
+  // J = journal, E = talk to nearby NPC, Esc = close anything
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       if (e.key.toLowerCase() === 'j') setJournalOpen((j) => !j)
+      if (e.key.toLowerCase() === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
       if (e.key === 'Escape') {
         setJournalOpen(false)
         setDialogNpc(null)
@@ -672,7 +674,7 @@ export function PlaygroundScreen() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [nearbyNpc, dialogNpc])
   const meta = WORLD_META[world]
 
   function askAthena(text: string) {
@@ -754,10 +756,17 @@ export function PlaygroundScreen() {
             const q = rpg.activeQuest
             if (q && q.id === questId) rpg.completeQuest(q)
           }}
-          onNpcNear={(id) => setDialogNpc(id)}
+          onNpcNearChange={(id) => setNearbyNpc(id)}
           botBubbles={botBubbles}
         />
-        <PlaygroundDialog npcId={dialogNpc} onClose={() => setDialogNpc(null)} />
+        <PlaygroundDialog
+          npcId={dialogNpc}
+          activeQuest={rpg.activeQuest}
+          onClose={() => setDialogNpc(null)}
+          onCompleteQuest={(qid) => rpg.completeQuestById(qid)}
+          onGrantItems={(items) => rpg.grantItems(items)}
+          onGrantSkillXp={(skills) => rpg.grantSkillXp(skills)}
+        />
         <PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} />
         <PlaygroundChat
           worldId={world}
@@ -787,7 +796,7 @@ export function PlaygroundScreen() {
           lastReward={rpg.lastReward}
         />
         <div className="pointer-events-none absolute left-1/2 top-3 z-[60] -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-[11px] uppercase tracking-[0.18em] text-white/70 backdrop-blur-xl">
-          {WORLD_META[world].name} · WASD/arrows · Space jump · portal teleports
+          {WORLD_META[world].name} · WASD walk · Shift sprint · E talk · J journal
         </div>
       </div>
     </PlaygroundErrorBoundary>

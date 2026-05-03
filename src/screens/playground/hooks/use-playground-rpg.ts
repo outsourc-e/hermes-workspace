@@ -9,6 +9,8 @@ import {
   type PlaygroundWorldId,
 } from '../lib/playground-rpg'
 
+export type PlaygroundRpg = ReturnType<typeof usePlaygroundRpg>
+
 const STORAGE_KEY = 'hermes-playground-rpg-state'
 
 export type PlaygroundRpgState = {
@@ -138,6 +140,38 @@ export function usePlaygroundRpg() {
     }))
   }, [])
 
+  const grantItems = useCallback((items: PlaygroundItemId[]) => {
+    if (!items?.length) return
+    setState((prev) => ({
+      ...prev,
+      inventory: Array.from(new Set([...prev.inventory, ...items])),
+    }))
+    setLastReward(`Items added: ${items.length}`)
+    window.setTimeout(() => setLastReward(null), 4000)
+  }, [])
+
+  const grantSkillXp = useCallback(
+    (skillXp: Partial<Record<PlaygroundSkillId, number>>) => {
+      setState((prev) => {
+        const next = { ...prev.skillXp }
+        for (const [skill, amount] of Object.entries(skillXp)) {
+          next[skill as PlaygroundSkillId] =
+            (next[skill as PlaygroundSkillId] ?? 0) + (amount ?? 0)
+        }
+        return { ...prev, skillXp: next }
+      })
+    },
+    [],
+  )
+
+  const completeQuestById = useCallback(
+    (questId: string) => {
+      const quest = PLAYGROUND_QUESTS.find((q) => q.id === questId)
+      if (quest) completeQuest(quest)
+    },
+    [completeQuest],
+  )
+
   const resetRpg = useCallback(() => {
     setState(defaultState())
     setLastReward(null)
@@ -150,7 +184,10 @@ export function usePlaygroundRpg() {
     worlds: PLAYGROUND_WORLDS,
     skills: PLAYGROUND_SKILLS,
     completeQuest,
+    completeQuestById,
     unlockWorld,
+    grantItems,
+    grantSkillXp,
     resetRpg,
     lastReward,
   }
