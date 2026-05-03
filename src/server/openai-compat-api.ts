@@ -1,7 +1,21 @@
 import { CLAUDE_API } from './gateway-capabilities'
 
-/** Optional bearer token for authenticated OpenAI-compatible endpoints (e.g. Codex OAuth). */
-const BEARER_TOKEN = process.env.CLAUDE_API_TOKEN || ''
+/**
+ * Optional bearer token for authenticated OpenAI-compatible endpoints
+ * (e.g. Codex OAuth, Hermes Agent gateway with API_SERVER_KEY set).
+ *
+ * Read at call time, not module-load time: under vite-node SSR the
+ * top-level `process.env` snapshot can be empty when this module is
+ * first evaluated, freezing a `const` to '' even though the env is
+ * populated by the time requests actually run. Reading inside the
+ * function avoids that.
+ *
+ * Honors `HERMES_API_TOKEN` first (current name) and falls back to
+ * `CLAUDE_API_TOKEN` for back-compat with pre-rename setups.
+ */
+function getBearerToken(): string {
+  return process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
+}
 
 /** Cached first available model from /v1/models — used as fallback when no model is specified. */
 let _cachedDefaultModel: string | null = null
@@ -14,7 +28,8 @@ async function getDefaultModel(): Promise<string> {
   }
   try {
     const headers: Record<string, string> = {}
-    if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
+    const bearer = getBearerToken()
+    if (bearer) headers['Authorization'] = `Bearer ${bearer}`
     const res = await fetch(`${CLAUDE_API}/v1/models`, {
       headers,
       signal: AbortSignal.timeout(3_000),
@@ -241,12 +256,13 @@ export async function openaiChat(
   options: OpenAIChatOptions = {},
 ): Promise<string | AsyncGenerator<StreamChunkType, void, void>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (BEARER_TOKEN) {
-    headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
+  const bearer = getBearerToken()
+  if (bearer) {
+    headers['Authorization'] = `Bearer ${bearer}`
   }
   // Only send session header when authenticated — gateways without
   // API_SERVER_KEY reject this header with an auth error.
-  if (options.sessionId && BEARER_TOKEN) {
+  if (options.sessionId && bearer) {
     headers['X-Claude-Session-Id'] = options.sessionId
   }
 
