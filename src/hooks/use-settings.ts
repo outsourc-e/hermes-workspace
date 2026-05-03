@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { getTheme, setTheme } from '@/lib/theme'
@@ -72,6 +73,10 @@ export const useSettingsStore = create<SettingsState>()(
 )
 
 export function useSettings() {
+  useEffect(() => {
+    void useSettingsStore.persist.rehydrate()
+  }, [])
+
   const settings = useSettingsStore(function selectSettings(state) {
     return state.settings
   })
