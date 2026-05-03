@@ -137,9 +137,8 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
           animation: status.color === '#34d399' ? 'pulse-online 2s ease-in-out infinite' : undefined,
         }}
       />
-      <span>
-        {n} agent{n === 1 ? '' : 's'} online
-      </span>
+      <span>Players online</span>
+      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/80">{n}</span>
       {stats?.peakToday && stats.peakToday > 0 && (
         <span className="text-white/45">· peak {stats.peakToday}</span>
       )}

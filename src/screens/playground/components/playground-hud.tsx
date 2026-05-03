@@ -74,7 +74,7 @@ export function PlaygroundHud({
         </div>
       </div>
 
-      <div className="pointer-events-none fixed left-1/2 top-[86px] z-[80] flex w-[min(92vw,440px)] -translate-x-1/2 flex-col gap-2">
+      <div className="pointer-events-none fixed left-1/2 top-[96px] z-[80] flex max-h-[36vh] w-[min(92vw,440px)] -translate-x-1/2 flex-col gap-2 overflow-visible">
         {toasts.map((toast) => (
           <div
             key={toast.id}

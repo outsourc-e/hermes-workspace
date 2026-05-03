@@ -112,6 +112,7 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
         const cdRemaining = Math.max(0, cdEnd - now)
         const cdPct = cdRemaining > 0 ? (cdRemaining / action.cooldownMs) * 100 : 0
         const noMp = mp < action.cost
+        const castable = cdRemaining === 0 && !noMp
         return (
           <div
             key={action.id}
@@ -124,9 +125,9 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
               disabled={cdRemaining > 0 || noMp}
               className="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-transform hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
               style={{
-                borderColor: cdRemaining > 0 ? '#1f2937' : action.color,
-                background: 'rgba(0,0,0,0.45)',
-                boxShadow: cdRemaining > 0 ? 'none' : `0 0 12px ${action.color}55`,
+                borderColor: castable ? action.color : '#1f2937',
+                background: castable ? `${action.color}18` : 'rgba(0,0,0,0.45)',
+                boxShadow: castable ? `0 0 12px ${action.color}55` : 'none',
               }}
             >
               <span className="text-xl">{action.icon}</span>
@@ -143,7 +144,16 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
                   {Math.ceil(cdRemaining / 1000)}s
                 </div>
               )}
-              <span className="absolute bottom-0 left-1 text-[9px] font-bold opacity-70">{action.key}</span>
+              <span
+                className="absolute bottom-0 left-1 rounded px-1 text-[9px] font-black"
+                style={{
+                  color: castable ? '#fff' : 'rgba(255,255,255,0.45)',
+                  background: castable ? action.color : 'rgba(255,255,255,0.08)',
+                  boxShadow: castable ? `0 0 10px ${action.color}66` : 'none',
+                }}
+              >
+                {action.key}
+              </span>
               {action.cost > 0 && (
                 <span className="absolute right-1 top-0.5 text-[8px] font-bold text-blue-300">{action.cost}</span>
               )}

@@ -842,6 +842,7 @@ function PlayerAndCamera({
   displayName = 'You',
   gearAccent,
   gearCape,
+  gearArtifact,
   gearWeapon,
   gearHelmet,
   spawn = [0, 0, 6],
@@ -855,6 +856,7 @@ function PlayerAndCamera({
   displayName?: string
   gearAccent?: string
   gearCape?: string
+  gearArtifact?: string | null
   gearWeapon?: AvatarConfig['weapon']
   gearHelmet?: AvatarConfig['helmet']
   spawn?: [number, number, number]
@@ -979,222 +981,256 @@ function PlayerAndCamera({
     <group ref={groupRef} position={spawn}>
       {/* shadow plate */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.55, 24]} />
+        <circleGeometry args={[0.68, 24]} />
         <meshBasicMaterial color="black" transparent opacity={0.4} />
       </mesh>
 
       {/* Legs */}
       <mesh
-        position={[0.13, 0.22, 0]}
+        position={[0.16, 0.28, 0]}
         rotation={[isMoving.current ? swing * 0.6 : 0, 0, 0]}
         castShadow
       >
-        <boxGeometry args={[0.16, 0.44, 0.16]} />
-        <meshStandardMaterial color="#0f3a3a" roughness={0.6} />
+        <boxGeometry args={[0.16, 0.56, 0.18]} />
+        <meshStandardMaterial color="#102a3a" roughness={0.58} />
       </mesh>
       <mesh
-        position={[-0.13, 0.22, 0]}
+        position={[-0.16, 0.28, 0]}
         rotation={[isMoving.current ? -swing * 0.6 : 0, 0, 0]}
         castShadow
       >
-        <boxGeometry args={[0.16, 0.44, 0.16]} />
-        <meshStandardMaterial color="#0f3a3a" roughness={0.6} />
+        <boxGeometry args={[0.16, 0.56, 0.18]} />
+        <meshStandardMaterial color="#102a3a" roughness={0.58} />
       </mesh>
 
       {/* Feet */}
       <mesh
         position={[
-          0.13,
-          0.04,
+          0.16,
+          0.05,
           isMoving.current ? swing * 0.18 : 0,
         ]}
         castShadow
       >
-        <boxGeometry args={[0.2, 0.08, 0.32]} />
+        <boxGeometry args={[0.24, 0.1, 0.36]} />
         <meshStandardMaterial color="#1f2937" roughness={0.7} />
       </mesh>
       <mesh
         position={[
-          -0.13,
-          0.04,
+          -0.16,
+          0.05,
           isMoving.current ? -swing * 0.18 : 0,
         ]}
         castShadow
       >
-        <boxGeometry args={[0.2, 0.08, 0.32]} />
+        <boxGeometry args={[0.24, 0.1, 0.36]} />
         <meshStandardMaterial color="#1f2937" roughness={0.7} />
       </mesh>
 
       {/* Torso */}
-      <mesh position={[0, 0.7, 0]} castShadow>
-        <boxGeometry args={[0.5, 0.55, 0.34]} />
-        <meshStandardMaterial color={cfg.outfit} roughness={0.5} emissive={cfg.outfit} emissiveIntensity={0.08} />
+      <mesh position={[0, 0.9, 0]} castShadow>
+        <cylinderGeometry args={[0.24, 0.34, 0.74, 10]} />
+        <meshStandardMaterial color={cfg.outfit} roughness={0.48} emissive={cfg.outfit} emissiveIntensity={0.1} />
+      </mesh>
+      <mesh position={[0, 1.02, 0.16]} castShadow rotation={[Math.PI / 4, 0, Math.PI / 4]}>
+        <boxGeometry args={[0.16, 0.16, 0.16]} />
+        <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.42} roughness={0.28} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.28} />
+      </mesh>
+      <mesh position={[0, 0.56, 0]} castShadow>
+        <boxGeometry args={[0.38, 0.12, 0.28]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.72} />
       </mesh>
 
       {/* Belt accent */}
-      <mesh position={[0, 0.46, 0]} castShadow>
-        <boxGeometry args={[0.52, 0.06, 0.36]} />
+      <mesh position={[0, 0.62, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.07, 0.32]} />
         <meshStandardMaterial color={gearAccent || cfg.outfitAccent} roughness={0.4} metalness={0.4} />
       </mesh>
 
       {/* Arms */}
       <mesh
-        position={[0.34, 0.7, 0]}
+        position={[0.39, 0.92, 0]}
         rotation={[isMoving.current ? -swing * 0.7 : 0, 0, 0.05]}
         castShadow
       >
-        <boxGeometry args={[0.14, 0.5, 0.14]} />
+        <boxGeometry args={[0.14, 0.58, 0.14]} />
         <meshStandardMaterial color={cfg.outfit} roughness={0.5} />
       </mesh>
       <mesh
-        position={[-0.34, 0.7, 0]}
+        position={[-0.39, 0.92, 0]}
         rotation={[isMoving.current ? swing * 0.7 : 0, 0, -0.05]}
         castShadow
       >
-        <boxGeometry args={[0.14, 0.5, 0.14]} />
+        <boxGeometry args={[0.14, 0.58, 0.14]} />
         <meshStandardMaterial color={cfg.outfit} roughness={0.5} />
       </mesh>
 
       {/* Hands */}
-      <mesh position={[0.34, 0.43, isMoving.current ? -swing * 0.18 : 0]} castShadow>
+      <mesh position={[0.39, 0.58, isMoving.current ? -swing * 0.18 : 0]} castShadow>
         <sphereGeometry args={[0.1, 12, 12]} />
         <meshStandardMaterial color={cfg.skin} roughness={0.5} />
       </mesh>
-      <mesh position={[-0.34, 0.43, isMoving.current ? swing * 0.18 : 0]} castShadow>
+      <mesh position={[-0.39, 0.58, isMoving.current ? swing * 0.18 : 0]} castShadow>
         <sphereGeometry args={[0.1, 12, 12]} />
         <meshStandardMaterial color={cfg.skin} roughness={0.5} />
       </mesh>
 
       {/* Neck */}
-      <mesh position={[0, 1.05, 0]} castShadow>
+      <mesh position={[0, 1.23, 0]} castShadow>
         <cylinderGeometry args={[0.09, 0.1, 0.1, 12]} />
         <meshStandardMaterial color={cfg.skin} roughness={0.6} />
       </mesh>
 
       {/* Head sphere base */}
-      <mesh position={[0, 1.22, 0]} castShadow>
-        <sphereGeometry args={[0.22, 16, 16]} />
+      <mesh position={[0, 1.44, 0]} castShadow>
+        <sphereGeometry args={[0.24, 16, 16]} />
         <meshStandardMaterial color={cfg.skin} roughness={0.55} />
+      </mesh>
+      <mesh position={[0, 1.27, 0.15]} castShadow>
+        <boxGeometry args={[0.18, 0.12, 0.08]} />
+        <meshStandardMaterial color={cfg.skin} roughness={0.5} />
       </mesh>
 
       {/* Eyes */}
-      <mesh position={[0.085, 1.24, 0.19]}>
+      <mesh position={[0.09, 1.46, 0.2]}>
         <sphereGeometry args={[0.025, 8, 8]} />
         <meshStandardMaterial color={cfg.eyes} />
       </mesh>
-      <mesh position={[-0.085, 1.24, 0.19]}>
+      <mesh position={[-0.09, 1.46, 0.2]}>
         <sphereGeometry args={[0.025, 8, 8]} />
         <meshStandardMaterial color={cfg.eyes} />
       </mesh>
       {/* Hair styles */}
       {cfg.hairStyle === 'short' && (
-        <mesh position={[0, 1.34, -0.02]} castShadow>
-          <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <mesh position={[0, 1.56, -0.03]} castShadow>
+          <sphereGeometry args={[0.255, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial color={cfg.hair} roughness={0.85} />
         </mesh>
       )}
       {cfg.hairStyle === 'cap' && (
-        <mesh position={[0, 1.36, -0.02]} castShadow>
-          <sphereGeometry args={[0.245, 14, 14, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+        <mesh position={[0, 1.58, -0.03]} castShadow>
+          <sphereGeometry args={[0.255, 14, 14, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
           <meshStandardMaterial color={cfg.hair} roughness={0.85} />
         </mesh>
       )}
       {cfg.hairStyle === 'long' && (<>
-        <mesh position={[0, 1.34, -0.02]} castShadow>
-          <sphereGeometry args={[0.245, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <mesh position={[0, 1.56, -0.03]} castShadow>
+          <sphereGeometry args={[0.255, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial color={cfg.hair} roughness={0.85} />
         </mesh>
-        <mesh position={[0, 1.0, -0.18]} castShadow>
-          <boxGeometry args={[0.4, 0.45, 0.08]} />
+        <mesh position={[0, 1.28, -0.2]} castShadow>
+          <boxGeometry args={[0.44, 0.54, 0.08]} />
           <meshStandardMaterial color={cfg.hair} roughness={0.85} />
         </mesh>
       </>)}
       {cfg.hairStyle === 'mohawk' && (
-        <mesh position={[0, 1.42, 0]} castShadow>
-          <boxGeometry args={[0.07, 0.18, 0.4]} />
+        <mesh position={[0, 1.64, 0]} castShadow>
+          <boxGeometry args={[0.08, 0.22, 0.42]} />
           <meshStandardMaterial color={cfg.hair} roughness={0.85} />
         </mesh>
       )}
       {(gearHelmet || cfg.helmet) === 'circlet' && (
-        <mesh position={[0, 1.28, 0]} castShadow>
-          <torusGeometry args={[0.225, 0.025, 8, 24]} />
+        <mesh position={[0, 1.49, 0]} castShadow>
+          <torusGeometry args={[0.245, 0.025, 8, 24]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
         </mesh>
       )}
       {(gearHelmet || cfg.helmet) === 'crown' && (<>
-        <mesh position={[0, 1.28, 0]} castShadow>
-          <torusGeometry args={[0.225, 0.025, 8, 24]} />
+        <mesh position={[0, 1.49, 0]} castShadow>
+          <torusGeometry args={[0.245, 0.025, 8, 24]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
         </mesh>
         {[0, Math.PI / 3, -Math.PI / 3, Math.PI * 2 / 3, -Math.PI * 2 / 3, Math.PI].map((a, i) => (
-          <mesh key={i} position={[Math.cos(a) * 0.225, 1.34, Math.sin(a) * 0.225]} castShadow>
+          <mesh key={i} position={[Math.cos(a) * 0.245, 1.56, Math.sin(a) * 0.245]} castShadow>
             <coneGeometry args={[0.025, 0.08, 4]} />
             <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
           </mesh>
         ))}
       </>)}
       {(gearHelmet || cfg.helmet) === 'cap' && (
-        <mesh position={[0, 1.4, -0.02]} castShadow>
-          <sphereGeometry args={[0.24, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+        <mesh position={[0, 1.62, -0.03]} castShadow>
+          <sphereGeometry args={[0.255, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
           <meshStandardMaterial color={cfg.outfit} roughness={0.55} emissive={cfg.outfit} emissiveIntensity={0.15} />
         </mesh>
       )}
       {(gearHelmet || cfg.helmet) === 'winged' && (<>
-        <mesh position={[0, 1.28, 0]} castShadow>
-          <torusGeometry args={[0.225, 0.025, 8, 24]} />
+        <mesh position={[0, 1.49, 0]} castShadow>
+          <torusGeometry args={[0.245, 0.025, 8, 24]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
         </mesh>
-        <mesh castShadow position={[0.18, 1.32, -0.02]} rotation={[0, 0, 0.6]}>
+        <mesh castShadow position={[0.21, 1.55, -0.02]} rotation={[0, 0, 0.6]}>
           <coneGeometry args={[0.06, 0.18, 5]} />
           <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
         </mesh>
-        <mesh castShadow position={[-0.18, 1.32, -0.02]} rotation={[0, 0, -0.6]}>
+        <mesh castShadow position={[-0.21, 1.55, -0.02]} rotation={[0, 0, -0.6]}>
           <coneGeometry args={[0.06, 0.18, 5]} />
           <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.35} roughness={0.5} />
         </mesh>
       </>)}
       {/* Shoulder pads */}
-      <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}>
-        <boxGeometry args={[0.26, 0.14, 0.22]} />
-        <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
-      </mesh>
-      <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}>
-        <boxGeometry args={[0.26, 0.14, 0.22]} />
-        <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
-      </mesh>
+      {(gearCape || cfg.cape) !== 'transparent' && (
+        <>
+          <mesh castShadow position={[-0.4, 1.1, -0.02]} rotation={[0.12, 0, 0.4]}>
+            <boxGeometry args={[0.3, 0.16, 0.28]} />
+            <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
+          </mesh>
+          <mesh castShadow position={[0.4, 1.1, -0.02]} rotation={[0.12, 0, -0.4]}>
+            <boxGeometry args={[0.3, 0.16, 0.28]} />
+            <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.55} roughness={0.4} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
+          </mesh>
+        </>
+      )}
       {/* Cape (optional) */}
       {(gearCape || cfg.cape) !== 'transparent' && (
-        <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}>
-          <planeGeometry args={[0.78, 1]} />
-          <meshStandardMaterial color={gearCape || cfg.cape} side={THREE.DoubleSide} roughness={0.55} emissive={gearCape || cfg.cape} emissiveIntensity={0.12} />
-        </mesh>
+        <group position={[0, 0.92, -0.24]}>
+          <mesh castShadow position={[-0.12, -0.08, 0]} rotation={[0.28, 0.08, 0.06]}>
+            <planeGeometry args={[0.48, 1.1]} />
+            <meshStandardMaterial color={gearCape || cfg.cape} side={THREE.DoubleSide} roughness={0.55} emissive={gearCape || cfg.cape} emissiveIntensity={0.12} />
+          </mesh>
+          <mesh castShadow position={[0.12, -0.08, 0]} rotation={[0.28, -0.08, -0.06]}>
+            <planeGeometry args={[0.48, 1.1]} />
+            <meshStandardMaterial color={gearCape || cfg.cape} side={THREE.DoubleSide} roughness={0.55} emissive={gearCape || cfg.cape} emissiveIntensity={0.12} />
+          </mesh>
+        </group>
       )}
       {/* Weapon */}
       {(gearWeapon || cfg.weapon) === 'sword' && (<>
-        <mesh castShadow position={[-0.32, 0.5, 0.05]} rotation={[0.05, 0, 1.45]}>
-          <boxGeometry args={[0.04, 0.85, 0.04]} />
+        <mesh castShadow position={[0.52, 0.72, 0.02]} rotation={[0.1, 0, -0.22]}>
+          <boxGeometry args={[0.05, 0.96, 0.05]} />
           <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.2} />
         </mesh>
-        <mesh castShadow position={[-0.32, 0.13, 0.05]} rotation={[0, 0, 1.45]}>
-          <boxGeometry args={[0.16, 0.05, 0.07]} />
+        <mesh castShadow position={[0.52, 0.28, 0.02]} rotation={[0.1, 0, -0.22]}>
+          <boxGeometry args={[0.18, 0.06, 0.08]} />
           <meshStandardMaterial color="#7c2d12" roughness={0.85} />
         </mesh>
       </>)}
       {(gearWeapon || cfg.weapon) === 'staff' && (
-        <mesh castShadow position={[0.4, 0.85, 0.05]} rotation={[0, 0, -0.1]}>
+        <mesh castShadow position={[0.5, 0.96, 0.08]} rotation={[0, 0, -0.08]}>
           <cylinderGeometry args={[0.04, 0.04, 1.7, 8]} />
           <meshStandardMaterial color="#7c4a1f" roughness={0.7} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
         </mesh>
       )}
       {(gearWeapon || cfg.weapon) === 'bow' && (
-        <mesh castShadow position={[0.45, 0.7, 0.05]} rotation={[0, 0, -0.4]}>
+        <mesh castShadow position={[0.52, 0.88, 0.04]} rotation={[0, 0, -0.32]}>
           <torusGeometry args={[0.45, 0.025, 8, 18, Math.PI]} />
           <meshStandardMaterial color="#7c4a1f" roughness={0.7} />
         </mesh>
       )}
+      {gearArtifact && (
+        <>
+          <mesh position={[0, 0.95, 0.33]} castShadow>
+            <octahedronGeometry args={[0.08, 0]} />
+            <meshStandardMaterial color={gearArtifact} emissive={gearArtifact} emissiveIntensity={1.3} roughness={0.18} metalness={0.2} />
+          </mesh>
+          <mesh position={[0, 0.95, 0.33]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.12, 0.012, 8, 24]} />
+            <meshStandardMaterial color={gearArtifact} emissive={gearArtifact} emissiveIntensity={1.1} />
+          </mesh>
+        </>
+      )}
 
       {/* nameplate w/ portrait chip — "You" */}
-      <Html position={[0, 1.95, 0]} center distanceFactor={8}>
+      <Html position={[0, 2.2, 0]} center distanceFactor={8}>
         <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'#a7f3d0',borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:'1px solid #34d39955',boxShadow:'0 0 8px #34d39933'}}>
           <img src={`/avatars/${portraitId}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:gearAccent || cfg.outfitAccent,objectFit:'cover',border:'1px solid #34d399'}} />
           <span>{displayName}</span>
@@ -1662,6 +1698,7 @@ function Scene({
   playerAvatar,
   playerAccent,
   playerCape,
+  playerArtifact,
   playerWeapon,
   playerHelmet,
   portalLabel,
@@ -1683,6 +1720,7 @@ function Scene({
   playerAvatar: AvatarConfig
   playerAccent?: string
   playerCape?: string
+  playerArtifact?: string | null
   playerWeapon?: AvatarConfig['weapon']
   playerHelmet?: AvatarConfig['helmet']
   portalLabel: string
@@ -1893,6 +1931,7 @@ function Scene({
           displayName={playerName}
           gearAccent={playerAccent}
           gearCape={playerCape}
+          gearArtifact={playerArtifact}
           gearWeapon={playerWeapon}
           gearHelmet={playerHelmet}
         />
@@ -1928,6 +1967,7 @@ export function PlaygroundWorld3D({
   playerAvatar,
   playerAccent,
   playerCape,
+  playerArtifact,
   playerWeapon,
   playerHelmet,
   portalLabel,
@@ -1948,6 +1988,7 @@ export function PlaygroundWorld3D({
   playerAvatar: AvatarConfig
   playerAccent?: string
   playerCape?: string
+  playerArtifact?: string | null
   playerWeapon?: AvatarConfig['weapon']
   playerHelmet?: AvatarConfig['helmet']
   portalLabel: string
@@ -2037,6 +2078,7 @@ export function PlaygroundWorld3D({
             playerAvatar={playerAvatar}
             playerAccent={playerAccent}
             playerCape={playerCape}
+            playerArtifact={playerArtifact}
             playerWeapon={playerWeapon}
             playerHelmet={playerHelmet}
             portalLabel={portalLabel}
@@ -2051,13 +2093,6 @@ export function PlaygroundWorld3D({
           />
         </Suspense>
       </Canvas>
-      {/* Multiplayer status — small chip top-right */}
-      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 70, pointerEvents: 'none' }}>
-        <div style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'rgba(0,0,0,0.55)', color: '#fff', border: `1px solid ${myColor}55`, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 999, background: myColor, boxShadow: `0 0 6px ${myColor}` }} />
-          {myName} · {Object.values(remotePlayers).filter((r) => r.world === worldId).length}
-        </div>
-      </div>
     </div>
   )
 }

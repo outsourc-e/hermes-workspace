@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { PlaygroundCustomizer } from './components/playground-customizer'
@@ -12,6 +12,7 @@ import { PlaygroundOnlineChip } from './components/playground-online-chip'
 import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
+import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
 import { botsFor } from './lib/playground-bots'
 import { itemById, PLAYGROUND_WORLDS, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
 
@@ -46,6 +47,7 @@ class PlaygroundErrorBoundary extends Component<
 
 export function PlaygroundScreen() {
   const rpg = usePlaygroundRpg()
+  const audioMuted = usePlaygroundAudioMuted()
   const [launched, setLaunched] = useState(false)
   const [world, setWorld] = useState<PlaygroundWorldId>(rpg.state.playerProfile.lastZone)
   const [dialogNpc, setDialogNpc] = useState<string | null>(null)
@@ -60,6 +62,7 @@ export function PlaygroundScreen() {
   const [tutorialCompleteOpen, setTutorialCompleteOpen] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
   const [monsterHp, setMonsterHp] = useState(44)
+  const heardToastIds = useRef<Set<string>>(new Set())
   const monsterHpMax = 44
 
   const activeQuest = rpg.activeQuest
@@ -84,6 +87,27 @@ export function PlaygroundScreen() {
       setTutorialCompleteOpen(true)
     }
   }, [rpg.state.completedQuests])
+
+  useEffect(() => {
+    for (const toast of rpg.toasts) {
+      if (heardToastIds.current.has(toast.id)) continue
+      heardToastIds.current.add(toast.id)
+      if (toast.kind === 'quest' || toast.kind === 'title') playgroundAudio.playQuestComplete()
+      if (toast.kind === 'item') playgroundAudio.playRewardPickup()
+    }
+  }, [rpg.toasts])
+
+  useEffect(() => {
+    if (!launched) {
+      playgroundAudio.setAmbient(null)
+      return
+    }
+    if (world === 'training' || world === 'forge') {
+      playgroundAudio.setAmbient(world)
+      return
+    }
+    playgroundAudio.setAmbient(null)
+  }, [launched, world, audioMuted])
 
   useEffect(() => {
     let cancelled = false
@@ -158,6 +182,7 @@ export function PlaygroundScreen() {
     return {
       accent: artifact?.accent || head?.accent || weapon?.accent || rpg.state.playerProfile.avatarConfig.outfitAccent,
       cape: cloak?.accent || rpg.state.playerProfile.avatarConfig.cape,
+      artifact: artifact?.accent || null,
       weapon:
         weapon?.id === 'training-blade'
           ? 'sword'
@@ -203,9 +228,11 @@ export function PlaygroundScreen() {
       const playerDamage = Math.floor(Math.random() * 4) + 1
       rpg.damagePlayer(playerDamage)
     }
+    playgroundAudio.playHit()
     setMonsterHp((current) => {
       const next = Math.max(0, current - damage)
       if (next === 0) {
+        playgroundAudio.playDefeat()
         rpg.markObjective('training-bonus-wisp', 'defeat-wisp')
         rpg.recordDefeat(35, 'wisp-core')
         rpg.markObjective('training-bonus-wisp', 'collect-core')
@@ -252,6 +279,7 @@ export function PlaygroundScreen() {
     const unlocked = order.filter((id) => rpg.state.unlockedWorlds.includes(id))
     const currentIndex = unlocked.indexOf(world)
     const next = unlocked[(currentIndex + 1) % unlocked.length] ?? world
+    playgroundAudio.playPortalWhoosh()
     setTransitioning(true)
     window.setTimeout(() => {
       setWorld(next)
@@ -301,6 +329,7 @@ export function PlaygroundScreen() {
           playerAvatar={rpg.state.playerProfile.avatarConfig}
           playerAccent={equippedVisuals.accent}
           playerCape={equippedVisuals.cape}
+          playerArtifact={equippedVisuals.artifact}
           playerWeapon={equippedVisuals.weapon}
           playerHelmet={equippedVisuals.helmet}
           portalLabel={world === 'training' ? 'Forge Gate' : 'World Portal'}
@@ -392,7 +421,11 @@ export function PlaygroundScreen() {
           worldAccent={WORLD_META[world].accent}
         />
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
-        <PlaygroundUtilityDock onCustomize={() => setCustomizerOpen(true)} />
+        <PlaygroundUtilityDock
+          audioMuted={audioMuted}
+          onCustomize={() => setCustomizerOpen(true)}
+          onToggleAudio={() => playgroundAudio.toggleMuted()}
+        />
         <ArchiveBriefingModal
           open={archiveOpen}
           onClose={() => setArchiveOpen(false)}
@@ -429,6 +462,11 @@ function TitleScreen({
   onEnter: () => void
 }) {
   const canEnter = displayName.trim().length > 0
+
+  useEffect(() => {
+    playgroundAudio.playTitleEntry()
+  }, [])
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050b12] p-6 text-white">
       <div className="w-full max-w-5xl overflow-hidden rounded-[28px] border border-cyan-300/20 bg-[#070b14] shadow-2xl">
@@ -441,6 +479,9 @@ function TitleScreen({
             <h1 className="text-5xl font-black tracking-tight" style={{ textShadow: '0 0 28px rgba(34,211,238,0.55)' }}>
               Hermes Playground
             </h1>
+            <div className="mt-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
+              {displayName.trim().length === 0 ? 'Welcome, builder. What should we call you?' : 'Your agent MMO onboarding loop'}
+            </div>
             <p className="mt-3 max-w-[640px] text-[15px] text-white/72">
               Enter the Training Grounds, meet Athena, equip your starter kit, learn chat and memory, then unlock the Forge Gate.
             </p>
@@ -522,7 +563,7 @@ function ArchiveBriefingModal({
         <div className="mt-1 text-xl font-extrabold">Docs and Memory Loop</div>
         <div className="mt-4 space-y-3 text-sm text-white/80">
           <p><strong>Docs:</strong> `docs/playground/README.md` explains the worlds, systems, and multiplayer wiring.</p>
-          <p><strong>Memory:</strong> Hermes saves project intent in `memory/goals/...` so the next iteration starts with context instead of drift.</p>
+          <p><strong>Memory:</strong> Hermes saves project intent in `memory/goals/...` so the next iteration starts with context, recall, and less drift.</p>
           <p><strong>Builder habit:</strong> read the spec, inspect the state shape, ship the smallest slice, then verify with a clean build.</p>
         </div>
         <div className="mt-5 flex justify-end gap-2">
@@ -580,9 +621,24 @@ function PlaygroundHelpHud({ worldName }: { worldName: string }) {
   )
 }
 
-function PlaygroundUtilityDock({ onCustomize }: { onCustomize: () => void }) {
+function PlaygroundUtilityDock({
+  audioMuted,
+  onCustomize,
+  onToggleAudio,
+}: {
+  audioMuted: boolean
+  onCustomize: () => void
+  onToggleAudio: () => void
+}) {
   return (
     <div className="pointer-events-auto fixed bottom-[78px] right-3 z-[70] flex flex-col gap-1.5">
+      <button
+        onClick={onToggleAudio}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
+        title={audioMuted ? 'Unmute audio' : 'Mute audio'}
+      >
+        {audioMuted ? '🔇' : '🔊'}
+      </button>
       <button
         onClick={onCustomize}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"

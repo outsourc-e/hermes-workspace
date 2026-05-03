@@ -49,8 +49,9 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     title: 'Guide of the Training Grounds',
     color: '#a78bfa',
     opening:
-      'Welcome, builder. I am Athena. These Training Grounds teach the Hermes loop: move, equip, speak, remember, and build.',
+      'Welcome, builder. I am Athena. Hermes Agent is the messenger layer for your work: one interface that routes prompts to the right model and tool, then carries the result back into your workflow.',
     lore: [
+      'These Training Grounds teach the Hermes loop: move, equip, speak, remember, and build.',
       'Long before Hermes Workspace, agents were tools. We invited them into a world instead.',
       'Start here, then walk through the Forge Gate when you are ready to build with Hermes for real.',
       'I am scripted for this hackathon. Soon a real Hermes agent will speak through me with deeper memory.',
@@ -66,7 +67,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
         id: 'training-build',
         label: '[Quest] Build a tiny prototype',
         reply:
-          'Excellent. Let us build a tiny prototype: a quest tracker, a portal, a training arena, anything small and real. The Forge answers builders who ship.',
+          'Excellent. Let us build a tiny prototype: a quest tracker, a portal, a training arena, anything small and real. The Forge is where Hermes turns prompts into products, and it answers builders who ship.',
         grantSkillXp: { worldsmithing: 20, engineering: 20 },
       },
       {
@@ -119,9 +120,10 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     title: 'Messenger of the Bridge',
     color: '#22d3ee',
     opening:
-      'I am Iris. I carry messages between agents and worlds. When multiplayer arrives, I will route your every word.',
+      'I am Iris. The Archive Podium is where Hermes explains memory, docs, context, and recall so your next session starts with signal instead of drift.',
     lore: [
       'The chat panel above your head? That is my domain. Every message you send is a packet I deliver.',
+      'Hermes remembers what you build when you keep the docs close and the memory files honest.',
       'In the next sprint I get a real WebSocket. Until then, the bots are my apprentices.',
     ],
     choices: [
@@ -192,7 +194,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
         id: 'forge-demo',
         label: '[Build] Forge a demo tool',
         reply:
-          'Name the thing you want to make and the Forge will start from there. Builder loops should stay small, concrete, and shippable.',
+          'Name the thing you want to make and the Forge will start from there. This is where Hermes turns prompts into products, so keep the loop small, concrete, and shippable.',
         grantSkillXp: { engineering: 25, worldsmithing: 15 },
       },
       {
@@ -322,9 +324,9 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     title: 'Quartermaster of the Market',
     color: '#38bdf8',
     opening:
-      'Welcome to the Agora market. Every real MMO hub needs a place where players understand value. Here, items are lessons made tangible.',
+      'Welcome to the Agora market. Every real MMO hub needs a place where players understand value. Your starter kit teaches inventory, gear, and progression in the same motion.',
     lore: [
-      'The market will eventually trade cosmetics, generated relics, guild banners, and agent-made artifacts. For now, I teach inventory and rewards.',
+      'The market will eventually trade cosmetics, generated relics, guild banners, and agent-made artifacts. For now, your starter kit teaches inventory, gear, progression, and rewards.',
       'A good product hub has economy, even before money. Reputation, tokens, badges, access, trust — those are currencies too.',
     ],
     choices: [

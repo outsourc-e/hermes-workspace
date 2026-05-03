@@ -105,6 +105,7 @@ function xpForNextLevel(level: number) {
 function normalizeState(raw: Partial<PlaygroundRpgState> | null): PlaygroundRpgState {
   const base = defaultState()
   const rawProfile = raw?.playerProfile
+  const completedQuests = Array.isArray(raw?.completedQuests) ? raw.completedQuests : []
   const legacy = raw as Partial<PlaygroundRpgState & {
     inventory: PlaygroundItemId[]
     level: number
@@ -117,13 +118,7 @@ function normalizeState(raw: Partial<PlaygroundRpgState> | null): PlaygroundRpgS
   const profile: PlayerProfile = {
     ...base.playerProfile,
     ...rawProfile,
-    displayName:
-      rawProfile?.displayName
-      ?? (typeof window !== 'undefined'
-        ? window.localStorage.getItem(PLAYGROUND_DISPLAY_NAME_STORAGE_KEY)
-          || window.localStorage.getItem(PLAYGROUND_LEGACY_NAME_KEY)
-          || ''
-        : ''),
+    displayName: rawProfile?.displayName ?? '',
     avatarConfig: { ...base.playerProfile.avatarConfig, ...(rawProfile?.avatarConfig ?? {}) },
     equipped: { ...EMPTY_EQUIPPED, ...(rawProfile?.equipped ?? {}) },
     inventory: Array.from(new Set(rawProfile?.inventory ?? legacyInventory ?? [])),
@@ -131,7 +126,7 @@ function normalizeState(raw: Partial<PlaygroundRpgState> | null): PlaygroundRpgS
     level: rawProfile?.level ?? legacyLevel ?? base.playerProfile.level,
     xp: rawProfile?.xp ?? legacyXp ?? base.playerProfile.xp,
     titlesUnlocked: Array.from(new Set(rawProfile?.titlesUnlocked ?? [])),
-    lastZone: rawProfile?.lastZone ?? base.playerProfile.lastZone,
+    lastZone: rawProfile?.lastZone ?? (completedQuests.includes('training-q1') ? 'agora' : 'training'),
   }
 
   return {
@@ -140,7 +135,7 @@ function normalizeState(raw: Partial<PlaygroundRpgState> | null): PlaygroundRpgS
     playerProfile: profile,
     skillXp: { ...base.skillXp, ...(raw?.skillXp ?? {}) },
     unlockedWorlds: Array.from(new Set(raw?.unlockedWorlds ?? base.unlockedWorlds)),
-    completedQuests: Array.from(new Set(raw?.completedQuests ?? [])),
+    completedQuests: Array.from(new Set(completedQuests)),
   }
 }
 
@@ -224,7 +219,6 @@ export function usePlaygroundRpg() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
       window.localStorage.setItem(PLAYGROUND_DISPLAY_NAME_STORAGE_KEY, state.playerProfile.displayName)
-      window.localStorage.setItem(PLAYGROUND_LEGACY_NAME_KEY, state.playerProfile.displayName)
     } catch {
       // ignore quota/private mode
     }

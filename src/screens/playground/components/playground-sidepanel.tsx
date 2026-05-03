@@ -37,6 +37,13 @@ const SLOT_LABELS: Array<{ slot: EquipmentSlot; label: string }> = [
   { slot: 'artifact', label: 'Artifact' },
 ]
 
+const EMPTY_SLOT_ICONS: Record<EquipmentSlot, string> = {
+  weapon: '⚔',
+  cloak: '🜁',
+  head: '◌',
+  artifact: '✦',
+}
+
 export function PlaygroundSidePanel({
   state,
   currentWorld,
@@ -56,6 +63,9 @@ export function PlaygroundSidePanel({
   const progress = activeQuest
     ? state.playerProfile.questProgress[activeQuest.id]
     : undefined
+  const tutorialStep = activeQuest?.id.startsWith('training-q')
+    ? Number(activeQuest.id.slice(-1))
+    : null
 
   return (
     <>
@@ -71,6 +81,11 @@ export function PlaygroundSidePanel({
           <div className="text-[12px] font-bold leading-tight" style={{ color: worldAccent }}>
             {activeQuest.title}
           </div>
+          {tutorialStep && (
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Step {tutorialStep} of 5
+            </div>
+          )}
           <div className="mt-1.5 space-y-1">
             {activeQuest.objectives.map((objective) => {
               const done = progress?.completedObjectives.includes(objective.id)
@@ -158,12 +173,17 @@ function InventoryTab({
               <button
                 key={slot}
                 onClick={() => item && onUnequipSlot(slot)}
-                className="rounded-lg border border-white/10 bg-black/35 p-2 text-left"
+                className="rounded-lg border bg-black/35 p-2 text-left"
+                style={{
+                  borderColor: item ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.18)',
+                  outline: item ? 'none' : '1px dashed rgba(255,255,255,0.14)',
+                  outlineOffset: '-4px',
+                }}
                 title={item ? `Unequip ${item.name}` : `Empty ${label} slot`}
               >
                 <div className="text-[9px] uppercase tracking-[0.12em] text-white/45">{label}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="text-lg">{item?.icon || '＋'}</span>
+                  <span className={`text-lg ${item ? '' : 'text-white/30'}`}>{item?.icon || EMPTY_SLOT_ICONS[slot]}</span>
                   <div className="min-w-0">
                     <div className="truncate text-[10px] font-semibold">{item?.name || 'Empty'}</div>
                     <div className="text-[8px] text-white/45">{item?.stat ? `${item.stat.label} +${item.stat.value}` : 'Click item below to equip'}</div>
