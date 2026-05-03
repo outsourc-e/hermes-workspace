@@ -268,10 +268,30 @@ export function OperationsAgentCard({
         <div className="absolute right-0 flex items-center gap-1">
           <button
             type="button"
-            aria-label={isActive ? `Pause ${displayName}` : `Run ${displayName} now`}
-            onClick={() => void handlePlayPause()}
-            disabled={isSending && !isActive}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={
+              agent.needsSetup
+                ? `Configure ${displayName} before running`
+                : isActive ? `Pause ${displayName}` : `Run ${displayName} now`
+            }
+            onClick={() => {
+              if (agent.needsSetup) {
+                onOpenSettings(agent.id)
+                return
+              }
+              void handlePlayPause()
+            }}
+            disabled={(isSending && !isActive)}
+            title={
+              agent.needsSetup
+                ? 'No model configured — open settings to set one up'
+                : undefined
+            }
+            className={cn(
+              'inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--theme-bg)] disabled:cursor-not-allowed disabled:opacity-60',
+              agent.needsSetup
+                ? 'text-amber-300 hover:text-amber-200'
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
+            )}
           >
             <HugeiconsIcon
               icon={isActive ? PauseIcon : PlayIcon}
@@ -322,6 +342,17 @@ export function OperationsAgentCard({
         <p className="w-full truncate text-[10px] text-[var(--theme-muted)]/80">
           {agent.jobs.length > 0 ? `${agent.jobs.length} scheduled job${agent.jobs.length === 1 ? '' : 's'}` : 'Manual only'}
         </p>
+        {agent.needsSetup ? (
+          <button
+            type="button"
+            onClick={() => onOpenSettings(agent.id)}
+            className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-300/40 bg-amber-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200 transition-colors hover:bg-amber-300/20"
+            title="This agent has no model configured. Click to set one up."
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300" />
+            Needs setup — click to configure
+          </button>
+        ) : null}
       </div>
 
       <AnimatePresence initial={false}>
