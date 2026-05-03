@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, Float, Html, Sparkles, Stars, Text, useTexture } from '@react-three/drei'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 
 type PlaygroundWorld = 'agora' | 'forge'
@@ -267,7 +267,92 @@ function PlaygroundScene({
   )
 }
 
+class PlaygroundErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('Playground WebGL render failed', error)
+  }
+
+  render() {
+    if (this.state.hasError) return <PlaygroundFallback />
+    return this.props.children
+  }
+}
+
+function PlaygroundFallback() {
+  return (
+    <div
+      className="flex h-full min-h-[520px] items-center justify-center p-6"
+      style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}
+    >
+      <div className="w-full max-w-3xl overflow-hidden rounded-3xl border shadow-2xl" style={{ borderColor: 'var(--theme-border)', background: 'var(--theme-card)' }}>
+        <div className="relative h-72 overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 30%, rgba(34,211,238,.25), transparent 55%), linear-gradient(135deg, #07121f, #182235)' }}>
+          <div className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/40 bg-cyan-300/10" />
+          {['Hermes', 'Athena', 'Kimi', 'Builder'].map((name, i) => (
+            <div
+              key={name}
+              className="absolute flex flex-col items-center gap-1"
+              style={{
+                left: `${28 + i * 15}%`,
+                top: `${38 + (i % 2) * 18}%`,
+              }}
+            >
+              <img src={`/avatars/${i === 1 ? 'athena' : 'hermes'}.png`} className="h-14 w-14 rounded-full border border-white/20 object-cover" />
+              <span className="rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">{name}</span>
+            </div>
+          ))}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-cyan-300/30 bg-black/50 px-4 py-2 text-xs uppercase tracking-[0.18em] text-cyan-100">
+            Playground Lite · WebGL fallback
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="mb-2 flex items-center gap-2">
+            <h1 className="text-xl font-semibold">Hermes Playground</h1>
+            <span className="rounded bg-cyan-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">hackathon</span>
+          </div>
+          <p className="text-sm opacity-75">
+            The 3D renderer failed to create a WebGL context in this browser, so this fallback keeps the demo alive.
+            Agora still works, and the 3D scene will load once WebGL/GPU acceleration is available.
+          </p>
+          <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ AI agent RPG concept</div>
+            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Human + agent world</div>
+            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Missions + generated worlds</div>
+            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Agora fallback ready</div>
+          </div>
+          <a href="/agora" className="mt-5 inline-flex rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--theme-accent)', color: 'var(--theme-bg)' }}>
+            Open Agora Lite
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function detectWebGL(): boolean {
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(
+      canvas.getContext('webgl2') ||
+        canvas.getContext('webgl') ||
+        canvas.getContext('experimental-webgl'),
+    )
+  } catch {
+    return false
+  }
+}
+
 export function PlaygroundScreen() {
+  const [webglStatus, setWebglStatus] = useState<'checking' | 'supported' | 'unsupported'>('checking')
   const [world, setWorld] = useState<PlaygroundWorld>('agora')
   const [quest, setQuest] = useState<QuestState>('start')
   const [input, setInput] = useState('')
@@ -295,11 +380,32 @@ export function PlaygroundScreen() {
       : 'Back to The Agora. Every portal can become a generated world.')
   }
 
+  useEffect(() => {
+    setWebglStatus(detectWebGL() ? 'supported' : 'unsupported')
+  }, [])
+
+  if (webglStatus !== 'supported') {
+    return <PlaygroundFallback />
+  }
+
   return (
     <div className="relative h-full min-h-0 overflow-hidden" style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}>
-      <Canvas shadows camera={{ position: [7, 7, 10], fov: 48 }} dpr={[1, 1.5]}>
-        <PlaygroundScene world={world} companionLine={companionLine} onEnterPortal={enterPortal} />
-      </Canvas>
+      <PlaygroundErrorBoundary>
+        <Canvas
+          shadows
+          camera={{ position: [7, 7, 10], fov: 48 }}
+          dpr={[1, 1.5]}
+          fallback={<PlaygroundFallback />}
+          gl={{
+            antialias: true,
+            alpha: false,
+            powerPreference: 'default',
+            failIfMajorPerformanceCaveat: false,
+          }}
+        >
+          <PlaygroundScene world={world} companionLine={companionLine} onEnterPortal={enterPortal} />
+        </Canvas>
+      </PlaygroundErrorBoundary>
 
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4">
         <div className="flex items-start justify-between gap-3">
