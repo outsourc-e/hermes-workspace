@@ -3,7 +3,9 @@
  * NPCs, and clickable portal. Hackathon base for Hermes Playground.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard, Html, useTexture } from '@react-three/drei'
+import { Billboard, Html, Sparkles, useTexture } from '@react-three/drei'
+import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
@@ -1527,6 +1529,9 @@ function Scene({
       <Ground world={world} />
       <WorldDecor world={world} />
       <ScatteredScenery worldId={worldId} />
+      {/* Ambient atmosphere particles for cinematic feel */}
+      <Sparkles count={80} scale={[60, 8, 60]} size={3} speed={0.25} color={world.accent} opacity={0.6} />
+      <Sparkles count={40} scale={[30, 4, 30]} size={1.5} speed={0.6} color={'#ffffff'} opacity={0.35} />
 
       {/* NPCs per world */}
       {worldId === 'agora' && (
@@ -1697,6 +1702,11 @@ export function PlaygroundWorld3D({
         gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
       >
         <Suspense fallback={null}>
+          <EffectComposer enableNormalPass={false}>
+            <Bloom mipmapBlur intensity={0.78} luminanceThreshold={0.62} luminanceSmoothing={0.18} radius={0.85} />
+            <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+            <Vignette eskil={false} offset={0.18} darkness={0.55} />
+          </EffectComposer>
           <Scene
             worldId={worldId}
             onPortal={onPortal}
