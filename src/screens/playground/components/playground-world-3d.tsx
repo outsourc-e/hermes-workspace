@@ -3,9 +3,7 @@
  * NPCs, and clickable portal. Hackathon base for Hermes Playground.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard, Text, useTexture, Sky, Stars } from '@react-three/drei'
-import { Physics, RigidBody, CapsuleCollider, CuboidCollider } from '@react-three/rapier'
-import Ecctrl, { EcctrlAnimation } from 'ecctrl'
+import { Billboard, Text, useTexture, Stars } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
@@ -89,15 +87,13 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
 /* ── Ground ── */
 function Ground({ world }: { world: WorldDef }) {
   return (
-    <RigidBody type="fixed" colliders={false} friction={1}>
-      <CuboidCollider args={[40, 0.1, 40]} position={[0, -0.1, 0]} />
-      <mesh receiveShadow position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <group>
+      <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[80, 80, 1, 1]} />
         <meshStandardMaterial color={world.groundColor} roughness={0.95} metalness={0.05} />
       </mesh>
-      {/* Grid overlay for spatial anchoring */}
       <gridHelper args={[80, 40, world.accent, '#1f2937']} position={[0, 0.01, 0]} />
-    </RigidBody>
+    </group>
   )
 }
 
@@ -114,7 +110,7 @@ function ClassicalPillars({ world }: { world: WorldDef }) {
   return (
     <>
       {pillars.map((pos, i) => (
-        <RigidBody key={i} type="fixed" position={pos as [number, number, number]} colliders="cuboid">
+        <group key={i} position={pos as [number, number, number]}>
           <mesh castShadow receiveShadow position={[0, 1.5, 0]}>
             <cylinderGeometry args={[0.4, 0.5, 3, 12]} />
             <meshStandardMaterial color={world.pillarColor} roughness={0.6} />
@@ -123,9 +119,8 @@ function ClassicalPillars({ world }: { world: WorldDef }) {
             <boxGeometry args={[1.4, 0.25, 1.4]} />
             <meshStandardMaterial color={world.pillarColor} roughness={0.5} />
           </mesh>
-        </RigidBody>
+        </group>
       ))}
-      {/* Center medallion */}
       <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <ringGeometry args={[3.5, 4, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.4} />
@@ -146,7 +141,7 @@ function TechPillars({ world }: { world: WorldDef }) {
   return (
     <>
       {cubes.map((pos, i) => (
-        <RigidBody key={i} type="fixed" position={pos as [number, number, number]} colliders="cuboid">
+        <group key={i} position={pos as [number, number, number]}>
           <mesh castShadow position={[0, 0.9, 0]}>
             <boxGeometry args={[1.6, 1.8, 1.6]} />
             <meshStandardMaterial color="#0f172a" emissive={world.pillarColor} emissiveIntensity={0.4} roughness={0.3} />
@@ -155,7 +150,7 @@ function TechPillars({ world }: { world: WorldDef }) {
             <boxGeometry args={[1.2, 0.05, 1.2]} />
             <meshStandardMaterial color={world.pillarColor} emissive={world.pillarColor} emissiveIntensity={2} />
           </mesh>
-        </RigidBody>
+        </group>
       ))}
       <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <ringGeometry args={[4, 4.4, 64]} />
@@ -217,21 +212,28 @@ function Portal({
   color,
   label,
   onEnter,
+  playerRef,
 }: {
   position: [number, number, number]
   color: string
   label: string
   onEnter: () => void
+  playerRef: React.MutableRefObject<THREE.Vector3>
 }) {
   const ringRef = useRef<THREE.Mesh>(null)
+  const triggered = useRef(false)
+  const center = useMemo(() => new THREE.Vector3(...position), [position])
   useFrame((_, dt) => {
     if (ringRef.current) ringRef.current.rotation.y += dt * 0.6
+    const dist = playerRef.current.distanceTo(center)
+    if (dist < 1.5 && !triggered.current) {
+      triggered.current = true
+      onEnter()
+      window.setTimeout(() => { triggered.current = false }, 1200)
+    }
   })
   return (
     <group position={position}>
-      <RigidBody type="fixed" colliders={false} sensor onIntersectionEnter={onEnter}>
-        <CuboidCollider args={[1.2, 1.2, 0.3]} position={[0, 1.2, 0]} sensor />
-      </RigidBody>
       <mesh ref={ringRef} position={[0, 1.2, 0]}>
         <torusGeometry args={[1.1, 0.08, 16, 64]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
@@ -250,23 +252,30 @@ function QuestZone({
   color,
   label,
   onEnter,
+  playerRef,
 }: {
   position: [number, number, number]
   color: string
   label: string
   onEnter: () => void
+  playerRef: React.MutableRefObject<THREE.Vector3>
 }) {
   const ref = useRef<THREE.Mesh>(null)
+  const triggered = useRef(false)
+  const center = useMemo(() => new THREE.Vector3(...position), [position])
   useFrame(({ clock }) => {
     if (!ref.current) return
     const s = 1 + Math.sin(clock.getElapsedTime() * 2) * 0.05
     ref.current.scale.setScalar(s)
+    const dist = playerRef.current.distanceTo(center)
+    if (dist < 1.6 && !triggered.current) {
+      triggered.current = true
+      onEnter()
+      window.setTimeout(() => { triggered.current = false }, 2000)
+    }
   })
   return (
     <group position={position}>
-      <RigidBody type="fixed" colliders={false} sensor onIntersectionEnter={onEnter}>
-        <CuboidCollider args={[1.5, 0.5, 1.5]} position={[0, 0.5, 0]} sensor />
-      </RigidBody>
       <mesh ref={ref} position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.2, 1.5, 32]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} transparent opacity={0.7} />
@@ -278,32 +287,101 @@ function QuestZone({
   )
 }
 
-/* ── Iso camera locked to player ── */
-function IsoCamera({ playerRef }: { playerRef: React.RefObject<THREE.Group> }) {
-  const { camera } = useThree()
-  const ideal = useMemo(() => new THREE.Vector3(), [])
-  const look = useMemo(() => new THREE.Vector3(), [])
-  useFrame(() => {
-    const player = playerRef.current
-    if (!player) return
-    const p = player.position
-    ideal.set(p.x + 8, 10, p.z + 8)
-    camera.position.lerp(ideal, 0.08)
-    look.set(p.x, p.y + 0.5, p.z)
-    camera.lookAt(look)
-  })
-  return null
+/* ── Keyboard hook ── */
+function useKeyboard() {
+  const keys = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      const k = e.key.toLowerCase()
+      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift',' '].includes(k)) {
+        keys.current.add(k)
+        e.preventDefault()
+      }
+    }
+    const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase())
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
+  return keys
 }
 
-/* ── Player avatar (billboard for now) ── */
-function PlayerAvatar({ avatarId = 'hermes' }: { avatarId?: string }) {
+/* ── Walking player + iso follow camera (no physics, simple kinematic) ── */
+function PlayerAndCamera({
+  avatarId = 'hermes',
+  spawn = [0, 0, 6],
+  positionRef,
+}: {
+  avatarId?: string
+  spawn?: [number, number, number]
+  positionRef: React.MutableRefObject<THREE.Vector3>
+}) {
+  const groupRef = useRef<THREE.Group>(null)
   const texture = useTexture(`/avatars/${avatarId}.png`)
+  const keys = useKeyboard()
+  const { camera } = useThree()
+  const camIdeal = useMemo(() => new THREE.Vector3(), [])
+  const camLook = useMemo(() => new THREE.Vector3(), [])
+  const yaw = useRef(0)
+  const isMoving = useRef(false)
+  const bobT = useRef(0)
+
+  // Initial spawn position
+  useEffect(() => {
+    positionRef.current.set(spawn[0], spawn[1], spawn[2])
+    if (groupRef.current) groupRef.current.position.copy(positionRef.current)
+  }, [spawn, positionRef])
+
+  useFrame((_, delta) => {
+    const k = keys.current
+    let dx = 0, dz = 0
+    if (k.has('w') || k.has('arrowup')) dz -= 1
+    if (k.has('s') || k.has('arrowdown')) dz += 1
+    if (k.has('a') || k.has('arrowleft')) dx -= 1
+    if (k.has('d') || k.has('arrowright')) dx += 1
+    isMoving.current = dx !== 0 || dz !== 0
+    const speed = (k.has('shift') ? 9 : 5) * delta
+    if (isMoving.current) {
+      const mag = Math.hypot(dx, dz) || 1
+      const mx = (dx / mag) * speed
+      const mz = (dz / mag) * speed
+      positionRef.current.x = THREE.MathUtils.clamp(positionRef.current.x + mx, -28, 28)
+      positionRef.current.z = THREE.MathUtils.clamp(positionRef.current.z + mz, -22, 22)
+      yaw.current = Math.atan2(mx, mz)
+      bobT.current += delta * 8
+    } else {
+      bobT.current = 0
+    }
+    if (groupRef.current) {
+      groupRef.current.position.x = positionRef.current.x
+      groupRef.current.position.z = positionRef.current.z
+      groupRef.current.position.y = isMoving.current ? Math.abs(Math.sin(bobT.current)) * 0.08 : 0
+      groupRef.current.rotation.y = yaw.current
+    }
+    camIdeal.set(positionRef.current.x + 9, 11, positionRef.current.z + 9)
+    camera.position.lerp(camIdeal, 0.12)
+    camLook.set(positionRef.current.x, positionRef.current.y + 0.6, positionRef.current.z)
+    camera.lookAt(camLook)
+  })
+
   return (
-    <>
+    <group ref={groupRef} position={spawn}>
+      {/* shadow plate */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.5, 24]} />
+        <meshBasicMaterial color="black" transparent opacity={0.4} />
+      </mesh>
+      {/* body */}
       <mesh position={[0, 0.55, 0]} castShadow>
         <capsuleGeometry args={[0.32, 0.6, 8, 16]} />
         <meshStandardMaterial color="#2dd4bf" roughness={0.5} />
       </mesh>
+      {/* avatar billboard head */}
       <Billboard position={[0, 1.4, 0]}>
         <mesh>
           <planeGeometry args={[1, 1]} />
@@ -313,7 +391,7 @@ function PlayerAvatar({ avatarId = 'hermes' }: { avatarId?: string }) {
       <Text position={[0, 2.1, 0]} fontSize={0.22} color="#a7f3d0" anchorX="center" outlineColor="#000" outlineWidth={0.02}>
         You
       </Text>
-    </>
+    </group>
   )
 }
 
@@ -328,65 +406,68 @@ function Scene({
   onQuestZone: (id: string) => void
 }) {
   const world = WORLDS_3D[worldId]
-  const playerRef = useRef<THREE.Group>(null!)
+  const playerPos = useRef(new THREE.Vector3(0, 0, 6))
 
   return (
     <>
       <color attach="background" args={[world.skyColor]} />
       <fog attach="fog" args={[world.skyColor, world.fogNear, world.fogFar]} />
       <Stars radius={80} depth={40} count={1500} factor={4} saturation={0} fade speed={0.3} />
-      <ambientLight intensity={0.6} color={world.ambient} />
+      <ambientLight intensity={0.7} color={world.ambient} />
       <directionalLight castShadow position={[10, 14, 6]} intensity={1.6} shadow-mapSize={[2048, 2048]} />
       <pointLight position={[0, 4, 0]} color={world.accent} intensity={2.5} distance={16} />
 
-      <Physics gravity={[0, -25, 0]}>
-        <Ground world={world} />
-        {world.pillarType === 'classical' ? <ClassicalPillars world={world} /> : <TechPillars world={world} />}
+      <Ground world={world} />
+      {world.pillarType === 'classical' ? <ClassicalPillars world={world} /> : <TechPillars world={world} />}
 
-        {/* NPCs */}
-        {worldId === 'agora' && (
-          <>
-            <NPC position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" />
-            <NPC position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" />
-            <NPC position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" />
-            <NPC position={[6, 0, -4]} avatar="nike" name="Nike · Champion" />
-          </>
-        )}
-        {worldId === 'forge' && (
-          <>
-            <NPC position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" />
-            <NPC position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" />
-          </>
-        )}
+      {/* NPCs */}
+      {worldId === 'agora' && (
+        <>
+          <NPC position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" />
+          <NPC position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" />
+          <NPC position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" />
+          <NPC position={[6, 0, -4]} avatar="nike" name="Nike · Champion" />
+        </>
+      )}
+      {worldId === 'forge' && (
+        <>
+          <NPC position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" />
+          <NPC position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" />
+        </>
+      )}
 
-        {/* Portal */}
-        <Portal position={[10, 0, -2]} color={world.accent} label={worldId === 'agora' ? 'To The Forge →' : '← Back to Agora'} onEnter={onPortal} />
+      {/* Portal */}
+      <Portal
+        position={[10, 0, -2]}
+        color={world.accent}
+        label={worldId === 'agora' ? 'To The Forge →' : '← Back to Agora'}
+        onEnter={onPortal}
+        playerRef={playerPos}
+      />
 
-        {/* Quest zone */}
-        {worldId === 'agora' && (
-          <QuestZone position={[-8, 0, -3]} color="#facc15" label="Athena's Scroll" onEnter={() => onQuestZone('awakening-agora')} />
-        )}
-        {worldId === 'forge' && (
-          <QuestZone position={[0, 0, -7]} color="#22d3ee" label="Forge Shard" onEnter={() => onQuestZone('enter-forge')} />
-        )}
+      {/* Quest zone */}
+      {worldId === 'agora' && (
+        <QuestZone
+          position={[-8, 0, -3]}
+          color="#facc15"
+          label="Athena's Scroll"
+          onEnter={() => onQuestZone('awakening-agora')}
+          playerRef={playerPos}
+        />
+      )}
+      {worldId === 'forge' && (
+        <QuestZone
+          position={[0, 0, -7]}
+          color="#22d3ee"
+          label="Forge Shard"
+          onEnter={() => onQuestZone('enter-forge')}
+          playerRef={playerPos}
+        />
+      )}
 
-        {/* Player */}
-        <Ecctrl
-          ref={playerRef as any}
-          position={[0, 2, 6]}
-          camCollision={false}
-          camInitDis={-10}
-          camMaxDis={-14}
-          camMinDis={-6}
-          maxVelLimit={6}
-          jumpVel={6}
-          followLight={false}
-        >
-          <PlayerAvatar />
-        </Ecctrl>
-      </Physics>
-
-      <IsoCamera playerRef={playerRef} />
+      <Suspense fallback={null}>
+        <PlayerAndCamera positionRef={playerPos} spawn={[0, 0, 6]} />
+      </Suspense>
     </>
   )
 }
