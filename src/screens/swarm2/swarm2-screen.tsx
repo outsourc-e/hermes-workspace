@@ -473,7 +473,7 @@ function rankMember(roomIds: Array<string>) {
 function sortSwarmMembers(members: Array<CrewMember>, roomIds: Array<string>) {
   const rank = rankMember(roomIds)
   return [...members]
-    .filter((member) => /^swarm\d+$/i.test(member.id))
+    .filter((member) => member.id && member.id.trim().length > 0)
     .sort((a, b) => {
       const r = rank(a) - rank(b)
       if (r !== 0) return r
