@@ -656,15 +656,22 @@ export function PlaygroundScreen() {
         <PlaygroundWorld3D
           worldId={world}
           onPortal={() => {
-            const next = world === 'agora' ? 'forge' : 'agora'
-            if (rpg.state.unlockedWorlds.includes(next)) {
-              setWorld(next)
-              if (next === 'forge' && rpg.activeQuest.id === 'enter-forge') {
-                rpg.completeQuest(rpg.activeQuest)
-              }
-            } else {
+            const order: PlaygroundWorldId[] = ['agora', 'forge', 'grove', 'oracle', 'arena']
+            const unlocked = order.filter((w) => rpg.state.unlockedWorlds.includes(w))
+            const currentIndex = unlocked.indexOf(world)
+            // Cycle to next unlocked world, or unlock+enter Forge if only Agora is unlocked
+            let next: PlaygroundWorldId
+            if (unlocked.length <= 1) {
               rpg.unlockWorld('forge')
-              setWorld('forge')
+              next = 'forge'
+            } else {
+              next = unlocked[(currentIndex + 1) % unlocked.length]
+            }
+            setWorld(next)
+            // Auto-complete enter-* quests on entry
+            const enterQuestId = `enter-${next}`
+            if (rpg.activeQuest && (rpg.activeQuest.id === enterQuestId || rpg.activeQuest.id === 'enter-forge' && next === 'forge')) {
+              rpg.completeQuest(rpg.activeQuest)
             }
           }}
           onQuestZone={(questId) => {

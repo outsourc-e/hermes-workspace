@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 
+type DecorType = 'classical' | 'tech' | 'forest' | 'temple' | 'arena'
+
 type WorldDef = {
   id: PlaygroundWorldId
   name: string
@@ -16,7 +18,7 @@ type WorldDef = {
   skyColor: string
   ambient: string
   pillarColor: string
-  pillarType: 'classical' | 'tech'
+  pillarType: DecorType
   fogNear: number
   fogFar: number
 }
@@ -54,7 +56,7 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
     skyColor: '#06150f',
     ambient: '#1a4030',
     pillarColor: '#86efac',
-    pillarType: 'classical',
+    pillarType: 'forest',
     fogNear: 16,
     fogFar: 50,
   },
@@ -66,7 +68,7 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
     skyColor: '#080714',
     ambient: '#251c40',
     pillarColor: '#c4b5fd',
-    pillarType: 'classical',
+    pillarType: 'temple',
     fogNear: 16,
     fogFar: 50,
   },
@@ -78,7 +80,7 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
     skyColor: '#16070a',
     ambient: '#3a1822',
     pillarColor: '#fda4af',
-    pillarType: 'tech',
+    pillarType: 'arena',
     fogNear: 14,
     fogFar: 42,
   },
@@ -158,6 +160,159 @@ function TechPillars({ world }: { world: WorldDef }) {
       </mesh>
     </>
   )
+}
+
+/* ── Forest decor (Grove) ── */
+function ForestDecor({ world }: { world: WorldDef }) {
+  const trees = useMemo(() => {
+    const out: Array<[number, number, number, number]> = []
+    const seed = (i: number) => Math.sin(i * 9.31) * 0.5 + 0.5
+    for (let i = 0; i < 22; i++) {
+      const ang = (i / 22) * Math.PI * 2
+      const r = 9 + seed(i) * 8
+      const x = Math.cos(ang) * r
+      const z = Math.sin(ang) * r
+      const scale = 0.8 + seed(i + 9) * 0.6
+      out.push([x, 0, z, scale])
+    }
+    return out
+  }, [])
+  return (
+    <>
+      {trees.map(([x, y, z, s], i) => (
+        <group key={i} position={[x, y, z]} scale={s}>
+          {/* trunk */}
+          <mesh castShadow position={[0, 0.7, 0]}>
+            <cylinderGeometry args={[0.15, 0.22, 1.4, 8]} />
+            <meshStandardMaterial color="#5b3a1f" roughness={0.8} />
+          </mesh>
+          {/* canopy */}
+          <mesh castShadow position={[0, 1.85, 0]}>
+            <coneGeometry args={[0.95, 1.7, 8]} />
+            <meshStandardMaterial color="#1f8b4f" roughness={0.8} />
+          </mesh>
+          <mesh castShadow position={[0, 2.55, 0]}>
+            <coneGeometry args={[0.7, 1.2, 8]} />
+            <meshStandardMaterial color={world.pillarColor} roughness={0.7} emissive={world.pillarColor} emissiveIntensity={0.06} />
+          </mesh>
+        </group>
+      ))}
+      {/* Mossy center ring */}
+      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[3, 4, 64]} />
+        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.4} />
+      </mesh>
+    </>
+  )
+}
+
+/* ── Temple decor (Oracle) ── */
+function TempleDecor({ world }: { world: WorldDef }) {
+  const crystals = useMemo(() => {
+    const out: Array<[number, number, number, number]> = []
+    const seed = (i: number) => Math.sin(i * 17.7) * 0.5 + 0.5
+    for (let i = 0; i < 14; i++) {
+      const ang = (i / 14) * Math.PI * 2
+      const r = 7 + seed(i) * 5
+      out.push([Math.cos(ang) * r, 1.2 + seed(i + 3) * 0.8, Math.sin(ang) * r, 0.6 + seed(i + 7) * 0.5])
+    }
+    return out
+  }, [])
+  return (
+    <>
+      {crystals.map(([x, y, z, s], i) => (
+        <FloatCrystal key={i} position={[x, y, z]} scale={s} color={world.pillarColor} />
+      ))}
+      {/* outer ring of low pillars */}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const ang = (i / 12) * Math.PI * 2
+        return (
+          <group key={`p${i}`} position={[Math.cos(ang) * 6, 0, Math.sin(ang) * 6]}>
+            <mesh castShadow position={[0, 0.6, 0]}>
+              <cylinderGeometry args={[0.25, 0.3, 1.2, 12]} />
+              <meshStandardMaterial color={world.pillarColor} emissive={world.pillarColor} emissiveIntensity={0.2} roughness={0.5} />
+            </mesh>
+          </group>
+        )
+      })}
+      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[3.2, 3.6, 64]} />
+        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={1} />
+      </mesh>
+    </>
+  )
+}
+
+function FloatCrystal({ position, scale, color }: { position: [number, number, number]; scale: number; color: string }) {
+  const ref = useRef<THREE.Mesh>(null)
+  const phase = useMemo(() => Math.random() * Math.PI * 2, [])
+  useFrame(({ clock }) => {
+    if (!ref.current) return
+    const t = clock.getElapsedTime() + phase
+    ref.current.position.y = position[1] + Math.sin(t * 0.8) * 0.2
+    ref.current.rotation.y += 0.01
+  })
+  return (
+    <mesh ref={ref} position={position} scale={scale}>
+      <octahedronGeometry args={[0.6, 0]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.6} transparent opacity={0.85} />
+    </mesh>
+  )
+}
+
+/* ── Arena decor (Benchmark Arena) ── */
+function ArenaDecor({ world }: { world: WorldDef }) {
+  const seats = useMemo(() => {
+    const out: Array<[number, number, number]> = []
+    for (let ring = 0; ring < 3; ring++) {
+      const r = 9 + ring * 1.6
+      const count = 24 + ring * 4
+      for (let i = 0; i < count; i++) {
+        const ang = (i / count) * Math.PI * 2
+        out.push([Math.cos(ang) * r, ring * 0.6, Math.sin(ang) * r])
+      }
+    }
+    return out
+  }, [])
+  return (
+    <>
+      {seats.map((pos, i) => (
+        <mesh key={i} position={[pos[0], pos[1] + 0.3, pos[2]]} castShadow>
+          <boxGeometry args={[0.6, 0.6, 0.6]} />
+          <meshStandardMaterial color="#27121a" emissive={world.pillarColor} emissiveIntensity={0.06} roughness={0.5} />
+        </mesh>
+      ))}
+      {/* central duel medallion */}
+      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[2.4, 4.4, 64]} />
+        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.6} />
+      </mesh>
+      {/* scoreboard pillars */}
+      {[-7, 7].map((x, i) => (
+        <group key={i} position={[x, 0, 0]}>
+          <mesh castShadow position={[0, 1.4, 0]}>
+            <boxGeometry args={[0.6, 2.8, 0.6]} />
+            <meshStandardMaterial color="#0f172a" emissive={world.accent} emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[0, 2.5, 0]}>
+            <boxGeometry args={[1.6, 0.8, 0.18]} />
+            <meshStandardMaterial color="#0f172a" emissive={world.accent} emissiveIntensity={1.4} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  )
+}
+
+/* ── Decor router ── */
+function WorldDecor({ world }: { world: WorldDef }) {
+  switch (world.pillarType) {
+    case 'classical': return <ClassicalPillars world={world} />
+    case 'tech': return <TechPillars world={world} />
+    case 'forest': return <ForestDecor world={world} />
+    case 'temple': return <TempleDecor world={world} />
+    case 'arena': return <ArenaDecor world={world} />
+  }
 }
 
 /* ── NPC billboard ── */
@@ -593,9 +748,9 @@ function Scene({
       <pointLight position={[0, 4, 0]} color={world.accent} intensity={2.5} distance={16} />
 
       <Ground world={world} />
-      {world.pillarType === 'classical' ? <ClassicalPillars world={world} /> : <TechPillars world={world} />}
+      <WorldDecor world={world} />
 
-      {/* NPCs */}
+      {/* NPCs per world */}
       {worldId === 'agora' && (
         <>
           <NPC position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" color={NPC_COLORS.athena} />
@@ -610,34 +765,52 @@ function Scene({
           <NPC position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" color={NPC_COLORS.chronos} />
         </>
       )}
+      {worldId === 'grove' && (
+        <>
+          <NPC position={[-4, 0, 1]} avatar="pan" name="Pan · Druid" color={NPC_COLORS.pan} />
+          <NPC position={[4, 0, 0]} avatar="apollo" name="Apollo · Songkeeper" color={NPC_COLORS.apollo} />
+          <NPC position={[0, 0, -5]} avatar="artemis" name="Artemis · Tracker" color={NPC_COLORS.artemis} />
+        </>
+      )}
+      {worldId === 'oracle' && (
+        <>
+          <NPC position={[-3, 0, -2]} avatar="athena" name="Athena · Oracle" color={NPC_COLORS.athena} />
+          <NPC position={[3, 0, -2]} avatar="chronos" name="Chronos · Archivist" color={NPC_COLORS.chronos} />
+          <NPC position={[0, 0, 4]} avatar="eros" name="Eros · Whisperer" color={NPC_COLORS.eros} />
+        </>
+      )}
+      {worldId === 'arena' && (
+        <>
+          <NPC position={[-3, 0, 4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} />
+          <NPC position={[3, 0, 4]} avatar="hermes" name="Hermes · Referee" color={NPC_COLORS.hermes} />
+          <NPC position={[0, 0, -5]} avatar="chronos" name="Chronos · Bookmaker" color={NPC_COLORS.chronos} />
+        </>
+      )}
 
-      {/* Portal */}
+      {/* Portal: routes to next unlocked world */}
       <Portal
         position={[10, 0, -2]}
         color={world.accent}
-        label={worldId === 'agora' ? 'To The Forge →' : '← Back to Agora'}
+        label="✨ Portal"
         onEnter={onPortal}
         playerRef={playerPos}
       />
 
-      {/* Quest zone */}
+      {/* Quest zones per world */}
       {worldId === 'agora' && (
-        <QuestZone
-          position={[-8, 0, -3]}
-          color="#facc15"
-          label="Athena's Scroll"
-          onEnter={() => onQuestZone('awakening-agora')}
-          playerRef={playerPos}
-        />
+        <QuestZone position={[-8, 0, -3]} color="#facc15" label="Athena's Scroll" onEnter={() => onQuestZone('awakening-agora')} playerRef={playerPos} />
       )}
       {worldId === 'forge' && (
-        <QuestZone
-          position={[0, 0, -7]}
-          color="#22d3ee"
-          label="Forge Shard"
-          onEnter={() => onQuestZone('enter-forge')}
-          playerRef={playerPos}
-        />
+        <QuestZone position={[0, 0, -7]} color="#22d3ee" label="Forge Shard" onEnter={() => onQuestZone('enter-forge')} playerRef={playerPos} />
+      )}
+      {worldId === 'grove' && (
+        <QuestZone position={[-6, 0, -4]} color="#34d399" label="Song of the Grove" onEnter={() => onQuestZone('grove-ritual')} playerRef={playerPos} />
+      )}
+      {worldId === 'oracle' && (
+        <QuestZone position={[5, 0, -3]} color="#a78bfa" label="Oracle's Riddle" onEnter={() => onQuestZone('oracle-riddle')} playerRef={playerPos} />
+      )}
+      {worldId === 'arena' && (
+        <QuestZone position={[0, 0, 0]} color="#fb7185" label="Enter the Duel" onEnter={() => onQuestZone('arena-duel')} playerRef={playerPos} />
       )}
 
       <Suspense fallback={null}>

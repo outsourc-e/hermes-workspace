@@ -22,6 +22,10 @@ export type PlaygroundItemId =
   | 'portal-key'
   | 'oracle-crystal'
   | 'kimi-sigil'
+  | 'grove-leaf'
+  | 'arena-medal'
+  | 'song-fragment'
+  | 'oracle-riddle'
 
 export type QuestObjectiveType =
   | 'talk_to_athena'
@@ -30,6 +34,10 @@ export type QuestObjectiveType =
   | 'open_world_map'
   | 'collect_item'
   | 'use_skill'
+  | 'visit_zone'
+  | 'talk_to_npc'
+  | 'duel_npc'
+  | 'gather_song'
 
 export type QuestObjective = {
   id: string
@@ -207,6 +215,34 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
     rarity: 'legendary',
     description: 'A hackathon relic. Opens the Benchmark Arena.',
   },
+  {
+    id: 'grove-leaf',
+    name: 'Grove Leaf',
+    icon: '🍃',
+    rarity: 'rare',
+    description: 'A glowing leaf from the bioluminescent forest. Sings on touch.',
+  },
+  {
+    id: 'song-fragment',
+    name: 'Song Fragment',
+    icon: '🎶',
+    rarity: 'epic',
+    description: 'A piece of a generative agent symphony. Three fragments unlock the Grove ritual.',
+  },
+  {
+    id: 'oracle-riddle',
+    name: "Oracle's Riddle",
+    icon: '🤔',
+    rarity: 'epic',
+    description: 'Sealed scroll of an unsolvable question. Maybe the answer is in the Grove.',
+  },
+  {
+    id: 'arena-medal',
+    name: 'Arena Medal',
+    icon: '🏅',
+    rarity: 'legendary',
+    description: 'Awarded for surviving the Duel of Models in the Benchmark Arena.',
+  },
 ]
 
 export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
@@ -255,6 +291,54 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
       items: ['forge-shard'],
       skillXp: { engineering: 60, worldsmithing: 60 },
       unlockWorlds: ['grove'],
+    },
+  },
+  {
+    id: 'grove-ritual',
+    chapter: 'Chapter II — The Grove Ritual',
+    title: 'The Grove Ritual',
+    description: 'Walk into the Grove and gather a Song Fragment from the bioluminescent forest.',
+    objectives: [
+      { id: 'enter-grove', type: 'enter_world', label: 'Enter The Grove', target: 'grove' },
+      { id: 'song', type: 'gather_song', label: 'Gather a Song Fragment', target: 'song-fragment' },
+    ],
+    reward: {
+      xp: 160,
+      items: ['grove-leaf', 'song-fragment'],
+      skillXp: { diplomacy: 80, oracle: 40 },
+      unlockWorlds: ['oracle'],
+    },
+  },
+  {
+    id: 'oracle-riddle',
+    chapter: 'Chapter III — Oracle\'s Riddle',
+    title: "Oracle's Riddle",
+    description: 'Visit the Oracle Temple and accept a Riddle from Athena the Oracle.',
+    objectives: [
+      { id: 'enter-oracle', type: 'enter_world', label: 'Enter the Oracle Temple', target: 'oracle' },
+      { id: 'riddle', type: 'collect_item', label: "Receive Oracle's Riddle", target: 'oracle-riddle' },
+    ],
+    reward: {
+      xp: 200,
+      items: ['oracle-riddle', 'oracle-crystal'],
+      skillXp: { oracle: 120, promptcraft: 60 },
+      unlockWorlds: ['arena'],
+    },
+  },
+  {
+    id: 'arena-duel',
+    chapter: 'Chapter IV — Arena of Models',
+    title: 'Duel of Models',
+    description: 'Step into the Benchmark Arena. Survive the duel and earn the Kimi Sigil.',
+    objectives: [
+      { id: 'enter-arena', type: 'enter_world', label: 'Enter the Benchmark Arena', target: 'arena' },
+      { id: 'survive', type: 'duel_npc', label: 'Survive the Duel of Models' },
+      { id: 'kimi', type: 'collect_item', label: 'Claim the Kimi Sigil', target: 'kimi-sigil' },
+    ],
+    reward: {
+      xp: 320,
+      items: ['arena-medal', 'kimi-sigil'],
+      skillXp: { engineering: 80, summoning: 80, oracle: 40 },
     },
   },
 ]
