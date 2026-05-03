@@ -5,6 +5,9 @@ import * as THREE from 'three'
 import { PlaygroundHud } from './components/playground-hud'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { PlaygroundDialog } from './components/playground-dialog'
+import { PlaygroundJournal } from './components/playground-journal'
+import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
+import { botsFor } from './lib/playground-bots'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import {
   PLAYGROUND_WORLDS,
@@ -600,7 +603,75 @@ export function PlaygroundScreen() {
   const [input, setInput] = useState('')
   const [companionLine, setCompanionLine] = useState('Welcome to Hermes Playground. I am Athena, your agent companion. Ask me to generate a world.')
   const [dialogNpc, setDialogNpc] = useState<string | null>(null)
+  const [journalOpen, setJournalOpen] = useState(false)
+  const [chatCollapsed, setChatCollapsed] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [botBubbles, setBotBubbles] = useState<Record<string, string>>({})
   const rpg = usePlaygroundRpg()
+
+  // Ambient bot chatter — every 6-14s a bot in current world says something
+  useEffect(() => {
+    let cancelled = false
+    function tick() {
+      if (cancelled) return
+      const bots = botsFor(world)
+      if (bots.length > 0) {
+        const bot = bots[Math.floor(Math.random() * bots.length)]
+        const line = bot.lines[Math.floor(Math.random() * bot.lines.length)]
+        const msg: ChatMessage = {
+          id: `${Date.now()}-${Math.random()}`,
+          authorId: bot.id,
+          authorName: bot.name,
+          body: line,
+          ts: Date.now(),
+          color: bot.color,
+        }
+        setMessages((prev) => [...prev, msg].slice(-40))
+        setBotBubbles((prev) => ({ ...prev, [bot.id]: line }))
+        window.setTimeout(() => {
+          setBotBubbles((prev) => {
+            const next = { ...prev }
+            delete next[bot.id]
+            return next
+          })
+        }, 5000)
+      }
+      window.setTimeout(tick, 6000 + Math.random() * 8000)
+    }
+    const initial = window.setTimeout(tick, 2500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(initial)
+    }
+  }, [world])
+
+  function sendChat(body: string) {
+    setMessages((prev) =>
+      [...prev, {
+        id: `${Date.now()}-${Math.random()}`,
+        authorId: 'self',
+        authorName: 'You',
+        body,
+        ts: Date.now(),
+        color: '#a7f3d0',
+      }].slice(-40),
+    )
+  }
+
+  // J key toggles journal
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (e.key.toLowerCase() === 'j') setJournalOpen((j) => !j)
+      if (e.key === 'Escape') {
+        setJournalOpen(false)
+        setDialogNpc(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const meta = WORLD_META[world]
 
   function askAthena(text: string) {
@@ -681,8 +752,17 @@ export function PlaygroundScreen() {
             if (q && q.id === questId) rpg.completeQuest(q)
           }}
           onNpcNear={(id) => setDialogNpc(id)}
+          botBubbles={botBubbles}
         />
         <PlaygroundDialog npcId={dialogNpc} onClose={() => setDialogNpc(null)} />
+        <PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} />
+        <PlaygroundChat
+          worldId={world}
+          messages={messages}
+          onSend={sendChat}
+          collapsed={chatCollapsed}
+          onToggle={() => setChatCollapsed((c) => !c)}
+        />
         <PlaygroundHud
           state={rpg.state}
           activeQuestTitle={rpg.activeQuest.title}

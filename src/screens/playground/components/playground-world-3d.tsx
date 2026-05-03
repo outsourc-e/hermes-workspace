@@ -7,6 +7,7 @@ import { Billboard, Html, useTexture } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
+import { botsFor, type BotProfile } from '../lib/playground-bots'
 
 type DecorType = 'classical' | 'tech' | 'forest' | 'temple' | 'arena'
 
@@ -746,18 +747,151 @@ const NPC_COLORS: Record<string, string> = {
   eros: '#f472b6',
 }
 
+/* ── Bot player (waypoint walker with chat bubble) ── */
+function BotPlayer({
+  bot,
+  bubbleText,
+}: {
+  bot: BotProfile
+  bubbleText?: string
+}) {
+  const ref = useRef<THREE.Group>(null)
+  const target = useRef(new THREE.Vector3(...bot.spawn))
+  const next = useRef(0)
+  const phase = useMemo(() => Math.random() * Math.PI * 2, [])
+  const texture = useTexture(`/avatars/${bot.avatar}.png`)
+  const swing = useRef(0)
+  const moving = useRef(false)
+
+  useFrame(({ clock }, dt) => {
+    if (!ref.current) return
+    const now = clock.getElapsedTime()
+    if (now > next.current) {
+      // Pick a new waypoint within ~10u of spawn
+      target.current.set(
+        bot.spawn[0] + (Math.random() - 0.5) * 10,
+        0,
+        bot.spawn[2] + (Math.random() - 0.5) * 10,
+      )
+      next.current = now + 4 + Math.random() * 4
+    }
+    const pos = ref.current.position
+    const dx = target.current.x - pos.x
+    const dz = target.current.z - pos.z
+    const dist = Math.hypot(dx, dz)
+    if (dist > 0.15) {
+      const speed = 2 * dt
+      pos.x += (dx / dist) * speed
+      pos.z += (dz / dist) * speed
+      ref.current.rotation.y = Math.atan2(dx, dz)
+      moving.current = true
+      swing.current += dt * 8
+    } else {
+      moving.current = false
+    }
+    pos.y = moving.current ? Math.abs(Math.sin(swing.current)) * 0.07 : 0
+  })
+
+  const limbSwing = Math.sin(swing.current)
+  return (
+    <group ref={ref} position={bot.spawn}>
+      {/* shadow */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.5, 18]} />
+        <meshBasicMaterial color="black" transparent opacity={0.4} />
+      </mesh>
+      {/* legs */}
+      <mesh position={[0.13, 0.22, 0]} rotation={[moving.current ? limbSwing * 0.5 : 0, 0, 0]} castShadow>
+        <boxGeometry args={[0.14, 0.44, 0.14]} />
+        <meshStandardMaterial color="#1f2a37" roughness={0.6} />
+      </mesh>
+      <mesh position={[-0.13, 0.22, 0]} rotation={[moving.current ? -limbSwing * 0.5 : 0, 0, 0]} castShadow>
+        <boxGeometry args={[0.14, 0.44, 0.14]} />
+        <meshStandardMaterial color="#1f2a37" roughness={0.6} />
+      </mesh>
+      {/* feet */}
+      <mesh position={[0.13, 0.04, moving.current ? limbSwing * 0.16 : 0]} castShadow>
+        <boxGeometry args={[0.18, 0.07, 0.28]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.7} />
+      </mesh>
+      <mesh position={[-0.13, 0.04, moving.current ? -limbSwing * 0.16 : 0]} castShadow>
+        <boxGeometry args={[0.18, 0.07, 0.28]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.7} />
+      </mesh>
+      {/* torso */}
+      <mesh position={[0, 0.7, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.55, 0.32]} />
+        <meshStandardMaterial color={bot.color} roughness={0.55} emissive={bot.color} emissiveIntensity={0.15} />
+      </mesh>
+      {/* belt */}
+      <mesh position={[0, 0.46, 0]} castShadow>
+        <boxGeometry args={[0.52, 0.05, 0.34]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.4} roughness={0.4} />
+      </mesh>
+      {/* arms */}
+      <mesh position={[0.32, 0.7, 0]} rotation={[moving.current ? -limbSwing * 0.6 : 0, 0, 0.05]} castShadow>
+        <boxGeometry args={[0.13, 0.5, 0.13]} />
+        <meshStandardMaterial color={bot.color} roughness={0.55} />
+      </mesh>
+      <mesh position={[-0.32, 0.7, 0]} rotation={[moving.current ? limbSwing * 0.6 : 0, 0, -0.05]} castShadow>
+        <boxGeometry args={[0.13, 0.5, 0.13]} />
+        <meshStandardMaterial color={bot.color} roughness={0.55} />
+      </mesh>
+      {/* hands */}
+      <mesh position={[0.32, 0.43, 0]} castShadow>
+        <sphereGeometry args={[0.09, 12, 12]} />
+        <meshStandardMaterial color="#fde68a" roughness={0.5} />
+      </mesh>
+      <mesh position={[-0.32, 0.43, 0]} castShadow>
+        <sphereGeometry args={[0.09, 12, 12]} />
+        <meshStandardMaterial color="#fde68a" roughness={0.5} />
+      </mesh>
+      {/* neck */}
+      <mesh position={[0, 1.05, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.095, 0.1, 12]} />
+        <meshStandardMaterial color="#fde68a" roughness={0.55} />
+      </mesh>
+      {/* head */}
+      <mesh position={[0, 1.22, 0]} castShadow>
+        <sphereGeometry args={[0.22, 16, 16]} />
+        <meshStandardMaterial color="#fde68a" roughness={0.55} />
+      </mesh>
+      {/* portrait */}
+      <Billboard position={[0, 1.55, 0]}>
+        <mesh>
+          <planeGeometry args={[0.7, 0.7]} />
+          <meshBasicMaterial map={texture} transparent toneMapped={false} />
+        </mesh>
+      </Billboard>
+      {/* nameplate (player-style, no NPC border style) */}
+      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
+        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color:bot.color,borderRadius:4,fontSize:11,fontWeight:700,whiteSpace:'nowrap'}}>{bot.name}</div>
+      </Html>
+      {/* chat bubble */}
+      {bubbleText && (
+        <Html position={[0, 2.6, 0]} center distanceFactor={8}>
+          <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:200,textAlign:'center',border:`1px solid ${bot.color}`}}>{bubbleText}</div>
+        </Html>
+      )}
+    </group>
+  )
+}
+
 /* ── Scene ── */
 function Scene({
   worldId,
   onPortal,
   onQuestZone,
   onNpcNear,
+  botBubbles,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
   onQuestZone: (id: string) => void
   onNpcNear: (npcId: string) => void
+  botBubbles: Record<string, string>
 }) {
+  const bots = botsFor(worldId)
   const world = WORLDS_3D[worldId]
   const playerPos = useRef(new THREE.Vector3(0, 0, 6))
 
@@ -838,6 +972,13 @@ function Scene({
       <Suspense fallback={null}>
         <PlayerAndCamera positionRef={playerPos} spawn={[0, 0, 6]} />
       </Suspense>
+
+      {/* Online bot players */}
+      {bots.map((bot) => (
+        <Suspense key={bot.id} fallback={null}>
+          <BotPlayer bot={bot} bubbleText={botBubbles[bot.id]} />
+        </Suspense>
+      ))}
     </>
   )
 }
@@ -848,11 +989,13 @@ export function PlaygroundWorld3D({
   onPortal,
   onQuestZone,
   onNpcNear,
+  botBubbles,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
   onQuestZone: (id: string) => void
   onNpcNear: (npcId: string) => void
+  botBubbles: Record<string, string>
 }) {
   return (
     <div
@@ -872,7 +1015,7 @@ export function PlaygroundWorld3D({
         gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
       >
         <Suspense fallback={null}>
-          <Scene worldId={worldId} onPortal={onPortal} onQuestZone={onQuestZone} onNpcNear={onNpcNear} />
+          <Scene worldId={worldId} onPortal={onPortal} onQuestZone={onQuestZone} onNpcNear={onNpcNear} botBubbles={botBubbles} />
         </Suspense>
       </Canvas>
     </div>
