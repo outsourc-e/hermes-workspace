@@ -3,6 +3,7 @@ import { Billboard, Float, Html, Sparkles, Stars, Text, useTexture } from '@reac
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { PlaygroundHud } from './components/playground-hud'
+import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import {
   PLAYGROUND_WORLDS,
@@ -625,27 +626,69 @@ export function PlaygroundScreen() {
     return <PlaygroundFallback onLaunch3D={() => setLaunch3D(true)} />
   }
 
-  // Hackathon-safe path: do not mount WebGL by default. Some browsers report
-  // WebGL support, then Three still kills the route while binding the renderer.
-  // This DOM/CSS world is reliable, screenshot-friendly, and keeps the story
-  // alive. True R3F/WebGL can come back behind a separate "Try WebGL" toggle.
-  return <PlaygroundLiteWorld
-    world={world}
-    setWorld={setWorld}
-    quest={quest}
-    setQuest={setQuest}
-    input={input}
-    setInput={setInput}
-    companionLine={companionLine}
-    setCompanionLine={setCompanionLine}
-    rpgState={rpg.state}
-    activeQuest={rpg.activeQuest}
-    levelProgress={rpg.levelProgress}
-    lastReward={rpg.lastReward}
-    completeQuest={rpg.completeQuest}
-    resetRpg={rpg.resetRpg}
-  />
+  // Real 3D path with GPU-safe Lite fallback if WebGL fails to bind.
+  if (!detectWebGL()) {
+    return <PlaygroundLiteWorld
+      world={world}
+      setWorld={setWorld}
+      quest={quest}
+      setQuest={setQuest}
+      input={input}
+      setInput={setInput}
+      companionLine={companionLine}
+      setCompanionLine={setCompanionLine}
+      rpgState={rpg.state}
+      activeQuest={rpg.activeQuest}
+      levelProgress={rpg.levelProgress}
+      lastReward={rpg.lastReward}
+      completeQuest={rpg.completeQuest}
+      resetRpg={rpg.resetRpg}
+    />
+  }
 
+  return (
+    <PlaygroundErrorBoundary>
+      <div className="relative h-full min-h-[640px] overflow-hidden" style={{ background: '#0b1720', color: 'white' }}>
+        <PlaygroundWorld3D
+          worldId={world}
+          onPortal={() => {
+            const next = world === 'agora' ? 'forge' : 'agora'
+            if (rpg.state.unlockedWorlds.includes(next)) {
+              setWorld(next)
+              if (next === 'forge' && rpg.activeQuest.id === 'enter-forge') {
+                rpg.completeQuest(rpg.activeQuest)
+              }
+            } else {
+              rpg.unlockWorld('forge')
+              setWorld('forge')
+            }
+          }}
+          onQuestZone={(questId) => {
+            const q = rpg.activeQuest
+            if (q && q.id === questId) rpg.completeQuest(q)
+          }}
+        />
+        <PlaygroundHud
+          state={rpg.state}
+          activeQuestTitle={rpg.activeQuest.title}
+          levelProgress={rpg.levelProgress}
+          currentWorld={world}
+          worlds={PLAYGROUND_WORLDS}
+          onSelectWorld={(next) => {
+            if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
+          }}
+          onReset={rpg.resetRpg}
+          lastReward={rpg.lastReward}
+        />
+        <div className="pointer-events-none absolute left-1/2 top-3 z-[60] -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-[11px] uppercase tracking-[0.18em] text-white/70 backdrop-blur-xl">
+          {WORLD_META[world].name} · WASD/arrows · Space jump · portal teleports
+        </div>
+      </div>
+    </PlaygroundErrorBoundary>
+  )
+
+  // Legacy R3F embedded path (kept for reference, unreachable due to early return above).
+  // eslint-disable-next-line @typescript-eslint/no-unreachable
   return (
     <div className="relative h-full min-h-0 overflow-hidden" style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}>
       <PlaygroundErrorBoundary>
