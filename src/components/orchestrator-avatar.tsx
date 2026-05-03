@@ -28,7 +28,7 @@ export type AvatarStyle =
   | 'robot'
   | 'ghost'
   | 'fox'
-  | 'lobster'
+  | 'wolf'
   | 'octopus'
   | 'dragon'
   | 'panda'
@@ -57,7 +57,7 @@ const AVATAR_OPTIONS: Array<AvatarOption> = [
   { id: 'robot', label: 'Robot', emoji: '🤖', tier: 'emoji' },
   { id: 'fox', label: 'Fox', emoji: '🦊', tier: 'emoji' },
   { id: 'ghost', label: 'Ghost', emoji: '👻', tier: 'emoji' },
-  { id: 'lobster', label: 'Lobster', emoji: '🦞', tier: 'emoji' },
+  { id: 'wolf', label: 'Wolf', emoji: '🐺', tier: 'emoji' },
   { id: 'octopus', label: 'Octopus', emoji: '🐙', tier: 'emoji' },
   { id: 'dragon', label: 'Dragon', emoji: '🐉', tier: 'emoji' },
   { id: 'panda', label: 'Panda', emoji: '🐼', tier: 'emoji' },
@@ -822,6 +822,146 @@ function FoxSVG({ state, size }: { state: OrchestratorState; size: number }) {
   )
 }
 
+function WolfSVG({ state, size }: { state: OrchestratorState; size: number }) {
+  ensureStyles()
+  const ey = state === 'thinking' ? 12.5 : 14
+  const G = '#9ca3af' // gray-400 wolf body
+  const GD = '#6b7280' // gray-500 shadow
+  const GL = '#e5e7eb' // gray-200 highlight
+  const EYE = '#facc15' // yellow eye
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      style={{ animation: stateAnim(state) }}
+    >
+      {state === 'thinking' && (
+        <circle
+          cx="16"
+          cy="16"
+          r="14.5"
+          fill="none"
+          stroke="#eab308"
+          strokeWidth="1.5"
+          strokeDasharray="6 4"
+          opacity="0.6"
+          style={{ animation: 'oa-think-ring 2s linear infinite' }}
+        />
+      )}
+      {/* Body / chest */}
+      <ellipse cx="16" cy="25" rx="6.5" ry="4.5" fill={G} />
+      <ellipse cx="16" cy="26" rx="3.5" ry="2.5" fill={GL} opacity="0.5" />
+      {/* Tail */}
+      <path
+        d="M23,26 Q27,21 28,26"
+        fill="none"
+        stroke={G}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M27,23 Q28.2,22 28.5,23"
+        fill="none"
+        stroke={GL}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.7"
+      />
+      {/* Head — slightly wider than fox, lower-set ears */}
+      <ellipse cx="16" cy="14.5" rx="9.5" ry="8.5" fill={G} />
+      {/* Ears — sharper triangles */}
+      <polygon points="7,9 5,1 11.5,7" fill={G} />
+      <polygon points="25,9 27,1 20.5,7" fill={G} />
+      <polygon points="8,7 6,2.5 10.5,7" fill={GD} opacity="0.5" />
+      <polygon points="24,7 26,2.5 21.5,7" fill={GD} opacity="0.5" />
+      {/* Snout — long muzzle */}
+      <ellipse cx="16" cy="19" rx="4.5" ry="3.5" fill={GL} />
+      {/* Cheek mask */}
+      <ellipse cx="16" cy="15.5" rx="6" ry="4" fill={GL} opacity="0.3" />
+      {/* Yellow eyes (wolves are intense) */}
+      <ellipse
+        cx="12.5"
+        cy={ey}
+        rx="1.4"
+        ry={state === 'responding' ? 0.7 : 1.4}
+        fill={EYE}
+      />
+      <ellipse
+        cx="19.5"
+        cy={ey}
+        rx="1.4"
+        ry={state === 'responding' ? 0.7 : 1.4}
+        fill={EYE}
+      />
+      {/* Pupil slits */}
+      <ellipse
+        cx="12.5"
+        cy={ey}
+        rx="0.5"
+        ry={state === 'responding' ? 0.5 : 1}
+        fill={D}
+      />
+      <ellipse
+        cx="19.5"
+        cy={ey}
+        rx="0.5"
+        ry={state === 'responding' ? 0.5 : 1}
+        fill={D}
+      />
+      <circle cx="12.7" cy={ey - 0.4} r="0.3" fill="white" opacity="0.9" />
+      <circle cx="19.7" cy={ey - 0.4} r="0.3" fill="white" opacity="0.9" />
+      {/* Nose */}
+      <ellipse cx="16" cy="17.8" rx="1" ry="0.7" fill={D} />
+      {/* Mouth — slight snarl on orchestrating */}
+      <path
+        d={
+          state === 'orchestrating'
+            ? 'M13,21 Q16,23 19,21'
+            : 'M14,20.3 Q16,21.2 18,20.3'
+        }
+        fill="none"
+        stroke={D}
+        strokeWidth="0.9"
+        strokeLinecap="round"
+      />
+      {/* Tiny fang hints when orchestrating */}
+      {state === 'orchestrating' && (
+        <>
+          <polygon points="14.5,21 14.7,21.8 14.9,21" fill="white" />
+          <polygon points="17.5,21 17.7,21.8 17.9,21" fill="white" />
+        </>
+      )}
+      {/* Responding speech dots */}
+      {state === 'responding' && (
+        <g>
+          <circle
+            cx="12"
+            cy="30.5"
+            r="1"
+            fill={GD}
+            style={{ animation: 'oa-dot1 1.2s ease-in-out infinite' }}
+          />
+          <circle
+            cx="16"
+            cy="30.5"
+            r="1"
+            fill={GD}
+            style={{ animation: 'oa-dot2 1.2s ease-in-out infinite' }}
+          />
+          <circle
+            cx="20"
+            cy="30.5"
+            r="1"
+            fill={GD}
+            style={{ animation: 'oa-dot3 1.2s ease-in-out infinite' }}
+          />
+        </g>
+      )}
+    </svg>
+  )
+}
+
 function OwlSVG({ state, size }: { state: OrchestratorState; size: number }) {
   ensureStyles()
   const er = state === 'thinking' ? 3.5 : state === 'responding' ? 2 : 3
@@ -1435,7 +1575,7 @@ const AVATAR_RENDERERS: Record<
   pan: PanPNG,
   chronos: ChronosPNG,
   // Emoji SVGs
-  lobster: LobsterSVG,
+  wolf: WolfSVG,
   'hermes-cat': ClawCatSVG,
   robot: RobotSVG,
   fox: FoxSVG,
