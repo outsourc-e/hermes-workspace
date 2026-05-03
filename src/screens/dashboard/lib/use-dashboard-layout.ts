@@ -132,11 +132,15 @@ type StoredLayout = {
 }
 
 /**
- * Iteration 010 defaults:
- * - Logs Tail still off (triage tool, not a default).
- * - Provider Mix off (Eric's call: kept Cache only).
+ * Iteration 014 defaults:
+ * - Logs Tail off (triage tool, not a default).
+ * - Provider Mix off (Eric kept Cache only).
  * - Velocity, Cost Ledger off (live in the menu so the picker
  *   actually has interesting opt-in widgets).
+ * - Operator Tip off too — Eric's call after iter 013, the bottom-
+ *   of-column gap is better solved by Sessions Intelligence's
+ *   flex-1 stretch than by an additional card. Tip stays available
+ *   in the edit menu for users who want a contextual nudge.
  * Attention is no longer a widget id at all (it moved into OpsStrip).
  */
 const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = [
@@ -144,6 +148,7 @@ const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = [
   'provider_mix',
   'velocity',
   'cost_ledger',
+  'operator_tip',
 ]
 
 /**
@@ -152,7 +157,7 @@ const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = [
  * so existing localStorage entries with `attention` get migrated
  * cleanly instead of silently re-hiding stale ids.
  */
-const STORAGE_VERSION = 3
+const STORAGE_VERSION = 4
 
 function readLayout(): StoredLayout {
   if (typeof window === 'undefined') {
