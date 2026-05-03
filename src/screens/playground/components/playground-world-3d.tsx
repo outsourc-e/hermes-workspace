@@ -683,10 +683,12 @@ function PlayerAndCamera({
   avatarId = 'hermes',
   spawn = [0, 0, 6],
   positionRef,
+  moveTargetRef,
 }: {
   avatarId?: string
   spawn?: [number, number, number]
   positionRef: React.MutableRefObject<THREE.Vector3>
+  moveTargetRef?: React.MutableRefObject<THREE.Vector3 | null>
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const texture = useTexture(`/avatars/${avatarId}.png`)
@@ -701,11 +703,16 @@ function PlayerAndCamera({
   const isMoving = useRef(false)
   const bobT = useRef(0)
 
-  // Initial spawn position
+  // Initial spawn position — runs ONCE per mount, ignoring spawn-array identity
+  // changes from parent re-renders (those caused snap-back to origin).
+  const spawnedRef = useRef(false)
   useEffect(() => {
+    if (spawnedRef.current) return
+    spawnedRef.current = true
     positionRef.current.set(spawn[0], spawn[1], spawn[2])
     if (groupRef.current) groupRef.current.position.copy(positionRef.current)
-  }, [spawn, positionRef])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useFrame((_, delta) => {
     const k = keys.current
@@ -723,9 +730,13 @@ function PlayerAndCamera({
     if (k.has('s')) dz += 1
     if (k.has('a')) dx -= 1
     if (k.has('d')) dx += 1
-    isMoving.current = dx !== 0 || dz !== 0
+    const wasdMoving = dx !== 0 || dz !== 0
+    if (wasdMoving && moveTargetRef) moveTargetRef.current = null // WASD cancels click-to-walk
     const speed = (k.has('shift') ? 9 : 5) * delta
-    if (isMoving.current) {
+
+    let mx = 0
+    let mz = 0
+    if (wasdMoving) {
       const mag = Math.hypot(dx, dz) || 1
       // Rotate input direction by camera yaw so W is always 'into' the scene
       const cy = Math.cos(camYaw.current)
@@ -734,8 +745,22 @@ function PlayerAndCamera({
       const iz = dz / mag
       const wx = ix * cy + iz * sy
       const wz = -ix * sy + iz * cy
-      const mx = wx * speed
-      const mz = wz * speed
+      mx = wx * speed
+      mz = wz * speed
+    } else if (moveTargetRef?.current) {
+      // Click-to-walk steering toward stored world target
+      const tx = moveTargetRef.current.x - positionRef.current.x
+      const tz = moveTargetRef.current.z - positionRef.current.z
+      const dist = Math.hypot(tx, tz)
+      if (dist < 0.18) {
+        moveTargetRef.current = null
+      } else {
+        mx = (tx / dist) * speed
+        mz = (tz / dist) * speed
+      }
+    }
+    isMoving.current = mx !== 0 || mz !== 0
+    if (isMoving.current) {
       positionRef.current.x = THREE.MathUtils.clamp(positionRef.current.x + mx, -28, 28)
       positionRef.current.z = THREE.MathUtils.clamp(positionRef.current.z + mz, -22, 22)
       yaw.current = Math.atan2(mx, mz)
@@ -1057,9 +1082,33 @@ function Scene({
   const bots = botsFor(worldId)
   const world = WORLDS_3D[worldId]
   const playerPos = useRef(new THREE.Vector3(0, 0, 6))
+  const moveTarget = useRef<THREE.Vector3 | null>(null)
+  const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
 
   return (
     <>
+      {/* Invisible ground catcher: click anywhere to walk there (RuneScape-style) */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.005, 0]}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          const x = THREE.MathUtils.clamp(e.point.x, -28, 28)
+          const z = THREE.MathUtils.clamp(e.point.z, -22, 22)
+          moveTarget.current = new THREE.Vector3(x, 0, z)
+          setPingPos([x, 0.05, z])
+          window.setTimeout(() => setPingPos(null), 700)
+        }}
+      >
+        <planeGeometry args={[120, 120, 1, 1]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {pingPos && (
+        <mesh position={pingPos} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.45, 0.6, 32]} />
+          <meshBasicMaterial color={world.accent} transparent opacity={0.85} />
+        </mesh>
+      )}
       <color attach="background" args={[world.skyColor]} />
       <fog attach="fog" args={[world.skyColor, world.fogNear, world.fogFar]} />
       <hemisphereLight intensity={0.55} color={'#fff4d6'} groundColor={world.id === 'agora' ? '#3f6b3a' : world.ambient} />
@@ -1152,7 +1201,7 @@ function Scene({
       )}
 
       <Suspense fallback={null}>
-        <PlayerAndCamera positionRef={playerPos} spawn={[0, 0, 6]} />
+        <PlayerAndCamera positionRef={playerPos} spawn={[0, 0, 6]} moveTargetRef={moveTarget} />
       </Suspense>
 
       {/* Online bot players */}
