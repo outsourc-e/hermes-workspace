@@ -44,7 +44,7 @@ function getStoredAvatar(): AvatarStyle {
   } catch {
     /* noop */
   }
-  return 'lobster'
+  return 'owl'
 }
 
 /* ── CSS keyframes ────────────────────────────────────── */
