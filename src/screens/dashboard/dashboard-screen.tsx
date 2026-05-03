@@ -23,6 +23,7 @@ import { CacheEfficiencyCard } from './components/cache-efficiency-card'
 import { ProviderMixCard } from './components/provider-mix-card'
 import { VelocityCard } from './components/velocity-card'
 import { CostLedgerCard } from './components/cost-ledger-card'
+import { OperatorTipCard } from './components/operator-tip-card'
 import { WidgetShell } from './components/widget-shell'
 import { EditModePanel } from './components/edit-mode-panel'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
@@ -1142,6 +1143,11 @@ export function DashboardScreen() {
           {layout.isVisible('logs_tail') ? (
             <WidgetShell id="logs_tail" layout={layout}>
               <LogsTailCard logs={overview?.logs ?? null} />
+            </WidgetShell>
+          ) : null}
+          {layout.isVisible('operator_tip') ? (
+            <WidgetShell id="operator_tip" layout={layout}>
+              <OperatorTipCard overview={overview ?? null} />
             </WidgetShell>
           ) : null}
         </div>

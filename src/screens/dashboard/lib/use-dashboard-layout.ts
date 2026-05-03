@@ -19,6 +19,7 @@ export type WidgetId =
   | 'cost_ledger'
   | 'sessions_intelligence'
   | 'logs_tail'
+  | 'operator_tip'
   | 'skills_usage'
   | 'achievements'
   | 'mix_rhythm'
@@ -92,6 +93,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Live logs',
     description:
       'Tail of the gateway log stream. Off by default in iter 006 — enable here when triaging.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'operator_tip',
+    label: 'Operator tip',
+    description:
+      'Context-aware tip that adapts to the live overview (cache, cron, drift, etc.).',
     column: 'main',
     hideable: true,
   },
