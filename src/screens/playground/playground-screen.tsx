@@ -721,6 +721,11 @@ export function PlaygroundScreen() {
     // Broadcast to other browser tabs / multiplayer (best-effort)
     try { (window as any).__hermesPlaygroundSendChat?.(body) } catch {}
   }
+  // Expose dialog opener so click-to-talk in 3D scene can auto-open dialog on arrival
+  useEffect(() => {
+    ;(window as any).__hermesPlaygroundOpenDialog = (id: string) => setDialogNpc(id)
+    return () => { try { delete (window as any).__hermesPlaygroundOpenDialog } catch {} }
+  }, [])
   function handleIncomingChat(msg: { id: string; name: string; color: string; text: string; ts: number }) {
     setMessages((prev) => [...prev, {
       id: `${msg.ts}-${msg.id}`,

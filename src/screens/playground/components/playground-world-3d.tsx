@@ -449,6 +449,7 @@ function NPC({
   npcId,
   playerRef,
   onNearChange,
+  onClickNpc,
 }: {
   position: [number, number, number]
   avatar: string
@@ -458,6 +459,7 @@ function NPC({
   npcId?: string
   playerRef?: React.MutableRefObject<THREE.Vector3>
   onNearChange?: (id: string | null) => void
+  onClickNpc?: (npcId: string, worldPos: [number, number, number]) => void
 }) {
   const ref = useRef<THREE.Group>(null)
   const base = useMemo(() => new THREE.Vector3(...position), [position])
@@ -492,7 +494,13 @@ function NPC({
   })
 
   return (
-    <group ref={ref} position={position}>
+    <group ref={ref} position={position} onPointerDown={(e) => {
+      if (!npcId || !onClickNpc) return
+      e.stopPropagation()
+      const p = ref.current?.position
+      if (!p) return
+      onClickNpc(npcId, [p.x, p.y, p.z])
+    }}>
       {/* shadow plate */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.5, 18]} />
@@ -1440,6 +1448,23 @@ function Scene({
   const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
   const [interior, setInterior] = useState<InteriorId | null>(null)
   const [outsideSpawn, setOutsideSpawn] = useState<[number, number, number]>([0, 0, 6])
+  const pendingNpc = useRef<string | null>(null)
+
+  const onClickNpc = (id: string, p: [number, number, number]) => {
+    // Walk to ~1.6u in front of NPC then auto-open dialog
+    const target = new THREE.Vector3(p[0], 0, p[2] + 1.6)
+    moveTarget.current = target
+    pendingNpc.current = id
+    setPingPos([target.x, 0.05, target.z])
+    window.setTimeout(() => setPingPos(null), 700)
+  }
+  const handleNearChange = (id: string | null) => {
+    onNpcNearChange(id)
+    if (id && pendingNpc.current === id) {
+      pendingNpc.current = null
+      try { (window as any).__hermesPlaygroundOpenDialog?.(id) } catch {}
+    }
+  }
 
   if (interior) {
     return (
@@ -1506,15 +1531,15 @@ function Scene({
       {/* NPCs per world */}
       {worldId === 'agora' && (
         <>
-          <NPC npcId="athena" position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="apollo" position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" color={NPC_COLORS.apollo} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="iris" position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" color={NPC_COLORS.iris} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="nike" position={[6, 0, -4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="shopkeeper" position={[-3, 0, 9.5]} avatar="iris" name="Dorian · Quartermaster" color={NPC_COLORS.shopkeeper} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="trainer" position={[-12, 0, 5.7]} avatar="nike" name="Leonidas · Trainer" color={NPC_COLORS.trainer} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="banker" position={[15.3, 0, 7.5]} avatar="chronos" name="Midas · Banker" color={NPC_COLORS.banker} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="recruiter" position={[-1.2, 0, -15.5]} avatar="athena" name="Cassia · Recruiter" color={NPC_COLORS.recruiter} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="tavernkeeper" position={[2, 0, 15.5]} avatar="apollo" name="Selene · Tavern" color={NPC_COLORS.tavernkeeper} drift={false} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="athena" position={[-5, 0, 2]} avatar="athena" name="Athena · Sage" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="apollo" position={[5, 0, 3]} avatar="apollo" name="Apollo · Bard" color={NPC_COLORS.apollo} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="iris" position={[-3, 0, -5]} avatar="iris" name="Iris · Messenger" color={NPC_COLORS.iris} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="nike" position={[6, 0, -4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="shopkeeper" position={[-3, 0, 9.5]} avatar="iris" name="Dorian · Quartermaster" color={NPC_COLORS.shopkeeper} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="trainer" position={[-12, 0, 5.7]} avatar="nike" name="Leonidas · Trainer" color={NPC_COLORS.trainer} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="banker" position={[15.3, 0, 7.5]} avatar="chronos" name="Midas · Banker" color={NPC_COLORS.banker} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="recruiter" position={[-1.2, 0, -15.5]} avatar="athena" name="Cassia · Recruiter" color={NPC_COLORS.recruiter} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="tavernkeeper" position={[2, 0, 15.5]} avatar="apollo" name="Selene · Tavern" color={NPC_COLORS.tavernkeeper} drift={false} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
           <DoorTrigger position={[2, 0, 16.4]} label="Tavern" color="#f59e0b" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([2, 0, 16.7]); setInterior('tavern') }} />
           <DoorTrigger position={[15.7, 0, 8.5]} label="Bank" color="#facc15" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([15.7, 0, 8.8]); setInterior('bank') }} />
           <DoorTrigger position={[-12.7, 0, -13.9]} label="Smithy" color="#fb7185" playerRef={playerPos} onEnter={() => { moveTarget.current = null; setOutsideSpawn([-12.7, 0, -13.5]); setInterior('smithy') }} />
@@ -1525,29 +1550,29 @@ function Scene({
       )}
       {worldId === 'forge' && (
         <>
-          <NPC npcId="pan" position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" color={NPC_COLORS.pan} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="chronos" position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" color={NPC_COLORS.chronos} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="pan" position={[-4, 0, 0]} avatar="pan" name="Pan · Hacker" color={NPC_COLORS.pan} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="chronos" position={[4, 0, 0]} avatar="chronos" name="Chronos · Architect" color={NPC_COLORS.chronos} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
         </>
       )}
       {worldId === 'grove' && (
         <>
-          <NPC npcId="pan" position={[-4, 0, 1]} avatar="pan" name="Pan · Druid" color={NPC_COLORS.pan} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="apollo" position={[4, 0, 0]} avatar="apollo" name="Apollo · Songkeeper" color={NPC_COLORS.apollo} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="artemis" position={[0, 0, -5]} avatar="artemis" name="Artemis · Tracker" color={NPC_COLORS.artemis} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="pan" position={[-4, 0, 1]} avatar="pan" name="Pan · Druid" color={NPC_COLORS.pan} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="apollo" position={[4, 0, 0]} avatar="apollo" name="Apollo · Songkeeper" color={NPC_COLORS.apollo} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="artemis" position={[0, 0, -5]} avatar="artemis" name="Artemis · Tracker" color={NPC_COLORS.artemis} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
         </>
       )}
       {worldId === 'oracle' && (
         <>
-          <NPC npcId="athena" position={[-3, 0, -2]} avatar="athena" name="Athena · Oracle" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="chronos" position={[3, 0, -2]} avatar="chronos" name="Chronos · Archivist" color={NPC_COLORS.chronos} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="eros" position={[0, 0, 4]} avatar="eros" name="Eros · Whisperer" color={NPC_COLORS.eros} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="athena" position={[-3, 0, -2]} avatar="athena" name="Athena · Oracle" color={NPC_COLORS.athena} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="chronos" position={[3, 0, -2]} avatar="chronos" name="Chronos · Archivist" color={NPC_COLORS.chronos} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="eros" position={[0, 0, 4]} avatar="eros" name="Eros · Whisperer" color={NPC_COLORS.eros} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
         </>
       )}
       {worldId === 'arena' && (
         <>
-          <NPC npcId="nike" position={[-3, 0, 4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="hermes" position={[3, 0, 4]} avatar="hermes" name="Hermes · Referee" color={NPC_COLORS.hermes} playerRef={playerPos} onNearChange={onNpcNearChange} />
-          <NPC npcId="chronos" position={[0, 0, -5]} avatar="chronos" name="Chronos · Bookmaker" color={NPC_COLORS.chronos} playerRef={playerPos} onNearChange={onNpcNearChange} />
+          <NPC npcId="nike" position={[-3, 0, 4]} avatar="nike" name="Nike · Champion" color={NPC_COLORS.nike} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="hermes" position={[3, 0, 4]} avatar="hermes" name="Hermes · Referee" color={NPC_COLORS.hermes} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
+          <NPC npcId="chronos" position={[0, 0, -5]} avatar="chronos" name="Chronos · Bookmaker" color={NPC_COLORS.chronos} playerRef={playerPos} onNearChange={handleNearChange} onClickNpc={onClickNpc} />
         </>
       )}
 
