@@ -8,7 +8,7 @@ import {
   PLAYGROUND_WORLDS,
   type PlaygroundWorldId,
   type PlaygroundQuest,
-} from './data/playground-rpg'
+} from './lib/playground-rpg'
 
 type PlaygroundWorld = PlaygroundWorldId
 type QuestState = 'start' | 'met-athena' | 'generated-world' | 'complete'

@@ -7,7 +7,7 @@ import {
   type PlaygroundQuest,
   type PlaygroundSkillId,
   type PlaygroundWorldId,
-} from '../data/playground-rpg'
+} from '../lib/playground-rpg'
 
 const STORAGE_KEY = 'hermes-playground-rpg-state'
 

@@ -4,7 +4,7 @@ import {
   PLAYGROUND_SKILLS,
   type PlaygroundItemId,
   type PlaygroundWorldId,
-} from '../data/playground-rpg'
+} from '../lib/playground-rpg'
 import type { PlaygroundRpgState } from '../hooks/use-playground-rpg'
 
 type HudProps = {
