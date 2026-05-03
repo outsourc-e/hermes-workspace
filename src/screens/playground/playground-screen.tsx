@@ -10,6 +10,7 @@ import { PlaygroundMap } from './components/playground-map'
 import { PlaygroundActionBar } from './components/playground-actionbar'
 import { PlaygroundMinimap } from './components/playground-minimap'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
+import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { botsFor } from './lib/playground-bots'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import {
@@ -888,12 +889,18 @@ export function PlaygroundScreen() {
           activeQuestTitle={rpg.activeQuest.title}
           levelProgress={rpg.levelProgress}
           currentWorld={world}
+          worldAccent={WORLD_META[world].accent}
+          lastReward={rpg.lastReward}
+        />
+        <PlaygroundSidePanel
+          state={rpg.state}
+          currentWorld={world}
           worlds={PLAYGROUND_WORLDS}
           onSelectWorld={(next) => {
             if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
           }}
           onReset={rpg.resetRpg}
-          lastReward={rpg.lastReward}
+          worldAccent={WORLD_META[world].accent}
         />
         <div className="pointer-events-none absolute left-1/2 top-3 z-[60] -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-[11px] uppercase tracking-[0.18em] text-white/70 backdrop-blur-xl">
           {WORLD_META[world].name} · WASD walk · Arrows camera · Shift sprint · E talk · J journal · M map · T chat · [/] zoom
