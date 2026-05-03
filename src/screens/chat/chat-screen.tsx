@@ -102,8 +102,7 @@ import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
-// Activity store removed — not used in Hermes Workspace
-const _noopSetActivity = (_s: string) => {}
+import { useChatActivityStore, type AgentActivity } from '@/stores/chat-activity-store'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -1477,7 +1476,9 @@ export function ChatScreen({
   }, [suggestion, resolvedSessionKey, dismiss])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setLocalActivity = _noopSetActivity
+  const setLocalActivity = useChatActivityStore(
+    (s) => s.setLocalActivity,
+  ) as (next: AgentActivity) => void
   useEffect(() => {
     if (liveToolActivity.length > 0) {
       setLocalActivity('tool-use')
