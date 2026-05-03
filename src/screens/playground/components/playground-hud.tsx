@@ -30,18 +30,22 @@ export function PlaygroundHud({
 }: HudProps) {
   return (
     <>
-      <div className="pointer-events-auto fixed left-[92px] top-3 z-[70] w-[280px] rounded-2xl border border-white/10 bg-black/55 p-3 text-white shadow-2xl backdrop-blur-xl md:left-[104px]">
+      <div className="pointer-events-auto fixed left-[92px] top-3 z-[70] w-[300px] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/90 to-black/85 p-3 text-white shadow-2xl backdrop-blur-xl md:left-[104px]" style={{boxShadow:'0 0 20px rgba(56,189,248,.25), 0 12px 40px rgba(0,0,0,.6)'}}>
         <div className="mb-2 flex items-center justify-between">
           <div>
-            <div className="text-sm font-semibold">Level {state.level} Worldsmith</div>
+            <div className="text-sm font-bold" style={{textShadow:'0 0 8px rgba(56,189,248,.6)'}}>Level {state.level} Worldsmith</div>
             <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">{activeQuestTitle}</div>
           </div>
           <button onClick={onReset} className="rounded px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/45 hover:bg-white/10">Reset</button>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-cyan-300" style={{ width: `${levelProgress.pct}%` }} />
-        </div>
-        <div className="mt-1 text-[10px] text-white/45">{levelProgress.current}/{levelProgress.needed} XP</div>
+        {/* HP */}
+        <Bar label="HP" value={state.hp} max={state.hpMax} color="#ef4444" />
+        <Bar label="MP" value={state.mp} max={state.mpMax} color="#3b82f6" />
+        <Bar label="SP" value={state.sp} max={state.spMax} color="#10b981" />
+        <Bar label="XP" value={levelProgress.current} max={levelProgress.needed} color="#22d3ee" />
+        {state.defeats > 0 && (
+          <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-amber-300/80">Monsters slain: {state.defeats}</div>
+        )}
       </div>
 
       <div className="pointer-events-auto fixed bottom-3 left-[92px] z-[70] flex max-w-[calc(100vw-120px)] gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-black/55 p-2 text-white shadow-2xl backdrop-blur-xl md:left-[104px]">
@@ -114,5 +118,20 @@ export function PlaygroundHud({
         </div>
       )}
     </>
+  )
+}
+
+function Bar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = Math.max(0, Math.min(100, (value / max) * 100))
+  return (
+    <div className="mb-1.5 last:mb-0">
+      <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.14em] text-white/55">
+        <span style={{ color }}>{label}</span>
+        <span>{value}/{max}</span>
+      </div>
+      <div className="mt-0.5 h-2 overflow-hidden rounded-full bg-black/60 ring-1 ring-white/10">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}aa, ${color})`, boxShadow: `0 0 6px ${color}66` }} />
+      </div>
+    </div>
   )
 }

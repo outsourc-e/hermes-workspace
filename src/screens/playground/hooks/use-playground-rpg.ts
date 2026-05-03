@@ -21,6 +21,13 @@ export type PlaygroundRpgState = {
   unlockedWorlds: PlaygroundWorldId[]
   completedQuests: string[]
   activeQuestId: string
+  hp: number
+  hpMax: number
+  mp: number
+  mpMax: number
+  sp: number
+  spMax: number
+  defeats: number
 }
 
 const DEFAULT_SKILL_XP = Object.fromEntries(
@@ -36,6 +43,13 @@ function defaultState(): PlaygroundRpgState {
     unlockedWorlds: ['agora'],
     completedQuests: [],
     activeQuestId: PLAYGROUND_QUESTS[0]?.id ?? '',
+    hp: 100,
+    hpMax: 100,
+    mp: 50,
+    mpMax: 50,
+    sp: 80,
+    spMax: 80,
+    defeats: 0,
   }
 }
 
@@ -172,6 +186,61 @@ export function usePlaygroundRpg() {
     [completeQuest],
   )
 
+  const damagePlayer = useCallback((amount: number) => {
+    setState((prev) => {
+      const hp = Math.max(0, prev.hp - amount)
+      return { ...prev, hp }
+    })
+  }, [])
+
+  const useMp = useCallback((amount: number) => {
+    let ok = false
+    setState((prev) => {
+      if (prev.mp < amount) return prev
+      ok = true
+      return { ...prev, mp: Math.max(0, prev.mp - amount) }
+    })
+    return ok
+  }, [])
+
+  const recordDefeat = useCallback((xpReward: number, itemDrop?: PlaygroundItemId) => {
+    setState((prev) => {
+      const reward = xpReward
+      let xp = prev.xp + reward
+      let level = prev.level
+      let needed = xpForNextLevel(level)
+      while (xp >= needed) {
+        xp -= needed
+        level += 1
+        needed = xpForNextLevel(level)
+      }
+      return {
+        ...prev,
+        xp,
+        level,
+        defeats: prev.defeats + 1,
+        inventory: itemDrop
+          ? Array.from(new Set([...prev.inventory, itemDrop]))
+          : prev.inventory,
+      }
+    })
+    setLastReward(`+${xpReward} XP · monster defeated`)
+    window.setTimeout(() => setLastReward(null), 4000)
+  }, [])
+
+  // Passive HP/MP/SP regen tick
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setState((prev) => ({
+        ...prev,
+        hp: Math.min(prev.hpMax, prev.hp + 1),
+        mp: Math.min(prev.mpMax, prev.mp + 1),
+        sp: Math.min(prev.spMax, prev.sp + 2),
+      }))
+    }, 2500)
+    return () => window.clearInterval(id)
+  }, [])
+
   const resetRpg = useCallback(() => {
     setState(defaultState())
     setLastReward(null)
@@ -188,6 +257,9 @@ export function usePlaygroundRpg() {
     unlockWorld,
     grantItems,
     grantSkillXp,
+    damagePlayer,
+    useMp,
+    recordDefeat,
     resetRpg,
     lastReward,
   }

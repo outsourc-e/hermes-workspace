@@ -89,13 +89,100 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
 
 /* ── Ground ── */
 function Ground({ world }: { world: WorldDef }) {
+  // Procedural premium ground: layered radial vignette + animated grid
+  const ringRef = useRef<THREE.Mesh>(null)
+  useFrame(({ clock }) => {
+    if (!ringRef.current) return
+    const t = clock.getElapsedTime()
+    const m = ringRef.current.material as THREE.MeshStandardMaterial
+    if (m && 'emissiveIntensity' in m) {
+      m.emissiveIntensity = 0.25 + Math.sin(t * 1.2) * 0.12
+    }
+  })
   return (
     <group>
+      {/* Base plane */}
       <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[80, 80, 1, 1]} />
-        <meshStandardMaterial color={world.groundColor} roughness={0.95} metalness={0.05} />
+        <meshStandardMaterial color={world.groundColor} roughness={0.95} metalness={0.1} />
       </mesh>
-      <gridHelper args={[80, 40, world.accent, '#1f2937']} position={[0, 0.01, 0]} />
+      {/* Tile pattern (multiple inner rings for depth) */}
+      <mesh ref={ringRef} position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[6, 9, 80]} />
+        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.3} transparent opacity={0.18} />
+      </mesh>
+      <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[10, 12, 80]} />
+        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.18} transparent opacity={0.1} />
+      </mesh>
+      {/* Outer fade vignette ring */}
+      <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[24, 38, 80]} />
+        <meshBasicMaterial color={world.skyColor} transparent opacity={0.55} />
+      </mesh>
+      <gridHelper args={[80, 40, world.accent, '#1a2331']} position={[0, 0.012, 0]} />
+    </group>
+  )
+}
+
+/* ── Monster (PvE) ── */
+function Monster({
+  position,
+  color = '#ef4444',
+  hp,
+  hpMax,
+  onAttack,
+  defeated,
+}: {
+  position: [number, number, number]
+  color?: string
+  hp: number
+  hpMax: number
+  onAttack: () => void
+  defeated: boolean
+}) {
+  const ref = useRef<THREE.Group>(null)
+  const phase = useMemo(() => Math.random() * Math.PI * 2, [])
+  useFrame(({ clock }) => {
+    if (!ref.current) return
+    const t = clock.getElapsedTime() + phase
+    ref.current.position.y = defeated ? -2 : Math.sin(t * 1.4) * 0.15
+    ref.current.rotation.y = t * 0.5
+  })
+  if (defeated) return null
+  const hpPct = Math.max(0, Math.min(1, hp / hpMax))
+  return (
+    <group ref={ref} position={position}>
+      {/* Floating dark spire */}
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation()
+          onAttack()
+        }}
+        castShadow
+      >
+        <octahedronGeometry args={[0.7, 0]} />
+        <meshStandardMaterial color="#220815" emissive={color} emissiveIntensity={0.8} roughness={0.3} />
+      </mesh>
+      {/* Outer ring */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.1, 0.04, 12, 32]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.4} />
+      </mesh>
+      {/* HP bar */}
+      <Html position={[0, 1.6, 0]} center distanceFactor={8}>
+        <div style={{ width: 90, padding: 2, background: 'rgba(0,0,0,0.85)', borderRadius: 4, border: `1px solid ${color}` }}>
+          <div style={{ height: 6, background: '#1f2937', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${hpPct * 100}%`, background: color, transition: 'width 200ms' }} />
+          </div>
+          <div style={{ marginTop: 2, fontSize: 9, color: 'white', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Rogue Model
+          </div>
+          <div style={{ fontSize: 9, color: '#9ca3af', textAlign: 'center' }}>
+            {hp}/{hpMax} HP · click to attack
+          </div>
+        </div>
+      </Html>
     </group>
   )
 }
@@ -539,7 +626,7 @@ function useKeyboard() {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       const k = e.key.toLowerCase()
-      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift',' '].includes(k)) {
+      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift',' ','[',']'].includes(k)) {
         keys.current.add(k)
         e.preventDefault()
       }
@@ -572,6 +659,9 @@ function PlayerAndCamera({
   const camIdeal = useMemo(() => new THREE.Vector3(), [])
   const camLook = useMemo(() => new THREE.Vector3(), [])
   const yaw = useRef(0)
+  const camYaw = useRef(Math.PI / 4) // 45° isometric default
+  const camPitch = useRef(0.85) // ~49° down
+  const camDistance = useRef(13)
   const isMoving = useRef(false)
   const bobT = useRef(0)
 
@@ -583,17 +673,33 @@ function PlayerAndCamera({
 
   useFrame((_, delta) => {
     const k = keys.current
+    // ARROW KEYS = camera orbit (yaw + pitch)
+    if (k.has('arrowleft')) camYaw.current -= delta * 1.6
+    if (k.has('arrowright')) camYaw.current += delta * 1.6
+    if (k.has('arrowup')) camPitch.current = Math.max(0.45, camPitch.current - delta * 1.2)
+    if (k.has('arrowdown')) camPitch.current = Math.min(1.25, camPitch.current + delta * 1.2)
+    if (k.has('[')) camDistance.current = Math.max(7, camDistance.current - delta * 8)
+    if (k.has(']')) camDistance.current = Math.min(22, camDistance.current + delta * 8)
+
+    // WASD = walk (relative to camera yaw so feels natural)
     let dx = 0, dz = 0
-    if (k.has('w') || k.has('arrowup')) dz -= 1
-    if (k.has('s') || k.has('arrowdown')) dz += 1
-    if (k.has('a') || k.has('arrowleft')) dx -= 1
-    if (k.has('d') || k.has('arrowright')) dx += 1
+    if (k.has('w')) dz -= 1
+    if (k.has('s')) dz += 1
+    if (k.has('a')) dx -= 1
+    if (k.has('d')) dx += 1
     isMoving.current = dx !== 0 || dz !== 0
     const speed = (k.has('shift') ? 9 : 5) * delta
     if (isMoving.current) {
       const mag = Math.hypot(dx, dz) || 1
-      const mx = (dx / mag) * speed
-      const mz = (dz / mag) * speed
+      // Rotate input direction by camera yaw so W is always 'into' the scene
+      const cy = Math.cos(camYaw.current)
+      const sy = Math.sin(camYaw.current)
+      const ix = dx / mag
+      const iz = dz / mag
+      const wx = ix * cy + iz * sy
+      const wz = -ix * sy + iz * cy
+      const mx = wx * speed
+      const mz = wz * speed
       positionRef.current.x = THREE.MathUtils.clamp(positionRef.current.x + mx, -28, 28)
       positionRef.current.z = THREE.MathUtils.clamp(positionRef.current.z + mz, -22, 22)
       yaw.current = Math.atan2(mx, mz)
@@ -607,9 +713,16 @@ function PlayerAndCamera({
       groupRef.current.position.y = isMoving.current ? Math.abs(Math.sin(bobT.current)) * 0.08 : 0
       groupRef.current.rotation.y = yaw.current
     }
-    camIdeal.set(positionRef.current.x + 9, 11, positionRef.current.z + 9)
+    // Orbital camera around player
+    const r = camDistance.current
+    const px = positionRef.current.x
+    const pz = positionRef.current.z
+    const ox = Math.sin(camYaw.current) * Math.sin(camPitch.current) * r
+    const oz = Math.cos(camYaw.current) * Math.sin(camPitch.current) * r
+    const oy = Math.cos(camPitch.current) * r + 1.5
+    camIdeal.set(px + ox, oy, pz + oz)
     camera.position.lerp(camIdeal, 0.12)
-    camLook.set(positionRef.current.x, positionRef.current.y + 0.6, positionRef.current.z)
+    camLook.set(px, 0.6, pz)
     camera.lookAt(camLook)
   })
 
@@ -999,12 +1112,20 @@ export function PlaygroundWorld3D({
   onQuestZone,
   onNpcNearChange,
   botBubbles,
+  monsterHp,
+  monsterHpMax,
+  monsterDefeated,
+  onMonsterAttack,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
   onQuestZone: (id: string) => void
   onNpcNearChange: (npcId: string | null) => void
   botBubbles: Record<string, string>
+  monsterHp: number
+  monsterHpMax: number
+  monsterDefeated: boolean
+  onMonsterAttack: () => void
 }) {
   return (
     <div
@@ -1024,7 +1145,17 @@ export function PlaygroundWorld3D({
         gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
       >
         <Suspense fallback={null}>
-          <Scene worldId={worldId} onPortal={onPortal} onQuestZone={onQuestZone} onNpcNearChange={onNpcNearChange} botBubbles={botBubbles} />
+          <Scene
+            worldId={worldId}
+            onPortal={onPortal}
+            onQuestZone={onQuestZone}
+            onNpcNearChange={onNpcNearChange}
+            botBubbles={botBubbles}
+            monsterHp={monsterHp}
+            monsterHpMax={monsterHpMax}
+            monsterDefeated={monsterDefeated}
+            onMonsterAttack={onMonsterAttack}
+          />
         </Suspense>
       </Canvas>
     </div>

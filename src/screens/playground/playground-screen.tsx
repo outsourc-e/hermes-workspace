@@ -6,6 +6,7 @@ import { PlaygroundHud } from './components/playground-hud'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { PlaygroundDialog } from './components/playground-dialog'
 import { PlaygroundJournal } from './components/playground-journal'
+import { PlaygroundMap } from './components/playground-map'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { botsFor } from './lib/playground-bots'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
@@ -609,7 +610,32 @@ export function PlaygroundScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [transitioning, setTransitioning] = useState(false)
   const [botBubbles, setBotBubbles] = useState<Record<string, string>>({})
+  const [mapOpen, setMapOpen] = useState(false)
+  const [monsterHp, setMonsterHp] = useState(60)
+  const [monsterDefeated, setMonsterDefeated] = useState(false)
+  const monsterHpMax = 60
   const rpg = usePlaygroundRpg()
+
+  // Reset monster on world change
+  useEffect(() => {
+    setMonsterHp(monsterHpMax)
+    setMonsterDefeated(false)
+  }, [world])
+
+  function handleMonsterAttack() {
+    if (monsterDefeated) return
+    const dmg = 10 + Math.floor(Math.random() * 8)
+    const playerDmg = Math.floor(Math.random() * 5) + 1
+    rpg.damagePlayer(playerDmg)
+    setMonsterHp((hp) => {
+      const next = Math.max(0, hp - dmg)
+      if (next <= 0 && !monsterDefeated) {
+        setMonsterDefeated(true)
+        rpg.recordDefeat(40)
+      }
+      return next
+    })
+  }
 
   // Ambient bot chatter — every 6-14s a bot in current world says something
   useEffect(() => {
@@ -660,16 +686,23 @@ export function PlaygroundScreen() {
     )
   }
 
-  // J = journal, E = talk to nearby NPC, Esc = close anything
+  // J = journal, E = talk, M = map, T = focus chat, Esc = close anything
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (e.key.toLowerCase() === 'j') setJournalOpen((j) => !j)
-      if (e.key.toLowerCase() === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+        if (e.key === 'Escape') (t as HTMLElement).blur()
+        return
+      }
+      const k = e.key.toLowerCase()
+      if (k === 'j') setJournalOpen((j) => !j)
+      if (k === 'm') setMapOpen((m) => !m)
+      if (k === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
+      if (k === 't') setChatCollapsed(false)
       if (e.key === 'Escape') {
         setJournalOpen(false)
         setDialogNpc(null)
+        setMapOpen(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -758,6 +791,10 @@ export function PlaygroundScreen() {
           }}
           onNpcNearChange={(id) => setNearbyNpc(id)}
           botBubbles={botBubbles}
+          monsterHp={monsterHp}
+          monsterHpMax={monsterHpMax}
+          monsterDefeated={monsterDefeated}
+          onMonsterAttack={handleMonsterAttack}
         />
         <PlaygroundDialog
           npcId={dialogNpc}
@@ -768,6 +805,22 @@ export function PlaygroundScreen() {
           onGrantSkillXp={(skills) => rpg.grantSkillXp(skills)}
         />
         <PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} />
+        <PlaygroundMap
+          open={mapOpen}
+          onClose={() => setMapOpen(false)}
+          currentWorld={world}
+          unlocked={rpg.state.unlockedWorlds}
+          onTravel={(id) => {
+            if (rpg.state.unlockedWorlds.includes(id)) {
+              setTransitioning(true)
+              window.setTimeout(() => {
+                setWorld(id)
+                setMapOpen(false)
+                window.setTimeout(() => setTransitioning(false), 350)
+              }, 350)
+            }
+          }}
+        />
         <PlaygroundChat
           worldId={world}
           messages={messages}
@@ -796,7 +849,7 @@ export function PlaygroundScreen() {
           lastReward={rpg.lastReward}
         />
         <div className="pointer-events-none absolute left-1/2 top-3 z-[60] -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-[11px] uppercase tracking-[0.18em] text-white/70 backdrop-blur-xl">
-          {WORLD_META[world].name} · WASD walk · Shift sprint · E talk · J journal
+          {WORLD_META[world].name} · WASD walk · Arrows camera · Shift sprint · E talk · J journal · M map · T chat · [/] zoom
         </div>
       </div>
     </PlaygroundErrorBoundary>
