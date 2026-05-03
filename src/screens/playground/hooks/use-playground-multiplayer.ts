@@ -9,6 +9,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
+import type { AvatarConfig } from '../lib/avatar-config'
+import { loadAvatarConfig } from '../lib/avatar-config'
 
 export type RemotePlayer = {
   id: string
@@ -23,6 +25,7 @@ export type RemotePlayer = {
   lastChat?: string
   lastChatAt?: number
   ts: number
+  avatar?: AvatarConfig
 }
 
 type PresenceWire = RemotePlayer & { kind: 'presence' }
@@ -81,6 +84,18 @@ export function usePlaygroundMultiplayer({
   const channelRef = useRef<BroadcastChannel | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const wsOpenRef = useRef(false)
+  const avatarRef = useRef<AvatarConfig | null>(loadAvatarConfig())
+  useEffect(() => {
+    const update = () => { avatarRef.current = loadAvatarConfig() }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hermes-playground-avatar-changed', update)
+      window.addEventListener('storage', update)
+      return () => {
+        window.removeEventListener('hermes-playground-avatar-changed', update)
+        window.removeEventListener('storage', update)
+      }
+    }
+  }, [])
   const [remotePlayers, setRemotePlayers] = useState<Record<string, RemotePlayer>>({})
   const [online, setOnline] = useState(false)
   const [transport, setTransport] = useState<'broadcast' | 'ws' | 'both'>('broadcast')
@@ -200,6 +215,7 @@ export function usePlaygroundMultiplayer({
         z: pos.z,
         yaw: yawRef.current,
         ts: Date.now(),
+        avatar: avatarRef.current || undefined,
       }
       try { ch.postMessage(wire) } catch {}
       if (wsOpenRef.current && wsRef.current) {

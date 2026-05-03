@@ -1496,12 +1496,19 @@ function RemotePlayer({ remote }: { remote: MpRemotePlayer }) {
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.5, 18]} /><meshBasicMaterial color="black" transparent opacity={0.4} /></mesh>
       <mesh position={[0.13, 0.22, 0]} castShadow><boxGeometry args={[0.14, 0.44, 0.14]} /><meshStandardMaterial color="#1f2a37" roughness={0.6} /></mesh>
       <mesh position={[-0.13, 0.22, 0]} castShadow><boxGeometry args={[0.14, 0.44, 0.14]} /><meshStandardMaterial color="#1f2a37" roughness={0.6} /></mesh>
-      <mesh position={[0, 0.7, 0]} castShadow><boxGeometry args={[0.5, 0.55, 0.32]} /><meshStandardMaterial color={remote.color} roughness={0.55} emissive={remote.color} emissiveIntensity={0.18} /></mesh>
-      <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
-      <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
-      <mesh position={[0, 1.22, 0]} castShadow><sphereGeometry args={[0.22, 16, 16]} /><meshStandardMaterial color="#fde68a" roughness={0.55} /></mesh>
-      <mesh position={[0, 1.34, -0.02]} castShadow><sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color={remote.color} roughness={0.85} emissive={remote.color} emissiveIntensity={0.18} /></mesh>
-      <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial color={remote.color} side={THREE.DoubleSide} roughness={0.6} /></mesh>
+      <mesh position={[0, 0.7, 0]} castShadow><boxGeometry args={[0.5, 0.55, 0.32]} /><meshStandardMaterial color={remote.avatar?.outfit || remote.color} roughness={0.55} emissive={remote.avatar?.outfit || remote.color} emissiveIntensity={0.12} /></mesh>
+      <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={remote.avatar?.outfitAccent || '#0e7490'} metalness={0.45} roughness={0.45} /></mesh>
+      <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={remote.avatar?.outfitAccent || '#0e7490'} metalness={0.45} roughness={0.45} /></mesh>
+      <mesh position={[0, 1.22, 0]} castShadow><sphereGeometry args={[0.22, 16, 16]} /><meshStandardMaterial color={remote.avatar?.skin || '#fde68a'} roughness={0.55} /></mesh>
+      <mesh position={[0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color={remote.avatar?.eyes || '#0b1220'} /></mesh>
+      <mesh position={[-0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color={remote.avatar?.eyes || '#0b1220'} /></mesh>
+      <mesh position={[0, 1.34, -0.02]} castShadow><sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color={remote.avatar?.hair || remote.color} roughness={0.85} /></mesh>
+      {remote.avatar?.cape && remote.avatar.cape !== 'transparent' && (
+        <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial color={remote.avatar.cape} side={THREE.DoubleSide} roughness={0.6} /></mesh>
+      )}
+      {(!remote.avatar) && (
+        <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial color={remote.color} side={THREE.DoubleSide} roughness={0.6} /></mesh>
+      )}
       <Html position={[0, 2.05, 0]} center distanceFactor={8}>
         <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color:'white',borderRadius:4,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:`1px solid ${remote.color}`}}>{remote.name}</div>
       </Html>
