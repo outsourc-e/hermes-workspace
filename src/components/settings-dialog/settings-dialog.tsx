@@ -235,7 +235,7 @@ const PROVIDER_CARDS: Array<{
     authType: 'api_key',
     envKey: 'XIAOMI_API_KEY',
   },
-  { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
+  { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key', envKey: 'CUSTOM_API_KEY' },
 ]
 
 function HermesContent() {
@@ -253,8 +253,6 @@ function HermesContent() {
   const [memEnabled, setMemEnabled] = useState(true)
   const [userProfileEnabled, setUserProfileEnabled] = useState(true)
   const [customBaseUrl, setCustomBaseUrl] = useState('')
-  const [customApiKey, setCustomApiKey] = useState('')
-  const [savingCustom, setSavingCustom] = useState(false)
   const [localDiscovery, setLocalDiscovery] = useState<{
     providers: Array<{ id: string; name: string; online: boolean; modelCount: number; configured: boolean; needsRestart: boolean }>
     models: Array<{ id: string; name: string; provider: string }>
@@ -313,7 +311,6 @@ function HermesContent() {
         const cfgProviders = (d.config?.providers as Record<string, any>) || {}
         const customCfg = cfgProviders['custom'] || cfgProviders['manifest'] || {}
         if (customCfg.base_url) setCustomBaseUrl(customCfg.base_url)
-        if (customCfg.api_key) setCustomApiKey(customCfg.api_key)
       })
       .catch(() => {})
   }, [])
@@ -504,62 +501,57 @@ function HermesContent() {
         </div>
       )}
 
-      {/* Custom OpenAI-compatible endpoint fields — same style as API Keys section */}
+      {/* Custom OpenAI-compatible endpoint fields — Base URL only; API key lives in API Keys section */}
       {activeProvider === 'custom' && (
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
             Custom Endpoint
           </p>
           <div className="space-y-1.5">
-            {(['base_url', 'api_key'] as const).map((field) => {
-              const isUrl = field === 'base_url'
-              const label = isUrl ? 'Base URL' : 'API Key'
-              const value = isUrl ? customBaseUrl : customApiKey
-              const setValue = isUrl ? setCustomBaseUrl : setCustomApiKey
-              const isEditing = editingKey === `custom_${field}`
-              const hasValue = !!value
+            {(() => {
+              const isEditing = editingKey === 'custom_base_url'
+              const hasValue = !!customBaseUrl
               return (
-                <div key={field} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
+                <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-sm font-medium">Base URL</div>
                     <div className="text-[11px] font-mono" style={mutedStyle}>
                       {isEditing ? (
                         <input
-                          type={isUrl ? 'url' : 'password'}
-                          value={value}
-                          onChange={(e) => setValue(e.target.value)}
-                          placeholder={isUrl ? 'http://127.0.0.1:38238/v1' : 'sk-...'}
+                          type="url"
+                          value={customBaseUrl}
+                          onChange={(e) => setCustomBaseUrl(e.target.value)}
+                          placeholder="http://127.0.0.1:38238/v1"
                           className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
                           style={{ color: 'var(--theme-text)' }}
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              setSavingCustom(true)
-                              save({ config: { provider: 'custom', providers: { custom: { type: 'openai', base_url: customBaseUrl, api_key: customApiKey || 'none' } } } })
-                                .then(() => { setSavingCustom(false); setEditingKey(null) })
+                              save({ config: { provider: 'custom', providers: { custom: { type: 'openai', base_url: customBaseUrl } } } })
+                                .then(() => setEditingKey(null))
                             }
                             if (e.key === 'Escape') setEditingKey(null)
                           }}
                         />
-                      ) : hasValue ? (isUrl ? value : '••••••••') : 'Not configured'}
+                      ) : hasValue ? customBaseUrl : 'Not configured'}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={cn('size-2 rounded-full', hasValue ? 'bg-green-500' : 'bg-neutral-500')} />
                     {isEditing ? (
                       <>
-                        <button type="button" onClick={() => { setSavingCustom(true); save({ config: { provider: 'custom', providers: { custom: { type: 'openai', base_url: customBaseUrl, api_key: customApiKey || 'none' } } } }).then(() => { setSavingCustom(false); setEditingKey(null) }) }} className="text-xs font-medium text-green-400">Save</button>
+                        <button type="button" onClick={() => { save({ config: { provider: 'custom', providers: { custom: { type: 'openai', base_url: customBaseUrl } } } }).then(() => setEditingKey(null)) }} className="text-xs font-medium text-green-400">Save</button>
                         <button type="button" onClick={() => setEditingKey(null)} className="text-xs" style={mutedStyle}>Cancel</button>
                       </>
                     ) : (
-                      <button type="button" onClick={() => setEditingKey(`custom_${field}`)} className="text-xs font-medium" style={{ color: 'var(--theme-accent)' }}>
+                      <button type="button" onClick={() => setEditingKey('custom_base_url')} className="text-xs font-medium" style={{ color: 'var(--theme-accent)' }}>
                         {hasValue ? 'Edit' : 'Add'}
                       </button>
                     )}
                   </div>
                 </div>
               )
-            })}
+            })()}
           </div>
         </div>
       )}
