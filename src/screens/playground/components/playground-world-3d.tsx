@@ -553,11 +553,19 @@ function NPC({
         <sphereGeometry args={[0.22, 16, 16]} />
         <meshStandardMaterial color="#fde68a" roughness={0.55} />
       </mesh>
+      {/* eyes */}
+      <mesh position={[0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
+      <mesh position={[-0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
+      {/* hair cap */}
+      <mesh position={[0, 1.34, -0.02]} castShadow>
+        <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={color} roughness={0.85} emissive={color} emissiveIntensity={0.18} />
+      </mesh>
       <NpcAccessories role={npcId || avatar} color={color} />
       {/* portrait billboard slightly above head */}
-      <Billboard position={[0, 1.55, 0]}>
+      <Billboard position={[0, 1.6, 0]}>
         <mesh>
-          <planeGeometry args={[0.7, 0.7]} />
+          <planeGeometry args={[0.55, 0.55]} />
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
@@ -893,10 +901,53 @@ function PlayerAndCamera({
         <meshStandardMaterial color="#fcd34d" roughness={0.55} />
       </mesh>
 
+      {/* Eyes */}
+      <mesh position={[0.085, 1.24, 0.19]}>
+        <sphereGeometry args={[0.025, 8, 8]} />
+        <meshStandardMaterial color="#0b1220" />
+      </mesh>
+      <mesh position={[-0.085, 1.24, 0.19]}>
+        <sphereGeometry args={[0.025, 8, 8]} />
+        <meshStandardMaterial color="#0b1220" />
+      </mesh>
+      {/* Hair */}
+      <mesh position={[0, 1.34, -0.02]} castShadow>
+        <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#3f2511" roughness={0.85} />
+      </mesh>
+      {/* Helmet/circlet (gold band) */}
+      <mesh position={[0, 1.28, 0]} castShadow>
+        <torusGeometry args={[0.225, 0.025, 8, 24]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.25} emissive="#facc15" emissiveIntensity={0.4} />
+      </mesh>
+      {/* Shoulder pads */}
+      <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}>
+        <boxGeometry args={[0.26, 0.14, 0.22]} />
+        <meshStandardMaterial color="#0e7490" metalness={0.55} roughness={0.4} emissive="#0891b2" emissiveIntensity={0.18} />
+      </mesh>
+      <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}>
+        <boxGeometry args={[0.26, 0.14, 0.22]} />
+        <meshStandardMaterial color="#0e7490" metalness={0.55} roughness={0.4} emissive="#0891b2" emissiveIntensity={0.18} />
+      </mesh>
+      {/* Cape */}
+      <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}>
+        <planeGeometry args={[0.78, 1]} />
+        <meshStandardMaterial color="#0891b2" side={THREE.DoubleSide} roughness={0.55} emissive="#0e7490" emissiveIntensity={0.18} />
+      </mesh>
+      {/* Sword on hip */}
+      <mesh castShadow position={[-0.32, 0.5, 0.05]} rotation={[0.05, 0, 1.45]}>
+        <boxGeometry args={[0.04, 0.85, 0.04]} />
+        <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.2} />
+      </mesh>
+      <mesh castShadow position={[-0.32, 0.13, 0.05]} rotation={[0, 0, 1.45]}>
+        <boxGeometry args={[0.16, 0.05, 0.07]} />
+        <meshStandardMaterial color="#7c2d12" roughness={0.85} />
+      </mesh>
+
       {/* Avatar portrait billboard slightly above head */}
-      <Billboard position={[0, 1.55, 0]}>
+      <Billboard position={[0, 1.6, 0]}>
         <mesh>
-          <planeGeometry args={[0.7, 0.7]} />
+          <planeGeometry args={[0.6, 0.6]} />
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
@@ -1046,10 +1097,21 @@ function BotPlayer({
         <sphereGeometry args={[0.22, 16, 16]} />
         <meshStandardMaterial color="#fde68a" roughness={0.55} />
       </mesh>
+      {/* eyes */}
+      <mesh position={[0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
+      <mesh position={[-0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
+      {/* hair cap (bot) */}
+      <mesh position={[0, 1.34, -0.02]} castShadow>
+        <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={bot.color} roughness={0.85} emissive={bot.color} emissiveIntensity={0.18} />
+      </mesh>
+      {/* shoulder pads (bot) */}
+      <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
+      <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
       {/* portrait */}
-      <Billboard position={[0, 1.55, 0]}>
+      <Billboard position={[0, 1.6, 0]}>
         <mesh>
-          <planeGeometry args={[0.7, 0.7]} />
+          <planeGeometry args={[0.55, 0.55]} />
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
