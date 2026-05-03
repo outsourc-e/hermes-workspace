@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { OpsStrip } from './components/ops-strip'
+import { ModelInfoCard } from './components/model-info-card'
+import { AchievementsCard } from './components/achievements-card'
+import { AnalyticsSummaryCard } from './components/analytics-summary-card'
 import {
   Area,
   AreaChart,
@@ -12,7 +17,6 @@ import {
 } from 'recharts'
 import type { ReactNode } from 'react'
 import type { ClaudeSession } from '@/server/claude-api'
-import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
@@ -167,48 +171,6 @@ function UnavailableWidget({
         <p className="text-sm text-muted">{description}</p>
       </div>
     </GlassCard>
-  )
-}
-
-// ── System Glance (status bar) ───────────────────
-
-function SystemGlance({
-  sessions,
-  connected,
-  model,
-  provider,
-  tokens,
-  cost,
-}: {
-  sessions: number
-  connected: boolean
-  model: string
-  provider: string
-  tokens: string
-  cost: string
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-2.5 backdrop-blur-sm">
-      <span
-        className={cn(
-          'size-2 shrink-0 rounded-full',
-          connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500',
-        )}
-      />
-      <div className="flex flex-1 items-center gap-x-4 overflow-x-auto">
-        <span className="text-xs font-medium text-ink">{model}</span>
-        <span className="text-muted">·</span>
-        <span className="text-xs text-neutral-500">{provider}</span>
-        <span className="text-muted">·</span>
-        <span className="text-xs text-neutral-500">{sessions} sessions</span>
-        <span className="text-muted">·</span>
-        <span className="text-xs font-bold tabular-nums text-ink">
-          {tokens} tokens
-        </span>
-        <span className="text-muted">·</span>
-        <span className="text-xs text-neutral-400">{cost}</span>
-      </div>
-    </div>
   )
 }
 
@@ -378,106 +340,6 @@ function ActivityChart({
           <span className="size-2 rounded-full" style={{ background: palette.success }} />
           Messages
         </span>
-      </div>
-    </GlassCard>
-  )
-}
-
-// ── Model Card ───────────────────────────────────────────────────
-
-function ModelCard({ palette }: { palette: ReturnType<typeof readDashboardPalette> }) {
-  const sessionsAvailable = useFeatureAvailable('sessions')
-  const configAvailable = useFeatureAvailable('config')
-  const configQuery = useQuery({
-    queryKey: ['claude-config'],
-    queryFn: async () => {
-      const res = await fetch('/api/claude-config')
-      if (!res.ok) return null
-      return res.json() as Promise<Record<string, unknown>>
-    },
-    staleTime: 30_000,
-    enabled: configAvailable,
-  })
-  const config = configQuery.data as Record<string, unknown> | undefined
-  const modelName = (config?.activeModel ?? '—') as string
-  const provider = (config?.activeProvider ?? '—') as string
-  const configBlock = config?.config as Record<string, unknown> | undefined
-  const modelBlock = configBlock?.model as Record<string, unknown> | undefined
-  const baseUrl = (modelBlock?.base_url ??
-    configBlock?.base_url ??
-    '') as string
-  const connected = sessionsAvailable
-  const fallbackBlock = config?.fallback_model as
-    | Record<string, unknown>
-    | undefined
-  const fallbackModel = fallbackBlock?.model as string | undefined
-
-  if (!configAvailable) {
-    return (
-      <UnavailableWidget
-        title="Model"
-        description={getUnavailableReason('config')}
-      />
-    )
-  }
-
-  return (
-    <GlassCard
-      title="Model"
-      titleRight={
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full',
-            connected
-              ? 'text-emerald-400 bg-emerald-500/10'
-              : 'text-red-400 bg-red-500/10',
-          )}
-        >
-          <span
-            className={cn(
-              'size-1.5 rounded-full',
-              connected ? 'bg-emerald-500' : 'bg-red-500',
-            )}
-          />
-          {connected ? 'Online' : 'Offline'}
-        </span>
-      }
-      accentColor={connected ? palette.success : palette.danger}
-      className="h-full"
-    >
-      <div className="space-y-2">
-        <div className="flex items-center gap-3 rounded-lg p-2.5 bg-[var(--theme-card2)] border border-[var(--theme-border)]">
-          <div
-            className="flex size-7 items-center justify-center rounded-md text-sm"
-            style={{ background: alpha(palette.accent, 0.1), color: palette.accent }}
-          >
-            🤖
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-mono text-[13px] font-bold text-ink truncate">
-              {typeof modelName === 'string' ? modelName : '—'}
-            </div>
-            <div className="text-[10px] text-muted font-mono truncate">
-              {provider}
-              {baseUrl ? ` · ${baseUrl}` : ''}
-            </div>
-          </div>
-        </div>
-        {fallbackModel && (
-          <div className="flex items-center gap-3 rounded-lg p-2.5 bg-[var(--theme-card2)] border border-[var(--theme-border)]">
-            <div className="flex size-7 items-center justify-center rounded-md bg-amber-500/10 text-sm">
-              🔄
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="font-mono text-[13px] text-ink truncate">
-                {fallbackModel}
-              </div>
-              <div className="text-[10px] text-muted font-mono truncate">
-                {(fallbackBlock?.provider as string) ?? ''}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </GlassCard>
   )
@@ -736,7 +598,22 @@ export function DashboardScreen() {
     return max
   }, [recentSessions])
 
-  const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
+  // Aggregate dashboard overview — surfaces the data the native
+  // Hermes dashboard exposes (status, platforms, cron, achievements,
+  // model info, analytics) in a single round trip with per-section
+  // graceful fallbacks. Each card renders only when its slice resolves.
+  const overviewQuery = useQuery<DashboardOverview>({
+    queryKey: ['dashboard', 'overview'],
+    queryFn: async () => {
+      const res = await fetch('/api/dashboard/overview')
+      if (!res.ok) throw new Error(`overview ${res.status}`)
+      return (await res.json()) as DashboardOverview
+    },
+    staleTime: 5_000,
+    refetchInterval: 30_000,
+  })
+  const overview = overviewQuery.data ?? null
+
   const palette = useDashboardPalette()
 
   const updateSettings = useSettingsStore((state) => state.updateSettings)
@@ -789,18 +666,31 @@ export function DashboardScreen() {
         </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
-      {/* ── Header: Hermes Logo + Quick Actions ── */}
-      <div className="flex flex-col items-center gap-3 py-3">
-        <img
-          src="/claude-avatar.webp"
-          alt="Hermes Agent"
-          className="size-12 md:size-14 rounded-md border border-[var(--theme-border)]"
-          style={{ padding: '3px', background: 'var(--theme-card)' }}
-        />
-        <p className="micro-label" style={{ color: 'var(--theme-muted)' }}>
-          Hermes Workspace
-        </p>
-        <div className="mt-1 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
+      {/* ── Header: Title + inline Quick Actions (no centered hero) ── */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <img
+            src="/claude-avatar.webp"
+            alt="Hermes Agent"
+            className="size-9 rounded-md border border-[var(--theme-border)]"
+            style={{ padding: '2px', background: 'var(--theme-card)' }}
+          />
+          <div className="flex flex-col">
+            <h1
+              className="text-base font-semibold tracking-tight"
+              style={{ color: 'var(--theme-text)' }}
+            >
+              Dashboard
+            </h1>
+            <span
+              className="font-mono text-[10px] uppercase tracking-[0.15em]"
+              style={{ color: 'var(--theme-muted)' }}
+            >
+              Hermes Workspace
+            </span>
+          </div>
+        </div>
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-xl">
           <QuickAction
             label="New Chat"
             icon="💬"
@@ -835,6 +725,13 @@ export function DashboardScreen() {
         </div>
       </div>
 
+      {/* ── Ops strip (gateway + version drift + platforms + cron pulse) ── */}
+      <OpsStrip
+        status={overview?.status ?? null}
+        cron={overview?.cron ?? null}
+        platforms={overview?.platforms ?? []}
+      />
+
       {/* ── Metrics Row ── */}
       {sessionsAvailable ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -859,7 +756,11 @@ export function DashboardScreen() {
           <MetricTile
             label="Tokens"
             value={formatNumber(stats.totalTokens)}
-            sub={costEstimate}
+            sub={
+              overview?.analytics?.estimatedCostUsd != null
+                ? `$${overview.analytics.estimatedCostUsd.toFixed(2)} · ${overview.analytics.windowDays}d`
+                : undefined
+            }
             icon="⚡"
             accentColor={palette.accentSecondary}
           />
@@ -871,9 +772,10 @@ export function DashboardScreen() {
         />
       )}
 
-      {/* ── Charts + Model + Skills ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-        <div className="lg:col-span-5">
+      {/* ── Primary content: Recent Sessions wide, side rail with Model/Skills/Achievements ── */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        {/* Activity area */}
+        <div className="flex flex-col gap-3 lg:col-span-8">
           {sessionsAvailable ? (
             <ActivityChart sessions={sessions} palette={palette} />
           ) : (
@@ -882,12 +784,16 @@ export function DashboardScreen() {
               description={getUnavailableReason('sessions')}
             />
           )}
+          <AnalyticsSummaryCard analytics={overview?.analytics ?? null} />
         </div>
-        <div className="lg:col-span-4">
-          <ModelCard palette={palette} />
-        </div>
-        <div className="lg:col-span-3">
+        {/* Side rail */}
+        <div className="flex flex-col gap-3 lg:col-span-4">
+          <ModelInfoCard
+            modelInfo={overview?.modelInfo ?? null}
+            palette={palette}
+          />
           <SkillsWidget palette={palette} />
+          <AchievementsCard achievements={overview?.achievements ?? null} />
         </div>
       </div>
 
