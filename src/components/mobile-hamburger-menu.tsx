@@ -2,6 +2,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
+  Building01Icon,
   Cancel01Icon,
   Chat01Icon,
   Clock01Icon,
@@ -38,6 +39,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: DashboardSquare01Icon,
     to: '/dashboard',
     match: (p: string) => p.startsWith('/dashboard'),
+  },
+  {
+    id: 'agora',
+    label: 'Agora',
+    icon: Building01Icon,
+    to: '/agora',
+    match: (p: string) => p.startsWith('/agora'),
   },
   {
     id: 'terminal',

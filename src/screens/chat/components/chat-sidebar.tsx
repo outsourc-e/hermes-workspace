@@ -4,6 +4,7 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   BrainIcon,
+  Building01Icon,
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
@@ -562,6 +563,7 @@ function ChatSidebarComponent({
   const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
+  const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
@@ -776,6 +778,13 @@ function ChatSidebarComponent({
       icon: MessageMultiple01Icon,
       label: t('nav.chat'),
       active: isChatActive,
+    },
+    {
+      kind: 'link',
+      to: '/agora',
+      icon: Building01Icon,
+      label: 'Agora',
+      active: isAgoraActive,
     },
     {
       kind: 'link',

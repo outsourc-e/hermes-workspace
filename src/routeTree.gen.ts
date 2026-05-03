@@ -22,6 +22,7 @@ import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
+import { Route as AgoraRouteImport } from './routes/agora'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
@@ -192,6 +193,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const ConductorRoute = ConductorRouteImport.update({
   id: '/conductor',
   path: '/conductor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgoraRoute = AgoraRouteImport.update({
+  id: '/agora',
+  path: '/agora',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -731,6 +737,7 @@ const ApiSessionsSessionKeyActiveRunRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
@@ -852,6 +859,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
@@ -973,6 +981,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
@@ -1096,6 +1105,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
+    | '/agora'
     | '/conductor'
     | '/dashboard'
     | '/files'
@@ -1217,6 +1227,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
+    | '/agora'
     | '/conductor'
     | '/dashboard'
     | '/files'
@@ -1337,6 +1348,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$'
+    | '/agora'
     | '/conductor'
     | '/dashboard'
     | '/files'
@@ -1459,6 +1471,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
+  AgoraRoute: typeof AgoraRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
   FilesRoute: typeof FilesRoute
@@ -1651,6 +1664,13 @@ declare module '@tanstack/react-router' {
       path: '/conductor'
       fullPath: '/conductor'
       preLoaderRoute: typeof ConductorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agora': {
+      id: '/agora'
+      path: '/agora'
+      fullPath: '/agora'
+      preLoaderRoute: typeof AgoraRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -2517,6 +2537,7 @@ const ApiSwarmMemoryRouteWithChildren = ApiSwarmMemoryRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  AgoraRoute: AgoraRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
   FilesRoute: FilesRoute,
