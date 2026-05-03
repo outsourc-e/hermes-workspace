@@ -2,8 +2,15 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, Float, Html, Sparkles, Stars, Text, useTexture } from '@react-three/drei'
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
+import { PlaygroundHud } from './components/playground-hud'
+import { usePlaygroundRpg } from './hooks/use-playground-rpg'
+import {
+  PLAYGROUND_WORLDS,
+  type PlaygroundWorldId,
+  type PlaygroundQuest,
+} from './data/playground-rpg'
 
-type PlaygroundWorld = 'agora' | 'forge'
+type PlaygroundWorld = PlaygroundWorldId
 type QuestState = 'start' | 'met-athena' | 'generated-world' | 'complete'
 
 type PlayerApi = {
@@ -33,6 +40,30 @@ const WORLD_META: Record<PlaygroundWorld, {
     ground: '#151827',
     sky: '#060712',
     prompt: 'Cyberpunk forge, neon code rivers, agent blacksmiths, mission terminals',
+  },
+  grove: {
+    name: 'The Grove',
+    subtitle: 'Living forest for music, rituals, and community quests',
+    accent: '#34d399',
+    ground: '#143025',
+    sky: '#06150f',
+    prompt: 'Bioluminescent forest grove, agent druids, music rituals',
+  },
+  oracle: {
+    name: 'Oracle Temple',
+    subtitle: 'Archive world for lore, memory, and search quests',
+    accent: '#a78bfa',
+    ground: '#1f1b35',
+    sky: '#080714',
+    prompt: 'Quiet oracle archive, floating crystals, agent librarians',
+  },
+  arena: {
+    name: 'Benchmark Arena',
+    subtitle: 'Model combat world for prompt duels and eval battles',
+    accent: '#fb7185',
+    ground: '#35181f',
+    sky: '#16070a',
+    prompt: 'Gladiator arena for AI model duels, neon scoreboards',
   },
 }
 
@@ -390,6 +421,12 @@ function PlaygroundLiteWorld({
   setInput,
   companionLine,
   setCompanionLine,
+  rpgState,
+  activeQuest,
+  levelProgress,
+  lastReward,
+  completeQuest,
+  resetRpg,
 }: {
   world: PlaygroundWorld
   setWorld: (world: PlaygroundWorld) => void
@@ -399,6 +436,12 @@ function PlaygroundLiteWorld({
   setInput: (value: string) => void
   companionLine: string
   setCompanionLine: (value: string) => void
+  rpgState: ReturnType<typeof usePlaygroundRpg>['state']
+  activeQuest: PlaygroundQuest
+  levelProgress: ReturnType<typeof usePlaygroundRpg>['levelProgress']
+  lastReward: string | null
+  completeQuest: ReturnType<typeof usePlaygroundRpg>['completeQuest']
+  resetRpg: ReturnType<typeof usePlaygroundRpg>['resetRpg']
 }) {
   const meta = WORLD_META[world]
   const isForge = world === 'forge'
@@ -409,21 +452,37 @@ function PlaygroundLiteWorld({
     setInput('')
     if (/generate|build|world|forge|cyber/i.test(body)) {
       setQuest('generated-world')
-      setCompanionLine('World generated: The Forge. Neon terminals, agent blacksmiths, and mission portals are ready. Click the portal to enter.')
+      if (activeQuest.id === 'awakening-agora') completeQuest(activeQuest)
+      else if (activeQuest.id === 'first-worldsmith') completeQuest(activeQuest)
+      setCompanionLine('World generated: The Forge. Neon terminals, agent blacksmiths, and mission portals are ready. Click the portal to enter. Rewards unlocked in your inventory.')
       return
     }
     setQuest(quest === 'start' ? 'met-athena' : quest)
+    if (activeQuest.id === 'awakening-agora') completeQuest(activeQuest)
     setCompanionLine('Hermes Playground is an AI agent RPG: humans explore, agents follow, missions unlock, and worlds are generated from prompts.')
   }
 
   function enterPortalLite() {
     setWorld(isForge ? 'agora' : 'forge')
     setQuest('complete')
-    setCompanionLine(isForge ? 'Back in The Agora. Every portal can become another generated world.' : 'Welcome to The Forge. The generated world is live, without needing WebGL.')
+    if (!isForge && activeQuest.id === 'enter-forge') completeQuest(activeQuest)
+    setCompanionLine(isForge ? 'Back in The Agora. Every portal can become another generated world.' : 'Welcome to The Forge. The generated world is live, without needing WebGL. Forge Shard recovered.')
   }
 
   return (
-    <div className="relative flex h-full min-h-[620px] flex-col overflow-hidden" style={{ background: meta.sky, color: 'white' }}>
+    <div className="relative flex h-full min-h-[720px] flex-col overflow-hidden" style={{ background: meta.sky, color: 'white' }}>
+      <PlaygroundHud
+        state={rpgState}
+        activeQuestTitle={activeQuest.title}
+        levelProgress={levelProgress}
+        currentWorld={world}
+        worlds={PLAYGROUND_WORLDS}
+        onSelectWorld={(next) => {
+          if (rpgState.unlockedWorlds.includes(next)) setWorld(next)
+        }}
+        onReset={resetRpg}
+        lastReward={lastReward}
+      />
       <div className="absolute inset-0 opacity-60" style={{ background: `radial-gradient(circle at 50% 22%, ${meta.accent}55, transparent 34%), linear-gradient(180deg, transparent, #000 92%)` }} />
       <div className="relative z-10 flex items-start justify-between gap-3 p-4">
         <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-3 shadow-2xl backdrop-blur-xl">
@@ -538,6 +597,7 @@ export function PlaygroundScreen() {
   const [quest, setQuest] = useState<QuestState>('start')
   const [input, setInput] = useState('')
   const [companionLine, setCompanionLine] = useState('Welcome to Hermes Playground. I am Athena, your agent companion. Ask me to generate a world.')
+  const rpg = usePlaygroundRpg()
   const meta = WORLD_META[world]
 
   function askAthena(text: string) {
@@ -569,7 +629,22 @@ export function PlaygroundScreen() {
   // WebGL support, then Three still kills the route while binding the renderer.
   // This DOM/CSS world is reliable, screenshot-friendly, and keeps the story
   // alive. True R3F/WebGL can come back behind a separate "Try WebGL" toggle.
-  return <PlaygroundLiteWorld world={world} setWorld={setWorld} quest={quest} setQuest={setQuest} input={input} setInput={setInput} companionLine={companionLine} setCompanionLine={setCompanionLine} />
+  return <PlaygroundLiteWorld
+    world={world}
+    setWorld={setWorld}
+    quest={quest}
+    setQuest={setQuest}
+    input={input}
+    setInput={setInput}
+    companionLine={companionLine}
+    setCompanionLine={setCompanionLine}
+    rpgState={rpg.state}
+    activeQuest={rpg.activeQuest}
+    levelProgress={rpg.levelProgress}
+    lastReward={rpg.lastReward}
+    completeQuest={rpg.completeQuest}
+    resetRpg={rpg.resetRpg}
+  />
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden" style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}>
