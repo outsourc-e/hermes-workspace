@@ -921,8 +921,9 @@ export function PlaygroundScreen() {
           worldAccent={WORLD_META[world].accent}
         />
         <div className="pointer-events-none absolute left-1/2 top-3 z-[60] -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-[11px] uppercase tracking-[0.18em] text-white/70 backdrop-blur-xl">
-          {WORLD_META[world].name} · WASD walk · Arrows camera · Shift sprint · E talk · J journal · M map · T chat · [/] zoom
+          {WORLD_META[world].name} · Click ground = walk · Click NPC = talk · WASD/arrows · Shift sprint · E talk · J journal · M map · T chat · [/] zoom
         </div>
+        <PlaygroundOnboardingCard />
       </div>
     </PlaygroundErrorBoundary>
   )
@@ -1010,6 +1011,41 @@ function MissionDone({ done, children }: { done?: boolean; children: React.React
         {done ? '✓' : '•'}
       </span>
       <span className={done ? 'text-white' : 'text-white/55'}>{children}</span>
+    </div>
+  )
+}
+
+function PlaygroundOnboardingCard() {
+  const KEY = 'hermes-playground-onboarded-v1'
+  const [open, setOpen] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return !window.localStorage.getItem(KEY)
+  })
+  if (!open) return null
+  return (
+    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/55 backdrop-blur-md">
+      <div className="w-[92vw] max-w-[520px] overflow-hidden rounded-3xl border-2 border-cyan-300/40 bg-[#070b14] text-white shadow-2xl"
+        style={{ boxShadow: '0 0 36px rgba(34,211,238,.35), 0 18px 54px rgba(0,0,0,.7)' }}
+      >
+        <div className="border-b border-white/10 bg-gradient-to-r from-cyan-500/15 via-transparent to-violet-500/15 px-5 py-3">
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">Hermes Playground · v0</div>
+          <div className="text-base font-extrabold">A multiplayer agent world</div>
+        </div>
+        <div className="space-y-2.5 p-5 text-[13px] leading-snug text-white/85">
+          <p>Walk around the Agora and meet Hermes Agent NPCs. Click the ground to walk, click an NPC to talk to them.</p>
+          <p>Enter buildings (Tavern, Bank, Smithy, Inn, Apothecary, Guild). Run quests. Visit the other 4 worlds via portal or world map (M).</p>
+          <p>Open this world in another browser window or tab — you’ll see each other and chat in real time. WebSocket multiplayer auto-connects when the server is online.</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t border-white/10 bg-black/40 px-5 py-3">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">Click NPC = talk · Click ground = walk · WASD = move</div>
+          <button
+            onClick={() => { try { window.localStorage.setItem(KEY, '1') } catch {}; setOpen(false) }}
+            className="rounded-lg border border-cyan-400/50 bg-cyan-400/15 px-4 py-1.5 text-[12px] font-bold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
+          >
+            Enter the Agora
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
