@@ -189,17 +189,46 @@ function NPC({
   return (
     <group ref={ref} position={position}>
       {/* shadow plate */}
-      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.4, 16]} />
-        <meshBasicMaterial color="black" transparent opacity={0.35} />
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.5, 18]} />
+        <meshBasicMaterial color="black" transparent opacity={0.4} />
       </mesh>
-      <Billboard position={[0, 0.95, 0]}>
+      {/* legs */}
+      <mesh position={[0.13, 0.22, 0]} castShadow>
+        <boxGeometry args={[0.14, 0.44, 0.14]} />
+        <meshStandardMaterial color="#1f2a37" roughness={0.6} />
+      </mesh>
+      <mesh position={[-0.13, 0.22, 0]} castShadow>
+        <boxGeometry args={[0.14, 0.44, 0.14]} />
+        <meshStandardMaterial color="#1f2a37" roughness={0.6} />
+      </mesh>
+      {/* feet */}
+      <mesh position={[0.13, 0.04, 0]} castShadow>
+        <boxGeometry args={[0.18, 0.07, 0.28]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.7} />
+      </mesh>
+      <mesh position={[-0.13, 0.04, 0]} castShadow>
+        <boxGeometry args={[0.18, 0.07, 0.28]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.7} />
+      </mesh>
+      {/* torso (robe) */}
+      <mesh position={[0, 0.7, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.55, 0.32]} />
+        <meshStandardMaterial color="#475569" roughness={0.55} />
+      </mesh>
+      {/* head sphere */}
+      <mesh position={[0, 1.15, 0]} castShadow>
+        <sphereGeometry args={[0.22, 16, 16]} />
+        <meshStandardMaterial color="#fcd34d" roughness={0.55} />
+      </mesh>
+      {/* portrait billboard on head */}
+      <Billboard position={[0, 1.25, 0]}>
         <mesh>
-          <planeGeometry args={[1.1, 1.1]} />
+          <planeGeometry args={[0.55, 0.55]} />
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
-      <Html position={[0, 1.7, 0]} center distanceFactor={8}>
+      <Html position={[0, 1.8, 0]} center distanceFactor={8}>
         <div style={{padding:'2px 6px',background:'rgba(0,0,0,0.6)',color:'white',borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>{name}</div>
       </Html>
     </group>
@@ -369,27 +398,131 @@ function PlayerAndCamera({
     camera.lookAt(camLook)
   })
 
+  // Walk cycle phase oscillator (limbs swing 0..1 sine)
+  const swing = Math.sin(bobT.current) // alternates -1..1
   return (
     <group ref={groupRef} position={spawn}>
       {/* shadow plate */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.5, 24]} />
+        <circleGeometry args={[0.55, 24]} />
         <meshBasicMaterial color="black" transparent opacity={0.4} />
       </mesh>
-      {/* body */}
-      <mesh position={[0, 0.55, 0]} castShadow>
-        <capsuleGeometry args={[0.32, 0.6, 8, 16]} />
+
+      {/* Legs */}
+      <mesh
+        position={[0.13, 0.22, 0]}
+        rotation={[isMoving.current ? swing * 0.6 : 0, 0, 0]}
+        castShadow
+      >
+        <boxGeometry args={[0.16, 0.44, 0.16]} />
+        <meshStandardMaterial color="#0f3a3a" roughness={0.6} />
+      </mesh>
+      <mesh
+        position={[-0.13, 0.22, 0]}
+        rotation={[isMoving.current ? -swing * 0.6 : 0, 0, 0]}
+        castShadow
+      >
+        <boxGeometry args={[0.16, 0.44, 0.16]} />
+        <meshStandardMaterial color="#0f3a3a" roughness={0.6} />
+      </mesh>
+
+      {/* Feet */}
+      <mesh
+        position={[
+          0.13,
+          0.04,
+          isMoving.current ? swing * 0.18 : 0,
+        ]}
+        castShadow
+      >
+        <boxGeometry args={[0.2, 0.08, 0.32]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.7} />
+      </mesh>
+      <mesh
+        position={[
+          -0.13,
+          0.04,
+          isMoving.current ? -swing * 0.18 : 0,
+        ]}
+        castShadow
+      >
+        <boxGeometry args={[0.2, 0.08, 0.32]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.7} />
+      </mesh>
+
+      {/* Torso */}
+      <mesh position={[0, 0.7, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.55, 0.34]} />
         <meshStandardMaterial color="#2dd4bf" roughness={0.5} />
       </mesh>
-      {/* avatar billboard head */}
-      <Billboard position={[0, 1.4, 0]}>
+
+      {/* Belt accent */}
+      <mesh position={[0, 0.46, 0]} castShadow>
+        <boxGeometry args={[0.52, 0.06, 0.36]} />
+        <meshStandardMaterial color="#facc15" roughness={0.4} metalness={0.4} />
+      </mesh>
+
+      {/* Arms */}
+      <mesh
+        position={[0.34, 0.7, 0]}
+        rotation={[isMoving.current ? -swing * 0.7 : 0, 0, 0.05]}
+        castShadow
+      >
+        <boxGeometry args={[0.14, 0.5, 0.14]} />
+        <meshStandardMaterial color="#2dd4bf" roughness={0.5} />
+      </mesh>
+      <mesh
+        position={[-0.34, 0.7, 0]}
+        rotation={[isMoving.current ? swing * 0.7 : 0, 0, -0.05]}
+        castShadow
+      >
+        <boxGeometry args={[0.14, 0.5, 0.14]} />
+        <meshStandardMaterial color="#2dd4bf" roughness={0.5} />
+      </mesh>
+
+      {/* Hands */}
+      <mesh position={[0.34, 0.43, isMoving.current ? -swing * 0.18 : 0]} castShadow>
+        <sphereGeometry args={[0.1, 12, 12]} />
+        <meshStandardMaterial color="#fcd34d" roughness={0.5} />
+      </mesh>
+      <mesh position={[-0.34, 0.43, isMoving.current ? swing * 0.18 : 0]} castShadow>
+        <sphereGeometry args={[0.1, 12, 12]} />
+        <meshStandardMaterial color="#fcd34d" roughness={0.5} />
+      </mesh>
+
+      {/* Neck */}
+      <mesh position={[0, 1.05, 0]} castShadow>
+        <cylinderGeometry args={[0.09, 0.1, 0.1, 12]} />
+        <meshStandardMaterial color="#fcd34d" roughness={0.6} />
+      </mesh>
+
+      {/* Head sphere base */}
+      <mesh position={[0, 1.22, 0]} castShadow>
+        <sphereGeometry args={[0.22, 16, 16]} />
+        <meshStandardMaterial color="#fcd34d" roughness={0.55} />
+      </mesh>
+
+      {/* Avatar portrait billboard on the head */}
+      <Billboard position={[0, 1.32, 0]}>
         <mesh>
-          <planeGeometry args={[1, 1]} />
+          <planeGeometry args={[0.55, 0.55]} />
           <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </Billboard>
-      <Html position={[0, 2.1, 0]} center distanceFactor={8}>
-        <div style={{padding:'2px 6px',background:'rgba(0,0,0,0.6)',color:'#a7f3d0',borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>You</div>
+
+      <Html position={[0, 1.95, 0]} center distanceFactor={8}>
+        <div
+          style={{
+            padding: '2px 6px',
+            background: 'rgba(0,0,0,0.6)',
+            color: '#a7f3d0',
+            borderRadius: 4,
+            fontSize: 11,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          You
+        </div>
       </Html>
     </group>
   )
