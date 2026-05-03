@@ -48,7 +48,7 @@ export function PlaygroundHud({
         )}
       </div>
 
-      <div className="pointer-events-auto fixed bottom-3 left-[92px] z-[70] flex max-w-[calc(100vw-120px)] gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-black/55 p-2 text-white shadow-2xl backdrop-blur-xl md:left-[104px]">
+      <div className="pointer-events-auto fixed bottom-3 left-[92px] z-[70] flex max-w-[calc(100vw-120px)] gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-black/55 p-2 text-white shadow-2xl backdrop-blur-xl md:left-[104px] xl:flex hidden">
         {PLAYGROUND_SKILLS.map((skill) => {
           const xp = state.skillXp[skill.id] ?? 0
           const level = Math.floor(xp / 100) + 1
@@ -62,7 +62,7 @@ export function PlaygroundHud({
         })}
       </div>
 
-      <div className="pointer-events-auto fixed right-3 bottom-3 z-[70] w-[300px] rounded-2xl border border-white/10 bg-black/55 p-3 text-white shadow-2xl backdrop-blur-xl">
+      <div className="pointer-events-auto fixed right-3 bottom-[88px] z-[70] hidden w-[210px] rounded-2xl border border-white/10 bg-black/55 p-3 text-white shadow-2xl backdrop-blur-xl xl:block">
         <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">World Map</div>
         <div className="space-y-1.5">
           {worlds.map((world) => {
@@ -90,7 +90,7 @@ export function PlaygroundHud({
         </div>
       </div>
 
-      <div className="pointer-events-auto fixed right-3 top-[152px] z-[70] w-[300px] rounded-2xl border border-white/10 bg-black/55 p-3 text-white shadow-2xl backdrop-blur-xl">
+      <div className="pointer-events-auto fixed right-3 top-[210px] z-[70] w-[210px] rounded-2xl border border-white/10 bg-black/55 p-3 text-white shadow-2xl backdrop-blur-xl">
         <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Inventory</div>
         <div className="grid grid-cols-4 gap-2">
           {Array.from({ length: 8 }).map((_, i) => {

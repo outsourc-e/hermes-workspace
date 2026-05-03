@@ -7,6 +7,8 @@ import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { PlaygroundDialog } from './components/playground-dialog'
 import { PlaygroundJournal } from './components/playground-journal'
 import { PlaygroundMap } from './components/playground-map'
+import { PlaygroundActionBar } from './components/playground-actionbar'
+import { PlaygroundMinimap } from './components/playground-minimap'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { botsFor } from './lib/playground-bots'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
@@ -622,11 +624,12 @@ export function PlaygroundScreen() {
     setMonsterDefeated(false)
   }, [world])
 
-  function handleMonsterAttack() {
-    if (monsterDefeated) return
-    const dmg = 10 + Math.floor(Math.random() * 8)
-    const playerDmg = Math.floor(Math.random() * 5) + 1
-    rpg.damagePlayer(playerDmg)
+  function attackMonster(dmg: number, takeBack = true) {
+    if (monsterDefeated) return false
+    if (takeBack) {
+      const playerDmg = Math.floor(Math.random() * 5) + 1
+      rpg.damagePlayer(playerDmg)
+    }
     setMonsterHp((hp) => {
       const next = Math.max(0, hp - dmg)
       if (next <= 0 && !monsterDefeated) {
@@ -635,6 +638,36 @@ export function PlaygroundScreen() {
       }
       return next
     })
+    return true
+  }
+
+  function handleMonsterAttack() {
+    attackMonster(10 + Math.floor(Math.random() * 8))
+  }
+
+  function handleCast(skillId: string): boolean {
+    switch (skillId) {
+      case 'strike':
+        return attackMonster(8 + Math.floor(Math.random() * 6))
+      case 'heal':
+        if (!rpg.useMp(12)) return false
+        rpg.damagePlayer(-35) // negative damage = heal
+        return true
+      case 'sprint':
+        if (!rpg.useMp(8)) return false
+        return true
+      case 'spell':
+        if (!rpg.useMp(18)) return false
+        return attackMonster(22 + Math.floor(Math.random() * 8), false)
+      case 'shield':
+        if (!rpg.useMp(14)) return false
+        return true
+      case 'summon':
+        if (!rpg.useMp(25)) return false
+        return true
+      default:
+        return false
+    }
   }
 
   // Ambient bot chatter — every 6-14s a bot in current world says something
@@ -827,6 +860,20 @@ export function PlaygroundScreen() {
           onSend={sendChat}
           collapsed={chatCollapsed}
           onToggle={() => setChatCollapsed((c) => !c)}
+        />
+        <PlaygroundActionBar
+          onCast={handleCast}
+          hp={rpg.state.hp}
+          hpMax={rpg.state.hpMax}
+          mp={rpg.state.mp}
+          mpMax={rpg.state.mpMax}
+          sp={rpg.state.sp}
+          spMax={rpg.state.spMax}
+        />
+        <PlaygroundMinimap
+          worldId={world}
+          worldName={WORLD_META[world].name}
+          worldAccent={WORLD_META[world].accent}
         />
         {/* Cinematic world transition fade */}
         <div

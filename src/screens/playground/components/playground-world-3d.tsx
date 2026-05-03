@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor, type BotProfile } from '../lib/playground-bots'
+import { ScatteredScenery } from './playground-environment'
 
 type DecorType = 'classical' | 'tech' | 'forest' | 'temple' | 'arena'
 
@@ -1027,6 +1028,7 @@ function Scene({
 
       <Ground world={world} />
       <WorldDecor world={world} />
+      <ScatteredScenery worldId={worldId} />
 
       {/* NPCs per world */}
       {worldId === 'agora' && (

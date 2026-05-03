@@ -188,7 +188,7 @@ export function usePlaygroundRpg() {
 
   const damagePlayer = useCallback((amount: number) => {
     setState((prev) => {
-      const hp = Math.max(0, prev.hp - amount)
+      const hp = Math.max(0, Math.min(prev.hpMax, prev.hp - amount))
       return { ...prev, hp }
     })
   }, [])
