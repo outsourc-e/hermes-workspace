@@ -649,7 +649,10 @@ export function PlaygroundScreen() {
         resetRpg={rpg.resetRpg}
       />
     }>
-      <div className="relative h-full min-h-[640px] overflow-hidden" style={{ background: '#0b1720', color: 'white' }}>
+      <div
+        className="relative overflow-hidden"
+        style={{ width: '100%', height: '100vh', minHeight: 640, background: '#0b1720', color: 'white' }}
+      >
         <PlaygroundWorld3D
           worldId={world}
           onPortal={() => {

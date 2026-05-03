@@ -483,8 +483,22 @@ export function PlaygroundWorld3D({
   onQuestZone: (id: string) => void
 }) {
   return (
-    <div className="absolute inset-0">
-      <Canvas shadows camera={{ position: [10, 12, 10], fov: 45 }} dpr={[1, 1.5]}>
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        background: '#0b1720',
+      }}
+    >
+      <Canvas
+        shadows
+        camera={{ position: [10, 12, 10], fov: 45 }}
+        dpr={[1, 1.5]}
+        style={{ width: '100%', height: '100%' }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
+      >
         <Suspense fallback={null}>
           <Scene worldId={worldId} onPortal={onPortal} onQuestZone={onQuestZone} />
         </Suspense>
