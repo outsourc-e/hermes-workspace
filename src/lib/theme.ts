@@ -16,37 +16,37 @@ export const THEMES: Array<{
 }> = [
   {
     id: 'claude-nous',
-    label: 'Claude Nous',
+    label: 'Nous',
     description: 'Deep teal background, cream accent — matches Nous Research chrome',
     icon: '◱',
   },
   {
     id: 'claude-nous-light',
-    label: 'Claude Nous Light',
+    label: 'Nous Light',
     description: 'Cold paper white with restrained cobalt framing',
     icon: '◲',
   },
   {
     id: 'claude-official',
-    label: 'Claude Official',
+    label: 'Hermes',
     description: 'Navy and indigo flagship theme',
     icon: '⚕',
   },
   {
     id: 'claude-official-light',
-    label: 'Claude Official Light',
+    label: 'Hermes Light',
     description: 'Editorial paper white with muted cobalt accents',
     icon: '⚕',
   },
   {
     id: 'claude-classic',
-    label: 'Claude Classic',
+    label: 'Bronze',
     description: 'Bronze accents on dark charcoal',
     icon: '🔶',
   },
   {
     id: 'claude-classic-light',
-    label: 'Classic Light',
+    label: 'Bronze Light',
     description: 'Warm parchment with bronze accents',
     icon: '🔶',
   },

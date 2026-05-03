@@ -63,6 +63,7 @@ import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
@@ -398,6 +399,11 @@ const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
 const ApiSendRoute = ApiSendRouteImport.update({
   id: '/api/send',
   path: '/api/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
+  id: '/api/provider-usage',
+  path: '/api/provider-usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
@@ -771,6 +777,7 @@ export interface FileRoutesByFullPath {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -891,6 +898,7 @@ export interface FileRoutesByTo {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1013,6 +1021,7 @@ export interface FileRoutesById {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1136,6 +1145,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1256,6 +1266,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1377,6 +1388,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1499,6 +1511,7 @@ export interface RootRouteChildren {
   ApiPingRoute: typeof ApiPingRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
@@ -1938,6 +1951,13 @@ declare module '@tanstack/react-router' {
       path: '/api/send'
       fullPath: '/api/send'
       preLoaderRoute: typeof ApiSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/provider-usage': {
+      id: '/api/provider-usage'
+      path: '/api/provider-usage'
+      fullPath: '/api/provider-usage'
+      preLoaderRoute: typeof ApiProviderUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/preview-file': {
@@ -2557,6 +2577,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPingRoute: ApiPingRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,

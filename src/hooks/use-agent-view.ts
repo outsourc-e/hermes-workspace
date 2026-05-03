@@ -611,10 +611,12 @@ export function useAgentView(): AgentViewResult {
       } catch (error) {
         if (isDisposed) return
 
-        setActiveAgents(createDemoActiveAgents())
-        setQueuedAgents(createDemoQueue())
-        setHistoryAgents(createDemoHistory())
-        setIsDemoMode(true)
+        // Gateway unreachable — leave the panel empty rather than show fake
+        // demo agents that look like real spawns. Show error message instead.
+        setActiveAgents([])
+        setQueuedAgents([])
+        setHistoryAgents([])
+        setIsDemoMode(false)
         setIsLiveConnected(false)
         setErrorMessage(
           error instanceof Error ? error.message : 'Gateway unavailable',

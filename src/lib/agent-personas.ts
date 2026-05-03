@@ -8,11 +8,11 @@ export type AgentPersona = {
   role: string
   emoji: string
   color: string // Tailwind color class
-  specialties: Array<string>
+  specialties: string[]
 }
 
 /** Default persona pool — assigned round-robin or by task matching */
-export const AGENT_PERSONAS: Array<AgentPersona> = [
+export const AGENT_PERSONAS: AgentPersona[] = [
   {
     name: 'Roger',
     role: 'Frontend Developer',

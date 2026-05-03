@@ -90,7 +90,7 @@ function getMiniAgentCardStatus(status: string): AgentCardStatus {
   return 'running'
 }
 
-const AGENT_NAME_KEY = 'clawsuite-agent-name'
+const AGENT_NAME_KEY = 'hermes-workspace-agent-name'
 
 function getStoredAgentName(): string {
   try {
@@ -114,7 +114,7 @@ const STATE_GLOW: Record<string, string> = {
 // ── Usage helpers (inline in OrchestratorCard) ─────────────────────────────
 
 const USAGE_POLL_MS = 30_000
-const PREFERRED_PROVIDER_KEY_OC = 'clawsuite-preferred-provider'
+const PREFERRED_PROVIDER_KEY_OC = 'hermes-workspace-preferred-provider'
 
 type OcUsageLine = {
   type: 'progress' | 'text' | 'badge'
@@ -375,7 +375,7 @@ function OrchestratorCard({
         )}
       >
         <div className="flex flex-col items-center gap-0.5">
-          <OrchestratorAvatar size={compact ? 32 : 52} />
+          <OrchestratorAvatar size={compact ? 40 : 88} />
           {!compact ? (
             <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-700">
               Main Agent
@@ -397,7 +397,7 @@ function OrchestratorCard({
                 onChange={(e) => setEditValue(e.target.value)}
                 onBlur={commitEdit}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) commitEdit()
+                  if (e.key === 'Enter') commitEdit()
                   if (e.key === 'Escape') setIsEditing(false)
                 }}
                 placeholder="Agent name..."
@@ -832,15 +832,21 @@ export function AgentViewPanel() {
     <>
       {isDesktop ? (
         <motion.aside
-          initial={false}
-          animate={{ x: panelVisible ? 0 : panelWidth }}
-          transition={{ duration: 0.22, ease: 'easeInOut' }}
+          initial={{ x: panelWidth, opacity: 0 }}
+          animate={{
+            x: panelVisible ? 0 : panelWidth,
+            opacity: panelVisible ? 1 : 0,
+          }}
+          transition={{
+            x: { duration: 0.32, ease: [0.32, 0.72, 0.24, 1] },
+            opacity: { duration: 0.22, ease: 'easeOut' },
+          }}
           className={cn(
-            'fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] z-40 w-72 border-l border-primary-300/70 bg-primary-100/92 backdrop-blur-xl',
+            'fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] z-40 w-72 bg-[color:var(--theme-sidebar,#060914)]/95 backdrop-blur-xl',
             panelVisible ? 'pointer-events-auto' : 'pointer-events-none',
           )}
         >
-          <div className="border-b border-primary-300/70 px-3 py-2">
+          <div className="px-3 py-2">
             {/* Row 1: Count left | Title center | Actions right */}
             <div className="flex items-center justify-between">
               {/* Left — active agent count + live indicator */}
@@ -919,13 +925,7 @@ export function AgentViewPanel() {
                 </Button>
               </div>
             </div>
-            {/* Row 2: Stats */}
-            {activeCount > 0 || queuedAgents.length > 0 ? (
-              <p className="mt-1 text-[10px] text-primary-600 tabular-nums">
-                {activeCount} active · {queuedAgents.length} queued ·{' '}
-                {formatCost(totalCost)}
-              </p>
-            ) : null}
+
           </div>
 
           <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
@@ -935,10 +935,10 @@ export function AgentViewPanel() {
                 <OrchestratorCard compact={false} />
 
                 {/* Agents — agent cards — only show when there's something */}
-                {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
+                {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl bg-primary-200/15 p-1">
                   {/* Centered Agents pill */}
                   <div className="mb-1 flex justify-center">
-                    <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
+                    <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
                       Agents
                     </span>
                   </div>
@@ -1000,7 +1000,7 @@ export function AgentViewPanel() {
                             damping: 30,
                           },
                         }}
-                        className="relative rounded-xl border border-primary-300/70 bg-linear-to-b from-primary-100 via-primary-100 to-primary-200/40 p-1"
+                        className="relative rounded-xl bg-primary-200/15 p-1"
                       >
                         <AnimatePresence initial={false}>
                           {spawningNodes.map(
@@ -1161,7 +1161,7 @@ export function AgentViewPanel() {
                 </section>}
 
                 {(cliAgentsQuery.isLoading || visibleCliAgents.length > 0) ? (
-                  <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                  <section className="rounded-2xl bg-primary-200/15 p-2">
                     <Collapsible
                       open={cliAgentsExpanded}
                       onOpenChange={setCliAgentsExpanded}
@@ -1333,9 +1333,9 @@ export function AgentViewPanel() {
                 <div className="space-y-3 p-3">
                   <OrchestratorCard compact={false} />
 
-                  <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
+                  <section className="rounded-2xl bg-primary-200/15 p-1">
                     <div className="mb-1 flex justify-center">
-                      <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
+                      <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
                         Agents
                       </span>
                     </div>
@@ -1384,7 +1384,7 @@ export function AgentViewPanel() {
                     ) : null}
                   </section>
                   {historyAgents.length > 0 ? (
-                    <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                    <section className="rounded-2xl bg-primary-200/15 p-2">
                       <button
                         type="button"
                         onClick={() => setHistoryOpen(!historyOpen)}

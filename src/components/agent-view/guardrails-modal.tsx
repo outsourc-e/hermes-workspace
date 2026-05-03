@@ -65,7 +65,7 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
     if (!open) return
     const normalizedId = agentId.trim()
     const parsed = normalizedId
-      ? parseGuardrails(window.localStorage.getItem(`clawsuite:guardrails:${normalizedId}`))
+      ? parseGuardrails(window.localStorage.getItem(`hermessuite:guardrails:${normalizedId}`))
       : DEFAULT_CONFIG
     setMaxTokens(parsed.maxTokens)
     setToolMode(parsed.toolMode)
@@ -86,7 +86,7 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
       stopOnIdle,
       stopOnTokenLimit,
     }
-    window.localStorage.setItem(`clawsuite:guardrails:${normalizedId}`, JSON.stringify(config))
+    window.localStorage.setItem(`hermessuite:guardrails:${normalizedId}`, JSON.stringify(config))
     toast(`Guardrails updated for ${agentName}`, { type: 'success' })
     onOpenChange(false)
   }
