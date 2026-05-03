@@ -718,6 +718,18 @@ export function PlaygroundScreen() {
         color: '#a7f3d0',
       }].slice(-40),
     )
+    // Broadcast to other browser tabs / multiplayer (best-effort)
+    try { (window as any).__hermesPlaygroundSendChat?.(body) } catch {}
+  }
+  function handleIncomingChat(msg: { id: string; name: string; color: string; text: string; ts: number }) {
+    setMessages((prev) => [...prev, {
+      id: `${msg.ts}-${msg.id}`,
+      authorId: msg.id,
+      authorName: msg.name,
+      body: msg.text,
+      ts: msg.ts,
+      color: msg.color,
+    }].slice(-40))
   }
 
   // J = journal, E = talk, M = map, T = focus chat, Esc = close anything
@@ -825,6 +837,7 @@ export function PlaygroundScreen() {
           }}
           onNpcNearChange={(id) => setNearbyNpc(id)}
           botBubbles={botBubbles}
+          onIncomingChat={handleIncomingChat}
           monsterHp={monsterHp}
           monsterHpMax={monsterHpMax}
           monsterDefeated={monsterDefeated}

@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor, type BotProfile } from '../lib/playground-bots'
 import { ScatteredScenery } from './playground-environment'
+import { usePlaygroundMultiplayer, type RemotePlayer as MpRemotePlayer, type IncomingChat } from '../hooks/use-playground-multiplayer'
 
 type DecorType = 'classical' | 'tech' | 'forest' | 'temple' | 'arena'
 
@@ -693,12 +694,14 @@ function PlayerAndCamera({
   positionRef,
   moveTargetRef,
   bounds = { x: 28, z: 22 },
+  yawOutRef,
 }: {
   avatarId?: string
   spawn?: [number, number, number]
   positionRef: React.MutableRefObject<THREE.Vector3>
   moveTargetRef?: React.MutableRefObject<THREE.Vector3 | null>
   bounds?: { x: number; z: number }
+  yawOutRef?: React.MutableRefObject<number>
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const texture = useTexture(`/avatars/${avatarId}.png`)
@@ -784,6 +787,7 @@ function PlayerAndCamera({
       groupRef.current.position.y = isMoving.current ? Math.abs(Math.sin(bobT.current)) * 0.08 : 0
       groupRef.current.rotation.y = yaw.current
     }
+    if (yawOutRef) yawOutRef.current = yaw.current
     // Orbital camera around player
     const r = camDistance.current
     const px = positionRef.current.x
@@ -1315,6 +1319,43 @@ function SmithyProps({ accent }: { accent: string }) {
   </group>
 }
 
+function RemotePlayer({ remote }: { remote: MpRemotePlayer }) {
+  const ref = useRef<THREE.Group>(null)
+  const target = useMemo(() => new THREE.Vector3(remote.x, remote.y, remote.z), [])
+  const targetYaw = useRef(remote.yaw)
+  useEffect(() => { target.set(remote.x, remote.y, remote.z); targetYaw.current = remote.yaw }, [remote.x, remote.y, remote.z, remote.yaw, target])
+  useFrame(() => {
+    if (!ref.current) return
+    ref.current.position.lerp(target, 0.18)
+    const cur = ref.current.rotation.y
+    let dy = targetYaw.current - cur
+    while (dy > Math.PI) dy -= Math.PI * 2
+    while (dy < -Math.PI) dy += Math.PI * 2
+    ref.current.rotation.y = cur + dy * 0.2
+  })
+  return (
+    <group ref={ref} position={[remote.x, remote.y, remote.z]}>
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.5, 18]} /><meshBasicMaterial color="black" transparent opacity={0.4} /></mesh>
+      <mesh position={[0.13, 0.22, 0]} castShadow><boxGeometry args={[0.14, 0.44, 0.14]} /><meshStandardMaterial color="#1f2a37" roughness={0.6} /></mesh>
+      <mesh position={[-0.13, 0.22, 0]} castShadow><boxGeometry args={[0.14, 0.44, 0.14]} /><meshStandardMaterial color="#1f2a37" roughness={0.6} /></mesh>
+      <mesh position={[0, 0.7, 0]} castShadow><boxGeometry args={[0.5, 0.55, 0.32]} /><meshStandardMaterial color={remote.color} roughness={0.55} emissive={remote.color} emissiveIntensity={0.18} /></mesh>
+      <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
+      <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
+      <mesh position={[0, 1.22, 0]} castShadow><sphereGeometry args={[0.22, 16, 16]} /><meshStandardMaterial color="#fde68a" roughness={0.55} /></mesh>
+      <mesh position={[0, 1.34, -0.02]} castShadow><sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color={remote.color} roughness={0.85} emissive={remote.color} emissiveIntensity={0.18} /></mesh>
+      <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial color={remote.color} side={THREE.DoubleSide} roughness={0.6} /></mesh>
+      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
+        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color:'white',borderRadius:4,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:`1px solid ${remote.color}`}}>{remote.name}</div>
+      </Html>
+      {remote.lastChat && remote.lastChatAt && Date.now() - remote.lastChatAt < 5500 && (
+        <Html position={[0, 2.6, 0]} center distanceFactor={8}>
+          <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:200,textAlign:'center',border:`1px solid ${remote.color}`}}>{remote.lastChat}</div>
+        </Html>
+      )}
+    </group>
+  )
+}
+
 /* ── Scene ── */
 function Scene({
   worldId,
@@ -1322,16 +1363,21 @@ function Scene({
   onQuestZone,
   onNpcNearChange,
   botBubbles,
+  playerPos,
+  playerYaw,
+  remotePlayers,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
   onQuestZone: (id: string) => void
   onNpcNearChange: (npcId: string | null) => void
   botBubbles: Record<string, string>
+  playerPos: React.MutableRefObject<THREE.Vector3>
+  playerYaw: React.MutableRefObject<number>
+  remotePlayers: Record<string, MpRemotePlayer>
 }) {
   const bots = botsFor(worldId)
   const world = WORLDS_3D[worldId]
-  const playerPos = useRef(new THREE.Vector3(0, 0, 6))
   const moveTarget = useRef<THREE.Vector3 | null>(null)
   const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
   const [interior, setInterior] = useState<InteriorId | null>(null)
@@ -1471,8 +1517,17 @@ function Scene({
       )}
 
       <Suspense fallback={null}>
-        <PlayerAndCamera positionRef={playerPos} spawn={outsideSpawn} moveTargetRef={moveTarget} />
+        <PlayerAndCamera positionRef={playerPos} spawn={outsideSpawn} moveTargetRef={moveTarget} yawOutRef={playerYaw} />
       </Suspense>
+
+      {/* Real remote players */}
+      {Object.values(remotePlayers)
+        .filter((r) => r.world === worldId && (r.interior ?? null) === null)
+        .map((remote) => (
+          <Suspense key={remote.id} fallback={null}>
+            <RemotePlayer remote={remote} />
+          </Suspense>
+        ))}
 
       {/* Online bot players */}
       {bots.map((bot) => (
@@ -1495,6 +1550,8 @@ export function PlaygroundWorld3D({
   monsterHpMax,
   monsterDefeated,
   onMonsterAttack,
+  multiplayerName,
+  onIncomingChat,
 }: {
   worldId: PlaygroundWorldId
   onPortal: () => void
@@ -1505,7 +1562,37 @@ export function PlaygroundWorld3D({
   monsterHpMax: number
   monsterDefeated: boolean
   onMonsterAttack: () => void
+  multiplayerName?: string
+  onIncomingChat?: (msg: IncomingChat) => void
 }) {
+  const playerPos = useRef(new THREE.Vector3(0, 0, 6))
+  const playerYaw = useRef(0)
+  const positionForMp = useRef<{ x: number; y: number; z: number } | null>({ x: 0, y: 0, z: 6 })
+  // Sync simple position object for multiplayer hook (it doesn't use THREE)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      positionForMp.current = { x: playerPos.current.x, y: playerPos.current.y, z: playerPos.current.z }
+    }, 80)
+    return () => window.clearInterval(id)
+  }, [])
+  const { remotePlayers, online, sendChat, myName, myColor, selfId } = usePlaygroundMultiplayer({
+    world: worldId,
+    interior: null,
+    positionRef: positionForMp,
+    yawRef: playerYaw,
+    name: multiplayerName,
+    onChat: onIncomingChat,
+  })
+  // Expose sendChat globally so the screen-level chat panel can broadcast.
+  useEffect(() => {
+    ;(window as any).__hermesPlaygroundSendChat = (text: string) => sendChat(text)
+    ;(window as any).__hermesPlaygroundMpInfo = () => ({ online, myName, myColor, selfId, remoteCount: Object.keys(remotePlayers).length })
+    return () => {
+      try { delete (window as any).__hermesPlaygroundSendChat } catch {}
+      try { delete (window as any).__hermesPlaygroundMpInfo } catch {}
+    }
+  }, [sendChat, online, myName, myColor, selfId, remotePlayers])
+
   return (
     <div
       style={{
@@ -1534,9 +1621,18 @@ export function PlaygroundWorld3D({
             monsterHpMax={monsterHpMax}
             monsterDefeated={monsterDefeated}
             onMonsterAttack={onMonsterAttack}
+            playerPos={playerPos}
+            playerYaw={playerYaw}
+            remotePlayers={remotePlayers}
           />
         </Suspense>
       </Canvas>
+      {/* Multiplayer status pill */}
+      <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 70, pointerEvents: 'none' }}>
+        <div style={{ padding: '3px 10px', borderRadius: 999, fontSize: 10, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', background: 'rgba(0,0,0,0.6)', color: '#fff', border: `1px solid ${myColor}`, boxShadow: `0 0 10px ${myColor}55`, whiteSpace: 'nowrap' }}>
+          {online ? 'Live' : 'Offline'} · {myName} · {Object.values(remotePlayers).filter((r) => r.world === worldId).length} nearby
+        </div>
+      </div>
     </div>
   )
 }
