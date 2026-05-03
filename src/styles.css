@@ -712,7 +712,11 @@ code {
 /* ── Hermes Workspace Themes ── */
 [data-theme='claude-official'] {
   --theme-bg: #0a0e1a;
-  --theme-sidebar: #0d1220;
+  /* Sidebar gets a deeper shade than the main bg so the column
+     reads as its own surface. Iter 014 fix: previously the sidebar
+     and bg were nearly identical (#0d1220 vs #0a0e1a) which made
+     the sidebar look transparent against the dashboard. */
+  --theme-sidebar: #060914;
   --theme-panel: #0d1220;
   --theme-card: #11182a;
   --theme-card2: #151d32;
