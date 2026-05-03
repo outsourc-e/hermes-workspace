@@ -33,10 +33,17 @@ function useGlbAvailable(id: string): boolean {
     if (typeof window === 'undefined') return
     _glbPresence.set(id, 'unknown')
     let cancelled = false
+    // TanStack Start's catch-all SSRs index.html for missing static files,
+    // returning 200 + text/html. We must inspect content-type to know if a
+    // real GLB is there. GLB files are application/octet-stream or model/gltf-binary.
     fetch(`/avatars-3d/${id}.glb`, { method: 'HEAD' })
       .then((r) => {
         if (cancelled) return
-        _glbPresence.set(id, r.ok ? 'present' : 'missing')
+        const ct = r.headers.get('content-type') || ''
+        const isReal = r.ok
+          && !ct.includes('text/html')
+          && (ct.includes('octet-stream') || ct.includes('gltf') || ct.includes('binary') || ct === '' || ct.includes('application/'))
+        _glbPresence.set(id, isReal ? 'present' : 'missing')
         force((n) => n + 1)
       })
       .catch(() => {

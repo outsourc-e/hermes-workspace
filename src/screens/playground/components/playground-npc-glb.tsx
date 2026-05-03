@@ -16,9 +16,22 @@
  *   - We freeze materials and disable raycasting on geometry to avoid
  *     pointer hit cost when the parent already handles clicks.
  */
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+
+class GlbErrorBoundary extends Component<
+  { children: ReactNode; onError?: () => void },
+  { failed: boolean }
+> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch() { this.props.onError?.() }
+  render() {
+    if (this.state.failed) return null
+    return this.props.children
+  }
+}
 
 type Props = {
   /** NPC id; will look for `/avatars-3d/<id>.glb`. */
@@ -45,10 +58,17 @@ function useGlbProbe(url: string): 'unknown' | 'present' | 'missing' {
       return
     }
     let cancelled = false
+    // Important: TanStack Start's catch-all returns 200 + text/html for
+    // missing static files. We must inspect Content-Type to know if a
+    // real GLB exists, otherwise useGLTF will try to parse HTML and crash.
     fetch(url, { method: 'HEAD' })
       .then((r) => {
         if (cancelled) return
-        const v = r.ok ? 'present' : 'missing'
+        const ct = r.headers.get('content-type') || ''
+        const isReal = r.ok
+          && !ct.includes('text/html')
+          && (ct.includes('octet-stream') || ct.includes('gltf') || ct.includes('binary') || ct === '' || ct.includes('application/'))
+        const v = isReal ? 'present' : 'missing'
         probeCache.set(url, v)
         setState(v)
       })
@@ -93,10 +113,16 @@ function GlbInner({ url, scale, yOffset }: { url: string; scale: number; yOffset
 export function PlaygroundNpcGlb({ npcId, scale = 1, yOffset = 0 }: Props) {
   const url = `/avatars-3d/${npcId}.glb`
   const status = useGlbProbe(url)
-  if (status !== 'present') return null
+  const [hardFailed, setHardFailed] = useState(false)
+  if (status !== 'present' || hardFailed) return null
   return (
-    <Suspense fallback={null}>
-      <GlbInner url={url} scale={scale} yOffset={yOffset} />
-    </Suspense>
+    <GlbErrorBoundary onError={() => {
+      probeCache.set(url, 'missing')
+      setHardFailed(true)
+    }}>
+      <Suspense fallback={null}>
+        <GlbInner url={url} scale={scale} yOffset={yOffset} />
+      </Suspense>
+    </GlbErrorBoundary>
   )
 }
