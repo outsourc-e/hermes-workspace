@@ -375,6 +375,48 @@ async function probe(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * Stricter probe for the legacy enhanced chat-stream endpoint.
+ *
+ * The previous probe used a generic GET and treated any non-404/403 status
+ * as "available". That misclassified vanilla hermes-agent (which serves a
+ * router-level handler that 405s/400s GETs to that path) as having the
+ * enhanced fork's session-stream capability. Workspace then fell through
+ * to streamChat() which posts to /api/sessions/{id}/chat/stream — vanilla
+ * agent returns 404 there at runtime and chat appears to fail with
+ * "Authentication error" because the bundle's error mapper is overly
+ * generous about what it interprets as auth failures. See #261.
+ *
+ * Real enhanced-fork gateways respond to GET on the probe path with one
+ * of: 405 Method Not Allowed (it's POST-only there too) but also expose
+ * the path in their router; we cannot distinguish reliably from a generic
+ * status code on GET, so we POST a tiny no-op body and look for a
+ * structured error shape that only the fork emits.
+ */
+async function probeEnhancedChatStream(): Promise<boolean> {
+  try {
+    const res = await fetch(`${CLAUDE_API}/api/sessions/__probe__/chat/stream`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+    // Vanilla hermes-agent has no such endpoint — dashboard layer 404s,
+    // gateway 404s, anything in between 404s. Enhanced fork accepts POST
+    // and returns either a 4xx structured error (validation) or starts a
+    // stream; either way the path is registered.
+    if (res.status === 404 || res.status === 403) return false
+    // 405 = the path exists but POST is wrong. That's still vanilla — no
+    // enhanced fork would 405 a POST to its own chat/stream endpoint.
+    if (res.status === 405) return false
+    // 401 means auth gate is wired; treat as available so token-gated
+    // setups don't get downgraded by a missing token at probe time.
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function probeChatCompletions(): Promise<boolean> {
   try {
     const getRes = await fetch(`${CLAUDE_API}/v1/chat/completions`, {
@@ -543,7 +585,7 @@ export async function probeGateway(options?: {
       probeChatCompletions(),
       probe('/v1/models'),
       probe('/api/sessions'),
-      probe('/api/sessions/__probe__/chat/stream'),
+      probeEnhancedChatStream(),
       probe('/api/skills'),
       probe('/api/config'),
       probe('/api/jobs'),
