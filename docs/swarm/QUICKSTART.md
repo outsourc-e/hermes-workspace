@@ -67,26 +67,7 @@ If a worker exists in the roster but has no local profile, it can still appear a
 
 ## 5. Spawn a tmux-backed worker
 
-There are two supported paths.
-
-### Option A: rotate/start script
-
-If your environment has the helper script installed, use:
-
-```bash
-/tmp/aurora-rotate-worker.sh swarm7
-```
-
-Replace `swarm7` with the worker ID you want. The convention is:
-
-```text
-tmux session: swarm-<workerId>
-profile:      ~/.hermes/profiles/<workerId>
-```
-
-After the script starts the session, open Swarm Mode and use Runtime view to attach to the TUI.
-
-### Option B: Add Swarm dialog
+### Add Swarm dialog
 
 In the workspace:
 
