@@ -3,7 +3,18 @@
  * Add new languages by adding a locale map below.
  */
 
-export type LocaleId = 'en' | 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'ko' | 'pt' | 'ru' | 'ar'
+export type LocaleId =
+  | 'en'
+  | 'es'
+  | 'fr'
+  | 'de'
+  | 'zh'
+  | 'zh-TW'
+  | 'ja'
+  | 'ko'
+  | 'pt'
+  | 'ru'
+  | 'ar'
 
 const EN = {
   // Nav
@@ -81,7 +92,8 @@ const ES: LocaleTranslations = {
   'jobs.newJob': 'Nuevo Trabajo',
   'settings.title': 'Configuración',
   'settings.language': 'Idioma',
-  'settings.languageDesc': 'Elige el idioma de la interfaz del espacio de trabajo.',
+  'settings.languageDesc':
+    'Elige el idioma de la interfaz del espacio de trabajo.',
   'common.save': 'Guardar',
   'common.cancel': 'Cancelar',
   'common.delete': 'Eliminar',
@@ -119,7 +131,8 @@ const FR: LocaleTranslations = {
   'jobs.newJob': 'Nouvelle tâche',
   'settings.title': 'Paramètres',
   'settings.language': 'Langue',
-  'settings.languageDesc': "Choisissez la langue d'affichage de l'espace de travail.",
+  'settings.languageDesc':
+    "Choisissez la langue d'affichage de l'espace de travail.",
   'common.save': 'Enregistrer',
   'common.cancel': 'Annuler',
   'common.delete': 'Supprimer',
@@ -205,8 +218,56 @@ const RU: LocaleTranslations = {
   'common.noData': 'Нет данных',
 }
 
+const ZH_TW: LocaleTranslations = {
+  'nav.dashboard': '儀表板',
+  'nav.chat': '聊天',
+  'nav.files': '檔案',
+  'nav.terminal': '終端機',
+  'nav.jobs': '工作',
+  'nav.tasks': '任務',
+  'nav.memory': '記憶體',
+  'nav.skills': '技能',
+  'nav.profiles': '個人資料',
+  'nav.settings': '設定',
+  'skills.installed': '已安裝',
+  'skills.marketplace': '市集',
+  'skills.search': '依名稱、標籤或描述搜尋',
+  'skills.noResults': '找不到技能',
+  'profiles.profiles': '個人資料',
+  'profiles.monitoring': '監控',
+  'tasks.title': '任務',
+  'tasks.newTask': '新增任務',
+  'tasks.backlog': '待辦清單',
+  'tasks.todo': '待處理',
+  'tasks.inProgress': '進行中',
+  'tasks.review': '審查',
+  'tasks.done': '完成',
+  'jobs.title': '工作',
+  'jobs.newJob': '新增工作',
+  'settings.title': '設定',
+  'settings.language': '語言',
+  'settings.languageDesc': '選擇工作區介面的顯示語言。',
+  'common.save': '儲存',
+  'common.cancel': '取消',
+  'common.delete': '刪除',
+  'common.search': '搜尋',
+  'common.loading': '載入中...',
+  'common.error': '錯誤',
+  'common.noData': '無資料',
+}
+
 const LOCALES: Record<LocaleId, LocaleTranslations> = {
-  en: EN, es: ES, fr: FR, de: EN, zh: ZH, ja: EN, ko: EN, pt: EN, ru: RU, ar: EN,
+  en: EN,
+  es: ES,
+  fr: FR,
+  de: EN,
+  zh: ZH,
+  'zh-TW': ZH_TW,
+  ja: EN,
+  ko: EN,
+  pt: EN,
+  ru: RU,
+  ar: EN,
 }
 
 export const LOCALE_LABELS: Record<LocaleId, string> = {
@@ -214,7 +275,8 @@ export const LOCALE_LABELS: Record<LocaleId, string> = {
   es: 'Español',
   fr: 'Français',
   de: 'Deutsch',
-  zh: '中文',
+  zh: '中文（简体）',
+  'zh-TW': '繁體中文',
   ja: '日本語',
   ko: '한국어',
   pt: 'Português',
@@ -228,8 +290,10 @@ export function getLocale(): LocaleId {
   if (typeof window === 'undefined') return 'en'
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored && stored in LOCALES) return stored as LocaleId
-  const browser = navigator.language.split('-')[0]
-  if (browser in LOCALES) return browser as LocaleId
+  const full = navigator.language
+  if (full in LOCALES) return full as LocaleId
+  const lang = full.split('-')[0]
+  if (lang in LOCALES) return lang as LocaleId
   return 'en'
 }
 
