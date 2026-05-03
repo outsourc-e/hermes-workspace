@@ -13,6 +13,41 @@ import { botsFor, type BotProfile } from '../lib/playground-bots'
 import { ScatteredScenery } from './playground-environment'
 import { usePlaygroundMultiplayer, type RemotePlayer as MpRemotePlayer, type IncomingChat } from '../hooks/use-playground-multiplayer'
 import { loadAvatarConfig, type AvatarConfig } from '../lib/avatar-config'
+import { PlaygroundNpcGlb } from './playground-npc-glb'
+
+/**
+ * Module-level GLB presence probe. Returns:
+ *   'unknown' — still probing
+ *   'present' — use GLB body
+ *   'missing' — fall back to voxel body
+ *
+ * Synchronous read after first probe; the NPC component re-renders when
+ * the result resolves.
+ */
+const _glbPresence = new Map<string, 'unknown' | 'present' | 'missing'>()
+function useGlbAvailable(id: string): boolean {
+  const [_, force] = useState(0)
+  const cached = _glbPresence.get(id)
+  useEffect(() => {
+    if (cached === 'present' || cached === 'missing') return
+    if (typeof window === 'undefined') return
+    _glbPresence.set(id, 'unknown')
+    let cancelled = false
+    fetch(`/avatars-3d/${id}.glb`, { method: 'HEAD' })
+      .then((r) => {
+        if (cancelled) return
+        _glbPresence.set(id, r.ok ? 'present' : 'missing')
+        force((n) => n + 1)
+      })
+      .catch(() => {
+        if (cancelled) return
+        _glbPresence.set(id, 'missing')
+        force((n) => n + 1)
+      })
+    return () => { cancelled = true }
+  }, [id, cached])
+  return cached === 'present'
+}
 
 function useAvatarConfig() {
   const [cfg, setCfg] = useState<AvatarConfig>(() => loadAvatarConfig())
@@ -481,6 +516,7 @@ function NPC({
   const ref = useRef<THREE.Group>(null)
   const base = useMemo(() => new THREE.Vector3(...position), [position])
   const phase = useMemo(() => Math.random() * Math.PI * 2, [])
+  const hasGlb = useGlbAvailable(npcId || avatar)
 
   const lastNear = useRef(false)
   const [isNear, setIsNear] = useState(false)
@@ -522,71 +558,78 @@ function NPC({
         <circleGeometry args={[0.5, 18]} />
         <meshBasicMaterial color="black" transparent opacity={0.4} />
       </mesh>
-      {/* legs */}
-      <mesh position={[0.13, 0.22, 0]} castShadow>
-        <boxGeometry args={[0.14, 0.44, 0.14]} />
-        <meshStandardMaterial color="#1f2a37" roughness={0.6} />
-      </mesh>
-      <mesh position={[-0.13, 0.22, 0]} castShadow>
-        <boxGeometry args={[0.14, 0.44, 0.14]} />
-        <meshStandardMaterial color="#1f2a37" roughness={0.6} />
-      </mesh>
-      {/* feet */}
-      <mesh position={[0.13, 0.04, 0]} castShadow>
-        <boxGeometry args={[0.18, 0.07, 0.28]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.7} />
-      </mesh>
-      <mesh position={[-0.13, 0.04, 0]} castShadow>
-        <boxGeometry args={[0.18, 0.07, 0.28]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.7} />
-      </mesh>
-      {/* torso (robe) — colored per NPC */}
-      <mesh position={[0, 0.7, 0]} castShadow>
-        <boxGeometry args={[0.5, 0.55, 0.32]} />
-        <meshStandardMaterial color={color} roughness={0.55} emissive={color} emissiveIntensity={0.15} />
-      </mesh>
-      {/* belt accent matching player */}
-      <mesh position={[0, 0.46, 0]} castShadow>
-        <boxGeometry args={[0.52, 0.05, 0.34]} />
-        <meshStandardMaterial color="#fbbf24" metalness={0.4} roughness={0.4} />
-      </mesh>
-      {/* arms */}
-      <mesh position={[0.32, 0.7, 0]} castShadow>
-        <boxGeometry args={[0.13, 0.5, 0.13]} />
-        <meshStandardMaterial color={color} roughness={0.55} />
-      </mesh>
-      <mesh position={[-0.32, 0.7, 0]} castShadow>
-        <boxGeometry args={[0.13, 0.5, 0.13]} />
-        <meshStandardMaterial color={color} roughness={0.55} />
-      </mesh>
-      {/* hands */}
-      <mesh position={[0.32, 0.43, 0]} castShadow>
-        <sphereGeometry args={[0.09, 12, 12]} />
-        <meshStandardMaterial color="#fde68a" roughness={0.5} />
-      </mesh>
-      <mesh position={[-0.32, 0.43, 0]} castShadow>
-        <sphereGeometry args={[0.09, 12, 12]} />
-        <meshStandardMaterial color="#fde68a" roughness={0.5} />
-      </mesh>
-      {/* neck */}
-      <mesh position={[0, 1.05, 0]} castShadow>
-        <cylinderGeometry args={[0.085, 0.095, 0.1, 12]} />
-        <meshStandardMaterial color="#fde68a" roughness={0.55} />
-      </mesh>
-      {/* head sphere */}
-      <mesh position={[0, 1.22, 0]} castShadow>
-        <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial color="#fde68a" roughness={0.55} />
-      </mesh>
-      {/* eyes */}
-      <mesh position={[0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
-      <mesh position={[-0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
-      {/* hair cap */}
-      <mesh position={[0, 1.34, -0.02]} castShadow>
-        <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={color} roughness={0.85} emissive={color} emissiveIntensity={0.18} />
-      </mesh>
-      <NpcAccessories role={npcId || avatar} color={color} />
+      {hasGlb ? (
+        // GLB body replaces voxel meshes when /avatars-3d/<id>.glb is present.
+        <PlaygroundNpcGlb npcId={npcId || avatar} />
+      ) : (
+        <>
+          {/* legs */}
+          <mesh position={[0.13, 0.22, 0]} castShadow>
+            <boxGeometry args={[0.14, 0.44, 0.14]} />
+            <meshStandardMaterial color="#1f2a37" roughness={0.6} />
+          </mesh>
+          <mesh position={[-0.13, 0.22, 0]} castShadow>
+            <boxGeometry args={[0.14, 0.44, 0.14]} />
+            <meshStandardMaterial color="#1f2a37" roughness={0.6} />
+          </mesh>
+          {/* feet */}
+          <mesh position={[0.13, 0.04, 0]} castShadow>
+            <boxGeometry args={[0.18, 0.07, 0.28]} />
+            <meshStandardMaterial color="#0f172a" roughness={0.7} />
+          </mesh>
+          <mesh position={[-0.13, 0.04, 0]} castShadow>
+            <boxGeometry args={[0.18, 0.07, 0.28]} />
+            <meshStandardMaterial color="#0f172a" roughness={0.7} />
+          </mesh>
+          {/* torso (robe) — colored per NPC */}
+          <mesh position={[0, 0.7, 0]} castShadow>
+            <boxGeometry args={[0.5, 0.55, 0.32]} />
+            <meshStandardMaterial color={color} roughness={0.55} emissive={color} emissiveIntensity={0.15} />
+          </mesh>
+          {/* belt accent matching player */}
+          <mesh position={[0, 0.46, 0]} castShadow>
+            <boxGeometry args={[0.52, 0.05, 0.34]} />
+            <meshStandardMaterial color="#fbbf24" metalness={0.4} roughness={0.4} />
+          </mesh>
+          {/* arms */}
+          <mesh position={[0.32, 0.7, 0]} castShadow>
+            <boxGeometry args={[0.13, 0.5, 0.13]} />
+            <meshStandardMaterial color={color} roughness={0.55} />
+          </mesh>
+          <mesh position={[-0.32, 0.7, 0]} castShadow>
+            <boxGeometry args={[0.13, 0.5, 0.13]} />
+            <meshStandardMaterial color={color} roughness={0.55} />
+          </mesh>
+          {/* hands */}
+          <mesh position={[0.32, 0.43, 0]} castShadow>
+            <sphereGeometry args={[0.09, 12, 12]} />
+            <meshStandardMaterial color="#fde68a" roughness={0.5} />
+          </mesh>
+          <mesh position={[-0.32, 0.43, 0]} castShadow>
+            <sphereGeometry args={[0.09, 12, 12]} />
+            <meshStandardMaterial color="#fde68a" roughness={0.5} />
+          </mesh>
+          {/* neck */}
+          <mesh position={[0, 1.05, 0]} castShadow>
+            <cylinderGeometry args={[0.085, 0.095, 0.1, 12]} />
+            <meshStandardMaterial color="#fde68a" roughness={0.55} />
+          </mesh>
+          {/* head sphere */}
+          <mesh position={[0, 1.22, 0]} castShadow>
+            <sphereGeometry args={[0.22, 16, 16]} />
+            <meshStandardMaterial color="#fde68a" roughness={0.55} />
+          </mesh>
+          {/* eyes */}
+          <mesh position={[0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
+          <mesh position={[-0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color="#0b1220" /></mesh>
+          {/* hair cap */}
+          <mesh position={[0, 1.34, -0.02]} castShadow>
+            <sphereGeometry args={[0.235, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color={color} roughness={0.85} emissive={color} emissiveIntensity={0.18} />
+          </mesh>
+          <NpcAccessories role={npcId || avatar} color={color} />
+        </>
+      )}
       {/* nameplate w/ portrait chip — replaces floating PNG */}
       <Html position={[0, 1.95, 0]} center distanceFactor={8}>
         <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'white',borderRadius:14,fontSize:11,fontWeight:600,whiteSpace:'nowrap',border:`1px solid ${color}`,boxShadow:`0 0 8px ${color}55`}}>
