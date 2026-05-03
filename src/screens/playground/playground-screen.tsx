@@ -3,6 +3,7 @@ import { Billboard, Float, Html, Sparkles, Stars, Text, useTexture } from '@reac
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { PlaygroundHud } from './components/playground-hud'
+import { PlaygroundOnlineChip } from './components/playground-online-chip'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { PlaygroundDialog } from './components/playground-dialog'
 import { PlaygroundJournal } from './components/playground-journal'
@@ -504,6 +505,7 @@ function PlaygroundLiteWorld({
         onReset={resetRpg}
         lastReward={lastReward}
       />
+      <PlaygroundOnlineChip accent={meta.accent} />
       <div className="absolute inset-0 opacity-60" style={{ background: `radial-gradient(circle at 50% 22%, ${meta.accent}55, transparent 34%), linear-gradient(180deg, transparent, #000 92%)` }} />
       <div className="relative z-10 flex items-start justify-between gap-3 p-4">
         <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-3 shadow-2xl backdrop-blur-xl">
@@ -926,6 +928,7 @@ export function PlaygroundScreen() {
           worldAccent={WORLD_META[world].accent}
           lastReward={rpg.lastReward}
         />
+        <PlaygroundOnlineChip accent={WORLD_META[world].accent} />
         <PlaygroundSidePanel
           state={rpg.state}
           currentWorld={world}

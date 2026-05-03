@@ -3,7 +3,7 @@
  * NPCs, and clickable portal. Hackathon base for Hermes Playground.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard, Html, Sparkles, useTexture } from '@react-three/drei'
+import { Html, Sparkles } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
@@ -481,7 +481,6 @@ function NPC({
   const ref = useRef<THREE.Group>(null)
   const base = useMemo(() => new THREE.Vector3(...position), [position])
   const phase = useMemo(() => Math.random() * Math.PI * 2, [])
-  const texture = useTexture(`/avatars/${avatar}.png`)
 
   const lastNear = useRef(false)
   const [isNear, setIsNear] = useState(false)
@@ -588,15 +587,12 @@ function NPC({
         <meshStandardMaterial color={color} roughness={0.85} emissive={color} emissiveIntensity={0.18} />
       </mesh>
       <NpcAccessories role={npcId || avatar} color={color} />
-      {/* portrait billboard slightly above head */}
-      <Billboard position={[0, 1.6, 0]}>
-        <mesh>
-          <planeGeometry args={[0.55, 0.55]} />
-          <meshBasicMaterial map={texture} transparent toneMapped={false} />
-        </mesh>
-      </Billboard>
-      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
-        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color:'white',borderRadius:4,fontSize:11,fontWeight:600,whiteSpace:'nowrap',border:`1px solid ${color}`}}>{name}</div>
+      {/* nameplate w/ portrait chip — replaces floating PNG */}
+      <Html position={[0, 1.95, 0]} center distanceFactor={8}>
+        <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'white',borderRadius:14,fontSize:11,fontWeight:600,whiteSpace:'nowrap',border:`1px solid ${color}`,boxShadow:`0 0 8px ${color}55`}}>
+          <img src={`/avatars/${avatar}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:color,objectFit:'cover',border:`1px solid ${color}`}} />
+          <span>{name}</span>
+        </div>
       </Html>
       {isNear && (
         <Html position={[0, 2.55, 0]} center distanceFactor={8}>
@@ -731,7 +727,6 @@ function PlayerAndCamera({
   const cfg = useAvatarConfig()
   const portraitId = avatarId || cfg.portrait || 'hermes'
   const groupRef = useRef<THREE.Group>(null)
-  const texture = useTexture(`/avatars/${portraitId}.png`)
   const keys = useKeyboard()
   const { camera } = useThree()
   const camIdeal = useMemo(() => new THREE.Vector3(), [])
@@ -1048,26 +1043,11 @@ function PlayerAndCamera({
         </mesh>
       )}
 
-      {/* Avatar portrait billboard slightly above head */}
-      <Billboard position={[0, 1.6, 0]}>
-        <mesh>
-          <planeGeometry args={[0.6, 0.6]} />
-          <meshBasicMaterial map={texture} transparent toneMapped={false} />
-        </mesh>
-      </Billboard>
-
-      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
-        <div
-          style={{
-            padding: '2px 6px',
-            background: 'rgba(0,0,0,0.6)',
-            color: '#a7f3d0',
-            borderRadius: 4,
-            fontSize: 11,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          You
+      {/* nameplate w/ portrait chip — "You" */}
+      <Html position={[0, 1.95, 0]} center distanceFactor={8}>
+        <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'#a7f3d0',borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:'1px solid #34d39955',boxShadow:'0 0 8px #34d39933'}}>
+          <img src={`/avatars/${portraitId}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:cfg.outfitAccent,objectFit:'cover',border:'1px solid #34d399'}} />
+          <span>You</span>
         </div>
       </Html>
     </group>
@@ -1106,7 +1086,6 @@ function BotPlayer({
   const target = useRef(new THREE.Vector3(...bot.spawn))
   const next = useRef(0)
   const phase = useMemo(() => Math.random() * Math.PI * 2, [])
-  const texture = useTexture(`/avatars/${bot.avatar}.png`)
   const swing = useRef(0)
   const moving = useRef(false)
 
@@ -1214,16 +1193,12 @@ function BotPlayer({
       {/* shoulder pads (bot) */}
       <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
       <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color="#0e7490" metalness={0.45} roughness={0.45} /></mesh>
-      {/* portrait */}
-      <Billboard position={[0, 1.6, 0]}>
-        <mesh>
-          <planeGeometry args={[0.55, 0.55]} />
-          <meshBasicMaterial map={texture} transparent toneMapped={false} />
-        </mesh>
-      </Billboard>
-      {/* nameplate (player-style, no NPC border style) */}
-      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
-        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color:bot.color,borderRadius:4,fontSize:11,fontWeight:700,whiteSpace:'nowrap'}}>{bot.name}</div>
+      {/* nameplate w/ portrait chip */}
+      <Html position={[0, 1.95, 0]} center distanceFactor={8}>
+        <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:bot.color,borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:`1px solid ${bot.color}55`,boxShadow:`0 0 8px ${bot.color}33`}}>
+          <img src={`/avatars/${bot.avatar}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:bot.color,objectFit:'cover',border:`1px solid ${bot.color}`}} />
+          <span>{bot.name}</span>
+        </div>
       </Html>
       {/* chat bubble */}
       {bubbleText && (
@@ -1509,8 +1484,13 @@ function RemotePlayer({ remote }: { remote: MpRemotePlayer }) {
       {(!remote.avatar) && (
         <mesh castShadow position={[0, 0.78, -0.22]} rotation={[0.18, 0, 0]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial color={remote.color} side={THREE.DoubleSide} roughness={0.6} /></mesh>
       )}
-      <Html position={[0, 2.05, 0]} center distanceFactor={8}>
-        <div style={{padding:'2px 8px',background:'rgba(0,0,0,0.7)',color:'white',borderRadius:4,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:`1px solid ${remote.color}`}}>{remote.name}</div>
+      <Html position={[0, 1.95, 0]} center distanceFactor={8}>
+        <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px 2px 2px',background:'rgba(0,0,0,0.78)',color:'white',borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:'nowrap',border:`1px solid ${remote.color}`,boxShadow:`0 0 8px ${remote.color}55`}}>
+          {remote.avatar?.portrait && (
+            <img src={`/avatars/${remote.avatar.portrait}.png`} alt="" style={{width:22,height:22,borderRadius:'50%',background:remote.color,objectFit:'cover',border:`1px solid ${remote.color}`}} />
+          )}
+          <span>{remote.name}</span>
+        </div>
       </Html>
       {remote.lastChat && remote.lastChatAt && Date.now() - remote.lastChatAt < 5500 && (
         <Html position={[0, 2.6, 0]} center distanceFactor={8}>
