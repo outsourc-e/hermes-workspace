@@ -19,6 +19,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
+import { toast } from '@/components/ui/toast'
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
@@ -857,8 +858,13 @@ function ControlPlaneStage({
 
           <div className={cn('relative z-10 flex flex-col gap-3', viewMode === 'runtime' ? 'block' : 'hidden')}>
             {!tmuxAvailable ? (
-              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs text-[var(--theme-muted)]">
-                tmux not installed — each worker still gets a live shell PTY at its workspace. Install tmux only if you want to attach to TUI sessions running outside the UI.
+              <div className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-2.5 text-xs text-amber-100">
+                <div className="font-semibold text-amber-50">tmux not installed on this host</div>
+                <div className="mt-1 text-amber-100/80">Spawning a Hermes swarm worker requires tmux. Without it, the worker can start but cannot dispatch tasks (you'll see &lsquo;can't find pane: swarm-&lt;id&gt;&rsquo; errors). Install tmux:</div>
+                <code className="mt-1 inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">brew install tmux</code>{' '}
+                <span className="text-amber-100/60">(macOS) or</span>{' '}
+                <code className="inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">apt install tmux</code>{' '}
+                <span className="text-amber-100/60">(Ubuntu/Debian).</span>
               </div>
             ) : null}
             {focusedRuntimeWorkerId ? (
@@ -1039,9 +1045,32 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
+          let parsed: { error?: string } = {}
+          try { parsed = JSON.parse(text) } catch {}
+          const msg = parsed.error || text || `HTTP ${res.status}`
+          if (msg.includes('tmux not installed')) {
+            toast({
+              title: 'tmux not installed',
+              description:
+                `Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
+              variant: 'destructive',
+            })
+          } else {
+            toast({
+              title: `Failed to start ${workerId}`,
+              description: msg,
+              variant: 'destructive',
+            })
+          }
           // eslint-disable-next-line no-console
           console.error('[swarm2] start session failed:', res.status, text)
         }
+      } catch (err) {
+        toast({
+          title: `Failed to start ${workerId}`,
+          description: err instanceof Error ? err.message : String(err),
+          variant: 'destructive',
+        })
       } finally {
         setPendingTmux((prev) => {
           const next = new Set(prev)

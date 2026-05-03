@@ -173,6 +173,12 @@ export type EnhancedCapabilities = {
    * once hermes-agent ships native `/api/mcp*` endpoints.
    */
   mcpFallback: boolean
+  /**
+   * True when the dashboard exposes `/api/conductor/missions`. The Conductor
+   * UI requires this; if false, the screen renders an 'upstream not ready'
+   * placeholder instead of failing mid-action. See #262.
+   */
+  conductor: boolean
 }
 
 export type DashboardCapabilities = {
@@ -217,6 +223,7 @@ let capabilities: GatewayCapabilities = {
   jobs: false,
   mcp: false,
   mcpFallback: false,
+  conductor: false,
   dashboard: {
     available: false,
     url: CLAUDE_DASHBOARD_URL,
@@ -558,6 +565,28 @@ async function probeDashboard(): Promise<{ available: boolean; url: string }> {
   }
 }
 
+/**
+ * Lightweight probe for the Conductor mission endpoint. Some dashboard builds
+ * ship without it; those deployments should show a graceful placeholder
+ * instead of letting the Conductor UI 500. See #262.
+ */
+async function probeConductor(dashboardAvailable: boolean): Promise<boolean> {
+  if (!dashboardAvailable) return false
+  try {
+    const res = await dashboardFetch('/api/conductor/missions', {
+      method: 'GET',
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+    if (res.status === 404 || res.status === 405) return false
+    // 401 means the path exists but the auth token isn't accepted yet —
+    // treat as available so token-gated setups don't hide the feature.
+    return true
+  } catch {
+    return false
+  }
+}
+
+
 // Vanilla hermes-agent 0.10.0 satisfies: health, chatCompletions, models, streaming,
 // sessions, skills, config, jobs. Dashboard-only endpoints (themes/plugins) and the
 // legacy enhanced-fork chat stream are optional — their absence should not emit the
@@ -710,6 +739,9 @@ export async function probeGateway(options?: {
     // the cache when the dashboard is up.
     const mcp = await probeMcp()
 
+    // Conductor probe runs after dashboard probe.
+    const conductor = await probeConductor(dashboard.available)
+
     // Phase 1.5 fallback: when native /api/mcp is missing but the dashboard
     // exposes `config.mcp_servers` AND we are loopback-only, allow a config
     // -backed CRUD path. Test/Discover/Logs remain disabled in this mode.
@@ -738,6 +770,7 @@ export async function probeGateway(options?: {
       jobs: dashboard.available || legacyJobs,
       mcp,
       mcpFallback,
+      conductor,
       dashboard,
     }
     lastProbeAt = Date.now()
