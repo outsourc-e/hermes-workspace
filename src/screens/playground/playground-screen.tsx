@@ -300,7 +300,7 @@ function PlaygroundScene({
 }
 
 class PlaygroundErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; fallback?: ReactNode },
   { hasError: boolean }
 > {
   state = { hasError: false }
@@ -314,7 +314,7 @@ class PlaygroundErrorBoundary extends Component<
   }
 
   render() {
-    if (this.state.hasError) return <PlaygroundFallback />
+    if (this.state.hasError) return this.props.fallback ?? <PlaygroundFallback />
     return this.props.children
   }
 }
@@ -626,28 +626,29 @@ export function PlaygroundScreen() {
     return <PlaygroundFallback onLaunch3D={() => setLaunch3D(true)} />
   }
 
-  // Real 3D path with GPU-safe Lite fallback if WebGL fails to bind.
-  if (!detectWebGL()) {
-    return <PlaygroundLiteWorld
-      world={world}
-      setWorld={setWorld}
-      quest={quest}
-      setQuest={setQuest}
-      input={input}
-      setInput={setInput}
-      companionLine={companionLine}
-      setCompanionLine={setCompanionLine}
-      rpgState={rpg.state}
-      activeQuest={rpg.activeQuest}
-      levelProgress={rpg.levelProgress}
-      lastReward={rpg.lastReward}
-      completeQuest={rpg.completeQuest}
-      resetRpg={rpg.resetRpg}
-    />
-  }
-
+  // Always try the real 3D world first. If R3F throws, the error boundary
+  // swaps in the GPU-safe Lite world. Previously we pre-gated on WebGL
+  // detection but that was over-eager and showed Lite even when the browser
+  // could render Three.
   return (
-    <PlaygroundErrorBoundary>
+    <PlaygroundErrorBoundary fallback={
+      <PlaygroundLiteWorld
+        world={world}
+        setWorld={setWorld}
+        quest={quest}
+        setQuest={setQuest}
+        input={input}
+        setInput={setInput}
+        companionLine={companionLine}
+        setCompanionLine={setCompanionLine}
+        rpgState={rpg.state}
+        activeQuest={rpg.activeQuest}
+        levelProgress={rpg.levelProgress}
+        lastReward={rpg.lastReward}
+        completeQuest={rpg.completeQuest}
+        resetRpg={rpg.resetRpg}
+      />
+    }>
       <div className="relative h-full min-h-[640px] overflow-hidden" style={{ background: '#0b1720', color: 'white' }}>
         <PlaygroundWorld3D
           worldId={world}
