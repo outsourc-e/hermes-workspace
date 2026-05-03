@@ -492,58 +492,62 @@ function HermesContent() {
         </div>
       )}
 
-      {/* Custom OpenAI-compatible endpoint fields */}
+      {/* Custom OpenAI-compatible endpoint fields — same style as API Keys section */}
       {activeProvider === 'custom' && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
             Custom Endpoint
           </p>
-          <div className="space-y-2 rounded-xl px-3 py-2.5" style={cardStyle}>
-            <div>
-              <label className="mb-1 block text-xs font-medium" style={mutedStyle}>Base URL</label>
-              <input
-                type="url"
-                className="w-full rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-mono text-primary-900 outline-none focus:ring-2 focus:ring-accent-500"
-                placeholder="http://127.0.0.1:38238/v1"
-                value={customBaseUrl}
-                onChange={(e) => setCustomBaseUrl(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium" style={mutedStyle}>API Key</label>
-              <input
-                type="password"
-                className="w-full rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-mono text-primary-900 outline-none focus:ring-2 focus:ring-accent-500"
-                placeholder="sk-... or leave blank"
-                value={customApiKey}
-                onChange={(e) => setCustomApiKey(e.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              disabled={savingCustom || !customBaseUrl}
-              onClick={async () => {
-                setSavingCustom(true)
-                await save({
-                  config: {
-                    provider: 'custom',
-                    providers: {
-                      custom: {
-                        type: 'openai',
-                        base_url: customBaseUrl,
-                        api_key: customApiKey || 'none',
-                      },
-                    },
-                  },
-                })
-                setActiveProvider('custom')
-                setSavingCustom(false)
-              }}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-50"
-              style={{ background: 'var(--theme-accent)', color: '#fff' }}
-            >
-              {savingCustom ? 'Saving…' : 'Save endpoint'}
-            </button>
+          <div className="space-y-1.5">
+            {(['base_url', 'api_key'] as const).map((field) => {
+              const isUrl = field === 'base_url'
+              const label = isUrl ? 'Base URL' : 'API Key'
+              const value = isUrl ? customBaseUrl : customApiKey
+              const setValue = isUrl ? setCustomBaseUrl : setCustomApiKey
+              const isEditing = editingKey === `custom_${field}`
+              const hasValue = !!value
+              return (
+                <div key={field} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-[11px] font-mono" style={mutedStyle}>
+                      {isEditing ? (
+                        <input
+                          type={isUrl ? 'url' : 'password'}
+                          value={value}
+                          onChange={(e) => setValue(e.target.value)}
+                          placeholder={isUrl ? 'http://127.0.0.1:38238/v1' : 'sk-...'}
+                          className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
+                          style={{ color: 'var(--theme-text)' }}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setSavingCustom(true)
+                              save({ config: { provider: 'custom', providers: { custom: { type: 'openai', base_url: customBaseUrl, api_key: customApiKey || 'none' } } } })
+                                .then(() => { setSavingCustom(false); setEditingKey(null) })
+                            }
+                            if (e.key === 'Escape') setEditingKey(null)
+                          }}
+                        />
+                      ) : hasValue ? (isUrl ? value : '••••••••') : 'Not configured'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={cn('size-2 rounded-full', hasValue ? 'bg-green-500' : 'bg-neutral-500')} />
+                    {isEditing ? (
+                      <>
+                        <button type="button" onClick={() => { setSavingCustom(true); save({ config: { provider: 'custom', providers: { custom: { type: 'openai', base_url: customBaseUrl, api_key: customApiKey || 'none' } } } }).then(() => { setSavingCustom(false); setEditingKey(null) }) }} className="text-xs font-medium text-green-400">Save</button>
+                        <button type="button" onClick={() => setEditingKey(null)} className="text-xs" style={mutedStyle}>Cancel</button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setEditingKey(`custom_${field}`)} className="text-xs font-medium" style={{ color: 'var(--theme-accent)' }}>
+                        {hasValue ? 'Edit' : 'Add'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
