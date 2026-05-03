@@ -491,6 +491,87 @@ export function PlazaDisc({ position, radius = 6, color = '#a98a5e' }: { positio
   )
 }
 
+/* ── Enterprise MMO hub landmarks ── */
+export function ClockTower({ position, accent = '#fbbf24' }: { position: [number, number, number]; accent?: string }) {
+  return (
+    <group position={position}>
+      <mesh castShadow receiveShadow position={[0, 0.25, 0]}><cylinderGeometry args={[1.25, 1.4, 0.5, 16]} /><meshStandardMaterial color="#8b7355" roughness={0.8} /></mesh>
+      <mesh castShadow position={[0, 2.2, 0]}><boxGeometry args={[1.25, 3.6, 1.25]} /><meshStandardMaterial color="#e7d2a6" roughness={0.72} /></mesh>
+      {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((rot, i) => (
+        <group key={i} rotation={[0, rot, 0]} position={[0, 3.1, 0.64]}>
+          <mesh><circleGeometry args={[0.36, 24]} /><meshStandardMaterial color="#fef3c7" emissive="#fef3c7" emissiveIntensity={0.25} roughness={0.45} /></mesh>
+          <mesh position={[0, 0.08, 0.02]} rotation={[0, 0, -0.5]}><boxGeometry args={[0.04, 0.22, 0.02]} /><meshStandardMaterial color="#1f2937" /></mesh>
+          <mesh position={[0.08, -0.02, 0.03]} rotation={[0, 0, 1.2]}><boxGeometry args={[0.035, 0.2, 0.02]} /><meshStandardMaterial color="#1f2937" /></mesh>
+        </group>
+      ))}
+      <mesh castShadow position={[0, 4.35, 0]} rotation={[0, Math.PI / 4, 0]}><coneGeometry args={[1.15, 1.2, 4]} /><meshStandardMaterial color="#7c2d12" roughness={0.68} /></mesh>
+      <mesh position={[0, 5.05, 0]}><octahedronGeometry args={[0.25, 0]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.1} /></mesh>
+      <pointLight position={[0, 4.7, 0]} color={accent} intensity={1.2} distance={9} />
+    </group>
+  )
+}
+
+export function Signpost({ position, rotation = 0, color = '#fbbf24' }: { position: [number, number, number]; rotation?: number; color?: string }) {
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh castShadow position={[0, 0.65, 0]}><cylinderGeometry args={[0.055, 0.055, 1.3, 8]} /><meshStandardMaterial color="#3f2511" roughness={0.85} /></mesh>
+      <mesh castShadow position={[0.34, 1.08, 0]}><boxGeometry args={[0.75, 0.22, 0.08]} /><meshStandardMaterial color="#8b5a2b" roughness={0.75} /></mesh>
+      <mesh position={[0.34, 1.08, 0.045]}><planeGeometry args={[0.62, 0.12]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.28} /></mesh>
+      <mesh castShadow position={[-0.32, 0.76, 0]}><boxGeometry args={[0.65, 0.2, 0.08]} /><meshStandardMaterial color="#8b5a2b" roughness={0.75} /></mesh>
+    </group>
+  )
+}
+
+export function Bench({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh castShadow position={[0, 0.38, 0]}><boxGeometry args={[1.25, 0.14, 0.38]} /><meshStandardMaterial color="#7c4a1f" roughness={0.85} /></mesh>
+      <mesh castShadow position={[0, 0.75, -0.19]} rotation={[0.25, 0, 0]}><boxGeometry args={[1.25, 0.12, 0.42]} /><meshStandardMaterial color="#6b3a18" roughness={0.85} /></mesh>
+      {[-0.45, 0.45].map((x) => <mesh key={x} castShadow position={[x, 0.18, 0]}><boxGeometry args={[0.09, 0.36, 0.32]} /><meshStandardMaterial color="#3f2511" roughness={0.9} /></mesh>)}
+    </group>
+  )
+}
+
+export function TrainingRing({ position, accent = '#fb7185' }: { position: [number, number, number]; accent?: string }) {
+  return (
+    <group position={position}>
+      <mesh receiveShadow position={[0, 0.018, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.8, 2.15, 48]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.15} roughness={0.65} /></mesh>
+      {[-1.4, 1.4].map((x) => <group key={x} position={[x, 0, 0]}><mesh castShadow position={[0, 0.55, 0]}><cylinderGeometry args={[0.18, 0.22, 1.1, 10]} /><meshStandardMaterial color="#8b5a2b" roughness={0.8} /></mesh><mesh castShadow position={[0, 1.22, 0]}><sphereGeometry args={[0.26, 10, 10]} /><meshStandardMaterial color="#f3d3a3" roughness={0.7} /></mesh><mesh castShadow position={[0, 0.7, 0.32]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.04, 0.04, 0.8, 8]} /><meshStandardMaterial color="#64748b" metalness={0.4} roughness={0.5} /></mesh></group>)}
+    </group>
+  )
+}
+
+export function RaisedDais({ position, accent = '#a78bfa' }: { position: [number, number, number]; accent?: string }) {
+  return (
+    <group position={position}>
+      <mesh castShadow receiveShadow position={[0, 0.24, 0]}><cylinderGeometry args={[2.4, 2.7, 0.48, 8]} /><meshStandardMaterial color="#9ca3af" roughness={0.78} /></mesh>
+      <mesh receiveShadow position={[0, 0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[2.2, 32]} /><meshStandardMaterial color="#d7c7a4" roughness={0.7} /></mesh>
+      {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a, i) => <Lantern key={i} position={[Math.cos(a) * 1.85, 0.48, Math.sin(a) * 1.85]} color={accent} />)}
+    </group>
+  )
+}
+
+export function CrystalCluster({ position, color = '#a78bfa' }: { position: [number, number, number]; color?: string }) {
+  return (
+    <group position={position}>
+      {[0, 0.5, -0.45].map((dx, i) => <mesh key={i} castShadow position={[dx, 0.45 + i * 0.18, i === 0 ? 0 : dx * 0.25]} rotation={[0.2, dx, 0.1]}><octahedronGeometry args={[0.35 + i * 0.08, 0]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.85} roughness={0.35} transparent opacity={0.92} /></mesh>)}
+      <pointLight position={[0, 1, 0]} color={color} intensity={1.5} distance={7} />
+    </group>
+  )
+}
+
+export function EnergyCore({ position, color = '#22d3ee' }: { position: [number, number, number]; color?: string }) {
+  const ref = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => { if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.8 })
+  return (
+    <group position={position}>
+      <mesh receiveShadow castShadow position={[0, 0.18, 0]}><cylinderGeometry args={[1.3, 1.5, 0.36, 16]} /><meshStandardMaterial color="#1f2937" roughness={0.55} metalness={0.25} /></mesh>
+      <group ref={ref} position={[0, 1.15, 0]}><mesh castShadow><octahedronGeometry args={[0.75, 0]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.3} roughness={0.25} /></mesh><mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.1, 0.035, 10, 48]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.1} /></mesh></group>
+      <pointLight position={[0, 1.2, 0]} color={color} intensity={2.4} distance={10} />
+    </group>
+  )
+}
+
 /* ── Scattered scenery cluster (auto-fills a world) ── */
 export function ScatteredScenery({
   worldId,
@@ -537,13 +618,13 @@ export function ScatteredScenery({
         out.push({ type: 'path', from: [0, 0], to: t, width: 1.6, color: '#9d7a4a' } as any)
       }
 
-      // Buildings around the plaza like a small town
-      out.push({ type: 'building', pos: [-13, 0, -15], color: '#e8d4a8', roofColor: '#b91c1c' })
-      out.push({ type: 'building', pos: [13, 0, -15], color: '#f5deb3', roofColor: '#1d4ed8' })
-      out.push({ type: 'building', pos: [-17, 0, 9], color: '#deb887', roofColor: '#92400e' })
-      out.push({ type: 'building', pos: [17, 0, 9], color: '#e8d4a8', roofColor: '#b91c1c' })
-      out.push({ type: 'building', pos: [-2, 0, -19], color: '#f3e1bb', roofColor: '#1d4ed8' })
-      out.push({ type: 'building', pos: [2, 0, 18], color: '#f3e1bb', roofColor: '#b91c1c' })
+      // Buildings around the plaza like a small town — signed roles create districts
+      out.push({ type: 'building', pos: [-13, 0, -15], color: '#e8d4a8', roofColor: '#b91c1c', sign: 'Smithy' } as any)
+      out.push({ type: 'building', pos: [13, 0, -15], color: '#f5deb3', roofColor: '#1d4ed8', sign: 'Apothecary' } as any)
+      out.push({ type: 'building', pos: [-17, 0, 9], color: '#deb887', roofColor: '#92400e', sign: 'Inn' } as any)
+      out.push({ type: 'building', pos: [17, 0, 9], color: '#e8d4a8', roofColor: '#b91c1c', sign: 'Bank' } as any)
+      out.push({ type: 'building', pos: [-2, 0, -19], color: '#f3e1bb', roofColor: '#1d4ed8', sign: 'Guild' } as any)
+      out.push({ type: 'building', pos: [2, 0, 18], color: '#f3e1bb', roofColor: '#b91c1c', sign: 'Tavern' } as any)
 
       // Market street: stalls + merchants behind them
       const stallSetup: { stall: [number, number, number]; merchant: [number, number, number]; mColor: string; mRot: number; awning: string }[] = [
@@ -594,12 +675,18 @@ export function ScatteredScenery({
       out.push({ type: 'rock', pos: [-9, 0, 9], scale: 0.9, color: '#6b7280' })
       out.push({ type: 'rock', pos: [10, 0, -9], scale: 1.1, color: '#5b6470' })
 
-      // Shop signs above some buildings (lightweight indicator of role)
-      out.push({ type: 'building', pos: [-13, 0, -15], color: '#e8d4a8', roofColor: '#b91c1c', sign: 'Smithy' } as any)
-      out.push({ type: 'building', pos: [13, 0, -15], color: '#f5deb3', roofColor: '#1d4ed8', sign: 'Apothecary' } as any)
-      out.push({ type: 'building', pos: [-17, 0, 9], color: '#deb887', roofColor: '#92400e', sign: 'Inn' } as any)
-      out.push({ type: 'building', pos: [17, 0, 9], color: '#e8d4a8', roofColor: '#b91c1c', sign: 'Bank' } as any)
-      // (the earlier 4 blank buildings remain so we have 6 total)
+      // Landmark layer: wayfinding, social rest points, vertical centerpieces
+      out.push({ type: 'clocktower', pos: [-7, 0, -14], color: '#fbbf24' } as any)
+      out.push({ type: 'dais', pos: [8, 0, -13], color: '#a78bfa' } as any)
+      out.push({ type: 'training', pos: [-12, 0, 3], color: '#fb7185' } as any)
+      out.push({ type: 'signpost', pos: [-4, 0, -7], rotation: 0.8, color: '#fbbf24' } as any)
+      out.push({ type: 'signpost', pos: [5, 0, -7], rotation: -0.6, color: '#7dd3fc' } as any)
+      for (const b of [
+        { pos: [-3.5, 0, 4.8], rotation: -0.55 },
+        { pos: [3.8, 0, 4.7], rotation: 0.55 },
+        { pos: [-4.8, 0, -4.2], rotation: 2.5 },
+        { pos: [4.8, 0, -4.2], rotation: -2.5 },
+      ]) out.push({ type: 'bench', ...b } as any)
 
       // Original arch + banners
       out.push({ type: 'arch', pos: [0, 0, 18], color: '#d7c7a4' })
@@ -608,12 +695,16 @@ export function ScatteredScenery({
     }
 
     if (worldId === 'forge') {
-      // Tech buildings + glowing crates + cyber lanterns
-      out.push({ type: 'building', pos: [-14, 0, -10], color: '#1f2937', roofColor: '#22d3ee' })
-      out.push({ type: 'building', pos: [14, 0, -10], color: '#1f2937', roofColor: '#22d3ee' })
-      for (let i = 0; i < 6; i++) {
-        const ang = (i / 6) * Math.PI * 2
-        out.push({ type: 'lantern', pos: [Math.cos(ang) * 5, 0, Math.sin(ang) * 5], color: '#22d3ee' })
+      // Industrial tool district: energy core, workshops, cyan lamps
+      out.push({ type: 'energycore', pos: [0, 0, -2], color: '#22d3ee' } as any)
+      out.push({ type: 'building', pos: [-14, 0, -10], color: '#1f2937', roofColor: '#22d3ee', sign: 'Tools' } as any)
+      out.push({ type: 'building', pos: [14, 0, -10], color: '#1f2937', roofColor: '#22d3ee', sign: 'Skills' } as any)
+      out.push({ type: 'dais', pos: [0, 0, 10], color: '#22d3ee' } as any)
+      out.push({ type: 'signpost', pos: [-5, 0, 3], rotation: 0.4, color: '#22d3ee' } as any)
+      out.push({ type: 'signpost', pos: [5, 0, 3], rotation: -0.4, color: '#22d3ee' } as any)
+      for (let i = 0; i < 8; i++) {
+        const ang = (i / 8) * Math.PI * 2
+        out.push({ type: 'lantern', pos: [Math.cos(ang) * 6, 0, Math.sin(ang) * 6], color: '#22d3ee' })
       }
     }
 
@@ -627,6 +718,9 @@ export function ScatteredScenery({
       }
       out.push({ type: 'logs', pos: [-5, 0, -3], rotation: 0.2 } as any)
       out.push({ type: 'logs', pos: [4, 0, 5], rotation: -0.6 } as any)
+      out.push({ type: 'dais', pos: [0, 0, -8], color: '#86efac' } as any)
+      out.push({ type: 'crystals', pos: [7, 0, -6], color: '#86efac' } as any)
+      out.push({ type: 'crystals', pos: [-7, 0, 6], color: '#34d399' } as any)
       for (let i = 0; i < 8; i++) {
         const ang = (i / 8) * Math.PI * 2
         out.push({ type: 'lantern', pos: [Math.cos(ang) * 6, 0, Math.sin(ang) * 6], color: '#86efac' })
@@ -634,8 +728,13 @@ export function ScatteredScenery({
     }
 
     if (worldId === 'oracle') {
+      out.push({ type: 'dais', pos: [0, 0, 0], color: '#a78bfa' } as any)
+      out.push({ type: 'crystals', pos: [-4, 0, -5], color: '#a78bfa' } as any)
+      out.push({ type: 'crystals', pos: [4, 0, 5], color: '#c4b5fd' } as any)
       out.push({ type: 'arch', pos: [0, 0, -10], color: '#c4b5fd' })
       out.push({ type: 'arch', pos: [0, 0, 10], color: '#c4b5fd' })
+      out.push({ type: 'signpost', pos: [-6, 0, 0], rotation: 1.2, color: '#a78bfa' } as any)
+      out.push({ type: 'signpost', pos: [6, 0, 0], rotation: -1.2, color: '#c4b5fd' } as any)
       for (let i = 0; i < 8; i++) {
         const ang = (i / 8) * Math.PI * 2
         out.push({ type: 'lantern', pos: [Math.cos(ang) * 9, 0, Math.sin(ang) * 9], color: '#a78bfa' })
@@ -644,7 +743,11 @@ export function ScatteredScenery({
     }
 
     if (worldId === 'arena') {
-      // Banners + braziers + war stalls
+      // Banners + duel ring + champion platform
+      out.push({ type: 'training', pos: [0, 0, 0], color: '#fb7185' } as any)
+      out.push({ type: 'dais', pos: [0, 0, -10], color: '#fb7185' } as any)
+      out.push({ type: 'signpost', pos: [-7, 0, 5], rotation: 0.6, color: '#fb7185' } as any)
+      out.push({ type: 'signpost', pos: [7, 0, 5], rotation: -0.6, color: '#fb7185' } as any)
       for (let i = 0; i < 10; i++) {
         const ang = (i / 10) * Math.PI * 2
         out.push({ type: 'banner', pos: [Math.cos(ang) * 11, 0, Math.sin(ang) * 11], color: '#fb7185' })
@@ -692,6 +795,20 @@ export function ScatteredScenery({
             return <PlazaDisc key={i} position={it.pos} radius={it.radius} color={it.color} />
           case 'path':
             return <PathStrip key={i} from={it.from} to={it.to} width={it.width} color={it.color} />
+          case 'clocktower':
+            return <ClockTower key={i} position={it.pos} accent={it.color} />
+          case 'signpost':
+            return <Signpost key={i} position={it.pos} rotation={it.rotation || 0} color={it.color} />
+          case 'bench':
+            return <Bench key={i} position={it.pos} rotation={it.rotation || 0} />
+          case 'training':
+            return <TrainingRing key={i} position={it.pos} accent={it.color} />
+          case 'dais':
+            return <RaisedDais key={i} position={it.pos} accent={it.color} />
+          case 'crystals':
+            return <CrystalCluster key={i} position={it.pos} color={it.color} />
+          case 'energycore':
+            return <EnergyCore key={i} position={it.pos} color={it.color} />
           default:
             return null
         }
