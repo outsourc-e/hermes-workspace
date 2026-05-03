@@ -938,7 +938,7 @@ export function AgentViewPanel() {
                 {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl bg-primary-200/15 p-1">
                   {/* Centered Agents pill */}
                   <div className="mb-1 flex justify-center">
-                    <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
+                    <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
                       Agents
                     </span>
                   </div>
@@ -1000,7 +1000,7 @@ export function AgentViewPanel() {
                             damping: 30,
                           },
                         }}
-                        className="relative rounded-xl border border-primary-300/70 bg-linear-to-b from-primary-100 via-primary-100 to-primary-200/40 p-1"
+                        className="relative rounded-xl bg-primary-200/15 p-1"
                       >
                         <AnimatePresence initial={false}>
                           {spawningNodes.map(
@@ -1161,7 +1161,7 @@ export function AgentViewPanel() {
                 </section>}
 
                 {(cliAgentsQuery.isLoading || visibleCliAgents.length > 0) ? (
-                  <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                  <section className="rounded-2xl bg-primary-200/15 p-2">
                     <Collapsible
                       open={cliAgentsExpanded}
                       onOpenChange={setCliAgentsExpanded}
@@ -1333,9 +1333,9 @@ export function AgentViewPanel() {
                 <div className="space-y-3 p-3">
                   <OrchestratorCard compact={false} />
 
-                  <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
+                  <section className="rounded-2xl bg-primary-200/15 p-1">
                     <div className="mb-1 flex justify-center">
-                      <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
+                      <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
                         Agents
                       </span>
                     </div>
@@ -1384,7 +1384,7 @@ export function AgentViewPanel() {
                     ) : null}
                   </section>
                   {historyAgents.length > 0 ? (
-                    <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                    <section className="rounded-2xl bg-primary-200/15 p-2">
                       <button
                         type="button"
                         onClick={() => setHistoryOpen(!historyOpen)}
