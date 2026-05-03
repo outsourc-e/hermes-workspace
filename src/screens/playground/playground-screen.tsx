@@ -11,6 +11,7 @@ import { PlaygroundActionBar } from './components/playground-actionbar'
 import { PlaygroundMinimap } from './components/playground-minimap'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { PlaygroundSidePanel } from './components/playground-sidepanel'
+import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
 import { botsFor } from './lib/playground-bots'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import {
@@ -328,61 +329,71 @@ class PlaygroundErrorBoundary extends Component<
 }
 
 function PlaygroundFallback({ onLaunch3D, webglFailed = false }: { onLaunch3D?: () => void; webglFailed?: boolean }) {
+  const [builderName, setBuilderName] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return window.localStorage.getItem('hermes-playground-builder-name') || ''
+  })
+  function launch() {
+    try { window.localStorage.setItem('hermes-playground-builder-name', builderName.trim()) } catch {}
+    onLaunch3D?.()
+  }
   return (
     <div
       className="flex h-full min-h-[520px] items-center justify-center p-6"
       style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}
     >
-      <div className="w-full max-w-3xl overflow-hidden rounded-3xl border shadow-2xl" style={{ borderColor: 'var(--theme-border)', background: 'var(--theme-card)' }}>
-        <div className="relative h-72 overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 30%, rgba(34,211,238,.25), transparent 55%), linear-gradient(135deg, #07121f, #182235)' }}>
-          <div className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/40 bg-cyan-300/10" />
-          {['Hermes', 'Athena', 'Kimi', 'Builder'].map((name, i) => (
-            <div
-              key={name}
-              className="absolute flex flex-col items-center gap-1"
-              style={{
-                left: `${28 + i * 15}%`,
-                top: `${38 + (i % 2) * 18}%`,
-              }}
-            >
-              <img src={`/avatars/${i === 1 ? 'athena' : 'hermes'}.png`} className="h-14 w-14 rounded-full border border-white/20 object-cover" />
-              <span className="rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">{name}</span>
+      <div className="w-full max-w-4xl overflow-hidden rounded-3xl border shadow-2xl" style={{ borderColor: 'var(--theme-border)', background: '#070b14' }}>
+        <div className="relative h-[320px] overflow-hidden">
+          <PlaygroundHeroCanvas />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+            <div className="mb-2 rounded-full border border-cyan-300/40 bg-black/45 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/85 backdrop-blur-sm">Hermes Playground · v0</div>
+            <div className="text-4xl font-extrabold tracking-tight" style={{ textShadow: '0 0 28px rgba(34,211,238,0.55)' }}>
+              The agent MMO
             </div>
-          ))}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-cyan-300/30 bg-black/50 px-4 py-2 text-xs uppercase tracking-[0.18em] text-cyan-100">
-            Playground Lite · WebGL fallback
+            <div className="mt-1 max-w-[520px] text-center text-[13px] text-white/70">
+              Walk into the Agora. Talk to Hermes Agent NPCs. Run quests. Meet other builders. Travel five worlds.
+            </div>
           </div>
         </div>
-        <div className="p-5">
-          <div className="mb-2 flex items-center gap-2">
-            <h1 className="text-xl font-semibold">Hermes Playground</h1>
-            <span className="rounded bg-cyan-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">hackathon</span>
+        <div className="p-5 text-white">
+          {webglFailed && (
+            <p className="mb-3 rounded-xl border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+              Your browser couldn’t create a WebGL context. Open in Chrome with hardware acceleration on, or try Agora Lite below.
+            </p>
+          )}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <label className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">Builder name</label>
+            <input
+              value={builderName}
+              onChange={(e) => setBuilderName(e.target.value)}
+              placeholder="Your handle"
+              maxLength={24}
+              className="min-w-[200px] flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-cyan-400/60 focus:outline-none"
+            />
           </div>
-          <p className="text-sm opacity-75">
-            {webglFailed
-              ? 'The 3D renderer could not create a WebGL context in this browser, so this fallback keeps the demo alive. Agora still works, and the 3D scene can load once WebGL/GPU acceleration is available.'
-              : 'Hackathon demo shell is live. Launch the 3D world when WebGL is available, or use Agora Lite as the reliable 2D multiplayer fallback.'}
-          </p>
-          <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ AI agent RPG concept</div>
-            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Human + agent world</div>
-            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Missions + generated worlds</div>
-            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)' }}>✓ Agora fallback ready</div>
+          <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ 5 worlds, 6 enterable buildings, 14+ NPCs</div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ Quests, skills, inventory, journal</div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ Click-to-walk + click-to-talk</div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">✓ Multiplayer presence (open in 2 tabs)</div>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             {onLaunch3D && (
               <button
                 type="button"
-                onClick={onLaunch3D}
-                className="inline-flex rounded-xl px-4 py-2 text-sm font-semibold"
-                style={{ background: 'var(--theme-accent)', color: 'var(--theme-bg)' }}
+                onClick={launch}
+                className="inline-flex rounded-xl border-2 border-cyan-300/60 bg-cyan-400/15 px-5 py-2.5 text-sm font-extrabold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
+                style={{ boxShadow: '0 0 22px rgba(34,211,238,.35)' }}
               >
-                Launch 3D World
+                Enter the Agora
               </button>
             )}
-            <a href="/agora" className="inline-flex rounded-xl border px-4 py-2 text-sm font-semibold" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
-              Open Agora Lite
+            <a href="/agora" className="inline-flex rounded-xl border border-white/20 px-5 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/5">
+              Agora Lite (2D)
             </a>
+          </div>
+          <div className="mt-4 text-[10px] uppercase tracking-[0.18em] text-white/40">
+            Click ground = walk · Click NPC = talk · WASD/arrows · Shift sprint · 1–6 skills
           </div>
         </div>
       </div>
@@ -843,6 +854,7 @@ export function PlaygroundScreen() {
           onNpcNearChange={(id) => setNearbyNpc(id)}
           botBubbles={botBubbles}
           onIncomingChat={handleIncomingChat}
+          multiplayerName={(typeof window !== 'undefined' ? window.localStorage.getItem('hermes-playground-builder-name') : '') || undefined}
           monsterHp={monsterHp}
           monsterHpMax={monsterHpMax}
           monsterDefeated={monsterDefeated}
