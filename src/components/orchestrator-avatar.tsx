@@ -1714,7 +1714,7 @@ function OrchestratorAvatarComponent({ size = 48, compact = false }: Orchestrato
     }
   }, [])
 
-  const tooltipText = useMemo(() => `⚡ Aurora — ${label}`, [label])
+  const tooltipText = useMemo(() => `⚡ Agent — ${label}`, [label])
 
   if (compact) {
     return (

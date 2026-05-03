@@ -85,7 +85,7 @@ export function TopologyBand({
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
           <div className="flex shrink-0 items-center gap-2 rounded-full border border-emerald-400/18 bg-emerald-500/8 px-3 py-1.5 text-xs text-emerald-100/75">
             <HugeiconsIcon icon={CpuIcon} size={13} />
-            Aurora
+            Agent
             <span className="text-emerald-200/45">→</span>
           </div>
           {members.length === 0 ? (

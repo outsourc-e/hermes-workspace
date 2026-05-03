@@ -28,6 +28,7 @@ import { Swarm2KanbanBoard } from './swarm2-kanban-board'
 import { Swarm2ReportsView, buildSwarm2InboxLanes, type Swarm2InboxItem } from './swarm2-reports-view'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
+import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import { cn } from '@/lib/utils'
 
 const SWARM2_ROOM_STORAGE_KEY = 'claude-swarm2-room-v1'
@@ -56,8 +57,8 @@ const SWARM2_OPERATION_THEME: CSSProperties = {
 
 export const SWARM2_INFORMATION_HIERARCHY = [
   'Status header: online workers, active room, refresh state, view switch.',
-  'Aurora/orchestrator hub card: top-center primary routing hub with aggregate state and router affordance.',
-  'Visible routing wires: subdued connection lines from Aurora to every worker, highlighted for selected and wired room nodes.',
+  'Orchestrator hub card: top-center primary routing hub with aggregate state and router affordance.',
+  'Visible routing wires: subdued connection lines from the orchestrator to every worker, highlighted for selected and wired room nodes.',
   'Operations-style worker node cards: role, state, current task, last useful signal, direct inline chat/action affordances.',
   'Minimal attention rail: only auth, worker availability, room count, selected runtime metadata.',
   'Central bottom router chat: orchestration brain for auto/manual/broadcast dispatch.',
@@ -1500,6 +1501,34 @@ export function Swarm2Screen() {
             </div>
 
             <div className="relative flex shrink-0 items-center gap-2 text-sm text-[var(--theme-muted)]">
+              <WorkflowHelpModal
+                compact
+                eyebrow="Swarm"
+                title="How Swarm works"
+                sections={[
+                  {
+                    title: 'What this surface does',
+                    bullets: [
+                      'Swarm turns a group of workers into one coordinated execution surface.',
+                      'Use it to route tasks, monitor state, and keep parallel work moving without losing context.',
+                    ],
+                  },
+                  {
+                    title: 'Typical flow',
+                    bullets: [
+                      'Review worker state, then dispatch or reroute work from the orchestration controls.',
+                      'Use reports, inbox, and runtime signals to spot blockers and pull workers back on track.',
+                    ],
+                  },
+                  {
+                    title: 'FAQ',
+                    bullets: [
+                      'If a worker is missing setup or model config, fix that in Operations first.',
+                      'Swarm2 is the operational coordination layer, not the first-time setup screen.',
+                    ],
+                  },
+                ]}
+              />
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((open) => !open)}

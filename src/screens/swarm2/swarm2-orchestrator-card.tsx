@@ -19,7 +19,7 @@ import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 
 const ORCHESTRATOR_NAME_KEY = 'swarm2:orchestrator:name'
-const DEFAULT_NAME = 'Aurora · Main Agent'
+const DEFAULT_NAME = 'Main Agent'
 
 type SwarmCardMode = 'cards' | 'office'
 type AgentLens = 'all' | 'working' | 'reviewing' | 'blocked' | 'ready'

@@ -500,7 +500,6 @@ export function UsageMeter() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       setProviderError(errorMessage)
-      toast('Failed to fetch provider usage', { type: 'error' })
     }
   }, [])
 

@@ -53,8 +53,8 @@ function orchestratorPromptForCheckpoint(input: {
   lines.push(`Decide next action per the swarm review spec for ${input.workerId} and the swarm auto-repair playbook:`)
   lines.push(`- DONE → mark mission complete, assign next from lane priority`)
   lines.push(`- HANDOFF → dispatch to named worker per next_action`)
-  lines.push(`- BLOCKED → consult auto-repair.yaml; if not in playbook, escalate to Aurora (publish to '${MAIN_SESSION_KEY}')`)
-  lines.push(`- NEEDS_INPUT → escalate to Aurora`)
+  lines.push(`- BLOCKED → consult auto-repair.yaml; if not in playbook, escalate to the main agent (publish to '${MAIN_SESSION_KEY}')`)
+  lines.push(`- NEEDS_INPUT → escalate to the main agent`)
   lines.push(`- NEEDS_REVIEW → queue Inbox card, route to Eric`)
   lines.push('')
   lines.push(`Reply with the dispatch you fired (POST /api/swarm-dispatch on http://localhost:3002) OR the escalation summary.`)
@@ -138,7 +138,7 @@ export function publishSwarmActionPrompt(input: {
 }
 
 function shouldEscalateToMain(stateLabel: string): boolean {
-  // Only NEEDS_INPUT escalates to Aurora directly.
+  // Only NEEDS_INPUT escalates to the main agent directly.
   // BLOCKED/HANDOFF/DONE go to the orchestrator first; orchestrator escalates if needed.
   return stateLabel === 'NEEDS_INPUT'
 }
@@ -194,7 +194,7 @@ export function publishSwarmCheckpointNotification(input: {
     missionId: input.missionId,
   })
 
-  // 2. Escalate to Aurora (main) only on NEEDS_INPUT, or when orchestrator unreachable.
+  // 2. Escalate to the main agent only on NEEDS_INPUT, or when the orchestrator is unreachable.
   const mustEscalate = shouldEscalateToMain(input.checkpoint.stateLabel) || (!orchestratorResult.sent && !orchestratorResult.skippedSelf)
   let publishedToMain = false
 
