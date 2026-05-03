@@ -884,7 +884,7 @@ export function DashboardScreen() {
            (not centered) on purpose: ops dashboards put brand left
            + actions right because that's the spatial hierarchy
            operators expect (Linear, Vercel, Datadog all do this). */}
-      <div className="flex flex-col items-center gap-3 md:items-stretch lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col items-center gap-1.5 md:gap-3 md:items-stretch lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center justify-center gap-3 md:justify-start">
           <span
             className="relative inline-flex shrink-0 items-center justify-center rounded-xl border"
