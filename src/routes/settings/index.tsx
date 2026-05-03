@@ -974,6 +974,10 @@ function ClaudeConfigSection({
   const [modelInput, setModelInput] = useState('')
   const [providerInput, setProviderInput] = useState('')
   const [baseUrlInput, setBaseUrlInput] = useState('')
+  const [customApiKey, setCustomApiKey] = useState('')
+  const [customBaseUrl, setCustomBaseUrl] = useState('')
+  const [editingCustomKey, setEditingCustomKey] = useState(false)
+  const [editingCustomBaseUrl, setEditingCustomBaseUrl] = useState(false)
 
   const [availableProviders, setAvailableProviders] = useState<
     Array<{ id: string; label: string; authenticated: boolean }>
@@ -987,6 +991,9 @@ function ClaudeConfigSection({
     setModelInput(configData.activeModel || '')
     setProviderInput(configData.activeProvider || '')
     setBaseUrlInput((configData.config?.base_url as string) || '')
+    const providersConfig = configData.config?.providers as Record<string, unknown> | undefined
+    const customConfig = providersConfig?.custom as Record<string, unknown> | undefined
+    setCustomBaseUrl((customConfig?.base_url as string) || '')
   }, [])
 
   const fetchConfig = useCallback(async () => {
@@ -1380,64 +1387,139 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="Custom Providers"
-        description="Read-only provider details loaded from config.yaml."
+        description="Configure a custom OpenAI-compatible endpoint."
         icon={CloudIcon}
       >
-        <div className="space-y-3">
-          {customProviders.length === 0 ? (
-            <div className="rounded-xl border border-primary-200 bg-primary-100/40 p-3 text-sm text-primary-600">
-              No custom providers configured.
-            </div>
-          ) : (
-            customProviders.map((provider, index) => (
-              <div
-                key={`${String(provider.name || provider.base_url || index)}`}
-                className="rounded-xl border border-primary-200 bg-primary-100/40 p-3"
-              >
-                <div className="grid gap-2 text-sm md:grid-cols-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-primary-500">
-                      Name
-                    </p>
-                    <p className="font-medium text-primary-900">
-                      {String(provider.name || 'Unnamed')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-primary-500">
-                      Base URL
-                    </p>
-                    <p className="font-mono text-xs text-primary-700 break-all">
-                      {String(provider.base_url || 'Not set')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-primary-500">
-                      Type
-                    </p>
-                    <p className="text-primary-700">
-                      {String(provider.type || provider.auth_type || 'Unknown')}
-                    </p>
-                  </div>
+        <SettingsRow
+          label="Custom OpenAI-compatible"
+          description={
+            data.providers.find((p) => p.envKeys.includes('CUSTOM_API_KEY'))
+              ?.configured
+              ? '✅ Configured'
+              : '❌ Not configured'
+          }
+        >
+          <div className="flex w-full max-w-sm items-center gap-2">
+            <div className="flex-1">
+              {editingCustomKey ? (
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    value={customApiKey}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setCustomApiKey(e.target.value)
+                    }
+                    placeholder="Enter CUSTOM_API_KEY"
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      void saveConfig({ env: { CUSTOM_API_KEY: customApiKey } })
+                      setEditingCustomKey(false)
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingCustomKey(false)}
+                  >
+                    ✕
+                  </Button>
                 </div>
-              </div>
-            ))
-          )}
-          <div className="flex flex-col gap-3 rounded-xl border border-primary-200 bg-primary-100/40 p-3 md:flex-row md:items-center md:justify-between">
-            <p className="text-sm text-primary-600">
-              Edit custom providers in config.yaml for security.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                void navigator.clipboard?.writeText(data.claudeHome)
-              }
-            >
-              Copy config path
-            </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-xs font-mono"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
+                    {data.providers.find((p) =>
+                      p.envKeys.includes('CUSTOM_API_KEY'),
+                    )?.maskedKeys?.['CUSTOM_API_KEY'] || 'Not set'}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingCustomKey(true)
+                      setCustomApiKey('')
+                    }}
+                  >
+                    {data.providers.find((p) =>
+                      p.envKeys.includes('CUSTOM_API_KEY'),
+                    )?.configured
+                      ? 'Change'
+                      : 'Add'}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Custom Base URL"
+          description={customBaseUrl ? `✅ ${customBaseUrl}` : '❌ Not configured'}
+        >
+          <div className="flex w-full max-w-sm items-center gap-2">
+            <div className="flex-1">
+              {editingCustomBaseUrl ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={customBaseUrl}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setCustomBaseUrl(e.target.value)
+                    }
+                    placeholder="https://api.example.com/v1"
+                    className="flex-1 font-mono text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      void saveConfig({
+                        config: {
+                          providers: {
+                            custom: {
+                              type: 'openai',
+                              base_url: customBaseUrl,
+                            },
+                          },
+                        },
+                      })
+                      setEditingCustomBaseUrl(false)
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingCustomBaseUrl(false)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-xs font-mono"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
+                    {customBaseUrl || 'Not set'}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingCustomBaseUrl(true)}
+                  >
+                    {customBaseUrl ? 'Edit' : 'Add'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </SettingsRow>
       </SettingsSection>
 
       <SettingsSection
