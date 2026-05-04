@@ -39,19 +39,31 @@ type StartRequest = {
 }
 
 const TMUX_BIN_CANDIDATES = [
-  join(homedir(), '.local', 'bin', 'tmux'),
+  process.env.TMUX_BIN,
   '/opt/homebrew/bin/tmux',
   '/usr/local/bin/tmux',
+  join(homedir(), '.local', 'bin', 'tmux'),
   'tmux',
-]
+].filter((value): value is string => Boolean(value))
 
 function resolveTmuxBin(): string | null {
   for (const candidate of TMUX_BIN_CANDIDATES) {
     if (candidate.includes('/')) {
-      if (existsSync(candidate)) return candidate
-    } else {
-      return candidate
+      // On this launchd-started Workspace, existsSync can incorrectly miss
+      // Homebrew binaries and then execFile('tmux') fails with ENOENT because
+      // PATH has been reshaped by pnpm. Prefer the stable absolute Homebrew
+      // paths; execFile will surface a clear error if they truly do not exist.
+      if (
+        candidate === process.env.TMUX_BIN ||
+        candidate === '/opt/homebrew/bin/tmux' ||
+        candidate === '/usr/local/bin/tmux' ||
+        existsSync(candidate)
+      ) {
+        return candidate
+      }
+      continue
     }
+    return candidate
   }
   return null
 }
@@ -66,6 +78,24 @@ function tmuxHasSession(tmuxBin: string, name: string): Promise<boolean> {
 
 function validateWorkerId(value: string): boolean {
   return /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(value)
+}
+
+const HERMES_BIN_CANDIDATES = [
+  process.env.HERMES_CLI_BIN,
+  join(homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'hermes'),
+  join(homedir(), '.local', 'bin', 'hermes'),
+  'hermes',
+].filter((value): value is string => Boolean(value))
+
+function resolveHermesBin(): string {
+  for (const candidate of HERMES_BIN_CANDIDATES) {
+    if (candidate.includes('/')) {
+      if (existsSync(candidate)) return candidate
+      continue
+    }
+    return candidate
+  }
+  return 'hermes'
 }
 
 function startSession(
@@ -84,7 +114,7 @@ function startSession(
         sessionName,
         '-c',
         cwd,
-        `HERMES_HOME='${profilePath.replace(/'/g, `'\\''`)}' exec hermes chat --continue`,
+        `HERMES_HOME='${profilePath.replace(/'/g, `'\\''`)}' HERMES_CLI_BIN='${resolveHermesBin().replace(/'/g, `'\\''`)}' exec '${resolveHermesBin().replace(/'/g, `'\\''`)}' chat --tui`,
       ],
       { timeout: 8_000 },
       (error, _stdout, stderr) => {

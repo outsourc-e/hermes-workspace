@@ -12,6 +12,24 @@ import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 
+const HERMES_BIN_CANDIDATES = [
+  process.env.HERMES_CLI_BIN,
+  join(homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'hermes'),
+  join(homedir(), '.local', 'bin', 'hermes'),
+  'hermes',
+].filter((value): value is string => Boolean(value))
+
+function resolveHermesBin(): string {
+  for (const candidate of HERMES_BIN_CANDIDATES) {
+    if (candidate.includes('/')) {
+      if (existsSync(candidate)) return candidate
+      continue
+    }
+    return candidate
+  }
+  return 'hermes'
+}
+
 type AssignmentRequest = {
   workerId: string
   task: string
@@ -90,12 +108,13 @@ function validateWorkerId(workerId: string): boolean {
 }
 
 const TMUX_BIN_CANDIDATES = [
-  join(homedir(), '.local', 'bin', 'tmux'),
+  process.env.TMUX_BIN,
   '/opt/homebrew/bin/tmux',
   '/usr/local/bin/tmux',
   '/usr/bin/tmux',
+  join(homedir(), '.local', 'bin', 'tmux'),
   'tmux',
-]
+].filter((value): value is string => Boolean(value))
 
 function resolveTmuxBin(): string | null {
   // Allow operators on non-standard installs (Docker, NixOS, custom
@@ -110,10 +129,17 @@ function resolveTmuxBin(): string | null {
   }
   for (const candidate of TMUX_BIN_CANDIDATES) {
     if (candidate.includes('/')) {
-      if (existsSync(candidate)) return candidate
-    } else {
-      return candidate
+      if (
+        candidate === process.env.TMUX_BIN ||
+        candidate === '/opt/homebrew/bin/tmux' ||
+        candidate === '/usr/local/bin/tmux' ||
+        existsSync(candidate)
+      ) {
+        return candidate
+      }
+      continue
     }
+    return candidate
   }
   return null
 }
@@ -529,9 +555,11 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
   const ghToken = resolveGithubToken()
   const launchPrefix = [
     `HERMES_HOME='${shellEscapeSingle(profilePath)}'`,
+    `HERMES_CLI_BIN='${shellEscapeSingle(resolveHermesBin())}'`,
     ghToken ? `GH_TOKEN='${shellEscapeSingle(ghToken)}'` : '',
     ghToken ? `GITHUB_TOKEN='${shellEscapeSingle(ghToken)}'` : '',
   ].filter(Boolean).join(' ')
+  const hermesBin = shellEscapeSingle(resolveHermesBin())
   const started = await execFileAsync(tmuxBin, [
     'new-session',
     '-d',
@@ -539,7 +567,7 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
     sessionName,
     '-c',
     cwd,
-    `${launchPrefix} exec hermes chat --continue`,
+    `${launchPrefix} exec '${hermesBin}' chat --tui`,
   ])
   if (!started.ok) {
     return { ok: false, error: started.error }
@@ -619,7 +647,7 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   // Give the TUI a beat to ingest the paste before submitting. Some workers
   // render slower and otherwise keep the pasted text sitting at the prompt.
   await sleep(120)
-  const enter = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'Enter'])
+  const enter = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-m'])
   if (!enter.ok) {
     return {
       workerId,
@@ -772,7 +800,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     }
 
     const useWrapper = existsSync(wrapperPath)
-    const cmd = useWrapper ? wrapperPath : 'hermes'
+    const cmd = useWrapper ? wrapperPath : resolveHermesBin()
     const args = ['chat', '-q', prompt, '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
     const env: NodeJS.ProcessEnv = {
       ...process.env,
