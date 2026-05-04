@@ -91,7 +91,11 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
   if (!STATS_URL && !stats) return null
   if (!stats && reachable === false) return null
 
+  // Show the live WS count once we're connected; otherwise show the snapshot
+  // count from /stats (it does NOT include you yet because you haven't connected).
+  const liveConnected = transport === 'ws' || transport === 'both'
   const n = stats?.online ?? 0
+  const displayCount = stats == null ? '—' : liveConnected ? String(n) : n === 0 ? '0' : String(n)
   const status: { color: string; label: string } = (() => {
     switch (transport) {
       case 'both':
@@ -101,7 +105,7 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
         return { color: '#facc15', label: 'local-only' }
       case 'offline':
       default:
-        return { color: '#94a3b8', label: 'offline' }
+        return { color: '#94a3b8', label: 'connecting…' }
     }
   })()
 
@@ -120,9 +124,8 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
 
   return (
     <div
-      className="pointer-events-auto fixed top-3 z-[70] flex items-center gap-2 rounded-full border-2 border-white/15 bg-black/65 px-3 py-1.5 text-[11px] font-bold text-white shadow-2xl backdrop-blur-xl"
+      className="pointer-events-auto fixed top-3 left-3 z-[70] flex items-center gap-2 rounded-full border-2 border-white/15 bg-black/65 px-3 py-1.5 text-[11px] font-bold text-white shadow-2xl backdrop-blur-xl"
       style={{
-        right: 16,
         boxShadow: `0 0 12px ${accent}33, 0 8px 24px rgba(0,0,0,.5)`,
       }}
       title={tooltip}
@@ -138,7 +141,7 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
         }}
       />
       <span>Players online</span>
-      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/80">{n}</span>
+      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/80">{displayCount}</span>
       {stats?.peakToday && stats.peakToday > 0 && (
         <span className="text-white/45">· peak {stats.peakToday}</span>
       )}

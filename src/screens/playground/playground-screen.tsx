@@ -76,6 +76,11 @@ export function PlaygroundScreen() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isNarrow, setIsNarrow] = useState(false)
   const [objectivePulseKey, setObjectivePulseKey] = useState(0)
+  // Focus mode — hides side rail (Quest Tracker, Inventory panel, Builders Nearby chip)
+  // so the player can see the world while playing/recording.
+  // Auto-engages on first movement; toggle with F.
+  const [focusMode, setFocusMode] = useState(false)
+  const focusModeAutoEngagedRef = useRef(false)
   const heardToastIds = useRef<Set<string>>(new Set())
   const completedTutorialRef = useRef(false)
   const lowHpArmedRef = useRef(true)
@@ -226,12 +231,21 @@ export function PlaygroundScreen() {
       if (key === 'm') setMapOpen((value) => !value)
       if (key === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
       if (key === 't') setChatCollapsed(false)
+      if (key === 'f') setFocusMode((value) => !value)
+      // Auto-engage focus mode on first movement so the world isn't blocked by panels
+      const movementKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']
+      if (movementKeys.includes(key) && !focusModeAutoEngagedRef.current) {
+        focusModeAutoEngagedRef.current = true
+        setFocusMode(true)
+      }
       if (event.key === 'Escape') {
         setJournalOpen(false)
         setDialogNpc(null)
         setMapOpen(false)
         setArchiveOpen(false)
         setTutorialCompleteOpen(false)
+        // Esc also bails out of focus mode so the rail comes back
+        setFocusMode(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -524,33 +538,46 @@ export function PlaygroundScreen() {
           toasts={rpg.toasts}
         />
         <PlaygroundOnlineChip accent={WORLD_META[world].accent} />
-        <NearbyBuildersChip players={remotePlayersInZone} />
-        <PlaygroundSidePanel
-          state={rpg.state}
-          currentWorld={world}
-          worlds={PLAYGROUND_WORLDS}
-          onSelectWorld={(next) => {
-            if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
-          }}
-          onReset={rpg.resetRpg}
-          onReplayTutorial={() => {
-            rpg.replayTutorial()
-            setTutorialCompleteOpen(false)
-            setArchiveOpen(false)
-            setJournalOpen(false)
-            setMapOpen(false)
-            setMobileMenuOpen(false)
-            setWorld('training')
-            try { window.localStorage.removeItem(FORGE_INTRO_STORAGE_KEY) } catch {}
-            forgeIntroSeenRef.current = false
-          }}
-          onOpenInventory={rpg.openInventory}
-          onEquipItem={rpg.equipItem}
-          onUnequipSlot={rpg.unequipSlot}
-          worldAccent={WORLD_META[world].accent}
-          open={!isNarrow || mobileMenuOpen}
-          onOpenChange={setMobileMenuOpen}
-        />
+        {!focusMode && <NearbyBuildersChip players={remotePlayersInZone} />}
+        {!focusMode && (
+          <PlaygroundSidePanel
+            state={rpg.state}
+            currentWorld={world}
+            worlds={PLAYGROUND_WORLDS}
+            onSelectWorld={(next) => {
+              if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
+            }}
+            onReset={rpg.resetRpg}
+            onReplayTutorial={() => {
+              rpg.replayTutorial()
+              setTutorialCompleteOpen(false)
+              setArchiveOpen(false)
+              setJournalOpen(false)
+              setMapOpen(false)
+              setMobileMenuOpen(false)
+              setWorld('training')
+              try { window.localStorage.removeItem(FORGE_INTRO_STORAGE_KEY) } catch {}
+              forgeIntroSeenRef.current = false
+            }}
+            onOpenInventory={rpg.openInventory}
+            onEquipItem={rpg.equipItem}
+            onUnequipSlot={rpg.unequipSlot}
+            worldAccent={WORLD_META[world].accent}
+            open={!isNarrow || mobileMenuOpen}
+            onOpenChange={setMobileMenuOpen}
+          />
+        )}
+        {/* Focus mode toggle (always visible, sits below minimap) */}
+        <button
+          type="button"
+          onClick={() => setFocusMode((v) => !v)}
+          title={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
+          className="pointer-events-auto fixed right-3 top-[200px] z-[71] hidden items-center gap-1.5 rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-xl backdrop-blur-xl md:flex"
+          style={{ boxShadow: focusMode ? `0 0 12px ${WORLD_META[world].accent}66` : undefined }}
+        >
+          <span style={{ color: focusMode ? WORLD_META[world].accent : 'white' }}>{focusMode ? '◉' : '○'}</span>
+          <span>{focusMode ? 'Focus on' : 'Focus'}</span>
+        </button>
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
@@ -798,7 +825,7 @@ function NearbyBuildersChip({ players }: { players: RemotePlayer[] }) {
   if (players.length === 0) return null
 
   return (
-    <div className="pointer-events-auto fixed right-3 top-14 z-[70] hidden w-[240px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block">
+    <div className="pointer-events-auto fixed left-3 top-12 z-[70] hidden w-[220px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block">
       <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Builders Nearby</div>
       <div className="space-y-1">
         {players.map((player) => (

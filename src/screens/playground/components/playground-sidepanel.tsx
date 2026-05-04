@@ -398,6 +398,7 @@ function SettingsTab({
           <li>E talk · T chat · J journal · M world map · C avatar</li>
           <li>Drag with mouse to rotate camera · wheel to zoom</li>
           <li>Arrow keys still orbit view · 1 Strike · 2 Dash · 3 Bolt</li>
+          <li><strong>F focus mode</strong> (hide rail) · Esc closes panels + focus</li>
         </ul>
       </div>
       {onReset && (
