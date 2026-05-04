@@ -84,7 +84,7 @@ export function PlaygroundSidePanel({
         >
           <div className="mb-1 flex items-center justify-between">
             <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/55">Quest Tracker</span>
-            <span className="text-[9px] uppercase tracking-[0.12em] text-white/40">J for journal</span>
+            <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white/55">J</span>
           </div>
           <div className="flex items-start gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg">

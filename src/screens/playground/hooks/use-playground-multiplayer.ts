@@ -43,8 +43,8 @@ type Wire = PresenceWire | ChatWire | LeaveWire | CountWire
 
 const CHANNEL_NAME = 'hermes.playground.v0'
 const PRESENCE_INTERVAL_MS = 200 // 5 Hz, was 100
-const KEEPALIVE_MS = 1500 // force a packet at least this often even if static
-const STALE_AFTER_MS = 5000 // matches server prune
+const KEEPALIVE_MS = 1000 // force a packet at least this often even if static
+const STALE_AFTER_MS = 6500 // matches server prune (server is 5000ms; we're slightly more lenient locally)
 const POS_EPSILON = 0.04 // skip-send if both deltas under this
 const YAW_EPSILON = 0.025 // ~1.4°
 const RENDER_POS_EPSILON = 0.03 // suppress re-render for ultra-small jitters
@@ -330,6 +330,48 @@ export function usePlaygroundMultiplayer({
       })
     }, PRESENCE_INTERVAL_MS)
     return () => window.clearInterval(tick)
+  }, [selfId, myName, myColor, world, interior, positionRef, yawRef])
+
+  // Immediately re-send presence when the tab becomes visible (after being
+  // backgrounded). Background tabs are throttled by the browser and can stop
+  // ticking long enough for the server to prune them — this prevents the
+  // "player disappears for a moment after switching tabs" flicker.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const onVisible = () => {
+      if (document.hidden) return
+      const pos = positionRef.current
+      if (!pos) return
+      // Force a fresh presence on next tick by clearing the dedupe baseline.
+      lastSentRef.current = { x: NaN, y: NaN, z: NaN, yaw: NaN, ts: 0, world: null }
+      // Also send immediately if WS open.
+      if (wsOpenRef.current && wsRef.current) {
+        try {
+          const wire: PresenceWire = {
+            kind: 'presence',
+            id: selfId,
+            name: myName,
+            color: myColor,
+            world,
+            interior,
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            yaw: yawRef.current ?? 0,
+            ts: Date.now(),
+            avatar: avatarRef.current || undefined,
+          }
+          wsRef.current.send(JSON.stringify(wire))
+          lastSentRef.current = { x: pos.x, y: pos.y, z: pos.z, yaw: yawRef.current ?? 0, ts: Date.now(), world }
+        } catch {}
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
   }, [selfId, myName, myColor, world, interior, positionRef, yawRef])
 
   const sendChat = useCallback((text: string) => {

@@ -61,7 +61,7 @@ export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
     >
       <div className="mb-1 flex items-center justify-between px-1">
         <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: worldAccent }}>{worldName}</span>
-        <span className="text-[9px] uppercase tracking-[0.12em] text-white/45">M for full</span>
+        <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white/65">M</span>
       </div>
       <div
         className="relative h-[150px] w-[150px] overflow-hidden rounded-lg border border-white/15"

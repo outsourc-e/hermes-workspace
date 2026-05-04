@@ -84,7 +84,7 @@ export function PlaygroundHud({
     <>
       {/* Combined player card: avatar portrait + name + level + title + HP/MP/SP/XP */}
       {/* Sits to the right of the side rail (left:140 instead of left:3) so it doesn't crowd the chat. */}
-      <div className="pointer-events-auto fixed top-3 z-[70] flex max-w-[360px] flex-col items-start gap-2" style={{ left: 'min(180px, 14vw)' }}>
+      <div className="pointer-events-auto fixed top-3 z-[70] flex max-w-[360px] flex-col items-start gap-2" style={{ left: 'min(120px, 9vw)' }}>
         <div
           className="rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 px-3 py-2.5 text-white shadow-2xl backdrop-blur-xl"
           style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
