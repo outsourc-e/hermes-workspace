@@ -218,7 +218,19 @@ function NavItem({
             {item.label}
           </span>
           {item.badge && item.badge !== 'error-dot' ? (
-            <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full border border-primary-700 bg-primary-900 px-2 py-0.5 text-[10px] font-semibold leading-none text-primary-300">
+            <span
+              className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
+              style={
+                item.badge === 'NEW'
+                  ? {
+                      background: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
+                      color: '#0b1320',
+                      boxShadow: '0 0 8px rgba(250,204,21,0.4)',
+                      letterSpacing: '0.08em',
+                    }
+                  : undefined
+              }
+            >
               {item.badge}
             </span>
           ) : null}
@@ -784,8 +796,9 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/playground',
       icon: Rocket01Icon,
-      label: 'Playground',
+      label: 'HermesWorld',
       active: isPlaygroundActive,
+      badge: 'NEW',
     },
     {
       kind: 'link',

@@ -7,17 +7,18 @@ function useAsciiPortrait(npcId: string | null) {
   const [art, setArt] = useState<string | null>(null)
   useEffect(() => {
     if (!npcId) { setArt(null); return }
-    if (ASCII_PORTRAIT_CACHE[npcId] !== undefined) {
-      setArt(ASCII_PORTRAIT_CACHE[npcId] || null)
+    const id = npcId
+    if (ASCII_PORTRAIT_CACHE[id] !== undefined) {
+      setArt(ASCII_PORTRAIT_CACHE[id] || null)
       return
     }
-    fetch(`/ascii-portraits/${npcId}.txt`)
+    fetch(`/ascii-portraits/${id}.txt`)
       .then((r) => (r.ok ? r.text() : ''))
       .then((t) => {
-        ASCII_PORTRAIT_CACHE[npcId] = t.trim()
+        ASCII_PORTRAIT_CACHE[id] = t.trim()
         setArt(t.trim() || null)
       })
-      .catch(() => { ASCII_PORTRAIT_CACHE[npcId] = ''; setArt(null) })
+      .catch(() => { ASCII_PORTRAIT_CACHE[id] = ''; setArt(null) })
   }, [npcId])
   return art
 }
