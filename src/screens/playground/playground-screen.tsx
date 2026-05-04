@@ -671,80 +671,210 @@ function TitleScreen({
   }, [])
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#050b12] p-6 text-white">
-      <div className="w-full max-w-5xl overflow-hidden rounded-[28px] border border-cyan-300/20 bg-[#070b14] shadow-2xl">
-        <div className="relative h-[340px] overflow-hidden">
+    <div
+      className="relative flex min-h-screen items-center justify-center overflow-hidden p-6 text-white"
+      style={{
+        background:
+          'radial-gradient(circle at 50% 18%, rgba(34,211,238,0.16) 0%, transparent 55%), radial-gradient(circle at 80% 80%, rgba(168,85,247,0.18) 0%, transparent 55%), linear-gradient(160deg, #02050a 0%, #050a14 60%, #07101a 100%)',
+      }}
+    >
+      {/* Animated starfield backdrop */}
+      <TitleStars />
+
+      <div
+        className="relative z-10 w-full max-w-[1080px] overflow-hidden rounded-[32px] border border-cyan-300/15"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(8,12,20,0.95) 0%, rgba(4,7,12,0.96) 100%)',
+          boxShadow:
+            '0 0 0 1px rgba(34,211,238,0.08), 0 30px 80px rgba(0,0,0,0.65), 0 0 80px rgba(34,211,238,0.08)',
+        }}
+      >
+        {/* Hero — cinematic title block */}
+        <div className="relative h-[400px] overflow-hidden">
           <PlaygroundHeroCanvas />
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <div className="mb-3 rounded-full border border-cyan-300/35 bg-black/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/85 backdrop-blur-sm">
-              Hermes Playground · Nous Research × Kimi
+          {/* Vignette */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 95%)' }} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+            <div
+              className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] backdrop-blur-md"
+              style={{
+                borderColor: 'rgba(250, 204, 21, 0.4)',
+                background: 'rgba(0,0,0,0.55)',
+                color: '#fde68a',
+                boxShadow: '0 0 18px rgba(250,204,21,0.18)',
+              }}
+            >
+              <span style={{ color: '#facc15' }}>✦</span>
+              Hermes Agent Realm
+              <span className="opacity-60">· Nous Research × Kimi</span>
             </div>
-            <h1 className="text-5xl font-black tracking-tight" style={{ textShadow: '0 0 28px rgba(34,211,238,0.55)' }}>
-              Hermes Playground
+            <h1
+              className="text-[88px] leading-none font-black tracking-tight"
+              style={{
+                background: 'linear-gradient(180deg, #ffffff 0%, #f5d97a 50%, #c89c2a 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                textShadow: '0 0 40px rgba(245,217,122,0.35)',
+                fontFamily: 'Cinzel, "Trajan Pro", "Cormorant Garamond", "Playfair Display", Georgia, serif',
+                letterSpacing: '0.04em',
+              }}
+            >
+              HermesWorld
             </h1>
-            <div className="mt-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
-              {displayName.trim().length === 0
-                ? 'Welcome, builder. What should we call you?'
-                : tutorialComplete
-                  ? `Ready when you are, ${displayName}.`
-                  : `Ready when you are, ${displayName}.`}
+            <div
+              className="mt-2 text-[10px] font-bold uppercase tracking-[0.45em]"
+              style={{ color: 'rgba(245, 217, 122, 0.7)' }}
+            >
+              — the agent MMO —
             </div>
-            <p className="mt-3 max-w-[640px] text-[15px] text-white/72">
-              Enter the Training Grounds, meet Athena, equip your starter kit, learn chat and memory, then unlock the Forge Gate.
+            <p className="mt-5 max-w-[560px] text-[15px] leading-relaxed text-white/72">
+              {displayName.trim().length === 0
+                ? 'Step into a shared world of Hermes agents. Train, build, and quest with builders worldwide.'
+                : tutorialComplete
+                  ? `Welcome back, ${displayName}. Six worlds await.`
+                  : `${displayName}, your training awaits. Six worlds. One builder. Forge your path.`}
             </p>
           </div>
         </div>
 
-        <div className="grid gap-6 p-6 lg:grid-cols-[1.3fr_0.7fr]">
+        {/* Bottom — entry block */}
+        <div className="relative grid gap-6 p-7 lg:grid-cols-[1.4fr_0.6fr]">
           <div className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Display Name</div>
+            <div
+              className="rounded-2xl border p-5"
+              style={{
+                borderColor: 'rgba(245, 217, 122, 0.18)',
+                background: 'linear-gradient(180deg, rgba(245,217,122,0.04) 0%, rgba(0,0,0,0.3) 100%)',
+                boxShadow: 'inset 0 1px 0 rgba(245,217,122,0.06)',
+              }}
+            >
+              <div
+                className="text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: '#fde68a' }}
+              >
+                ❖ Identify Yourself
+              </div>
               <input
                 value={displayName}
                 onChange={(event) => onChangeDisplayName(event.target.value.slice(0, 24))}
-                placeholder="Builder handle"
+                placeholder="Enter your builder name..."
                 maxLength={24}
-                className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-3 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-cyan-400/60"
+                className="mt-3 w-full rounded-xl border-2 bg-black/40 px-4 py-3.5 text-base text-white outline-none placeholder:text-white/25"
+                style={{ borderColor: 'rgba(245,217,122,0.25)' }}
               />
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="button"
                   onClick={onCustomize}
-                  className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-white/5"
+                  className="flex-shrink-0 rounded-xl border-2 px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition-all hover:scale-[1.02]"
+                  style={{
+                    borderColor: 'rgba(255,255,255,0.18)',
+                    color: 'rgba(255,255,255,0.85)',
+                    background: 'rgba(255,255,255,0.03)',
+                  }}
                 >
-                  Customize Avatar
+                  🎭 Customize Avatar
                 </button>
                 <button
                   type="button"
                   onClick={onEnter}
                   disabled={!canEnter}
-                  className="rounded-xl border-2 border-cyan-300/60 bg-cyan-400/15 px-5 py-2 text-sm font-extrabold uppercase tracking-[0.16em] text-cyan-100 hover:bg-cyan-400/25"
-                  style={{ boxShadow: '0 0 22px rgba(34,211,238,.35)' }}
+                  className="flex-1 rounded-xl border-2 px-6 py-3 text-base font-extrabold uppercase tracking-[0.18em] transition-all hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
+                  style={{
+                    borderColor: '#facc15',
+                    color: '#0b1320',
+                    background: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
+                    boxShadow: canEnter
+                      ? '0 0 30px rgba(250,204,21,0.45), inset 0 1px 0 rgba(255,255,255,0.5)'
+                      : 'none',
+                  }}
                 >
-                  Enter Training Grounds
+                  Enter the Realm
                 </button>
               </div>
             </div>
-            <div className="grid gap-2 text-sm sm:grid-cols-2">
-              <FeatureCard>Display-name-only entry</FeatureCard>
-              <FeatureCard>Avatar customizer before launch</FeatureCard>
-              <FeatureCard>Training tutorial, gear, chat, memory, build loop</FeatureCard>
-              <FeatureCard>Action bar, minimap, quest tracker, and multiplayer presence</FeatureCard>
+            <div className="grid gap-2 text-[12px] sm:grid-cols-3">
+              <PremiumFeatureCard icon="❁" title="Six Worlds" desc="Training Grounds → Forge → Arena" />
+              <PremiumFeatureCard icon="⛔" title="Live Multiplayer" desc="Walk with builders worldwide" />
+              <PremiumFeatureCard icon="🔮" title="Hermes Skills" desc="Promptcraft · Memory · Diplomacy" />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/35 p-4 text-sm text-white/80">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/70">Starter Route</div>
-            <ol className="mt-3 space-y-2 text-[13px]">
-              <li>1. Arrival Circle → meet Athena and claim the Hermes Sigil.</li>
-              <li>2. Quartermaster kit → equip the Training Blade and Novice Cloak.</li>
-              <li>3. Send one local chat message.</li>
-              <li>4. Visit the Archive Podium for docs and memory guidance.</li>
-              <li>5. Reach the Forge Gate and complete a placeholder build ritual.</li>
+          <div
+            className="rounded-2xl border p-5 text-sm text-white/80"
+            style={{
+              borderColor: 'rgba(34,211,238,0.18)',
+              background: 'linear-gradient(180deg, rgba(34,211,238,0.04) 0%, rgba(0,0,0,0.3) 100%)',
+            }}
+          >
+            <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(34,211,238,0.85)' }}>
+              ◈ Your Path
+            </div>
+            <ol className="mt-4 space-y-3 text-[13px]">
+              {[
+                'Meet Athena. Claim the Hermes Sigil.',
+                'Equip your kit at the Quartermaster.',
+                'Send your first chat message.',
+                'Visit the Archive Podium.',
+                'Pass through the Forge Gate.',
+              ].map((step, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span
+                    className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold"
+                    style={{ borderColor: 'rgba(34,211,238,0.35)', color: '#22d3ee', background: 'rgba(34,211,238,0.08)' }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="leading-tight text-white/75">{step}</span>
+                </li>
+              ))}
             </ol>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Subtle animated starfield for the title screen background. */
+function TitleStars() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 opacity-60">
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(1px 1px at 20% 30%, white 50%, transparent), radial-gradient(1px 1px at 70% 60%, white 50%, transparent), radial-gradient(1px 1px at 40% 80%, rgba(245,217,122,0.7) 50%, transparent), radial-gradient(2px 2px at 85% 15%, rgba(34,211,238,0.6) 50%, transparent), radial-gradient(1px 1px at 10% 75%, white 50%, transparent), radial-gradient(1.5px 1.5px at 55% 25%, rgba(168,85,247,0.5) 50%, transparent)',
+          backgroundSize: '600px 600px',
+          animation: 'hermesworld-stars 90s linear infinite',
+        }}
+      />
+      <style>{`
+        @keyframes hermesworld-stars {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(-600px, -300px); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function PremiumFeatureCard({ icon, title, desc }: { icon: string; title: string; desc: string }) {
+  return (
+    <div
+      className="rounded-xl border p-3"
+      style={{
+        borderColor: 'rgba(255,255,255,0.08)',
+        background: 'rgba(255,255,255,0.025)',
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-[14px]" style={{ color: '#fbbf24' }}>{icon}</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">{title}</span>
+      </div>
+      <div className="mt-1 text-[11px] text-white/55">{desc}</div>
     </div>
   )
 }
@@ -976,7 +1106,7 @@ function RouteFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050b12] p-6 text-white">
       <div className="max-w-[520px] rounded-3xl border border-amber-300/25 bg-[#070b14] p-5 shadow-2xl">
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200/80">Hermes Playground</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200/80">HermesWorld</div>
         <div className="mt-1 text-xl font-extrabold">Route fallback active</div>
         <p className="mt-3 text-sm text-white/75">
           The 3D route failed to render in this browser context. Reload the page or open `/agora` for the lightweight fallback.

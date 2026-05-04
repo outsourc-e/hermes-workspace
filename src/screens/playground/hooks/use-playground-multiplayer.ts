@@ -54,18 +54,23 @@ function getSelfId() {
   if (_selfId) return _selfId
   if (typeof window !== 'undefined') {
     // sessionStorage is per-TAB, so two tabs in the same browser get distinct
-    // self-ids and never collide on the WS hub. (localStorage was shared across
-    // tabs which caused both tabs to use the same id — the server stored only
-    // one presence record, so when one tab throttled, the avatar disappeared
-    // for both sides.)
+    // self-ids and never collide on the WS hub. We also fold the tab-load
+    // timestamp into the id so even duplicated tabs (which share sessionStorage)
+    // get unique ids per fresh load.
     const k = 'hermes.playground.selfId'
     let v: string | null = null
     try { v = window.sessionStorage.getItem(k) } catch {}
     if (!v) {
-      v = `p_${Math.random().toString(36).slice(2, 10)}`
+      const stamp = Date.now().toString(36)
+      const rand = Math.random().toString(36).slice(2, 10)
+      v = `p_${stamp}_${rand}`
       try { window.sessionStorage.setItem(k, v) } catch {}
     }
     _selfId = v
+    if (typeof console !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.log('[Hermes MP] selfId:', v, '(if two tabs see the same id, MP will collide)')
+    }
     return v
   }
   return 'p_unknown'
@@ -216,21 +221,29 @@ export function usePlaygroundMultiplayer({
         } else if (msg.kind === 'presence' && msg.id !== selfId) {
           mergePresence(msg as RemotePlayer)
         } else if (msg.kind === 'leave' && msg.id !== selfId) {
+          // eslint-disable-next-line no-console
+          console.log('[Hermes MP] received leave for', msg.id, '— removing remote')
           setRemotePlayers((prev) => { const { [msg.id]: _, ...rest } = prev; return rest })
         } else if (msg.kind === 'chat' && msg.id !== selfId) {
           onChatRef.current?.(msg as ChatWire)
         }
       })
-      ws.addEventListener('close', () => {
+      ws.addEventListener('close', (ev) => {
         wsOpenRef.current = false
         wsRef.current = null
         setTransport((t) => (t === 'both' ? 'broadcast' : t === 'ws' ? 'offline' : t))
+        // eslint-disable-next-line no-console
+        console.log('[Hermes MP] WS close', { code: ev.code, reason: ev.reason, wasClean: ev.wasClean })
         if (!stop) {
           retry = Math.min(8, retry + 1)
           window.setTimeout(open, retry * 500)
         }
       })
-      ws.addEventListener('error', () => { try { ws?.close() } catch {} })
+      ws.addEventListener('error', (e) => {
+        // eslint-disable-next-line no-console
+        console.warn('[Hermes MP] WS error', e)
+        try { ws?.close() } catch {}
+      })
     }
     open()
     return () => {
