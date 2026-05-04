@@ -8,6 +8,6 @@ export const Route = createFileRoute('/playground')({
 })
 
 function PlaygroundRoute() {
-  usePageTitle('Playground')
+  usePageTitle('HermesWorld')
   return <PlaygroundScreen />
 }

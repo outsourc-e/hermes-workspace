@@ -121,7 +121,7 @@ export function PlaygroundSidePanel({
           style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.6)` }}
         >
         <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 md:hidden">
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Playground Menu</div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">HermesWorld Menu</div>
           <button
             type="button"
             onClick={() => onOpenChange?.(false)}
