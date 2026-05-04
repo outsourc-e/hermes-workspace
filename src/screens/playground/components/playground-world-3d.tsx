@@ -931,6 +931,62 @@ function PlayerAndCamera({
     return () => window.removeEventListener('hermes-playground-dash', onDash)
   }, [])
 
+  // Right-click drag for mouse-look (yaw + pitch). Middle-click also works.
+  useEffect(() => {
+    let dragging = false
+    let lastX = 0
+    let lastY = 0
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault()
+    }
+    const onDown = (e: MouseEvent) => {
+      // Right-click or middle-click starts drag
+      if (e.button !== 2 && e.button !== 1) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      dragging = true
+      lastX = e.clientX
+      lastY = e.clientY
+      document.body.style.cursor = 'grabbing'
+    }
+    const onMove = (e: MouseEvent) => {
+      if (!dragging) return
+      const dx = e.clientX - lastX
+      const dy = e.clientY - lastY
+      lastX = e.clientX
+      lastY = e.clientY
+      // Sensitivity: smaller = slower, larger = faster
+      const sens = 0.005
+      camYaw.current += dx * sens
+      camPitch.current = Math.max(0.25, Math.min(1.4, camPitch.current + dy * sens))
+    }
+    const onUp = () => {
+      if (dragging) {
+        dragging = false
+        document.body.style.cursor = ''
+      }
+    }
+    const onWheel = (e: WheelEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      // Only zoom when not over a chat/UI panel — check if event is over canvas-y area
+      camDistance.current = Math.max(6, Math.min(28, camDistance.current + e.deltaY * 0.01))
+    }
+    window.addEventListener('contextmenu', onContext)
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('wheel', onWheel, { passive: true })
+    return () => {
+      window.removeEventListener('contextmenu', onContext)
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('wheel', onWheel)
+      document.body.style.cursor = ''
+    }
+  }, [])
+
   // Initial spawn position — runs ONCE per mount, ignoring spawn-array identity
   // changes from parent re-renders (those caused snap-back to origin).
   const spawnedRef = useRef(false)

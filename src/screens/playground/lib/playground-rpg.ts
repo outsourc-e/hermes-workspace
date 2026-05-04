@@ -72,6 +72,10 @@ export type PlaygroundQuest = {
   chapter: string
   title: string
   description: string
+  /** What this quest teaches about Hermes Agent / product-building. */
+  lesson?: string
+  /** Why the player should care, shown in the journal as practical payoff. */
+  payoff?: string
   objectives: QuestObjective[]
   reward: QuestReward
   optional?: boolean
@@ -355,6 +359,8 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     chapter: 'Training Grounds Tutorial',
     title: 'Move and Speak',
     description: 'Walk to Athena at the Arrival Circle and accept the Hermes Sigil.',
+    lesson: 'Hermes Agent is the messenger layer for your workflow: one place to route prompts to models, tools, files, memory, and channels.',
+    payoff: 'You learn the basic interaction loop: approach an agent, choose a response, receive useful work back.',
     objectives: [
       {
         id: 'speak-athena',
@@ -381,6 +387,8 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     chapter: 'Training Grounds Tutorial',
     title: 'Open Your Kit',
     description: 'Open your inventory and equip the starter blade and cloak.',
+    lesson: 'In Hermes, capabilities are modular. Skills, tools, profiles, and context files are your equipment loadout for different jobs.',
+    payoff: 'You learn how to inspect, equip, and combine capabilities before starting real work.',
     objectives: [
       {
         id: 'open-kit',
@@ -411,6 +419,8 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     chapter: 'Training Grounds Tutorial',
     title: 'Learn Chat and Community',
     description: 'Send one local chat message to the builders around you.',
+    lesson: 'Hermes can operate across chat surfaces and human workflows, not just inside one app window.',
+    payoff: 'You learn how multiplayer/social context turns isolated agent work into collaborative product-building.',
     objectives: [
       {
         id: 'send-local-chat',
@@ -429,6 +439,8 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     chapter: 'Training Grounds Tutorial',
     title: 'Learn Memory and Docs',
     description: 'Visit the Archive Podium and inspect the docs and memory guidance.',
+    lesson: 'Memory, docs, and context let Hermes remember what matters: goals, decisions, repo state, preferences, and project handoffs.',
+    payoff: 'You learn why durable context beats repeating yourself every session.',
     objectives: [
       {
         id: 'visit-archive',
@@ -454,6 +466,8 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     chapter: 'Training Grounds Tutorial',
     title: 'Build with Hermes',
     description: 'Travel to the Forge Gate and ask Athena to build something with you.',
+    lesson: 'The Forge represents the core Hermes loop: describe an outcome, dispatch agents/tools, review progress, and turn prompts into products.',
+    payoff: 'You graduate from learning the interface to using Hermes as a builder system.',
     objectives: [
       {
         id: 'visit-forge-gate',
@@ -482,6 +496,8 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     chapter: 'Training Grounds Bonus',
     title: 'Clear the Glitch Wisp',
     description: 'Defeat the unstable wisp haunting the Trainer’s Ring.',
+    lesson: 'Real projects create glitches: bad prompts, broken tools, missing context, failing auth, and noisy feedback loops.',
+    payoff: 'You learn the product habit Hermes rewards: detect the issue, choose the right tool, and clear the blocker.',
     optional: true,
     objectives: [
       {

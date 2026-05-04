@@ -124,6 +124,22 @@ export function PlaygroundJournal({
                     </div>
                   </div>
                   <div className="mt-1 text-[13px] text-white/70">{quest.description}</div>
+                  {(quest.lesson || quest.payoff) && (
+                    <div className="mt-3 grid gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/5 p-3 text-[12px] md:grid-cols-2">
+                      {quest.lesson && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200/80">Hermes lesson</div>
+                          <div className="mt-1 text-white/72">{quest.lesson}</div>
+                        </div>
+                      )}
+                      {quest.payoff && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200/80">Why it matters</div>
+                          <div className="mt-1 text-white/72">{quest.payoff}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="mt-3 space-y-1.5 text-[12px]">
                     {quest.objectives.map((objective) => {
                       const completed = progress?.completedObjectives.includes(objective.id)
@@ -141,10 +157,15 @@ export function PlaygroundJournal({
                       )
                     })}
                   </div>
-                  <div className="mt-3 text-[11px] text-emerald-300/80">
-                    Reward: +{quest.reward.xp} XP
-                    {quest.reward.items?.length ? ` · ${quest.reward.items.map((itemId) => itemById(itemId)?.name ?? itemId).join(', ')}` : ''}
-                    {quest.reward.unlockWorlds?.length ? ` · unlocks ${quest.reward.unlockWorlds.join(', ')}` : ''}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div className="text-emerald-300/80">
+                      Reward: +{quest.reward.xp} XP
+                      {quest.reward.items?.length ? ` · ${quest.reward.items.map((itemId) => itemById(itemId)?.name ?? itemId).join(', ')}` : ''}
+                      {quest.reward.unlockWorlds?.length ? ` · unlocks ${quest.reward.unlockWorlds.join(', ')}` : ''}
+                    </div>
+                    <div className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-white/50">
+                      {done ? 'Completed' : active ? 'Selected automatically — complete the highlighted step in-world' : 'Unlocks after prior quest'}
+                    </div>
                   </div>
                 </div>
               )

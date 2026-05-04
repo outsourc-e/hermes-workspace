@@ -396,7 +396,8 @@ function SettingsTab({
         <ul className="mt-1 space-y-0.5">
           <li>WASD move · Shift sprint</li>
           <li>E talk · T chat · J journal · M world map · C avatar</li>
-          <li>1 Strike · 2 Dash · 3 Bolt</li>
+          <li>Right/middle-click drag to rotate camera · wheel to zoom</li>
+          <li>Arrow keys still orbit view · 1 Strike · 2 Dash · 3 Bolt</li>
         </ul>
       </div>
       {onReset && (
