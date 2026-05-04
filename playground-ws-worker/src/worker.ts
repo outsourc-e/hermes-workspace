@@ -298,12 +298,21 @@ export class PlaygroundHub {
     const cleanup = () => {
       this.sockets.delete(socket)
       const meta = this.socketMeta.get(socket)
+      this.socketMeta.delete(socket)
+      // Do NOT immediately broadcast 'leave' on socket close — the client may
+      // be reconnecting transparently (browser idle hibernation, network blip,
+      // bg-tab throttling). Let the alarm-driven pruneStale handle it after
+      // STALE_AFTER_MS (12s) of no presence packets. This eliminates the
+      // 'avatar disappeared then came back' flicker that was happening every
+      // time a tab momentarily lost focus.
       if (meta?.playerId && this.presence.has(meta.playerId)) {
-        const prior = this.presence.get(meta.playerId)
-        const world = (prior?.world || prior?.worldId) as string | undefined
-        this.presence.delete(meta.playerId)
-        this.broadcast(null, { kind: 'leave', id: meta.playerId }, { world })
-        this.maybeBroadcastCount()
+        // Mark presence as 'aging' by setting an old ts so prune picks it up
+        // if no reconnect happens within STALE_AFTER_MS.
+        const cur = this.presence.get(meta.playerId)
+        if (cur) {
+          ;(cur as any).ts = Date.now() - (STALE_AFTER_MS / 2)
+          this.presence.set(meta.playerId, cur)
+        }
       }
     }
     socket.addEventListener('close', cleanup)
