@@ -398,10 +398,22 @@ function HermesContent() {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {PROVIDER_CARDS.map((p) => {
             const isActive = activeProvider === p.id
+            const localOnline =
+              localDiscovery?.providers.find((lp) => lp.id === p.id)?.online ===
+              true
+            // verified = truly available right now. OAuth status isn't tracked
+            // here, so OAuth providers stay neutral until an actual session
+            // check is wired. Local providers require live discovery hit.
+            const verified =
+              (p.authType === 'none' && localOnline) ||
+              (p.authType === 'api_key' &&
+                !!p.envKey &&
+                !!configuredKeys[p.envKey])
+            const missingKey = p.authType === 'api_key' && !verified
+            // hasKey gates click — keep OAuth + local clickable (existing
+            // behaviour) so users can still authenticate via the card.
             const hasKey =
-              p.authType === 'none' ||
-              p.authType === 'oauth' ||
-              (p.envKey ? !!configuredKeys[p.envKey] : false)
+              p.authType === 'none' || p.authType === 'oauth' || verified
             return (
               <button
                 key={p.id}
@@ -414,21 +426,20 @@ function HermesContent() {
                   isActive
                     ? 'ring-2 ring-accent-500 shadow-md'
                     : 'hover:brightness-110',
-                  !hasKey && p.authType === 'api_key' && 'opacity-60',
+                  missingKey && 'opacity-60',
                 )}
                 style={cardStyle}
               >
                 <div className="flex w-full items-center justify-between">
                   <ProviderLogo provider={p.id} size={32} />
-                  {isActive && (
+                  {/* Single-dot precedence: active > missing-key > verified > none */}
+                  {isActive ? (
                     <span className="size-2 rounded-full bg-green-500" />
-                  )}
-                  {!isActive && hasKey && (
-                    <span className="size-2 rounded-full bg-green-500/40" />
-                  )}
-                  {!hasKey && p.authType === 'api_key' && (
+                  ) : missingKey ? (
                     <span className="size-2 rounded-full bg-red-500/60" />
-                  )}
+                  ) : verified ? (
+                    <span className="size-2 rounded-full bg-green-500/40" />
+                  ) : null}
                 </div>
                 <span className="text-xs font-semibold mt-1">{p.name}</span>
                 <span className="text-[9px]" style={mutedStyle}>
