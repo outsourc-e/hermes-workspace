@@ -103,8 +103,12 @@ function tmuxHasSession(name: string): Promise<boolean> {
 }
 
 function tmuxIsInstalled(): Promise<boolean> {
+  // Honour HERMES_TMUX_BIN so a custom-path install isn't reported as
+  // 'tmux not installed' just because PATH doesn't include it. See #244.
+  const bin =
+    process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN || 'tmux'
   return new Promise((resolve) => {
-    execFile('tmux', ['-V'], (error) => resolve(!error))
+    execFile(bin, ['-V'], (error) => resolve(!error))
   })
 }
 

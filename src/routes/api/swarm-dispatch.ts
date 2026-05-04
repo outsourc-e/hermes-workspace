@@ -93,10 +93,21 @@ const TMUX_BIN_CANDIDATES = [
   join(homedir(), '.local', 'bin', 'tmux'),
   '/opt/homebrew/bin/tmux',
   '/usr/local/bin/tmux',
+  '/usr/bin/tmux',
   'tmux',
 ]
 
 function resolveTmuxBin(): string | null {
+  // Allow operators on non-standard installs (Docker, NixOS, custom
+  // package layouts) to point Swarm at the right tmux binary without
+  // patching this list. See #244.
+  const override = process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN
+  if (override) {
+    if (existsSync(override)) return override
+    // If the override looks like a bare command (no slashes), trust it
+    // and let execFile resolve it via PATH.
+    if (!override.includes('/')) return override
+  }
   for (const candidate of TMUX_BIN_CANDIDATES) {
     if (candidate.includes('/')) {
       if (existsSync(candidate)) return candidate
