@@ -49,6 +49,13 @@ describe('i18n translations', () => {
     })
   })
 
+  it('uses Japanese labels instead of falling back to English', () => {
+    withLocale('ja', () => {
+      expect(t('nav.dashboard')).toBe('ダッシュボード')
+      expect(t('settings.language')).toBe('言語')
+    })
+  })
+
   it('exposes readable locale labels for contributor-targeted languages', () => {
     expect(LOCALE_LABELS.zh).toBe('中文')
     expect(LOCALE_LABELS.ru).toBe('Русский')
