@@ -53,11 +53,17 @@ let _selfId: string | null = null
 function getSelfId() {
   if (_selfId) return _selfId
   if (typeof window !== 'undefined') {
+    // sessionStorage is per-TAB, so two tabs in the same browser get distinct
+    // self-ids and never collide on the WS hub. (localStorage was shared across
+    // tabs which caused both tabs to use the same id — the server stored only
+    // one presence record, so when one tab throttled, the avatar disappeared
+    // for both sides.)
     const k = 'hermes.playground.selfId'
-    let v = window.localStorage.getItem(k)
+    let v: string | null = null
+    try { v = window.sessionStorage.getItem(k) } catch {}
     if (!v) {
       v = `p_${Math.random().toString(36).slice(2, 10)}`
-      window.localStorage.setItem(k, v)
+      try { window.sessionStorage.setItem(k, v) } catch {}
     }
     _selfId = v
     return v

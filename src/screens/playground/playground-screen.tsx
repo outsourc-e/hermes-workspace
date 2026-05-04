@@ -12,6 +12,7 @@ import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
+import { autoNarrateWorld, cancelNarration, isNarrationMuted, setNarrationMuted, narrateWorldNow } from './lib/playground-narration'
 import { botsFor } from './lib/playground-bots'
 import { itemById, PLAYGROUND_WORLDS, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
 import type { RemotePlayer } from './hooks/use-playground-multiplayer'
@@ -80,6 +81,11 @@ export function PlaygroundScreen() {
   // Auto-engages on first movement; toggle with F.
   const [focusMode, setFocusMode] = useState(false)
   const focusModeAutoEngagedRef = useRef(false)
+  // Narration mute (Web Speech API). Initialized from persisted state.
+  const [narrationMuted, setNarrationMutedState] = useState(false)
+  useEffect(() => {
+    setNarrationMutedState(isNarrationMuted())
+  }, [])
   const heardToastIds = useRef<Set<string>>(new Set())
   const completedTutorialRef = useRef(false)
   const lowHpArmedRef = useRef(true)
@@ -176,6 +182,14 @@ export function PlaygroundScreen() {
     }
     playgroundAudio.setAmbient(null)
   }, [launched, world, audioMuted])
+
+  // Auto-narrate each world the first time you enter it (per session).
+  // Cancels prior narration when you change worlds.
+  useEffect(() => {
+    if (!launched) return
+    cancelNarration()
+    autoNarrateWorld(world)
+  }, [launched, world])
 
   useEffect(() => {
     let cancelled = false
@@ -593,8 +607,15 @@ export function PlaygroundScreen() {
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
         <PlaygroundUtilityDock
           audioMuted={audioMuted}
+          narrationMuted={narrationMuted}
           onCustomize={() => setCustomizerOpen(true)}
           onToggleAudio={() => playgroundAudio.toggleMuted()}
+          onReplayNarration={() => narrateWorldNow(world)}
+          onToggleNarration={() => {
+            const next = !narrationMuted
+            setNarrationMuted(next)
+            setNarrationMutedState(next)
+          }}
         />
         <ArchiveBriefingModal
           open={archiveOpen}
@@ -906,13 +927,33 @@ function PlaygroundUtilityDock({
   audioMuted,
   onCustomize,
   onToggleAudio,
+  onReplayNarration,
+  onToggleNarration,
+  narrationMuted,
 }: {
   audioMuted: boolean
   onCustomize: () => void
   onToggleAudio: () => void
+  onReplayNarration: () => void
+  onToggleNarration: () => void
+  narrationMuted: boolean
 }) {
   return (
     <div className="pointer-events-auto fixed bottom-[78px] right-3 z-[70] flex flex-col gap-1.5">
+      <button
+        onClick={onReplayNarration}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
+        title="Replay world narration"
+      >
+        📢
+      </button>
+      <button
+        onClick={onToggleNarration}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
+        title={narrationMuted ? 'Unmute narration' : 'Mute narration'}
+      >
+        {narrationMuted ? '🔇' : '🗣️'}
+      </button>
       <button
         onClick={onToggleAudio}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
