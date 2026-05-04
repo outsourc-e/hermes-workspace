@@ -57,6 +57,13 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
   const onlineLabel = serverOnline != null && liveConnected
     ? `${onlineCount} player${onlineCount === 1 ? '' : 's'}`
     : `${onlineCount} online`
+  const transportLabel = transport === 'ws' || transport === 'both'
+    ? 'WS'
+    : transport === 'broadcast'
+      ? 'local-only (no hub)'
+      : transport === 'offline'
+        ? 'offline'
+        : 'connecting'
   return (
     <div
       className="pointer-events-auto fixed bottom-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/65 text-white shadow-2xl backdrop-blur-xl"
@@ -67,9 +74,13 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
           <span
             className="inline-block h-2 w-2 rounded-full"
             style={{ background: liveConnected ? '#34d399' : '#facc15' }}
+            title={transportLabel}
           />
           Chat · {onlineLabel}
           {npcCount > 0 && <span className="text-white/35"> · {npcCount} NPC</span>}
+          <span className="ml-1 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.14em] text-white/45">
+            {transportLabel}
+          </span>
         </div>
         <button
           onClick={onToggle}
