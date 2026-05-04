@@ -58,9 +58,9 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
     ? `${onlineCount} player${onlineCount === 1 ? '' : 's'}`
     : `${onlineCount} online`
   const transportLabel = transport === 'ws' || transport === 'both'
-    ? 'WS'
+    ? 'live'
     : transport === 'broadcast'
-      ? 'local-only (no hub)'
+      ? 'local-only'
       : transport === 'offline'
         ? 'offline'
         : 'connecting'

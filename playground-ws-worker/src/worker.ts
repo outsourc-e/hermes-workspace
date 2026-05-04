@@ -258,6 +258,84 @@ export class PlaygroundHub {
       })
     }
 
+    // ───── HTTP polling endpoints (reliable fallback for WebSockets) ─────
+    // POST /presence  body: { id, name, color, world, x, y, z, yaw, avatar?, lastChatAt? }
+    //   Updates presence + returns { presences: [...other-players-in-world], chats: [...recent], count, byWorld, peakToday }
+    if (url.pathname === '/presence' && request.method === 'POST') {
+      let body: any
+      try { body = await request.json() } catch { return new Response('bad json', { status: 400, headers: cors }) }
+      if (!body || typeof body.id !== 'string') return new Response('missing id', { status: 400, headers: cors })
+      const now = Date.now()
+      const world = (body.world || body.worldId) as string | undefined
+      const wire: PresenceMsg & { ts: number } = { ...body, kind: 'presence', ts: now }
+      const wasNew = !this.presence.has(body.id)
+      this.presence.set(body.id, wire)
+      if (wasNew) {
+        await this.bumpPeak()
+        this.maybeBroadcastCount()
+      }
+      // Persist async — don't block the response
+      this.persistPresence().catch(() => {})
+      // Mirror to any active WebSockets (so clients on either transport see each other)
+      this.broadcast(null, wire, { world })
+      // Return: presences in same world (excluding caller), recent chats, count summary
+      const presences = []
+      for (const [id, p] of this.presence) {
+        if (id === body.id) continue
+        const pw = (p.world || p.worldId) as string | undefined
+        if (world && pw && pw !== world) continue
+        presences.push(p)
+      }
+      const sinceTs = typeof body.sinceChatTs === 'number' ? body.sinceChatTs : (now - 30000)
+      const chats = this.chatRing.filter((c: any) => {
+        if (typeof c.ts !== 'number' || c.ts <= sinceTs) return false
+        if (c.id === body.id) return false
+        const cw = (c.world || c.worldId) as string | undefined
+        if (world && cw && cw !== world) return false
+        return true
+      })
+      return Response.json({
+        presences,
+        chats,
+        online: this.presence.size,
+        byWorld: this.byWorld(),
+        peakToday: this.peakToday,
+        ts: now,
+      }, { headers: { ...cors, 'cache-control': 'no-cache' } })
+    }
+
+    // POST /chat   body: { id, name, color, world, text, ts }
+    if (url.pathname === '/chat' && request.method === 'POST') {
+      let body: any
+      try { body = await request.json() } catch { return new Response('bad json', { status: 400, headers: cors }) }
+      if (!body || typeof body.id !== 'string' || typeof body.text !== 'string') {
+        return new Response('missing fields', { status: 400, headers: cors })
+      }
+      if (body.text.length > 240) body.text = body.text.slice(0, 240)
+      body.kind = 'chat'
+      body.ts = Date.now()
+      this.chatRing.push(body)
+      if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
+      this.persistChat().catch(() => {})
+      const world = (body.world || body.worldId) as string | undefined
+      this.broadcast(null, body, { world })
+      return Response.json({ ok: true, ts: body.ts }, { headers: cors })
+    }
+
+    // POST /leave   body: { id }
+    if (url.pathname === '/leave' && request.method === 'POST') {
+      let body: any
+      try { body = await request.json() } catch { return new Response('bad json', { status: 400, headers: cors }) }
+      if (!body || typeof body.id !== 'string') return new Response('missing id', { status: 400, headers: cors })
+      const prior = this.presence.get(body.id)
+      const world = (prior?.world || prior?.worldId) as string | undefined
+      this.presence.delete(body.id)
+      this.broadcast(null, { kind: 'leave', id: body.id }, { world })
+      this.maybeBroadcastCount()
+      this.persistPresence().catch(() => {})
+      return Response.json({ ok: true }, { headers: cors })
+    }
+
     if (url.pathname === '/playground') {
       const upgradeHeader = request.headers.get('Upgrade')
       if (upgradeHeader !== 'websocket') {

@@ -360,6 +360,104 @@ export function usePlaygroundMultiplayer({
     return () => window.clearInterval(tick)
   }, [selfId, myName, myColor, world, interior, positionRef, yawRef])
 
+  // ───── HTTP polling transport (reliable fallback) ─────
+  // WebSockets have too many failure modes (CF DO hibernation, bg-tab
+  // throttling, dev bundle env issues). HTTP polling is dead simple and
+  // bulletproof: every 1s we POST our presence and get back the snapshot
+  // of who else is in our world + recent chats. We use this in addition to
+  // (not instead of) the WS — if WS works it's lower latency, but we
+  // don't depend on it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const baseUrl =
+      (window as any).__HERMES_PLAYGROUND_HTTP_URL ||
+      ((import.meta as any).env?.VITE_PLAYGROUND_STATS_URL as string | undefined)?.replace(/\/stats$/, '') ||
+      'https://hermes-playground-ws.myaurora-agi.workers.dev'
+    let stop = false
+    let lastChatTs = 0
+    const tick = async () => {
+      if (stop) return
+      const pos = positionRef.current
+      if (!pos) {
+        if (!stop) window.setTimeout(tick, 1000)
+        return
+      }
+      try {
+        const r = await fetch(`${baseUrl}/presence`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            id: selfId,
+            name: myName,
+            color: myColor,
+            world,
+            interior,
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            yaw: yawRef.current ?? 0,
+            avatar: avatarRef.current || undefined,
+            sinceChatTs: lastChatTs,
+          }),
+          keepalive: document.visibilityState === 'hidden', // helps survive bg throttle
+        })
+        if (!stop && r.ok) {
+          const data = await r.json() as { presences: any[]; chats: any[]; online: number; byWorld: Record<string, number>; peakToday: number }
+          // Merge presences
+          for (const p of data.presences || []) {
+            mergePresence(p as RemotePlayer)
+          }
+          // Replay any chat messages we haven't seen
+          for (const c of data.chats || []) {
+            if (typeof c.ts === 'number' && c.ts > lastChatTs) lastChatTs = c.ts
+            onChatRef.current?.(c as ChatWire)
+          }
+          // Push count update
+          setServerCount({ online: data.online, byWorld: data.byWorld, peakToday: data.peakToday })
+          // Mark transport as live (for the chat header chip)
+          setTransport((t) => (t === 'ws' || t === 'both') ? t : 'ws')
+        }
+      } catch (err) {
+        if (!stop) {
+          // eslint-disable-next-line no-console
+          console.warn('[Hermes MP] presence POST failed:', err)
+        }
+      }
+      if (!stop) window.setTimeout(tick, 1000)
+    }
+    tick()
+    // Send a leave on tab close so others see us go away immediately
+    const onUnload = () => {
+      try {
+        navigator.sendBeacon(`${baseUrl}/leave`, JSON.stringify({ id: selfId }))
+      } catch {}
+    }
+    window.addEventListener('beforeunload', onUnload)
+    window.addEventListener('pagehide', onUnload)
+    return () => {
+      stop = true
+      window.removeEventListener('beforeunload', onUnload)
+      window.removeEventListener('pagehide', onUnload)
+      onUnload()
+    }
+  }, [selfId, myName, myColor, world, interior, positionRef, yawRef, mergePresence])
+
+  // Also send chats over HTTP so they propagate even when WS is dead.
+  // We override sendChat to do both.
+  const httpSendChat = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    const baseUrl =
+      (window as any).__HERMES_PLAYGROUND_HTTP_URL ||
+      ((import.meta as any).env?.VITE_PLAYGROUND_STATS_URL as string | undefined)?.replace(/\/stats$/, '') ||
+      'https://hermes-playground-ws.myaurora-agi.workers.dev'
+    fetch(`${baseUrl}/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: selfId, name: myName, color: myColor, world, text: trimmed.slice(0, 240), ts: Date.now() }),
+    }).catch(() => {})
+  }, [selfId, myName, myColor, world])
+
   // Immediately re-send presence when the tab becomes visible (after being
   // backgrounded). Background tabs are throttled by the browser and can stop
   // ticking long enough for the server to prune them — this prevents the
@@ -414,11 +512,13 @@ export function usePlaygroundMultiplayer({
       text: trimmed.slice(0, 240),
       ts: Date.now(),
     }
+    // Best-effort fan-out across all transports.
     try { channelRef.current?.postMessage(wire) } catch {}
     if (wsOpenRef.current && wsRef.current) {
       try { wsRef.current.send(JSON.stringify(wire)) } catch {}
     }
-  }, [selfId, myName, myColor, world])
+    httpSendChat(trimmed) // HTTP polling transport — always works
+  }, [selfId, myName, myColor, world, httpSendChat])
 
   // World-scoped remote players: never render people from other worlds.
   const visibleRemotes = useMemo(() => {
