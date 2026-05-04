@@ -35,6 +35,12 @@ export type ProductUpdateStatus = {
   canUpdate: boolean
   state: UpdateState
   reason: string | null
+  /**
+   * When state is 'blocked' due to a dirty checkout, this lists up to a few
+   * paths that are causing the block (modified, staged, or untracked files).
+   * Surfaced in the UI so the user can see which files to deal with. See #293.
+   */
+  blockingFiles?: Array<string>
   updateMode:
     | 'git-ff'
     | 'hermes-update'
@@ -181,6 +187,25 @@ function remoteHead(repoPath: string, remote = 'origin'): string | null {
 
 function isDirty(repoPath: string): boolean {
   return Boolean(git(['status', '--porcelain'], repoPath))
+}
+
+/**
+ * Return up to `limit` paths from `git status --porcelain` so the UI can
+ * tell the user exactly which files are blocking an update. The shape of
+ * each entry is the relative path inside the repo (XY status code stripped).
+ */
+function listDirtyFiles(repoPath: string, limit = 24): Array<string> {
+  const raw = git(['status', '--porcelain'], repoPath)
+  if (!raw) return []
+  const out: Array<string> = []
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue
+    // porcelain format: XY <space> path  (path may be quoted with renames)
+    const path = line.slice(3).trim()
+    if (path) out.push(path)
+    if (out.length >= limit) break
+  }
+  return out
 }
 
 function canFastForward(repoPath: string, remoteRef: string): boolean {
@@ -351,12 +376,13 @@ export function readWorkspaceUpdateStatus(
       : !supportedBranch
         ? 'Workspace one-click updates are only enabled on main/master branches.'
         : dirty
-          ? 'Workspace checkout has local changes. Commit or stash before updating.'
+          ? 'Workspace checkout has local changes. Commit, stash, or remove the listed files before updating.'
           : updateAvailable && !canSync
             ? 'Workspace update could not verify the remote branch ref.'
             : updateAvailable && !ff
               ? 'Workspace branch diverged from origin. One-click update will realign to the remote branch.'
               : null,
+    blockingFiles: dirty ? listDirtyFiles(gitRepo) : undefined,
     updateMode: 'git-ff',
   }
 }
@@ -448,12 +474,13 @@ export function readAgentUpdateStatus(): ProductUpdateStatus {
     reason: !repoMatches
       ? 'Hermes Agent origin remote does not look like hermes-agent.'
       : dirty
-        ? 'Hermes Agent checkout has local changes. Commit or stash before updating.'
+        ? 'Hermes Agent checkout has local changes. Commit, stash, or remove the listed files before updating.'
         : updateAvailable && !canSync
           ? 'Hermes Agent update could not verify the remote branch ref.'
           : updateAvailable && !ff
             ? 'Hermes Agent branch diverged from origin. One-click update will realign to the remote branch.'
             : null,
+    blockingFiles: dirty ? listDirtyFiles(repoPath) : undefined,
     updateMode: 'hermes-update',
   }
 }

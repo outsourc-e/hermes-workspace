@@ -28,6 +28,7 @@ type ProductUpdateStatus = {
   canUpdate: boolean
   state: 'current' | 'available' | 'blocked' | 'unsupported' | 'error'
   reason: string | null
+  blockingFiles?: Array<string>
   updateMode: string
 }
 
@@ -314,12 +315,45 @@ function UpdateCard({
               ? `${product.label} update blocked`
               : `${product.label} update available`}
           </p>
+          {/* Don't truncate when blocked — the full reason is what the
+              user needs to act on. See #293. */}
           <p
-            className="truncate text-xs"
+            className={cn('text-xs', blocked ? '' : 'truncate')}
             style={{ color: 'var(--theme-muted)' }}
           >
             {subtitle}
           </p>
+          {blocked && product.repoPath ? (
+            <p
+              className="mt-0.5 truncate font-mono text-[11px]"
+              style={{ color: 'var(--theme-muted)' }}
+              title={product.repoPath}
+            >
+              {product.repoPath}
+            </p>
+          ) : null}
+          {blocked && product.blockingFiles && product.blockingFiles.length > 0 ? (
+            <ul className="mt-1 max-h-24 overflow-auto pr-1">
+              {product.blockingFiles.slice(0, 8).map((file) => (
+                <li
+                  key={file}
+                  className="truncate font-mono text-[11px]"
+                  style={{ color: 'var(--theme-muted)' }}
+                  title={file}
+                >
+                  {file}
+                </li>
+              ))}
+              {product.blockingFiles.length > 8 ? (
+                <li
+                  className="text-[11px] italic"
+                  style={{ color: 'var(--theme-muted)' }}
+                >
+                  …and {product.blockingFiles.length - 8} more
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {product.canUpdate ? (
