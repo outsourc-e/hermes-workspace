@@ -34,10 +34,10 @@ function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   // Resolve relative to the workspace root (parent of hermes-workspace/)
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'),            // sibling (old README)
-    resolve(workspaceRoot, '..', 'hermes-agent'),      // one level up
-    resolve(os.homedir(), '.claude', 'hermes-agent'),  // Nous installer default
-    resolve(os.homedir(), 'hermes-agent'),             // ~/hermes-agent
+    resolve(workspaceRoot, 'hermes-agent'), // sibling (old README)
+    resolve(workspaceRoot, '..', 'hermes-agent'), // one level up
+    resolve(os.homedir(), '.claude', 'hermes-agent'), // Nous installer default
+    resolve(os.homedir(), 'hermes-agent'), // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
@@ -85,10 +85,36 @@ async function isClaudeAgentHealthy(port = 8642): Promise<boolean> {
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const claudeApiUrl = env.CLAUDE_API_URL?.trim() || 'http://127.0.0.1:8642'
+  // Dashboard URL — where /api/sessions actually lives. The Hermes Agent
+  // (port 8642) does not serve /api/sessions; the Hermes Dashboard does
+  // (default port 9119). The Vite dev-server health probe used to hit
+  // /api/sessions on the agent URL, producing a 404 every 15 seconds in
+  // setups where the dashboard runs separately. See #276.
   const claudeDashboardUrl =
     env.HERMES_DASHBOARD_URL?.trim() ||
     env.CLAUDE_DASHBOARD_URL?.trim() ||
     'http://127.0.0.1:9119'
+  const claudeApiToken =
+    env.HERMES_API_TOKEN?.trim() || env.CLAUDE_API_TOKEN?.trim() || ''
+  const probeHeaders: Record<string, string> = claudeApiToken
+    ? { Authorization: `Bearer ${claudeApiToken}` }
+    : {}
+
+  // Cache the most recent successful /api/connection-status result so we
+  // don't hammer the agent + dashboard with three fetches every 15s when
+  // the answer hasn't changed. Negative results are cached for a much
+  // shorter window so transient outages recover quickly.
+  type ConnectionStatusBody = {
+    ok: boolean
+    mode: 'enhanced' | 'portable' | 'disconnected'
+    backend: string
+  }
+  let connectionStatusCache: {
+    expiresAt: number
+    body: ConnectionStatusBody
+  } | null = null
+  const CONNECTION_STATUS_CACHE_OK_MS = 60_000
+  const CONNECTION_STATUS_CACHE_FAIL_MS = 5_000
 
   // Hermes Agent auto-start state
   let claudeAgentChild: ChildProcess | null = null
@@ -136,7 +162,15 @@ const config = defineConfig(({ mode, command }) => {
       const useGatewayRun = existsSync(resolve(agentDir, 'gateway', 'run.py'))
       commandArgs = useGatewayRun
         ? ['-m', 'gateway.run']
-        : ['-m', 'uvicorn', 'webapi.app:app', '--host', '0.0.0.0', '--port', '8642']
+        : [
+            '-m',
+            'uvicorn',
+            'webapi.app:app',
+            '--host',
+            '0.0.0.0',
+            '--port',
+            '8642',
+          ]
       launchCwd = agentDir
       console.log(
         `[hermes-agent] Starting from ${agentDir} using ${launchCmd} (${useGatewayRun ? 'gateway.run' : 'uvicorn'})`,
@@ -151,27 +185,23 @@ const config = defineConfig(({ mode, command }) => {
       return
     }
 
-    const child = spawn(
-      launchCmd,
-      commandArgs,
-      {
-        cwd: launchCwd,
-        detached: false, // keep tied to vite process — stops when dev server stops
-        stdio: 'pipe',
-        env: {
-          ...process.env,
-          PATH: [
-            resolve(os.homedir(), '.claude', 'bin'),
-            resolve(os.homedir(), '.local', 'bin'),
-            agentDir ? resolve(agentDir, '.venv', 'bin') : '',
-            agentDir ? resolve(agentDir, 'venv', 'bin') : '',
-            process.env.PATH || '',
-          ]
-            .filter(Boolean)
-            .join(':'),
-        },
+    const child = spawn(launchCmd, commandArgs, {
+      cwd: launchCwd,
+      detached: false, // keep tied to vite process — stops when dev server stops
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        PATH: [
+          resolve(os.homedir(), '.claude', 'bin'),
+          resolve(os.homedir(), '.local', 'bin'),
+          agentDir ? resolve(agentDir, '.venv', 'bin') : '',
+          agentDir ? resolve(agentDir, 'venv', 'bin') : '',
+          process.env.PATH || '',
+        ]
+          .filter(Boolean)
+          .join(':'),
       },
-    )
+    })
 
     claudeAgentChild = child
     claudeAgentStarted = true
@@ -473,6 +503,38 @@ const config = defineConfig(({ mode, command }) => {
       port: process.env.PORT ? Number(process.env.PORT) : 3000,
       strictPort: false, // allow fallback if port is taken, but log clearly
       allowedHosts: true,
+      watch: {
+        ignored: [
+          // NOTE: the generated TanStack route tree must NOT be added to this
+          // ignore list — doing so causes route changes to require a full
+          // dev-server restart. See src/router-route-resolution.test.ts.
+          // Real fix for HMR thrash on the generated tree is to ensure only
+          // ONE vite dev server runs against this source tree at a time.
+          // Local portable session store, rewritten on every chat send.
+          // Without this, the watcher fires on every message → spurious
+          // server-side reload events / test churn during development.
+          '**/.runtime/**',
+          // Internal TanStack Start state cache.
+          '**/.tanstack/**',
+          // Local plan/notes/scratch state used by OMC tooling — never
+          // imported by the module graph, but file events still spam logs.
+          '**/.omc/**',
+          '**/.omx/**',
+          // Build artifacts.
+          '**/dist/**',
+          '**/.output/**',
+          // Test/coverage outputs.
+          '**/coverage/**',
+          '**/playwright-report/**',
+          '**/test-results/**',
+          // Editor / agent metadata.
+          '**/.vscode/**',
+          '**/.claude/**',
+          '**/.cursor/**',
+          // Loose log files.
+          '**/*.log',
+        ],
+      },
       proxy: {
         // WebSocket proxy: clients connect to /ws-claude on the Hermes Workspace
         // server (any IP/port), which internally forwards to the local server.
@@ -483,7 +545,7 @@ const config = defineConfig(({ mode, command }) => {
           ws: true,
           rewrite: (path) => path.replace(/^\/ws-claude/, ''),
         },
-// REST API proxy: API proxy for Hermes backend
+        // REST API proxy: API proxy for Hermes backend
         '/api/claude-proxy': {
           target: proxyTarget,
           changeOrigin: true,
@@ -538,39 +600,68 @@ const config = defineConfig(({ mode, command }) => {
               req.method === 'GET' &&
               requestPath === '/api/connection-status'
             ) {
+              const sendCached = (body: ConnectionStatusBody) => {
+                res.statusCode = body.ok ? 200 : 502
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify(body))
+              }
+
+              if (
+                connectionStatusCache &&
+                connectionStatusCache.expiresAt > Date.now()
+              ) {
+                sendCached(connectionStatusCache.body)
+                return
+              }
+
+              const cacheAndSend = (
+                body: ConnectionStatusBody,
+                ttlMs: number,
+              ) => {
+                connectionStatusCache = {
+                  expiresAt: Date.now() + ttlMs,
+                  body,
+                }
+                sendCached(body)
+              }
+
               try {
-                // Check for enhanced Hermes Agent gateway first (has /api/sessions)
+                // Probe the agent for /v1/models and the dashboard for
+                // /api/sessions in parallel. /api/sessions lives on the
+                // dashboard, not the agent, so probing it on the agent URL
+                // (the previous behaviour) produced a 404 every 15s when
+                // the dashboard ran on a separate port. See #276.
                 const [modelsRes, sessionsRes] = await Promise.all([
                   fetch(`${claudeApiUrl}/v1/models`, {
+                    headers: probeHeaders,
                     signal: AbortSignal.timeout(3000),
                   }).catch(() => null),
                   fetch(`${claudeDashboardUrl}/api/sessions?limit=1`, {
+                    headers: probeHeaders,
                     signal: AbortSignal.timeout(3000),
                   }).catch(() => null),
                 ])
                 const hasModels = modelsRes?.ok ?? false
                 const hasSessions = sessionsRes?.ok ?? false
                 if (hasModels && hasSessions) {
-                  res.statusCode = 200
-                  res.setHeader('content-type', 'application/json')
-                  res.end(
-                    JSON.stringify({
+                  cacheAndSend(
+                    {
                       ok: true,
                       mode: 'enhanced',
                       backend: claudeApiUrl,
-                    }),
+                    },
+                    CONNECTION_STATUS_CACHE_OK_MS,
                   )
                   return
                 }
                 if (hasModels) {
-                  res.statusCode = 200
-                  res.setHeader('content-type', 'application/json')
-                  res.end(
-                    JSON.stringify({
+                  cacheAndSend(
+                    {
                       ok: true,
                       mode: 'portable',
                       backend: claudeApiUrl,
-                    }),
+                    },
+                    CONNECTION_STATUS_CACHE_OK_MS,
                   )
                   return
                 }
@@ -578,24 +669,24 @@ const config = defineConfig(({ mode, command }) => {
                 const healthRes = await fetch(`${claudeApiUrl}/health`, {
                   signal: AbortSignal.timeout(3000),
                 })
-                res.statusCode = healthRes.ok ? 200 : 502
-                res.setHeader('content-type', 'application/json')
-                res.end(
-                  JSON.stringify({
+                cacheAndSend(
+                  {
                     ok: healthRes.ok,
                     mode: 'enhanced',
                     backend: claudeApiUrl,
-                  }),
+                  },
+                  healthRes.ok
+                    ? CONNECTION_STATUS_CACHE_OK_MS
+                    : CONNECTION_STATUS_CACHE_FAIL_MS,
                 )
               } catch {
-                res.statusCode = 502
-                res.setHeader('content-type', 'application/json')
-                res.end(
-                  JSON.stringify({
+                cacheAndSend(
+                  {
                     ok: false,
                     mode: 'disconnected',
                     backend: claudeApiUrl,
-                  }),
+                  },
+                  CONNECTION_STATUS_CACHE_FAIL_MS,
                 )
               }
               return
