@@ -50,6 +50,9 @@ export type QuestObjectiveType =
   | 'enter_world'
   | 'gather_song'
   | 'duel_npc'
+  | 'meet_player'
+  | 'exchange_chat'
+  | 'summon_familiar'
 
 export type QuestObjective = {
   id: string
@@ -489,6 +492,42 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
       unlockWorlds: ['forge'],
       title: 'Initiate Builder',
       skillXp: { worldsmithing: 55, engineering: 45 },
+    },
+  },
+  {
+    id: 'agora-diplomacy',
+    chapter: 'Agora Bonus — Diplomacy',
+    title: 'Pact of the Agora',
+    description: 'Find another live builder in the Agora Commons. Stand within speaking distance and exchange a chat.',
+    lesson: 'Hermes Diplomacy: agents shine when they coordinate with others. The first protocol is presence; the second is acknowledging another mind.',
+    payoff: 'Multiplayer coordination is a real Hermes skill — not just a flourish. Every collab pipeline starts here.',
+    optional: true,
+    objectives: [
+      { id: 'meet-builder', type: 'meet_player', label: 'Stand near another live builder in the Agora' },
+      { id: 'exchange-chat', type: 'exchange_chat', label: 'Send a chat while another player is nearby' },
+    ],
+    reward: {
+      xp: 80,
+      skillXp: { diplomacy: 80 },
+      title: 'Diplomat of the Realm',
+    },
+  },
+  {
+    id: 'forge-summon',
+    chapter: 'Forge Bonus — Summoning',
+    title: 'Summon a Forge Familiar',
+    description: 'Channel a temporary Hermes familiar at the Forge. It walks beside you for one minute.',
+    lesson: 'Hermes Summoning: orchestrate sub-agents on demand to extend your reach without bloating your context.',
+    payoff: 'You learn the foundation of agent composition — spawn helpers, get value, dismiss cleanly.',
+    optional: true,
+    objectives: [
+      { id: 'enter-forge-bonus', type: 'enter_world', label: 'Enter the Forge', target: 'forge' },
+      { id: 'summon-familiar', type: 'summon_familiar', label: 'Use the action bar 4-key to summon a familiar' },
+    ],
+    reward: {
+      xp: 80,
+      skillXp: { summoning: 80 },
+      title: 'Summoner of the Forge',
     },
   },
   {

@@ -101,6 +101,13 @@ export function PlaygroundScreen() {
     () => Object.values(remotePlayers).filter((player) => player.world === world),
     [remotePlayers, world],
   )
+  // Diplomacy: mark meet-builder objective the first time we see another
+  // live player in our world.
+  useEffect(() => {
+    if (remotePlayersInZone.length > 0) {
+      rpg.markObjective('agora-diplomacy', 'meet-builder')
+    }
+  }, [remotePlayersInZone.length, rpg])
   const lowHpThreshold = rpg.state.hpMax * 0.25
   const lowHpRecoverThreshold = rpg.state.hpMax * 0.3
   const lowHpActive = rpg.state.hp <= lowHpThreshold
@@ -310,6 +317,11 @@ export function PlaygroundScreen() {
       color: '#a7f3d0',
     })
     rpg.markObjective('training-q3', 'send-local-chat')
+    // Diplomacy: if there's a remote player nearby in this world, count it.
+    if (remotePlayersInZone.length > 0) {
+      rpg.markObjective('agora-diplomacy', 'meet-builder')
+      rpg.markObjective('agora-diplomacy', 'exchange-chat')
+    }
     // Speech bubble over our own head too, so we see what we said in-world.
     try {
       window.dispatchEvent(
@@ -364,6 +376,17 @@ export function PlaygroundScreen() {
       case 'bolt':
         if (!rpg.useMp(15)) return false
         return attackMonster(18 + Math.floor(Math.random() * 6), false)
+      case 'summon':
+        if (!rpg.useMp(20)) return false
+        // Spawn a 60-second familiar via custom event — the world component listens.
+        window.dispatchEvent(
+          new CustomEvent('hermes-playground-summon-familiar', {
+            detail: { durationMs: 60000, color: '#a78bfa' },
+          }),
+        )
+        rpg.markObjective('forge-summon', 'enter-forge-bonus')
+        rpg.markObjective('forge-summon', 'summon-familiar')
+        return true
       default:
         return false
     }
@@ -1001,7 +1024,10 @@ function NearbyBuildersChip({ players }: { players: RemotePlayer[] }) {
   if (players.length === 0) return null
 
   return (
-    <div className="pointer-events-auto fixed left-3 top-12 z-[70] hidden w-[220px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block">
+    <div
+      className="pointer-events-auto fixed top-[210px] z-[70] hidden w-[220px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block"
+      style={{ left: 'min(120px, 9vw)' }}
+    >
       <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Builders Nearby</div>
       <div className="space-y-1">
         {players.map((player) => (

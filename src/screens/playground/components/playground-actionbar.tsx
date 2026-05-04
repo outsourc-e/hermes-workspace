@@ -42,6 +42,16 @@ const ACTIONS: ActionSlot[] = [
     description: 'Ranged bolt that hits the test enemy from a distance.',
     color: '#facc15',
   },
+  {
+    id: 'summon',
+    key: '4',
+    label: 'Summon',
+    icon: '✨',
+    cost: 20,
+    cooldownMs: 30000,
+    description: 'Summon a temporary Hermes familiar that walks beside you for 60s. (Hermes Summoning skill)',
+    color: '#a78bfa',
+  },
 ]
 
 type Props = {

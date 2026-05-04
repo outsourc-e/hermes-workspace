@@ -161,8 +161,52 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
 }
 
 /* ── Ground ── */
+/** Procedural stone-tile plaza overlay (canvas texture). Used as a circular */
+/** floor under the central HermesStatue in Training Grounds + Agora. */
+function stoneTileTexture(): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null
+  const size = 512
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  // Base: warm stone
+  ctx.fillStyle = '#5a5240'
+  ctx.fillRect(0, 0, size, size)
+  // Tiles: ~7×7 with mortar gaps
+  const tile = size / 8
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      // Slight color variation per tile
+      const v = Math.floor(60 + Math.random() * 30)
+      ctx.fillStyle = `rgb(${v + 30},${v + 22},${v + 8})`
+      ctx.fillRect(x * tile + 2, y * tile + 2, tile - 4, tile - 4)
+      // Subtle highlights/cracks
+      if (Math.random() < 0.25) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.18)'
+        ctx.beginPath()
+        ctx.moveTo(x * tile + Math.random() * tile, y * tile + Math.random() * tile)
+        ctx.lineTo(x * tile + Math.random() * tile, y * tile + Math.random() * tile)
+        ctx.stroke()
+      }
+      // Specular highlight on a corner
+      if (Math.random() < 0.4) {
+        ctx.fillStyle = `rgba(255,240,200,${0.04 + Math.random() * 0.06})`
+        ctx.fillRect(x * tile + 4, y * tile + 4, tile / 2, tile / 8)
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(2, 2)
+  return tex
+}
+
 function Ground({ world }: { world: WorldDef }) {
   const isAgora = world.id === 'agora'
+  const showPlaza = world.id === 'training' || world.id === 'agora'
+  const stoneTex = useMemo(() => stoneTileTexture(), [])
   // Build a subtle procedural grass color variation by jittering vertex colors
   const grassGeo = useMemo(() => {
     const g = new THREE.PlaneGeometry(120, 120, 80, 80)
@@ -187,6 +231,13 @@ function Ground({ world }: { world: WorldDef }) {
       <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={grassGeo}>
         <meshStandardMaterial vertexColors roughness={1} metalness={0} />
       </mesh>
+      {/* Stone-tile circular plaza under central statue */}
+      {showPlaza && stoneTex && (
+        <mesh receiveShadow position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[7, 64]} />
+          <meshStandardMaterial map={stoneTex} roughness={0.9} metalness={0.05} />
+        </mesh>
+      )}
       {/* Soft subtle accent ring far out, only for non-agora worlds */}
       {!isAgora && (
         <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -330,6 +381,8 @@ function TechPillars({ world }: { world: WorldDef }) {
         <ringGeometry args={[4, 4.4, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={1} />
       </mesh>
+      {/* Hermes statue at the Forge center — cyan-tinted */}
+      <HermesStatue position={[0, 0, 0]} accent={world.accent} base="#1e293b" />
       {/* Cyan-flame Forge braziers */}
       {[[-5, -5], [5, -5], [-5, 5], [5, 5]].map(([x, z], i) => (
         <Brazier key={i} position={[x, 0, z]} color={world.accent} />
@@ -337,6 +390,8 @@ function TechPillars({ world }: { world: WorldDef }) {
       {/* Tech-banners with Hermes sigil */}
       <HermesBanner position={[-9, 0, 0]} rotation={[0, Math.PI / 2, 0]} color={world.accent} cloth="#0a0e1a" />
       <HermesBanner position={[9, 0, 0]} rotation={[0, -Math.PI / 2, 0]} color={world.accent} cloth="#0a0e1a" />
+      {/* Floating data motes — Forge feels alive */}
+      <Sparkles count={40} scale={[18, 5, 18]} size={2.4} speed={0.8} color={world.accent} opacity={0.55} />
     </>
   )
 }
@@ -418,6 +473,15 @@ function TempleDecor({ world }: { world: WorldDef }) {
         <ringGeometry args={[3.2, 3.6, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={1} />
       </mesh>
+      {/* Hermes statue at the temple center */}
+      <HermesStatue position={[0, 0, 0]} accent={world.accent} base="#312e81" />
+      {/* Mystical incense braziers */}
+      <Brazier position={[-4, 0, 0]} color="#a78bfa" />
+      <Brazier position={[4, 0, 0]} color="#a78bfa" />
+      <Brazier position={[0, 0, -4]} color="#a78bfa" />
+      <Brazier position={[0, 0, 4]} color="#a78bfa" />
+      {/* Floating runes */}
+      <Sparkles count={35} scale={[14, 6, 14]} size={2.6} speed={0.3} color={world.accent} opacity={0.7} />
     </>
   )
 }
@@ -937,6 +1001,60 @@ function NpcAccessories({ role = '', color }: { role?: string; color: string }) 
 }
 
 /* ── NPC billboard with proximity sensing ── */
+// Per-NPC ambient lines (cycles when nobody clicks them).
+const NPC_AMBIENT_LINES: Record<string, string[]> = {
+  athena: [
+    'Welcome, builder. The road begins here.',
+    'Hermes carries your prompts — wisely.',
+    'Memory turns moments into a story.',
+  ],
+  iris: [
+    'Every doc is a thread to follow.',
+    'I keep the archive. Ask, and I’ll fetch.',
+  ],
+  pan: [
+    'Prompts harden into tools at the Forge.',
+    'Build small. Ship now. Iterate.',
+  ],
+  nike: [
+    'Strike with intent. Iterate with rigor.',
+    'Champions earn the field, then defend it.',
+  ],
+  shopkeeper: [
+    'Starter kit, cheap and proud.',
+    'A blade and a cloak. That’s a beginning.',
+  ],
+  hermes: [
+    'Speed is the soul of an agent.',
+    'I deliver — between thought and tool.',
+  ],
+  chronos: [
+    'Records outlast the writer.',
+    'Time is the only honest critic.',
+  ],
+  apollo: [
+    'A song carries what code cannot.',
+  ],
+  artemis: [
+    'Track the signal. Ignore the noise.',
+  ],
+  eros: [
+    'Connection is the first protocol.',
+  ],
+  trainer: [
+    'Form. Then power. Then speed.',
+  ],
+  recruiter: [
+    'No one builds alone. Find your party.',
+  ],
+  banker: [
+    'Compound the small wins.',
+  ],
+  tavernkeeper: [
+    'Rest. Trade. Listen.',
+  ],
+}
+
 function NPC({
   position,
   avatar,
@@ -964,6 +1082,24 @@ function NPC({
   const base = useMemo(() => new THREE.Vector3(...position), [position])
   const phase = useMemo(() => Math.random() * Math.PI * 2, [])
   const hasGlb = useGlbAvailable(npcId || avatar)
+
+  // Ambient speech bubble — cycles every ~12-22s with NPC lore lines.
+  const [ambient, setAmbient] = useState<string | null>(null)
+  useEffect(() => {
+    const lines = (npcId && NPC_AMBIENT_LINES[npcId]) || NPC_AMBIENT_LINES[avatar] || []
+    if (lines.length === 0) return
+    let stop = false
+    const tick = () => {
+      if (stop) return
+      const line = lines[Math.floor(Math.random() * lines.length)]
+      setAmbient(line)
+      window.setTimeout(() => { if (!stop) setAmbient(null) }, 6000)
+      window.setTimeout(tick, 12000 + Math.random() * 10000)
+    }
+    // Stagger so all NPCs don't speak in unison.
+    const initial = window.setTimeout(tick, 2000 + Math.random() * 8000)
+    return () => { stop = true; window.clearTimeout(initial) }
+  }, [npcId, avatar])
 
   const lastNear = useRef(false)
   const [isNear, setIsNear] = useState(false)
@@ -1092,6 +1228,11 @@ function NPC({
       {isNear && (
         <Html position={[0, 2.55, 0]} center distanceFactor={8}>
           <div style={{padding:'4px 10px',background:color,color:'#000',borderRadius:6,fontSize:11,fontWeight:800,whiteSpace:'nowrap',boxShadow:`0 0 12px ${color}`,letterSpacing:'0.1em',textTransform:'uppercase'}}>Press E to talk</div>
+        </Html>
+      )}
+      {ambient && !isNear && (
+        <Html position={[0, 2.7, 0]} center distanceFactor={8}>
+          <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:220,textAlign:'center',border:`1px solid ${color}`,boxShadow:`0 0 10px ${color}66`}}>{ambient}</div>
         </Html>
       )}
     </group>
@@ -1771,6 +1912,52 @@ function PlayerAndCamera({
   )
 }
 
+/** Hermes Summoning skill — a glowing familiar orbits the player for 60s after summon. */
+function SummonedFamiliar({ playerRef }: { playerRef: React.MutableRefObject<THREE.Vector3> }) {
+  const ref = useRef<THREE.Mesh>(null)
+  const lightRef = useRef<THREE.PointLight>(null)
+  const [active, setActive] = useState<{ untilTs: number; color: string } | null>(null)
+  useEffect(() => {
+    const onSummon = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as { durationMs?: number; color?: string } | undefined
+      const dur = detail?.durationMs ?? 60000
+      const col = detail?.color ?? '#a78bfa'
+      setActive({ untilTs: Date.now() + dur, color: col })
+    }
+    window.addEventListener('hermes-playground-summon-familiar', onSummon)
+    return () => window.removeEventListener('hermes-playground-summon-familiar', onSummon)
+  }, [])
+  useFrame(({ clock }) => {
+    if (!active) return
+    if (Date.now() > active.untilTs) {
+      setActive(null)
+      return
+    }
+    if (!ref.current) return
+    const t = clock.getElapsedTime()
+    const r = 1.5
+    ref.current.position.x = playerRef.current.x + Math.cos(t * 1.6) * r
+    ref.current.position.z = playerRef.current.z + Math.sin(t * 1.6) * r
+    ref.current.position.y = 1.7 + Math.sin(t * 3) * 0.15
+    ref.current.rotation.y = t * 2
+    if (lightRef.current) {
+      lightRef.current.position.copy(ref.current.position)
+    }
+  })
+  if (!active) return null
+  const remainingMs = Math.max(0, active.untilTs - Date.now())
+  const fade = Math.min(1, remainingMs / 5000)
+  return (
+    <>
+      <mesh ref={ref}>
+        <octahedronGeometry args={[0.18, 0]} />
+        <meshStandardMaterial color={active.color} emissive={active.color} emissiveIntensity={1.4 * fade} transparent opacity={0.9 * fade} />
+      </mesh>
+      <pointLight ref={lightRef} color={active.color} intensity={1.2 * fade} distance={4} decay={1.5} />
+    </>
+  )
+}
+
 /** Listens for the local player's chat sends and pops a speech bubble over their head. */
 function SelfChatBubble() {
   const [bubble, setBubble] = useState<{ text: string; ts: number } | null>(null)
@@ -2233,8 +2420,21 @@ function RemotePlayer({ remote }: { remote: MpRemotePlayer }) {
       <mesh position={[0.13, 0.22, 0]} castShadow><boxGeometry args={[0.14, 0.44, 0.14]} /><meshStandardMaterial color="#1f2a37" roughness={0.6} /></mesh>
       <mesh position={[-0.13, 0.22, 0]} castShadow><boxGeometry args={[0.14, 0.44, 0.14]} /><meshStandardMaterial color="#1f2a37" roughness={0.6} /></mesh>
       <mesh position={[0, 0.7, 0]} castShadow><boxGeometry args={[0.5, 0.55, 0.32]} /><meshStandardMaterial color={remote.avatar?.outfit || remote.color} roughness={0.55} emissive={remote.avatar?.outfit || remote.color} emissiveIntensity={0.12} /></mesh>
+      {/* knight cuirass + sigil */}
+      <mesh position={[0, 0.78, 0.18]} castShadow><boxGeometry args={[0.46, 0.5, 0.06]} /><meshStandardMaterial color="#cbd5e1" metalness={0.7} roughness={0.3} emissive={remote.avatar?.outfitAccent || remote.color} emissiveIntensity={0.18} /></mesh>
+      <mesh position={[0, 0.8, 0.215]}><cylinderGeometry args={[0.1, 0.1, 0.018, 16]} /><meshStandardMaterial color={remote.avatar?.outfitAccent || remote.color} metalness={0.7} roughness={0.25} emissive={remote.avatar?.outfitAccent || remote.color} emissiveIntensity={0.55} /></mesh>
       <mesh castShadow position={[-0.36, 0.96, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={remote.avatar?.outfitAccent || '#0e7490'} metalness={0.45} roughness={0.45} /></mesh>
       <mesh castShadow position={[0.36, 0.96, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={remote.avatar?.outfitAccent || '#0e7490'} metalness={0.45} roughness={0.45} /></mesh>
+      {/* tasset */}
+      {[-0.16, -0.05, 0.05, 0.16].map((x) => (
+        <mesh key={x} castShadow position={[x, 0.42, 0.14]} rotation={[0.04, 0, 0]}><boxGeometry args={[0.09, 0.18, 0.04]} /><meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.4} emissive={remote.avatar?.outfitAccent || remote.color} emissiveIntensity={0.1} /></mesh>
+      ))}
+      {/* gauntlets */}
+      <mesh position={[0.36, 0.6, 0]} castShadow><cylinderGeometry args={[0.075, 0.07, 0.18, 10]} /><meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} emissive={remote.avatar?.outfitAccent || remote.color} emissiveIntensity={0.12} /></mesh>
+      <mesh position={[-0.36, 0.6, 0]} castShadow><cylinderGeometry args={[0.075, 0.07, 0.18, 10]} /><meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} emissive={remote.avatar?.outfitAccent || remote.color} emissiveIntensity={0.12} /></mesh>
+      {/* greaves */}
+      <mesh position={[0.13, 0.16, 0]} castShadow><boxGeometry args={[0.16, 0.28, 0.18]} /><meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.35} /></mesh>
+      <mesh position={[-0.13, 0.16, 0]} castShadow><boxGeometry args={[0.16, 0.28, 0.18]} /><meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.35} /></mesh>
       <mesh position={[0, 1.22, 0]} castShadow><sphereGeometry args={[0.22, 16, 16]} /><meshStandardMaterial color={remote.avatar?.skin || '#fde68a'} roughness={0.55} /></mesh>
       <mesh position={[0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color={remote.avatar?.eyes || '#0b1220'} /></mesh>
       <mesh position={[-0.085, 1.24, 0.19]}><sphereGeometry args={[0.025, 8, 8]} /><meshStandardMaterial color={remote.avatar?.eyes || '#0b1220'} /></mesh>
@@ -2529,6 +2729,9 @@ function Scene({
           gearHelmet={playerHelmet}
         />
       </Suspense>
+
+      {/* Summoned Hermes familiar (orbits the player while active) */}
+      <SummonedFamiliar playerRef={playerPos} />
 
       {/* Real remote players */}
       {Object.values(remotePlayers)
