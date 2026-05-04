@@ -231,11 +231,19 @@ function Ground({ world }: { world: WorldDef }) {
       <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={grassGeo}>
         <meshStandardMaterial vertexColors roughness={1} metalness={0} />
       </mesh>
-      {/* Stone-tile circular plaza under central statue */}
+      {/* Stone-tile circular plaza under central statue — polygon-offset prevents */}
+      {/* z-fighting with the statue inscription ring + Agora accent ring above. */}
       {showPlaza && stoneTex && (
-        <mesh receiveShadow position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh receiveShadow position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
           <circleGeometry args={[7, 64]} />
-          <meshStandardMaterial map={stoneTex} roughness={0.9} metalness={0.05} />
+          <meshStandardMaterial
+            map={stoneTex}
+            roughness={0.9}
+            metalness={0.05}
+            polygonOffset
+            polygonOffsetFactor={1}
+            polygonOffsetUnits={1}
+          />
         </mesh>
       )}
       {/* Soft subtle accent ring far out, only for non-agora worlds */}
@@ -335,9 +343,18 @@ function ClassicalPillars({ world }: { world: WorldDef }) {
           </mesh>
         </group>
       ))}
-      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh position={[0, 0.018, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <ringGeometry args={[3.5, 4, 64]} />
-        <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.4} />
+        <meshStandardMaterial
+          color={world.accent}
+          emissive={world.accent}
+          emissiveIntensity={0.4}
+          transparent
+          opacity={0.85}
+          polygonOffset
+          polygonOffsetFactor={-1}
+          polygonOffsetUnits={-1}
+        />
       </mesh>
       {/* Central Hermes statue — plaza centerpiece */}
       <HermesStatue position={[0, 0, 0]} scale={1.15} accent={world.accent} base="#e6dcc4" />
@@ -721,10 +738,19 @@ function HermesStatue({
           <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} />
         </mesh>
       ))}
-      {/* base inscription glow ring */}
-      <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* base inscription glow ring — polygon-offset to prevent z-fighting with the stone plaza below */}
+      <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.85, 2.1, 48]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} transparent opacity={0.7} />
+        <meshStandardMaterial
+          color={accent}
+          emissive={accent}
+          emissiveIntensity={0.55}
+          transparent
+          opacity={0.7}
+          polygonOffset
+          polygonOffsetFactor={-2}
+          polygonOffsetUnits={-2}
+        />
       </mesh>
     </group>
   )
