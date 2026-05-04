@@ -710,6 +710,97 @@ code {
 }
 
 /* ── Hermes Workspace Themes ── */
+
+[data-theme='matrix'] {
+  --theme-bg: #020804;
+  --theme-sidebar: #030d06;
+  --theme-panel: #041008;
+  --theme-card: #07130a;
+  --theme-card2: #0a1c0f;
+  --theme-border: rgba(0, 255, 65, 0.28);
+  --theme-border-subtle: rgba(0, 255, 65, 0.13);
+  --theme-text: #d8ffe3;
+  --theme-muted: rgba(216, 255, 227, 0.58);
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.72);
+  --theme-shadow-2: 0 10px 28px rgba(0, 0, 0, 0.62);
+  --theme-shadow-3: 0 18px 54px rgba(0, 0, 0, 0.72);
+  --theme-glass: rgba(2, 8, 4, 0.88);
+  --theme-focus: #00ff41;
+  --theme-accent: #00ff41;
+  --theme-accent-secondary: #7cff9b;
+  --theme-accent-subtle: rgba(0, 255, 65, 0.13);
+  --theme-accent-border: rgba(0, 255, 65, 0.36);
+  --theme-active: #00ff41;
+  --theme-link: #7cff9b;
+  --theme-success: #00ff41;
+  --theme-warning: #d6ff5f;
+  --theme-danger: #ff5f6d;
+  --theme-stripe: rgba(0, 255, 65, 0.055);
+  --theme-header-bg: #030d06;
+  --theme-header-border: rgba(0, 255, 65, 0.26);
+  --chat-user-bg: #07230d;
+  --chat-user-border: rgba(0, 255, 65, 0.34);
+  --chat-user-foreground: #eaffef;
+  --chat-assistant-bg: #041008;
+  --chat-assistant-border: rgba(0, 255, 65, 0.15);
+  --chat-assistant-foreground: #d8ffe3;
+  --composer-bg: #020b05;
+  --composer-border: rgba(0, 255, 65, 0.3);
+  --composer-placeholder: rgba(216, 255, 227, 0.42);
+  --tool-card-bg: #041008;
+  --tool-card-border: rgba(0, 255, 65, 0.2);
+  --tool-card-title: #eaffef;
+  --tool-card-muted: rgba(216, 255, 227, 0.56);
+  --code-bg: #010602;
+  --code-border: rgba(0, 255, 65, 0.18);
+  --theme-input: #07130a;
+}
+
+[data-theme='matrix-light'] {
+  --theme-bg: #f4fff6;
+  --theme-sidebar: #eafff0;
+  --theme-panel: #f0fff4;
+  --theme-card: #ffffff;
+  --theme-card2: #f4fff6;
+  --theme-border: rgba(0, 126, 34, 0.2);
+  --theme-border-subtle: rgba(0, 126, 34, 0.1);
+  --theme-text: #062a12;
+  --theme-muted: rgba(6, 42, 18, 0.55);
+  --theme-shadow-1: 0 1px 2px rgba(0, 80, 20, 0.08);
+  --theme-shadow-2: 0 10px 28px rgba(0, 80, 20, 0.1);
+  --theme-shadow-3: 0 18px 54px rgba(0, 80, 20, 0.14);
+  --theme-glass: rgba(244, 255, 246, 0.88);
+  --theme-focus: #008f2d;
+  --theme-accent: #008f2d;
+  --theme-accent-secondary: #006b22;
+  --theme-accent-subtle: rgba(0, 143, 45, 0.1);
+  --theme-accent-border: rgba(0, 143, 45, 0.3);
+  --theme-active: #008f2d;
+  --theme-link: #006b22;
+  --theme-success: #008f2d;
+  --theme-warning: #7a6200;
+  --theme-danger: #c0392b;
+  --theme-stripe: rgba(0, 143, 45, 0.04);
+  --theme-header-bg: #eafff0;
+  --theme-header-border: rgba(0, 126, 34, 0.18);
+  --chat-user-bg: #eafff1;
+  --chat-user-border: rgba(0, 126, 34, 0.22);
+  --chat-user-foreground: #062a12;
+  --chat-assistant-bg: #ffffff;
+  --chat-assistant-border: rgba(0, 126, 34, 0.12);
+  --chat-assistant-foreground: #062a12;
+  --composer-bg: #f4fff6;
+  --composer-border: rgba(0, 126, 34, 0.22);
+  --composer-placeholder: rgba(6, 42, 18, 0.38);
+  --tool-card-bg: #f0fff4;
+  --tool-card-border: rgba(0, 126, 34, 0.15);
+  --tool-card-title: #062a12;
+  --tool-card-muted: rgba(6, 42, 18, 0.55);
+  --code-bg: #eafff0;
+  --code-border: rgba(0, 126, 34, 0.14);
+  --theme-input: #ffffff;
+}
+
 [data-theme='claude-official'] {
   --theme-bg: #0a0e1a;
   /* Sidebar gets a deeper shade than the main bg so the column

@@ -920,6 +920,7 @@ function AppearanceContent() {
 
 const ENTERPRISE_THEME_FAMILIES: Array<ThemeId> = [
   'claude-nous',
+  'matrix',
   'claude-official',
   'claude-classic',
   'claude-slate',
@@ -945,6 +946,22 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
             accent: '#2557B7',
             text: '#16315F',
           }
+      : theme.id === 'matrix'
+        ? {
+            bg: '#020804',
+            panel: '#07130A',
+            border: 'rgba(0,255,65,0.28)',
+            accent: '#00FF41',
+            text: '#D8FFE3',
+          }
+        : theme.id === 'matrix-light'
+          ? {
+              bg: '#F4FFF6',
+              panel: '#FFFFFF',
+              border: 'rgba(0,126,34,0.2)',
+              accent: '#008F2D',
+              text: '#062A12',
+            }
       : theme.id === 'claude-official'
       ? {
           bg: '#0A0E1A',
