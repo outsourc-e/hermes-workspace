@@ -36,8 +36,14 @@ export function PlaygroundHeroCanvas() {
     for (let i = 0; i < 90; i++) stars.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.4 + 0.2, tw: Math.random() * Math.PI * 2 })
 
     const orbiters: Array<{ phase: number; orbit: number; speed: number; size: number; color: string }> = []
-    const palette = ['#22d3ee', '#a78bfa', '#fb7185', '#facc15', '#34d399', '#f472b6', '#38bdf8', '#fbbf24']
-    for (let i = 0; i < 38; i++) orbiters.push({ phase: Math.random() * Math.PI * 2, orbit: 0.18 + Math.random() * 0.22, speed: 0.4 + Math.random() * 0.5, size: 1.5 + Math.random() * 2.4, color: palette[Math.floor(Math.random() * palette.length)] })
+    // Gold-warm palette to match HermesWorld branding
+    const palette = ['#facc15', '#fbbf24', '#fde68a', '#22d3ee', '#a78bfa', '#fb7185', '#34d399']
+    for (let i = 0; i < 42; i++) orbiters.push({ phase: Math.random() * Math.PI * 2, orbit: 0.18 + Math.random() * 0.22, speed: 0.4 + Math.random() * 0.5, size: 1.5 + Math.random() * 2.4, color: palette[Math.floor(Math.random() * palette.length)] })
+
+    // Agent network nodes — fixed positions on the ring, connected with thin lines.
+    const agentNodes: Array<{ a: number; r: number; color: string }> = []
+    const agentColors = ['#facc15', '#22d3ee', '#a78bfa', '#34d399', '#fb7185', '#fbbf24']
+    for (let i = 0; i < 6; i++) agentNodes.push({ a: (i / 6) * Math.PI * 2, r: 1.0, color: agentColors[i] })
 
     let t = 0
     const draw = () => {
@@ -103,11 +109,45 @@ export function PlaygroundHeroCanvas() {
         ctx.globalAlpha = 1
       }
 
-      // Inner orb
+      // Agent network: 6 fixed nodes connected through center, slow rotation.
+      const netRot = t * 0.08
+      const nodePts = agentNodes.map((n) => ({
+        x: Math.cos(n.a + netRot) * baseR * n.r,
+        y: Math.sin(n.a + netRot) * baseR * n.r * 0.7,
+        color: n.color,
+      }))
+      // Edges: every node to every other (sparse), with golden tint.
+      ctx.lineWidth = 0.7
+      for (let i = 0; i < nodePts.length; i++) {
+        for (let j = i + 1; j < nodePts.length; j++) {
+          const a = nodePts[i]
+          const b = nodePts[j]
+          const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y)
+          grad.addColorStop(0, `${a.color}55`)
+          grad.addColorStop(1, `${b.color}55`)
+          ctx.strokeStyle = grad
+          ctx.beginPath()
+          ctx.moveTo(a.x, a.y)
+          ctx.lineTo(b.x, b.y)
+          ctx.stroke()
+        }
+      }
+      // Nodes themselves
+      for (const n of nodePts) {
+        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 14)
+        grad.addColorStop(0, n.color)
+        grad.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = grad
+        ctx.beginPath()
+        ctx.arc(n.x, n.y, 14, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      // Inner orb (now warm gold)
       const orb = ctx.createRadialGradient(0, 0, 8, 0, 0, baseR * 0.55)
-      orb.addColorStop(0, 'rgba(34,211,238,0.85)')
-      orb.addColorStop(0.4, 'rgba(34,211,238,0.18)')
-      orb.addColorStop(1, 'rgba(34,211,238,0)')
+      orb.addColorStop(0, 'rgba(250, 204, 21, 0.7)')
+      orb.addColorStop(0.4, 'rgba(250, 204, 21, 0.16)')
+      orb.addColorStop(1, 'rgba(250, 204, 21, 0)')
       ctx.fillStyle = orb
       ctx.beginPath()
       ctx.arc(0, 0, baseR * 0.55, 0, Math.PI * 2)
