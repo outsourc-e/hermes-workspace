@@ -10,6 +10,7 @@ export type EnhancedFeature =
   | 'jobs'
   | 'mcp'
   | 'mcpFallback'
+  | 'kanban'
 
 const FEATURE_LABELS: Record<EnhancedFeature, string> = {
   sessions: 'Sessions',
@@ -19,6 +20,7 @@ const FEATURE_LABELS: Record<EnhancedFeature, string> = {
   jobs: 'Jobs',
   mcp: 'MCP Servers',
   mcpFallback: 'MCP Servers (config fallback)',
+  kanban: 'Kanban (Hermes plugin)',
 }
 
 function normalizeFeature(
@@ -32,7 +34,8 @@ function normalizeFeature(
     normalized === 'config' ||
     normalized === 'jobs' ||
     normalized === 'mcp' ||
-    normalized === 'mcpfallback'
+    normalized === 'mcpfallback' ||
+    normalized === 'kanban'
   ) {
     return normalized === 'mcpfallback' ? 'mcpFallback' : normalized
   }

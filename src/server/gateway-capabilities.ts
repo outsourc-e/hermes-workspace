@@ -179,6 +179,15 @@ export type EnhancedCapabilities = {
    * placeholder instead of failing mid-action. See #262.
    */
   conductor: boolean
+  /**
+   * True when the dashboard exposes `/api/plugins/kanban/board` (the native
+   * Hermes kanban plugin shipped upstream). When available, the workspace's
+   * /swarm kanban surface can sync with the dashboard's kanban DB so both
+   * UIs read/write the same SQLite source of truth instead of running
+   * separate stores. When false, the workspace falls back to its local
+   * file-backed swarm-kanban store. See v2.3.0 plan.
+   */
+  kanban: boolean
 }
 
 export type DashboardCapabilities = {
@@ -224,6 +233,7 @@ let capabilities: GatewayCapabilities = {
   mcp: false,
   mcpFallback: false,
   conductor: false,
+  kanban: false,
   dashboard: {
     available: false,
     url: CLAUDE_DASHBOARD_URL,
@@ -606,6 +616,30 @@ async function probeConductor(dashboardAvailable: boolean): Promise<boolean> {
   }
 }
 
+/**
+ * Lightweight probe for the upstream Hermes kanban plugin. When the dashboard
+ * exposes `/api/plugins/kanban/board` we assume the kanban plugin is loaded
+ * and the workspace can sync its /swarm kanban surface with the dashboard's
+ * SQLite-backed kanban DB. Mounted by hermes_cli.web_server
+ * `_mount_plugin_api_routes()`. See v2.3.0 plan.
+ */
+async function probeKanban(dashboardAvailable: boolean): Promise<boolean> {
+  if (!dashboardAvailable) return false
+  try {
+    const res = await dashboardFetch('/api/plugins/kanban/board', {
+      method: 'GET',
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+    if (res.status === 404 || res.status === 405) return false
+    // The plugin route is unauthenticated by design (loopback-only), so
+    // 200 is the normal success. Some auth setups may return 401 — still
+    // means the route exists.
+    return true
+  } catch {
+    return false
+  }
+}
+
 
 // Vanilla hermes-agent 0.10.0 satisfies: health, chatCompletions, models, streaming,
 // sessions, skills, config, jobs. Dashboard-only endpoints (themes/plugins) and the
@@ -761,6 +795,7 @@ export async function probeGateway(options?: {
 
     // Conductor probe runs after dashboard probe.
     const conductor = await probeConductor(dashboard.available)
+    const kanban = await probeKanban(dashboard.available)
 
     // Phase 1.5 fallback: when native /api/mcp is missing but the dashboard
     // exposes `config.mcp_servers` AND we are loopback-only, allow a config
@@ -791,6 +826,7 @@ export async function probeGateway(options?: {
       mcp,
       mcpFallback,
       conductor,
+      kanban,
       dashboard,
     }
     lastProbeAt = Date.now()
