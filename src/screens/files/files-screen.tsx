@@ -108,6 +108,11 @@ function isMarkdownFile(name: string): boolean {
   return ext === 'md' || ext === 'mdx'
 }
 
+function isHtmlFile(name: string): boolean {
+  const ext = getExt(name)
+  return ext === 'html' || ext === 'htm'
+}
+
 function isEditableFile(name: string): boolean {
   return !isImageFile(name)
 }
@@ -686,6 +691,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   const ext = getExt(fileName)
   const isImage = isImageFile(fileName)
   const isMd = isMarkdownFile(fileName)
+  const isHtml = isHtmlFile(fileName)
   const isCode = isCodeFile(fileName)
   const isEditable = isEditableFile(fileName)
 
@@ -819,13 +825,13 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {isMd && !isImage && (
+        {(isMd || isHtml) && !isImage && (
           <Button
             size="sm"
             variant="outline"
             onClick={() => setRawMode((v) => !v)}
           >
-            {rawMode ? 'Preview' : 'Raw'}
+            {rawMode ? (isHtml ? 'Preview HTML' : 'Preview') : (isHtml ? 'Raw HTML' : 'Raw')}
           </Button>
         )}
         {isEditable && (
@@ -932,6 +938,28 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
             </ScrollAreaScrollbar>
             <ScrollAreaCorner />
           </ScrollAreaRoot>
+          {footer}
+        </div>
+      </>
+    )
+  }
+
+  // ── HTML preview ───────────────────────────────────────────────────────────
+
+  if (isHtml && !rawMode) {
+    return (
+      <>
+        {diffModal}
+        <div className="flex h-full flex-col">
+          {header}
+          <div className="min-h-0 flex-1 bg-white">
+            <iframe
+              title={`HTML preview: ${selectedEntry.name}`}
+              srcDoc={content}
+              sandbox="allow-same-origin"
+              className="h-full w-full border-0 bg-white"
+            />
+          </div>
           {footer}
         </div>
       </>
