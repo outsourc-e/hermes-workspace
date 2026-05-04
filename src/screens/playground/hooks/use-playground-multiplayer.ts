@@ -163,10 +163,19 @@ export function usePlaygroundMultiplayer({
     })
   }, [])
 
-  // Open WebSocket transport (optional, controlled by VITE_PLAYGROUND_WS_URL)
+  // Open WebSocket transport. URL precedence:
+  //   1. window.__HERMES_PLAYGROUND_WS_URL (runtime override; survives stale bundles)
+  //   2. VITE_PLAYGROUND_WS_URL (build-time env)
+  //   3. Hardcoded public hub fallback (so shipping the public Cloudflare hub
+  //      always Just Works even if the .env didn't propagate to the dev bundle)
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const url = (import.meta as any).env?.VITE_PLAYGROUND_WS_URL as string | undefined
+    const url =
+      (window as any).__HERMES_PLAYGROUND_WS_URL ||
+      ((import.meta as any).env?.VITE_PLAYGROUND_WS_URL as string | undefined) ||
+      'wss://hermes-playground-ws.myaurora-agi.workers.dev/playground'
+    // eslint-disable-next-line no-console
+    console.log('[Hermes MP] connecting to WS:', url)
     if (!url) return
     let ws: WebSocket | null = null
     let stop = false
