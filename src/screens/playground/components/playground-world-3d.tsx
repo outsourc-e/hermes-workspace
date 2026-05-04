@@ -2952,9 +2952,22 @@ export function PlaygroundWorld3D({
       <Canvas
         shadows
         camera={{ position: [10, 12, 10], fov: 45 }}
-        dpr={[1, 1.5]}
+        // Adaptive DPR: matches device pixel ratio up to 1.5 for crispness on retina,
+        // drops to 1 on lower-end devices to keep frame times under 16ms.
+        dpr={[1, Math.min(1.5, typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1)]}
+        // Render on demand when no animation needed reduces CPU when idle on title screen.
+        // Game loop still runs because useFrame components subscribe.
+        frameloop="always"
+        performance={{ min: 0.5 }}
         style={{ width: '100%', height: '100%' }}
-        gl={{ antialias: true, alpha: false, powerPreference: 'default', preserveDrawingBuffer: true }}
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance',
+          preserveDrawingBuffer: true,
+          stencil: false,
+          depth: true,
+        }}
       >
         <Suspense fallback={null}>
           <EffectComposer enableNormalPass={false}>

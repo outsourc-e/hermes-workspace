@@ -1,5 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { NPC_DIALOG, type DialogChoice } from '../lib/npc-dialog'
+
+// Tiny in-memory cache for ASCII portraits.
+const ASCII_PORTRAIT_CACHE: Record<string, string> = {}
+function useAsciiPortrait(npcId: string | null) {
+  const [art, setArt] = useState<string | null>(null)
+  useEffect(() => {
+    if (!npcId) { setArt(null); return }
+    if (ASCII_PORTRAIT_CACHE[npcId] !== undefined) {
+      setArt(ASCII_PORTRAIT_CACHE[npcId] || null)
+      return
+    }
+    fetch(`/ascii-portraits/${npcId}.txt`)
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((t) => {
+        ASCII_PORTRAIT_CACHE[npcId] = t.trim()
+        setArt(t.trim() || null)
+      })
+      .catch(() => { ASCII_PORTRAIT_CACHE[npcId] = ''; setArt(null) })
+  }, [npcId])
+  return art
+}
 import type {
   PlaygroundItemId,
   PlaygroundSkillId,
@@ -52,6 +73,7 @@ export function PlaygroundDialog({
     }
   }, [chatLog.length, askingLLM])
 
+  const asciiArt = useAsciiPortrait(npcId)
   if (!npcId) return null
   const npc = NPC_DIALOG[npcId]
   if (!npc) return null
@@ -166,6 +188,20 @@ export function PlaygroundDialog({
             <div className="text-base font-bold" style={{ color: npc.color }}>
               {npc.name}
             </div>
+            {asciiArt && (
+              <pre
+                className="hidden rounded border bg-black/30 px-2 py-1 text-[8px] leading-[1.05] md:block"
+                style={{
+                  color: npc.color,
+                  borderColor: `${npc.color}55`,
+                  fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
+                  whiteSpace: 'pre',
+                  margin: 0,
+                }}
+              >
+                {asciiArt}
+              </pre>
+            )}
             {offlineMode && (
               <span className="rounded bg-amber-300/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-200">
                 scripted mode

@@ -766,6 +766,21 @@ function TitleScreen({
             >
               HermesWorld
             </h1>
+            {/* ASCII signature — distinctive, hand-crafted feel */}
+            <pre
+              className="mt-3 hidden text-[8px] leading-[1.05] md:block"
+              style={{
+                color: 'rgba(245,217,122,0.45)',
+                fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
+                whiteSpace: 'pre',
+                margin: 0,
+                textShadow: '0 0 8px rgba(245,217,122,0.3)',
+              }}
+            >{`_   _                             __        __         _     _ 
+| | | | ___ _ __ _ __ ___   ___  __\\ \\      / /__  _ __| | __| |
+| |_| |/ _ \\ '__| '_ \` _ \\ / _ \\/ __\\ \\ /\\ / / _ \\| '__| |/ _\` |
+|  _  |  __/ |  | | | | | |  __/\\__ \\\\ V  V / (_) | |  | | (_| |
+|_| |_|\\___|_|  |_| |_| |_|\\___||___/ \\_/\\_/ \\___/|_|  |_|\\__,_|`}</pre>
             <div
               className="mt-2 text-[10px] font-bold uppercase tracking-[0.45em]"
               style={{ color: 'rgba(245, 217, 122, 0.7)' }}
@@ -1092,7 +1107,7 @@ function PlaygroundHelpHud({ worldName }: { worldName: string }) {
       </button>
       {open && (
         <div className="rounded-xl border border-white/10 bg-black/85 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-white/80 backdrop-blur-xl">
-          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1 Strike · 2 Dash · 3 Bolt · E talk · J journal · M map · T chat
+          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1 Strike · 2 Dash · 3 Bolt · 4 Summon · E talk · J journal · M map · T chat · F focus · Drag mouse to rotate camera
         </div>
       )}
     </div>
@@ -1114,8 +1129,62 @@ function PlaygroundUtilityDock({
   onToggleNarration: () => void
   narrationMuted: boolean
 }) {
+  const [isFullscreen, setIsFullscreen] = useState(
+    typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false,
+  )
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onFs)
+    return () => document.removeEventListener('fullscreenchange', onFs)
+  }, [])
+  const captureScreenshot = () => {
+    const canvas = document.querySelector('canvas')
+    if (!canvas) return
+    try {
+      const dataUrl = (canvas as HTMLCanvasElement).toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = dataUrl
+      a.download = `hermesworld-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
+      a.click()
+    } catch {}
+  }
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        await document.documentElement.requestFullscreen()
+      }
+    } catch {}
+  }
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+    } catch {}
+  }
   return (
     <div className="pointer-events-auto fixed bottom-[78px] right-3 z-[70] flex flex-col gap-1.5">
+      <button
+        onClick={captureScreenshot}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
+        title="Screenshot the world (PNG)"
+      >
+        📸
+      </button>
+      <button
+        onClick={toggleFullscreen}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
+        title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+      >
+        {isFullscreen ? '⤢' : '⛶'}
+      </button>
+      <button
+        onClick={copyShareLink}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
+        title="Copy share link"
+      >
+        🔗
+      </button>
       <button
         onClick={onReplayNarration}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
