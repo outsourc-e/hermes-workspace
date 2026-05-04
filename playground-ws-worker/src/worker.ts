@@ -1,16 +1,20 @@
 /**
  * Hermes Playground multiplayer hub — Cloudflare Worker + Durable Object.
  *
- * One Durable Object instance per "room" (currently global). Stateless relay
- * that mirrors the Node sidecar (`scripts/playground-ws.mjs`) protocol so
- * the client (`use-playground-multiplayer.ts`) connects unchanged.
+ * One Durable Object instance per "room" (currently global).
  *
- * v1 hardening (2026-05-03):
+ * v2 (2026-05-04): Hibernation API — uses state.acceptWebSocket() so the DO
+ * can hibernate when idle without killing live WebSocket connections. Without
+ * this, the DO worker would hibernate after ~10s of inactivity and silently
+ * close every WS, causing the "everyone disappears" bug for users on the
+ * title screen or with bg tabs.
+ *
+ * v1 hardening:
  *   - World-scoped fan-out: only broadcast presence to clients in same world.
  *   - Server pushes `count` events on changes (HUD doesn't need to poll).
  *   - Per-socket rate limit: 30 msgs/sec token bucket (drop excess).
  *   - Dedupe: skip relaying identical presence within 50ms per player.
- *   - Stale prune at 5s (matches client).
+ *   - Stale prune at 12s.
  *
  * Endpoints
  *   GET  /playground   — WebSocket upgrade (presence + chat fan-out)
@@ -35,10 +39,10 @@ interface PresenceMsg {
   [key: string]: unknown
 }
 
-const STALE_AFTER_MS = 12000 // bumped from 5000 — forgive bg-tab throttling so avatars don't flicker
+const STALE_AFTER_MS = 12000
 const CHAT_RING_MAX = 50
 const PRESENCE_DEDUPE_MS = 50
-const RATE_BUCKET_CAP = 30 // msgs
+const RATE_BUCKET_CAP = 30
 const RATE_REFILL_PER_SEC = 30
 
 export default {
@@ -49,7 +53,9 @@ export default {
   },
 }
 
-interface SocketMeta {
+// Per-socket meta is attached via state.serializeAttachment so it survives
+// hibernation. We persist only what we need to route messages.
+interface SocketAttach {
   playerId?: string
   world?: string
   bucket: number
@@ -59,13 +65,10 @@ interface SocketMeta {
 
 export class PlaygroundHub {
   state: DurableObjectState
-  sockets = new Set<WebSocket>()
-  socketMeta = new WeakMap<WebSocket, SocketMeta>()
   presence = new Map<string, PresenceMsg & { ts: number }>()
   chatRing: any[] = []
   peakToday = 0
   peakDay = ''
-  // Sliding count for push notifications when set changes.
   lastBroadcastCount = -1
 
   constructor(state: DurableObjectState) {
@@ -76,25 +79,44 @@ export class PlaygroundHub {
         this.peakToday = stored.peak
         this.peakDay = stored.day
       }
+      // Restore presence map from storage so we survive hibernation.
+      const presStored = await this.state.storage.get<Array<[string, PresenceMsg & { ts: number }]>>('presence')
+      if (presStored) this.presence = new Map(presStored)
+      const chatStored = await this.state.storage.get<any[]>('chatRing')
+      if (chatStored) this.chatRing = chatStored
     })
     this.state.blockConcurrencyWhile(async () => {
       this.scheduleAlarm()
     })
   }
 
+  // ───── Persistence helpers ─────
+  async persistPresence() {
+    try {
+      await this.state.storage.put('presence', [...this.presence.entries()])
+    } catch {}
+  }
+
+  async persistChat() {
+    try {
+      await this.state.storage.put('chatRing', this.chatRing)
+    } catch {}
+  }
+
+  // ───── Alarm-driven prune ─────
   async scheduleAlarm() {
     const cur = await this.state.storage.getAlarm()
     if (!cur) await this.state.storage.setAlarm(Date.now() + 1000)
   }
 
   async alarm() {
-    this.pruneStale()
-    if (this.sockets.size > 0) {
+    await this.pruneStale()
+    if (this.state.getWebSockets().length > 0 || this.presence.size > 0) {
       await this.state.storage.setAlarm(Date.now() + 1000)
     }
   }
 
-  pruneStale() {
+  async pruneStale() {
     const cutoff = Date.now() - STALE_AFTER_MS
     let removed = false
     for (const [id, p] of this.presence) {
@@ -106,16 +128,38 @@ export class PlaygroundHub {
         removed = true
       }
     }
-    if (removed) this.maybeBroadcastCount()
+    if (removed) {
+      await this.persistPresence()
+      this.maybeBroadcastCount()
+    }
+  }
+
+  // ───── Hibernation-safe socket helpers ─────
+  attach(socket: WebSocket): SocketAttach {
+    let attached = socket.deserializeAttachment() as SocketAttach | undefined
+    if (!attached) {
+      attached = {
+        bucket: RATE_BUCKET_CAP,
+        bucketTs: Date.now(),
+        lastPresenceTs: 0,
+      }
+      socket.serializeAttachment(attached)
+    }
+    return attached
+  }
+
+  saveAttach(socket: WebSocket, a: SocketAttach) {
+    socket.serializeAttachment(a)
   }
 
   worldOf(socket: WebSocket): string | undefined {
-    return this.socketMeta.get(socket)?.world
+    const a = socket.deserializeAttachment() as SocketAttach | undefined
+    return a?.world
   }
 
   broadcast(origin: WebSocket | null, data: any, opts?: { world?: string }) {
     const payload = typeof data === 'string' ? data : JSON.stringify(data)
-    for (const sock of this.sockets) {
+    for (const sock of this.state.getWebSockets()) {
       if (sock === origin) continue
       if (opts?.world && this.worldOf(sock) && this.worldOf(sock) !== opts.world) continue
       try { sock.send(payload) } catch {}
@@ -159,13 +203,12 @@ export class PlaygroundHub {
     })
   }
 
-  /** Push a count update to all sockets when the count actually changed. */
   maybeBroadcastCount() {
     const live = this.presence.size
     if (live === this.lastBroadcastCount) return
     this.lastBroadcastCount = live
     const payload = this.countMessage()
-    for (const sock of this.sockets) {
+    for (const sock of this.state.getWebSockets()) {
       try { sock.send(payload) } catch {}
     }
   }
@@ -180,23 +223,22 @@ export class PlaygroundHub {
     }
   }
 
-  // Token bucket: returns true if allowed, false if rate-limited.
-  spend(meta: SocketMeta): boolean {
+  spend(a: SocketAttach): boolean {
     const now = Date.now()
-    const dt = (now - meta.bucketTs) / 1000
-    meta.bucket = Math.min(RATE_BUCKET_CAP, meta.bucket + dt * RATE_REFILL_PER_SEC)
-    meta.bucketTs = now
-    if (meta.bucket < 1) return false
-    meta.bucket -= 1
+    const dt = (now - a.bucketTs) / 1000
+    a.bucket = Math.min(RATE_BUCKET_CAP, a.bucket + dt * RATE_REFILL_PER_SEC)
+    a.bucketTs = now
+    if (a.bucket < 1) return false
+    a.bucket -= 1
     return true
   }
 
+  // ───── Fetch handler ─────
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
-    const cors = {
-      'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'GET',
-      'access-control-allow-headers': 'content-type',
+    const cors: HeadersInit = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'content-type',
     }
 
     if (request.method === 'OPTIONS') {
@@ -223,99 +265,111 @@ export class PlaygroundHub {
       }
       const pair = new WebSocketPair()
       const [client, server] = [pair[0], pair[1]]
-      this.handleSocket(server)
+      // KEY CHANGE: state.acceptWebSocket allows the DO to hibernate without
+      // killing the WS. Messages route to webSocketMessage() below.
+      this.state.acceptWebSocket(server)
+      this.attach(server)
+      await this.scheduleAlarm()
+
+      // Send initial bootstrap (hello + count + presence snapshot + chat ring).
+      try {
+        server.send(JSON.stringify({ kind: 'hello', server: 'hermes.playground.cf-worker.v2-hibernation', ts: Date.now() }))
+        server.send(this.countMessage())
+        for (const p of this.presence.values()) {
+          try { server.send(JSON.stringify(p)) } catch {}
+        }
+        for (const c of this.chatRing) {
+          try { server.send(JSON.stringify(c)) } catch {}
+        }
+      } catch {}
+
       return new Response(null, { status: 101, webSocket: client })
     }
 
     return new Response('not found', { status: 404, headers: cors })
   }
 
-  async handleSocket(socket: WebSocket) {
-    socket.accept()
-    this.sockets.add(socket)
-    this.socketMeta.set(socket, {
-      bucket: RATE_BUCKET_CAP,
-      bucketTs: Date.now(),
-      lastPresenceTs: 0,
-    })
-    await this.scheduleAlarm()
-
+  // ───── Hibernation event handlers ─────
+  async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer) {
+    const meta = this.attach(socket)
+    if (!this.spend(meta)) {
+      this.saveAttach(socket, meta)
+      return
+    }
+    let msg: any
     try {
-      socket.send(JSON.stringify({ kind: 'hello', server: 'hermes.playground.cf-worker.v1', ts: Date.now() }))
-      // Send current count baseline immediately for HUD.
-      socket.send(this.countMessage())
-      // bootstrap presence snapshot
-      for (const p of this.presence.values()) {
-        try { socket.send(JSON.stringify(p)) } catch {}
-      }
-      for (const c of this.chatRing) {
-        try { socket.send(JSON.stringify(c)) } catch {}
-      }
-    } catch {}
+      msg = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw))
+    } catch {
+      this.saveAttach(socket, meta)
+      return
+    }
+    if (!msg || typeof msg.kind !== 'string') {
+      this.saveAttach(socket, meta)
+      return
+    }
 
-    socket.addEventListener('message', async (evt) => {
-      const meta = this.socketMeta.get(socket)
-      if (!meta) return
-      if (!this.spend(meta)) return // dropped (rate limited)
-      let msg: any
-      try { msg = JSON.parse(typeof evt.data === 'string' ? evt.data : new TextDecoder().decode(evt.data as ArrayBuffer)) } catch { return }
-      if (!msg || typeof msg.kind !== 'string') return
-
-      if (msg.kind === 'presence' && typeof msg.id === 'string') {
-        const now = Date.now()
-        if (now - meta.lastPresenceTs < PRESENCE_DEDUPE_MS) return
-        meta.lastPresenceTs = now
-        const world = (msg.world || msg.worldId) as string | undefined
-        meta.playerId = msg.id
-        meta.world = world
-        const wire: PresenceMsg & { ts: number } = { ...msg, ts: now }
-        const wasNew = !this.presence.has(msg.id)
-        this.presence.set(msg.id, wire)
-        if (wasNew) {
-          await this.bumpPeak()
-          this.maybeBroadcastCount()
-        }
-        // World-scoped fan-out
-        this.broadcast(socket, wire, { world })
-      } else if (msg.kind === 'chat' && typeof msg.id === 'string') {
-        // Truncate text defensively
-        if (typeof msg.text === 'string' && msg.text.length > 240) {
-          msg.text = msg.text.slice(0, 240)
-        }
-        this.chatRing.push(msg)
-        if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
-        const world = (msg.world || msg.worldId) as string | undefined
-        this.broadcast(socket, msg, { world })
-      } else if (msg.kind === 'leave' && typeof msg.id === 'string') {
-        const prior = this.presence.get(msg.id)
-        const world = (prior?.world || prior?.worldId) as string | undefined
-        this.presence.delete(msg.id)
-        this.broadcast(socket, msg, { world })
+    if (msg.kind === 'presence' && typeof msg.id === 'string') {
+      const now = Date.now()
+      if (now - meta.lastPresenceTs < PRESENCE_DEDUPE_MS) {
+        this.saveAttach(socket, meta)
+        return
+      }
+      meta.lastPresenceTs = now
+      const world = (msg.world || msg.worldId) as string | undefined
+      meta.playerId = msg.id
+      meta.world = world
+      this.saveAttach(socket, meta)
+      const wire: PresenceMsg & { ts: number } = { ...msg, ts: now }
+      const wasNew = !this.presence.has(msg.id)
+      this.presence.set(msg.id, wire)
+      if (wasNew) {
+        await this.bumpPeak()
         this.maybeBroadcastCount()
       }
-    })
+      // Persist periodically (every ~5 presence updates per id is enough).
+      // We keep this synchronous-ish for correctness on hibernation.
+      await this.persistPresence()
+      this.broadcast(socket, wire, { world })
+    } else if (msg.kind === 'chat' && typeof msg.id === 'string') {
+      if (typeof msg.text === 'string' && msg.text.length > 240) {
+        msg.text = msg.text.slice(0, 240)
+      }
+      this.chatRing.push(msg)
+      if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
+      await this.persistChat()
+      const world = (msg.world || msg.worldId) as string | undefined
+      this.broadcast(socket, msg, { world })
+      this.saveAttach(socket, meta)
+    } else if (msg.kind === 'leave' && typeof msg.id === 'string') {
+      const prior = this.presence.get(msg.id)
+      const world = (prior?.world || prior?.worldId) as string | undefined
+      this.presence.delete(msg.id)
+      await this.persistPresence()
+      this.broadcast(socket, msg, { world })
+      this.maybeBroadcastCount()
+      this.saveAttach(socket, meta)
+    } else {
+      this.saveAttach(socket, meta)
+    }
+  }
 
-    const cleanup = () => {
-      this.sockets.delete(socket)
-      const meta = this.socketMeta.get(socket)
-      this.socketMeta.delete(socket)
-      // Do NOT immediately broadcast 'leave' on socket close — the client may
-      // be reconnecting transparently (browser idle hibernation, network blip,
-      // bg-tab throttling). Let the alarm-driven pruneStale handle it after
-      // STALE_AFTER_MS (12s) of no presence packets. This eliminates the
-      // 'avatar disappeared then came back' flicker that was happening every
-      // time a tab momentarily lost focus.
-      if (meta?.playerId && this.presence.has(meta.playerId)) {
-        // Mark presence as 'aging' by setting an old ts so prune picks it up
-        // if no reconnect happens within STALE_AFTER_MS.
-        const cur = this.presence.get(meta.playerId)
-        if (cur) {
-          ;(cur as any).ts = Date.now() - (STALE_AFTER_MS / 2)
-          this.presence.set(meta.playerId, cur)
-        }
+  async webSocketClose(socket: WebSocket, _code: number, _reason: string, _wasClean: boolean) {
+    // Hibernation API closes don't necessarily mean the user left — they could
+    // be the DO hibernating mid-session. Just age the presence; the alarm prune
+    // will clean it up after STALE_AFTER_MS if no reconnect happens.
+    const meta = socket.deserializeAttachment() as SocketAttach | undefined
+    if (meta?.playerId && this.presence.has(meta.playerId)) {
+      const cur = this.presence.get(meta.playerId)
+      if (cur) {
+        ;(cur as any).ts = Date.now() - (STALE_AFTER_MS / 2)
+        this.presence.set(meta.playerId, cur)
+        await this.persistPresence()
       }
     }
-    socket.addEventListener('close', cleanup)
-    socket.addEventListener('error', cleanup)
+  }
+
+  async webSocketError(socket: WebSocket, _err: unknown) {
+    // Same treatment as close — let prune handle the actual disappearance.
+    return this.webSocketClose(socket, 0, '', false)
   }
 }
