@@ -24,14 +24,15 @@ export function PlaygroundHud({
   const { playerProfile } = state
   return (
     <>
-      <div className="pointer-events-auto fixed left-3 top-20 z-[70] flex max-w-[340px] flex-col items-start gap-2 md:left-[104px] md:top-3">
+      {/* Combined player card: avatar + name + level + title + HP/MP/SP/XP */}
+      <div className="pointer-events-auto fixed left-3 top-3 z-[70] flex max-w-[360px] flex-col items-start gap-2">
         <div
-          className="rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/90 to-black/85 px-3 py-2 text-white shadow-2xl backdrop-blur-xl"
+          className="rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 px-3 py-2.5 text-white shadow-2xl backdrop-blur-xl"
           style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-full border-2 text-xs font-bold"
+              className="flex h-12 w-12 items-center justify-center rounded-full border-2 text-sm font-bold"
               style={{
                 borderColor: worldAccent,
                 background: `${worldAccent}22`,
@@ -42,35 +43,38 @@ export function PlaygroundHud({
               {playerProfile.level}
             </div>
             <div className="leading-tight">
-              <div className="text-[12px] font-bold">
+              <div className="text-[13px] font-bold">
                 {playerProfile.displayName || 'New Builder'}
               </div>
-              <div className="max-w-[210px] truncate text-[9px] uppercase tracking-[0.16em] text-white/45">
+              <div className="max-w-[220px] truncate text-[9px] uppercase tracking-[0.16em] text-white/45">
                 {playerProfile.titlesUnlocked.at(-1) || 'Training Grounds'}
+              </div>
+              <div className="mt-0.5 text-[9px] text-white/40">
+                XP {playerProfile.xp} · next {Math.max(0, levelProgress.needed - levelProgress.current)}
               </div>
             </div>
           </div>
+          <div className="mt-2.5 flex items-center justify-between gap-1.5">
+            <Orb label="HP" v={state.hp} m={state.hpMax} color="#ef4444" />
+            <Orb label="MP" v={state.mp} m={state.mpMax} color="#3b82f6" />
+            <Orb label="SP" v={state.sp} m={state.spMax} color="#10b981" />
+            <Orb label="XP" v={levelProgress.current} m={levelProgress.needed} color="#22d3ee" />
+          </div>
         </div>
 
+        {/* Compact objective panel directly under the player card */}
         <div
           className="w-full rounded-2xl border border-white/10 bg-black/70 px-3 py-2 shadow-xl backdrop-blur-xl"
           style={{ borderColor: `${worldAccent}33` }}
         >
           <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Current Objective</div>
-          <div className="mt-1 text-[13px] font-bold" style={{ color: worldAccent }}>
+          <div className="mt-0.5 text-[12px] font-bold" style={{ color: worldAccent }}>
             {activeQuestTitle}
           </div>
-          <div className="mt-1 text-[11px] text-white/88">{objectiveLabel}</div>
+          <div className="mt-0.5 text-[11px] leading-snug text-white/85">{objectiveLabel}</div>
           {objectiveHint && (
-            <div className="mt-1 text-[10px] text-white/55">{objectiveHint}</div>
+            <div className="mt-0.5 text-[10px] text-white/55">{objectiveHint}</div>
           )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Orb label="HP" v={state.hp} m={state.hpMax} color="#ef4444" />
-          <Orb label="MP" v={state.mp} m={state.mpMax} color="#3b82f6" />
-          <Orb label="SP" v={state.sp} m={state.spMax} color="#10b981" />
-          <Orb label="XP" v={levelProgress.current} m={levelProgress.needed} color="#22d3ee" secondary={`${playerProfile.xp}`} />
         </div>
       </div>
 

@@ -8,7 +8,6 @@ import { PlaygroundHud } from './components/playground-hud'
 import { PlaygroundJournal } from './components/playground-journal'
 import { PlaygroundMap } from './components/playground-map'
 import { PlaygroundMinimap } from './components/playground-minimap'
-import { PlaygroundOnlineChip } from './components/playground-online-chip'
 import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
@@ -188,7 +187,7 @@ export function PlaygroundScreen() {
         const line = bot.lines[Math.floor(Math.random() * bot.lines.length)]
         const msg: ChatMessage = {
           id: `${Date.now()}-${Math.random()}`,
-          authorId: bot.id,
+          authorId: `bot:${bot.id}`,
           authorName: bot.name,
           body: line,
           ts: Date.now(),
@@ -537,7 +536,7 @@ export function PlaygroundScreen() {
           worldAccent={WORLD_META[world].accent}
           toasts={rpg.toasts}
         />
-        <PlaygroundOnlineChip accent={WORLD_META[world].accent} />
+        {/* Online chip removed — the chat header now shows live player count + NPC count. */}
         {!focusMode && <NearbyBuildersChip players={remotePlayersInZone} />}
         {!focusMode && (
           <PlaygroundSidePanel
@@ -567,16 +566,21 @@ export function PlaygroundScreen() {
             onOpenChange={setMobileMenuOpen}
           />
         )}
-        {/* Focus mode toggle (always visible, sits below minimap) */}
+        {/* Focus mode toggle — eyeball icon (sits in the gap between minimap and quest tracker) */}
         <button
           type="button"
           onClick={() => setFocusMode((v) => !v)}
+          aria-label={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
           title={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
-          className="pointer-events-auto fixed right-3 top-[200px] z-[71] hidden items-center gap-1.5 rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-xl backdrop-blur-xl md:flex"
-          style={{ boxShadow: focusMode ? `0 0 12px ${WORLD_META[world].accent}66` : undefined }}
+          className="pointer-events-auto fixed right-3 top-[210px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[16px] text-white shadow-xl backdrop-blur-xl md:flex"
+          style={{
+            boxShadow: focusMode ? `0 0 14px ${WORLD_META[world].accent}88` : '0 8px 22px rgba(0,0,0,.55)',
+            borderColor: focusMode ? WORLD_META[world].accent : 'rgba(255,255,255,0.15)',
+          }}
         >
-          <span style={{ color: focusMode ? WORLD_META[world].accent : 'white' }}>{focusMode ? '◉' : '○'}</span>
-          <span>{focusMode ? 'Focus on' : 'Focus'}</span>
+          <span aria-hidden="true" style={{ filter: focusMode ? 'none' : 'grayscale(0.4)' }}>
+            {focusMode ? '👁️' : '👁'}
+          </span>
         </button>
         <button
           type="button"

@@ -79,7 +79,7 @@ export function PlaygroundSidePanel({
       {open && <div className="absolute inset-0 bg-black/55 backdrop-blur-sm md:hidden" onClick={() => onOpenChange?.(false)} />}
       {activeQuest && (
         <div
-          className="pointer-events-auto fixed left-3 right-3 top-3 z-[76] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl md:left-auto md:right-3 md:top-[210px] md:w-[280px]"
+          className="pointer-events-auto fixed left-3 right-3 top-3 z-[76] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl md:left-auto md:right-3 md:top-[260px] md:w-[280px]"
           style={{ borderColor: `${worldAccent}55`, boxShadow: `0 0 16px ${worldAccent}33, 0 8px 22px rgba(0,0,0,.55)` }}
         >
           <div className="mb-1 flex items-center justify-between">
@@ -117,7 +117,7 @@ export function PlaygroundSidePanel({
 
       {(open || typeof window === 'undefined') && (
         <div
-          className="pointer-events-auto fixed bottom-4 left-3 right-3 top-[122px] z-[76] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl md:bottom-auto md:left-auto md:right-3 md:top-[388px] md:block md:w-[280px]"
+          className="pointer-events-auto fixed bottom-4 left-3 right-3 top-[122px] z-[76] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl md:bottom-auto md:left-auto md:right-3 md:top-[438px] md:block md:w-[280px]"
           style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.6)` }}
         >
         <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 md:hidden">

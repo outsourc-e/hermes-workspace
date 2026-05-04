@@ -25,7 +25,32 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length])
-  const onlineCount = 1 + botsFor(worldId).length
+  // Live online count from the multiplayer hub (dispatched by playground-world-3d).
+  // Fallback: include bots so the chat doesn't say "0 online" while you're offline.
+  const [serverOnline, setServerOnline] = useState<number | null>(null)
+  const [transport, setTransport] = useState<string | null>(null)
+  useEffect(() => {
+    const onCount = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as { online?: number } | undefined
+      if (typeof detail?.online === 'number') setServerOnline(detail.online)
+    }
+    const onTransport = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as string | undefined
+      if (detail) setTransport(detail)
+    }
+    window.addEventListener('hermes-playground-count', onCount)
+    window.addEventListener('hermes-playground-transport', onTransport)
+    return () => {
+      window.removeEventListener('hermes-playground-count', onCount)
+      window.removeEventListener('hermes-playground-transport', onTransport)
+    }
+  }, [])
+  const liveConnected = transport === 'ws' || transport === 'both'
+  const npcCount = botsFor(worldId).length
+  const onlineCount = serverOnline != null && liveConnected ? serverOnline : 1 + npcCount
+  const onlineLabel = serverOnline != null && liveConnected
+    ? `${onlineCount} player${onlineCount === 1 ? '' : 's'}`
+    : `${onlineCount} online`
   return (
     <div
       className="pointer-events-auto fixed bottom-3 left-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/65 text-white shadow-2xl backdrop-blur-xl"
@@ -33,8 +58,12 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/65">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
-          Chat · {onlineCount} online
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ background: liveConnected ? '#34d399' : '#facc15' }}
+          />
+          Chat · {onlineLabel}
+          {npcCount > 0 && <span className="text-white/35"> · {npcCount} NPC</span>}
         </div>
         <button
           onClick={onToggle}
@@ -49,14 +78,22 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
             {messages.length === 0 ? (
               <div className="text-center text-white/40">No messages yet — say hi 👋</div>
             ) : (
-              messages.map((m) => (
-                <div key={m.id} className="mb-1.5">
-                  <span className="font-semibold" style={{ color: m.color ?? 'white' }}>
-                    {m.authorName}:
-                  </span>{' '}
-                  <span className="opacity-90">{m.body}</span>
-                </div>
-              ))
+              messages.map((m) => {
+                const isBot = typeof m.authorId === 'string' && m.authorId.startsWith('bot:')
+                return (
+                  <div key={m.id} className="mb-1.5">
+                    {isBot && (
+                      <span className="mr-1 rounded bg-purple-400/20 px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-purple-200">
+                        NPC
+                      </span>
+                    )}
+                    <span className="font-semibold" style={{ color: m.color ?? 'white' }}>
+                      {m.authorName}:
+                    </span>{' '}
+                    <span className="opacity-90">{m.body}</span>
+                  </div>
+                )
+              })
             )}
           </div>
           <form
