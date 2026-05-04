@@ -682,13 +682,8 @@ export function PlaygroundScreen() {
         />
         <ForgeArrivalOverlay open={forgeIntro.open} flavor={forgeIntro.flavor} loading={forgeIntro.loading} />
         <LowHpOverlay active={lowHpActive} />
-        <div
-          className="pointer-events-none fixed inset-0 z-[95] transition-opacity duration-300"
-          style={{
-            background: 'radial-gradient(circle at center, transparent 20%, #000 80%)',
-            opacity: transitioning ? 1 : 0,
-          }}
-        />
+        <CameraPresetToast />
+        <TransitionLoadingScreen active={transitioning} worldName={WORLD_META[world].name} />
       </div>
     </PlaygroundErrorBoundary>
   )
@@ -1087,6 +1082,106 @@ function LowHpOverlay({ active }: { active: boolean }) {
           50% { opacity: 1; }
         }
       `}</style>
+    </div>
+  )
+}
+
+/** Brief toast that flashes when the user cycles cinematic camera presets via Tab. */
+function CameraPresetToast() {
+  const [name, setName] = useState<string | null>(null)
+  useEffect(() => {
+    const onPreset = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as string | undefined
+      if (!detail) return
+      setName(detail)
+      const id = window.setTimeout(() => setName(null), 1400)
+      return () => window.clearTimeout(id)
+    }
+    window.addEventListener('hermes-playground-camera-preset', onPreset)
+    return () => window.removeEventListener('hermes-playground-camera-preset', onPreset)
+  }, [])
+  if (!name) return null
+  return (
+    <div
+      className="pointer-events-none fixed left-1/2 top-[88px] z-[85] -translate-x-1/2 rounded-full border-2 border-white/30 bg-black/85 px-5 py-2 text-[12px] font-bold uppercase tracking-[0.2em] text-amber-200 backdrop-blur-xl"
+      style={{ boxShadow: '0 0 22px rgba(250, 204, 21, 0.45)', animation: 'hermes-toast-in 200ms ease-out' }}
+    >
+      🎬 {name}
+      <style>{`@keyframes hermes-toast-in { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
+    </div>
+  )
+}
+
+const HERMES_LORE_LINES = [
+  'Hermes carried prompts between the gods of Olympus and the builders of Earth.',
+  'A Hermes Agent is just a fast, faithful messenger — with memory.',
+  'Promptcraft is the first skill. Diplomacy is the last.',
+  'Build small. Ship now. Iterate at the speed of intent.',
+  'Memory turns moments into a story. Story turns a tool into a teammate.',
+  'The Forge is where prompts harden into tools. The Arena is where they earn their keep.',
+  'Six worlds. One builder. Forge your path.',
+  'Every NPC here teaches a real Hermes Agent skill. Listen.',
+  'Routing is the art of choosing the right tool, the right model, the right moment.',
+  'You are not alone. The Agora is full of builders walking the same road.',
+]
+
+/** Loading screen shown during world transitions — rotating Hermes lore + spinner. */
+function TransitionLoadingScreen({ active, worldName }: { active: boolean; worldName: string }) {
+  const [lore, setLore] = useState(HERMES_LORE_LINES[0])
+  useEffect(() => {
+    if (!active) return
+    setLore(HERMES_LORE_LINES[Math.floor(Math.random() * HERMES_LORE_LINES.length)])
+  }, [active])
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 z-[95] flex items-center justify-center transition-opacity duration-300"
+      style={{
+        opacity: active ? 1 : 0,
+        background:
+          'radial-gradient(circle at center, rgba(8,12,20,0.65) 30%, #000 90%)',
+      }}
+    >
+      <div className="flex max-w-[640px] flex-col items-center gap-6 px-8 text-center">
+        <div
+          className="text-[12px] font-bold uppercase tracking-[0.45em]"
+          style={{ color: 'rgba(245, 217, 122, 0.7)' }}
+        >
+          — entering —
+        </div>
+        <div
+          className="text-[44px] leading-none font-black"
+          style={{
+            background: 'linear-gradient(180deg, #ffffff 0%, #f5d97a 50%, #c89c2a 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            textShadow: '0 0 30px rgba(245,217,122,0.4)',
+            fontFamily: 'Cinzel, "Trajan Pro", "Cormorant Garamond", Georgia, serif',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {worldName}
+        </div>
+        <div className="flex items-center gap-3">
+          <div
+            className="h-1 w-32 overflow-hidden rounded-full"
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+          >
+            <div
+              className="h-full rounded-full"
+              style={{
+                background: 'linear-gradient(90deg, transparent, #facc15, transparent)',
+                animation: 'hermes-loading-bar 1.4s linear infinite',
+                width: '40%',
+              }}
+            />
+          </div>
+        </div>
+        <p className="max-w-[440px] text-[13px] italic leading-relaxed text-white/65">
+          “{lore}”
+        </p>
+      </div>
+      <style>{`@keyframes hermes-loading-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }`}</style>
     </div>
   )
 }

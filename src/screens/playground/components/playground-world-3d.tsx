@@ -1553,6 +1553,38 @@ function PlayerAndCamera({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Cinematic camera mode — Tab cycles through preset angles useful for filming.
+  // ESC returns to default isometric.
+  useEffect(() => {
+    const presets: Array<{ yaw: number; pitch: number; distance: number; name: string }> = [
+      { yaw: Math.PI / 4, pitch: 0.85, distance: 13, name: 'Isometric' },
+      { yaw: 0, pitch: 0.55, distance: 9, name: 'Behind-back' },
+      { yaw: Math.PI, pitch: 0.6, distance: 9, name: 'Front-face' },
+      { yaw: Math.PI / 2, pitch: 1.15, distance: 18, name: 'Top-down' },
+      { yaw: -Math.PI / 4, pitch: 0.7, distance: 16, name: 'Cinematic-low' },
+      { yaw: Math.PI / 4, pitch: 0.4, distance: 22, name: 'Wide-establish' },
+    ]
+    let idx = 0
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        idx = (idx + 1) % presets.length
+        const p = presets[idx]
+        camYaw.current = p.yaw
+        camPitch.current = p.pitch
+        camDistance.current = p.distance
+        // Tiny ephemeral toast
+        try {
+          window.dispatchEvent(new CustomEvent('hermes-playground-camera-preset', { detail: p.name }))
+        } catch {}
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   useFrame((_, delta) => {
     const k = keys.current
     // ARROW KEYS = camera orbit (yaw + pitch)
