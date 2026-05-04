@@ -179,11 +179,12 @@ export function SearchModal() {
     const normalized = deferredQuery.trim()
     if (!normalized) return []
 
-    // Real sessions data
+    // Real sessions data — search across friendlyId, key, derived title,
+    // and preview so user queries match chat content (#291).
     const chats = filterResults(
       sessions,
       normalized,
-      ['friendlyId', 'key', 'title'],
+      ['friendlyId', 'key', 'title', 'preview'],
       RESULT_LIMITS.chats,
     ).map<SearchResultItemData>((entry) => ({
       id: entry.id,

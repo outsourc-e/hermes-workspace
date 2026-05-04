@@ -161,15 +161,31 @@ async function fetchSessions(
 
   const sessions = Array.isArray(data.sessions) ? data.sessions : []
 
-  return sessions.map((session) => ({
-    id: String(session.key || session.friendlyId || 'unknown'),
-    key: String(session.key || ''),
-    friendlyId: String(session.friendlyId || session.key || 'unknown'),
-    title: String(session.friendlyId || session.key || 'Untitled'),
-    preview: '',
-    updatedAt:
-      typeof session.updatedAt === 'number' ? session.updatedAt : Date.now(),
-  }))
+  return sessions.map((session) => {
+    const derivedTitle =
+      typeof session.derivedTitle === 'string' && session.derivedTitle.trim()
+        ? session.derivedTitle.trim()
+        : ''
+    const friendlyId = String(session.friendlyId || session.key || 'unknown')
+    const preview =
+      typeof session.preview === 'string' ? session.preview : ''
+    return {
+      id: String(session.key || session.friendlyId || 'unknown'),
+      key: String(session.key || ''),
+      friendlyId,
+      // Prefer the API-supplied derived title (chat content) over the
+      // raw session id, so user queries like 'github' or 'workflow'
+      // actually match what the chat is about.
+      title: derivedTitle || friendlyId || 'Untitled',
+      preview,
+      updatedAt:
+        typeof session.updatedAt === 'number'
+          ? session.updatedAt
+          : typeof session.startedAt === 'number'
+            ? session.startedAt
+            : Date.now(),
+    }
+  })
 }
 
 async function fetchFiles(
