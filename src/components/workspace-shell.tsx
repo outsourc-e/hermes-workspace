@@ -142,10 +142,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
   const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
-  // HermesWorld is a full-bleed game surface — the desktop sidebar overlaps the
-  // canvas + HUD overlays (which use position:fixed). Auto-collapse to give the
-  // game its own real estate; user can re-open via the hamburger / shortcut.
-  const hideChatSidebar = (isOnChatRoute && chatFocusMode) || isOnPlaygroundRoute
+  const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
 
