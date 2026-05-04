@@ -407,10 +407,18 @@ export function usePlaygroundMultiplayer({
           for (const p of data.presences || []) {
             mergePresence(p as RemotePlayer)
           }
-          // Replay any chat messages we haven't seen
+          // Replay any chat messages we haven't seen + attach them to the
+          // matching remote player so a speech bubble appears over their head.
           for (const c of data.chats || []) {
             if (typeof c.ts === 'number' && c.ts > lastChatTs) lastChatTs = c.ts
             onChatRef.current?.(c as ChatWire)
+            if (c.id && typeof c.text === 'string') {
+              setRemotePlayers((prev) => {
+                const cur = prev[c.id]
+                if (!cur) return prev
+                return { ...prev, [c.id]: { ...cur, lastChat: c.text, lastChatAt: c.ts || Date.now() } }
+              })
+            }
           }
           // Push count update
           setServerCount({ online: data.online, byWorld: data.byWorld, peakToday: data.peakToday })

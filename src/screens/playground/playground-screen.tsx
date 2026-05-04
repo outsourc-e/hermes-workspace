@@ -286,23 +286,43 @@ export function PlaygroundScreen() {
   }, [rpg.state.playerProfile])
 
   function addChatMessage(message: ChatMessage) {
-    setMessages((prev) => [...prev, message].slice(-40))
+    setMessages((prev) => {
+      // Dedupe: if we already have this (author + body + ts within 2s), skip.
+      const dupe = prev.some(
+        (m) =>
+          m.authorId === message.authorId &&
+          m.body === message.body &&
+          Math.abs(m.ts - message.ts) < 2000,
+      )
+      if (dupe) return prev
+      return [...prev, message].slice(-40)
+    })
   }
 
   function sendChat(body: string) {
+    const ts = Date.now()
     addChatMessage({
-      id: `${Date.now()}-${Math.random()}`,
+      id: `${ts}-${Math.random()}`,
       authorId: 'self',
       authorName: rpg.state.playerProfile.displayName || 'You',
       body,
-      ts: Date.now(),
+      ts,
       color: '#a7f3d0',
     })
     rpg.markObjective('training-q3', 'send-local-chat')
+    // Speech bubble over our own head too, so we see what we said in-world.
+    try {
+      window.dispatchEvent(
+        new CustomEvent('hermes-playground-self-chat-bubble', { detail: body }),
+      )
+    } catch {}
     try { (window as any).__hermesPlaygroundSendChat?.(body) } catch {}
   }
 
   function handleIncomingChat(msg: { id: string; name: string; color: string; text: string; ts: number }) {
+    // Defensive: never accept a chat that we sent ourselves — the server tries
+    // to filter, but old chat ring entries from previous selfIds can leak.
+    if (msg.name === (rpg.state.playerProfile.displayName || 'You')) return
     addChatMessage({
       id: `${msg.ts}-${msg.id}`,
       authorId: msg.id,

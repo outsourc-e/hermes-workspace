@@ -1765,7 +1765,36 @@ function PlayerAndCamera({
           <span>{displayName}</span>
         </div>
       </Html>
+      {/* Self chat speech bubble — fades after 5.5s */}
+      <SelfChatBubble />
     </group>
+  )
+}
+
+/** Listens for the local player's chat sends and pops a speech bubble over their head. */
+function SelfChatBubble() {
+  const [bubble, setBubble] = useState<{ text: string; ts: number } | null>(null)
+  useEffect(() => {
+    const onChat = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as string | undefined
+      if (!detail) return
+      setBubble({ text: detail, ts: Date.now() })
+    }
+    window.addEventListener('hermes-playground-self-chat-bubble', onChat)
+    return () => window.removeEventListener('hermes-playground-self-chat-bubble', onChat)
+  }, [])
+  useEffect(() => {
+    if (!bubble) return
+    const id = window.setTimeout(() => setBubble(null), 5500)
+    return () => window.clearTimeout(id)
+  }, [bubble])
+  if (!bubble) return null
+  return (
+    <Html position={[0, 2.85, 0]} center distanceFactor={8}>
+      <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:200,textAlign:'center',border:'1px solid #34d399',boxShadow:'0 0 10px #34d39966'}}>
+        {bubble.text}
+      </div>
+    </Html>
   )
 }
 
