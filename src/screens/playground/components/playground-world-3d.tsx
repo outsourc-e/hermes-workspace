@@ -931,26 +931,49 @@ function PlayerAndCamera({
     return () => window.removeEventListener('hermes-playground-dash', onDash)
   }, [])
 
-  // Right-click drag for mouse-look (yaw + pitch). Middle-click also works.
+  // Mouse-look (yaw + pitch): left-click drag (with movement threshold so NPC clicks still register), right/middle-click drag, plus wheel zoom.
   useEffect(() => {
     let dragging = false
     let lastX = 0
     let lastY = 0
+    let startX = 0
+    let startY = 0
+    let dragArmedLeft = false // armed but not yet active until movement passes threshold
+    let dragActive = false
+    const DRAG_THRESHOLD = 5 // px — below this we let the click pass to NPCs/UI
     const onContext = (e: MouseEvent) => {
       e.preventDefault()
     }
     const onDown = (e: MouseEvent) => {
-      // Right-click or middle-click starts drag
-      if (e.button !== 2 && e.button !== 1) return
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
-      dragging = true
-      lastX = e.clientX
-      lastY = e.clientY
-      document.body.style.cursor = 'grabbing'
+      // Right/middle: drag immediately. Left: only on the canvas, and only after movement threshold.
+      const isCanvas = target?.tagName === 'CANVAS'
+      if (e.button === 2 || e.button === 1) {
+        dragging = true
+        dragActive = true
+        dragArmedLeft = false
+        lastX = startX = e.clientX
+        lastY = startY = e.clientY
+        document.body.style.cursor = 'grabbing'
+      } else if (e.button === 0 && isCanvas) {
+        dragging = true
+        dragActive = false // not active until threshold exceeded
+        dragArmedLeft = true
+        lastX = startX = e.clientX
+        lastY = startY = e.clientY
+      }
     }
     const onMove = (e: MouseEvent) => {
       if (!dragging) return
+      // For left-drag, gate on movement threshold so plain clicks still hit NPCs
+      if (dragArmedLeft && !dragActive) {
+        const totalDx = e.clientX - startX
+        const totalDy = e.clientY - startY
+        if (Math.hypot(totalDx, totalDy) < DRAG_THRESHOLD) return
+        dragActive = true
+        document.body.style.cursor = 'grabbing'
+      }
       const dx = e.clientX - lastX
       const dy = e.clientY - lastY
       lastX = e.clientX
@@ -963,6 +986,8 @@ function PlayerAndCamera({
     const onUp = () => {
       if (dragging) {
         dragging = false
+        dragActive = false
+        dragArmedLeft = false
         document.body.style.cursor = ''
       }
     }
