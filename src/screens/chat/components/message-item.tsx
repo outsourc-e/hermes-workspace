@@ -1472,6 +1472,20 @@ function InlineToolSectionItem({
   const hasInputData =
     toolSection.input && Object.keys(toolSection.input).length > 0
   const hasOutputData = !!(toolSection.outputText || toolSection.errorText)
+  const isArtifact = toolSection.type.startsWith('artifact:')
+  const artifactKind = isArtifact ? toolSection.type.slice('artifact:'.length) : null
+  const artifactTitle =
+    typeof toolSection.input?.title === 'string' && toolSection.input.title.trim()
+      ? toolSection.input.title.trim()
+      : 'Artifact'
+  const artifactPath =
+    typeof toolSection.input?.path === 'string' && toolSection.input.path.trim()
+      ? toolSection.input.path.trim()
+      : ''
+  const artifactPreview =
+    typeof toolSection.preview === 'string' && toolSection.preview.trim()
+      ? toolSection.preview.trim()
+      : ''
 
   return (
     <div>
@@ -1528,7 +1542,75 @@ function InlineToolSectionItem({
 
       {open && (
         <div className="mt-1 ml-3 flex flex-col gap-1.5 border-l border-[var(--theme-border)]/70 pb-1 pl-3 animate-in slide-in-from-top-1 duration-150">
-          {hasInputData && !showRawJson ? (
+          {isArtifact ? (
+            <div
+              className="overflow-hidden rounded-xl border"
+              style={{
+                borderColor: 'var(--theme-border)',
+                background:
+                  'color-mix(in srgb, var(--theme-accent) 4%, var(--theme-card))',
+              }}
+            >
+              <div className="flex items-start justify-between gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm" aria-hidden="true">📄</span>
+                    <span className="truncate text-sm font-semibold text-[var(--theme-text)]">
+                      {artifactTitle}
+                    </span>
+                    {artifactKind ? (
+                      <span
+                        className="rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+                        style={{
+                          background: 'var(--theme-card2)',
+                          color: 'var(--theme-muted)',
+                        }}
+                      >
+                        {artifactKind}
+                      </span>
+                    ) : null}
+                  </div>
+                  {artifactPath ? (
+                    <div
+                      className="mt-1 truncate font-mono text-[11px]"
+                      style={{ color: 'var(--theme-muted)' }}
+                      title={artifactPath}
+                    >
+                      {artifactPath}
+                    </div>
+                  ) : null}
+                </div>
+                {artifactPath ? (
+                  <a
+                    href={artifactPath}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium"
+                    style={{
+                      background: 'var(--theme-card2)',
+                      color: 'var(--theme-text)',
+                    }}
+                  >
+                    Open ↗
+                  </a>
+                ) : null}
+              </div>
+              {artifactPreview ? (
+                <div
+                  className="border-t px-3 py-2 text-xs"
+                  style={{
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-muted)',
+                    background:
+                      'color-mix(in srgb, var(--theme-bg) 75%, transparent)',
+                  }}
+                >
+                  {artifactPreview}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {hasInputData && !showRawJson && !isArtifact ? (
             <div>
               <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">
                 Input
@@ -1554,7 +1636,7 @@ function InlineToolSectionItem({
             </div>
           ) : null}
 
-          {!showRawJson ? (
+          {!showRawJson && !isArtifact ? (
             isError && toolSection.errorText ? (
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">
@@ -1595,7 +1677,7 @@ function InlineToolSectionItem({
             </pre>
           )}
 
-          {(shouldTruncateOutput || toolSection.outputText) && (
+          {!isArtifact && (shouldTruncateOutput || toolSection.outputText) && (
             <div className="flex flex-wrap items-center gap-2">
               {shouldTruncateOutput && (
                 <button
@@ -1622,7 +1704,7 @@ function InlineToolSectionItem({
             </div>
           )}
           {/* Fallback when no args or output available */}
-          {!hasInputData && !hasOutputData && !isRunning && (
+          {!isArtifact && !hasInputData && !hasOutputData && !isRunning && (
             <div className="text-[10px] text-primary-400 italic">
               No detail available for this tool call
             </div>

@@ -602,6 +602,18 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             phase: 'complete',
             name: `artifact:${kind}`,
             result: path ? `${title} — ${path}` : title,
+            preview:
+              typeof payload.preview === 'string' && payload.preview.trim()
+                ? payload.preview.trim()
+                : undefined,
+            // Preserve the structured artifact metadata so the chat renderer
+            // can show a first-class artifact card instead of degrading the
+            // event to a generic tool row. See #295.
+            args: {
+              title,
+              kind,
+              path: path || undefined,
+            },
             runId: activeRunIdRef.current ?? undefined,
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',
