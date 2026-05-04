@@ -175,6 +175,30 @@ export function usePlaygroundMultiplayer({
         lastAvatarSigRef.current = ''
         lastSentRef.current = { x: NaN, y: NaN, z: NaN, yaw: NaN, ts: 0, world: null }
         setTransport((t) => (t === 'broadcast' ? 'both' : 'ws'))
+        // Send presence immediately so the hub counts us right away
+        // (otherwise we wait up to PRESENCE_INTERVAL_MS for the first tick).
+        try {
+          const pos = positionRef.current
+          if (pos) {
+            const wire: PresenceWire = {
+              kind: 'presence',
+              id: selfId,
+              name: myName,
+              color: myColor,
+              world,
+              interior,
+              x: pos.x,
+              y: pos.y,
+              z: pos.z,
+              yaw: yawRef.current ?? 0,
+              ts: Date.now(),
+              avatar: avatarRef.current || undefined,
+            }
+            ws?.send(JSON.stringify(wire))
+            lastSentRef.current = { x: pos.x, y: pos.y, z: pos.z, yaw: yawRef.current ?? 0, ts: Date.now(), world }
+            lastAvatarSigRef.current = avatarSig(avatarRef.current)
+          }
+        } catch {}
       })
       ws.addEventListener('message', (ev) => {
         let msg: Wire | { kind: 'hello' }

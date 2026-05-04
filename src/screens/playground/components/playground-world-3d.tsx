@@ -2530,12 +2530,15 @@ export function PlaygroundWorld3D({
   const playerPos = useRef(new THREE.Vector3(0, 0, 6))
   const playerYaw = useRef(0)
   const positionForMp = useRef<{ x: number; y: number; z: number } | null>({ x: 0, y: 0, z: 6 })
-  // Sync simple position object for multiplayer hook (it doesn't use THREE)
+  // Sync simple position object for multiplayer hook (it doesn't use THREE).
+  // Also expose to window so the HUD objective arrow can compute heading.
   useEffect(() => {
     // Sample player position at presence cadence (~5Hz). The hook
     // skip-sends when delta < epsilon, so this is cheap.
     const id = window.setInterval(() => {
-      positionForMp.current = { x: playerPos.current.x, y: playerPos.current.y, z: playerPos.current.z }
+      const p = { x: playerPos.current.x, y: playerPos.current.y, z: playerPos.current.z }
+      positionForMp.current = p
+      ;(window as any).__hermesPlaygroundPlayerPos = p
     }, 200)
     return () => window.clearInterval(id)
   }, [])

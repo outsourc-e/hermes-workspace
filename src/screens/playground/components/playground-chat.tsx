@@ -30,6 +30,12 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
   const [serverOnline, setServerOnline] = useState<number | null>(null)
   const [transport, setTransport] = useState<string | null>(null)
   useEffect(() => {
+    // Seed from window globals so we don't miss the first dispatch if chat
+    // mounts after world-3d has already fired the events.
+    const cur = (window as any).__hermesPlaygroundLiveCount as { online?: number } | undefined
+    if (typeof cur?.online === 'number') setServerOnline(cur.online)
+    const curT = (window as any).__hermesPlaygroundLiveTransport as string | undefined
+    if (curT) setTransport(curT)
     const onCount = (ev: Event) => {
       const detail = (ev as CustomEvent).detail as { online?: number } | undefined
       if (typeof detail?.online === 'number') setServerOnline(detail.online)
@@ -53,8 +59,8 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
     : `${onlineCount} online`
   return (
     <div
-      className="pointer-events-auto fixed bottom-3 left-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/65 text-white shadow-2xl backdrop-blur-xl"
-      style={{ width: 360, height: collapsed ? 42 : 240, maxWidth: 'calc(100vw - 24px)' }}
+      className="pointer-events-auto fixed bottom-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/65 text-white shadow-2xl backdrop-blur-xl"
+      style={{ width: 360, height: collapsed ? 42 : 240, maxWidth: 'calc(100vw - 320px)', left: 'min(180px, 14vw)' }}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/65">

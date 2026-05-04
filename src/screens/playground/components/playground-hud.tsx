@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import type { PlaygroundRpgState, RewardToast } from '../hooks/use-playground-rpg'
 
@@ -10,6 +11,39 @@ type HudProps = {
   currentWorld: PlaygroundWorldId
   worldAccent: string
   toasts: RewardToast[]
+  objectiveTarget?: string | null
+}
+
+// Fixed positions for known targets (world coords). Used to compute the
+// objective arrow direction from the player's current position.
+const TARGET_POS: Record<string, Record<string, [number, number]>> = {
+  training: {
+    athena: [-10.5, 7.2],
+    iris: [6.2, 0.4],
+    pan: [11.2, -7.5],
+    nike: [-4.8, -4.8],
+    shopkeeper: [-14.5, -10.2],
+    'archive-podium': [6, 0],
+    'forge-gate': [14, -10],
+    'training-blade': [-14.5, -10.2],
+    'novice-cloak': [-14.5, -10.2],
+    'hermes-sigil': [-14.5, -10.2],
+    'build-demo': [11.2, -7.5],
+    'glitch-wisp': [-4.8, -4],
+    'wisp-core': [-4.8, -4],
+  },
+  agora: {
+    athena: [-5, 2],
+    apollo: [5, 3],
+    iris: [-3, -5],
+    nike: [6, -4],
+    shopkeeper: [-3, 9.5],
+    'awakening-agora': [-8, -3],
+  },
+  forge: { pan: [-4, 0], chronos: [4, 0], 'enter-forge': [0, -7], 'forge-shard': [0, -7] },
+  grove: { pan: [-4, 1], apollo: [4, 0], artemis: [0, -5], 'grove-ritual': [-6, -4], 'song-fragment': [-6, -4] },
+  oracle: { athena: [-3, -2], chronos: [3, -2], eros: [0, 4], 'oracle-riddle': [5, -3] },
+  arena: { nike: [-3, 4], hermes: [3, 4], chronos: [0, -5], 'arena-duel': [0, 0], 'kimi-sigil': [0, 0] },
 }
 
 export function PlaygroundHud({
@@ -20,27 +54,69 @@ export function PlaygroundHud({
   levelProgress,
   worldAccent,
   toasts,
+  currentWorld,
+  objectiveTarget,
 }: HudProps) {
   const { playerProfile } = state
+
+  // Compute heading angle from player to objective target (in degrees, screen up = 0).
+  // Throttled to ~10 Hz so we don't re-render the HUD on every animation frame.
+  const [arrowDeg, setArrowDeg] = useState<number | null>(null)
+  useEffect(() => {
+    if (!objectiveTarget) { setArrowDeg(null); return }
+    const target = TARGET_POS[currentWorld]?.[objectiveTarget]
+    if (!target) { setArrowDeg(null); return }
+    const compute = () => {
+      const player = (window as any).__hermesPlaygroundPlayerPos as { x: number; z: number } | undefined
+      const px = player?.x ?? 0
+      const pz = player?.z ?? 0
+      const dx = target[0] - px
+      const dz = target[1] - pz
+      // World uses (x, z) plane. Screen-up corresponds to -z. atan2(dx, -dz)
+      // returns 0° when target is straight ahead (north).
+      return Math.atan2(dx, -dz) * (180 / Math.PI)
+    }
+    setArrowDeg(compute())
+    const id = window.setInterval(() => setArrowDeg(compute()), 100)
+    return () => window.clearInterval(id)
+  }, [objectiveTarget, currentWorld])
   return (
     <>
-      {/* Combined player card: avatar + name + level + title + HP/MP/SP/XP */}
-      <div className="pointer-events-auto fixed left-3 top-3 z-[70] flex max-w-[360px] flex-col items-start gap-2">
+      {/* Combined player card: avatar portrait + name + level + title + HP/MP/SP/XP */}
+      {/* Sits to the right of the side rail (left:140 instead of left:3) so it doesn't crowd the chat. */}
+      <div className="pointer-events-auto fixed top-3 z-[70] flex max-w-[360px] flex-col items-start gap-2" style={{ left: 'min(180px, 14vw)' }}>
         <div
           className="rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 px-3 py-2.5 text-white shadow-2xl backdrop-blur-xl"
           style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
         >
           <div className="flex items-center gap-3">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-full border-2 text-sm font-bold"
-              style={{
-                borderColor: worldAccent,
-                background: `${worldAccent}22`,
-                color: worldAccent,
-                boxShadow: `0 0 10px ${worldAccent}66`,
-              }}
-            >
-              {playerProfile.level}
+            {/* Avatar portrait + level badge */}
+            <div className="relative">
+              <div
+                className="h-14 w-14 overflow-hidden rounded-full border-2"
+                style={{
+                  borderColor: worldAccent,
+                  background: `linear-gradient(180deg, ${playerProfile.avatarConfig.outfitAccent || worldAccent}33, ${playerProfile.avatarConfig.outfit || '#0f172a'})`,
+                  boxShadow: `0 0 12px ${worldAccent}66`,
+                }}
+              >
+                <img
+                  src={`/avatars/${playerProfile.avatarConfig.portrait || 'hermes'}.png`}
+                  alt={playerProfile.displayName || 'Builder'}
+                  className="h-full w-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                />
+              </div>
+              <div
+                className="absolute -right-1 -bottom-1 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold"
+                style={{
+                  borderColor: '#0b1320',
+                  background: worldAccent,
+                  color: '#0b1320',
+                }}
+              >
+                {playerProfile.level}
+              </div>
             </div>
             <div className="leading-tight">
               <div className="text-[13px] font-bold">
@@ -61,20 +137,38 @@ export function PlaygroundHud({
             <Orb label="XP" v={levelProgress.current} m={levelProgress.needed} color="#22d3ee" />
           </div>
         </div>
+      </div>
 
-        {/* Compact objective panel directly under the player card */}
+      {/* Current Objective — top-center banner with arrow pointing toward the objective */}
+      <div className="pointer-events-auto fixed left-1/2 top-3 z-[71] flex w-[min(92vw,460px)] -translate-x-1/2 flex-col items-center">
         <div
-          className="w-full rounded-2xl border border-white/10 bg-black/70 px-3 py-2 shadow-xl backdrop-blur-xl"
-          style={{ borderColor: `${worldAccent}33` }}
+          className="flex w-full items-center gap-2 rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 px-3 py-2 text-white shadow-2xl backdrop-blur-xl"
+          style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
         >
-          <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Current Objective</div>
-          <div className="mt-0.5 text-[12px] font-bold" style={{ color: worldAccent }}>
-            {activeQuestTitle}
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border"
+            style={{ borderColor: `${worldAccent}55`, background: `${worldAccent}1a` }}
+            title={arrowDeg != null ? 'Pointing toward objective' : 'Objective'}
+          >
+            <span
+              className="text-[18px] leading-none"
+              style={{
+                color: worldAccent,
+                transform: `rotate(${arrowDeg != null ? arrowDeg - 90 : -45}deg)`,
+                transition: 'transform 220ms cubic-bezier(.2,.8,.2,1)',
+                filter: arrowDeg != null ? `drop-shadow(0 0 6px ${worldAccent})` : undefined,
+              }}
+              aria-hidden
+            >➤</span>
           </div>
-          <div className="mt-0.5 text-[11px] leading-snug text-white/85">{objectiveLabel}</div>
-          {objectiveHint && (
-            <div className="mt-0.5 text-[10px] text-white/55">{objectiveHint}</div>
-          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Objective</span>
+              <span className="truncate text-[12px] font-bold" style={{ color: worldAccent }}>{activeQuestTitle}</span>
+            </div>
+            <div className="truncate text-[11px] leading-snug text-white/85">{objectiveLabel}</div>
+            {objectiveHint && <div className="truncate text-[10px] text-white/55">{objectiveHint}</div>}
+          </div>
         </div>
       </div>
 

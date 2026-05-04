@@ -531,6 +531,7 @@ export function PlaygroundScreen() {
           activeQuestTitle={activeQuest?.title ?? 'Training Complete'}
           objectiveLabel={currentObjective?.label ?? 'Forge Gate unlocked. Keep exploring the Playground.'}
           objectiveHint={currentObjective?.hint}
+          objectiveTarget={currentObjective?.target ?? null}
           levelProgress={rpg.levelProgress}
           currentWorld={world}
           worldAccent={WORLD_META[world].accent}
