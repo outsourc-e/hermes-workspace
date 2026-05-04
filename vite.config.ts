@@ -85,6 +85,10 @@ async function isClaudeAgentHealthy(port = 8642): Promise<boolean> {
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const claudeApiUrl = env.CLAUDE_API_URL?.trim() || 'http://127.0.0.1:8642'
+  const claudeDashboardUrl =
+    env.HERMES_DASHBOARD_URL?.trim() ||
+    env.CLAUDE_DASHBOARD_URL?.trim() ||
+    'http://127.0.0.1:9119'
 
   // Hermes Agent auto-start state
   let claudeAgentChild: ChildProcess | null = null
@@ -540,7 +544,7 @@ const config = defineConfig(({ mode, command }) => {
                   fetch(`${claudeApiUrl}/v1/models`, {
                     signal: AbortSignal.timeout(3000),
                   }).catch(() => null),
-                  fetch(`${claudeApiUrl}/api/sessions?limit=1`, {
+                  fetch(`${claudeDashboardUrl}/api/sessions?limit=1`, {
                     signal: AbortSignal.timeout(3000),
                   }).catch(() => null),
                 ])

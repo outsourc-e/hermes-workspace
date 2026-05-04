@@ -412,7 +412,7 @@ export function OperationsAgentCard({
                   </div>
                   <div className="mt-3 flex justify-end">
                     <Button
-                      render={<a href="/cron" />}
+                      render={<a href="/jobs" />}
                       variant="secondary"
                       className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                     >
@@ -426,7 +426,7 @@ export function OperationsAgentCard({
                     No scheduled jobs
                   </p>
                   <Button
-                    render={<a href="/cron" />}
+                    render={<a href="/jobs" />}
                     variant="secondary"
                     className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                   >
