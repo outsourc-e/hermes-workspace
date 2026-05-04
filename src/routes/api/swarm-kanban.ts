@@ -23,7 +23,11 @@ export const Route = createFileRoute('/api/swarm-kanban')({
   server: {
     handlers: {
       GET: async () => {
-        return json({ ok: true, cards: listKanbanCards(), backend: getKanbanBackendMeta() })
+        return json({
+          ok: true,
+          cards: await listKanbanCards(),
+          backend: getKanbanBackendMeta(),
+        })
       },
       POST: async ({ request }) => {
         let body: unknown
@@ -36,7 +40,7 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         if (!parsed.success) {
           return json({ ok: false, error: parsed.error.issues.map((issue) => issue.message).join('; ') }, { status: 400 })
         }
-        const card = createKanbanCard(parsed.data)
+        const card = await createKanbanCard(parsed.data)
         return json({ ok: true, card, backend: getKanbanBackendMeta() })
       },
       PATCH: async ({ request }) => {
@@ -51,7 +55,7 @@ export const Route = createFileRoute('/api/swarm-kanban')({
           return json({ ok: false, error: parsed.error.issues.map((issue) => issue.message).join('; ') }, { status: 400 })
         }
         const { id, ...updates } = parsed.data
-        const card = updateKanbanCard(id, updates)
+        const card = await updateKanbanCard(id, updates)
         if (!card) return json({ ok: false, error: 'Card not found' }, { status: 404 })
         return json({ ok: true, card, backend: getKanbanBackendMeta() })
       },

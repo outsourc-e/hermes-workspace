@@ -101,7 +101,7 @@ describe('kanban-backend', () => {
       path: '/Users/aurora/.claude/kanban.db',
     })
 
-    const cards = mod.listKanbanCards()
+    const cards = await mod.listKanbanCards()
     expect(cards).toHaveLength(1)
     expect(cards[0]).toMatchObject({
       id: 't_12345678',
@@ -143,7 +143,7 @@ describe('kanban-backend', () => {
       path: '/Users/aurora/.claude/kanban.db',
     })
     expect(mod.getKanbanBackendMeta().details).toContain('direct local storage access')
-    expect(mod.listKanbanCards()[0]).toMatchObject({ id: 't_direct', status: 'ready' })
+    expect((await mod.listKanbanCards())[0]).toMatchObject({ id: 't_direct', status: 'ready' })
   })
 
   it('resolves canonical Kanban paths from legacy profile-home env fallback too', async () => {
@@ -181,7 +181,7 @@ describe('kanban-backend', () => {
       writable: true,
       path: '/tmp/swarm2-kanban.json',
     })
-    expect(mod.listKanbanCards()[0]?.id).toBe('local-1')
+    expect((await mod.listKanbanCards())[0]?.id).toBe('local-1')
   })
 
   it('creates and updates Hermes tasks through canonical kanban.db path', async () => {
@@ -216,8 +216,8 @@ describe('kanban-backend', () => {
       },
     })
 
-    const created = mod.createKanbanCard({ title: 'Created Hermes task', spec: 'Task body', assignedWorker: 'swarm6', status: 'backlog' })
-    const updated = mod.updateKanbanCard('t_deadbeef', { title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
+    const created = await mod.createKanbanCard({ title: 'Created Hermes task', spec: 'Task body', assignedWorker: 'swarm6', status: 'backlog' })
+    const updated = await mod.updateKanbanCard('t_deadbeef', { title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
 
     expect(created).toMatchObject({ id: 't_deadbeef', title: 'Created Hermes task', status: 'backlog', assignedWorker: 'swarm6', createdBy: 'claude-kanban' })
     expect(updated).toMatchObject({ id: 't_deadbeef', title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })

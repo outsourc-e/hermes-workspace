@@ -12,8 +12,15 @@ import {
   updateSwarmKanbanCard,
   type UpdateSwarmKanbanCardInput,
 } from './swarm-kanban-store'
+import { CLAUDE_DASHBOARD_URL, getCapabilities } from './gateway-capabilities'
+import {
+  fetchDashboardKanbanBoard,
+  createDashboardKanbanTask,
+  updateDashboardKanbanTask,
+  type DashboardKanbanTask,
+} from './kanban-dashboard-proxy'
 
-export type KanbanBackendId = 'local' | 'claude'
+export type KanbanBackendId = 'local' | 'claude' | 'hermes-proxy'
 
 export type KanbanBackendMeta = {
   id: KanbanBackendId
@@ -26,9 +33,90 @@ export type KanbanBackendMeta = {
 
 type KanbanBackend = {
   meta(): KanbanBackendMeta
-  list(): SwarmKanbanCard[]
-  create(input: CreateSwarmKanbanCardInput): SwarmKanbanCard
-  update(cardId: string, updates: UpdateSwarmKanbanCardInput): SwarmKanbanCard | null
+  list(): SwarmKanbanCard[] | Promise<SwarmKanbanCard[]>
+  create(input: CreateSwarmKanbanCardInput): SwarmKanbanCard | Promise<SwarmKanbanCard>
+  update(
+    cardId: string,
+    updates: UpdateSwarmKanbanCardInput,
+  ): SwarmKanbanCard | null | Promise<SwarmKanbanCard | null>
+}
+
+// Map upstream Hermes kanban statuses (triage/todo/ready/running/done/blocked
+// and any custom user statuses) into our internal lane vocabulary. Mirrors
+// mapClaudeStatus() but kept separate because the dashboard plugin sometimes
+// returns slightly different status strings than direct SQL access.
+function mapDashboardStatusToLane(
+  status: string | null | undefined,
+): SwarmKanbanCard['status'] {
+  switch ((status ?? '').toLowerCase()) {
+    case 'triage':
+    case 'todo':
+    case 'queued':
+      return 'backlog'
+    case 'ready':
+      return 'ready'
+    case 'running':
+    case 'claimed':
+    case 'in_progress':
+      return 'running'
+    case 'review':
+      return 'review'
+    case 'blocked':
+      return 'blocked'
+    case 'done':
+    case 'complete':
+    case 'completed':
+      return 'done'
+    default:
+      return 'backlog'
+  }
+}
+
+function mapLaneToDashboardStatus(lane: SwarmKanbanCard['status']): string {
+  switch (lane) {
+    case 'backlog':
+      return 'todo'
+    case 'ready':
+      return 'ready'
+    case 'running':
+      // The Hermes dashboard rejects direct writes of 'running' — only the
+      // dispatcher's claim path may move a task into 'running'. Treat a
+      // user dragging a card to the running lane as 'mark it ready, let
+      // the dispatcher pick it up'. The card will flip to running on the
+      // next dispatcher tick (default 60s).
+      return 'ready'
+    case 'review':
+      // 'review' isn't a first-class Hermes status; map to 'ready' so the
+      // task remains visible on the board until a worker is assigned.
+      return 'ready'
+    case 'blocked':
+      return 'blocked'
+    case 'done':
+      return 'done'
+    default:
+      return 'todo'
+  }
+}
+
+function dashboardTaskToCard(task: DashboardKanbanTask): SwarmKanbanCard {
+  const createdAt = normalizeTimestamp(task.created_at)
+  const updatedAt = normalizeTimestamp(
+    task.started_at ?? task.completed_at ?? task.created_at,
+  )
+  return {
+    id: task.id,
+    title: task.title,
+    spec: task.body ?? '',
+    acceptanceCriteria: [],
+    assignedWorker: task.assignee ?? null,
+    reviewer: null,
+    status: mapDashboardStatusToLane(task.status),
+    missionId: null,
+    reportPath: null,
+    createdBy: task.created_by ?? 'hermes-kanban',
+    createdAt,
+    updatedAt,
+  }
 }
 
 type ClaudeTaskRow = {
@@ -322,26 +410,124 @@ const claudeBackend: KanbanBackend = {
   },
 }
 
+// Hermes Dashboard kanban plugin backend (HTTP proxy).
+//
+// Used when the upstream Hermes Agent dashboard exposes the kanban plugin
+// (caps.kanban === true). Goes through HTTP rather than direct SQLite so
+// remote workspaces (Docker, VPS, separate machines) can use the same
+// kanban DB the agent is using. See kanban-dashboard-proxy.ts.
+const dashboardProxyBackend: KanbanBackend = {
+  meta() {
+    const caps = getCapabilities()
+    return {
+      id: 'hermes-proxy',
+      label: 'Hermes Dashboard kanban',
+      detected: caps.kanban,
+      writable: caps.kanban,
+      path: caps.dashboard.url || CLAUDE_DASHBOARD_URL,
+      details: caps.kanban
+        ? `Synced with the Hermes Dashboard kanban plugin at ${caps.dashboard.url}/kanban (single SQLite source of truth, dispatcher-aware).`
+        : 'Hermes Dashboard kanban plugin not detected.',
+    }
+  },
+  async list() {
+    const board = await fetchDashboardKanbanBoard()
+    const cards: SwarmKanbanCard[] = []
+    for (const column of board.columns) {
+      for (const task of column.tasks) {
+        cards.push(dashboardTaskToCard(task))
+      }
+    }
+    return cards.sort(
+      (a, b) => b.updatedAt - a.updatedAt || a.title.localeCompare(b.title),
+    )
+  },
+  async create(input) {
+    const task = await createDashboardKanbanTask({
+      title: input.title.trim(),
+      body: (input.spec ?? '').trim() || undefined,
+      assignee: input.assignedWorker?.trim() || undefined,
+      status: mapLaneToDashboardStatus(input.status ?? 'backlog'),
+      created_by: input.createdBy?.trim() || 'hermes-workspace',
+    })
+    return dashboardTaskToCard(task)
+  },
+  async update(cardId, updates) {
+    const patch: Parameters<typeof updateDashboardKanbanTask>[1] = {}
+    if (typeof updates.title === 'string' && updates.title.trim())
+      patch.title = updates.title.trim()
+    if (typeof updates.spec === 'string') patch.body = updates.spec
+    if (updates.assignedWorker !== undefined)
+      patch.assignee = updates.assignedWorker?.trim() || null
+    if (updates.status) patch.status = mapLaneToDashboardStatus(updates.status)
+    if (Object.keys(patch).length === 0) {
+      // No-op patches: just refetch.
+      const board = await fetchDashboardKanbanBoard()
+      for (const column of board.columns) {
+        for (const task of column.tasks) {
+          if (task.id === cardId) return dashboardTaskToCard(task)
+        }
+      }
+      return null
+    }
+    try {
+      const updated = await updateDashboardKanbanTask(cardId, patch)
+      return dashboardTaskToCard(updated)
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('→ 404')) return null
+      throw err
+    }
+  },
+}
+
+/**
+ * Resolve which backend to use.
+ *
+ * Precedence (highest first):
+ *   1. CLAUDE_KANBAN_BACKEND env var (local | claude | hermes-proxy | auto)
+ *   2. caps.kanban (Hermes Dashboard plugin available) → hermes-proxy
+ *   3. legacy claudeBackend (direct sqlite to ~/.hermes/kanban.db) when DB exists
+ *   4. localBackend (file-backed swarm2-kanban.json) as last resort
+ *
+ * The 'auto' default deliberately prefers hermes-proxy over the legacy direct
+ * SQLite path so dispatchers + transactional helpers stay in charge of writes.
+ * Set CLAUDE_KANBAN_BACKEND=claude to force the direct-SQLite path during
+ * troubleshooting.
+ */
 export function resolveKanbanBackend(): KanbanBackend {
   const preference = (env('CLAUDE_KANBAN_BACKEND') ?? 'auto').toLowerCase()
   if (preference === 'local') return localBackend
+  if (preference === 'hermes-proxy' || preference === 'proxy') {
+    return getCapabilities().kanban ? dashboardProxyBackend : localBackend
+  }
+  if (preference === 'claude') {
+    const claudeMeta = claudeBackend.meta()
+    return claudeMeta.detected ? claudeBackend : localBackend
+  }
+  // auto
+  if (getCapabilities().kanban) return dashboardProxyBackend
   const claudeMeta = claudeBackend.meta()
-  if (preference === 'claude') return claudeMeta.detected ? claudeBackend : localBackend
-  return claudeMeta.detected ? claudeBackend : localBackend
+  if (claudeMeta.detected) return claudeBackend
+  return localBackend
 }
 
 export function getKanbanBackendMeta(): KanbanBackendMeta {
   return resolveKanbanBackend().meta()
 }
 
-export function listKanbanCards(): SwarmKanbanCard[] {
-  return resolveKanbanBackend().list()
+export async function listKanbanCards(): Promise<SwarmKanbanCard[]> {
+  return Promise.resolve(resolveKanbanBackend().list())
 }
 
-export function createKanbanCard(input: CreateSwarmKanbanCardInput): SwarmKanbanCard {
-  return resolveKanbanBackend().create(input)
+export async function createKanbanCard(
+  input: CreateSwarmKanbanCardInput,
+): Promise<SwarmKanbanCard> {
+  return Promise.resolve(resolveKanbanBackend().create(input))
 }
 
-export function updateKanbanCard(cardId: string, updates: UpdateSwarmKanbanCardInput): SwarmKanbanCard | null {
-  return resolveKanbanBackend().update(cardId, updates)
+export async function updateKanbanCard(
+  cardId: string,
+  updates: UpdateSwarmKanbanCardInput,
+): Promise<SwarmKanbanCard | null> {
+  return Promise.resolve(resolveKanbanBackend().update(cardId, updates))
 }
