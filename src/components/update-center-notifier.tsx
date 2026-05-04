@@ -150,7 +150,13 @@ export function UpdateCenterNotifier() {
   const visibleProducts = useMemo(() => {
     const products = data ? [data.products.workspace, data.products.agent] : []
     return products.filter((product) => {
+      // Product decision: only show the top-of-app update banner when a
+      // one-click update is actually safe. Dirty checkouts, non-main branches,
+      // and blocked/conflicting states still exist, but they belong in an
+      // advanced update center view rather than a disruptive banner. See
+      // Eric feedback 2026-05-04.
       if (!product.updateAvailable) return false
+      if (!product.canUpdate) return false
       if (phases[product.id] === 'done') return false
       return !dismissed.has(productDismissKey(product))
     })
