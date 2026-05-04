@@ -991,7 +991,6 @@ code {
   --theme-input: #ffffff;
 }
 
-
 /* ============================================================
    Hermes Nous — matches nousresearch.com/hermes-agent chrome
    Dark:  deep teal #041C1C background, cream #ffe6cb accent
@@ -1270,7 +1269,9 @@ code {
 [data-theme$='-light'] .shadow-lg,
 [data-theme$='-light'] .shadow-xl,
 [data-theme$='-light'] .shadow-2xl {
-  box-shadow: 0 1px 0 rgba(22, 49, 95, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  box-shadow:
+    0 1px 0 rgba(22, 49, 95, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
 }
 [data-theme$='-light'] .shadow-md {
   box-shadow: 0 1px 0 rgba(22, 49, 95, 0.04) !important;

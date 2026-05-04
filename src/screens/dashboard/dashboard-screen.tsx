@@ -498,7 +498,7 @@ function SecondaryAction({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="group inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 md:px-3 md:py-2 text-[11px] md:text-xs font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.015] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+      className="group inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.015] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         borderColor: 'var(--theme-border)',
         color: 'var(--theme-muted)',
@@ -512,7 +512,7 @@ function SecondaryAction({
         strokeWidth={1.6}
         className="transition-colors group-hover:text-[var(--theme-accent)]"
       />
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
     </button>
   )
 }
@@ -884,8 +884,8 @@ export function DashboardScreen() {
            (not centered) on purpose: ops dashboards put brand left
            + actions right because that's the spatial hierarchy
            operators expect (Linear, Vercel, Datadog all do this). */}
-      <div className="flex flex-col items-center gap-1.5 md:gap-3 md:items-stretch lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center justify-center gap-3 md:justify-start">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
           <span
             className="relative inline-flex shrink-0 items-center justify-center rounded-xl border"
             style={{
@@ -928,7 +928,7 @@ export function DashboardScreen() {
         {/* Action row: hierarchy per Hermes Agent review.
            New Chat is primary (full button + accent), Terminal +
            Skills are secondary, Settings collapses to icon-only. */}
-        <div className="flex w-full flex-wrap items-center justify-center gap-1.5 md:gap-2 md:justify-end lg:max-w-xl">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:max-w-xl">
           <button
             type="button"
             onClick={() =>
@@ -937,7 +937,7 @@ export function DashboardScreen() {
                 params: { sessionKey: 'new' },
               })
             }
-            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-2.5 py-1.5 md:px-3.5 md:py-2 text-[11px] md:text-sm font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99]"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3.5 py-2 text-sm font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99]"
             style={{
               background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentSecondary})`,
               color: 'var(--theme-on-accent, white)',
@@ -1002,7 +1002,7 @@ export function DashboardScreen() {
             aria-label="Settings"
             title="Settings"
             onClick={() => navigate({ to: '/settings', search: {} })}
-            className="hidden md:inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
+            className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
             style={{
               borderColor: 'var(--theme-border)',
               color: 'var(--theme-muted)',

@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
 import YAML from 'yaml'
 import {
   CLAUDE_API,
@@ -52,8 +53,12 @@ export const Route = createFileRoute('/api/connection-status')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const authResult = isAuthenticated(request)
-        if (authResult !== true) return authResult as unknown as Response
+        // isAuthenticated() returns boolean. The previous "return authResult as
+        // unknown as Response" cast silenced TypeScript but threw at runtime
+        // because the framework received `false`, not a Response. See #261, #263.
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         const caps = await ensureGatewayProbed()
         const activeModel = readActiveModel()
@@ -121,6 +126,9 @@ export const Route = createFileRoute('/api/connection-status')({
             memory: caps.memory,
             config: caps.config,
             jobs: caps.jobs,
+            mcp: caps.mcp,
+            conductor: caps.conductor,
+            enhancedChat: caps.enhancedChat,
             dashboard: caps.dashboard.available,
           },
           claudeUrl: CLAUDE_API,

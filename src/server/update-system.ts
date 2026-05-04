@@ -192,6 +192,23 @@ function canFastForward(repoPath: string, remoteRef: string): boolean {
   )
 }
 
+function canResetToRemote(repoPath: string, remoteRef: string): boolean {
+  return Boolean(git(['rev-parse', '--verify', remoteRef], repoPath, 10_000))
+}
+
+function syncRepoToRemote(repoPath: string, remoteRef: string): string {
+  if (canFastForward(repoPath, remoteRef)) {
+    return execOrThrow('git', ['merge', '--ff-only', remoteRef], {
+      cwd: repoPath,
+      timeout: 60_000,
+    })
+  }
+  return execOrThrow('git', ['reset', '--hard', remoteRef], {
+    cwd: repoPath,
+    timeout: 60_000,
+  })
+}
+
 function readCommits(
   repoPath: string,
   from: string | null,
@@ -300,9 +317,10 @@ export function readWorkspaceUpdateStatus(
     supportedBranch && currentHead && latestHead && currentHead !== latestHead,
   )
   const remoteRef = `origin/${branch || 'main'}`
+  const canSync = updateAvailable ? canResetToRemote(gitRepo, remoteRef) : true
   const ff = updateAvailable ? canFastForward(gitRepo, remoteRef) : true
   const canUpdate = Boolean(
-    repoMatches && supportedBranch && updateAvailable && !dirty && ff,
+    repoMatches && supportedBranch && updateAvailable && !dirty && canSync,
   )
 
   return {
@@ -324,7 +342,7 @@ export function readWorkspaceUpdateStatus(
         : dirty
           ? 'blocked'
           : updateAvailable
-            ? ff
+            ? canSync
               ? 'available'
               : 'blocked'
             : 'current',
@@ -334,9 +352,11 @@ export function readWorkspaceUpdateStatus(
         ? 'Workspace one-click updates are only enabled on main/master branches.'
         : dirty
           ? 'Workspace checkout has local changes. Commit or stash before updating.'
-          : updateAvailable && !ff
-            ? 'Workspace update is not a fast-forward. Manual rebase/merge required.'
-            : null,
+          : updateAvailable && !canSync
+            ? 'Workspace update could not verify the remote branch ref.'
+            : updateAvailable && !ff
+              ? 'Workspace branch diverged from origin. One-click update will realign to the remote branch.'
+              : null,
     updateMode: 'git-ff',
   }
 }
@@ -395,11 +415,14 @@ export function readAgentUpdateStatus(): ProductUpdateStatus {
   const currentHead = git(['rev-parse', 'HEAD'], repoPath)
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], repoPath)
   const latestHead = repoMatches ? remoteHead(repoPath, 'origin') : null
+  const remoteRef = repoMatches ? `origin/${branch || 'main'}` : null
   const dirty = isDirty(repoPath)
   const updateAvailable = Boolean(
-    currentHead && latestHead && currentHead !== latestHead,
+    currentHead && latestHead && currentHead !== latestHead && remoteRef,
   )
-  const canUpdate = Boolean(repoMatches && updateAvailable && !dirty)
+  const canSync = remoteRef ? canResetToRemote(repoPath, remoteRef) : false
+  const ff = remoteRef ? canFastForward(repoPath, remoteRef) : false
+  const canUpdate = Boolean(repoMatches && updateAvailable && !dirty && canSync)
 
   return {
     id: 'agent',
@@ -417,14 +440,20 @@ export function readAgentUpdateStatus(): ProductUpdateStatus {
       ? 'unsupported'
       : dirty
         ? 'blocked'
-        : updateAvailable
+        : updateAvailable && canSync
           ? 'available'
-          : 'current',
+          : updateAvailable
+            ? 'blocked'
+            : 'current',
     reason: !repoMatches
       ? 'Hermes Agent origin remote does not look like hermes-agent.'
       : dirty
         ? 'Hermes Agent checkout has local changes. Commit or stash before updating.'
-        : null,
+        : updateAvailable && !canSync
+          ? 'Hermes Agent update could not verify the remote branch ref.'
+          : updateAvailable && !ff
+            ? 'Hermes Agent branch diverged from origin. One-click update will realign to the remote branch.'
+            : null,
     updateMode: 'hermes-update',
   }
 }
@@ -462,7 +491,7 @@ export function applyWorkspaceUpdate(): ApplyUpdateResult {
     }),
   )
   const remoteRef = `origin/${before.branch}`
-  if (!canFastForward(before.repoPath, remoteRef)) {
+  if (!canResetToRemote(before.repoPath, remoteRef)) {
     const status = readWorkspaceUpdateStatus()
     return {
       ok: false,
@@ -471,15 +500,10 @@ export function applyWorkspaceUpdate(): ApplyUpdateResult {
       restartRequired: false,
       status,
       releaseNotes: [],
-      error: `${remoteRef} is not a fast-forward update.`,
+      error: `${remoteRef} could not be verified.`,
     }
   }
-  output.push(
-    execOrThrow('git', ['merge', '--ff-only', remoteRef], {
-      cwd: before.repoPath,
-      timeout: 60_000,
-    }),
-  )
+  output.push(syncRepoToRemote(before.repoPath, remoteRef))
   const after = readWorkspaceUpdateStatus()
   const changedFiles =
     before.currentHead && after.currentHead
@@ -566,7 +590,7 @@ export function applyAgentUpdate(): ApplyUpdateResult {
     }),
   )
   const remoteRef = `origin/${before.branch || 'main'}`
-  if (!canFastForward(before.repoPath, remoteRef)) {
+  if (!canResetToRemote(before.repoPath, remoteRef)) {
     const status = readAgentUpdateStatus()
     return {
       ok: false,
@@ -575,15 +599,10 @@ export function applyAgentUpdate(): ApplyUpdateResult {
       restartRequired: false,
       status,
       releaseNotes: [],
-      error: `${remoteRef} is not a fast-forward update.`,
+      error: `${remoteRef} could not be verified.`,
     }
   }
-  output.push(
-    execOrThrow('git', ['merge', '--ff-only', remoteRef], {
-      cwd: before.repoPath,
-      timeout: 60_000,
-    }),
-  )
+  output.push(syncRepoToRemote(before.repoPath, remoteRef))
 
   const after = readAgentUpdateStatus()
   const releaseNotes = [

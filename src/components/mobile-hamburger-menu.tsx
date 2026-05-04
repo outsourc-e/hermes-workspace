@@ -10,6 +10,7 @@ import {
   CommandLineIcon,
   DashboardSquare01Icon,
   File01Icon,
+  McpServerIcon,
   Menu01Icon,
   PuzzleIcon,
   Rocket01Icon,
@@ -97,6 +98,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: PuzzleIcon,
     to: '/skills',
     match: (p: string) => p.startsWith('/skills'),
+  },
+  {
+    id: 'mcp',
+    label: 'MCP',
+    icon: McpServerIcon,
+    to: '/mcp',
+    match: (p: string) => p.startsWith('/mcp'),
   },
   {
     id: 'profiles',

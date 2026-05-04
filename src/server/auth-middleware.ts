@@ -138,19 +138,31 @@ export function revokeSessionToken(token: string): void {
 }
 
 /**
+ * Resolve the configured workspace password.
+ *
+ * Honors HERMES_PASSWORD first (current name, post-rename) and falls back to
+ * CLAUDE_PASSWORD for back-compat with deployments configured pre-rename.
+ */
+function getConfiguredPassword(): string {
+  const fromHermes = process.env.HERMES_PASSWORD
+  if (fromHermes && fromHermes.length > 0) return fromHermes
+  const fromClaude = process.env.CLAUDE_PASSWORD
+  if (fromClaude && fromClaude.length > 0) return fromClaude
+  return ''
+}
+
+/**
  * Check if password protection is enabled.
  */
 export function isPasswordProtectionEnabled(): boolean {
-  return Boolean(
-    process.env.CLAUDE_PASSWORD && process.env.CLAUDE_PASSWORD.length > 0,
-  )
+  return getConfiguredPassword().length > 0
 }
 
 /**
  * Verify password using timing-safe comparison.
  */
 export function verifyPassword(password: string): boolean {
-  const configured = process.env.CLAUDE_PASSWORD
+  const configured = getConfiguredPassword()
   if (!configured || configured.length === 0) {
     return false
   }

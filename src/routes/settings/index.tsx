@@ -855,7 +855,7 @@ type LoaderStyleOption = { value: LoaderStyle; label: string }
 
 const LOADER_STYLES: Array<LoaderStyleOption> = [
   { value: 'dots', label: 'Dots' },
-  { value: 'braille-claude', label: 'Claude' },
+  { value: 'braille-claude', label: 'Hermes' },
   { value: 'braille-orbit', label: 'Orbit' },
   { value: 'braille-breathe', label: 'Breathe' },
   { value: 'braille-pulse', label: 'Pulse' },
@@ -1172,7 +1172,7 @@ function ClaudeConfigSection({
         </SettingsRow>
         <SettingsRow
           label="Model"
-          description="The model Claude uses for conversations."
+          description="The default model Hermes Agent uses for conversations."
         >
           <div className="flex w-full max-w-sm gap-2">
             {availableModels.length > 0 ? (
@@ -1447,7 +1447,7 @@ function ClaudeConfigSection({
       >
         <SettingsRow
           label="Config location"
-          description="Where Claude stores its configuration."
+          description="Where Hermes Agent stores its configuration."
         >
           <span
             className="text-xs font-mono"

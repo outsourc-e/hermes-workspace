@@ -52,9 +52,31 @@ function ContextBarComponent({
   const refresh = useCallback(async () => {
     try {
       const params = sessionId
+        ? `?sessionKey=${encodeURIComponent(sessionId)}`
+        : ''
+      const statusRes = await fetch(`/api/session-status${params}`)
+      if (statusRes.ok) {
+        const statusData = await statusRes.json()
+        const payload = statusData?.payload ?? {}
+        const contextPercent = Number(payload.contextPercent ?? 0)
+        const maxTokens = Number(payload.maxTokens ?? 0)
+        const usedTokens = Number(payload.usedTokens ?? 0)
+        const model = String(payload.model ?? '')
+        if (statusData?.ok && (maxTokens > 0 || usedTokens > 0 || contextPercent > 0)) {
+          setCtx({
+            contextPercent,
+            model,
+            maxTokens,
+            usedTokens,
+          })
+          return
+        }
+      }
+
+      const fallbackParams = sessionId
         ? `?sessionId=${encodeURIComponent(sessionId)}`
         : ''
-      const res = await fetch(`/api/context-usage${params}`)
+      const res = await fetch(`/api/context-usage${fallbackParams}`)
       if (!res.ok) return
       const data = await res.json()
       if (data.ok) {

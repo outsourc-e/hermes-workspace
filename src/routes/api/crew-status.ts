@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
@@ -37,7 +37,16 @@ function buildCrewDefinitions(): CrewDefinition[] {
   const profilesDir = join(getClaudeRoot(), 'profiles')
   const dynamicProfiles = existsSync(profilesDir)
     ? readdirSync(profilesDir, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
+        .filter((entry) => {
+          const profilePath = join(profilesDir, entry.name)
+          if (entry.isDirectory()) return true
+          if (!entry.isSymbolicLink()) return false
+          try {
+            return statSync(profilePath).isDirectory()
+          } catch {
+            return false
+          }
+        })
         .map((entry) => entry.name)
         .sort()
     : []

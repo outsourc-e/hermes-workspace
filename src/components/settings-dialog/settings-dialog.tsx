@@ -1374,7 +1374,7 @@ function _AdvancedContent() {
           <div className="w-full max-w-sm">
             <Input
               type="url"
-              placeholder="https://api.claudeworkspace.app"
+              placeholder="http://127.0.0.1:8642"
               value={settings.claudeUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"

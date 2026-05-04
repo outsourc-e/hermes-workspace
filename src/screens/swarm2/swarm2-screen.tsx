@@ -19,6 +19,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
+import { toast } from '@/components/ui/toast'
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
@@ -27,6 +28,7 @@ import { Swarm2KanbanBoard } from './swarm2-kanban-board'
 import { Swarm2ReportsView, buildSwarm2InboxLanes, type Swarm2InboxItem } from './swarm2-reports-view'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
+import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import { cn } from '@/lib/utils'
 
 const SWARM2_ROOM_STORAGE_KEY = 'claude-swarm2-room-v1'
@@ -55,8 +57,8 @@ const SWARM2_OPERATION_THEME: CSSProperties = {
 
 export const SWARM2_INFORMATION_HIERARCHY = [
   'Status header: online workers, active room, refresh state, view switch.',
-  'Aurora/orchestrator hub card: top-center primary routing hub with aggregate state and router affordance.',
-  'Visible routing wires: subdued connection lines from Aurora to every worker, highlighted for selected and wired room nodes.',
+  'Orchestrator hub card: top-center primary routing hub with aggregate state and router affordance.',
+  'Visible routing wires: subdued connection lines from the orchestrator to every worker, highlighted for selected and wired room nodes.',
   'Operations-style worker node cards: role, state, current task, last useful signal, direct inline chat/action affordances.',
   'Minimal attention rail: only auth, worker availability, room count, selected runtime metadata.',
   'Central bottom router chat: orchestration brain for auto/manual/broadcast dispatch.',
@@ -473,7 +475,7 @@ function rankMember(roomIds: Array<string>) {
 function sortSwarmMembers(members: Array<CrewMember>, roomIds: Array<string>) {
   const rank = rankMember(roomIds)
   return [...members]
-    .filter((member) => /^swarm\d+$/i.test(member.id))
+    .filter((member) => member.id && member.id.trim().length > 0)
     .sort((a, b) => {
       const r = rank(a) - rank(b)
       if (r !== 0) return r
@@ -857,8 +859,13 @@ function ControlPlaneStage({
 
           <div className={cn('relative z-10 flex flex-col gap-3', viewMode === 'runtime' ? 'block' : 'hidden')}>
             {!tmuxAvailable ? (
-              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs text-[var(--theme-muted)]">
-                tmux not installed — each worker still gets a live shell PTY at its workspace. Install tmux only if you want to attach to TUI sessions running outside the UI.
+              <div className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-2.5 text-xs text-amber-100">
+                <div className="font-semibold text-amber-50">tmux not installed on this host</div>
+                <div className="mt-1 text-amber-100/80">Spawning a Hermes swarm worker requires tmux. Without it, the worker can start but cannot dispatch tasks (you'll see &lsquo;can't find pane: swarm-&lt;id&gt;&rsquo; errors). Install tmux:</div>
+                <code className="mt-1 inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">brew install tmux</code>{' '}
+                <span className="text-amber-100/60">(macOS) or</span>{' '}
+                <code className="inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">apt install tmux</code>{' '}
+                <span className="text-amber-100/60">(Ubuntu/Debian).</span>
               </div>
             ) : null}
             {focusedRuntimeWorkerId ? (
@@ -1039,9 +1046,32 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
+          let parsed: { error?: string } = {}
+          try { parsed = JSON.parse(text) } catch {}
+          const msg = parsed.error || text || `HTTP ${res.status}`
+          if (msg.includes('tmux not installed')) {
+            toast({
+              title: 'tmux not installed',
+              description:
+                `Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
+              variant: 'destructive',
+            })
+          } else {
+            toast({
+              title: `Failed to start ${workerId}`,
+              description: msg,
+              variant: 'destructive',
+            })
+          }
           // eslint-disable-next-line no-console
           console.error('[swarm2] start session failed:', res.status, text)
         }
+      } catch (err) {
+        toast({
+          title: `Failed to start ${workerId}`,
+          description: err instanceof Error ? err.message : String(err),
+          variant: 'destructive',
+        })
       } finally {
         setPendingTmux((prev) => {
           const next = new Set(prev)
@@ -1471,6 +1501,34 @@ export function Swarm2Screen() {
             </div>
 
             <div className="relative flex shrink-0 items-center gap-2 text-sm text-[var(--theme-muted)]">
+              <WorkflowHelpModal
+                compact
+                eyebrow="Swarm"
+                title="How Swarm works"
+                sections={[
+                  {
+                    title: 'What this surface does',
+                    bullets: [
+                      'Swarm turns a group of workers into one coordinated execution surface.',
+                      'Use it to route tasks, monitor state, and keep parallel work moving without losing context.',
+                    ],
+                  },
+                  {
+                    title: 'Typical flow',
+                    bullets: [
+                      'Review worker state, then dispatch or reroute work from the orchestration controls.',
+                      'Use reports, inbox, and runtime signals to spot blockers and pull workers back on track.',
+                    ],
+                  },
+                  {
+                    title: 'FAQ',
+                    bullets: [
+                      'If a worker is missing setup or model config, fix that in Operations first.',
+                      'Swarm2 is the operational coordination layer, not the first-time setup screen.',
+                    ],
+                  },
+                ]}
+              />
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((open) => !open)}

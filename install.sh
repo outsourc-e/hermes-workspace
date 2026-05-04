@@ -8,7 +8,7 @@
 #   1. Verifies Node 22+, git, pnpm
 #   2. Installs hermes-agent via Nous's official upstream installer
 #   3. Clones hermes-workspace
-#   4. Sets up .env, enables the Claude HTTP API, installs deps,
+#   4. Sets up .env, enables the Hermes API server, installs deps,
 #      and links bundled skills
 #
 # Re-runnable. Will skip anything already installed.
@@ -34,7 +34,7 @@ banner() {
   cat <<'EOF'
 
    ╭────────────────────────────────────────────╮
-   │  PROJECT WORKSPACE — zero-fork installer   │
+   │  HERMES WORKSPACE — zero-fork installer   │
    │  outsourc-e/hermes-workspace               │
    ╰────────────────────────────────────────────╯
 
@@ -111,15 +111,15 @@ green "  pnpm $(pnpm --version) ✓"
 # ─── install hermes-agent (delegate to Nous upstream installer) ──────────
 # hermes-agent is NOT on PyPI. It installs from source via Nous's own
 # script, which handles PEP 668, uv, Python toolchain, Termux, etc. We
-# only need to ensure `claude` ends up on PATH before continuing.
+# only need to ensure `hermes` ends up on PATH before continuing.
 
 cyan "→ Installing hermes-agent (via Nous upstream installer)…"
-# Pick up claude if it was installed in a prior run but not on PATH yet
-ensure_path "$HOME/.claude/bin"
+# Pick up hermes if it was installed in a prior run but not on PATH yet
+ensure_path "$HOME/.hermes/bin"
 ensure_path "$HOME/.local/bin"
 
-if command -v claude &>/dev/null; then
-  green "  hermes-agent already installed ✓ ($(command -v claude))"
+if command -v hermes &>/dev/null; then
+  green "  hermes-agent already installed ✓ ($(command -v hermes))"
 else
   yellow "  Delegating to: $NOUS_INSTALLER_URL"
   if ! curl -fsSL "$NOUS_INSTALLER_URL" | bash; then
@@ -128,16 +128,16 @@ else
     red "    curl -fsSL $NOUS_INSTALLER_URL | bash"
     exit 1
   fi
-  # Nous typically installs `claude` to ~/.hermes/bin or ~/.local/bin
-  ensure_path "$HOME/.claude/bin"
+  # Nous typically installs `hermes` to ~/.hermes/bin or ~/.local/bin
+  ensure_path "$HOME/.hermes/bin"
   ensure_path "$HOME/.local/bin"
-  if ! command -v claude &>/dev/null; then
-    red "  hermes-agent installed, but 'claude' is not on PATH in this shell."
+  if ! command -v hermes &>/dev/null; then
+    red "  hermes-agent installed, but 'hermes' is not on PATH in this shell."
     yellow "  Open a new shell (or: source ~/.bashrc / ~/.zshrc) and re-run:"
     yellow "    curl -fsSL https://hermes-workspace.com/install.sh | bash"
     exit 1
   fi
-  green "  hermes-agent installed ✓ ($(command -v claude))"
+  green "  hermes-agent installed ✓ ($(command -v hermes))"
 fi
 
 # ─── clone workspace ──────────────────────────────────────────────────────
@@ -165,25 +165,25 @@ fi
 ensure_env_key "$INSTALL_DIR/.env" "HERMES_API_URL" "http://127.0.0.1:${GATEWAY_PORT}"
 green "  .env ready ✓"
 
-cyan "→ Enabling Claude HTTP API…"
-CLAUDE_ENV_PATH="$(claude config env-path 2>/dev/null || true)"
-if [[ -z "$CLAUDE_ENV_PATH" ]]; then
-  CLAUDE_ENV_PATH="$HOME/.claude/.env"
+cyan "→ Enabling Hermes API server…"
+HERMES_ENV_PATH="$(hermes config env-path 2>/dev/null || true)"
+if [[ -z "$HERMES_ENV_PATH" ]]; then
+  HERMES_ENV_PATH="$HOME/.hermes/.env"
 fi
-ensure_env_key "$CLAUDE_ENV_PATH" "API_SERVER_ENABLED" "true"
-green "  Claude env updated: $CLAUDE_ENV_PATH ✓"
+ensure_env_key "$HERMES_ENV_PATH" "API_SERVER_ENABLED" "true"
+green "  Hermes env updated: $HERMES_ENV_PATH ✓"
 
 # Guard against a common foot-gun: users editing ~/.hermes/.env by hand and
 # writing env var names without underscores (APISERVERENABLED vs
 # API_SERVER_ENABLED). The gateway reads exact names — typos are silently
 # ignored, which produces a "gateway starts but API server never binds"
 # failure that's hard to diagnose from the UI.
-if [[ -f "$CLAUDE_ENV_PATH" ]]; then
-  SUSPICIOUS=$(grep -E "^(API[A-Z]+|CLAUDE[A-Z]+)=" "$CLAUDE_ENV_PATH" 2>/dev/null \
-    | grep -vE "^(API_|CLAUDE_)" || true)
+if [[ -f "$HERMES_ENV_PATH" ]]; then
+  SUSPICIOUS=$(grep -E "^(API[A-Z]+|HERMES[A-Z]+)=" "$HERMES_ENV_PATH" 2>/dev/null \
+    | grep -vE "^(API_|HERMES_)" || true)
   if [[ -n "$SUSPICIOUS" ]]; then
     yellow ""
-    yellow "⚠  Found env var names missing underscores in $CLAUDE_ENV_PATH:"
+    yellow "⚠  Found env var names missing underscores in $HERMES_ENV_PATH:"
     echo "$SUSPICIOUS" | sed 's/^/      /'
     yellow "   The gateway reads names with underscores (API_SERVER_ENABLED,"
     yellow "   not APISERVERENABLED). These lines will be silently ignored."
@@ -196,15 +196,15 @@ cyan "→ Installing npm deps (pnpm install)…"
 pnpm install --silent
 green "  deps installed ✓"
 
-# ─── seed Claude skills (Conductor needs workspace-dispatch) ─────────────
+# ─── seed Hermes skills (Conductor needs workspace-dispatch) ─────────────
 
 cyan "→ Linking bundled skills into ~/.hermes/skills…"
-CLAUDE_SKILLS_DIR="$HOME/.claude/skills"
-mkdir -p "$CLAUDE_SKILLS_DIR"
+HERMES_SKILLS_DIR="$HOME/.hermes/skills"
+mkdir -p "$HERMES_SKILLS_DIR"
 if [[ -d "$INSTALL_DIR/skills" ]]; then
   for skill_path in "$INSTALL_DIR/skills"/*/; do
     skill_name=$(basename "$skill_path")
-    target="$CLAUDE_SKILLS_DIR/$skill_name"
+    target="$HERMES_SKILLS_DIR/$skill_name"
     if [[ -e "$target" || -L "$target" ]]; then
       continue
     fi
@@ -225,7 +225,7 @@ Next steps (two terminals):
 
   1) Start the Hermes Agent gateway:
        hermes gateway run
-     (first run may prompt for claude setup)
+     (first run may prompt for hermes setup)
 
   2) Start the workspace UI:
        cd $INSTALL_DIR && pnpm dev

@@ -8,11 +8,33 @@ export type ConnectionErrorKind =
   | 'disconnected'
   | 'unknown'
 
+// Markers that indicate an auth failure happened (used to qualify generic
+// keywords like "token" so we don't misclassify network noise).
+const AUTH_FAILURE_MARKERS = [
+  'unauthorized',
+  'unauthenticated',
+  'forbidden',
+  'invalid',
+  'expired',
+  'rejected',
+  'denied',
+  'missing',
+  'no auth',
+  'auth failed',
+  'auth required',
+  '401',
+  '403',
+]
+
+function looksLikeAuthFailure(lower: string): boolean {
+  return AUTH_FAILURE_MARKERS.some((marker) => lower.includes(marker))
+}
+
 export function classifyConnectionError(
   error?: string | Error | null,
   status?: number | null,
 ): ConnectionErrorKind {
-  const msg = typeof error === 'string' ? error : error?.message ?? ''
+  const msg = typeof error === 'string' ? error : (error?.message ?? '')
   const lower = msg.toLowerCase()
   if (!lower && !status) return 'gateway_unreachable'
   if (status === 401) return 'clawsuite_auth_required'
@@ -23,12 +45,18 @@ export function classifyConnectionError(
   ) {
     return 'gateway_pairing_required'
   }
+  // Gateway auth rejection: the gateway received our request but refused
+  // the device's auth token. Match on phrases that clearly indicate an
+  // auth failure — generic words like "token" only count when paired with
+  // an auth-failure marker (rejected/invalid/expired/etc.) so that benign
+  // strings like "failed to fetch token from /api/x" don't get misrouted
+  // to a "log in again" prompt.
   if (
     lower.includes('missing gateway auth') ||
     lower.includes('gateway auth') ||
-    lower.includes('token') ||
     lower.includes('forbidden') ||
-    lower.includes('unauthorized')
+    lower.includes('unauthorized') ||
+    (lower.includes('token') && looksLikeAuthFailure(lower))
   ) {
     return 'gateway_auth_rejected'
   }
@@ -71,17 +99,17 @@ export function getConnectionErrorMessage(
         action: 'Enter your password to continue',
       }
     case 'gateway_auth_rejected':
-    case 'clawsuite_auth_required':
       return {
-        title: 'Claude Login Required',
-        description: 'This instance requires a password to access.',
-        action: 'Enter your password to continue',
+        title: 'Gateway rejected this device',
+        description:
+          "The gateway is reachable, but it refused this device's auth token. The token is missing, invalid, or expired.",
+        action:
+          'Re-pair this device with the gateway, or check that the gateway auth token is configured correctly.',
       }
     case 'gateway_pairing_required':
       return {
         title: 'Pair this device first',
-        description:
-          'This device is not paired with the gateway yet.',
+        description: 'This device is not paired with the gateway yet.',
         action: 'Run `claude pair` on the gateway machine, then reconnect.',
       }
     case 'gateway_unreachable':
@@ -95,7 +123,8 @@ export function getConnectionErrorMessage(
         title: 'Connection could not be verified',
         description:
           'The gateway responded, but the secure connection handshake did not complete.',
-        action: 'Try reconnecting. If it keeps failing, check gateway pairing and auth.',
+        action:
+          'Try reconnecting. If it keeps failing, check gateway pairing and auth.',
       }
     case 'handshake_timeout':
       return {
@@ -125,9 +154,7 @@ export function getConnectionErrorInfo(
   const kind = classifyConnectionError(error, status)
   const base = getConnectionErrorMessage(kind)
   const details =
-    typeof error === 'string'
-      ? error.trim()
-      : error?.message?.trim() ?? ''
+    typeof error === 'string' ? error.trim() : (error?.message?.trim() ?? '')
 
   const showDetails =
     details.length > 0 &&

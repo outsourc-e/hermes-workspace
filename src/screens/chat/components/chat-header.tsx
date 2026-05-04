@@ -9,7 +9,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { InspectorToggleButton } from '@/components/inspector/inspector-panel'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 
 function toTitleCase(value: string): string {
@@ -301,9 +300,6 @@ function ChatHeaderComponent({
 
           <div className="flex-1" />
 
-          <div className="shrink-0 flex items-center gap-1">
-            <InspectorToggleButton />
-          </div>
         </div>
       </div>
     )
@@ -606,7 +602,6 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         )}
-        <InspectorToggleButton className="ml-2" />
       </div>
     </div>
   )

@@ -325,7 +325,7 @@ export function AgentCard({
         initial={{ opacity: 0.9 }}
         animate={{ opacity: 1 }}
         className={cn(
-          'group relative overflow-visible rounded-3xl border border-primary-300/80 bg-primary-100/70 shadow-md backdrop-blur-sm',
+          'group relative overflow-visible rounded-3xl border border-primary-300/35 bg-primary-100/70 shadow-md backdrop-blur-sm',
           'w-full p-3',
           isCompact ? 'col-span-2' : '',
           className,
@@ -354,7 +354,7 @@ export function AgentCard({
         </div>
 
         {/* Status + model row */}
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-primary-300/30 bg-primary-200/24 p-2.5">
           <span
             className={cn(
               'inline-flex size-2 shrink-0 rounded-full',
@@ -374,7 +374,7 @@ export function AgentCard({
         </div>
 
         {/* Last output / task preview */}
-        <div className="mb-3 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
+        <div className="mb-3 rounded-xl border border-primary-300/30 bg-primary-200/24 p-2.5">
           <p className="mb-1 text-[10px] font-medium text-primary-600">Last message</p>
           <p className="text-[11px] leading-relaxed text-primary-800">
             {node.task.length > 80 ? `${node.task.slice(0, 80)}…` : node.task}
@@ -382,7 +382,7 @@ export function AgentCard({
         </div>
 
         {/* Compact stats */}
-        <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary-300/60 bg-primary-200/30 px-2.5 py-2 text-[10px] tabular-nums text-primary-600">
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary-300/30 bg-primary-200/24 px-2.5 py-2 text-[10px] tabular-nums text-primary-600">
           <span>{formatRuntime(node.runtimeSeconds)}</span>
           <span className="text-primary-300">·</span>
           <span>{node.tokenCount.toLocaleString()} tok</span>
@@ -447,7 +447,7 @@ export function AgentCard({
         x: { duration: 0.3, ease: 'easeOut' },
       }}
       className={cn(
-        'group relative rounded-3xl border border-primary-300/80 bg-primary-100/70 shadow-md backdrop-blur-sm',
+        'group relative rounded-3xl border border-primary-300/35 bg-primary-100/70 shadow-md backdrop-blur-sm',
         isCompact
           ? 'w-full min-w-0 overflow-visible rounded-xl p-2'
           : 'w-full overflow-hidden p-2.5',
@@ -468,7 +468,7 @@ export function AgentCard({
                 strokeWidth={2.5}
                 className="absolute inset-0"
               />
-              <div className="absolute inset-1 inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
+              <div className="absolute inset-1 inline-flex items-center justify-center rounded-full border border-primary-300/35 bg-primary-200/72">
                 {node.isMain ? (
                   <AgentAvatar size="sm" />
                 ) : (
@@ -579,7 +579,7 @@ export function AgentCard({
                   )}
                 />
               ) : null}
-              <div className="absolute inset-1.5 inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
+              <div className="absolute inset-1.5 inline-flex items-center justify-center rounded-full border border-primary-300/35 bg-primary-200/72">
                 {node.isMain ? (
                   <AgentAvatar size="md" />
                 ) : (

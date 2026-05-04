@@ -2,6 +2,7 @@ import { BotIcon, Rocket01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
+import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 
 export function AgentsScreen() {
   const navigate = useNavigate()
@@ -21,13 +22,43 @@ export function AgentsScreen() {
               </p>
             </div>
           </div>
-          <Button
-            className="bg-accent-500 text-primary-950 hover:bg-accent-400"
-            onClick={() => void navigate({ to: '/conductor' })}
-          >
-            <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.8} />
-            Open Conductor
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <WorkflowHelpModal
+              compact
+              eyebrow="Operations"
+              title="How Operations works"
+              sections={[
+                {
+                  title: 'What this screen does',
+                  bullets: [
+                    'Operations is the setup and readiness layer for your agents.',
+                    'Use it to confirm which profiles are configured and which ones still need setup.',
+                  ],
+                },
+                {
+                  title: 'Typical flow',
+                  bullets: [
+                    'Repair or configure agents here first.',
+                    'Then use Conductor for mission-style dispatch and Swarm for coordinated multi-worker runs.',
+                  ],
+                },
+                {
+                  title: 'FAQ',
+                  bullets: [
+                    'Needs setup usually means missing model or related runtime configuration.',
+                    'If an agent is broken in Operations, other dispatch surfaces will usually be unreliable too.',
+                  ],
+                },
+              ]}
+            />
+            <Button
+              className="bg-accent-500 text-primary-950 hover:bg-accent-400"
+              onClick={() => void navigate({ to: '/conductor' })}
+            >
+              <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.8} />
+              Open Conductor
+            </Button>
+          </div>
         </header>
 
         <section className="rounded-xl border border-primary-200 bg-[var(--theme-card)] p-6 shadow-sm">

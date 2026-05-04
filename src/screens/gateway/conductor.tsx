@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, ArrowRight01Icon, PlayIcon, Rocket01Icon, Search01Icon, Settings01Icon, TaskDone01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
+import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { OfficeView } from './components/office-view'
 import type { AgentWorkingRow } from './components/agents-working-panel'
@@ -1301,6 +1302,34 @@ export function Conductor() {
                   <span className="size-2.5 rounded-full bg-emerald-400" />
                 </div>
                 <div className="absolute right-0 flex items-center gap-2">
+                  <WorkflowHelpModal
+                    compact
+                    eyebrow="Conductor"
+                    title="How Conductor works"
+                    sections={[
+                      {
+                        title: 'What Conductor is for',
+                        bullets: [
+                          'Conductor is the mission-level orchestration surface for coordinated agent execution.',
+                          'Use it when one goal should be planned, assigned, and tracked end to end.',
+                        ],
+                      },
+                      {
+                        title: 'Typical flow',
+                        bullets: [
+                          'Start a mission, watch worker progress, and intervene only when something is blocked or clearly off-course.',
+                          'Use the mission views to understand what happened before retrying or launching the next mission.',
+                        ],
+                      },
+                      {
+                        title: 'FAQ',
+                        bullets: [
+                          'If Conductor says upstream is unavailable, the underlying runtime capability is not ready yet.',
+                          'Conductor is for orchestration, not first-time setup. Fix setup issues in Operations first.',
+                        ],
+                      },
+                    ]}
+                  />
                   <button
                     type="button"
                     onClick={() => setMissionModalOpen(true)}
@@ -1882,6 +1911,34 @@ export function Conductor() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
+                    <WorkflowHelpModal
+                      compact
+                      eyebrow="Conductor"
+                      title="How Conductor works"
+                      sections={[
+                        {
+                          title: 'What Conductor is for',
+                          bullets: [
+                            'Conductor is the mission-level orchestration surface for coordinated agent execution.',
+                            'Use it when one goal should be planned, assigned, and tracked end to end.',
+                          ],
+                        },
+                        {
+                          title: 'Typical flow',
+                          bullets: [
+                            'Start a mission, watch worker progress, and intervene only when something is blocked or clearly off-course.',
+                            'Use the mission views to understand what happened before retrying or launching the next mission.',
+                          ],
+                        },
+                        {
+                          title: 'FAQ',
+                          bullets: [
+                            'If Conductor says upstream is unavailable, the underlying runtime capability is not ready yet.',
+                            'Conductor is for orchestration, not first-time setup. Fix setup issues in Operations first.',
+                          ],
+                        },
+                      ]}
+                    />
                     <Button
                       type="button"
                       onClick={() => void conductor.retryMission()}

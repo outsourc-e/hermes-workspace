@@ -22,7 +22,14 @@ export const useInspectorStore = create<InspectorStore>((set) => ({
 
 // ── Tab types ─────────────────────────────────────────────────────────────────
 
-type TabId = 'activity' | 'artifacts' | 'files' | 'memory' | 'skills' | 'logs'
+type TabId =
+  | 'activity'
+  | 'artifacts'
+  | 'files'
+  | 'memory'
+  | 'skills'
+  | 'mcp'
+  | 'logs'
 
 const TABS: Array<{
   id: TabId
@@ -34,6 +41,7 @@ const TABS: Array<{
   { id: 'files', label: 'Files' },
   { id: 'memory', label: 'Memory', feature: 'memory' },
   { id: 'skills', label: 'Skills', feature: 'skills' },
+  { id: 'mcp', label: 'MCP' },
   { id: 'logs', label: 'Logs' },
 ]
 
@@ -370,6 +378,94 @@ function SkillsTab() {
   )
 }
 
+// ── MCP Tab ───────────────────────────────────────────────────────────────────
+
+type McpInspectorServer = {
+  id: string
+  name: string
+  enabled: boolean
+  status?: string
+  discoveredToolsCount?: number
+}
+
+function McpTab() {
+  const [servers, setServers] = useState<Array<McpInspectorServer> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/mcp')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        if (cancelled) return
+        const list = Array.isArray(json?.servers) ? json.servers : []
+        setServers(
+          list.map((entry: Record<string, unknown>) => ({
+            id: String(entry?.id || entry?.name || ''),
+            name: String(entry?.name || ''),
+            enabled: Boolean(entry?.enabled),
+            status:
+              typeof entry?.status === 'string' ? entry.status : undefined,
+            discoveredToolsCount:
+              typeof entry?.discoveredToolsCount === 'number'
+                ? entry.discoveredToolsCount
+                : undefined,
+          })),
+        )
+        setLoading(false)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err.message || 'Failed to load MCP servers')
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) return <LoadingState text="Loading MCP servers…" />
+  if (error) return <ErrorState text={`MCP: ${error}`} />
+  if (!servers || servers.length === 0)
+    return <EmptyState text="No MCP servers configured" />
+
+  return (
+    <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+      <p className="mb-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+        {servers.length} MCP server{servers.length === 1 ? '' : 's'}
+      </p>
+      {servers.map((server) => (
+        <div
+          key={server.id}
+          className="rounded-lg px-3 py-2 text-xs leading-relaxed"
+          style={{
+            backgroundColor: 'var(--theme-card)',
+            border: '1px solid var(--theme-border)',
+            color: 'var(--theme-text)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">{server.name}</span>
+            <span style={{ color: 'var(--theme-accent)' }}>
+              {server.enabled ? 'on' : 'off'}
+              {typeof server.discoveredToolsCount === 'number'
+                ? ` · ${server.discoveredToolsCount} tools`
+                : ''}
+            </span>
+          </div>
+          {server.status ? (
+            <div style={{ color: 'var(--theme-muted)' }}>{server.status}</div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Logs Tab ──────────────────────────────────────────────────────────────────
 
 function LogsTab() {
@@ -411,7 +507,7 @@ function LogsTab() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function InspectorPanel() {
+export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const isOpen = useInspectorStore((s) => s.isOpen)
   const memoryAvailable = useFeatureAvailable('memory')
   const skillsAvailable = useFeatureAvailable('skills')
@@ -426,19 +522,27 @@ export function InspectorPanel() {
     }
   }, [activeTab, memoryAvailable, skillsAvailable])
 
+  if (embedded && !isOpen) return null
+
   return (
     <div
       className={cn(
-        'fixed right-0 top-0 h-full z-40 flex flex-col overflow-hidden transition-[width] duration-200',
-        isOpen ? 'w-[350px]' : 'w-0',
+        embedded
+          ? 'relative overflow-hidden rounded-2xl border border-primary-200/20 bg-primary-100/60 shadow-sm backdrop-blur-sm'
+          : 'relative h-full shrink-0 overflow-hidden transition-[width] duration-200',
+        !embedded && (isOpen ? 'w-[350px]' : 'w-0'),
       )}
-      style={{
-        background: 'var(--theme-panel)',
-        borderLeft: '2px solid var(--theme-border)',
-        boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.2)',
-      }}
+      style={
+        embedded
+          ? undefined
+          : {
+              background: 'var(--theme-panel)',
+              borderLeft: '1px solid var(--theme-border)',
+              boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.12)',
+            }
+      }
     >
-      {isOpen && (
+      {(embedded || isOpen) && (
         <>
           {/* Header */}
           <div
@@ -524,6 +628,7 @@ export function InspectorPanel() {
             {activeTab === 'files' && <FilesTab />}
             {activeTab === 'memory' && <MemoryTab />}
             {activeTab === 'skills' && <SkillsTab />}
+            {activeTab === 'mcp' && <McpTab />}
             {activeTab === 'logs' && <LogsTab />}
           </div>
         </>

@@ -68,6 +68,13 @@ export type OperationsAgent = GatewayConfigAgent & {
   progressValue: number
   progressStatus: 'running' | 'queued' | 'failed' | 'complete' | 'thinking'
   recentOutputs: OperationsOutputItem[]
+  /**
+   * True when the agent's profile has no model configured (blank model in
+   * config.yaml). Dispatching into an unconfigured agent hangs because
+   * hermes-agent has nothing to call. Show 'Needs setup' state instead.
+   * See #270.
+   */
+  needsSetup: boolean
 }
 
 type ConfigPayload = {
@@ -567,6 +574,8 @@ export function useOperations() {
         .sort((left, right) => right.timestamp - left.timestamp)
         .slice(0, 5)
 
+      const needsSetup = !agent.model || agent.model.trim().length === 0
+
       return {
         ...agent,
         meta,
@@ -586,6 +595,7 @@ export function useOperations() {
         progressValue: getProgressValue(status, latestSession),
         progressStatus: getProgressStatus(status, latestSession),
         recentOutputs,
+        needsSetup,
       } satisfies OperationsAgent
     })
   }, [

@@ -12,6 +12,7 @@ import {
   ViewIcon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
+import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import {
   getOnlineStatus,
   useCrewStatus,
@@ -227,6 +228,34 @@ export function SwarmScreen() {
           </div>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
+          <WorkflowHelpModal
+            compact
+            eyebrow="Swarm"
+            title="How Swarm works"
+            sections={[
+              {
+                title: 'What Swarm is for',
+                bullets: [
+                  'Swarm is the multi-worker orchestration surface for parallel execution.',
+                  'Use it when one goal should be split across several agents with live visibility and routing.',
+                ],
+              },
+              {
+                title: 'Typical flow',
+                bullets: [
+                  'Select workers, dispatch targeted tasks, and monitor progress from the hub and cards.',
+                  'Use ping, refresh, and card status to triage stuck or unhealthy workers quickly.',
+                ],
+              },
+              {
+                title: 'FAQ',
+                bullets: [
+                  'If workers look empty or unhealthy, fix setup and runtime issues in Operations first.',
+                  'Swarm is best for coordination and throughput, not first-time configuration.',
+                ],
+              },
+            ]}
+          />
           <ViewModeToggle mode={viewMode} setMode={setViewMode} />
           {updatedAgo ? <div className="text-[11px] text-emerald-200/55">Updated {updatedAgo}</div> : null}
           <button

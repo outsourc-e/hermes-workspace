@@ -39,7 +39,7 @@ import { MobilePageHeader } from '@/components/mobile-page-header'
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
 import { ClaudeReconnectBanner } from '@/components/claude-reconnect-banner'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
-// System metrics footer removed — not used in Hermes Workspace
+import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
@@ -98,8 +98,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (path === '/swarm' || path.startsWith('/swarm2')) return 5
     if (path.startsWith('/memory')) return 6
     if (path.startsWith('/skills')) return 7
-    if (path.startsWith('/profiles')) return 8
-    if (path.startsWith('/settings')) return 9
+    if (path.startsWith('/mcp')) return 8
+    if (path.startsWith('/profiles')) return 9
+    if (path.startsWith('/settings')) return 10
     return -1
   }, [])
 
@@ -130,6 +131,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Swarm'
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
+    if (pathname.startsWith('/mcp')) return 'MCP'
     if (pathname.startsWith('/profiles')) return 'Profiles'
     if (pathname.startsWith('/settings')) return 'Settings'
     if (pathname.startsWith('/debug')) return 'Debug'
@@ -322,7 +324,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 : !isMobile &&
                     !isOnChatRoute &&
                     settings.showSystemMetricsFooter
-                  ? 'pb-[calc(1.5rem+1.75rem)]'
+                  ? 'pb-7'
                   : '',
             ].join(' ')}
             data-tour="chat-area"
@@ -394,7 +396,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       </div>
 
       <MobileHamburgerMenu />
-      {/* System metrics footer removed */}
+      {!isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
+        <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
+      ) : null}
       <CommandPalette pathname={pathname} sessions={sessions} />
     </>
   )

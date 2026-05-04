@@ -10,6 +10,7 @@ import {
   Chat01Icon,
   CommandLineIcon,
   File01Icon,
+  McpServerIcon,
   PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
@@ -128,6 +129,11 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       return
     }
 
+    if (command === '/mcp') {
+      void navigate({ to: '/mcp' })
+      return
+    }
+
     if (command === '/model' || command === '/skin') {
       const section = command === '/skin' ? 'appearance' : 'claude'
       if (pathname.startsWith('/chat') || pathname === '/') {
@@ -205,6 +211,15 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
         onSelect: () => void navigate({ to: '/skills' }),
       },
       {
+        id: 'screen-mcp',
+        group: 'Screens',
+        label: 'MCP',
+        keywords: 'mcp servers model context protocol presets',
+        shortcut: 'Go',
+        icon: McpServerIcon,
+        onSelect: () => void navigate({ to: '/mcp' }),
+      },
+      {
         id: 'screen-settings',
         group: 'Screens',
         label: 'Settings',
@@ -275,6 +290,15 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
         shortcut: 'Run',
         icon: CommandLineIcon,
         onSelect: () => runSlashCommand('/skills'),
+      },
+      {
+        id: 'slash-mcp',
+        group: 'Slash Commands',
+        label: '/mcp',
+        keywords: 'mcp servers model context protocol page',
+        shortcut: 'Run',
+        icon: CommandLineIcon,
+        onSelect: () => runSlashCommand('/mcp'),
       },
       {
         id: 'slash-skin',

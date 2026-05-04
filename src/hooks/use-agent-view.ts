@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
@@ -56,9 +56,8 @@ type AgentViewState = {
   setHistoryOpen: (isOpen: boolean) => void
 }
 
-const PANEL_WIDTH_PX = 320
+const PANEL_WIDTH_PX = 288
 const MIN_DESKTOP_WIDTH = 1024
-const AUTO_OPEN_WIDTH = 1440
 const REFRESH_INTERVAL_MS = 5000
 
 function createDemoActiveAgents(): Array<ActiveAgent> {
@@ -146,8 +145,7 @@ function createDemoHistory(): Array<AgentHistoryItem> {
 }
 
 function inferInitialOpenState(): boolean {
-  if (typeof window === 'undefined') return true
-  return window.innerWidth >= AUTO_OPEN_WIDTH
+  return false
 }
 
 function readString(value: unknown): string {
@@ -515,7 +513,7 @@ export function useAgentView(): AgentViewResult {
   const missionSessionMap = useMissionStore((state) => state.agentSessionMap)
 
   const [viewportWidth, setViewportWidth] = useState(() => {
-    if (typeof window === 'undefined') return AUTO_OPEN_WIDTH
+    if (typeof window === 'undefined') return MIN_DESKTOP_WIDTH
     return window.innerWidth
   })
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -529,8 +527,6 @@ export function useAgentView(): AgentViewResult {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [isLiveConnected, setIsLiveConnected] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  const previousAutoOpenRef = useRef(false)
 
   useEffect(() => {
     function handleResize() {
@@ -640,15 +636,7 @@ export function useAgentView(): AgentViewResult {
     }
   }, [])
 
-  const shouldAutoOpen = viewportWidth >= AUTO_OPEN_WIDTH
-  useEffect(() => {
-    const isCrossingToLargeDesktop =
-      shouldAutoOpen && previousAutoOpenRef.current !== shouldAutoOpen
-    previousAutoOpenRef.current = shouldAutoOpen
-    if (isCrossingToLargeDesktop) {
-      setOpen(true)
-    }
-  }, [setOpen, shouldAutoOpen])
+  const shouldAutoOpen = false
 
   const isDesktop = viewportWidth >= MIN_DESKTOP_WIDTH
   const panelVisible = isDesktop && isOpen

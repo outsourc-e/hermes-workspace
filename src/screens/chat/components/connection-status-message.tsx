@@ -59,7 +59,7 @@ function classifyConnectionError(
     return {
       title: 'Hermes Agent gateway not running',
       description: 'The Hermes Agent gateway is not running on port 8642.',
-      action: 'Run: pip install -U hermes-agent && hermes gateway run',
+      action: 'Run the official Hermes installer, then start the gateway with: hermes gateway run',
     }
   }
 

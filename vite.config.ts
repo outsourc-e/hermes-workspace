@@ -419,6 +419,18 @@ const config = defineConfig(({ mode, command }) => {
         '**/skills-bundle/**',
         '**/.{idea,git,cache,output,temp}/**',
       ],
+      // Force vitest to run React through its own transform pipeline so ESM
+      // `import` and CJS `require('react')` share a single module instance.
+      // Without this, react-dom sets the dispatcher on its CJS React copy while
+      // components call hooks on the ESM React copy → null dispatcher → crash.
+      deps: {
+        inline: [
+          'react',
+          'react-dom',
+          '@testing-library/react',
+          '@testing-library/dom',
+        ],
+      },
     },
     define: {
       // Note: Do NOT set 'process.env': {} here — TanStack Start uses environment-based

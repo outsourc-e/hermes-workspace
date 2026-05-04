@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "Read repos, issues, PRs via the GitHub MCP server.",
+      "category": "Official Presets",
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["dev", "git"],
+      "template": {
+        "name": "github",
+        "transportType": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-everything"],
+        "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "" },
+        "authType": "none",
+        "toolMode": "all"
+      }
+    },
+    {
+      "id": "filesystem",
+      "name": "Filesystem",
+      "description": "Read and write files within an allow-listed root.",
+      "category": "Official Presets",
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["files"],
+      "template": {
+        "name": "filesystem",
+        "transportType": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/root"],
+        "authType": "none",
+        "toolMode": "all"
+      }
+    },
+    {
+      "id": "postgres",
+      "name": "Postgres",
+      "description": "Run read-only SQL against a Postgres database.",
+      "category": "Official Presets",
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["db", "sql"],
+      "template": {
+        "name": "postgres",
+        "transportType": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-postgres",
+          "postgresql://user:pass@host:5432/db"
+        ],
+        "authType": "none",
+        "toolMode": "all"
+      }
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "description": "Read and post messages via the Slack MCP server.",
+      "category": "Communication",
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["chat"],
+      "template": {
+        "name": "slack",
+        "transportType": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-slack"],
+        "env": { "SLACK_BOT_TOKEN": "", "SLACK_TEAM_ID": "" },
+        "authType": "none",
+        "toolMode": "all"
+      }
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "description": "Query Linear issues and projects.",
+      "category": "Productivity",
+      "homepage": "https://linear.app",
+      "tags": ["issues"],
+      "template": {
+        "name": "linear",
+        "transportType": "http",
+        "url": "https://mcp.linear.app/mcp",
+        "authType": "oauth",
+        "toolMode": "all"
+      }
+    },
+    {
+      "id": "memory",
+      "name": "Memory",
+      "description": "Persistent knowledge-graph memory for agents.",
+      "category": "Official Presets",
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["memory"],
+      "template": {
+        "name": "memory",
+        "transportType": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"],
+        "authType": "none",
+        "toolMode": "all"
+      }
+    },
+    {
+      "id": "fetch",
+      "name": "Fetch",
+      "description": "Fetch arbitrary HTTP content for the agent to read.",
+      "category": "Official Presets",
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["web"],
+      "template": {
+        "name": "fetch",
+        "transportType": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-fetch"],
+        "authType": "none",
+        "toolMode": "all"
+      }
+    }
+  ]
+}

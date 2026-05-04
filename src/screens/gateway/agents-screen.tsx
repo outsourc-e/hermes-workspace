@@ -139,7 +139,7 @@ const ACTIVE_HEARTBEAT_MS = 30_000
 const FALLBACK_AGENT_REGISTRY: Array<AgentDefinition> = [
   {
     id: 'aurora-main',
-    name: 'Aurora/Main',
+    name: 'Main Agent',
     category: 'Core',
     role: 'Orchestrator',
     color: 'orange',

@@ -48,6 +48,7 @@ type SkillSummary = {
   enabled: boolean
   featuredGroup?: string
   security?: SecurityRisk
+  origin?: 'builtin' | 'agent-created' | 'marketplace'
 }
 
 type SkillsApiResponse = {
@@ -133,6 +134,7 @@ export function SkillsScreen() {
   const [debouncedMarketplaceSearch, setDebouncedMarketplaceSearch] =
     useState('')
   const [category, setCategory] = useState('All')
+  const [origin, setOrigin] = useState<string>('All')
   const [sort, setSort] = useState<SkillsSort>('name')
   const [page, setPage] = useState(1)
   const [actionSkillId, setActionSkillId] = useState<string | null>(null)
@@ -152,12 +154,13 @@ export function SkillsScreen() {
   }, [searchInput, tab])
 
   const skillsQuery = useQuery({
-    queryKey: ['skills-browser', tab, searchInput, category, page, sort],
+    queryKey: ['skills-browser', tab, searchInput, category, origin, page, sort],
     queryFn: async function fetchSkills(): Promise<SkillsApiResponse> {
       const params = new URLSearchParams()
       params.set('tab', tab)
       params.set('search', searchInput)
       params.set('category', category)
+      params.set('origin', origin)
       params.set('page', String(page))
       params.set('limit', String(PAGE_LIMIT))
       params.set('sort', sort)
@@ -270,8 +273,7 @@ export function SkillsScreen() {
           icon:
             skill.source === 'github'
               ? '🐙'
-              : skill.source === 'official' ||
-                  skill.trust_level === 'builtin'
+              : skill.source === 'official' || skill.trust_level === 'builtin'
                 ? '✅'
                 : skill.source === 'skills-sh'
                   ? '📦'
@@ -288,7 +290,10 @@ export function SkillsScreen() {
             .filter(Boolean)
             .join('\n\n'),
           fileCount: 0,
-          sourcePath: skill.identifier || (typeof homepage === 'string' ? homepage : '') || skill.source,
+          sourcePath:
+            skill.identifier ||
+            (typeof homepage === 'string' ? homepage : '') ||
+            skill.source,
           installed: skill.installed,
           enabled: skill.installed,
           featuredGroup: undefined,
@@ -302,6 +307,7 @@ export function SkillsScreen() {
             flags: [],
             score: 0,
           },
+          origin: 'marketplace' as const,
         }
       })
     },
@@ -439,6 +445,11 @@ export function SkillsScreen() {
     setPage(1)
   }
 
+  function handleOriginChange(value: string) {
+    setOrigin(value)
+    setPage(1)
+  }
+
   function handleSortChange(value: SkillsSort) {
     setSort(value)
     setPage(1)
@@ -466,66 +477,73 @@ export function SkillsScreen() {
 
         <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-3 backdrop-blur-xl sm:p-4">
           <Tabs value={tab} onValueChange={handleTabChange}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={searchInput}
+                onChange={(event) => handleSearchChange(event.target.value)}
+                placeholder={
+                  tab === 'marketplace'
+                    ? 'Search Skills Hub, GitHub, and local fallback'
+                    : 'Search by name, tags, or description'
+                }
+                className="h-9 w-full min-w-0 flex-1 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
+              />
+
+              {tab === 'installed' ? (
+                <select
+                  value={category}
+                  onChange={(event) =>
+                    handleCategoryChange(event.target.value)
+                  }
+                  className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
+                >
+                  {categories.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+
+              {tab === 'installed' ? (
+                <select
+                  value={origin}
+                  onChange={(event) => handleOriginChange(event.target.value)}
+                  className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
+                >
+                  <option value="All">All Origins</option>
+                  <option value="builtin">Built-in</option>
+                  <option value="agent-created">Agent-created</option>
+                  <option value="marketplace">Marketplace</option>
+                </select>
+              ) : null}
+
+              {tab === 'installed' ? (
+                <select
+                  value={sort}
+                  onChange={(event) =>
+                    handleSortChange(
+                      event.target.value === 'category' ? 'category' : 'name',
+                    )
+                  }
+                  className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
+                >
+                  <option value="name">Name A-Z</option>
+                  <option value="category">Category</option>
+                </select>
+              ) : null}
+
               <TabsList
-                className="w-full rounded-xl border border-primary-200 bg-primary-100/60 p-1 sm:w-auto"
+                className="ml-auto rounded-xl border border-primary-200 bg-primary-100/60 p-1"
                 variant="default"
               >
-                <TabsTab value="installed" className="flex-1 sm:min-w-[132px]">
+                <TabsTab value="installed" className="min-w-[110px]">
                   Installed
                 </TabsTab>
-                <TabsTab
-                  value="marketplace"
-                  className="flex-1 sm:min-w-[168px]"
-                >
+                <TabsTab value="marketplace" className="min-w-[120px]">
                   Marketplace
                 </TabsTab>
-
               </TabsList>
-
-              {tab !== 'marketplace' ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    value={searchInput}
-                    onChange={(event) => handleSearchChange(event.target.value)}
-                    placeholder="Search by name, tags, or description"
-                    className="h-9 w-full min-w-0 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
-                  />
-
-                  {tab === 'installed' ? (
-                    <select
-                      value={category}
-                      onChange={(event) =>
-                        handleCategoryChange(event.target.value)
-                      }
-                      className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
-                    >
-                      {categories.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-
-                  {tab === 'installed' ? (
-                    <select
-                      value={sort}
-                      onChange={(event) =>
-                        handleSortChange(
-                          event.target.value === 'category'
-                            ? 'category'
-                            : 'name',
-                        )
-                      }
-                      className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
-                    >
-                      <option value="name">Name A-Z</option>
-                      <option value="category">Category</option>
-                    </select>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
 
             {actionError ? (
@@ -552,16 +570,14 @@ export function SkillsScreen() {
             </TabsPanel>
 
             <TabsPanel value="marketplace" className="space-y-3 pt-2">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <input
-                  value={searchInput}
-                  onChange={(event) => handleSearchChange(event.target.value)}
-                  placeholder="Search Skills Hub, GitHub, and local fallback"
-                  className="h-10 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
-                />
-                <div className="text-xs text-primary-500 sm:text-right">
-                  Source: {hubQuery.data?.source || 'hub'}
-                </div>
+              <div className="flex items-center justify-between gap-2">
+                {hubQuery.data?.source ? (
+                  <div className="text-xs text-primary-500">
+                    Source: {hubQuery.data.source}
+                  </div>
+                ) : (
+                  <div />
+                )}
               </div>
 
               {hubQuery.error ? (
@@ -722,12 +738,33 @@ export function SkillsScreen() {
               </ScrollAreaRoot>
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-200 px-5 py-3">
-                <p className="text-sm text-primary-500 text-pretty">
-                  Source:{' '}
-                  <code className="inline-code">
-                    {selectedSkill.sourcePath}
-                  </code>
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedSkill.origin ? (
+                    <span
+                      className={cn(
+                        'rounded-md border px-2 py-0.5 text-xs tabular-nums',
+                        selectedSkill.origin === 'builtin' &&
+                          'border-primary-200 bg-primary-100/60 text-primary-500',
+                        selectedSkill.origin === 'agent-created' &&
+                          'border-amber-300/70 bg-amber-100/60 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200',
+                        selectedSkill.origin === 'marketplace' &&
+                          'border-emerald-300/70 bg-emerald-100/60 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-200',
+                      )}
+                    >
+                      {selectedSkill.origin === 'builtin'
+                        ? 'Built-in'
+                        : selectedSkill.origin === 'agent-created'
+                          ? 'Agent-created'
+                          : 'Marketplace'}
+                    </span>
+                  ) : null}
+                  <p className="text-sm text-primary-500 text-pretty">
+                    Source:{' '}
+                    <code className="inline-code">
+                      {selectedSkill.sourcePath}
+                    </code>
+                  </p>
+                </div>
                 <div className="flex items-center gap-2">
                   {selectedSkill.installed ? (
                     <Button
@@ -844,7 +881,10 @@ function SecurityBadge({
           {config.label}
         </button>
         {expanded && (
-          <div className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 rounded-xl border border-primary-200 bg-surface p-0 shadow-xl overflow-hidden">
+          <div
+            className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-primary-200 p-0 shadow-xl"
+            style={{ backgroundColor: 'var(--color-primary-50)' }}
+          >
             <SecurityScanCard security={security} />
           </div>
         )}
@@ -977,28 +1017,53 @@ function SkillsGrid({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18 }}
-              className="flex min-h-[220px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
+              className="relative z-0 flex min-h-[220px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm hover:z-20 focus-within:z-20"
             >
               <div className="mb-2 flex items-start justify-between gap-2">
-                <div className="space-y-1">
-                  <p className="text-xl leading-none">{skill.icon}</p>
-                  <h3 className="line-clamp-1 text-base font-medium text-ink text-balance">
-                    {skill.name}
-                  </h3>
-                  <p className="line-clamp-1 text-xs text-primary-500">
-                    by {skill.author}
-                  </p>
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl leading-none">{skill.icon}</span>
+                    <h3 className="line-clamp-1 min-w-0 text-base font-medium text-ink text-balance">
+                      {skill.name}
+                    </h3>
+                  </div>
+                  {skill.author ? (
+                    <p className="line-clamp-1 text-xs text-primary-500">
+                      by {skill.author}
+                    </p>
+                  ) : null}
                 </div>
-                <span
-                  className={cn(
-                    'rounded-md border px-2 py-0.5 text-xs tabular-nums',
-                    skill.installed
-                      ? 'border-primary/40 bg-primary/15 text-primary'
-                      : 'border-primary-200 bg-primary-100/60 text-primary-500',
-                  )}
-                >
-                  {skill.installed ? 'Installed' : 'Available'}
-                </span>
+                <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
+                  {skill.origin ? (
+                    <span
+                      className={cn(
+                        'rounded-md border px-2 py-0.5 text-xs tabular-nums',
+                        skill.origin === 'builtin' &&
+                          'border-primary-200 bg-primary-100/60 text-primary-500',
+                        skill.origin === 'agent-created' &&
+                          'border-amber-300/70 bg-amber-100/60 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200',
+                        skill.origin === 'marketplace' &&
+                          'border-emerald-300/70 bg-emerald-100/60 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-200',
+                      )}
+                    >
+                      {skill.origin === 'builtin'
+                        ? 'Built-in'
+                        : skill.origin === 'agent-created'
+                          ? 'Agent-created'
+                          : 'Marketplace'}
+                    </span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      'rounded-md border px-2 py-0.5 text-xs tabular-nums',
+                      skill.installed
+                        ? 'border-primary/40 bg-primary/15 text-primary'
+                        : 'border-primary-200 bg-primary-100/60 text-primary-500',
+                    )}
+                  >
+                    {skill.installed ? 'Installed' : 'Available'}
+                  </span>
+                </div>
               </div>
 
               <p className="line-clamp-3 min-h-[58px] text-sm text-primary-500 text-pretty">
