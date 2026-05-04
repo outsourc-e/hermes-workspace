@@ -2283,6 +2283,7 @@ function InteriorScene({
       </>}
 
       <ExitTrigger playerRef={playerRef} onExit={onExit} accent={info.accent} />
+      <InteriorExitButton onExit={onExit} accent={info.accent} />
       <Suspense fallback={null}>
         <PlayerAndCamera positionRef={playerRef} spawn={[0, 0, 4.7]} moveTargetRef={moveTargetRef} bounds={{ x: 8, z: 7 }} />
       </Suspense>
@@ -2298,7 +2299,7 @@ function ExitTrigger({ playerRef, onExit, accent }: { playerRef: React.MutableRe
   const center = useMemo(() => new THREE.Vector3(0, 0, 6.2), [])
   useFrame(() => {
     const dist = playerRef.current.distanceTo(center)
-    if (dist < 1.05 && !triggered.current) {
+    if (dist < 1.6 && !triggered.current) {
       triggered.current = true
       onExit()
       window.setTimeout(() => { triggered.current = false }, 1200)
@@ -2306,12 +2307,64 @@ function ExitTrigger({ playerRef, onExit, accent }: { playerRef: React.MutableRe
   })
   return (
     <group position={[0, 0, 6.2]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
-        <ringGeometry args={[0.7, 0.92, 32]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.6} transparent opacity={0.78} />
+      {/* Bigger, clickable exit pad — click anywhere on the ring or use it as a portal. */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.05, 0]}
+        onPointerDown={(e) => { e.stopPropagation(); if (!triggered.current) { triggered.current = true; onExit() } }}
+      >
+        <ringGeometry args={[0.8, 1.5, 32]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} transparent opacity={0.85} />
       </mesh>
-      <Html position={[0, 1.25, 0]} center distanceFactor={8}><div style={{padding:'3px 8px',background:'rgba(0,0,0,0.75)',color:accent,borderRadius:6,fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>Exit to Agora</div></Html>
+      {/* Glowing pillar so you can see the exit from anywhere in the room. */}
+      <mesh position={[0, 1.6, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 3, 8]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.2} transparent opacity={0.6} />
+      </mesh>
+      <pointLight position={[0, 1.6, 0]} color={accent} intensity={1.6} distance={8} />
+      <Html position={[0, 2.3, 0]} center distanceFactor={8}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); if (!triggered.current) { triggered.current = true; onExit() } }}
+          style={{padding:'4px 12px',background:accent,color:'#000',borderRadius:8,fontSize:11,fontWeight:800,whiteSpace:'nowrap',border:'none',cursor:'pointer',boxShadow:`0 0 14px ${accent}`,letterSpacing:'0.1em',textTransform:'uppercase'}}
+        >
+          → Exit to Agora
+        </button>
+      </Html>
     </group>
+  )
+}
+
+/** Always-visible exit button for interiors — fixed in HUD so the user can leave even if the floor trigger fails. */
+function InteriorExitButton({ onExit, accent }: { onExit: () => void; accent: string }) {
+  return (
+    <Html fullscreen>
+      <button
+        type="button"
+        onClick={onExit}
+        style={{
+          position: 'fixed',
+          top: 80,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '8px 16px',
+          background: accent,
+          color: '#000',
+          borderRadius: 999,
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          border: 'none',
+          cursor: 'pointer',
+          boxShadow: `0 0 18px ${accent}, 0 8px 22px rgba(0,0,0,0.45)`,
+          pointerEvents: 'auto',
+          zIndex: 100,
+        }}
+      >
+        ← Leave Building
+      </button>
+    </Html>
   )
 }
 
