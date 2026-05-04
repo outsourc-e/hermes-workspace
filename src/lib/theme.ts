@@ -9,6 +9,8 @@ export type ThemeId =
   | 'claude-classic-light'
   | 'claude-slate'
   | 'claude-slate-light'
+  | 'scifi'
+  | 'scifi-light'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -76,6 +78,18 @@ export const THEMES: Array<{
     description: 'GitHub-light palette with blue accents',
     icon: '🔷',
   },
+  {
+    id: 'scifi',
+    label: 'SciFi',
+    description: 'Cyberpunk HUD — deep navy, cyan neon, orange highlights',
+    icon: '🌌',
+  },
+  {
+    id: 'scifi-light',
+    label: 'SciFi Light',
+    description: 'Cold steel and teal — cyberpunk interface in daylight',
+    icon: '🌌',
+  },
 ]
 
 const STORAGE_KEY = 'claude-theme'
@@ -90,6 +104,7 @@ const LIGHT_THEME_MAP: Record<
   'claude-official': 'claude-official-light',
   'claude-classic': 'claude-classic-light',
   'claude-slate': 'claude-slate-light',
+  'scifi': 'scifi-light',
 }
 const DARK_THEME_MAP: Record<
   Extract<ThemeId, `${string}-light`>,
@@ -100,6 +115,7 @@ const DARK_THEME_MAP: Record<
   'claude-official-light': 'claude-official',
   'claude-classic-light': 'claude-classic',
   'claude-slate-light': 'claude-slate',
+  'scifi-light': 'scifi',
 }
 
 const LIGHT_THEMES = new Set<ThemeId>([
@@ -108,6 +124,7 @@ const LIGHT_THEMES = new Set<ThemeId>([
   'claude-official-light',
   'claude-classic-light',
   'claude-slate-light',
+  'scifi-light',
 ])
 
 export function isValidTheme(

@@ -1,0 +1,177 @@
+/* ════════════════════════════════════════════════════════════════════
+   SciFi Theme — inspired by cyberpunk HUD aesthetic
+   Dark:  deep navy #060b18 background, cyan neon #00f0ff accent
+   Light: cold steel #eef1f5, deep navy text, cyan accent
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── SciFi Dark ─────────────────────────────────────────────────────── */
+[data-theme='scifi'] {
+  --theme-bg: #060b18;
+  --theme-sidebar: #0a1628;
+  --theme-panel: #0d1b2a;
+  --theme-card: #112240;
+  --theme-card2: #153258;
+  --theme-border: #1a3a5c;
+  --theme-border-subtle: #142d4a;
+  --theme-text: #e0f7fa;
+  --theme-muted: #5d9bb8;
+  --theme-shadow-1: 0 1px 3px rgba(0, 240, 255, 0.06);
+  --theme-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 240, 255, 0.1);
+  --theme-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 240, 255, 0.08);
+  --theme-glass: rgba(6, 11, 24, 0.9);
+  --theme-focus: #00f0ff;
+  --theme-accent: #00f0ff;
+  --theme-accent-secondary: #00b8d4;
+  --theme-accent-subtle: rgba(0, 240, 255, 0.08);
+  --theme-accent-border: rgba(0, 240, 255, 0.25);
+  --theme-active: #00e5ff;
+  --theme-link: #00f0ff;
+  --theme-success: #64ffda;
+  --theme-warning: #ff6b35;
+  --theme-danger: #ff5252;
+  --theme-stripe: rgba(26, 58, 92, 0.35);
+  --theme-header-bg: #0a1628;
+  --theme-header-border: #1a3a5c;
+  --chat-user-bg: #112a4a;
+  --chat-user-border: rgba(0, 240, 255, 0.2);
+  --chat-user-foreground: #e0f7fa;
+  --chat-assistant-bg: #0d1b2a;
+  --chat-assistant-border: #142d4a;
+  --chat-assistant-foreground: #e0f7fa;
+  --composer-bg: #0a1628;
+  --composer-border: #1a3a5c;
+  --composer-placeholder: #5d9bb8;
+  --tool-card-bg: #0d1b2a;
+  --tool-card-border: #1a3a5c;
+  --tool-card-title: #e0f7fa;
+  --tool-card-muted: #5d9bb8;
+  --code-bg: #070d1c;
+  --code-border: #142d4a;
+  --code-foreground: #64ffda;
+  --theme-input: #0a1628;
+}
+
+/* ── SciFi Light ────────────────────────────────────────────────────── */
+[data-theme='scifi-light'] {
+  --theme-bg: #eef1f5;
+  --theme-sidebar: #e4e9ef;
+  --theme-panel: #e8ecf2;
+  --theme-card: #f4f6f9;
+  --theme-card2: #e0e4ea;
+  --theme-border: #c4cdd8;
+  --theme-border-subtle: #d4dbe4;
+  --theme-text: #0a1628;
+  --theme-muted: #5a6a7e;
+  --theme-shadow-1: 0 1px 2px rgba(10, 22, 40, 0.06);
+  --theme-shadow-2: 0 4px 16px rgba(10, 22, 40, 0.08);
+  --theme-shadow-3: 0 12px 40px rgba(10, 22, 40, 0.12);
+  --theme-glass: rgba(238, 241, 245, 0.92);
+  --theme-focus: #0097a7;
+  --theme-accent: #0097a7;
+  --theme-accent-secondary: #00bcd4;
+  --theme-accent-subtle: rgba(0, 151, 167, 0.08);
+  --theme-accent-border: rgba(0, 151, 167, 0.2);
+  --theme-active: #00838f;
+  --theme-link: #0097a7;
+  --theme-success: #2e7d52;
+  --theme-warning: #c45000;
+  --theme-danger: #c62828;
+  --theme-stripe: rgba(196, 205, 216, 0.4);
+  --theme-header-bg: #e4e9ef;
+  --theme-header-border: #c4cdd8;
+  --chat-user-bg: #d4e8f0;
+  --chat-user-border: rgba(0, 151, 167, 0.25);
+  --chat-user-foreground: #0a1628;
+  --chat-assistant-bg: #f2f4f7;
+  --chat-assistant-border: #d4dbe4;
+  --chat-assistant-foreground: #0a1628;
+  --composer-bg: #f6f8fa;
+  --composer-border: #c4cdd8;
+  --composer-placeholder: #5a6a7e;
+  --tool-card-bg: #eaedf2;
+  --tool-card-border: #c4cdd8;
+  --tool-card-title: #0a1628;
+  --tool-card-muted: #5a6a7e;
+  --code-bg: #e4e9ef;
+  --code-border: #c4cdd8;
+  --code-foreground: #0a1628;
+  --theme-input: #f6f8fa;
+}
+
+/* ── SciFi dark theme body bg/color overrides ───────────────────────── */
+[data-theme='scifi'] html,
+[data-theme='scifi'] body,
+[data-theme='scifi'] #root,
+[data-theme='scifi'] .dark {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+/* ── SciFi light theme body bg/color overrides ──────────────────────── */
+[data-theme='scifi-light'] html,
+[data-theme='scifi-light'] body,
+[data-theme='scifi-light'] #root,
+[data-theme='scifi-light'] .light {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+/* ── SciFi Tailwind primary token remaps — dark ─────────────────────── */
+[data-theme='scifi'] {
+  --color-primary-50: var(--theme-panel);
+  --color-primary-100: var(--theme-card);
+  --color-primary-200: var(--theme-border);
+  --color-primary-300: var(--theme-border-subtle);
+  --color-primary-400: var(--theme-muted);
+  --color-primary-500: var(--theme-muted);
+  --color-primary-600: var(--theme-muted);
+  --color-primary-700: var(--theme-text);
+  --color-primary-800: var(--theme-text);
+  --color-primary-900: var(--theme-text);
+  --color-primary-950: var(--theme-text);
+  --color-surface: var(--theme-bg);
+  --color-surface-deep: var(--theme-bg);
+  --color-ink: var(--theme-text);
+  --color-accent-400: var(--theme-accent-secondary);
+  --color-accent-500: var(--theme-accent);
+  --color-accent-600: var(--theme-accent);
+}
+
+/* ── SciFi Tailwind primary token remaps — light ────────────────────── */
+[data-theme='scifi-light'] {
+  color-scheme: light !important;
+  --color-primary-50: var(--theme-card) !important;
+  --color-primary-100: var(--theme-card2) !important;
+  --color-primary-200: var(--theme-border) !important;
+  --color-primary-300: var(--theme-border-subtle) !important;
+  --color-primary-400: var(--theme-muted) !important;
+  --color-primary-500: var(--theme-muted) !important;
+  --color-primary-600: var(--theme-muted) !important;
+  --color-primary-700: var(--theme-text) !important;
+  --color-primary-800: var(--theme-text) !important;
+  --color-primary-900: var(--theme-text) !important;
+  --color-primary-950: var(--theme-text) !important;
+  --color-surface: var(--theme-bg) !important;
+  --color-surface-deep: var(--theme-bg) !important;
+  --color-ink: var(--theme-text) !important;
+  --color-accent-400: var(--theme-accent-secondary) !important;
+  --color-accent-500: var(--theme-accent) !important;
+  --color-accent-600: var(--theme-accent) !important;
+}
+
+/* ── SciFi dark: cyan glow on focus rings ───────────────────────────── */
+[data-theme='scifi'] :focus-visible {
+  outline-color: rgba(0, 240, 255, 0.5);
+}
+
+/* ── SciFi dark: subtle cyan glow on cards/panels ───────────────────── */
+[data-theme='scifi'] .frame,
+[data-theme='scifi'] .frame-panel {
+  box-shadow: 0 0 1px rgba(0, 240, 255, 0.08);
+}
+
+/* ── SciFi dark: accent glow on active/hovered items ────────────────── */
+[data-theme='scifi'] a:hover,
+[data-theme='scifi'] button:hover {
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}

@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:opsz,wght@8..120,400..800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
+@import './scifi-theme.css';
 
 /* Tailwind v4 — enable dark: variant on .dark class (set by __root.tsx) */
 @variant dark (&:where(.dark, .dark *));

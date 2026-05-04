@@ -182,6 +182,20 @@ const THEME_PREVIEWS: Record<
     accent: '#3b82f6',
     text: '#1F2328',
   },
+  'scifi': {
+    bg: '#060b18',
+    panel: '#0a1628',
+    border: '#1a3a5c',
+    accent: '#00f0ff',
+    text: '#e0f7fa',
+  },
+  'scifi-light': {
+    bg: '#EEF1F5',
+    panel: '#FFFFFF',
+    border: '#B0BEC5',
+    accent: '#0097A7',
+    text: '#0A1628',
+  },
 }
 
 function WorkspaceThemePicker() {
