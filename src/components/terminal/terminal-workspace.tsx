@@ -343,6 +343,11 @@ export function TerminalWorkspace({
           // Let the server pick the shell from $SHELL
           cols: terminal.cols,
           rows: terminal.rows,
+          // If this tab already has a sessionId, ask the server to reattach
+          // to that PTY rather than spawning a fresh one. Lets us survive
+          // transient SSE disconnects (network blip, browser suspension,
+          // HMR reload) without dropping the user's shell. See #298.
+          sessionId: tab.sessionId || undefined,
         }),
       }).catch(function handleError() {
         return null
@@ -461,20 +466,52 @@ export function TerminalWorkspace({
       const latestTab = useTerminalPanelStore
         .getState()
         .tabs.find((item) => item.id === tab.id)
-      if (latestTab?.sessionId) {
-        await fetch('/api/terminal-close', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: latestTab.sessionId }),
-        }).catch(function ignore() {
-          return undefined
-        })
-      }
-      setTabSessionId(tab.id, null)
-      setTabStatus(tab.id, 'idle')
-      connectedRef.current.delete(tab.id)
 
-      // No auto-reconnect — user can create a new tab if needed
+      // SSE stream ended. Two reasons it could end:
+      // 1) The shell process exited (PTY closed) — server emits 'close'
+      //    and we should fully tear down on the client too.
+      // 2) The SSE stream itself dropped (network blip, browser tab
+      //    suspension, HMR reload) but the PTY is still alive on the
+      //    server (we changed terminal-stream to keep PTYs alive across
+      //    SSE disconnects — see #298). In that case, try to reattach.
+      //
+      // We don't reliably know which reason from inside the read loop, so
+      // attempt a single quick reattach with the existing sessionId. If the
+      // server says the session is gone, we fall through to a clean idle.
+      const previousSessionId = latestTab?.sessionId ?? null
+      connectedRef.current.delete(tab.id)
+      setTabStatus(tab.id, 'idle')
+
+      if (previousSessionId) {
+        // Don't call /api/terminal-close — we *want* the PTY to live so
+        // we can reattach to it. The server will reap the session via
+        // its own DETACH_TTL_MS if no client comes back.
+
+        // Wait a beat for the server to register the markDetached, then
+        // try to reconnect. The connectTab path will send sessionId in
+        // the body, so the server reattaches to the same PTY.
+        const stillSameTab =
+          useTerminalPanelStore
+            .getState()
+            .tabs.find((item) => item.id === tab.id)?.sessionId ===
+          previousSessionId
+        if (stillSameTab) {
+          terminal.writeln('\r\n\x1b[2m[reconnecting...]\x1b[0m')
+          // Schedule a reconnect on the next tick to break out of this
+          // closure cleanly. connectTab guards against double-connecting.
+          setTimeout(() => {
+            const refreshed = useTerminalPanelStore
+              .getState()
+              .tabs.find((item) => item.id === tab.id)
+            if (refreshed && refreshed.sessionId === previousSessionId) {
+              void connectTab(refreshed)
+            }
+          }, 600)
+          return
+        }
+      }
+
+      setTabSessionId(tab.id, null)
     },
     [renameTab, setTabSessionId, setTabStatus],
   )
