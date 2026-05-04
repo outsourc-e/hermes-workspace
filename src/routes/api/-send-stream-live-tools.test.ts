@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   collectSyntheticLiveToolEvents,
   createSyntheticLiveToolTracker,
-} from './send-stream-live-tools'
+} from './-send-stream-live-tools'
 
 describe('collectSyntheticLiveToolEvents', () => {
   it('emits a live calling event as soon as an assistant tool call appears, before any tool result exists', () => {

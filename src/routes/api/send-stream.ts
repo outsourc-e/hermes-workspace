@@ -3,7 +3,7 @@ import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-heade
 import {
   collectSyntheticLiveToolEvents,
   createSyntheticLiveToolTracker,
-} from './send-stream-live-tools'
+} from './-send-stream-live-tools'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'

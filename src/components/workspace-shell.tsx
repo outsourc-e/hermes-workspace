@@ -21,7 +21,7 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import type { AuthStatus } from '@/lib/claude-auth'
+import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -120,6 +120,47 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     setAuthStatus(status)
     setConnectionVerified(true)
   }, [])
+
+  // Fallback startup verification in the shell itself.
+  // This prevents a bad loading loop if the splash component gets stuck even
+  // though /api/auth-check or /api/connection-status are already healthy.
+  useEffect(() => {
+    if (typeof window === 'undefined' || connectionVerified) return
+    let cancelled = false
+
+    const verify = async () => {
+      try {
+        const status = await fetchClaudeAuthStatus(3000)
+        if (cancelled) return
+        setAuthStatus(status)
+        setConnectionVerified(true)
+        return
+      } catch {
+        // Fall through to connection-status as a looser readiness signal.
+      }
+
+      try {
+        const res = await fetch('/api/connection-status', { cache: 'no-store' })
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as {
+          ok?: boolean
+          chatReady?: boolean
+          modelConfigured?: boolean
+        }
+        if (data?.ok || (data?.chatReady && data?.modelConfigured)) {
+          setAuthStatus({ authenticated: true, authRequired: false })
+          setConnectionVerified(true)
+        }
+      } catch {
+        // Keep the startup screen if both checks fail.
+      }
+    }
+
+    void verify()
+    return () => {
+      cancelled = true
+    }
+  }, [connectionVerified])
 
   // Derive active session from URL
   const mobilePageTitle = (() => {
