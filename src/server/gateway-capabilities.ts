@@ -142,7 +142,18 @@ export const CLAUDE_UPGRADE_INSTRUCTIONS =
 export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes backend does not support the sessions API. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
 
 const PROBE_TIMEOUT_MS = 3_000
+// Probe TTL: 120s when the gateway is healthy, 15s when it isn't. The
+// shorter window during 'disconnected' state means a Docker stack where
+// the workspace boots before the agent recovers within ~15s of the agent
+// becoming reachable, instead of being stuck on the first failed probe
+// for two minutes. See #275.
 const PROBE_TTL_MS = 120_000
+const PROBE_TTL_DISCONNECTED_MS = 15_000
+
+function effectiveProbeTtl(caps: { health: boolean; chatCompletions: boolean }): number {
+  if (caps.health || caps.chatCompletions) return PROBE_TTL_MS
+  return PROBE_TTL_DISCONNECTED_MS
+}
 const DASHBOARD_TOKEN_REGEX =
   /window\.__(?:CLAUDE|HERMES)_SESSION_TOKEN__\s*=\s*["'](.+?)["']/
 
@@ -842,11 +853,21 @@ export async function probeGateway(options?: {
 }
 
 export async function ensureGatewayProbed(): Promise<GatewayCapabilities> {
-  const isStale = Date.now() - lastProbeAt > PROBE_TTL_MS
+  const isStale =
+    Date.now() - lastProbeAt > effectiveProbeTtl(capabilities)
   if (!capabilities.probed || isStale) {
     return probeGateway({ force: isStale })
   }
   return capabilities
+}
+
+/**
+ * Force-reprobe regardless of TTL. Used by the UI 'Reconnect' action
+ * and by any tool that wants to validate the current state immediately
+ * (for example after a docker compose restart). See #275.
+ */
+export async function forceReprobeGateway(): Promise<GatewayCapabilities> {
+  return probeGateway({ force: true })
 }
 
 // ── Accessors ─────────────────────────────────────────────────────
