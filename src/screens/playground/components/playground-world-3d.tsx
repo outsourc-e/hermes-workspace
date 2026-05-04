@@ -1518,14 +1518,39 @@ function PlayerAndCamera({
         <cylinderGeometry args={[0.24, 0.34, 0.74, 10]} />
         <meshStandardMaterial color={cfg.outfit} roughness={0.48} emissive={cfg.outfit} emissiveIntensity={0.1} />
       </mesh>
+      {/* Knight chest plate — muscled cuirass with sigil disc */}
+      <mesh position={[0, 0.96, 0.18]} castShadow>
+        <boxGeometry args={[0.46, 0.62, 0.08]} />
+        <meshStandardMaterial color="#cbd5e1" metalness={0.7} roughness={0.3} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
+      </mesh>
+      <mesh position={[0, 0.98, 0.225]}>
+        <cylinderGeometry args={[0.12, 0.12, 0.02, 16]} />
+        <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.7} roughness={0.25} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.55} />
+      </mesh>
+      {/* Wings on the chest sigil */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * 0.13, 0.99, 0.232]} rotation={[0, 0, s * 0.55]}>
+          <coneGeometry args={[0.04, 0.12, 6]} />
+          <meshStandardMaterial color="#fff5d1" emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.7} />
+        </mesh>
+      ))}
+      {/* Pauldron stud */}
       <mesh position={[0, 1.02, 0.16]} castShadow rotation={[Math.PI / 4, 0, Math.PI / 4]}>
         <boxGeometry args={[0.16, 0.16, 0.16]} />
         <meshStandardMaterial color={gearAccent || cfg.outfitAccent} metalness={0.42} roughness={0.28} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.28} />
       </mesh>
+      {/* Pelvis */}
       <mesh position={[0, 0.56, 0]} castShadow>
         <boxGeometry args={[0.38, 0.12, 0.28]} />
         <meshStandardMaterial color="#0f172a" roughness={0.72} />
       </mesh>
+      {/* Tasset (skirt of armor strips) */}
+      {[-0.18, -0.06, 0.06, 0.18].map((x) => (
+        <mesh key={x} castShadow position={[x, 0.42, 0.16]} rotation={[0.05, 0, 0]}>
+          <boxGeometry args={[0.1, 0.22, 0.05]} />
+          <meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.4} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.12} />
+        </mesh>
+      ))}
 
       {/* Belt accent */}
       <mesh position={[0, 0.62, 0]} castShadow>
@@ -1559,6 +1584,24 @@ function PlayerAndCamera({
       <mesh position={[-0.39, 0.58, isMoving.current ? swing * 0.18 : 0]} castShadow>
         <sphereGeometry args={[0.1, 12, 12]} />
         <meshStandardMaterial color={cfg.skin} roughness={0.5} />
+      </mesh>
+      {/* Gauntlets (forearm armor) */}
+      <mesh position={[0.39, 0.7, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.075, 0.22, 10]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
+      </mesh>
+      <mesh position={[-0.39, 0.7, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.075, 0.22, 10]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.18} />
+      </mesh>
+      {/* Greaves (shin armor) */}
+      <mesh position={[0.16, 0.18, 0]} castShadow>
+        <boxGeometry args={[0.18, 0.32, 0.2]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.65} roughness={0.32} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.12} />
+      </mesh>
+      <mesh position={[-0.16, 0.18, 0]} castShadow>
+        <boxGeometry args={[0.18, 0.32, 0.2]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.65} roughness={0.32} emissive={gearAccent || cfg.outfitAccent} emissiveIntensity={0.12} />
       </mesh>
 
       {/* Neck */}

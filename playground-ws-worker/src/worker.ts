@@ -35,7 +35,7 @@ interface PresenceMsg {
   [key: string]: unknown
 }
 
-const STALE_AFTER_MS = 5000
+const STALE_AFTER_MS = 12000 // bumped from 5000 — forgive bg-tab throttling so avatars don't flicker
 const CHAT_RING_MAX = 50
 const PRESENCE_DEDUPE_MS = 50
 const RATE_BUCKET_CAP = 30 // msgs
