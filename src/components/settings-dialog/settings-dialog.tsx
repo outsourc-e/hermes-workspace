@@ -23,6 +23,7 @@ import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
+import type {LocaleId} from '@/lib/i18n';
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
@@ -55,6 +56,10 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
+
+// ── Language ────────────────────────────────────────────────────────────
+
+import { LOCALE_LABELS,  getLocale, setLocale } from '@/lib/i18n'
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -185,7 +190,12 @@ const PROVIDER_CARDS: Array<{
     id: 'nous',
     name: 'Nous Portal',
     logo: '/providers/nous.png',
-    models: ['xiaomi/mimo-v2-pro', 'xiaomi/mimo-v2-omni', 'claude-3-llama-3.1-405b', 'claude-3-llama-3.1-70b'],
+    models: [
+      'xiaomi/mimo-v2-pro',
+      'xiaomi/mimo-v2-omni',
+      'claude-3-llama-3.1-405b',
+      'claude-3-llama-3.1-70b',
+    ],
     authType: 'oauth',
   },
   {
@@ -223,7 +233,7 @@ const PROVIDER_CARDS: Array<{
     id: 'minimax',
     name: 'MiniMax',
     logo: '/providers/minimax.png',
-    models: ['MiniMax-M2.7', 'MiniMax-M2.7-Lightning'],
+    models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'],
     authType: 'api_key',
     envKey: 'MINIMAX_API_KEY',
   },
@@ -235,7 +245,7 @@ const PROVIDER_CARDS: Array<{
     authType: 'api_key',
     envKey: 'XIAOMI_API_KEY',
   },
-  { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
+  { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key', envKey: 'CUSTOM_API_KEY' },
 ]
 
 function HermesContent() {
@@ -252,40 +262,53 @@ function HermesContent() {
   )
   const [memEnabled, setMemEnabled] = useState(true)
   const [userProfileEnabled, setUserProfileEnabled] = useState(true)
+  const [customBaseUrl, setCustomBaseUrl] = useState('')
   const [localDiscovery, setLocalDiscovery] = useState<{
-    providers: Array<{ id: string; name: string; online: boolean; modelCount: number; configured: boolean; needsRestart: boolean }>
+    providers: Array<{
+      id: string
+      name: string
+      online: boolean
+      modelCount: number
+      configured: boolean
+      needsRestart: boolean
+    }>
     models: Array<{ id: string; name: string; provider: string }>
   } | null>(null)
 
-  const fetchModelsForProvider = useCallback((providerId: string) => {
-    // For local providers, prefer auto-discovered models first
-    if (localDiscovery) {
-      const discovered = localDiscovery.models
-        .filter((m) => m.provider === providerId)
-        .map((m) => m.id)
-      if (discovered.length > 0) {
-        setAvailableModels(discovered)
-        return
+  const fetchModelsForProvider = useCallback(
+    (providerId: string) => {
+      // For local providers, prefer auto-discovered models first
+      if (localDiscovery) {
+        const discovered = localDiscovery.models
+          .filter((m) => m.provider === providerId)
+          .map((m) => m.id)
+        if (discovered.length > 0) {
+          setAvailableModels(discovered)
+          return
+        }
       }
-    }
-    fetch(
-      `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`,
-    )
-      .then((r) => r.json())
-      .then((d: { models?: Array<{ id: string }> }) => {
-        setAvailableModels((d.models || []).map((m) => m.id))
-      })
-      .catch(() => {
-        // Fall back to hardcoded
-        const card = PROVIDER_CARDS.find((p) => p.id === providerId)
-        setAvailableModels(card?.models || [])
-      })
-  }, [localDiscovery])
+      fetch(
+        `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`,
+      )
+        .then((r) => r.json())
+        .then((d: { models?: Array<{ id: string }> }) => {
+          setAvailableModels((d.models || []).map((m) => m.id))
+        })
+        .catch(() => {
+          // Fall back to hardcoded
+          const card = PROVIDER_CARDS.find((p) => p.id === providerId)
+          setAvailableModels(card?.models || [])
+        })
+    },
+    [localDiscovery],
+  )
 
   useEffect(() => {
     fetch('/api/local-providers')
       .then((r) => r.json())
-      .then((d: any) => { if (d.ok) setLocalDiscovery(d) })
+      .then((d: any) => {
+        if (d.ok) setLocalDiscovery(d)
+      })
       .catch(() => {})
   }, [])
 
@@ -306,6 +329,10 @@ function HermesContent() {
             keys[p.envKeys[0]] = p.maskedKeys?.[p.envKeys[0]] || '••••'
         }
         setConfiguredKeys(keys)
+        // Load custom provider config (may be stored as 'custom' or legacy 'manifest')
+        const cfgProviders = (d.config?.providers as Record<string, any>) || {}
+        const customCfg = cfgProviders['custom'] || cfgProviders['manifest'] || {}
+        if (customCfg.base_url) setCustomBaseUrl(customCfg.base_url)
       })
       .catch(() => {})
   }, [])
@@ -409,11 +436,15 @@ function HermesContent() {
               (p.authType === 'api_key' &&
                 !!p.envKey &&
                 !!configuredKeys[p.envKey])
-            const missingKey = p.authType === 'api_key' && !verified
+            const missingKey =
+              p.authType === 'api_key' && !verified && p.id !== 'custom'
             // hasKey gates click — keep OAuth + local clickable (existing
             // behaviour) so users can still authenticate via the card.
             const hasKey =
-              p.authType === 'none' || p.authType === 'oauth' || verified
+              p.authType === 'none' ||
+              p.authType === 'oauth' ||
+              verified ||
+              p.id === 'custom'
             return (
               <button
                 key={p.id}
@@ -444,7 +475,9 @@ function HermesContent() {
                 <span className="text-xs font-semibold mt-1">{p.name}</span>
                 <span className="text-[9px]" style={mutedStyle}>
                   {(() => {
-                    const disc = localDiscovery?.providers.find((lp) => lp.id === p.id)
+                    const disc = localDiscovery?.providers.find(
+                      (lp) => lp.id === p.id,
+                    )
                     if (disc?.online) return '🟢 Detected'
                     if (p.authType === 'oauth') return 'OAuth'
                     if (p.authType === 'none') return 'Local'
@@ -474,7 +507,10 @@ function HermesContent() {
                 .filter((m) => m.provider === activeProvider)
                 .map((m) => m.id)
               if (discovered && discovered.length > 0) return discovered
-              return PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models || []
+              return (
+                PROVIDER_CARDS.find((p) => p.id === activeProvider)?.models ||
+                []
+              )
             })().map((model) => (
               <button
                 key={model}
@@ -495,12 +531,73 @@ function HermesContent() {
         </div>
       )}
 
+      {/* Custom OpenAI-compatible endpoint fields — Base URL only; API key lives in API Keys section */}
+      {activeProvider === 'custom' && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
+            Custom Endpoint
+          </p>
+          <div className="space-y-1.5">
+            {(() => {
+              const isEditing = editingKey === 'custom_base_url'
+              const hasValue = !!customBaseUrl
+              return (
+                <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">Base URL</div>
+                    <div className="text-[11px] font-mono" style={mutedStyle}>
+                      {isEditing ? (
+                        <input
+                          type="url"
+                          value={customBaseUrl}
+                          onChange={(e) => setCustomBaseUrl(e.target.value)}
+                          placeholder="http://127.0.0.1:38238/v1"
+                          className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
+                          style={{ color: 'var(--theme-text)' }}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              save({ config: { model: { provider: 'manifest' }, providers: { manifest: { type: 'openai', base_url: customBaseUrl, key_env: 'CUSTOM_API_KEY' } } } })
+                                .then(() => setEditingKey(null))
+                            }
+                            if (e.key === 'Escape') setEditingKey(null)
+                          }}
+                        />
+                      ) : hasValue ? customBaseUrl : 'Not configured'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={cn('size-2 rounded-full', hasValue ? 'bg-green-500' : 'bg-neutral-500')} />
+                    {isEditing ? (
+                      <>
+                        <button type="button" onClick={() => { save({ config: { model: { provider: 'manifest' }, providers: { manifest: { type: 'openai', base_url: customBaseUrl, key_env: 'CUSTOM_API_KEY' } } } }).then(() => setEditingKey(null)) }} className="text-xs font-medium text-green-400">Save</button>
+                        <button type="button" onClick={() => setEditingKey(null)} className="text-xs" style={mutedStyle}>Cancel</button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setEditingKey('custom_base_url')} className="text-xs font-medium" style={{ color: 'var(--theme-accent)' }}>
+                        {hasValue ? 'Edit' : 'Add'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
       {(() => {
-        const disc = localDiscovery?.providers.find((lp) => lp.id === activeProvider)
+        const disc = localDiscovery?.providers.find(
+          (lp) => lp.id === activeProvider,
+        )
         if (!disc || !disc.needsRestart) return null
         return (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-            ⚠️ Gateway restart needed to use {disc.name}. Run <code className="rounded bg-black/30 px-1">hermes gateway restart</code> in your terminal.
+            ⚠️ Gateway restart needed to use {disc.name}. Run{' '}
+            <code className="rounded bg-black/30 px-1">
+              hermes gateway restart
+            </code>{' '}
+            in your terminal.
           </div>
         )
       })()}
@@ -946,69 +1043,69 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
             accent: '#2557B7',
             text: '#16315F',
           }
-      : theme.id === 'matrix'
-        ? {
-            bg: '#020804',
-            panel: '#07130A',
-            border: 'rgba(0,255,65,0.28)',
-            accent: '#00FF41',
-            text: '#D8FFE3',
-          }
-        : theme.id === 'matrix-light'
+        : theme.id === 'matrix'
           ? {
-              bg: '#F4FFF6',
-              panel: '#FFFFFF',
-              border: 'rgba(0,126,34,0.2)',
-              accent: '#008F2D',
-              text: '#062A12',
+              bg: '#020804',
+              panel: '#07130A',
+              border: 'rgba(0,255,65,0.28)',
+              accent: '#00FF41',
+              text: '#D8FFE3',
             }
-      : theme.id === 'claude-official'
-      ? {
-          bg: '#0A0E1A',
-          panel: '#11182A',
-          border: '#24304A',
-          accent: '#6366F1',
-          text: '#E6EAF2',
-        }
-      : theme.id === 'claude-official-light'
-        ? {
-            bg: '#F7F7F1',
-            panel: '#FAFBF6',
-            border: '#CDD5DA',
-            accent: '#2557B7',
-            text: '#16315F',
-          }
-        : theme.id === 'claude-classic'
-          ? {
-              bg: '#0d0f12',
-              panel: '#1a1f26',
-              border: '#2a313b',
-              accent: '#b98a44',
-              text: '#eceff4',
-            }
-          : theme.id === 'claude-classic-light'
+          : theme.id === 'matrix-light'
             ? {
-                bg: '#F5F2ED',
-                panel: '#FCFAF7',
-                border: '#D8CCBC',
-                accent: '#b98a44',
-                text: '#1a1f26',
+                bg: '#F4FFF6',
+                panel: '#FFFFFF',
+                border: 'rgba(0,126,34,0.2)',
+                accent: '#008F2D',
+                text: '#062A12',
               }
-            : theme.id === 'claude-slate'
+            : theme.id === 'claude-official'
               ? {
-                  bg: '#0d1117',
-                  panel: '#1c2128',
-                  border: '#30363d',
-                  accent: '#7eb8f6',
-                  text: '#c9d1d9',
+                  bg: '#0A0E1A',
+                  panel: '#11182A',
+                  border: '#24304A',
+                  accent: '#6366F1',
+                  text: '#E6EAF2',
                 }
-              : {
-                  bg: '#F6F8FA',
-                  panel: '#FFFFFF',
-                  border: '#D0D7DE',
-                  accent: '#3b82f6',
-                  text: '#24292f',
-                },
+              : theme.id === 'claude-official-light'
+                ? {
+                    bg: '#F7F7F1',
+                    panel: '#FAFBF6',
+                    border: '#CDD5DA',
+                    accent: '#2557B7',
+                    text: '#16315F',
+                  }
+                : theme.id === 'claude-classic'
+              ? {
+                  bg: '#0d0f12',
+                  panel: '#1a1f26',
+                  border: '#2a313b',
+                  accent: '#b98a44',
+                  text: '#eceff4',
+                }
+              : theme.id === 'claude-classic-light'
+                ? {
+                    bg: '#F5F2ED',
+                    panel: '#FCFAF7',
+                    border: '#D8CCBC',
+                    accent: '#b98a44',
+                    text: '#1a1f26',
+                  }
+                : theme.id === 'claude-slate'
+                  ? {
+                      bg: '#0d1117',
+                      panel: '#1c2128',
+                      border: '#30363d',
+                      accent: '#7eb8f6',
+                      text: '#c9d1d9',
+                    }
+                  : {
+                      bg: '#F6F8FA',
+                      panel: '#FFFFFF',
+                      border: '#D0D7DE',
+                      accent: '#3b82f6',
+                      text: '#24292f',
+                    },
 }))
 
 function ThemeSwatch({
@@ -1280,10 +1377,7 @@ function ChatContent() {
             value={cs.chatWidth}
             onChange={(e) =>
               updateCS({
-                chatWidth: e.target.value as
-                  | 'comfortable'
-                  | 'wide'
-                  | 'full',
+                chatWidth: e.target.value as 'comfortable' | 'wide' | 'full',
               })
             }
             className="h-8 rounded-md border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400"
@@ -1398,11 +1492,14 @@ function _AdvancedContent() {
         description="Hermes Agent endpoint and connectivity."
       />
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Hermes Agent URL" description="Used for API requests from Studio">
+        <Row
+          label="Hermes Agent URL"
+          description="Used for API requests from Studio"
+        >
           <div className="w-full max-w-sm">
             <Input
               type="url"
-              placeholder="http://127.0.0.1:8642"
+              placeholder="https://api.claudeworkspace.app"
               value={settings.claudeUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
@@ -1927,10 +2024,6 @@ function DisplayContent() {
   )
 }
 
-// ── Language ────────────────────────────────────────────────────────────
-
-import { getLocale, setLocale, LOCALE_LABELS, type LocaleId } from '@/lib/i18n'
-
 function LanguageContent() {
   return (
     <div className="space-y-4">
@@ -1938,7 +2031,10 @@ function LanguageContent() {
         title="Language"
         description="Choose the display language for the workspace UI."
       />
-      <Row label="Interface Language" description="Translates navigation, labels, and buttons.">
+      <Row
+        label="Interface Language"
+        description="Translates navigation, labels, and buttons."
+      >
         <select
           value={getLocale()}
           onChange={(e) => {
@@ -1947,9 +2043,13 @@ function LanguageContent() {
           }}
           className="h-9 w-full rounded-lg border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-800 px-3 text-sm text-primary-900 dark:text-neutral-100 outline-none md:max-w-xs"
         >
-          {(Object.entries(LOCALE_LABELS) as Array<[LocaleId, string]>).map(([id, label]) => (
-            <option key={id} value={id}>{label}</option>
-          ))}
+          {(Object.entries(LOCALE_LABELS) as Array<[LocaleId, string]>).map(
+            ([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ),
+          )}
         </select>
       </Row>
     </div>
