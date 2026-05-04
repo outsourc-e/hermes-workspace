@@ -288,6 +288,17 @@ function ClassicalPillars({ world }: { world: WorldDef }) {
         <ringGeometry args={[3.5, 4, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.4} />
       </mesh>
+      {/* Central Hermes statue — plaza centerpiece */}
+      <HermesStatue position={[0, 0, 0]} scale={1.15} accent={world.accent} base="#e6dcc4" />
+      {/* Banners along the colonnade entrances */}
+      <HermesBanner position={[-17, 0, -9.5]} rotation={[0, Math.PI / 2, 0]} color={world.accent} />
+      <HermesBanner position={[17, 0, -9.5]} rotation={[0, -Math.PI / 2, 0]} color={world.accent} />
+      <HermesBanner position={[-17, 0, 9.5]} rotation={[0, Math.PI / 2, 0]} color={world.accent} />
+      <HermesBanner position={[17, 0, 9.5]} rotation={[0, -Math.PI / 2, 0]} color={world.accent} />
+      {/* Braziers around the central statue */}
+      {[[-3.2, -3.2], [3.2, -3.2], [-3.2, 3.2], [3.2, 3.2]].map(([x, z], i) => (
+        <Brazier key={i} position={[x, 0, z]} color="#fbbf24" />
+      ))}
     </>
   )
 }
@@ -319,6 +330,13 @@ function TechPillars({ world }: { world: WorldDef }) {
         <ringGeometry args={[4, 4.4, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={1} />
       </mesh>
+      {/* Cyan-flame Forge braziers */}
+      {[[-5, -5], [5, -5], [-5, 5], [5, 5]].map(([x, z], i) => (
+        <Brazier key={i} position={[x, 0, z]} color={world.accent} />
+      ))}
+      {/* Tech-banners with Hermes sigil */}
+      <HermesBanner position={[-9, 0, 0]} rotation={[0, Math.PI / 2, 0]} color={world.accent} cloth="#0a0e1a" />
+      <HermesBanner position={[9, 0, 0]} rotation={[0, -Math.PI / 2, 0]} color={world.accent} cloth="#0a0e1a" />
     </>
   )
 }
@@ -461,6 +479,16 @@ function ArenaDecor({ world }: { world: WorldDef }) {
           </mesh>
         </group>
       ))}
+      {/* Braziers ringing the duel medallion */}
+      {Array.from({ length: 6 }).map((_, i) => {
+        const ang = (i / 6) * Math.PI * 2
+        return <Brazier key={`bz${i}`} position={[Math.cos(ang) * 5.2, 0, Math.sin(ang) * 5.2]} color="#fb7185" />
+      })}
+      {/* Banners flanking the entrances */}
+      <HermesBanner position={[-9, 0, -9]} rotation={[0, 0.5, 0]} color={world.accent} cloth="#3b0a1c" />
+      <HermesBanner position={[9, 0, -9]} rotation={[0, -0.5, 0]} color={world.accent} cloth="#3b0a1c" />
+      <HermesBanner position={[-9, 0, 9]} rotation={[0, 2.5, 0]} color={world.accent} cloth="#3b0a1c" />
+      <HermesBanner position={[9, 0, 9]} rotation={[0, -2.5, 0]} color={world.accent} cloth="#3b0a1c" />
     </>
   )
 }
@@ -472,10 +500,32 @@ function TrainingDecor({ world }: { world: WorldDef }) {
     { text: 'Quartermaster Tent', pos: [-14, 2.4, -10] as [number, number, number] },
     { text: 'Archive Podium', pos: [6, 2.4, 0] as [number, number, number] },
     { text: 'Forge Gate', pos: [14, 2.6, -10] as [number, number, number] },
+    { text: 'Hermes Sigil', pos: [0, 4.5, 0] as [number, number, number] },
   ]
 
   return (
     <>
+      {/* Hermes statue at the heart of the grounds */}
+      <HermesStatue position={[0, 0, 0]} accent={world.accent} />
+      {/* Practice dummies + weapon racks around the trainer’s ring */}
+      <PracticeDummy position={[-7.4, 0, -3.2]} />
+      <PracticeDummy position={[-2.8, 0, -6.6]} />
+      <PracticeDummy position={[-7.6, 0, -6.4]} />
+      <WeaponRack position={[-9.2, 0, -3.0]} accent={world.accent} />
+      <WeaponRack position={[-9.2, 0, -5.6]} accent="#fde68a" />
+      {/* Banners flanking the Forge Gate */}
+      <HermesBanner position={[11.6, 0, -10]} rotation={[0, 0.4, 0]} color={world.accent} />
+      <HermesBanner position={[16.4, 0, -10]} rotation={[0, -0.4, 0]} color="#fbbf24" />
+      {/* Banners by Arrival Circle */}
+      <HermesBanner position={[-13.2, 0, 8]} rotation={[0, 0.6, 0]} color={world.accent} />
+      <HermesBanner position={[-8.8, 0, 8]} rotation={[0, -0.6, 0]} color={world.accent} />
+      {/* Braziers around the central statue and trainer ring */}
+      <Brazier position={[3.2, 0, 3.2]} color="#fbbf24" />
+      <Brazier position={[-3.2, 0, 3.2]} color="#fbbf24" />
+      <Brazier position={[3.2, 0, -3.2]} color="#fb923c" />
+      <Brazier position={[-3.2, 0, -3.2]} color="#fb923c" />
+      <Brazier position={[-2.0, 0, -1.6]} color="#fb7185" />
+      <Brazier position={[-8.0, 0, -1.6]} color="#fb7185" />
       <mesh position={[-11, 0.05, 8]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <ringGeometry args={[2.4, 3.4, 72]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.5} />
@@ -527,6 +577,255 @@ function TrainingDecor({ world }: { world: WorldDef }) {
   )
 }
 
+/* ── Hermes statue — winged-sandals hero centerpiece for plazas ── */
+function HermesStatue({
+  position = [0, 0, 0],
+  scale = 1,
+  accent = '#f5d97a',
+  base = '#cbd5e1',
+}: {
+  position?: [number, number, number]
+  scale?: number
+  accent?: string
+  base?: string
+}) {
+  return (
+    <group position={position} scale={scale}>
+      {/* tiered plinth */}
+      <mesh castShadow receiveShadow position={[0, 0.18, 0]}>
+        <cylinderGeometry args={[1.6, 1.8, 0.36, 24]} />
+        <meshStandardMaterial color={base} roughness={0.7} />
+      </mesh>
+      <mesh castShadow position={[0, 0.5, 0]}>
+        <cylinderGeometry args={[1.25, 1.5, 0.32, 20]} />
+        <meshStandardMaterial color={base} roughness={0.6} />
+      </mesh>
+      {/* legs */}
+      <mesh castShadow position={[-0.18, 1.05, 0]}>
+        <cylinderGeometry args={[0.13, 0.16, 0.9, 10]} />
+        <meshStandardMaterial color={base} roughness={0.55} />
+      </mesh>
+      <mesh castShadow position={[0.18, 1.05, 0]}>
+        <cylinderGeometry args={[0.13, 0.16, 0.9, 10]} />
+        <meshStandardMaterial color={base} roughness={0.55} />
+      </mesh>
+      {/* torso */}
+      <mesh castShadow position={[0, 1.7, 0]}>
+        <cylinderGeometry args={[0.32, 0.38, 0.8, 12]} />
+        <meshStandardMaterial color={base} roughness={0.5} />
+      </mesh>
+      {/* chlamys cape */}
+      <mesh castShadow position={[0, 1.62, -0.2]} rotation={[0.18, 0, 0]}>
+        <planeGeometry args={[1.0, 1.1]} />
+        <meshStandardMaterial color={accent} side={THREE.DoubleSide} roughness={0.6} emissive={accent} emissiveIntensity={0.12} />
+      </mesh>
+      {/* head */}
+      <mesh castShadow position={[0, 2.32, 0]}>
+        <sphereGeometry args={[0.26, 16, 16]} />
+        <meshStandardMaterial color={base} roughness={0.5} />
+      </mesh>
+      {/* winged petasos (helmet) */}
+      <mesh castShadow position={[0, 2.55, 0]}>
+        <coneGeometry args={[0.32, 0.18, 18]} />
+        <meshStandardMaterial color={accent} metalness={0.45} roughness={0.4} emissive={accent} emissiveIntensity={0.35} />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} castShadow position={[s * 0.34, 2.55, 0]} rotation={[0, 0, s * 0.6]}>
+          <coneGeometry args={[0.08, 0.42, 6]} />
+          <meshStandardMaterial color="#fff5d1" emissive={accent} emissiveIntensity={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* caduceus staff */}
+      <mesh castShadow position={[0.45, 1.6, 0.05]} rotation={[0, 0, -0.05]}>
+        <cylinderGeometry args={[0.04, 0.04, 2.2, 8]} />
+        <meshStandardMaterial color={accent} metalness={0.6} roughness={0.3} emissive={accent} emissiveIntensity={0.25} />
+      </mesh>
+      <mesh castShadow position={[0.45, 2.74, 0.05]}>
+        <torusGeometry args={[0.12, 0.04, 8, 16]} />
+        <meshStandardMaterial color={accent} metalness={0.7} roughness={0.25} emissive={accent} emissiveIntensity={0.55} />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} castShadow position={[0.45 + s * 0.12, 2.78, 0.05]} rotation={[0, 0, s * 0.4]}>
+          <coneGeometry args={[0.06, 0.22, 6]} />
+          <meshStandardMaterial color="#fff5d1" emissive={accent} emissiveIntensity={0.6} />
+        </mesh>
+      ))}
+      {/* winged sandals (small accents at feet) */}
+      {[-1, 1].map((s) => (
+        <mesh key={`sandal${s}`} castShadow position={[s * 0.18, 0.7, 0.15]} rotation={[0, 0, s * 0.4]}>
+          <coneGeometry args={[0.06, 0.18, 6]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} />
+        </mesh>
+      ))}
+      {/* base inscription glow ring */}
+      <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.85, 2.1, 48]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} transparent opacity={0.7} />
+      </mesh>
+    </group>
+  )
+}
+
+/* ── Practice dummy + weapon rack ── */
+function PracticeDummy({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* base */}
+      <mesh castShadow position={[0, 0.1, 0]}>
+        <cylinderGeometry args={[0.45, 0.55, 0.2, 10]} />
+        <meshStandardMaterial color="#3f2a18" roughness={0.85} />
+      </mesh>
+      {/* post */}
+      <mesh castShadow position={[0, 0.95, 0]}>
+        <cylinderGeometry args={[0.08, 0.1, 1.5, 8]} />
+        <meshStandardMaterial color="#5b3a1f" roughness={0.85} />
+      </mesh>
+      {/* torso bag */}
+      <mesh castShadow position={[0, 1.7, 0]}>
+        <cylinderGeometry args={[0.28, 0.32, 0.8, 12]} />
+        <meshStandardMaterial color="#a16207" roughness={0.7} />
+      </mesh>
+      {/* head sack with crude X */}
+      <mesh castShadow position={[0, 2.18, 0]}>
+        <sphereGeometry args={[0.22, 12, 12]} />
+        <meshStandardMaterial color="#7c5a30" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 2.18, 0.22]} rotation={[0, 0, 0.78]}>
+        <boxGeometry args={[0.04, 0.18, 0.005]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[0, 2.18, 0.22]} rotation={[0, 0, -0.78]}>
+        <boxGeometry args={[0.04, 0.18, 0.005]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+    </group>
+  )
+}
+
+function WeaponRack({ position, accent = '#cbd5e1' }: { position: [number, number, number]; accent?: string }) {
+  return (
+    <group position={position}>
+      {/* frame */}
+      {[-0.4, 0.4].map((x) => (
+        <mesh key={x} castShadow position={[x, 0.7, 0]}>
+          <boxGeometry args={[0.08, 1.4, 0.08]} />
+          <meshStandardMaterial color="#5b3a1f" roughness={0.8} />
+        </mesh>
+      ))}
+      <mesh castShadow position={[0, 1.35, 0]}>
+        <boxGeometry args={[1.0, 0.08, 0.08]} />
+        <meshStandardMaterial color="#5b3a1f" roughness={0.8} />
+      </mesh>
+      {/* spear */}
+      <mesh castShadow position={[-0.25, 0.85, 0.06]} rotation={[0, 0, 0.06]}>
+        <cylinderGeometry args={[0.025, 0.025, 1.6, 8]} />
+        <meshStandardMaterial color="#8b6f3a" roughness={0.7} />
+      </mesh>
+      <mesh castShadow position={[-0.25, 1.7, 0.06]} rotation={[0, 0, 0.06]}>
+        <coneGeometry args={[0.05, 0.18, 6]} />
+        <meshStandardMaterial color={accent} metalness={0.6} roughness={0.3} emissive={accent} emissiveIntensity={0.2} />
+      </mesh>
+      {/* sword */}
+      <mesh castShadow position={[0.0, 0.9, 0.06]} rotation={[0, 0, -0.04]}>
+        <boxGeometry args={[0.08, 0.95, 0.04]} />
+        <meshStandardMaterial color={accent} metalness={0.7} roughness={0.25} emissive={accent} emissiveIntensity={0.18} />
+      </mesh>
+      <mesh castShadow position={[0.0, 0.36, 0.06]}>
+        <boxGeometry args={[0.22, 0.07, 0.07]} />
+        <meshStandardMaterial color="#3f2a18" roughness={0.7} />
+      </mesh>
+      {/* shield */}
+      <mesh castShadow position={[0.32, 0.85, 0.07]}>
+        <cylinderGeometry args={[0.32, 0.32, 0.06, 24]} />
+        <meshStandardMaterial color="#1d4ed8" metalness={0.45} roughness={0.4} emissive="#fbbf24" emissiveIntensity={0.18} />
+      </mesh>
+      <mesh position={[0.32, 0.85, 0.105]}>
+        <torusGeometry args={[0.12, 0.025, 8, 24]} />
+        <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.6} />
+      </mesh>
+    </group>
+  )
+}
+
+/* ── Hermes banner (cloth on a pole) ── */
+function HermesBanner({
+  position,
+  rotation = [0, 0, 0],
+  color = '#fbbf24',
+  cloth = '#7c2d12',
+}: {
+  position: [number, number, number]
+  rotation?: [number, number, number]
+  color?: string
+  cloth?: string
+}) {
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh castShadow position={[0, 1.5, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 3, 8]} />
+        <meshStandardMaterial color="#3f2a18" roughness={0.7} />
+      </mesh>
+      <mesh castShadow position={[0, 3.05, 0]}>
+        <coneGeometry args={[0.12, 0.22, 8]} />
+        <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} emissive={color} emissiveIntensity={0.4} />
+      </mesh>
+      {/* horizontal arm */}
+      <mesh castShadow position={[0.45, 2.85, 0]}>
+        <boxGeometry args={[0.9, 0.06, 0.06]} />
+        <meshStandardMaterial color="#3f2a18" roughness={0.7} />
+      </mesh>
+      {/* cloth */}
+      <mesh position={[0.45, 1.85, 0]}>
+        <planeGeometry args={[0.85, 1.85]} />
+        <meshStandardMaterial color={cloth} side={THREE.DoubleSide} roughness={0.7} emissive={color} emissiveIntensity={0.06} />
+      </mesh>
+      {/* sigil dot */}
+      <mesh position={[0.45, 1.95, 0.01]}>
+        <circleGeometry args={[0.18, 18]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} side={THREE.DoubleSide} />
+      </mesh>
+      {/* wings on sigil */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[0.45 + s * 0.18, 1.97, 0.012]} rotation={[0, 0, s * 0.5]}>
+          <coneGeometry args={[0.07, 0.16, 6]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/* ── Brazier (flame on pillar) ── */
+function Brazier({ position, color = '#fb923c' }: { position: [number, number, number]; color?: string }) {
+  const flameRef = useRef<THREE.Mesh>(null)
+  useFrame(({ clock }) => {
+    if (!flameRef.current) return
+    const t = clock.getElapsedTime()
+    const s = 1 + Math.sin(t * 8 + position[0]) * 0.08
+    flameRef.current.scale.set(s, 1 + Math.sin(t * 6) * 0.12, s)
+  })
+  return (
+    <group position={position}>
+      {/* pillar */}
+      <mesh castShadow position={[0, 0.65, 0]}>
+        <cylinderGeometry args={[0.16, 0.22, 1.3, 12]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.7} />
+      </mesh>
+      {/* bowl */}
+      <mesh castShadow position={[0, 1.4, 0]}>
+        <cylinderGeometry args={[0.32, 0.22, 0.18, 16]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.5} />
+      </mesh>
+      {/* flame */}
+      <mesh ref={flameRef} position={[0, 1.7, 0]}>
+        <coneGeometry args={[0.25, 0.55, 8]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.2} transparent opacity={0.92} />
+      </mesh>
+      <pointLight position={[0, 1.7, 0]} color={color} intensity={0.9} distance={5} decay={1.5} />
+    </group>
+  )
+}
+
 /* ── Decor router ── */
 function WorldDecor({ world }: { world: WorldDef }) {
   switch (world.pillarType) {
@@ -546,29 +845,93 @@ function NpcAccessories({ role = '', color }: { role?: string; color: string }) 
   const isRecruiter = role === 'recruiter' || role === 'athena'
   const isTavern = role === 'tavernkeeper' || role === 'apollo'
   const isShop = role === 'shopkeeper' || role === 'iris'
+  const isHermes = role === 'hermes'
+  const isKnight = isTrainer || isRecruiter || isHermes
   return (
     <group>
       {/* shoulder silhouette */}
-      {(isTrainer || isRecruiter || isBanker) && (
+      {(isTrainer || isRecruiter || isBanker || isHermes) && (
         <>
-          <mesh castShadow position={[-0.36, 0.98, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={isTrainer ? '#94a3b8' : color} metalness={isTrainer ? 0.6 : 0.15} roughness={0.42} emissive={color} emissiveIntensity={0.12} /></mesh>
-          <mesh castShadow position={[0.36, 0.98, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={isTrainer ? '#94a3b8' : color} metalness={isTrainer ? 0.6 : 0.15} roughness={0.42} emissive={color} emissiveIntensity={0.12} /></mesh>
+          <mesh castShadow position={[-0.36, 0.98, 0]} rotation={[0, 0, 0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={isTrainer || isHermes ? '#94a3b8' : color} metalness={isTrainer || isHermes ? 0.6 : 0.15} roughness={0.42} emissive={color} emissiveIntensity={0.12} /></mesh>
+          <mesh castShadow position={[0.36, 0.98, 0]} rotation={[0, 0, -0.4]}><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={isTrainer || isHermes ? '#94a3b8' : color} metalness={isTrainer || isHermes ? 0.6 : 0.15} roughness={0.42} emissive={color} emissiveIntensity={0.12} /></mesh>
         </>
       )}
+      {/* breastplate disc (knights only) */}
+      {isKnight && (
+        <mesh castShadow position={[0, 0.78, 0.18]}>
+          <cylinderGeometry args={[0.18, 0.22, 0.08, 18]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.7} roughness={0.3} emissive={color} emissiveIntensity={0.18} />
+        </mesh>
+      )}
       {/* cape/back panel, visible in orbit and screenshots */}
-      {(isRecruiter || isBanker || isTavern) && (
+      {(isRecruiter || isBanker || isTavern || isHermes) && (
         <mesh castShadow position={[0, 0.78, -0.2]} rotation={[0.18, 0, 0]}>
           <planeGeometry args={[0.72, 0.9]} />
-          <meshStandardMaterial color={color} side={THREE.DoubleSide} roughness={0.6} emissive={color} emissiveIntensity={0.08} />
+          <meshStandardMaterial color={color} side={THREE.DoubleSide} roughness={0.6} emissive={color} emissiveIntensity={isHermes ? 0.18 : 0.08} />
         </mesh>
       )}
       {/* hats/crowns so roles read at distance */}
       {isBanker && <mesh castShadow position={[0, 1.48, 0]}><cylinderGeometry args={[0.2, 0.24, 0.18, 12]} /><meshStandardMaterial color="#fbbf24" metalness={0.45} roughness={0.38} emissive="#fbbf24" emissiveIntensity={0.25} /></mesh>}
       {isShop && <mesh castShadow position={[0, 1.45, 0]} rotation={[0, 0, 0.2]}><coneGeometry args={[0.28, 0.28, 8]} /><meshStandardMaterial color="#38bdf8" roughness={0.55} emissive="#38bdf8" emissiveIntensity={0.1} /></mesh>}
       {isTavern && <mesh castShadow position={[0, 1.44, 0]}><torusGeometry args={[0.19, 0.025, 8, 24]} /><meshStandardMaterial color="#f59e0b" roughness={0.5} emissive="#f59e0b" emissiveIntensity={0.2} /></mesh>}
-      {/* weapons/tools */}
+      {/* helmet for Trainer & Recruiter (knight) */}
+      {(isTrainer || isRecruiter) && (
+        <>
+          <mesh castShadow position={[0, 1.46, 0]}>
+            <sphereGeometry args={[0.2, 14, 12, 0, Math.PI * 2, 0, Math.PI / 1.6]} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} />
+          </mesh>
+          {/* plume */}
+          <mesh castShadow position={[0, 1.62, -0.04]} rotation={[0.4, 0, 0]}>
+            <coneGeometry args={[0.07, 0.32, 8]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} />
+          </mesh>
+        </>
+      )}
+      {/* Hermes-specific winged petasos */}
+      {isHermes && (
+        <>
+          <mesh castShadow position={[0, 1.5, 0]}>
+            <coneGeometry args={[0.24, 0.16, 14]} />
+            <meshStandardMaterial color="#fbbf24" metalness={0.6} roughness={0.3} emissive="#fbbf24" emissiveIntensity={0.5} />
+          </mesh>
+          {[-1, 1].map((s) => (
+            <mesh key={s} castShadow position={[s * 0.26, 1.5, 0]} rotation={[0, 0, s * 0.6]}>
+              <coneGeometry args={[0.06, 0.32, 6]} />
+              <meshStandardMaterial color="#fff5d1" emissive="#fbbf24" emissiveIntensity={0.7} />
+            </mesh>
+          ))}
+        </>
+      )}
+      {/* sword sheath at hip for knights */}
+      {isKnight && (
+        <>
+          <mesh castShadow position={[0.34, 0.62, 0.04]} rotation={[0, 0, 0.18]}>
+            <boxGeometry args={[0.06, 0.5, 0.06]} />
+            <meshStandardMaterial color="#3f2a18" roughness={0.8} />
+          </mesh>
+          <mesh castShadow position={[0.34, 0.92, 0.06]} rotation={[0, 0, 0.18]}>
+            <boxGeometry args={[0.08, 0.18, 0.06]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} metalness={0.4} roughness={0.4} />
+          </mesh>
+        </>
+      )}
+      {/* weapons/tools (existing) */}
       {isTrainer && <mesh castShadow position={[0.52, 0.82, 0.08]} rotation={[0.1, 0, -0.75]}><boxGeometry args={[0.05, 0.9, 0.05]} /><meshStandardMaterial color="#cbd5e1" metalness={0.6} roughness={0.35} /></mesh>}
       {isShop && <mesh castShadow position={[-0.48, 0.72, 0.08]} rotation={[0, 0, 0.25]}><boxGeometry args={[0.16, 0.38, 0.08]} /><meshStandardMaterial color="#a16207" roughness={0.8} /></mesh>}
+      {/* Hermes caduceus staff */}
+      {isHermes && (
+        <>
+          <mesh castShadow position={[-0.5, 0.85, 0.08]} rotation={[0, 0, 0.04]}>
+            <cylinderGeometry args={[0.03, 0.03, 1.6, 8]} />
+            <meshStandardMaterial color="#fbbf24" metalness={0.7} roughness={0.3} emissive="#fbbf24" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh castShadow position={[-0.5, 1.6, 0.08]}>
+            <torusGeometry args={[0.08, 0.02, 8, 14]} />
+            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.7} />
+          </mesh>
+        </>
+      )}
     </group>
   )
 }
