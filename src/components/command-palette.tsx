@@ -120,7 +120,9 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
 
   const runSlashCommand = (command: string) => {
     if (command === '/new') {
-      void navigate({ to: '/chat' })
+      // /chat index redirects to last session via localStorage — use the
+      // explicit 'new' sentinel so /new actually opens a fresh chat. See #300.
+      void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
       return
     }
 

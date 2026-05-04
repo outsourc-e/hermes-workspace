@@ -1172,6 +1172,28 @@ export function ChatScreen({
     handoffTimeoutMs: modelsQuery.data?.streamHandoffTimeoutMs,
   })
 
+  // Cancel any in-flight stream when the user navigates between sessions or
+  // starts a new chat. Without this, an SSE stream from session A keeps
+  // running after the user navigates away — and any chunks it had already
+  // buffered before our abort takes effect could land in session B (the
+  // newly active session). See #297 (cross-session response contamination).
+  // Note: useStreamingMessage also has its own generation-token guard for
+  // the buffered-chunk race, but cancelling here is the cleaner contract
+  // (an in-flight response that the user navigated away from is no longer
+  // wanted in either session).
+  const navCancelKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    const navKey = `${activeCanonicalKey ?? ''}::${isNewChat ? 'new' : activeFriendlyId}`
+    if (navCancelKeyRef.current === null) {
+      navCancelKeyRef.current = navKey
+      return
+    }
+    if (navCancelKeyRef.current !== navKey) {
+      navCancelKeyRef.current = navKey
+      cancelStreaming()
+    }
+  }, [activeCanonicalKey, activeFriendlyId, isNewChat, cancelStreaming])
+
   const activeIsRealtimeStreaming = isPortableMode
     ? localIsStreaming
     : isRealtimeStreaming
@@ -2210,7 +2232,11 @@ export function ChatScreen({
       if (!trimmedCommand.startsWith('/')) return false
 
       if (trimmedCommand === '/new') {
-        navigate({ to: '/chat' })
+        // Use the explicit 'new' session sentinel rather than '/chat' alone.
+        // The /chat index route redirects to the last-active session via
+        // localStorage, so navigating to '/chat' would land in the previous
+        // chat instead of opening a fresh one. See #300.
+        navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
         return true
       }
 

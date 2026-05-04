@@ -87,7 +87,8 @@ export function SearchModal() {
         description: 'Start a new conversation session',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/chat' })
+          // /chat redirects to last session — force the new sentinel. See #300.
+          navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
         },
       },
       {
