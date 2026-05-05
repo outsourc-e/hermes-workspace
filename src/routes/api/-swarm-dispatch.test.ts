@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildHermesTmuxLaunchCommand,
   checkpointFromRuntimeSnapshot,
   runtimeCheckpointSignature,
   runtimeSnapshotIsFresh,
@@ -41,6 +42,21 @@ describe('checkpointFromRuntimeSnapshot', () => {
     })
 
     expect(checkpoint).toBeNull()
+  })
+})
+
+describe('buildHermesTmuxLaunchCommand', () => {
+  it('keeps the tmux shell alive so startup failures leave readable output', () => {
+    const command = buildHermesTmuxLaunchCommand({
+      profilePath: '/tmp/hermes profiles/swarm1',
+      hermesBin: '/opt/homebrew/bin/hermes',
+      ghToken: 'ghp_testtokenvalue123456',
+    })
+
+    expect(command).toContain("HERMES_HOME='/tmp/hermes profiles/swarm1'")
+    expect(command).toContain("'/opt/homebrew/bin/hermes' chat --tui")
+    expect(command).toContain('[Hermes worker exited with status %s]')
+    expect(command).not.toContain('exec ')
   })
 })
 

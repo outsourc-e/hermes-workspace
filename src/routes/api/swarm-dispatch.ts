@@ -194,6 +194,25 @@ function shellEscapeSingle(value: string): string {
   return value.replace(/'/g, `'\\''`)
 }
 
+export function buildHermesTmuxLaunchCommand(input: {
+  profilePath: string
+  hermesBin: string
+  ghToken?: string | null
+}): string {
+  const launchPrefix = [
+    `HERMES_HOME='${shellEscapeSingle(input.profilePath)}'`,
+    `HERMES_CLI_BIN='${shellEscapeSingle(input.hermesBin)}'`,
+    input.ghToken ? `GH_TOKEN='${shellEscapeSingle(input.ghToken)}'` : '',
+    input.ghToken ? `GITHUB_TOKEN='${shellEscapeSingle(input.ghToken)}'` : '',
+  ].filter(Boolean).join(' ')
+  const hermesBin = shellEscapeSingle(input.hermesBin)
+
+  // Do not exec the Hermes process. Keeping the parent shell alive means a
+  // failed worker startup leaves a readable tmux pane instead of destroying the
+  // session and turning the real error into "can't find pane".
+  return `${launchPrefix} '${hermesBin}' chat --tui; status=$?; printf '\n[Hermes worker exited with status %s]\n' "$status"`
+}
+
 function parseAssignments(value: unknown): Array<AssignmentRequest> {
   if (!Array.isArray(value)) return []
   const assignments: Array<AssignmentRequest> = []
@@ -541,6 +560,17 @@ function resolveWorkerCwd(workerId: string): string {
   return homedir()
 }
 
+async function captureTmuxPane(tmuxBin: string, sessionName: string): Promise<string> {
+  const captured = await execFileAsync(tmuxBin, ['capture-pane', '-p', '-t', sessionName, '-S', '-200'], 8_000)
+  return captured.ok ? captured.stdout.trim() : ''
+}
+
+function redactStartupOutput(output: string): string {
+  return output
+    .replace(/(sk-[A-Za-z0-9_-]{12,})/g, '[REDACTED]')
+    .replace(/(gh[pousr]_[A-Za-z0-9_]{12,})/g, '[REDACTED]')
+}
+
 async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmuxBin: string; sessionName: string } | { ok: false; error: string }> {
   const tmuxBin = resolveTmuxBin()
   if (!tmuxBin) return { ok: false, error: 'tmux not installed' }
@@ -552,14 +582,13 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
 
   const profilePath = getProfilePath(workerId)
   const cwd = resolveWorkerCwd(workerId)
-  const ghToken = resolveGithubToken()
-  const launchPrefix = [
-    `HERMES_HOME='${shellEscapeSingle(profilePath)}'`,
-    `HERMES_CLI_BIN='${shellEscapeSingle(resolveHermesBin())}'`,
-    ghToken ? `GH_TOKEN='${shellEscapeSingle(ghToken)}'` : '',
-    ghToken ? `GITHUB_TOKEN='${shellEscapeSingle(ghToken)}'` : '',
-  ].filter(Boolean).join(' ')
-  const hermesBin = shellEscapeSingle(resolveHermesBin())
+  const hermesBin = resolveHermesBin()
+  const launchCommand = buildHermesTmuxLaunchCommand({
+    profilePath,
+    hermesBin,
+    ghToken: resolveGithubToken(),
+  })
+
   const started = await execFileAsync(tmuxBin, [
     'new-session',
     '-d',
@@ -567,14 +596,38 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
     sessionName,
     '-c',
     cwd,
-    `${launchPrefix} exec '${hermesBin}' chat --tui`,
   ])
   if (!started.ok) {
     return { ok: false, error: started.error }
   }
 
-  // Give the agent a moment to render its prompt before sending keys.
+  const launched = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, launchCommand, 'C-m'])
+  if (!launched.ok) {
+    return { ok: false, error: launched.error }
+  }
+
+  // Give the agent a moment to render its prompt before sending keys. If Hermes
+  // exits immediately, the shell stays alive and prints a sentinel that lets us
+  // surface the real startup failure instead of a later tmux "can't find pane".
   await sleep(1200)
+  if (!(await tmuxHasSession(tmuxBin, sessionName))) {
+    return { ok: false, error: `Hermes worker tmux session ${sessionName} exited during startup` }
+  }
+
+  const startupOutput = await captureTmuxPane(tmuxBin, sessionName)
+  if (startupOutput.includes('[Hermes worker exited with status')) {
+    const sanitizedOutput = redactStartupOutput(startupOutput).slice(-4_000)
+    const logsDir = join(profilePath, 'logs')
+    mkdirSync(logsDir, { recursive: true })
+    const startupLogPath = join(logsDir, 'swarm-dispatch-startup.log')
+    writeFileSync(startupLogPath, `${new Date().toISOString()} ${sanitizedOutput}
+`, { flag: 'a' })
+    return {
+      ok: false,
+      error: `Hermes worker failed to start in tmux session ${sessionName}. Startup output saved to ${startupLogPath}: ${sanitizedOutput}`,
+    }
+  }
+
   return { ok: true, tmuxBin, sessionName }
 }
 
