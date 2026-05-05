@@ -78,6 +78,7 @@ import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-provid
 import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
+import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
@@ -487,6 +488,11 @@ const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   path: '/api/gateway-status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
+  id: '/api/gateway-reprobe',
+  path: '/api/gateway-reprobe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
   id: '/api/files',
   path: '/api/files',
@@ -836,6 +842,7 @@ export interface FileRoutesByFullPath {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -968,6 +975,7 @@ export interface FileRoutesByTo {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -1102,6 +1110,7 @@ export interface FileRoutesById {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -1237,6 +1246,7 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
+    | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/history'
     | '/api/integrations'
@@ -1369,6 +1379,7 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
+    | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/history'
     | '/api/integrations'
@@ -1502,6 +1513,7 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
+    | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/history'
     | '/api/integrations'
@@ -1636,6 +1648,7 @@ export interface RootRouteChildren {
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
+  ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiIntegrationsRoute: typeof ApiIntegrationsRoute
@@ -2191,6 +2204,13 @@ declare module '@tanstack/react-router' {
       path: '/api/gateway-status'
       fullPath: '/api/gateway-status'
       preLoaderRoute: typeof ApiGatewayStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway-reprobe': {
+      id: '/api/gateway-reprobe'
+      path: '/api/gateway-reprobe'
+      fullPath: '/api/gateway-reprobe'
+      preLoaderRoute: typeof ApiGatewayReprobeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -2826,6 +2846,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
+  ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiIntegrationsRoute: ApiIntegrationsRoute,
