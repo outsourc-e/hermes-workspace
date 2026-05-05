@@ -8,7 +8,7 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { newestCheckpointFromMessages, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { createOrUpdateMission, markMissionAssignmentDispatched, recordMissionCheckpoint } from '../../server/swarm-missions'
-import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
+import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/swarm-memory'
 import { rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 
@@ -644,9 +644,11 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
     }
   }
 
-  // Give the TUI a beat to ingest the paste before submitting. Some workers
-  // render slower and otherwise keep the pasted text sitting at the prompt.
-  await sleep(120)
+  // Give the TUI enough time to ingest the paste before submitting. The Hermes
+  // prompt can visually contain the pasted text before prompt_toolkit is ready
+  // to accept Enter; sending a confirmation Enter shortly after the first one
+  // prevents the user-visible failure mode where the task sits at the prompt.
+  await sleep(2000)
   const enter = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-m'])
   if (!enter.ok) {
     return {
@@ -654,6 +656,19 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
       ok: false,
       output: '',
       error: enter.error,
+      durationMs: Date.now() - startedAt,
+      exitCode: null,
+      delivery: 'tmux',
+    }
+  }
+  await sleep(1000)
+  const confirmEnter = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-m'])
+  if (!confirmEnter.ok) {
+    return {
+      workerId,
+      ok: false,
+      output: '',
+      error: confirmEnter.error,
       durationMs: Date.now() - startedAt,
       exitCode: null,
       delivery: 'tmux',

@@ -46,9 +46,11 @@ function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   return null
 }
 
-/** Find the `claude` CLI binary installed by Nous's installer. */
+/** Find the Hermes CLI binary used to start the local gateway. */
 function resolveClaudeBinary(): string | null {
   const candidates = [
+    process.env.HERMES_CLI_BIN || '',
+    resolve(os.homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'hermes'),
     resolve(os.homedir(), '.claude', 'bin', 'claude'),
     resolve(os.homedir(), '.local', 'bin', 'claude'),
   ]
