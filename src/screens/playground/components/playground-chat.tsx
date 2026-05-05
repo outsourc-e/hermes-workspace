@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor } from '../lib/playground-bots'
 
@@ -21,10 +22,14 @@ type Props = {
 
 export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, onToggle }: Props) {
   const [draft, setDraft] = useState('')
+  const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
+  const chromeLeft = sidebarCollapsed ? 'min(120px, 9vw)' : '320px'
+  const chromeMaxWidth = sidebarCollapsed ? 'calc(100vw - 320px)' : 'calc(100vw - 520px)'
+  const [filter, setFilter] = useState<'all' | 'humans' | 'npcs'>('all')
   const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages.length])
+  }, [messages.length, filter])
   // Live online count from the multiplayer hub (dispatched by playground-world-3d).
   // Fallback: include bots so the chat doesn't say "0 online" while you're offline.
   const [serverOnline, setServerOnline] = useState<number | null>(null)
@@ -53,6 +58,9 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
   }, [])
   const liveConnected = transport === 'ws' || transport === 'both'
   const npcCount = botsFor(worldId).length
+  const humanMessages = messages.filter((m) => !(typeof m.authorId === 'string' && m.authorId.startsWith('bot:')))
+  const npcMessages = messages.filter((m) => typeof m.authorId === 'string' && m.authorId.startsWith('bot:'))
+  const visibleMessages = filter === 'humans' ? humanMessages : filter === 'npcs' ? npcMessages : messages
   const onlineCount = serverOnline != null && liveConnected ? serverOnline : 1 + npcCount
   const onlineLabel = serverOnline != null && liveConnected
     ? `${onlineCount} player${onlineCount === 1 ? '' : 's'}`
@@ -66,8 +74,8 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
         : 'connecting'
   return (
     <div
-      className="pointer-events-auto fixed bottom-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/65 text-white shadow-2xl backdrop-blur-xl"
-      style={{ width: 360, height: collapsed ? 42 : 240, maxWidth: 'calc(100vw - 320px)', left: 'min(120px, 9vw)' }}
+      className="pointer-events-auto fixed bottom-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/70 text-white shadow-2xl backdrop-blur-xl"
+      style={{ width: 380, height: collapsed ? 42 : 264, maxWidth: chromeMaxWidth, left: chromeLeft }}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/65">
@@ -77,7 +85,7 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
             title={transportLabel}
           />
           Chat · {onlineLabel}
-          {npcCount > 0 && <span className="text-white/35"> · {npcCount} NPC</span>}
+          {npcCount > 0 && <span className="text-white/35"> · {npcCount} ambient NPC</span>}
           <span className="ml-1 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.14em] text-white/45">
             {transportLabel}
           </span>
@@ -91,17 +99,25 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
       </div>
       {!collapsed && (
         <>
+          <div className="flex items-center gap-1 border-b border-white/8 px-2 py-1.5">
+            <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={messages.length} />
+            <FilterButton active={filter === 'humans'} onClick={() => setFilter('humans')} label="Humans" count={humanMessages.length} />
+            <FilterButton active={filter === 'npcs'} onClick={() => setFilter('npcs')} label="NPC" count={npcMessages.length} />
+            <span className="ml-auto text-[9px] text-white/32">NPC flavor is local, not analytics</span>
+          </div>
           <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-[12px] leading-snug">
-            {messages.length === 0 ? (
-              <div className="text-center text-white/40">No messages yet — say hi 👋</div>
+            {visibleMessages.length === 0 ? (
+              <div className="text-center text-white/40">
+                {filter === 'humans' ? 'No human chat yet — say hi 👋' : filter === 'npcs' ? 'No ambient NPC lines yet.' : 'No messages yet — say hi 👋'}
+              </div>
             ) : (
-              messages.map((m) => {
+              visibleMessages.map((m) => {
                 const isBot = typeof m.authorId === 'string' && m.authorId.startsWith('bot:')
                 return (
-                  <div key={m.id} className="mb-1.5">
+                  <div key={m.id} className={`mb-1.5 rounded-lg px-1.5 py-1 ${isBot ? 'bg-purple-300/[0.035] text-white/72' : 'bg-cyan-300/[0.045]'}`}>
                     {isBot && (
-                      <span className="mr-1 rounded bg-purple-400/20 px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-purple-200">
-                        NPC
+                      <span className="mr-1 rounded bg-purple-400/15 px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-purple-200">
+                        Ambient NPC
                       </span>
                     )}
                     <span className="font-semibold" style={{ color: m.color ?? 'white' }}>
@@ -126,7 +142,7 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               maxLength={140}
-              placeholder="Press Enter to send…"
+              placeholder="Press Enter to send human chat…"
               className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/10 px-2 py-1 text-[12px] outline-none"
             />
             <button
@@ -140,5 +156,21 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
         </>
       )}
     </div>
+  )
+}
+
+function FilterButton({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] transition ${
+        active
+          ? 'border-cyan-200/45 bg-cyan-200/15 text-cyan-50 shadow-[0_0_14px_rgba(34,211,238,.18)]'
+          : 'border-white/10 bg-white/[0.04] text-white/42 hover:bg-white/[0.08] hover:text-white/70'
+      }`}
+    >
+      {label} <span className="text-white/45">{count}</span>
+    </button>
   )
 }

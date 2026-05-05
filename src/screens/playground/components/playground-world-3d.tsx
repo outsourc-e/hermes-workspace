@@ -90,73 +90,73 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
     id: 'training',
     name: 'Training Grounds',
     accent: '#5eead4',
-    groundColor: '#16362d',
-    skyColor: '#07131a',
-    ambient: '#183d34',
+    groundColor: '#1c4a3b',
+    skyColor: '#0b2530',
+    ambient: '#2a6b59',
     pillarColor: '#99f6e4',
     pillarType: 'training',
-    fogNear: 20,
-    fogFar: 60,
+    fogNear: 16,
+    fogFar: 54,
   },
   agora: {
     id: 'agora',
     name: 'The Agora',
     accent: '#d9b35f',
-    groundColor: '#5a8a4f',
-    skyColor: '#cfe7f0',
-    ambient: '#a8c8d8',
+    groundColor: '#6b9a55',
+    skyColor: '#b9e2ef',
+    ambient: '#d7be88',
     pillarColor: '#f3dcb0',
     pillarType: 'classical',
-    fogNear: 22,
-    fogFar: 70,
+    fogNear: 18,
+    fogFar: 62,
   },
   forge: {
     id: 'forge',
     name: 'The Forge',
     accent: '#22d3ee',
-    groundColor: '#181e2e',
-    skyColor: '#060712',
-    ambient: '#1a2540',
-    pillarColor: '#2dd4bf',
+    groundColor: '#21192a',
+    skyColor: '#090611',
+    ambient: '#45211c',
+    pillarColor: '#ff8a3d',
     pillarType: 'tech',
-    fogNear: 14,
-    fogFar: 48,
+    fogNear: 10,
+    fogFar: 42,
   },
   grove: {
     id: 'grove',
     name: 'The Grove',
     accent: '#34d399',
-    groundColor: '#1a3a25',
-    skyColor: '#06150f',
-    ambient: '#1a4030',
+    groundColor: '#193b2c',
+    skyColor: '#071811',
+    ambient: '#1f5f48',
     pillarColor: '#86efac',
     pillarType: 'forest',
-    fogNear: 16,
-    fogFar: 50,
+    fogNear: 11,
+    fogFar: 44,
   },
   oracle: {
     id: 'oracle',
     name: 'Oracle Temple',
     accent: '#a78bfa',
-    groundColor: '#231b3a',
-    skyColor: '#080714',
-    ambient: '#251c40',
+    groundColor: '#261b46',
+    skyColor: '#0b0718',
+    ambient: '#33215e',
     pillarColor: '#c4b5fd',
     pillarType: 'temple',
-    fogNear: 16,
-    fogFar: 50,
+    fogNear: 12,
+    fogFar: 46,
   },
   arena: {
     id: 'arena',
     name: 'Benchmark Arena',
     accent: '#fb7185',
-    groundColor: '#3a1820',
-    skyColor: '#16070a',
-    ambient: '#3a1822',
+    groundColor: '#491827',
+    skyColor: '#1b070c',
+    ambient: '#55202c',
     pillarColor: '#fda4af',
     pillarType: 'arena',
-    fogNear: 14,
-    fogFar: 42,
+    fogNear: 10,
+    fogFar: 38,
   },
 }
 
@@ -398,8 +398,7 @@ function TechPillars({ world }: { world: WorldDef }) {
         <ringGeometry args={[4, 4.4, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={1} />
       </mesh>
-      {/* Hermes statue at the Forge center — cyan-tinted */}
-      <HermesStatue position={[0, 0, 0]} accent={world.accent} base="#1e293b" />
+      <ForgeSuperFurnace position={[0, 0, 0]} accent={world.accent} ember="#ff8a3d" />
       {/* Cyan-flame Forge braziers */}
       {[[-5, -5], [5, -5], [-5, 5], [5, 5]].map(([x, z], i) => (
         <Brazier key={i} position={[x, 0, z]} color={world.accent} />
@@ -453,6 +452,7 @@ function ForestDecor({ world }: { world: WorldDef }) {
         <ringGeometry args={[3, 4, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.4} />
       </mesh>
+      <MemoryTree position={[0, 0, 0]} accent={world.accent} />
     </>
   )
 }
@@ -490,8 +490,7 @@ function TempleDecor({ world }: { world: WorldDef }) {
         <ringGeometry args={[3.2, 3.6, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={1} />
       </mesh>
-      {/* Hermes statue at the temple center */}
-      <HermesStatue position={[0, 0, 0]} accent={world.accent} base="#312e81" />
+      <OracleRingTower position={[0, 0, 0]} accent={world.accent} />
       {/* Mystical incense braziers */}
       <Brazier position={[-4, 0, 0]} color="#a78bfa" />
       <Brazier position={[4, 0, 0]} color="#a78bfa" />
@@ -500,6 +499,72 @@ function TempleDecor({ world }: { world: WorldDef }) {
       {/* Floating runes */}
       <Sparkles count={35} scale={[14, 6, 14]} size={2.6} speed={0.3} color={world.accent} opacity={0.7} />
     </>
+  )
+}
+
+function ForgeSuperFurnace({ position, accent, ember }: { position: [number, number, number]; accent: string; ember: string }) {
+  const ringRef = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    if (ringRef.current) ringRef.current.rotation.y = clock.getElapsedTime() * 0.35
+  })
+  return (
+    <group position={position}>
+      <mesh castShadow receiveShadow position={[0, 0.35, 0]}>
+        <cylinderGeometry args={[2.1, 2.6, 0.7, 16]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.45} metalness={0.25} emissive={ember} emissiveIntensity={0.12} />
+      </mesh>
+      <mesh castShadow position={[0, 1.45, 0]}>
+        <cylinderGeometry args={[1.15, 1.45, 2.2, 12]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.38} metalness={0.35} emissive={accent} emissiveIntensity={0.38} />
+      </mesh>
+      <mesh position={[0, 2.7, 0]}>
+        <coneGeometry args={[1.4, 1.25, 8]} />
+        <meshStandardMaterial color="#2a1420" roughness={0.42} emissive={ember} emissiveIntensity={0.55} />
+      </mesh>
+      <group ref={ringRef} position={[0, 2.05, 0]}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[2.05, 0.045, 10, 64]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.25} /></mesh>
+        <mesh rotation={[Math.PI / 2, 0, Math.PI / 3]}><torusGeometry args={[1.45, 0.035, 10, 64]} /><meshStandardMaterial color={ember} emissive={ember} emissiveIntensity={1.15} /></mesh>
+      </group>
+      {[-1.4, 1.4].map((x) => <mesh key={x} castShadow position={[x, 0.85, 0]}><boxGeometry args={[0.45, 1.25, 0.55]} /><meshStandardMaterial color="#111827" emissive={ember} emissiveIntensity={0.35} /></mesh>)}
+      {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a, i) => <mesh key={i} position={[Math.cos(a) * 2.8, 0.04, Math.sin(a) * 2.8]} rotation={[-Math.PI / 2, 0, a]}><planeGeometry args={[0.36, 3.4]} /><meshStandardMaterial color={ember} emissive={ember} emissiveIntensity={0.75} transparent opacity={0.55} /></mesh>)}
+      <pointLight position={[0, 2.1, 0]} color={ember} intensity={2.6} distance={13} />
+      <pointLight position={[0, 2.8, 0]} color={accent} intensity={1.8} distance={12} />
+    </group>
+  )
+}
+
+function MemoryTree({ position, accent }: { position: [number, number, number]; accent: string }) {
+  return (
+    <group position={position}>
+      <mesh castShadow position={[0, 1.45, 0]}>
+        <cylinderGeometry args={[0.42, 0.7, 2.9, 10]} />
+        <meshStandardMaterial color="#5b3a1f" roughness={0.82} emissive={accent} emissiveIntensity={0.08} />
+      </mesh>
+      {[0, 0.8, -0.85, 1.7, -1.7].map((x, i) => <mesh key={i} castShadow position={[x, 3.0 + (i % 2) * 0.25, i === 0 ? 0 : x * 0.18]}><dodecahedronGeometry args={[1.05 - Math.min(i, 2) * 0.12, 0]} /><meshStandardMaterial color={i === 0 ? '#86efac' : '#2bbf6f'} roughness={0.72} emissive={accent} emissiveIntensity={0.12} flatShading /></mesh>)}
+      <mesh position={[0, 4.3, 0]}><octahedronGeometry args={[0.34, 0]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.4} transparent opacity={0.9} /></mesh>
+      {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a, i) => <mesh key={i} position={[Math.cos(a) * 2.9, 0.05, Math.sin(a) * 2.9]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.22, 18]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} transparent opacity={0.55} /></mesh>)}
+      <pointLight position={[0, 3.6, 0]} color={accent} intensity={1.6} distance={12} />
+    </group>
+  )
+}
+
+function OracleRingTower({ position, accent }: { position: [number, number, number]; accent: string }) {
+  const ref = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.22
+  })
+  return (
+    <group position={position}>
+      <mesh castShadow receiveShadow position={[0, 0.28, 0]}><cylinderGeometry args={[1.9, 2.3, 0.56, 18]} /><meshStandardMaterial color="#312e81" roughness={0.5} emissive={accent} emissiveIntensity={0.18} /></mesh>
+      <mesh castShadow position={[0, 1.55, 0]}><cylinderGeometry args={[0.42, 0.58, 2.4, 12]} /><meshStandardMaterial color="#171032" roughness={0.42} emissive={accent} emissiveIntensity={0.35} /></mesh>
+      <group ref={ref} position={[0, 3.0, 0]}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[2.2, 0.045, 12, 72]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.35} /></mesh>
+        <mesh rotation={[0.75, 0, 0]}><torusGeometry args={[1.55, 0.04, 12, 72]} /><meshStandardMaterial color="#c4b5fd" emissive="#c4b5fd" emissiveIntensity={1.2} /></mesh>
+        <mesh rotation={[0, 0, 0.75]}><torusGeometry args={[1.0, 0.035, 12, 64]} /><meshStandardMaterial color="#fef3c7" emissive="#fef3c7" emissiveIntensity={0.95} /></mesh>
+        <mesh><octahedronGeometry args={[0.42, 0]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.8} transparent opacity={0.9} /></mesh>
+      </group>
+      <pointLight position={[0, 3, 0]} color={accent} intensity={2.1} distance={13} />
+    </group>
   )
 }
 
@@ -547,6 +612,11 @@ function ArenaDecor({ world }: { world: WorldDef }) {
         <ringGeometry args={[2.4, 4.4, 64]} />
         <meshStandardMaterial color={world.accent} emissive={world.accent} emissiveIntensity={0.6} />
       </mesh>
+      <mesh position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[2.15, 48]} />
+        <meshStandardMaterial color="#16070a" emissive={world.accent} emissiveIntensity={0.22} roughness={0.45} />
+      </mesh>
+      <pointLight position={[0, 4, 0]} color={world.accent} intensity={2.2} distance={14} />
       {/* scoreboard pillars */}
       {[-7, 7].map((x, i) => (
         <group key={i} position={[x, 0, 0]}>
@@ -586,6 +656,12 @@ function TrainingDecor({ world }: { world: WorldDef }) {
 
   return (
     <>
+      {/* Premium readable routes: the world should pull the eye toward the next stop, not rely only on HUD text. */}
+      <PathRibbon from={[0, 0]} to={[-11, 8]} color="#5eead4" width={1.25} />
+      <PathRibbon from={[0, 0]} to={[-5, -4]} color="#fb7185" width={1.2} />
+      <PathRibbon from={[0, 0]} to={[6, 0]} color="#a78bfa" width={1.08} />
+      <PathRibbon from={[0, 0]} to={[14, -10]} color="#22d3ee" width={1.35} />
+      <PathRibbon from={[-5, -4]} to={[-14, -10]} color="#fbbf24" width={1.08} />
       {/* Hermes statue at the heart of the grounds */}
       <HermesStatue position={[0, 0, 0]} accent={world.accent} />
       {/* Practice dummies + weapon racks around the trainer’s ring */}
@@ -636,16 +712,31 @@ function TrainingDecor({ world }: { world: WorldDef }) {
         </mesh>
       </group>
       <group position={[14, 0, -10]}>
+        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <ringGeometry args={[2.8, 4.6, 72]} />
+          <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.28} transparent opacity={0.48} />
+        </mesh>
         <mesh castShadow position={[0, 2.3, 0]}>
           <torusGeometry args={[2.2, 0.18, 18, 64]} />
-          <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={1.4} />
+          <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={1.75} />
+        </mesh>
+        <mesh castShadow position={[0, 2.3, -0.08]} rotation={[0, 0, Math.PI / 4]}>
+          <torusGeometry args={[1.55, 0.06, 12, 48]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={1.1} transparent opacity={0.9} />
         </mesh>
         {[-2.8, 2.8].map((x) => (
-          <mesh key={x} castShadow position={[x, 1.5, 0]}>
-            <boxGeometry args={[0.7, 3, 0.7]} />
-            <meshStandardMaterial color="#0f172a" emissive="#22d3ee" emissiveIntensity={0.25} />
-          </mesh>
+          <group key={x} position={[x, 0, 0]}>
+            <mesh castShadow position={[0, 1.5, 0]}>
+              <boxGeometry args={[0.7, 3, 0.7]} />
+              <meshStandardMaterial color="#0f172a" emissive="#22d3ee" emissiveIntensity={0.32} />
+            </mesh>
+            <mesh castShadow position={[0, 3.25, 0]}>
+              <coneGeometry args={[0.65, 0.85, 4]} />
+              <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.45} roughness={0.42} />
+            </mesh>
+          </group>
         ))}
+        <pointLight position={[0, 2.5, 0]} color="#22d3ee" intensity={2.4} distance={13} />
       </group>
       {labels.map((label) => (
         <Html key={label.text} position={label.pos} center distanceFactor={12}>
@@ -655,6 +746,39 @@ function TrainingDecor({ world }: { world: WorldDef }) {
         </Html>
       ))}
     </>
+  )
+}
+
+function PathRibbon({
+  from,
+  to,
+  color,
+  width = 1.1,
+}: {
+  from: [number, number]
+  to: [number, number]
+  color: string
+  width?: number
+}) {
+  const dx = to[0] - from[0]
+  const dz = to[1] - from[1]
+  const length = Math.sqrt(dx * dx + dz * dz)
+  const angle = Math.atan2(dx, dz)
+  return (
+    <group position={[from[0] + dx / 2, 0.018, from[1] + dz / 2]} rotation={[0, angle, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[width, length]} />
+        <meshStandardMaterial color="#80633d" roughness={0.92} transparent opacity={0.74} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-width / 2, 0.006, 0]}>
+        <planeGeometry args={[0.06, length]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} transparent opacity={0.72} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, 0.006, 0]}>
+        <planeGeometry args={[0.06, length]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} transparent opacity={0.72} />
+      </mesh>
+    </group>
   )
 }
 
@@ -2701,13 +2825,13 @@ function Scene({
       )}
       <color attach="background" args={[world.skyColor]} />
       <fog attach="fog" args={[world.skyColor, world.fogNear, world.fogFar]} />
-      <hemisphereLight intensity={0.55} color={'#fff4d6'} groundColor={world.id === 'agora' ? '#3f6b3a' : world.ambient} />
-      <ambientLight intensity={0.35} color={world.ambient} />
+      <hemisphereLight intensity={0.68} color={world.id === 'forge' ? '#ffd0a3' : '#fff4d6'} groundColor={world.id === 'agora' ? '#3f6b3a' : world.ambient} />
+      <ambientLight intensity={0.28} color={world.ambient} />
       <directionalLight
         castShadow
-        position={[14, 18, 8]}
-        intensity={1.8}
-        color={'#fff1cc'}
+        position={[14, 20, 8]}
+        intensity={2.15}
+        color={world.id === 'oracle' ? '#ece7ff' : world.id === 'forge' ? '#ffd3aa' : '#fff1cc'}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-30}
         shadow-camera-right={30}
@@ -2722,8 +2846,8 @@ function Scene({
       <WorldDecor world={world} />
       <ScatteredScenery worldId={worldId} />
       {/* Ambient atmosphere particles — light-touch for performance */}
-      <Sparkles count={50} scale={[60, 8, 60]} size={2.5} speed={0.22} color={world.accent} opacity={0.55} />
-      <Sparkles count={20} scale={[30, 4, 30]} size={1.2} speed={0.5} color={'#ffffff'} opacity={0.3} />
+      <Sparkles count={70} scale={[64, 10, 64]} size={2.8} speed={0.18} color={world.accent} opacity={0.62} />
+      <Sparkles count={24} scale={[34, 5, 34]} size={1.2} speed={0.45} color={'#ffffff'} opacity={0.25} />
 
       {/* NPCs per world */}
       {worldId === 'training' && (

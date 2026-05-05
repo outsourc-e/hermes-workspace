@@ -1,0 +1,47 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="224" fill="#07080D"/>
+  <rect x="42" y="42" width="940" height="940" rx="190" fill="url(#bg)" stroke="url(#border)" stroke-width="12"/>
+  <circle cx="512" cy="512" r="286" fill="#0B1118" stroke="url(#ring)" stroke-width="18"/>
+  <circle cx="512" cy="512" r="220" stroke="#22D3EE" stroke-opacity="0.26" stroke-width="8" stroke-dasharray="28 22"/>
+  <path d="M512 238C585 320 633 394 633 491C633 604 575 681 512 776C449 681 391 604 391 491C391 394 439 320 512 238Z" fill="url(#portal)" stroke="#F8E4AC" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M512 345C557 401 582 447 582 505C582 570 552 619 512 678C472 619 442 570 442 505C442 447 467 401 512 345Z" fill="#071018" stroke="#22D3EE" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M512 301V716" stroke="#F8E4AC" stroke-width="18" stroke-linecap="round"/>
+  <path d="M454 462C488 438 536 438 570 462" stroke="#F8E4AC" stroke-width="16" stroke-linecap="round"/>
+  <path d="M454 532C488 556 536 556 570 532" stroke="#F8E4AC" stroke-width="16" stroke-linecap="round"/>
+  <path d="M371 371C286 346 211 374 151 455C246 458 323 438 383 393L371 371Z" fill="url(#wingL)" stroke="#F8E4AC" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M653 371C738 346 813 374 873 455C778 458 701 438 641 393L653 371Z" fill="url(#wingR)" stroke="#F8E4AC" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M179 431C250 420 306 397 358 360" stroke="#071018" stroke-width="14" stroke-linecap="round" opacity="0.58"/>
+  <path d="M845 431C774 420 718 397 666 360" stroke="#071018" stroke-width="14" stroke-linecap="round" opacity="0.58"/>
+  <path d="M354 658L512 746L670 658" stroke="#22D3EE" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <circle cx="512" cy="512" r="36" fill="#F8E4AC" stroke="#07080D" stroke-width="10"/>
+  <circle cx="512" cy="512" r="18" fill="#22D3EE"/>
+  <defs>
+    <linearGradient id="bg" x1="128" y1="76" x2="896" y2="958" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10151F"/>
+      <stop offset="0.48" stop-color="#080B12"/>
+      <stop offset="1" stop-color="#050608"/>
+    </linearGradient>
+    <linearGradient id="border" x1="140" y1="80" x2="880" y2="944" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8E4AC" stop-opacity="0.75"/>
+      <stop offset="0.45" stop-color="#22D3EE" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#A78BFA" stop-opacity="0.45"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="276" y1="222" x2="760" y2="814" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8E4AC"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="portal" x1="512" y1="238" x2="512" y2="776" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8E4AC"/>
+      <stop offset="0.45" stop-color="#D9B35F"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="wingL" x1="149" y1="350" x2="388" y2="457" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#F8E4AC"/>
+    </linearGradient>
+    <linearGradient id="wingR" x1="875" y1="350" x2="636" y2="457" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#F8E4AC"/>
+    </linearGradient>
+  </defs>
+</svg>

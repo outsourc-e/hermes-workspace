@@ -85,7 +85,7 @@ export function TasksScreen() {
 
   const tasksByColumn = useMemo(() => {
     const map: Record<TaskColumn, Array<ClaudeTask>> = {
-      backlog: [], todo: [], in_progress: [], review: [], done: [],
+      backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [],
     }
     for (const t of tasks) {
       if (assigneeFilter && t.assignee !== assigneeFilter) continue
@@ -99,11 +99,12 @@ export function TasksScreen() {
 
   const stats = useMemo(() => {
     const total = tasks.length
-    const inProgress = tasks.filter(t => t.column === 'in_progress').length
+    const running = tasks.filter(t => t.column === 'in_progress').length
+    const blocked = tasks.filter(t => t.column === 'blocked').length
     const done = tasks.filter(t => t.column === 'done').length
     const overdue = tasks.filter(t => isOverdue(t) && t.column !== 'done').length
     const completion = total > 0 ? Math.round((done / total) * 100) : 0
-    return { total, inProgress, done, overdue, completion }
+    return { total, running, blocked, done, overdue, completion }
   }, [tasks])
 
   const invalidate = useCallback(() => {
@@ -198,7 +199,13 @@ export function TasksScreen() {
           <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)] flex-wrap">
             <span>{stats.total} total</span>
             <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{stats.inProgress} in progress</span>
+            <span className="hidden sm:inline">{stats.running} running</span>
+            {stats.blocked > 0 && (
+              <>
+                <span className="hidden sm:inline">·</span>
+                <span className="text-red-400">{stats.blocked} blocked</span>
+              </>
+            )}
             {stats.overdue > 0 && (
               <>
                 <span>·</span>

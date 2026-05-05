@@ -5,8 +5,12 @@ compatibility_flags = ["nodejs_compat"]
 
 [[durable_objects.bindings]]
 name = "PLAYGROUND_HUB"
-class_name = "PlaygroundHub"
+class_name = "PlaygroundHubV2"
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PlaygroundHub"]
+
+[[migrations]]
+tag = "v2"
+renamed_classes = [{from = "PlaygroundHub", to = "PlaygroundHubV2"}]

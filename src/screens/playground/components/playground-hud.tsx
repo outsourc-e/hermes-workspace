@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import type { PlaygroundRpgState, RewardToast } from '../hooks/use-playground-rpg'
 
@@ -58,6 +59,8 @@ export function PlaygroundHud({
   objectiveTarget,
 }: HudProps) {
   const { playerProfile } = state
+  const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
+  const chromeLeft = sidebarCollapsed ? 'min(120px, 9vw)' : '320px'
 
   // Compute heading angle from player to objective target (in degrees, screen up = 0).
   // Throttled to ~10 Hz so we don't re-render the HUD on every animation frame.
@@ -84,10 +87,14 @@ export function PlaygroundHud({
     <>
       {/* Combined player card: avatar portrait + name + level + title + HP/MP/SP/XP */}
       {/* Sits to the right of the side rail (left:140 instead of left:3) so it doesn't crowd the chat. */}
-      <div className="pointer-events-auto fixed top-3 z-[70] flex max-w-[360px] flex-col items-start gap-2" style={{ left: 'min(120px, 9vw)' }}>
+      <div className="pointer-events-auto fixed top-3 z-[70] flex max-w-[360px] flex-col items-start gap-2" style={{ left: chromeLeft }}>
         <div
-          className="rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 px-3 py-2.5 text-white shadow-2xl backdrop-blur-xl"
-          style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
+          className="rounded-3xl border px-3 py-2.5 text-white shadow-2xl backdrop-blur-xl"
+          style={{
+            borderColor: `${worldAccent}38`,
+            background: `linear-gradient(180deg, rgba(16,22,31,.92), rgba(3,7,18,.88)), radial-gradient(circle at 20% 0%, ${worldAccent}24, transparent 55%)`,
+            boxShadow: `0 0 24px ${worldAccent}30, inset 0 1px 0 rgba(255,255,255,.08), 0 14px 42px rgba(0,0,0,.58)`,
+          }}
         >
           <div className="flex items-center gap-3">
             {/* Avatar portrait + level badge */}
@@ -142,12 +149,16 @@ export function PlaygroundHud({
       {/* Current Objective — top-center banner with arrow pointing toward the objective */}
       <div className="pointer-events-auto fixed left-1/2 top-3 z-[71] flex w-[min(92vw,460px)] -translate-x-1/2 flex-col items-center">
         <div
-          className="flex w-full items-center gap-2 rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 px-3 py-2 text-white shadow-2xl backdrop-blur-xl"
-          style={{ boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.55)` }}
+          className="flex w-full items-center gap-2 rounded-3xl border px-3 py-2 text-white shadow-2xl backdrop-blur-xl"
+          style={{
+            borderColor: `${worldAccent}42`,
+            background: `linear-gradient(180deg, rgba(16,22,31,.94), rgba(3,7,18,.9)), radial-gradient(circle at 0% 0%, ${worldAccent}22, transparent 55%)`,
+            boxShadow: `0 0 24px ${worldAccent}32, inset 0 1px 0 rgba(255,255,255,.08), 0 14px 42px rgba(0,0,0,.58)`,
+          }}
         >
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border"
-            style={{ borderColor: `${worldAccent}55`, background: `${worldAccent}1a` }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border"
+            style={{ borderColor: `${worldAccent}65`, background: `linear-gradient(180deg, ${worldAccent}24, rgba(255,255,255,.04))`, boxShadow: `inset 0 1px 0 rgba(255,255,255,.08), 0 0 16px ${worldAccent}24` }}
             title={arrowDeg != null ? 'Pointing toward objective' : 'Objective'}
           >
             <span

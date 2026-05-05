@@ -24,6 +24,29 @@
 
 export interface Env {
   PLAYGROUND_HUB: DurableObjectNamespace
+  PLAYGROUND_ADMIN_TOKEN?: string
+}
+
+type AnalyticsEvent = {
+  type: 'join' | 'leave' | 'chat' | 'world_change'
+  id: string
+  name?: string
+  color?: string
+  world?: string
+  text?: string
+  ts: number
+}
+
+type PlayerDailySummary = {
+  id: string
+  name?: string
+  color?: string
+  firstSeen: number
+  lastSeen: number
+  lastWorld?: string
+  lastChatAt?: number
+  chats: number
+  joins: number
 }
 
 interface PresenceMsg {
@@ -41,6 +64,7 @@ interface PresenceMsg {
 
 const STALE_AFTER_MS = 12000
 const CHAT_RING_MAX = 50
+const ADMIN_EVENT_RING_MAX = 250
 const PRESENCE_DEDUPE_MS = 50
 const RATE_BUCKET_CAP = 30
 const RATE_REFILL_PER_SEC = 30
@@ -63,16 +87,25 @@ interface SocketAttach {
   lastPresenceTs: number
 }
 
-export class PlaygroundHub {
+export class PlaygroundHubV2 {
   state: DurableObjectState
+  env: Env
   presence = new Map<string, PresenceMsg & { ts: number }>()
   chatRing: any[] = []
   peakToday = 0
   peakDay = ''
   lastBroadcastCount = -1
+  analyticsDay = ''
+  uniqueToday = new Set<string>()
+  joinsToday = 0
+  leavesToday = 0
+  chatsToday = 0
+  playerDaily = new Map<string, PlayerDailySummary>()
+  eventRing: AnalyticsEvent[] = []
 
-  constructor(state: DurableObjectState) {
+  constructor(state: DurableObjectState, env: Env) {
     this.state = state
+    this.env = env
     this.state.blockConcurrencyWhile(async () => {
       const stored = await this.state.storage.get<{ peak: number; day: string }>('peak')
       if (stored) {
@@ -84,6 +117,24 @@ export class PlaygroundHub {
       if (presStored) this.presence = new Map(presStored)
       const chatStored = await this.state.storage.get<any[]>('chatRing')
       if (chatStored) this.chatRing = chatStored
+      const analyticsStored = await this.state.storage.get<{
+        day: string
+        uniqueToday: string[]
+        joinsToday: number
+        leavesToday: number
+        chatsToday: number
+        playerDaily: Array<[string, PlayerDailySummary]>
+        eventRing: AnalyticsEvent[]
+      }>('analytics')
+      if (analyticsStored) {
+        this.analyticsDay = analyticsStored.day || ''
+        this.uniqueToday = new Set(analyticsStored.uniqueToday || [])
+        this.joinsToday = analyticsStored.joinsToday || 0
+        this.leavesToday = analyticsStored.leavesToday || 0
+        this.chatsToday = analyticsStored.chatsToday || 0
+        this.playerDaily = new Map(analyticsStored.playerDaily || [])
+        this.eventRing = analyticsStored.eventRing || []
+      }
     })
     this.state.blockConcurrencyWhile(async () => {
       this.scheduleAlarm()
@@ -101,6 +152,105 @@ export class PlaygroundHub {
     try {
       await this.state.storage.put('chatRing', this.chatRing)
     } catch {}
+  }
+
+  async persistAnalytics() {
+    try {
+      await this.state.storage.put('analytics', {
+        day: this.analyticsDay,
+        uniqueToday: [...this.uniqueToday],
+        joinsToday: this.joinsToday,
+        leavesToday: this.leavesToday,
+        chatsToday: this.chatsToday,
+        playerDaily: [...this.playerDaily.entries()],
+        eventRing: this.eventRing,
+      })
+    } catch {}
+  }
+
+  ensureAnalyticsDay(ts = Date.now()) {
+    const day = new Date(ts).toISOString().slice(0, 10)
+    if (this.analyticsDay && this.analyticsDay === day) return
+    this.analyticsDay = day
+    this.uniqueToday = new Set()
+    this.joinsToday = 0
+    this.leavesToday = 0
+    this.chatsToday = 0
+    this.playerDaily = new Map()
+    this.eventRing = []
+  }
+
+  notePlayer(
+    id: string,
+    patch: Partial<PlayerDailySummary> & { name?: string; color?: string; lastWorld?: string },
+    ts = Date.now(),
+  ) {
+    this.ensureAnalyticsDay(ts)
+    const current = this.playerDaily.get(id)
+    const next: PlayerDailySummary = current
+      ? {
+          ...current,
+          ...patch,
+          name: patch.name ?? current.name,
+          color: patch.color ?? current.color,
+          lastSeen: ts,
+          lastWorld: patch.lastWorld ?? current.lastWorld,
+          lastChatAt: patch.lastChatAt ?? current.lastChatAt,
+          chats: patch.chats ?? current.chats,
+          joins: patch.joins ?? current.joins,
+        }
+      : {
+          id,
+          name: patch.name,
+          color: patch.color,
+          firstSeen: ts,
+          lastSeen: ts,
+          lastWorld: patch.lastWorld,
+          lastChatAt: patch.lastChatAt,
+          chats: patch.chats ?? 0,
+          joins: patch.joins ?? 0,
+        }
+    this.playerDaily.set(id, next)
+    this.uniqueToday.add(id)
+  }
+
+  pushEvent(event: AnalyticsEvent) {
+    this.ensureAnalyticsDay(event.ts)
+    this.eventRing.push(event)
+    if (this.eventRing.length > ADMIN_EVENT_RING_MAX) {
+      this.eventRing = this.eventRing.slice(-ADMIN_EVENT_RING_MAX)
+    }
+  }
+
+  activePlayersWithin(ms: number) {
+    const cutoff = Date.now() - ms
+    let count = 0
+    for (const p of this.playerDaily.values()) {
+      if (p.lastSeen >= cutoff) count += 1
+    }
+    return count
+  }
+
+  adminStats() {
+    this.ensureAnalyticsDay()
+    const recentPlayers = [...this.playerDaily.values()]
+      .sort((a, b) => b.lastSeen - a.lastSeen)
+      .slice(0, 50)
+    return {
+      online: this.presence.size,
+      byWorld: this.byWorld(),
+      peakToday: this.peakToday,
+      peakDay: this.peakDay,
+      uniqueToday: this.uniqueToday.size,
+      joinsToday: this.joinsToday,
+      leavesToday: this.leavesToday,
+      chatsToday: this.chatsToday,
+      activeLast15m: this.activePlayersWithin(15 * 60 * 1000),
+      activeLast60m: this.activePlayersWithin(60 * 60 * 1000),
+      recentPlayers,
+      recentEvents: this.eventRing.slice(-100).reverse(),
+      ts: Date.now(),
+    }
   }
 
   // ───── Alarm-driven prune ─────
@@ -258,6 +408,15 @@ export class PlaygroundHub {
       })
     }
 
+    const adminHeader = request.headers.get('authorization') || ''
+    const adminOk = !!this.env.PLAYGROUND_ADMIN_TOKEN && adminHeader === `Bearer ${this.env.PLAYGROUND_ADMIN_TOKEN}`
+    if (url.pathname === '/admin/stats') {
+      if (!adminOk) return new Response('unauthorized', { status: 401, headers: cors })
+      return Response.json(this.adminStats(), {
+        headers: { ...cors, 'cache-control': 'no-cache' },
+      })
+    }
+
     // ───── HTTP polling endpoints (reliable fallback for WebSockets) ─────
     // POST /presence  body: { id, name, color, world, x, y, z, yaw, avatar?, lastChatAt? }
     //   Updates presence + returns { presences: [...other-players-in-world], chats: [...recent], count, byWorld, peakToday }
@@ -268,14 +427,40 @@ export class PlaygroundHub {
       const now = Date.now()
       const world = (body.world || body.worldId) as string | undefined
       const wire: PresenceMsg & { ts: number } = { ...body, kind: 'presence', ts: now }
-      const wasNew = !this.presence.has(body.id)
+      const prior = this.presence.get(body.id)
+      const wasNew = !prior
       this.presence.set(body.id, wire)
+      this.notePlayer(body.id, {
+        name: typeof body.name === 'string' ? body.name : undefined,
+        color: typeof body.color === 'string' ? body.color : undefined,
+        lastWorld: world,
+        joins: wasNew ? (this.playerDaily.get(body.id)?.joins || 0) + 1 : (this.playerDaily.get(body.id)?.joins || 0),
+      }, now)
       if (wasNew) {
+        this.joinsToday += 1
+        this.pushEvent({
+          type: 'join',
+          id: body.id,
+          name: typeof body.name === 'string' ? body.name : undefined,
+          color: typeof body.color === 'string' ? body.color : undefined,
+          world,
+          ts: now,
+        })
         await this.bumpPeak()
         this.maybeBroadcastCount()
+      } else if ((prior.world || prior.worldId) !== world) {
+        this.pushEvent({
+          type: 'world_change',
+          id: body.id,
+          name: typeof body.name === 'string' ? body.name : undefined,
+          color: typeof body.color === 'string' ? body.color : undefined,
+          world,
+          ts: now,
+        })
       }
       // Persist async — don't block the response
       this.persistPresence().catch(() => {})
+      this.persistAnalytics().catch(() => {})
       // Mirror to any active WebSockets (so clients on either transport see each other)
       this.broadcast(null, wire, { world })
       // Return: presences in same world (excluding caller), recent chats, count summary
@@ -316,7 +501,25 @@ export class PlaygroundHub {
       body.ts = Date.now()
       this.chatRing.push(body)
       if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
+      this.chatsToday += 1
+      this.notePlayer(body.id, {
+        name: typeof body.name === 'string' ? body.name : undefined,
+        color: typeof body.color === 'string' ? body.color : undefined,
+        lastWorld: (body.world || body.worldId) as string | undefined,
+        lastChatAt: body.ts,
+        chats: (this.playerDaily.get(body.id)?.chats || 0) + 1,
+      }, body.ts)
+      this.pushEvent({
+        type: 'chat',
+        id: body.id,
+        name: typeof body.name === 'string' ? body.name : undefined,
+        color: typeof body.color === 'string' ? body.color : undefined,
+        world: (body.world || body.worldId) as string | undefined,
+        text: typeof body.text === 'string' ? body.text.slice(0, 160) : undefined,
+        ts: body.ts,
+      })
       this.persistChat().catch(() => {})
+      this.persistAnalytics().catch(() => {})
       const world = (body.world || body.worldId) as string | undefined
       this.broadcast(null, body, { world })
       return Response.json({ ok: true, ts: body.ts }, { headers: cors })
@@ -330,9 +533,24 @@ export class PlaygroundHub {
       const prior = this.presence.get(body.id)
       const world = (prior?.world || prior?.worldId) as string | undefined
       this.presence.delete(body.id)
+      this.leavesToday += 1
+      this.notePlayer(body.id, {
+        name: typeof prior?.name === 'string' ? prior.name : undefined,
+        color: typeof prior?.color === 'string' ? prior.color : undefined,
+        lastWorld: world,
+      })
+      this.pushEvent({
+        type: 'leave',
+        id: body.id,
+        name: typeof prior?.name === 'string' ? prior.name : undefined,
+        color: typeof prior?.color === 'string' ? prior.color : undefined,
+        world,
+        ts: Date.now(),
+      })
       this.broadcast(null, { kind: 'leave', id: body.id }, { world })
       this.maybeBroadcastCount()
       this.persistPresence().catch(() => {})
+      this.persistAnalytics().catch(() => {})
       return Response.json({ ok: true }, { headers: cors })
     }
 
@@ -398,15 +616,27 @@ export class PlaygroundHub {
       meta.world = world
       this.saveAttach(socket, meta)
       const wire: PresenceMsg & { ts: number } = { ...msg, ts: now }
-      const wasNew = !this.presence.has(msg.id)
+      const prior = this.presence.get(msg.id)
+      const wasNew = !prior
       this.presence.set(msg.id, wire)
+      this.notePlayer(msg.id, {
+        name: typeof msg.name === 'string' ? msg.name : undefined,
+        color: typeof msg.color === 'string' ? msg.color : undefined,
+        lastWorld: world,
+        joins: wasNew ? (this.playerDaily.get(msg.id)?.joins || 0) + 1 : (this.playerDaily.get(msg.id)?.joins || 0),
+      }, now)
       if (wasNew) {
+        this.joinsToday += 1
+        this.pushEvent({ type: 'join', id: msg.id, name: msg.name, color: msg.color, world, ts: now })
         await this.bumpPeak()
         this.maybeBroadcastCount()
+      } else if ((prior.world || prior.worldId) !== world) {
+        this.pushEvent({ type: 'world_change', id: msg.id, name: msg.name, color: msg.color, world, ts: now })
       }
       // Persist periodically (every ~5 presence updates per id is enough).
       // We keep this synchronous-ish for correctness on hibernation.
       await this.persistPresence()
+      await this.persistAnalytics()
       this.broadcast(socket, wire, { world })
     } else if (msg.kind === 'chat' && typeof msg.id === 'string') {
       if (typeof msg.text === 'string' && msg.text.length > 240) {
@@ -414,7 +644,25 @@ export class PlaygroundHub {
       }
       this.chatRing.push(msg)
       if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
+      this.chatsToday += 1
+      this.notePlayer(msg.id, {
+        name: typeof msg.name === 'string' ? msg.name : undefined,
+        color: typeof msg.color === 'string' ? msg.color : undefined,
+        lastWorld: (msg.world || msg.worldId) as string | undefined,
+        lastChatAt: typeof msg.ts === 'number' ? msg.ts : Date.now(),
+        chats: (this.playerDaily.get(msg.id)?.chats || 0) + 1,
+      }, typeof msg.ts === 'number' ? msg.ts : Date.now())
+      this.pushEvent({
+        type: 'chat',
+        id: msg.id,
+        name: typeof msg.name === 'string' ? msg.name : undefined,
+        color: typeof msg.color === 'string' ? msg.color : undefined,
+        world: (msg.world || msg.worldId) as string | undefined,
+        text: typeof msg.text === 'string' ? msg.text.slice(0, 160) : undefined,
+        ts: typeof msg.ts === 'number' ? msg.ts : Date.now(),
+      })
       await this.persistChat()
+      await this.persistAnalytics()
       const world = (msg.world || msg.worldId) as string | undefined
       this.broadcast(socket, msg, { world })
       this.saveAttach(socket, meta)
@@ -422,7 +670,22 @@ export class PlaygroundHub {
       const prior = this.presence.get(msg.id)
       const world = (prior?.world || prior?.worldId) as string | undefined
       this.presence.delete(msg.id)
+      this.leavesToday += 1
+      this.notePlayer(msg.id, {
+        name: typeof prior?.name === 'string' ? prior.name : undefined,
+        color: typeof prior?.color === 'string' ? prior.color : undefined,
+        lastWorld: world,
+      })
+      this.pushEvent({
+        type: 'leave',
+        id: msg.id,
+        name: typeof prior?.name === 'string' ? prior.name : undefined,
+        color: typeof prior?.color === 'string' ? prior.color : undefined,
+        world,
+        ts: Date.now(),
+      })
       await this.persistPresence()
+      await this.persistAnalytics()
       this.broadcast(socket, msg, { world })
       this.maybeBroadcastCount()
       this.saveAttach(socket, meta)

@@ -145,3 +145,4 @@ skills-bundle/
 # Local agent artifacts (audit dumps, temporary playwright scripts)
 .hermes/
 .env.bak-*
+pr-triage-20260505-*/

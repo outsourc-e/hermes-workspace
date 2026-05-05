@@ -1,5 +1,6 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
+import { PlaygroundAdminPanel } from './components/playground-admin-panel'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { PlaygroundCustomizer } from './components/playground-customizer'
 import { PlaygroundDialog } from './components/playground-dialog'
@@ -16,6 +17,7 @@ import { autoNarrateWorld, cancelNarration, isNarrationMuted, setNarrationMuted,
 import { botsFor } from './lib/playground-bots'
 import { itemById, PLAYGROUND_WORLDS, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
 import type { RemotePlayer } from './hooks/use-playground-multiplayer'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = {
   training: { name: 'Training Grounds', accent: '#5eead4' },
@@ -83,9 +85,27 @@ export function PlaygroundScreen() {
   const focusModeAutoEngagedRef = useRef(false)
   // Narration mute (Web Speech API). Initialized from persisted state.
   const [narrationMuted, setNarrationMutedState] = useState(false)
+  const [adminMode, setAdminMode] = useState(false)
   useEffect(() => {
     setNarrationMutedState(isNarrationMuted())
   }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const fromUrl = params.get('admin') === '1'
+    const fromStorage = window.localStorage.getItem('hermes-playground-admin') === '1'
+    setAdminMode(fromUrl || fromStorage)
+  }, [])
+  const toggleAdminMode = () => {
+    setAdminMode((prev) => {
+      const next = !prev
+      if (typeof window !== 'undefined') {
+        if (next) window.localStorage.setItem('hermes-playground-admin', '1')
+        else window.localStorage.removeItem('hermes-playground-admin')
+      }
+      return next
+    })
+  }
   const heardToastIds = useRef<Set<string>>(new Set())
   const completedTutorialRef = useRef(false)
   const lowHpArmedRef = useRef(true)
@@ -222,11 +242,13 @@ export function PlaygroundScreen() {
             delete next[bot.id]
             return next
           })
-        }, 5000)
+        }, 4200)
       }
-      window.setTimeout(tick, 6000 + Math.random() * 8000)
+      // Ambient NPC chatter should make the world feel alive, not drown out
+      // human chat or inflate product energy. Keep it sparse and clearly local.
+      window.setTimeout(tick, 18000 + Math.random() * 20000)
     }
-    const initial = window.setTimeout(tick, 2500)
+    const initial = window.setTimeout(tick, 7000 + Math.random() * 5000)
     return () => {
       cancelled = true
       window.clearTimeout(initial)
@@ -640,6 +662,23 @@ export function PlaygroundScreen() {
             {focusMode ? '👁️' : '👁'}
           </span>
         </button>
+        {/* Admin mode toggle — shield icon, persistent via localStorage */}
+        <button
+          type="button"
+          onClick={toggleAdminMode}
+          aria-label={adminMode ? 'Hide admin panel' : 'Show admin panel'}
+          title={adminMode ? 'Hide admin panel' : 'Show admin panel'}
+          className="pointer-events-auto fixed right-3 top-[272px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
+          style={{
+            boxShadow: adminMode ? '0 0 14px rgba(251,191,36,0.55)' : '0 8px 22px rgba(0,0,0,.55)',
+            borderColor: adminMode ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            {adminMode ? <path d="m9 12 2 2 4-4" /> : null}
+          </svg>
+        </button>
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
@@ -648,6 +687,7 @@ export function PlaygroundScreen() {
           Menu
         </button>
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
+        {adminMode ? <PlaygroundAdminPanel /> : null}
         <PlaygroundUtilityDock
           audioMuted={audioMuted}
           narrationMuted={narrationMuted}
@@ -1030,13 +1070,15 @@ function ForgeArrivalOverlay({
 
 function NearbyBuildersChip({ players }: { players: RemotePlayer[] }) {
   const [pingedId, setPingedId] = useState<string | null>(null)
+  const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
+  const chromeLeft = sidebarCollapsed ? 'min(120px, 9vw)' : '320px'
 
   if (players.length === 0) return null
 
   return (
     <div
       className="pointer-events-auto fixed top-[210px] z-[70] hidden w-[220px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block"
-      style={{ left: 'min(120px, 9vw)' }}
+      style={{ left: chromeLeft }}
     >
       <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Builders Nearby</div>
       <div className="space-y-1">

@@ -1,6 +1,6 @@
 const BASE = '/api/claude-tasks'
 
-export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
+export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
 export type ClaudeTask = {
@@ -108,14 +108,15 @@ export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'us
 }
 
 export const COLUMN_LABELS: Record<TaskColumn, string> = {
-  backlog: 'Backlog',
-  todo: 'Todo',
-  in_progress: 'In Progress',
+  backlog: 'Triage',
+  todo: 'Ready',
+  in_progress: 'Running',
   review: 'Review',
+  blocked: 'Blocked',
   done: 'Done',
 }
 
-export const COLUMN_ORDER: Array<TaskColumn> = ['backlog', 'todo', 'in_progress', 'review', 'done']
+export const COLUMN_ORDER: Array<TaskColumn> = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done']
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
   high: '#ef4444',
@@ -128,6 +129,7 @@ export const COLUMN_COLORS: Record<TaskColumn, string> = {
   todo: '#3b82f6',
   in_progress: '#f97316',
   review: '#a855f7',
+  blocked: '#ef4444',
   done: '#22c55e',
 }
 
