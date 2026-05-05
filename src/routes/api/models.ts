@@ -66,6 +66,22 @@ function normalizeModel(entry: unknown): ModelEntry | null {
   }
 }
 
+export function mergeModelEntries(...sources: Array<Array<ModelEntry>>): Array<ModelEntry> {
+  const merged: Array<ModelEntry> = []
+  const seen = new Set<string>()
+
+  for (const source of sources) {
+    for (const model of source) {
+      const normalized = normalizeModel(model)
+      if (!normalized || seen.has(normalized.id)) continue
+      merged.push(normalized)
+      seen.add(normalized.id)
+    }
+  }
+
+  return merged
+}
+
 /**
  * Read user-configured models from active profile's models.json.
  */
@@ -194,22 +210,22 @@ export const Route = createFileRoute('/api/models')({
             models.unshift(defaultModel)
           }
 
-          // Fallback: if no models.json, fetch from hermes-agent /v1/models
-          if (models.length === 0 && getGatewayCapabilities().models) {
-            models = await fetchClaudeModels()
-            source = 'hermes-agent'
+          // Merge the authoritative Hermes model catalog whenever it is
+          // available. Previously, a non-empty models.json stopped here, so the
+          // Operations picker only showed the local Workspace subset and drifted
+          // from the CLI/backend model universe.
+          if (getGatewayCapabilities().models) {
+            const hermesModels = await fetchClaudeModels()
+            models = mergeModelEntries(models, hermesModels)
+            source = source === 'models.json' ? 'models.json+hermes-agent' : 'hermes-agent'
           }
 
           // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)
           await ensureDiscovery()
           const localModels = getDiscoveredModels()
-          const existingIds = new Set(models.map((m) => m.id))
+          models = mergeModelEntries(models, localModels)
           for (const m of localModels) {
-            if (!existingIds.has(m.id)) {
-              models.push(m)
-              existingIds.add(m.id)
-              ensureProviderInConfig(m.provider)
-            }
+            ensureProviderInConfig(m.provider)
           }
 
           const configuredProviders = Array.from(
