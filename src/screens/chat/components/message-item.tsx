@@ -13,6 +13,12 @@ import { AssistantAvatar, UserAvatar } from '@/components/avatars'
 import { CodeBlock } from '@/components/prompt-kit/code-block'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { Message, MessageContent } from '@/components/prompt-kit/message'
+import {
+  DialogClose,
+  DialogContent,
+  DialogRoot,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -1362,6 +1368,160 @@ function MarkdownMessageCard({ content }: { content: string }) {
   )
 }
 
+type InlineArtifact = {
+  type: string
+  title: string
+  content: string
+}
+
+type InlineArtifactParseResult = {
+  cleanedText: string
+  artifacts: Array<InlineArtifact>
+}
+
+function parseArtifactAttributes(rawAttributes: string): Record<string, string> {
+  const attributes: Record<string, string> = {}
+  const attributeRegex = /(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g
+
+  for (const match of rawAttributes.matchAll(attributeRegex)) {
+    const key = (match[1] || '').trim().toLowerCase()
+    const value = (match[2] || match[3] || match[4] || '').trim()
+    if (key) {
+      attributes[key] = value
+    }
+  }
+
+  return attributes
+}
+
+export function parseInlineArtifacts(text: string): InlineArtifactParseResult {
+  const artifacts: Array<InlineArtifact> = []
+  const cleanedText = text.replace(
+    /<artifact\b([^>]*)>([\s\S]*?)<\/artifact>/gi,
+    (_, rawAttributes: string, rawContent: string) => {
+      const attributes = parseArtifactAttributes(rawAttributes || '')
+      const content = typeof rawContent === 'string' ? rawContent.trim() : ''
+      if (!content) return ''
+      artifacts.push({
+        type: (attributes.type || 'html').trim().toLowerCase(),
+        title: (attributes.title || 'Artifact').trim() || 'Artifact',
+        content,
+      })
+      return ''
+    },
+  )
+
+  return {
+    cleanedText: cleanedText.replace(/\n{3,}/g, '\n\n').trim(),
+    artifacts,
+  }
+}
+
+function summarizeArtifactContent(artifact: InlineArtifact): string {
+  const singleLine = artifact.content.replace(/\s+/g, ' ').trim()
+  if (singleLine.length <= 140) return singleLine
+  return `${singleLine.slice(0, 137)}…`
+}
+
+function artifactLanguage(type: string): string {
+  if (type === 'js' || type === 'javascript') return 'javascript'
+  if (type === 'ts' || type === 'typescript') return 'typescript'
+  if (type === 'md') return 'markdown'
+  if (type === 'py') return 'python'
+  return type
+}
+
+function ArtifactPreviewBody({ artifact }: { artifact: InlineArtifact }) {
+  if (artifact.type === 'html' || artifact.type === 'svg') {
+    return (
+      <iframe
+        title={artifact.title}
+        sandbox="allow-scripts"
+        srcDoc={artifact.content}
+        className="h-[60vh] w-full rounded-lg border"
+        style={{
+          borderColor: 'var(--theme-border)',
+          background: 'white',
+        }}
+      />
+    )
+  }
+
+  if (artifact.type === 'markdown' || artifact.type === 'md') {
+    return (
+      <div
+        className="max-h-[60vh] overflow-auto rounded-lg border p-4"
+        style={{ borderColor: 'var(--theme-border)' }}
+      >
+        <Markdown className="text-sm">{artifact.content}</Markdown>
+      </div>
+    )
+  }
+
+  return (
+    <CodeBlock
+      content={artifact.content}
+      language={artifactLanguage(artifact.type)}
+      className="my-0 max-h-[60vh] overflow-auto"
+    />
+  )
+}
+
+function InlineArtifactCard({ artifact }: { artifact: InlineArtifact }) {
+  const [open, setOpen] = useState(false)
+  const summary = summarizeArtifactContent(artifact)
+
+  return (
+    <>
+      <div
+        className="rounded-xl border p-3"
+        style={{
+          borderColor: 'var(--chat-assistant-border)',
+          background: 'color-mix(in srgb, var(--chat-assistant-bg) 85%, white 15%)',
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true">🧩</span>
+              <span className="truncate text-sm font-semibold">{artifact.title}</span>
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+                style={{
+                  background: 'var(--theme-card2)',
+                  color: 'var(--theme-muted)',
+                }}
+              >
+                {artifact.type}
+              </span>
+            </div>
+            {summary ? (
+              <p className="mt-2 text-xs opacity-80">{summary}</p>
+            ) : null}
+          </div>
+          <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+            Open
+          </Button>
+        </div>
+      </div>
+      <DialogRoot open={open} onOpenChange={setOpen}>
+        <DialogContent className="w-[min(1100px,96vw)] max-h-[92vh]">
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--theme-border)' }}>
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base">{artifact.title}</DialogTitle>
+              <div className="text-xs uppercase tracking-wide opacity-70">{artifact.type}</div>
+            </div>
+            <DialogClose>Close</DialogClose>
+          </div>
+          <div className="p-4">
+            <ArtifactPreviewBody artifact={artifact} />
+          </div>
+        </DialogContent>
+      </DialogRoot>
+    </>
+  )
+}
+
 const TOOL_ICONS: Record<string, string> = {
   exec: '\u2699',
   terminal: '\u2699',
@@ -1915,9 +2075,16 @@ function MessageItemComponent({
     () => detectAssistantCorruptionWarning(role, assistantDisplayText),
     [role, assistantDisplayText],
   )
-  const standaloneMarkdownDocument = useMemo(
-    () => extractStandaloneMarkdownFence(assistantDisplayText),
+  const parsedInlineArtifacts = useMemo(
+    () => parseInlineArtifacts(assistantDisplayText),
     [assistantDisplayText],
+  )
+  const standaloneMarkdownDocument = useMemo(
+    () =>
+      parsedInlineArtifacts.artifacts.length === 0
+        ? extractStandaloneMarkdownFence(parsedInlineArtifacts.cleanedText)
+        : null,
+    [parsedInlineArtifacts],
   )
 
   useEffect(() => {
@@ -2036,9 +2203,13 @@ function MessageItemComponent({
   const hasInlineImages = inlineImages.length > 0
 
   const hasText = displayText.length > 0
+  const hasRenderableAssistantText =
+    parsedInlineArtifacts.cleanedText.length > 0 ||
+    parsedInlineArtifacts.artifacts.length > 0
   const hasRevealedText = effectiveIsStreaming
-    ? assistantDisplayText.length > 0
-    : hasText
+    ? parsedInlineArtifacts.cleanedText.length > 0 ||
+      parsedInlineArtifacts.artifacts.length > 0
+    : hasRenderableAssistantText
   const canRetryMessage =
     isUser && (hasText || hasAttachments || hasInlineImages)
 
@@ -2534,7 +2705,7 @@ function MessageItemComponent({
                   ) : null}
                   {standaloneMarkdownDocument ? (
                     <MarkdownMessageCard content={standaloneMarkdownDocument} />
-                  ) : (
+                  ) : parsedInlineArtifacts.cleanedText ? (
                     <MessageContent
                       markdown
                       className={cn(
@@ -2542,12 +2713,22 @@ function MessageItemComponent({
                         effectiveIsStreaming && 'chat-streaming-content',
                       )}
                     >
-                      {assistantDisplayText}
+                      {parsedInlineArtifacts.cleanedText}
                     </MessageContent>
-                  )}
-                  {effectiveIsStreaming && (
+                  ) : null}
+                  {parsedInlineArtifacts.artifacts.length > 0 ? (
+                    <div className="mt-3 flex flex-col gap-3">
+                      {parsedInlineArtifacts.artifacts.map((artifact, index) => (
+                        <InlineArtifactCard
+                          key={`${artifact.title}-${artifact.type}-${index}`}
+                          artifact={artifact}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {effectiveIsStreaming && parsedInlineArtifacts.cleanedText ? (
                     <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent-500 align-text-bottom" />
-                  )}
+                  ) : null}
                 </div>
               ) : null)}
             {/* Sent indicator — message delivered, waiting for response */}
