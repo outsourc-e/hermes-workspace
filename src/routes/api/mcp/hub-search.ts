@@ -15,7 +15,12 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { rateLimit, getClientIp, rateLimitResponse, safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import { unifiedSearch } from '../../../server/mcp-hub/index'
 import type { SearchSource } from '../../../server/mcp-hub/index'
 
@@ -26,7 +31,10 @@ export const Route = createFileRoute('/api/mcp/hub-search')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          return Response.json(
+            { ok: false, error: 'Unauthorized' },
+            { status: 401 },
+          )
         }
 
         const ip = getClientIp(request)
@@ -38,15 +46,17 @@ export const Route = createFileRoute('/api/mcp/hub-search')({
         const q = url.searchParams.get('q') ?? ''
         const rawSource = url.searchParams.get('source') ?? 'all'
         const rawLimit = url.searchParams.get('limit') ?? '20'
+        const rawOffset = url.searchParams.get('offset') ?? '0'
 
         const source: SearchSource = VALID_SOURCES.has(rawSource)
           ? (rawSource as SearchSource)
           : 'all'
 
-        const limit = Math.min(100, Math.max(1, parseInt(rawLimit, 10) || 20))
+        const limit = Math.min(500, Math.max(1, parseInt(rawLimit, 10) || 20))
+        const offset = Math.max(0, parseInt(rawOffset, 10) || 0)
 
         try {
-          const result = await unifiedSearch(q, source, limit)
+          const result = await unifiedSearch(q, source, limit, offset)
           return Response.json({
             ok: true,
             results: result.results,

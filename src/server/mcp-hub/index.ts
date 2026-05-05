@@ -9,10 +9,10 @@
  * Phase 3.2: at runtime, loads user-defined sources from readHubSources()
  * and routes them through the generic-json adapter.
  */
+import { readHubSources } from '../mcp-hub-sources-store'
 import { fetchLocalFile } from './sources/local-file'
 import { fetchMcpGet } from './sources/mcp-get'
 import { fetchGenericJson } from './sources/generic-json'
-import { readHubSources } from '../mcp-hub-sources-store'
 import type { HubMcpEntry, HubSource, HubTrust } from './types'
 
 export type { HubMcpEntry }
@@ -20,10 +20,10 @@ export type { HubMcpEntry }
 export type SearchSource = 'all' | HubSource
 
 export interface UnifiedSearchResult {
-  results: HubMcpEntry[]
+  results: Array<HubMcpEntry>
   source: string
   total: number
-  warnings?: string[]
+  warnings?: Array<string>
 }
 
 const PER_SOURCE_TIMEOUT_MS = 8_000
@@ -42,7 +42,7 @@ async function getInstalledNames(): Promise<Set<string>> {
     // Config may be wrapped in { config: {...} } shape
     const root =
       config && typeof config === 'object' && 'config' in config
-        ? (config as Record<string, unknown>).config
+        ? config.config
         : config
 
     const mcp =
@@ -65,8 +65,8 @@ async function getInstalledNames(): Promise<Set<string>> {
 // -----------------------------------------------------------------------
 
 interface SourceResult {
-  entries: HubMcpEntry[]
-  warnings?: string[]
+  entries: Array<HubMcpEntry>
+  warnings?: Array<string>
   /** Mirrors McpGetResult.degraded — true when the source had a soft failure */
   degraded?: boolean
   sourceLabel: string
@@ -83,14 +83,23 @@ async function fetchWithTimeout<T>(
 async function fetchSource(source: HubSource): Promise<SourceResult> {
   if (source === 'local') {
     const res = await fetchLocalFile()
-    return { entries: res.entries, warnings: res.warnings, sourceLabel: 'local' }
+    return {
+      entries: res.entries,
+      warnings: res.warnings,
+      sourceLabel: 'local',
+    }
   }
   if (source === 'mcp-get') {
     const res = await fetchWithTimeout(
       (signal) => fetchMcpGet(signal),
       PER_SOURCE_TIMEOUT_MS,
     )
-    return { entries: res.entries, warnings: res.warnings, degraded: res.degraded, sourceLabel: 'mcp-get' }
+    return {
+      entries: res.entries,
+      warnings: res.warnings,
+      degraded: res.degraded,
+      sourceLabel: 'mcp-get',
+    }
   }
   return { entries: [], sourceLabel: source }
 }
@@ -147,9 +156,10 @@ export async function unifiedSearch(
   query: string,
   sources: SearchSource = 'all',
   limit = 20,
+  offset = 0,
 ): Promise<UnifiedSearchResult> {
   // Load user-defined sources at runtime (Phase 3.2)
-  let userSources: UserSourceSpec[] = []
+  let userSources: Array<UserSourceSpec> = []
   try {
     const hubSources = await readHubSources()
     userSources = hubSources.sources
@@ -159,12 +169,13 @@ export async function unifiedSearch(
     // Non-fatal — user sources unavailable, continue with built-ins
   }
 
-  const builtinSourcesToQuery: HubSource[] =
-    sources === 'all' ? ['mcp-get', 'local'] : [sources as HubSource]
+  const builtinSourcesToQuery: Array<HubSource> =
+    sources === 'all' ? ['mcp-get', 'local'] : [sources]
 
   // Fetch all sources in parallel; tolerate individual failures
   const builtinPromises = builtinSourcesToQuery.map((s) => fetchSource(s))
-  const userPromises = sources === 'all' ? userSources.map((s) => fetchUserSource(s)) : []
+  const userPromises =
+    sources === 'all' ? userSources.map((s) => fetchUserSource(s)) : []
 
   const allPromises = [...builtinPromises, ...userPromises]
   const allSourceLabels = [
@@ -174,8 +185,8 @@ export async function unifiedSearch(
 
   const settledResults = await Promise.allSettled(allPromises)
 
-  const warnings: string[] = []
-  const allEntries: HubMcpEntry[] = []
+  const warnings: Array<string> = []
+  const allEntries: Array<HubMcpEntry> = []
   let anyRemoteSucceeded = false
 
   for (let i = 0; i < settledResults.length; i++) {
@@ -183,7 +194,10 @@ export async function unifiedSearch(
     const sourceId = allSourceLabels[i]
 
     if (settled.status === 'rejected') {
-      const reason = settled.reason instanceof Error ? settled.reason.message : String(settled.reason)
+      const reason =
+        settled.reason instanceof Error
+          ? settled.reason.message
+          : String(settled.reason)
       warnings.push(`${sourceId}: failed — ${reason}`)
       continue
     }
@@ -209,7 +223,9 @@ export async function unifiedSearch(
       allEntries.push(...localRes.entries)
       warnings.push('all remote sources failed — local-file fallback used')
     } catch (err) {
-      warnings.push(`local-file fallback also failed: ${err instanceof Error ? err.message : String(err)}`)
+      warnings.push(
+        `local-file fallback also failed: ${err instanceof Error ? err.message : String(err)}`,
+      )
     }
   }
 
@@ -218,7 +234,7 @@ export async function unifiedSearch(
   // user sources with the same server name are also kept distinct.
   // (LOW fix: include entry.id in dedupe key to prevent collision)
   const seen = new Set<string>()
-  const deduped: HubMcpEntry[] = []
+  const deduped: Array<HubMcpEntry> = []
   for (const entry of allEntries) {
     const key = `${entry.source}:${entry.id}:${entry.name}`
     if (!seen.has(key)) {
@@ -243,7 +259,7 @@ export async function unifiedSearch(
     .filter(Boolean)
     .join(',')
 
-  const limited = filtered.slice(0, limit)
+  const limited = filtered.slice(offset, offset + limit)
 
   return {
     results: limited,

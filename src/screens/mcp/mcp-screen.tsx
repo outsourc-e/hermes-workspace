@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTab, TabsPanel } from '@/components/ui/tabs'
 import { McpServerCard } from './components/mcp-server-card'
 import { McpServerDialog } from './components/mcp-server-dialog'
 import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
 import { useMcpCapabilityMode } from './hooks/use-mcp-capability-mode'
 import { useMcpServers } from './hooks/use-mcp-servers'
-import { useMcpHub, type HubMcpEntry } from './hooks/use-mcp-hub'
+import { useMcpHub } from './hooks/use-mcp-hub'
 import { SourcesManagerDialog } from './components/sources-manager-dialog'
+import type { HubMcpEntry } from './hooks/use-mcp-hub'
 import type { McpClientInput, McpServer } from '@/types/mcp'
+import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 
 type Tab = 'installed' | 'marketplace'
 
@@ -23,7 +24,9 @@ export function McpScreen() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<McpServer | McpClientInput | null>(null)
+  const [editing, setEditing] = useState<McpServer | McpClientInput | null>(
+    null,
+  )
   const [installEntry, setInstallEntry] = useState<HubMcpEntry | null>(null)
   const [sourcesOpen, setSourcesOpen] = useState(false)
 
@@ -144,7 +147,9 @@ export function McpScreen() {
                   <div className="text-xs text-primary-500">
                     Source: {hubQuery.data.source}
                   </div>
-                ) : <div />}
+                ) : (
+                  <div />
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -185,6 +190,21 @@ export function McpScreen() {
                 loading={hubQuery.isPending}
                 onInstall={setInstallEntry}
               />
+
+              {hubQuery.hasNextPage ? (
+                <div className="flex items-center justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={hubQuery.isFetchingNextPage}
+                    onClick={() => hubQuery.fetchNextPage()}
+                  >
+                    {hubQuery.isFetchingNextPage
+                      ? 'Loading…'
+                      : `Load more (${(hubQuery.data?.results.length ?? 0).toLocaleString()} of ${(hubQuery.data?.total ?? 0).toLocaleString()})`}
+                  </Button>
+                </div>
+              ) : null}
             </TabsPanel>
           </Tabs>
         </section>
@@ -291,15 +311,18 @@ function EmptyCard({ title, description, tone = 'neutral' }: EmptyCardProps) {
 const TRUST_PILL: Record<string, { label: string; className: string }> = {
   official: {
     label: 'Official',
-    className: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
+    className:
+      'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
   },
   community: {
     label: 'Community',
-    className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
+    className:
+      'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
   },
   unverified: {
     label: 'Unverified',
-    className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
+    className:
+      'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
   },
 }
 
@@ -314,7 +337,11 @@ interface MarketplaceGridProps {
   onInstall: (entry: HubMcpEntry) => void
 }
 
-function MarketplaceGrid({ entries, loading, onInstall }: MarketplaceGridProps) {
+function MarketplaceGrid({
+  entries,
+  loading,
+  onInstall,
+}: MarketplaceGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -399,9 +426,15 @@ function MarketplaceGrid({ entries, loading, onInstall }: MarketplaceGridProps) 
 
               <div className="mt-auto flex items-center justify-end gap-2 pt-2">
                 {entry.installed ? (
-                  <span className="text-xs text-primary-500">Already installed</span>
+                  <span className="text-xs text-primary-500">
+                    Already installed
+                  </span>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => onInstall(entry)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onInstall(entry)}
+                  >
                     Install
                   </Button>
                 )}
