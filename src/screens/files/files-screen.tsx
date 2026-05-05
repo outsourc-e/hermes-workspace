@@ -37,6 +37,10 @@ type FilesListResponse = {
   entries: Array<FileEntry>
 }
 
+export const FILE_BROWSER_MODE_LABEL = 'Server workspace'
+export const FILE_BROWSER_REMOTE_HELP =
+  'Files are loaded from the Workspace server via /api/files, so remote deployments show files created by the agent.'
+
 type FileReadResponse = {
   type: 'text' | 'image'
   path: string
@@ -1231,15 +1235,26 @@ export function FilesScreen() {
         {/* Tree body */}
         <ScrollAreaRoot className="flex-1 min-h-0">
           <ScrollAreaViewport className="px-1 py-1">
+            <div className="mx-2 mb-2 rounded-md border border-primary-200 bg-white/70 px-2 py-1.5 text-[11px] text-primary-500 dark:border-neutral-800 dark:bg-neutral-950/40 dark:text-neutral-400">
+              <span className="font-medium text-primary-700 dark:text-neutral-200">
+                {FILE_BROWSER_MODE_LABEL}
+              </span>{' '}
+              · {FILE_BROWSER_REMOTE_HELP}
+            </div>
             {treeLoading ? (
               <div className="px-3 py-2 text-xs text-primary-400 dark:text-neutral-500">
-                Loading…
+                Loading server workspace…
               </div>
             ) : treeError ? (
-              <div className="px-3 py-2 text-xs text-red-500">{treeError}</div>
+              <div className="space-y-1 px-3 py-2 text-xs text-red-500">
+                <div>{treeError}</div>
+                <div className="text-primary-400 dark:text-neutral-500">
+                  Check the server workspace catalog or HERMES_WORKSPACE_DIR; this browser no longer needs local folder access.
+                </div>
+              </div>
             ) : entries.length === 0 ? (
               <div className="px-3 py-2 text-xs text-primary-400 dark:text-neutral-500">
-                Workspace is empty
+                Server workspace is empty. Agent-created files will appear here after they are written to the configured workspace path.
               </div>
             ) : (
               entries
