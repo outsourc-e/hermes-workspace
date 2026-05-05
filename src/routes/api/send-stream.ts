@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-headers'
+import { buildWorkspaceScopedTextMessage } from '../../lib/workspace-message-scope'
 import {
   collectSyntheticLiveToolEvents,
   createSyntheticLiveToolTracker,
@@ -8,6 +9,7 @@ import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
+import { loadWorkspaceCatalog } from './workspace'
 import {
   registerActiveSendRun,
   unregisterActiveSendRun,
@@ -371,6 +373,12 @@ export const Route = createFileRoute('/api/send-stream')({
           resolvedFriendlyId = sessionKey
         }
 
+        const workspaceScope = await loadWorkspaceCatalog().catch(() => null)
+        const scopedMessage = buildWorkspaceScopedTextMessage(
+          getChatMessage(message, attachments),
+          workspaceScope,
+        )
+
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
         let streamClosed = false
@@ -512,7 +520,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
                 try {
                   const userContent = buildMultimodalContent(
-                    message,
+                    scopedMessage,
                     attachments,
                   )
                   // Inject locale preference so the agent responds in the user's language
@@ -570,7 +578,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     >()
                     try {
                       const responsesStream = streamResponses({
-                        input: typeof message === 'string' ? message : '',
+                        input: scopedMessage,
                         conversationHistory: effectiveHistory,
                         model:
                           typeof body.model === 'string' ? body.model : undefined,
@@ -958,7 +966,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 await streamChat(
                 sessionKey,
                 {
-                  message: getChatMessage(message, attachments),
+                  message: scopedMessage,
                   model:
                     typeof body.model === 'string' ? body.model : undefined,
                   system_message: thinking,
