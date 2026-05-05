@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildJobMutationPayload,
   findJobById,
   getJobErrorText,
   getLatestJobOutputText,
@@ -63,5 +64,25 @@ describe('job helpers', () => {
     expect(getJobErrorText({ ...job, last_run_error: '  boom  ' })).toBe('boom')
     expect(getJobErrorText({ ...job, last_run_error: null, error: 'oops' })).toBe('oops')
     expect(getJobErrorText(null)).toBeNull()
+  })
+})
+
+
+describe('job mutation payloads', () => {
+  it('sends prompt as input for Hermes cron APIs that require an input string', () => {
+    expect(
+      buildJobMutationPayload({
+        name: 'Daily summary',
+        schedule: 'every 30m',
+        prompt: 'summarize the latest notes',
+        deliver: ['local'],
+      }),
+    ).toEqual({
+      name: 'Daily summary',
+      schedule: 'every 30m',
+      prompt: 'summarize the latest notes',
+      input: 'summarize the latest notes',
+      deliver: ['local'],
+    })
   })
 })

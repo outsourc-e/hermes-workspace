@@ -162,18 +162,29 @@ function errorMessageFromBody(body: unknown, fallback: string): string {
   return fallback
 }
 
-export async function createJob(input: {
+type JobMutationInput = {
   schedule: string
   prompt: string
   name?: string
   deliver?: Array<string>
   skills?: Array<string>
   repeat?: number
-}): Promise<ClaudeJob> {
+}
+
+export function buildJobMutationPayload(input: JobMutationInput): JobMutationInput & { input: string } {
+  const prompt = typeof input.prompt === 'string' ? input.prompt : ''
+  return {
+    ...input,
+    prompt,
+    input: prompt,
+  }
+}
+
+export async function createJob(input: JobMutationInput): Promise<ClaudeJob> {
   const res = await fetch(CLAUDE_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    body: JSON.stringify(buildJobMutationPayload(input)),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -186,10 +197,14 @@ export async function updateJob(
   jobId: string,
   updates: Record<string, unknown>,
 ): Promise<ClaudeJob> {
+  const payload =
+    typeof updates.prompt === 'string'
+      ? { ...updates, input: updates.prompt }
+      : updates
   const res = await fetch(`${CLAUDE_API}/${jobId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
