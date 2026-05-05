@@ -1033,7 +1033,9 @@ function ChatSidebarComponent({
       )}
 
       {/* ── HermesWorld featured link (gold castle, NEW badge) ────── */}
-      {!isVisuallyCollapsed && (
+      {/* Hide when VITE_HERMESWORLD_ENABLED is explicitly '0' */}
+      {!isVisuallyCollapsed &&
+        (import.meta as any).env?.VITE_HERMESWORLD_ENABLED !== '0' && (
         <div className="px-2 pb-2">
           <Link
             to="/playground"
