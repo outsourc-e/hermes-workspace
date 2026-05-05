@@ -21,6 +21,7 @@ import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
 import type { SettingsNavId } from '@/components/settings/settings-sidebar'
 import type {LocaleId} from '@/lib/i18n';
+import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
 import {
   SETTINGS_NAV_ITEMS,
   SettingsMobilePills,
@@ -1167,6 +1168,7 @@ function ClaudeConfigSection({
   const ttsOpenAi = (ttsConfig.openai as Record<string, unknown>) || {}
   const sttProvider = (sttConfig.provider as string) || 'local'
   const sttLocal = (sttConfig.local as Record<string, unknown>) || {}
+  const sttGroq = (sttConfig.groq as Record<string, unknown>) || {}
 
   const renderClaudeOverview = () => (
     <>
@@ -1860,8 +1862,11 @@ function ClaudeConfigSection({
             }
             className={selectClassName}
           >
-            <option value="local">Local (Whisper)</option>
-            <option value="openai">OpenAI Whisper API</option>
+            {STT_PROVIDER_OPTIONS.map((provider) => (
+              <option key={provider.value} value={provider.value}>
+                {provider.label}
+              </option>
+            ))}
           </select>
         </SettingsRow>
         {sttProvider === 'local' && (
@@ -1885,6 +1890,45 @@ function ClaudeConfigSection({
               ))}
             </select>
           </SettingsRow>
+        )}
+        {sttProvider === 'groq' && (
+          <>
+            <SettingsRow
+              label="Groq model"
+              description="Choose the Whisper model Groq should run."
+            >
+              <select
+                value={(sttGroq.model as string) || GROQ_STT_MODELS[0]}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: { stt: { groq: { ...sttGroq, model: e.target.value } } },
+                  })
+                }
+                className={selectClassName}
+              >
+                {GROQ_STT_MODELS.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+            <SettingsRow
+              label="Language"
+              description="Optional BCP-47 code, e.g. en or en-US. Leave blank for auto-detect."
+            >
+              <Input
+                value={(sttConfig.language as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: { stt: { language: e.target.value } },
+                  })
+                }
+                placeholder="auto"
+                className="md:w-64"
+              />
+            </SettingsRow>
+          </>
         )}
       </SettingsSection>
     </div>

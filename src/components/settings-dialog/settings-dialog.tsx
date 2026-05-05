@@ -24,6 +24,7 @@ import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
 import type {LocaleId} from '@/lib/i18n';
+import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
@@ -1845,6 +1846,9 @@ function VoiceContent() {
   }
 
   const ttsProvider = String(tts.provider || 'edge')
+  const sttProvider = String(stt.provider || 'local')
+  const sttGroq =
+    (stt.groq as Record<string, unknown> | undefined) || {}
 
   return (
     <div className="space-y-4">
@@ -1917,14 +1921,47 @@ function VoiceContent() {
         </Row>
         <Row label="STT Provider">
           <select
-            value={String(stt.provider || 'local')}
+            value={sttProvider}
             onChange={(e) => saveStt('provider', e.target.value)}
             className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
           >
-            <option value="local">Local (Whisper)</option>
-            <option value="openai">OpenAI Whisper</option>
+            {STT_PROVIDER_OPTIONS.map((provider) => (
+              <option key={provider.value} value={provider.value}>
+                {provider.label}
+              </option>
+            ))}
           </select>
         </Row>
+        {sttProvider === 'groq' && (
+          <>
+            <Row label="Groq model">
+              <select
+                value={String(sttGroq.model || GROQ_STT_MODELS[0])}
+                onChange={(e) =>
+                  saveStt('groq', {
+                    ...sttGroq,
+                    model: e.target.value,
+                  })
+                }
+                className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+              >
+                {GROQ_STT_MODELS.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </Row>
+            <Row label="Language" description="Optional BCP-47 code, e.g. en or en-US.">
+              <Input
+                value={String(stt.language || '')}
+                onChange={(e) => saveStt('language', e.target.value)}
+                placeholder="auto"
+                className="h-8 w-40"
+              />
+            </Row>
+          </>
+        )}
       </div>
     </div>
   )
