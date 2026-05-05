@@ -7,6 +7,41 @@ import { CodeBlock } from './code-block'
 import type { Components } from 'react-markdown'
 import { cn } from '@/lib/utils'
 
+/**
+ * Rewrite Workspace-local `MEDIA:<path>` tokens emitted by Hermes Agent to the
+ * authenticated media endpoint. Messaging bridges intercept MEDIA tags before
+ * rendering; the web chat sees raw markdown/HTML and needs this client-side
+ * rewrite so browsers can load the file through Workspace instead of trying to
+ * resolve a local filesystem path directly.
+ */
+export function rewriteLocalMediaSources(content: string): string {
+  const rewritePath = (rawPath: string): string | null => {
+    const path = rawPath.trim()
+    if (!path || /^https?:\/\//i.test(path)) return null
+    return `/api/media?path=${encodeURIComponent(path)}`
+  }
+
+  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\)\s]+)(\))/g
+  const withMarkdownImages = content.replace(
+    markdownImage,
+    (_match, prefix: string, mediaPath: string, suffix: string) => {
+      const rewritten = rewritePath(mediaPath)
+      return rewritten ? `${prefix}${rewritten}${suffix}` : `${prefix}MEDIA:${mediaPath}${suffix}`
+    },
+  )
+
+  const htmlImage = /(<img\b[^>]*\bsrc=)(["'])MEDIA:([^"']+)\2/gi
+  return withMarkdownImages.replace(
+    htmlImage,
+    (_match, prefix: string, quote: string, mediaPath: string) => {
+      const rewritten = rewritePath(mediaPath)
+      return rewritten
+        ? `${prefix}${quote}${rewritten}${quote}`
+        : `${prefix}${quote}MEDIA:${mediaPath}${quote}`
+    },
+  )
+}
+
 export type MarkdownProps = {
   children: string
   id?: string
@@ -331,7 +366,10 @@ function MarkdownComponent({
 }: MarkdownProps) {
   const generatedId = useId()
   const blockId = id ?? generatedId
-  const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children])
+  const blocks = useMemo(
+    () => parseMarkdownIntoBlocks(rewriteLocalMediaSources(children)),
+    [children],
+  )
 
   return (
     <div
