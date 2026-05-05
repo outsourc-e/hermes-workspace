@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { CLAUDE_API } from './gateway-capabilities'
 
 /**
@@ -10,11 +13,31 @@ import { CLAUDE_API } from './gateway-capabilities'
  * populated by the time requests actually run. Reading inside the
  * function avoids that.
  *
- * Honors `HERMES_API_TOKEN` first (current name) and falls back to
- * `CLAUDE_API_TOKEN` for back-compat with pre-rename setups.
+ * Resolution order:
+ * 1. `HERMES_API_TOKEN` env var
+ * 2. `CLAUDE_API_TOKEN` env var (back-compat)
+ * 3. Codex OAuth access token from `~/.codex/auth.json`
  */
 function getBearerToken(): string {
-  return process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
+  const fromEnv = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN
+  if (fromEnv) return fromEnv
+
+  // Fall back to Codex OAuth token when no env var is set.
+  // This bridges the gap for users who authenticated via `codex login`
+  // but don't have HERMES_API_TOKEN configured.
+  try {
+    const codexAuthPath = join(homedir(), '.codex', 'auth.json')
+    if (existsSync(codexAuthPath)) {
+      const auth = JSON.parse(readFileSync(codexAuthPath, 'utf-8')) as {
+        tokens?: { access_token?: string }
+      }
+      if (auth.tokens?.access_token) return auth.tokens.access_token
+    }
+  } catch {
+    // Silently ignore — no Codex auth available
+  }
+
+  return ''
 }
 
 /** Cached first available model from /v1/models — used as fallback when no model is specified. */
