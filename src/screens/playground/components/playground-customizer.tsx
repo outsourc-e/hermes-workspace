@@ -52,9 +52,9 @@ export function PlaygroundCustomizer({ open, onClose, value, onChange }: Props) 
   if (!open) return null
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[110] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="pointer-events-auto fixed inset-0 z-[110] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
       <div
-        className="flex w-full max-w-[840px] flex-col overflow-hidden rounded-2xl border-2 text-white shadow-2xl"
+        className="flex max-h-[calc(100svh-1.5rem)] w-full max-w-[840px] flex-col overflow-hidden rounded-2xl border-2 text-white shadow-2xl sm:max-h-[calc(100vh-2rem)]"
         style={{ borderColor: 'rgba(34,211,238,0.45)', background: '#070b14', boxShadow: '0 0 38px rgba(34,211,238,.35), 0 18px 54px rgba(0,0,0,.7)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -67,9 +67,9 @@ export function PlaygroundCustomizer({ open, onClose, value, onChange }: Props) 
           <button onClick={onClose} className="text-white/55 hover:text-white">✕</button>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-[260px_1fr]">
+        <div className="grid min-h-0 grid-cols-1 gap-4 overflow-y-auto p-4 sm:gap-5 sm:p-5 md:grid-cols-[260px_1fr]">
           {/* Live preview */}
-          <div className="flex flex-col items-center gap-3">
+          <div className="relative z-10 flex flex-col items-center gap-3">
             <div className="relative h-[260px] w-[220px] overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-cyan-500/10 to-black/40">
               <PreviewSvg cfg={cfg} />
             </div>
@@ -88,7 +88,7 @@ export function PlaygroundCustomizer({ open, onClose, value, onChange }: Props) 
           </div>
 
           {/* Tweaks */}
-          <div className="space-y-4">
+          <div className="relative z-0 space-y-4">
             <Section label="Skin">
               <Swatches values={SKIN_TONES} active={cfg.skin} onPick={(v) => update('skin', v)} />
             </Section>
@@ -227,29 +227,30 @@ function PreviewSvg({ cfg }: { cfg: AvatarConfig }) {
       <rect x={w / 2 + 6} y={h - 68} width={16} height={50} rx={4} fill="#1f2937" />
       {/* Neck */}
       <rect x={w / 2 - 6} y={h - 145} width={12} height={10} fill={cfg.skin} />
+      {/* Back hair sits behind the face so it never masks portrait details. */}
+      {cfg.hairStyle === 'long' && <>
+        <rect x={w / 2 - 29} y={h - 178} width={8} height={36} rx={4} fill={cfg.hair} />
+        <rect x={w / 2 + 21} y={h - 178} width={8} height={36} rx={4} fill={cfg.hair} />
+      </>}
       {/* Head */}
       <circle cx={w / 2} cy={h - 165} r={26} fill={cfg.skin} />
-      {/* Eyes */}
-      <circle cx={w / 2 - 9} cy={h - 167} r={3} fill={cfg.eyes} />
-      <circle cx={w / 2 + 9} cy={h - 167} r={3} fill={cfg.eyes} />
-      {/* Hair */}
-      {cfg.hairStyle === 'short' && <path d={`M${w / 2 - 26} ${h - 175} Q${w / 2} ${h - 198} ${w / 2 + 26} ${h - 175} L${w / 2 + 26} ${h - 168} Q${w / 2} ${h - 188} ${w / 2 - 26} ${h - 168} Z`} fill={cfg.hair} />}
-      {cfg.hairStyle === 'cap' && <ellipse cx={w / 2} cy={h - 178} rx={28} ry={14} fill={cfg.hair} />}
-      {cfg.hairStyle === 'long' && <>
-        <ellipse cx={w / 2} cy={h - 175} rx={28} ry={20} fill={cfg.hair} />
-        <rect x={w / 2 - 28} y={h - 175} width={6} height={32} fill={cfg.hair} />
-        <rect x={w / 2 + 22} y={h - 175} width={6} height={32} fill={cfg.hair} />
-      </>}
+      {/* Hair/headwear kept above the forehead, below facial features. */}
+      {cfg.hairStyle === 'short' && <path d={`M${w / 2 - 26} ${h - 176} Q${w / 2} ${h - 198} ${w / 2 + 26} ${h - 176} L${w / 2 + 24} ${h - 168} Q${w / 2} ${h - 184} ${w / 2 - 24} ${h - 168} Z`} fill={cfg.hair} />}
+      {cfg.hairStyle === 'cap' && <path d={`M${w / 2 - 28} ${h - 176} Q${w / 2} ${h - 198} ${w / 2 + 28} ${h - 176} L${w / 2 + 24} ${h - 169} Q${w / 2} ${h - 181} ${w / 2 - 24} ${h - 169} Z`} fill={cfg.hair} />}
+      {cfg.hairStyle === 'long' && <path d={`M${w / 2 - 27} ${h - 176} Q${w / 2} ${h - 199} ${w / 2 + 27} ${h - 176} L${w / 2 + 23} ${h - 168} Q${w / 2} ${h - 184} ${w / 2 - 23} ${h - 168} Z`} fill={cfg.hair} />}
       {cfg.hairStyle === 'mohawk' && <path d={`M${w / 2 - 5} ${h - 192} L${w / 2 + 5} ${h - 192} L${w / 2 + 4} ${h - 168} L${w / 2 - 4} ${h - 168} Z`} fill={cfg.hair} />}
       {/* Helmet */}
       {cfg.helmet === 'circlet' && <ellipse cx={w / 2} cy={h - 170} rx={28} ry={4} fill="#fbbf24" stroke="#fde68a" strokeWidth={1} />}
       {cfg.helmet === 'crown' && <path d={`M${w / 2 - 22} ${h - 178} L${w / 2 - 18} ${h - 188} L${w / 2 - 8} ${h - 180} L${w / 2} ${h - 192} L${w / 2 + 8} ${h - 180} L${w / 2 + 18} ${h - 188} L${w / 2 + 22} ${h - 178} Z`} fill="#fbbf24" />}
-      {cfg.helmet === 'cap' && <path d={`M${w / 2 - 28} ${h - 175} Q${w / 2} ${h - 200} ${w / 2 + 28} ${h - 175} Z`} fill="#22d3ee" />}
+      {cfg.helmet === 'cap' && <path d={`M${w / 2 - 28} ${h - 176} Q${w / 2} ${h - 200} ${w / 2 + 28} ${h - 176} L${w / 2 + 22} ${h - 169} Q${w / 2} ${h - 181} ${w / 2 - 22} ${h - 169} Z`} fill="#22d3ee" />}
       {cfg.helmet === 'winged' && <>
         <ellipse cx={w / 2} cy={h - 170} rx={28} ry={4} fill="#fbbf24" />
         <path d={`M${w / 2 + 18} ${h - 168} l 18 -10 l -10 14 z`} fill="#fef3c7" />
         <path d={`M${w / 2 - 18} ${h - 168} l -18 -10 l 10 14 z`} fill="#fef3c7" />
       </>}
+      {/* Eyes rendered last in the face stack to stay visible in every customizer state. */}
+      <circle cx={w / 2 - 9} cy={h - 167} r={3} fill={cfg.eyes} />
+      <circle cx={w / 2 + 9} cy={h - 167} r={3} fill={cfg.eyes} />
       {/* Weapon */}
       {cfg.weapon === 'sword' && <rect x={w / 2 + 50} y={h - 130} width={4} height={60} fill="#cbd5e1" transform={`rotate(20 ${w / 2 + 52} ${h - 100})`} />}
       {cfg.weapon === 'staff' && <rect x={w / 2 - 56} y={h - 160} width={3} height={90} fill="#92400e" />}
