@@ -225,7 +225,7 @@ export function PlaygroundDialog({
       {/* Speech body / chat history */}
       {!showChat ? (
         <div className="px-4 py-4">
-          <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name}>
+          <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name} portraitSrc={npc.portraitSrc} portraitAlt={npc.portraitAlt}>
             {reply ?? npc.opening}
           </SpeechBubble>
         </div>
@@ -236,7 +236,7 @@ export function PlaygroundDialog({
         >
           {/* Show opening line as an initial assistant turn for context */}
           <div className="mb-3">
-            <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name} compact>
+            <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name} portraitSrc={npc.portraitSrc} portraitAlt={npc.portraitAlt} compact>
               {reply ?? npc.opening}
             </SpeechBubble>
           </div>
@@ -249,7 +249,7 @@ export function PlaygroundDialog({
                   </SpeechBubble>
                 </div>
               ) : (
-                <SpeechBubble variant={t.fallback ? 'system' : 'npc'} tail="left" accent={npc.color} name={npc.name} compact>
+                <SpeechBubble variant={t.fallback ? 'system' : 'npc'} tail="left" accent={npc.color} name={npc.name} portraitSrc={npc.portraitSrc} portraitAlt={npc.portraitAlt} compact>
                   {t.content}
                   {t.fallback && (
                     <span className="ml-2 rounded bg-amber-800/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-900/75">

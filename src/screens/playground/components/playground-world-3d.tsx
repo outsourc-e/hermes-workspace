@@ -162,6 +162,14 @@ const WORLDS_3D: Record<PlaygroundWorldId, WorldDef> = {
   },
 }
 
+const ZONE_FALLBACK_BACKGROUNDS: Partial<Record<PlaygroundWorldId, string>> = {
+  training: '/assets/hermesworld/zones/zone-1.jpg',
+  forge: '/assets/hermesworld/zones/zone-2.jpg',
+  grove: '/assets/hermesworld/zones/zone-3.jpg',
+  oracle: '/assets/hermesworld/zones/zone-4.jpg',
+  arena: '/assets/hermesworld/zones/zone-5.jpg',
+}
+
 /* ── Ground ── */
 /** Procedural stone-tile plaza overlay (canvas texture). Used as a circular */
 /** floor under the central HermesStatue in Training Grounds + Agora. */
@@ -3102,6 +3110,7 @@ export function PlaygroundWorld3D({
   const playerYaw = useRef(0)
   const [settings] = useHermesWorldSettings()
   const photosensitiveMode = settings.accessibility.photosensitiveMode
+  const fallbackBackground = ZONE_FALLBACK_BACKGROUNDS[worldId]
   const positionForMp = useRef<{ x: number; y: number; z: number } | null>({ x: 0, y: 0, z: 6 })
   // Sync simple position object for multiplayer hook (it doesn't use THREE).
   // Also expose to window so the HUD objective arrow can compute heading.
@@ -3159,9 +3168,22 @@ export function PlaygroundWorld3D({
         inset: 0,
         width: '100%',
         height: '100%',
-        background: '#0b1720',
+        background: fallbackBackground
+          ? `linear-gradient(180deg, rgba(5,11,18,.22), rgba(5,11,18,.6)), url(${fallbackBackground}) center / cover no-repeat, #0b1720`
+          : '#0b1720',
       }}
     >
+      {fallbackBackground ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 50% 45%, transparent 0%, rgba(5,11,18,.34) 68%, rgba(5,11,18,.78) 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+      ) : null}
       <style>{`
         @keyframes hermes-target-arrow {
           0%, 100% { transform: translateY(0); opacity: 0.78; }

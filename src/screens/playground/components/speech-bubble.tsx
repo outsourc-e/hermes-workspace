@@ -14,6 +14,8 @@ type SpeechBubbleProps = {
   tail?: SpeechBubbleTail
   accent?: string
   name?: string
+  portraitSrc?: string
+  portraitAlt?: string
   className?: string
   style?: CSSProperties
   compact?: boolean
@@ -82,6 +84,8 @@ export function SpeechBubble({
   tail = 'bottom',
   accent,
   name,
+  portraitSrc,
+  portraitAlt,
   className = '',
   style,
   compact = false,
@@ -113,21 +117,46 @@ export function SpeechBubble({
           ...style,
         }}
       >
-        {name ? (
-          <div
-            style={{
-              color: accent || tokens.label,
-              fontSize: compact ? 9 : 10,
-              fontWeight: 900,
-              letterSpacing: '.16em',
-              textTransform: 'uppercase',
-              marginBottom: compact ? 2 : 5,
-            }}
-          >
-            {name}
+        <div style={{ display: portraitSrc ? 'flex' : 'block', gap: compact ? 8 : 12, alignItems: 'flex-start' }}>
+          {portraitSrc ? (
+            <img
+              src={portraitSrc}
+              alt={portraitAlt || name || 'NPC portrait'}
+              loading="lazy"
+              style={{
+                width: compact ? 42 : 64,
+                height: compact ? 42 : 64,
+                flex: '0 0 auto',
+                borderRadius: compact ? 12 : 16,
+                border: `2px solid ${border}`,
+                objectFit: 'cover',
+                objectPosition: 'center',
+                background: 'rgba(0,0,0,.18)',
+                boxShadow: `0 0 14px ${tokens.glow}`,
+              }}
+              onError={(event) => {
+                ;(event.currentTarget as HTMLImageElement).style.display = 'none'
+              }}
+            />
+          ) : null}
+          <div>
+            {name ? (
+              <div
+                style={{
+                  color: accent || tokens.label,
+                  fontSize: compact ? 9 : 10,
+                  fontWeight: 900,
+                  letterSpacing: '.16em',
+                  textTransform: 'uppercase',
+                  marginBottom: compact ? 2 : 5,
+                }}
+              >
+                {name}
+              </div>
+            ) : null}
+            <div>{children}</div>
           </div>
-        ) : null}
-        <div>{children}</div>
+        </div>
       </div>
     </>
   )

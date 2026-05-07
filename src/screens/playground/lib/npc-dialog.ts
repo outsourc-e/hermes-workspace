@@ -34,6 +34,9 @@ export type NpcDialogTree = {
   name: string
   title: string
   color: string
+  /** Optional runtime portrait used by the shared SpeechBubble component. */
+  portraitSrc?: string
+  portraitAlt?: string
   /** Opening line shown when dialog starts */
   opening: string
   /** Lore line shown if player keeps talking */
@@ -321,10 +324,12 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
   shopkeeper: {
     id: 'shopkeeper',
     name: 'Dorian',
-    title: 'Quartermaster of the Market',
-    color: '#38bdf8',
+    title: 'Quartermaster of the Starter Kit',
+    color: '#fbbf24',
+    portraitSrc: '/assets/hermesworld/v2/wave-a-source/A03-A08-rerolls.png',
+    portraitAlt: 'Midjourney quartermaster portrait reference for Dorian',
     opening:
-      'Welcome to the Agora market. Every real MMO hub needs a place where players understand value. Your starter kit teaches inventory, gear, and progression in the same motion.',
+      'You look under-equipped. I am Dorian, quartermaster of the Training Grounds. Builders do better with a blade, a cloak, and a sigil.',
     lore: [
       'The market will eventually trade cosmetics, generated relics, guild banners, and agent-made artifacts. For now, your starter kit teaches inventory, gear, progression, and rewards.',
       'A good product hub has economy, even before money. Reputation, tokens, badges, access, trust — those are currencies too.',
