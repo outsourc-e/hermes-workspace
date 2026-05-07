@@ -15,6 +15,7 @@ import { usePlaygroundMultiplayer, type RemotePlayer as MpRemotePlayer, type Inc
 import { loadAvatarConfig, type AvatarConfig } from '../lib/avatar-config'
 import { PlaygroundNpcGlb } from './playground-npc-glb'
 import { SpeechBubble } from './speech-bubble'
+import { useHermesWorldSettings } from './hermesworld-settings'
 
 /**
  * Module-level GLB presence probe. Returns:
@@ -373,6 +374,8 @@ function ClassicalPillars({ world }: { world: WorldDef }) {
 }
 
 function TechPillars({ world }: { world: WorldDef }) {
+  const [settings] = useHermesWorldSettings()
+  const photosensitiveMode = settings.accessibility.photosensitiveMode
   const cubes = useMemo(() => {
     const positions: Array<[number, number, number]> = []
     for (let x = -14; x <= 14; x += 5) {
@@ -407,8 +410,8 @@ function TechPillars({ world }: { world: WorldDef }) {
       {/* Tech-banners with Hermes sigil */}
       <HermesBanner position={[-9, 0, 0]} rotation={[0, Math.PI / 2, 0]} color={world.accent} cloth="#0a0e1a" />
       <HermesBanner position={[9, 0, 0]} rotation={[0, -Math.PI / 2, 0]} color={world.accent} cloth="#0a0e1a" />
-      {/* Floating data motes — Forge feels alive */}
-      <Sparkles count={40} scale={[18, 5, 18]} size={2.4} speed={0.8} color={world.accent} opacity={0.55} />
+      {/* Floating data motes — disabled in Photosensitive Mode */}
+      {!photosensitiveMode && <Sparkles count={20} scale={[18, 5, 18]} size={1.8} speed={0.12} color={world.accent} opacity={0.22} />}
     </>
   )
 }
@@ -460,6 +463,8 @@ function ForestDecor({ world }: { world: WorldDef }) {
 
 /* ── Temple decor (Oracle) ── */
 function TempleDecor({ world }: { world: WorldDef }) {
+  const [settings] = useHermesWorldSettings()
+  const photosensitiveMode = settings.accessibility.photosensitiveMode
   const crystals = useMemo(() => {
     const out: Array<[number, number, number, number]> = []
     const seed = (i: number) => Math.sin(i * 17.7) * 0.5 + 0.5
@@ -497,8 +502,8 @@ function TempleDecor({ world }: { world: WorldDef }) {
       <Brazier position={[4, 0, 0]} color="#a78bfa" />
       <Brazier position={[0, 0, -4]} color="#a78bfa" />
       <Brazier position={[0, 0, 4]} color="#a78bfa" />
-      {/* Floating runes */}
-      <Sparkles count={35} scale={[14, 6, 14]} size={2.6} speed={0.3} color={world.accent} opacity={0.7} />
+      {/* Floating runes — disabled in Photosensitive Mode */}
+      {!photosensitiveMode && <Sparkles count={16} scale={[14, 6, 14]} size={1.9} speed={0.1} color={world.accent} opacity={0.22} />}
     </>
   )
 }
@@ -1373,7 +1378,7 @@ function NPC({
       </Html>
       {highlight && (
         <Html position={[0, 2.95, 0]} center distanceFactor={8}>
-          <div style={{ color: '#fef08a', fontSize: 24, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow 1s ease-in-out infinite' }}>↓</div>
+          <div style={{ color: '#fef08a', fontSize: 24, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow var(--hw-flash-rate, 1.5s) ease-in-out infinite' }}>↓</div>
         </Html>
       )}
       {isNear && (
@@ -1411,6 +1416,8 @@ function Portal({
   playerRef: React.MutableRefObject<THREE.Vector3>
 }) {
   const ringRef = useRef<THREE.Mesh>(null)
+  const [settings] = useHermesWorldSettings()
+  const photosensitiveMode = settings.accessibility.photosensitiveMode
   const unlockedAtRef = useRef<number | null>(locked ? null : Date.now())
   const prevLockedRef = useRef(locked)
   const triggered = useRef(false)
@@ -1425,7 +1432,7 @@ function Portal({
     const t = clock.getElapsedTime()
     if (ringRef.current) {
       ringRef.current.rotation.y += dt * (locked ? 0.45 : 0.85)
-      const pulse = locked ? 1 + Math.sin(t * 2.4) * 0.08 : 1 + Math.sin(t * 3.1) * 0.04
+      const pulse = photosensitiveMode ? 1 : (locked ? 1 + Math.sin(t * 2.1) * 0.05 : 1 + Math.sin(t * 2.6) * 0.03)
       ringRef.current.scale.setScalar(pulse)
     }
     const dist = playerRef.current.distanceTo(center)
@@ -1443,13 +1450,13 @@ function Portal({
       </mesh>
       {!locked && <pointLight position={[0, 1.2, 0]} color={color} intensity={4.8} distance={7} />}
       {locked && <pointLight position={[0, 1.2, 0]} color="#64748b" intensity={1.2} distance={5} />}
-      {!locked && <Sparkles count={18} scale={[2.5, 2.5, 2.5]} size={2.4} speed={1.8} color={color} opacity={0.8} />}
+      {!locked && !photosensitiveMode && <Sparkles count={8} scale={[2.5, 2.5, 2.5]} size={1.7} speed={0.12} color={color} opacity={0.22} />}
       {highlight && (
         <Html position={[0, 3.4, 0]} center distanceFactor={8}>
-          <div style={{ color: '#fef08a', fontSize: 26, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow 1s ease-in-out infinite' }}>↓</div>
+          <div style={{ color: '#fef08a', fontSize: 26, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow var(--hw-flash-rate, 1.5s) ease-in-out infinite' }}>↓</div>
         </Html>
       )}
-      {!locked && unlockedAtRef.current && Date.now() - unlockedAtRef.current < 2200 && (
+      {!photosensitiveMode && !locked && unlockedAtRef.current && Date.now() - unlockedAtRef.current < 2200 && (
         <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[1.8, 2.5, 48]} />
           <meshBasicMaterial color={color} transparent opacity={0.42} />
@@ -1503,7 +1510,7 @@ function QuestZone({
       </Html>
       {highlight && (
         <Html position={[0, 2.65, 0]} center distanceFactor={8}>
-          <div style={{ color: '#fef08a', fontSize: 24, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow 1s ease-in-out infinite' }}>↓</div>
+          <div style={{ color: '#fef08a', fontSize: 24, textShadow: '0 0 18px rgba(250,204,21,0.8)', animation: 'hermes-target-arrow var(--hw-flash-rate, 1.5s) ease-in-out infinite' }}>↓</div>
         </Html>
       )}
     </group>
@@ -1518,7 +1525,7 @@ function useKeyboard() {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       const k = e.key.toLowerCase()
-      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift',' ','[',']'].includes(k)) {
+      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift','control',' ','[',']'].includes(k)) {
         keys.current.add(k)
         e.preventDefault()
       }
@@ -1579,13 +1586,34 @@ function PlayerAndCamera({
   const isMoving = useRef(false)
   const bobT = useRef(0)
   const dashUntil = useRef(0)
+  const jumpStartedAt = useRef<number | null>(null)
+  const lastJumpAt = useRef(0)
+  const jumpHeight = useRef(0)
+  const mobileCrouch = useRef(false)
 
   useEffect(() => {
+    const tryJump = () => {
+      const now = Date.now()
+      if (jumpStartedAt.current || now - lastJumpAt.current < 600) return
+      lastJumpAt.current = now
+      jumpStartedAt.current = now
+      try { window.dispatchEvent(new CustomEvent('hermesworld-player-jumped')) } catch {}
+    }
     const onDash = () => {
       dashUntil.current = Date.now() + 900
     }
+    const onJump = () => tryJump()
+    const onCrouch = (event: Event) => {
+      mobileCrouch.current = !!(event as CustomEvent<{ active?: boolean }>).detail?.active
+    }
     window.addEventListener('hermes-playground-dash', onDash)
-    return () => window.removeEventListener('hermes-playground-dash', onDash)
+    window.addEventListener('hermesworld-mobile-jump', onJump)
+    window.addEventListener('hermesworld-mobile-crouch', onCrouch)
+    return () => {
+      window.removeEventListener('hermes-playground-dash', onDash)
+      window.removeEventListener('hermesworld-mobile-jump', onJump)
+      window.removeEventListener('hermesworld-mobile-crouch', onCrouch)
+    }
   }, [])
 
   // Mouse-look (yaw + pitch): left-click drag (with movement threshold so NPC clicks still register), right/middle-click drag, plus wheel zoom.
@@ -1730,8 +1758,25 @@ function PlayerAndCamera({
     if (k.has('d')) dx += 1
     const wasdMoving = dx !== 0 || dz !== 0
     if (wasdMoving && moveTargetRef) moveTargetRef.current = null // WASD cancels click-to-walk
-    const dashBoost = dashUntil.current > Date.now() ? 1.95 : 1
-    const speed = (k.has('shift') ? 9 : 5) * dashBoost * delta
+    const now = Date.now()
+    if (k.has(' ') && !jumpStartedAt.current && now - lastJumpAt.current >= 600) {
+      lastJumpAt.current = now
+      jumpStartedAt.current = now
+      try { window.dispatchEvent(new CustomEvent('hermesworld-player-jumped')) } catch {}
+    }
+    if (jumpStartedAt.current) {
+      const elapsed = now - jumpStartedAt.current
+      const t = Math.min(1, elapsed / 520)
+      jumpHeight.current = Math.sin(t * Math.PI) * 0.75
+      if (t >= 1) {
+        jumpStartedAt.current = null
+        jumpHeight.current = 0
+      }
+    }
+    const crouching = k.has('control') || mobileCrouch.current
+    const dashBoost = dashUntil.current > now ? 1.95 : 1
+    const crouchSlow = crouching ? 0.6 : 1
+    const speed = (k.has('shift') ? 9 : 5) * dashBoost * crouchSlow * delta
 
     let mx = 0
     let mz = 0
@@ -1770,7 +1815,8 @@ function PlayerAndCamera({
     if (groupRef.current) {
       groupRef.current.position.x = positionRef.current.x
       groupRef.current.position.z = positionRef.current.z
-      groupRef.current.position.y = isMoving.current ? Math.abs(Math.sin(bobT.current)) * 0.08 : 0
+      groupRef.current.position.y = jumpHeight.current + (isMoving.current ? Math.abs(Math.sin(bobT.current)) * 0.08 : 0)
+      groupRef.current.scale.y = THREE.MathUtils.lerp(groupRef.current.scale.y, crouching ? 0.52 : 1, 0.22)
       groupRef.current.rotation.y = yaw.current
     }
     if (yawOutRef) yawOutRef.current = yaw.current
@@ -1780,10 +1826,10 @@ function PlayerAndCamera({
     const pz = positionRef.current.z
     const ox = Math.sin(camYaw.current) * Math.sin(camPitch.current) * r
     const oz = Math.cos(camYaw.current) * Math.sin(camPitch.current) * r
-    const oy = Math.cos(camPitch.current) * r + 1.5
+    const oy = Math.cos(camPitch.current) * r + (crouching ? 0.85 : 1.5)
     camIdeal.set(px + ox, oy, pz + oz)
     camera.position.lerp(camIdeal, 0.12)
-    camLook.set(px, 0.6, pz)
+    camLook.set(px, crouching ? 0.35 : 0.6, pz)
     camera.lookAt(camLook)
   })
 
@@ -2402,6 +2448,8 @@ function InteriorScene({
   onNpcNearChange: (npcId: string | null) => void
 }) {
   const info = INTERIORS[id]
+  const [settings] = useHermesWorldSettings()
+  const photosensitiveMode = settings.accessibility.photosensitiveMode
   const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
   return (
     <>
@@ -2410,7 +2458,7 @@ function InteriorScene({
       <hemisphereLight intensity={0.35} color={'#fff1d0'} groundColor={'#251609'} />
       <ambientLight intensity={0.42} color={'#f4c982'} />
       <directionalLight castShadow position={[6, 10, 8]} intensity={1.1} color={'#ffe4b5'} shadow-mapSize={[1024, 1024]} />
-      <pointLight position={[0, 3, -2]} color={info.accent} intensity={2.1} distance={16} />
+      <pointLight position={[0, 3, -2]} color={info.accent} intensity={photosensitiveMode ? 0.8 : 2.1} distance={16} />
 
       {/* click-to-walk interior floor catcher */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.007, 0]} onPointerDown={(e) => {
@@ -2424,7 +2472,7 @@ function InteriorScene({
         <planeGeometry args={[18, 16, 1, 1]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {pingPos && <mesh position={pingPos} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.45, 0.6, 32]} /><meshBasicMaterial color={info.accent} transparent opacity={0.85} /></mesh>}
+      {pingPos && !photosensitiveMode && <mesh position={pingPos} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.45, 0.6, 32]} /><meshBasicMaterial color={info.accent} transparent opacity={0.55} /></mesh>}
 
       <InteriorRoom id={id} accent={info.accent} />
       <NPC npcId={info.keeperNpc} position={[0, 0, -3.8]} avatar={info.keeperAvatar} name={info.keeper} color={info.keeperColor} drift={false} playerRef={playerRef} onNearChange={onNpcNearChange} />
@@ -2756,6 +2804,8 @@ function Scene({
 }) {
   const bots = botsFor(worldId)
   const world = WORLDS_3D[worldId]
+  const [settings] = useHermesWorldSettings()
+  const photosensitiveMode = settings.accessibility.photosensitiveMode
   const moveTarget = useRef<THREE.Vector3 | null>(null)
   const [pingPos, setPingPos] = useState<[number, number, number] | null>(null)
   const [interior, setInterior] = useState<InteriorId | null>(null)
@@ -2824,10 +2874,10 @@ function Scene({
         <planeGeometry args={[120, 120, 1, 1]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {pingPos && (
+      {pingPos && !photosensitiveMode && (
         <mesh position={pingPos} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.45, 0.6, 32]} />
-          <meshBasicMaterial color={world.accent} transparent opacity={0.85} />
+          <meshBasicMaterial color={world.accent} transparent opacity={0.55} />
         </mesh>
       )}
       <color attach="background" args={[world.skyColor]} />
@@ -2853,8 +2903,12 @@ function Scene({
       <WorldDecor world={world} />
       <ScatteredScenery worldId={worldId} />
       {/* Ambient atmosphere particles — light-touch for performance */}
-      <Sparkles count={70} scale={[64, 10, 64]} size={2.8} speed={0.18} color={world.accent} opacity={0.62} />
-      <Sparkles count={24} scale={[34, 5, 34]} size={1.2} speed={0.45} color={'#ffffff'} opacity={0.25} />
+      {!photosensitiveMode && (
+        <>
+          <Sparkles count={36} scale={[64, 10, 64]} size={2.2} speed={0.08} color={world.accent} opacity={0.28} />
+          <Sparkles count={12} scale={[34, 5, 34]} size={1} speed={0.12} color={'#ffffff'} opacity={0.14} />
+        </>
+      )}
 
       {/* NPCs per world */}
       {worldId === 'training' && (
@@ -3046,6 +3100,8 @@ export function PlaygroundWorld3D({
 }) {
   const playerPos = useRef(new THREE.Vector3(0, 0, 6))
   const playerYaw = useRef(0)
+  const [settings] = useHermesWorldSettings()
+  const photosensitiveMode = settings.accessibility.photosensitiveMode
   const positionForMp = useRef<{ x: number; y: number; z: number } | null>({ x: 0, y: 0, z: 6 })
   // Sync simple position object for multiplayer hook (it doesn't use THREE).
   // Also expose to window so the HUD objective arrow can compute heading.
@@ -3108,9 +3164,10 @@ export function PlaygroundWorld3D({
     >
       <style>{`
         @keyframes hermes-target-arrow {
-          0%, 100% { transform: translateY(0); opacity: 0.72; }
-          50% { transform: translateY(6px); opacity: 1; }
+          0%, 100% { transform: translateY(0); opacity: 0.78; }
+          50% { transform: translateY(4px); opacity: 0.9; }
         }
+        .hermesworld-photosensitive .hermes-target-flash { animation: none !important; opacity: 0.82 !important; }
       `}</style>
       <Canvas
         shadows
@@ -3134,7 +3191,7 @@ export function PlaygroundWorld3D({
       >
         <Suspense fallback={null}>
           <EffectComposer enableNormalPass={false}>
-            <Bloom mipmapBlur intensity={0.78} luminanceThreshold={0.62} luminanceSmoothing={0.18} radius={0.85} />
+            <Bloom mipmapBlur intensity={photosensitiveMode ? 0.18 : 0.78} luminanceThreshold={0.72} luminanceSmoothing={0.35} radius={0.85} />
             <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
             <Vignette eskil={false} offset={0.18} darkness={0.55} />
           </EffectComposer>

@@ -86,6 +86,7 @@ export function PlaygroundSidePanel({
   onOpenChange,
 }: Props) {
   const [tab, setTab] = useState<TabId>('inventory')
+  const [questRailOpen, setQuestRailOpen] = useState(false)
   const foundersVaultUnclaimed = getFoundersVaultUnclaimedCount()
 
   const activeQuest = PLAYGROUND_QUESTS.find(
@@ -115,19 +116,17 @@ export function PlaygroundSidePanel({
       )}
       {activeQuest && (
         <div
-          className="pointer-events-auto fixed left-3 right-3 top-3 z-[76] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl md:left-auto md:right-3 md:top-[260px] md:w-[280px]"
+          className="pointer-events-auto fixed right-3 top-[356px] z-[76] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl md:w-[280px]"
+          hidden={!questRailOpen}
+
           style={{
             borderColor: `${worldAccent}55`,
             boxShadow: `0 0 16px ${worldAccent}33, 0 8px 22px rgba(0,0,0,.55)`,
           }}
         >
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/55">
-              Quest Tracker
-            </span>
-            <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white/55">
-              J
-            </span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/55">Quest Tracker</span>
+            <button type="button" onClick={() => setQuestRailOpen(false)} className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white/55">Hide</button>
           </div>
           <div className="flex items-start gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg">
@@ -166,9 +165,20 @@ export function PlaygroundSidePanel({
         </div>
       )}
 
+      {activeQuest && !questRailOpen && (
+        <button
+          type="button"
+          onClick={() => setQuestRailOpen(true)}
+          className="pointer-events-auto fixed right-3 top-[356px] z-[76] rounded-full border border-amber-200/35 bg-black/70 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100 shadow-xl backdrop-blur-xl"
+          title="Open quest tracker"
+        >
+          📜 Quest
+        </button>
+      )}
+
       {(open || typeof window === 'undefined') && (
         <div
-          className="pointer-events-auto fixed bottom-4 left-3 right-3 top-[122px] z-[76] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl md:bottom-auto md:left-auto md:right-3 md:top-[438px] md:block md:w-[280px]"
+          className="pointer-events-auto fixed bottom-4 left-3 right-3 top-[122px] z-[76] rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#0b1320]/92 to-black/86 text-white shadow-2xl backdrop-blur-xl md:bottom-auto md:left-auto md:right-3 md:top-[404px] md:block md:w-[280px]"
           style={{
             boxShadow: `0 0 18px ${worldAccent}33, 0 12px 36px rgba(0,0,0,.6)`,
           }}

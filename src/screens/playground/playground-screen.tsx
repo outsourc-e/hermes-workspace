@@ -12,6 +12,11 @@ import { PlaygroundMinimap } from './components/playground-minimap'
 import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { Toast } from './components/toast'
+import { FpsCounter } from './components/fps-counter'
+import { KeyboardShortcutsOverlay } from './components/keyboard-shortcuts-overlay'
+import { PhotosensitiveWarningSplash } from './components/photosensitive-warning-splash'
+import { SettingsPanel } from './components/settings-panel'
+import { useHermesWorldSettings } from './components/hermesworld-settings'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
 import { autoNarrateWorld, cancelNarration, isNarrationMuted, setNarrationMuted, narrateWorldNow } from './lib/playground-narration'
@@ -60,13 +65,16 @@ class PlaygroundErrorBoundary extends Component<
 export function PlaygroundScreen() {
   const rpg = usePlaygroundRpg()
   const audioMuted = usePlaygroundAudioMuted()
+  const [settings] = useHermesWorldSettings()
   const [launched, setLaunched] = useState(false)
   const [world, setWorld] = useState<PlaygroundWorldId>(rpg.state.playerProfile.lastZone)
   const [dialogNpc, setDialogNpc] = useState<string | null>(null)
   const [nearbyNpc, setNearbyNpc] = useState<string | null>(null)
   const [journalOpen, setJournalOpen] = useState(false)
   const [customizerOpen, setCustomizerOpen] = useState(false)
-  const [chatCollapsed, setChatCollapsed] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [onboardingHintOpen, setOnboardingHintOpen] = useState(false)
+  const [chatCollapsed, setChatCollapsed] = useState(true)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [botBubbles, setBotBubbles] = useState<Record<string, string>>({})
   const [mapOpen, setMapOpen] = useState(false)
@@ -180,6 +188,16 @@ export function PlaygroundScreen() {
   }, [activeQuest?.id, currentObjective?.id])
 
   useEffect(() => {
+    if (activeQuest?.id === 'training-q1' && rpg.state.playerProfile.questProgress['training-q1'] && !rpg.state.completedQuests.includes('training-q1')) {
+      setOnboardingHintOpen(true)
+      const id = window.setTimeout(() => setOnboardingHintOpen(false), 8000)
+      const onJump = () => setOnboardingHintOpen(false)
+      window.addEventListener('hermesworld-player-jumped', onJump, { once: true })
+      return () => { window.clearTimeout(id); window.removeEventListener('hermesworld-player-jumped', onJump) }
+    }
+  }, [activeQuest?.id, rpg.state.playerProfile.questProgress, rpg.state.completedQuests])
+
+  useEffect(() => {
     for (const toast of rpg.toasts) {
       if (heardToastIds.current.has(toast.id)) continue
       heardToastIds.current.add(toast.id)
@@ -272,7 +290,12 @@ export function PlaygroundScreen() {
       if (key === 'j') setJournalOpen((value) => !value)
       if (key === 'c') setCustomizerOpen((value) => !value)
       if (key === 'm') setMapOpen((value) => !value)
+      if (key === 'i') setMobileMenuOpen((value) => !value)
+      if (key === 'n') setMobileMenuOpen((value) => !value)
+      if (key === 'k') setMobileMenuOpen((value) => !value)
       if (key === 'e' && nearbyNpc && !dialogNpc) setDialogNpc(nearbyNpc)
+      if (key === 'Enter') setChatCollapsed(false)
+      if (key === '/') setChatCollapsed(false)
       if (key === 't') setChatCollapsed(false)
       if (key === 'f') setFocusMode((value) => !value)
       // Auto-engage focus mode on first movement so the world isn't blocked by panels
@@ -282,6 +305,9 @@ export function PlaygroundScreen() {
         setFocusMode(true)
       }
       if (event.key === 'Escape') {
+        const closingAny = journalOpen || !!dialogNpc || mapOpen || archiveOpen || tutorialCompleteOpen || settingsOpen
+        if (!closingAny) { setSettingsOpen(true); return }
+        setSettingsOpen(false)
         setJournalOpen(false)
         setDialogNpc(null)
         setMapOpen(false)
@@ -293,7 +319,7 @@ export function PlaygroundScreen() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dialogNpc, nearbyNpc])
+  }, [archiveOpen, dialogNpc, journalOpen, mapOpen, nearbyNpc, settingsOpen, tutorialCompleteOpen])
 
   const equippedVisuals = useMemo(() => {
     const weapon = rpg.state.playerProfile.equipped.weapon ? itemById(rpg.state.playerProfile.equipped.weapon) : null
@@ -606,6 +632,7 @@ export function PlaygroundScreen() {
           worldName={WORLD_META[world].name}
           worldAccent={WORLD_META[world].accent}
         />
+        <FpsCounter enabled={settings.performance.fpsCounter} />
         <PlaygroundHud
           state={rpg.state}
           activeQuestTitle={activeQuest?.title ?? 'Training Complete'}
@@ -666,10 +693,20 @@ export function PlaygroundScreen() {
         {/* Admin mode toggle — shield icon, persistent via localStorage */}
         <button
           type="button"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Open settings"
+          title="Settings (Esc)"
+          className="pointer-events-auto fixed right-3 top-[314px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
+          style={{ boxShadow: '0 8px 22px rgba(0,0,0,.55)', borderColor: 'rgba(241,197,109,0.42)' }}
+        >
+          ⚙
+        </button>
+        <button
+          type="button"
           onClick={toggleAdminMode}
           aria-label={adminMode ? 'Hide admin panel' : 'Show admin panel'}
           title={adminMode ? 'Hide admin panel' : 'Show admin panel'}
-          className="pointer-events-auto fixed right-3 top-[272px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
+          className="pointer-events-auto fixed right-3 top-[314px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
           style={{
             boxShadow: adminMode ? '0 0 14px rgba(251,191,36,0.55)' : '0 8px 22px rgba(0,0,0,.55)',
             borderColor: adminMode ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)',
@@ -687,6 +724,11 @@ export function PlaygroundScreen() {
           >
           Menu
         </button>
+        <KeyboardShortcutsOverlay />
+        <MobileAbilityControls />
+        <OnboardingHintCard open={onboardingHintOpen} />
+        <PhotosensitiveWarningSplash onOpenSettings={() => setSettingsOpen(true)} />
+        <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} signedInName={rpg.state.playerProfile.displayName || null} />
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
         {adminMode ? <PlaygroundAdminPanel /> : null}
         <PlaygroundUtilityDock
@@ -727,6 +769,53 @@ export function PlaygroundScreen() {
         <TransitionLoadingScreen active={transitioning} worldName={WORLD_META[world].name} />
       </div>
     </PlaygroundErrorBoundary>
+  )
+}
+
+
+function MobileAbilityControls() {
+  const [crouching, setCrouching] = useState(false)
+  const emitCrouch = (active: boolean) => {
+    setCrouching(active)
+    try { window.dispatchEvent(new CustomEvent('hermesworld-mobile-crouch', { detail: { active } })) } catch {}
+  }
+  const jump = () => {
+    try { window.dispatchEvent(new CustomEvent('hermesworld-mobile-jump')) } catch {}
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={jump}
+        className="pointer-events-auto fixed bottom-[138px] right-4 z-[74] h-14 w-14 rounded-full border-2 border-amber-200/40 bg-black/72 text-[11px] font-black uppercase tracking-[0.12em] text-amber-100 shadow-2xl backdrop-blur-xl md:hidden"
+      >
+        Jump
+      </button>
+      <button
+        type="button"
+        onClick={() => emitCrouch(!crouching)}
+        className="pointer-events-auto fixed bottom-[104px] left-4 z-[74] rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-xl backdrop-blur-xl md:hidden"
+        style={{ background: crouching ? 'rgba(241,197,109,.24)' : 'rgba(0,0,0,.68)', borderColor: crouching ? 'rgba(241,197,109,.55)' : 'rgba(255,255,255,.15)' }}
+      >
+        {crouching ? 'Crouch on' : 'Crouch'}
+      </button>
+    </>
+  )
+}
+
+function OnboardingHintCard({ open }: { open: boolean }) {
+  if (!open) return null
+  return (
+    <div className="pointer-events-none fixed left-1/2 top-[108px] z-[92] w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-amber-200/35 bg-black/76 p-3 text-white shadow-2xl backdrop-blur-xl">
+      <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200/70">Training hint</div>
+      <div className="mt-1 text-sm font-black text-[#F1C56D]">Move • Talk • Jump • Crouch</div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/72">
+        <span><kbd className="text-amber-100">WASD</kbd> Move</span>
+        <span><kbd className="text-amber-100">E</kbd> Talk</span>
+        <span><kbd className="text-amber-100">Space</kbd> Jump</span>
+        <span><kbd className="text-amber-100">Ctrl</kbd> Crouch</span>
+      </div>
+    </div>
   )
 }
 

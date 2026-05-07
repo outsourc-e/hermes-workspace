@@ -5,6 +5,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useHermesWorldSettings } from './hermesworld-settings'
 
 // Deterministic pseudo-random based on seed so layout is stable per render
 function rng(seed: number) {
@@ -418,8 +419,10 @@ export function LogPile({ position, rotation = 0 }: { position: [number, number,
 /* ── Fountain (Agora centerpiece) ── */
 export function Fountain({ position, accent = '#7dd3fc' }: { position: [number, number, number]; accent?: string }) {
   const splashRef = useRef<THREE.Mesh>(null)
+  const [settings] = useHermesWorldSettings()
+  const safeMotion = settings.accessibility.photosensitiveMode || settings.performance.reducedMotion
   useFrame(({ clock }) => {
-    if (!splashRef.current) return
+    if (!splashRef.current || safeMotion) return
     const t = clock.getElapsedTime()
     splashRef.current.scale.y = 1 + Math.sin(t * 3) * 0.08
     splashRef.current.position.y = 1.55 + Math.sin(t * 2) * 0.04
@@ -452,9 +455,9 @@ export function Fountain({ position, accent = '#7dd3fc' }: { position: [number, 
       {/* Splash plume (animated) */}
       <mesh ref={splashRef} position={[0, 1.55, 0]}>
         <coneGeometry args={[0.18, 0.55, 12, 1, true]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} transparent opacity={0.6} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={safeMotion ? 0.22 : 0.7} transparent opacity={safeMotion ? 0.34 : 0.6} side={THREE.DoubleSide} />
       </mesh>
-      <pointLight position={[0, 1.4, 0]} color={accent} intensity={1.4} distance={6} />
+      <pointLight position={[0, 1.4, 0]} color={accent} intensity={safeMotion ? 0.45 : 1.4} distance={6} />
     </group>
   )
 }

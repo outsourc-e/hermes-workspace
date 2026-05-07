@@ -22,6 +22,7 @@ type Props = {
 
 export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, onToggle }: Props) {
   const [draft, setDraft] = useState('')
+  const [softExpanded, setSoftExpanded] = useState(false)
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const chromeLeft = sidebarCollapsed ? 'min(120px, 9vw)' : '320px'
   const chromeMaxWidth = sidebarCollapsed ? 'calc(100vw - 320px)' : 'calc(100vw - 520px)'
@@ -72,10 +73,15 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
       : transport === 'offline'
         ? 'offline'
         : 'connecting'
+  const visiblyCollapsed = collapsed && !softExpanded
   return (
     <div
-      className="pointer-events-auto fixed bottom-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/70 text-white shadow-2xl backdrop-blur-xl"
-      style={{ width: 380, height: collapsed ? 42 : 264, maxWidth: chromeMaxWidth, left: chromeLeft }}
+      className="pointer-events-auto fixed bottom-3 z-[60] flex max-w-[92vw] flex-col rounded-2xl border border-white/10 bg-black/70 text-white shadow-2xl backdrop-blur-xl transition-[height]"
+      onMouseEnter={() => setSoftExpanded(true)}
+      onMouseLeave={() => setSoftExpanded(false)}
+      onFocus={() => setSoftExpanded(true)}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSoftExpanded(false) }}
+      style={{ width: 380, height: visiblyCollapsed ? 32 : 264, maxWidth: chromeMaxWidth, left: chromeLeft, opacity: 'var(--hermesworld-hud-opacity, .88)' }}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/65">
@@ -94,10 +100,10 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
           onClick={onToggle}
           className="rounded px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/55 hover:bg-white/10"
         >
-          {collapsed ? '▾' : '▴'}
+          {visiblyCollapsed ? '▾' : '▴'}
         </button>
       </div>
-      {!collapsed && (
+      {!visiblyCollapsed && (
         <>
           <div className="flex items-center gap-1 border-b border-white/8 px-2 py-1.5">
             <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={messages.length} />

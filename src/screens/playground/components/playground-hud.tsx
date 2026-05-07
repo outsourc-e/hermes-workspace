@@ -238,10 +238,10 @@ function Orb({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-        <div className="text-[10px] font-bold leading-none" style={{ color }}>
+        <div className="text-[8px] font-bold leading-none" style={{ color }}>
           {label}
         </div>
-        <div className="text-[10px] font-bold leading-tight">{Math.round(v)}</div>
+        <div className="text-[8px] font-bold leading-tight">{Math.round(v)}</div>
         {secondary && <div className="text-[8px] font-bold leading-none text-white/50">{secondary}</div>}
       </div>
     </div>

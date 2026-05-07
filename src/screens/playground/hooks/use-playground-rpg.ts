@@ -289,7 +289,7 @@ export function usePlaygroundRpg() {
     setToasts((prev) => [...prev, { id, kind, title, body }])
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id))
-    }, kind === 'title' ? 6500 : 4500)
+    }, 3500)
   }, [])
 
   const setDisplayName = useCallback((displayName: string) => {
