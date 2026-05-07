@@ -36,6 +36,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'o3-mini': 200_000,
   'gemini-2.5-flash': 1_000_000,
   'gemini-2.5-pro': 1_000_000,
+  'kimi-k2.6': 256_000,
 }
 
 const CHARS_PER_TOKEN = 3.5
