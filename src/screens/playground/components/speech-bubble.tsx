@@ -28,9 +28,9 @@ const VARIANT_TOKENS: Record<
   npc: {
     ink: '#3d2a12',
     label: '#8a5a10',
-    border: '#d9b35f',
-    bg: 'linear-gradient(180deg, rgba(255,244,205,.98), rgba(226,190,118,.96))',
-    glow: 'rgba(217,179,95,.48)',
+    border: '#F1C56D',
+    bg: 'linear-gradient(180deg, rgba(244,233,211,.98), rgba(218,187,120,.96))',
+    glow: 'rgba(241,197,109,.42)',
   },
   player: {
     ink: '#10251e',
@@ -69,7 +69,9 @@ function SpeechBubbleStyles() {
       @keyframes hermes-speech-tail-wag { 0%, 100% { transform: translateX(-50%) rotate(45deg); } 50% { transform: translateX(-50%) rotate(38deg); } }
       @keyframes hermes-speech-tail-left-wag { 0%, 100% { transform: translateY(-50%) rotate(45deg); } 50% { transform: translateY(-50%) rotate(52deg); } }
       .hermes-speech-bubble { position: relative; isolation: isolate; }
-      .hermes-speech-bubble::before { content: ''; position: absolute; inset: 4px; border-radius: inherit; border: 1px solid rgba(255,255,255,.55); pointer-events: none; opacity: .65; }
+      .hermes-speech-bubble::before { content: ''; position: absolute; inset: 5px; border-radius: inherit; border: 1px solid rgba(138,86,24,.28); pointer-events: none; opacity: .85; }
+      .hermes-speech-bubble[data-variant='npc'] { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 7px), 0 7px); }
+      .hermes-speech-bubble[data-variant='npc']::before { box-shadow: inset 0 0 18px rgba(184,134,43,.18); }
       .hermes-speech-bubble[data-tail='bottom']::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 14px; height: 14px; border-right: 2px solid var(--speech-border); border-bottom: 2px solid var(--speech-border); background: var(--speech-tail-bg); transform: translateX(-50%) rotate(45deg); animation: hermes-speech-tail-wag 1.9s ease-in-out infinite; }
       .hermes-speech-bubble[data-tail='left']::after { content: ''; position: absolute; left: -7px; top: 50%; width: 14px; height: 14px; border-left: 2px solid var(--speech-border); border-bottom: 2px solid var(--speech-border); background: var(--speech-tail-bg); transform: translateY(-50%) rotate(45deg); animation: hermes-speech-tail-left-wag 2.1s ease-in-out infinite; }
       .hermes-speech-bubble[data-tail='right']::after { content: ''; position: absolute; right: -7px; top: 50%; width: 14px; height: 14px; border-right: 2px solid var(--speech-border); border-top: 2px solid var(--speech-border); background: var(--speech-tail-bg); transform: translateY(-50%) rotate(45deg); animation: hermes-speech-tail-left-wag 2.1s ease-in-out infinite reverse; }
@@ -104,11 +106,11 @@ export function SpeechBubble({
           ['--speech-tail-bg' as any]: tokens.bg,
           maxWidth: compact ? 220 : 520,
           border: `2px solid ${border}`,
-          borderRadius: compact ? 14 : 20,
-          padding: compact ? '7px 10px' : '12px 15px',
+          borderRadius: compact ? 10 : 16,
+          padding: compact ? '8px 12px' : '13px 16px',
           background: tokens.bg,
           color: tokens.ink,
-          boxShadow: `0 10px 28px rgba(0,0,0,.34), 0 0 22px ${tokens.glow}, inset 0 2px 0 rgba(255,255,255,.55)`,
+          boxShadow: `0 12px 28px rgba(10,13,18,.38), 0 0 18px ${tokens.glow}, inset 0 2px 0 rgba(255,255,255,.42), inset 0 -10px 18px rgba(184,134,43,.14)`,
           fontSize: compact ? 12 : 14,
           fontWeight: 700,
           lineHeight: 1.35,

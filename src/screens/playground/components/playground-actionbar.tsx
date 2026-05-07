@@ -9,48 +9,71 @@ export type ActionSlot = {
   cooldownMs: number
   description: string
   color: string
+  locked?: boolean
 }
 
-const ACTIONS: ActionSlot[] = [
+const ACTIONS: Array<ActionSlot> = [
   {
     id: 'strike',
     key: '1',
     label: 'Strike',
-    icon: '⚔️',
+    icon: '◇',
     cost: 0,
     cooldownMs: 900,
     description: 'Basic melee attack for nearby targets.',
-    color: '#fb7185',
+    color: '#F1C56D',
   },
   {
     id: 'dash',
     key: '2',
     label: 'Dash',
-    icon: '💨',
+    icon: '↟',
     cost: 8,
     cooldownMs: 4000,
     description: 'Short movement burst. Costs 8 MP.',
-    color: '#22d3ee',
+    color: '#2E6A63',
   },
   {
     id: 'bolt',
     key: '3',
     label: 'Bolt',
-    icon: '⚡',
+    icon: '⌁',
     cost: 15,
     cooldownMs: 5200,
     description: 'Ranged bolt that hits the test enemy from a distance.',
-    color: '#facc15',
+    color: '#B8862B',
   },
   {
     id: 'summon',
     key: '4',
     label: 'Summon',
-    icon: '✨',
+    icon: '✦',
     cost: 20,
     cooldownMs: 30000,
     description: 'Summon a temporary Hermes familiar that walks beside you for 60s. (Hermes Summoning skill)',
-    color: '#a78bfa',
+    color: '#F4E9D3',
+  },
+  {
+    id: 'sigil',
+    key: '5',
+    label: 'Sigil',
+    icon: '☤',
+    cost: 0,
+    cooldownMs: 1,
+    description: 'Hermes sigil focus slot. Unlocks in Agora.',
+    color: '#F1C56D',
+    locked: true,
+  },
+  {
+    id: 'scroll',
+    key: '6',
+    label: 'Scroll',
+    icon: '▱',
+    cost: 0,
+    cooldownMs: 1,
+    description: 'Reserved scroll slot for quests and lore.',
+    color: '#F4E9D3',
+    locked: true,
   },
 ]
 
@@ -85,6 +108,7 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
   const tryCast = (action: ActionSlot) => {
     const now = Date.now()
     const cdEnd = cooldowns[action.id] ?? 0
+    if (action.locked) return
     if (cdEnd > now) return
     if (mp < action.cost) return
     const ok = onCast(action.id)
@@ -100,7 +124,7 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
         return
       }
       const slot = ACTIONS.find((action) => action.key === event.key)
-      if (slot) tryCast(slot)
+      if (slot && !slot.locked) tryCast(slot)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -108,13 +132,17 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
 
   return (
     <div
-      className="pointer-events-auto fixed bottom-3 left-1/2 z-[70] flex w-[min(94vw,420px)] -translate-x-1/2 items-center justify-center gap-2 rounded-2xl border-2 border-white/15 bg-gradient-to-b from-[#08111d]/95 to-black/90 px-3 py-2 text-white shadow-2xl backdrop-blur-xl md:w-auto"
-      style={{ boxShadow: '0 0 26px rgba(56,189,248,.18), 0 14px 40px rgba(0,0,0,.6)' }}
+      className="pointer-events-auto fixed bottom-[22px] left-1/2 z-[70] flex w-[min(94vw,548px)] -translate-x-1/2 items-center justify-center gap-2 rounded-[24px] border px-3 py-2 text-white shadow-2xl backdrop-blur-xl md:w-auto"
+      style={{
+        borderColor: 'rgba(241,197,109,0.62)',
+        background: 'linear-gradient(180deg, rgba(15,22,34,.92), rgba(10,13,18,.88)), radial-gradient(circle at 50% 0%, rgba(241,197,109,.2), transparent 58%)',
+        boxShadow: '0 18px 46px rgba(0,0,0,.68), 0 0 34px rgba(241,197,109,.22), inset 0 1px 0 rgba(244,233,211,.14)',
+      }}
     >
-      <div className="mr-2 hidden flex-col gap-1 md:flex">
-        <Pip label="HP" v={hp} m={hpMax} c="#ef4444" />
-        <Pip label="MP" v={mp} m={mpMax} c="#3b82f6" />
-        <Pip label="SP" v={sp} m={spMax} c="#10b981" />
+      <div className="mr-2 hidden flex-col gap-1.5 md:flex">
+        <Pip label="HP" v={hp} m={hpMax} c="#B03A30" />
+        <Pip label="MP" v={mp} m={mpMax} c="#2E6A63" />
+        <Pip label="SP" v={sp} m={spMax} c="#F1C56D" />
       </div>
       {ACTIONS.map((action) => {
         const cdEnd = cooldowns[action.id] ?? 0
@@ -122,7 +150,7 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
         const cdRemaining = Math.max(0, cdEnd - now)
         const cdPct = cdRemaining > 0 ? (cdRemaining / action.cooldownMs) * 100 : 0
         const noMp = mp < action.cost
-        const castable = cdRemaining === 0 && !noMp
+        const castable = cdRemaining === 0 && !noMp && !action.locked
         return (
           <div
             key={action.id}
@@ -132,18 +160,18 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
           >
             <button
               onClick={() => tryCast(action)}
-              disabled={cdRemaining > 0 || noMp}
-              className="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-transform hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
+              disabled={cdRemaining > 0 || noMp || action.locked}
+              className="relative h-14 w-14 overflow-hidden rounded-[14px] border transition-transform hover:-translate-y-1 disabled:opacity-55 disabled:hover:translate-y-0"
               style={{
-                borderColor: castable ? action.color : '#1f2937',
-                background: castable ? `${action.color}18` : 'rgba(0,0,0,0.45)',
-                boxShadow: castable ? `0 0 12px ${action.color}55` : 'none',
+                borderColor: castable ? action.color : 'rgba(184,134,43,.36)',
+                background: castable ? `linear-gradient(180deg, ${action.color}20, rgba(10,13,18,.78))` : 'linear-gradient(180deg, rgba(27,36,51,.72), rgba(10,13,18,.82))',
+                boxShadow: castable ? `0 0 16px ${action.color}55, inset 0 1px 0 rgba(244,233,211,.16)` : 'inset 0 1px 0 rgba(244,233,211,.08)',
               }}
             >
-              <span className="text-xl">{action.icon}</span>
+              <span className="text-[24px] font-black leading-none">{action.icon}</span>
               {cdRemaining > 0 && (
                 <div
-                  className="absolute inset-0 bg-black/65"
+                  className="absolute inset-0 bg-[#0A0D12]/75"
                   style={{
                     clipPath: `polygon(0 0, 100% 0, 100% ${100 - cdPct}%, 0 ${100 - cdPct}%)`,
                   }}
@@ -157,27 +185,27 @@ export function PlaygroundActionBar({ onCast, hp, hpMax, mp, mpMax, sp, spMax }:
               <span
                 className="absolute bottom-0 left-1 rounded px-1 text-[9px] font-black"
                 style={{
-                  color: castable ? '#fff' : 'rgba(255,255,255,0.45)',
-                  background: castable ? action.color : 'rgba(255,255,255,0.08)',
+                  color: castable ? '#0A0D12' : 'rgba(244,233,211,0.45)',
+                  background: castable ? 'linear-gradient(180deg, #F1C56D, #B8862B)' : 'rgba(244,233,211,0.08)',
                   boxShadow: castable ? `0 0 10px ${action.color}66` : 'none',
                 }}
               >
                 {action.key}
               </span>
               {action.cost > 0 && (
-                <span className="absolute right-1 top-0.5 text-[8px] font-bold text-blue-300">{action.cost}</span>
+                <span className="absolute right-1.5 top-1 text-[8px] font-black text-[#F4E9D3]/70">{action.cost}</span>
               )}
             </button>
             {tipFor === action.id && (
               <div
-                className="absolute bottom-[58px] left-1/2 w-44 -translate-x-1/2 rounded border bg-black/90 px-2 py-1.5 text-[10px] leading-tight"
+                className="absolute bottom-[68px] left-1/2 w-48 -translate-x-1/2 rounded-xl border bg-[#0A0D12]/95 px-2.5 py-2 text-[10px] leading-tight text-[#F4E9D3] shadow-2xl"
                 style={{ borderColor: action.color }}
               >
                 <div className="text-[11px] font-bold" style={{ color: action.color }}>
                   {action.label}
                 </div>
                 <div className="opacity-80">{action.description}</div>
-                {noMp && <div className="mt-1 text-amber-300">Not enough MP</div>}
+                {noMp && <div className="mt-1 text-[#F1C56D]">Not enough MP</div>}
               </div>
             )}
           </div>
@@ -191,7 +219,7 @@ function Pip({ label, v, m, c }: { label: string; v: number; m: number; c: strin
   return (
     <div className="flex items-center gap-1 text-[8px] font-bold">
       <span style={{ color: c }}>{label}</span>
-      <div className="h-1 w-12 overflow-hidden rounded-full bg-white/10">
+      <div className="h-1 w-12 overflow-hidden rounded-full bg-[#F4E9D3]/10">
         <div className="h-full" style={{ width: `${(v / m) * 100}%`, background: c }} />
       </div>
     </div>
