@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/outsourc-e-hermes-workspace-badge.png)](https://mseep.ai/app/outsourc-e-hermes-workspace)
+
 <div align="center">
 
 <img src="./public/claude-avatar.webp" alt="Hermes Workspace" width="80" style="border-radius: 16px" />
