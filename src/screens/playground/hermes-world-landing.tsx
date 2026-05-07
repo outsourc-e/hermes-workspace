@@ -2,6 +2,7 @@ import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
 
 const HERMES_REPO_URL = 'https://github.com/outsourc-e/hermes-workspace'
 const HERMES_ROADMAP_URL = 'https://github.com/outsourc-e/hermes-workspace/blob/main/docs/hermesworld/master-roadmap.md'
+const HERMES_DOCS_URL = 'https://github.com/outsourc-e/hermes-workspace/tree/main/docs/hermesworld'
 const HERMES_FEATURES_URL = 'https://github.com/outsourc-e/hermes-workspace/blob/main/FEATURES-INVENTORY.md'
 
 const externalLinkProps = { target: '_blank', rel: 'noreferrer' }
@@ -111,8 +112,8 @@ export function HermesWorldLanding() {
             <a href={HERMES_REPO_URL} {...externalLinkProps} className="inline-flex items-center justify-center rounded-xl border border-[#d9b35f]/24 bg-[#0b1118]/78 px-6 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#f8e4ac] shadow-[inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-xl transition hover:border-[#d9b35f]/50 hover:bg-[#121823]">
               View on GitHub
             </a>
-            <a href={HERMES_ROADMAP_URL} {...externalLinkProps} className="inline-flex items-center justify-center rounded-xl border border-[#d9b35f]/24 bg-[#0b1118]/78 px-6 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#f8e4ac] shadow-[inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-xl transition hover:border-[#d9b35f]/50 hover:bg-[#121823]">
-              Read Roadmap
+            <a href={HERMES_DOCS_URL} {...externalLinkProps} className="inline-flex items-center justify-center rounded-xl border border-[#d9b35f]/24 bg-[#0b1118]/78 px-6 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#f8e4ac] shadow-[inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-xl transition hover:border-[#d9b35f]/50 hover:bg-[#121823]">
+              Read Docs
             </a>
           </div>
 
@@ -166,6 +167,7 @@ function Header() {
         <a href="#sigils" className="transition hover:text-[#f8e4ac]">Sigils</a>
         <a href="#preview" className="transition hover:text-[#f8e4ac]">Preview</a>
         <a href="#today" className="transition hover:text-[#f8e4ac]">Today</a>
+        <a href={HERMES_DOCS_URL} {...externalLinkProps} className="transition hover:text-[#f8e4ac]">Docs</a>
         <a href="/playground" className="rounded-lg border border-[#ffe7a3]/55 bg-[linear-gradient(180deg,#ffe7a3,#d9a63f)] px-4 py-2 font-black text-[#11100b] shadow-[0_0_30px_rgba(217,179,95,.18)] transition hover:brightness-110">▶ Play</a>
         <a href={HERMES_REPO_URL} {...externalLinkProps} className="rounded-lg border border-[#d9b35f]/30 bg-[#d9b35f]/10 px-4 py-2 text-[#f8e4ac] shadow-[0_0_30px_rgba(217,179,95,.08)] transition hover:bg-[#d9b35f]/18">GitHub</a>
       </nav>
@@ -384,6 +386,7 @@ function FinalCta() {
         <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[#d7d0bd]/62">Enter HermesWorld and explore the first playable layer of Hermes Workspace: zones, quests, companions, sigils, and persistent agent progression.</p>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <a href="/playground" className="rounded-xl bg-[#f8e4ac] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#11100b] transition hover:-translate-y-0.5 hover:bg-white">▶ Play Now</a>
+          <a href={HERMES_DOCS_URL} {...externalLinkProps} className="rounded-xl border border-white/12 bg-white/[0.055] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-white/78 transition hover:bg-white/[0.1]">Read Docs</a>
           <a href={HERMES_REPO_URL} {...externalLinkProps} className="rounded-xl border border-white/12 bg-white/[0.055] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-white/78 transition hover:bg-white/[0.1]">View GitHub</a>
           <a href={HERMES_ROADMAP_URL} {...externalLinkProps} className="rounded-xl border border-white/12 bg-white/[0.055] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-white/78 transition hover:bg-white/[0.1]">Read Roadmap</a>
         </div>
@@ -401,6 +404,7 @@ function Footer() {
       </div>
       <div className="flex flex-wrap gap-4 uppercase tracking-[0.16em]">
         <a href={HERMES_REPO_URL} {...externalLinkProps} className="hover:text-[#f8e4ac]">GitHub</a>
+        <a href={HERMES_DOCS_URL} {...externalLinkProps} className="hover:text-[#f8e4ac]">Docs</a>
         <a href={HERMES_ROADMAP_URL} {...externalLinkProps} className="hover:text-[#f8e4ac]">Roadmap</a>
         <a href={HERMES_FEATURES_URL} {...externalLinkProps} className="hover:text-[#f8e4ac]">Feature List</a>
         <a href="#today" className="hover:text-[#f8e4ac]">Today’s Drop</a>
