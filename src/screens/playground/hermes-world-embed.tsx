@@ -1,15 +1,21 @@
 import { useMemo, useState } from 'react'
+import { WaveChatPanelsShowcase } from './components/wave-chat-panels-showcase'
 
 const HERMES_WORLD_ORIGIN = 'https://hermes-world.ai'
 
 export function HermesWorldEmbed() {
   const [loaded, setLoaded] = useState(false)
+  const showPanelShowcase = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('panels') === 'wave-chat'
   const src = useMemo(() => {
     const url = new URL('/play/', HERMES_WORLD_ORIGIN)
     url.searchParams.set('embed', 'workspace')
     url.searchParams.set('source', 'hermes-workspace')
     return url.toString()
   }, [])
+
+  if (showPanelShowcase) {
+    return <WaveChatPanelsShowcase />
+  }
 
   return (
     <main className="relative h-full min-h-0 overflow-hidden bg-[#050015] text-white">
