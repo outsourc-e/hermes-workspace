@@ -787,20 +787,17 @@ function TitleScreen({
               Hermes Agent Realm
               <span className="opacity-60">· Nous Research × Kimi</span>
             </div>
-            <h1
-              className="text-[88px] leading-none font-black tracking-tight"
+            <img
+              src="/assets/hermesworld/art/hermesworld-logo-horizontal.svg"
+              alt="HermesWorld"
+              width={760}
+              height={228}
+              className="mt-2 w-[min(760px,82vw)] max-w-full"
               style={{
-                background: 'linear-gradient(180deg, #ffffff 0%, #f5d97a 50%, #c89c2a 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                textShadow: '0 0 40px rgba(245,217,122,0.35)',
-                fontFamily: 'Cinzel, "Trajan Pro", "Cormorant Garamond", "Playfair Display", Georgia, serif',
-                letterSpacing: '0.04em',
+                filter:
+                  'drop-shadow(0 12px 34px rgba(2,7,11,0.62)) drop-shadow(0 0 34px rgba(245,217,122,0.22))',
               }}
-            >
-              HermesWorld
-            </h1>
+            />
             {/* ASCII signature — distinctive, hand-crafted feel */}
             <pre
               className="mt-3 hidden text-[8px] leading-[1.05] md:block"
