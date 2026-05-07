@@ -36,6 +36,11 @@ services:
   # Provides the backend API that the workspace connects to
   hermes-agent:
     image: nousresearch/hermes-agent:latest
+    # The Hermes Agent image entrypoint defaults to the interactive CLI which exits
+    # immediately under `docker compose up -d`. We override here to start the
+    # gateway, which is the long-running API/health server the Workspace needs.
+    # See #360.
+    command: ["gateway", "run"]
     env_file:
       - .env
     environment:
