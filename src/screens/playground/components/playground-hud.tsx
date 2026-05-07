@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import type { PlaygroundRpgState, RewardToast } from '../hooks/use-playground-rpg'
+import { Toast, rarityForPlaygroundToast } from './toast'
 
 type HudProps = {
   state: PlaygroundRpgState
@@ -183,33 +184,11 @@ export function PlaygroundHud({
         </div>
       </div>
 
-      <div className="pointer-events-none fixed left-1/2 top-[154px] z-[80] flex max-h-[30vh] w-[min(92vw,440px)] -translate-x-1/2 flex-col gap-2 overflow-visible md:top-[96px] md:max-h-[36vh]">
+      <div className="hermes-toast-lane pointer-events-none fixed left-1/2 top-[154px] z-[80] flex max-h-[30vh] w-[min(92vw,440px)] -translate-x-1/2 flex-col gap-2 overflow-visible md:top-[96px] md:max-h-[36vh]">
         {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className="rounded-2xl border px-4 py-2 text-sm font-semibold text-white shadow-2xl backdrop-blur-xl"
-            style={{
-              borderColor:
-                toast.kind === 'title'
-                  ? 'rgba(250,204,21,.35)'
-                  : toast.kind === 'item'
-                    ? 'rgba(34,211,238,.35)'
-                    : toast.kind === 'quest'
-                      ? 'rgba(16,185,129,.35)'
-                      : 'rgba(255,255,255,.2)',
-              background:
-                toast.kind === 'title'
-                  ? 'rgba(250,204,21,.16)'
-                  : toast.kind === 'item'
-                    ? 'rgba(34,211,238,.16)'
-                    : toast.kind === 'quest'
-                      ? 'rgba(16,185,129,.16)'
-                      : 'rgba(255,255,255,.12)',
-            }}
-          >
-            <div className="text-[10px] uppercase tracking-[0.18em] text-white/70">{toast.title}</div>
-            <div>{toast.body}</div>
-          </div>
+          <Toast key={toast.id} title={toast.title} rarity={rarityForPlaygroundToast(toast.kind)}>
+            {toast.body}
+          </Toast>
         ))}
       </div>
     </>

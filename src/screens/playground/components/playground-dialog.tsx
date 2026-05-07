@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NPC_DIALOG, type DialogChoice } from '../lib/npc-dialog'
+import { SpeechBubble } from './speech-bubble'
 
 // Tiny in-memory cache for ASCII portraits.
 const ASCII_PORTRAIT_CACHE: Record<string, string> = {}
@@ -158,11 +159,11 @@ export function PlaygroundDialog({
 
   return (
     <div
-      className="pointer-events-auto fixed bottom-[120px] left-1/2 z-[80] w-[680px] max-w-[94vw] -translate-x-1/2 overflow-hidden rounded-2xl border-2 text-white shadow-2xl backdrop-blur-xl"
+      className="pointer-events-auto fixed bottom-[max(132px,env(safe-area-inset-bottom))] left-1/2 z-[80] w-[680px] max-w-[94vw] -translate-x-1/2 overflow-visible rounded-[24px] border-2 text-white shadow-2xl backdrop-blur-xl max-[760px]:bottom-[132px] max-[760px]:max-h-[calc(100vh-190px)] max-[760px]:overflow-y-auto"
       style={{
-        borderColor: npc.color,
-        background: 'linear-gradient(180deg, rgba(8,12,20,0.95), rgba(0,0,0,0.95))',
-        boxShadow: `0 0 36px ${npc.color}66, 0 18px 60px rgba(0,0,0,0.7)`,
+        borderColor: '#d9b35f',
+        background: 'linear-gradient(180deg, rgba(54,36,16,0.96), rgba(12,8,4,0.97))',
+        boxShadow: `0 0 36px ${npc.color}66, 0 18px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,244,205,.16)`,
       }}
     >
       {/* Ornate header strip */}
@@ -223,8 +224,10 @@ export function PlaygroundDialog({
 
       {/* Speech body / chat history */}
       {!showChat ? (
-        <div className="px-4 py-4 text-[13px] leading-relaxed text-white/90">
-          {reply ?? npc.opening}
+        <div className="px-4 py-4">
+          <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name}>
+            {reply ?? npc.opening}
+          </SpeechBubble>
         </div>
       ) : (
         <div
@@ -232,31 +235,28 @@ export function PlaygroundDialog({
           className="max-h-[260px] overflow-y-auto px-4 py-3 text-[13px] leading-relaxed"
         >
           {/* Show opening line as an initial assistant turn for context */}
-          <div className="mb-2 text-white/70">
-            <span className="mr-2 font-bold" style={{ color: npc.color }}>
-              {npc.name}:
-            </span>
-            {reply ?? npc.opening}
+          <div className="mb-3">
+            <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name} compact>
+              {reply ?? npc.opening}
+            </SpeechBubble>
           </div>
           {chatLog.map((t, i) => (
             <div key={i} className="mb-2">
               {t.role === 'user' ? (
-                <div className="text-white/95">
-                  <span className="mr-2 font-bold text-cyan-300">You:</span>
-                  {t.content}
+                <div className="flex justify-end">
+                  <SpeechBubble variant="player" tail="right" name="You" compact>
+                    {t.content}
+                  </SpeechBubble>
                 </div>
               ) : (
-                <div className="text-white/85">
-                  <span className="mr-2 font-bold" style={{ color: npc.color }}>
-                    {npc.name}:
-                  </span>
+                <SpeechBubble variant={t.fallback ? 'system' : 'npc'} tail="left" accent={npc.color} name={npc.name} compact>
                   {t.content}
                   {t.fallback && (
-                    <span className="ml-2 rounded bg-amber-300/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-200">
+                    <span className="ml-2 rounded bg-amber-800/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-900/75">
                       offline
                     </span>
                   )}
-                </div>
+                </SpeechBubble>
               )}
             </div>
           ))}

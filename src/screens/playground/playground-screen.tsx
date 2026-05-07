@@ -11,6 +11,7 @@ import { PlaygroundMap } from './components/playground-map'
 import { PlaygroundMinimap } from './components/playground-minimap'
 import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
+import { Toast } from './components/toast'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
 import { autoNarrateWorld, cancelNarration, isNarrationMuted, setNarrationMuted, narrateWorldNow } from './lib/playground-narration'
@@ -1141,12 +1142,10 @@ function CameraPresetToast() {
   }, [])
   if (!name) return null
   return (
-    <div
-      className="pointer-events-none fixed left-1/2 top-[88px] z-[85] -translate-x-1/2 rounded-full border-2 border-white/30 bg-black/85 px-5 py-2 text-[12px] font-bold uppercase tracking-[0.2em] text-amber-200 backdrop-blur-xl"
-      style={{ boxShadow: '0 0 22px rgba(250, 204, 21, 0.45)', animation: 'hermes-toast-in 200ms ease-out' }}
-    >
-      🎬 {name}
-      <style>{`@keyframes hermes-toast-in { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
+    <div className="pointer-events-none fixed left-1/2 top-[88px] z-[85] w-[min(86vw,360px)] -translate-x-1/2">
+      <Toast title="Camera preset" rarity="common" icon="🎬">
+        {name}
+      </Toast>
     </div>
   )
 }

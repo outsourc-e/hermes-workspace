@@ -14,6 +14,7 @@ import { ScatteredScenery } from './playground-environment'
 import { usePlaygroundMultiplayer, type RemotePlayer as MpRemotePlayer, type IncomingChat } from '../hooks/use-playground-multiplayer'
 import { loadAvatarConfig, type AvatarConfig } from '../lib/avatar-config'
 import { PlaygroundNpcGlb } from './playground-npc-glb'
+import { SpeechBubble } from './speech-bubble'
 
 /**
  * Module-level GLB presence probe. Returns:
@@ -1382,7 +1383,9 @@ function NPC({
       )}
       {ambient && !isNear && (
         <Html position={[0, 2.7, 0]} center distanceFactor={8}>
-          <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:220,textAlign:'center',border:`1px solid ${color}`,boxShadow:`0 0 10px ${color}66`}}>{ambient}</div>
+          <SpeechBubble className="hermes-world-bubble" variant="npc" accent={color} compact>
+            {ambient}
+          </SpeechBubble>
         </Html>
       )}
     </group>
@@ -2160,9 +2163,9 @@ function SelfChatBubble() {
   if (!bubble) return null
   return (
     <Html position={[0, 2.85, 0]} center distanceFactor={8}>
-      <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:200,textAlign:'center',border:'1px solid #34d399',boxShadow:'0 0 10px #34d39966'}}>
+      <SpeechBubble className="hermes-world-bubble" variant="player" compact>
         {bubble.text}
-      </div>
+      </SpeechBubble>
     </Html>
   )
 }
@@ -2316,7 +2319,9 @@ function BotPlayer({
       {/* chat bubble */}
       {bubbleText && (
         <Html position={[0, 2.6, 0]} center distanceFactor={8}>
-          <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:200,textAlign:'center',border:`1px solid ${bot.color}`}}>{bubbleText}</div>
+          <SpeechBubble className="hermes-world-bubble" variant="party" accent={bot.color} compact>
+            {bubbleText}
+          </SpeechBubble>
         </Html>
       )}
     </group>
@@ -2690,7 +2695,9 @@ function RemotePlayer({ remote }: { remote: MpRemotePlayer }) {
       </Html>
       {remote.lastChat && remote.lastChatAt && Date.now() - remote.lastChatAt < 5500 && (
         <Html position={[0, 2.6, 0]} center distanceFactor={8}>
-          <div style={{padding:'4px 10px',background:'rgba(0,0,0,0.85)',color:'white',borderRadius:8,fontSize:12,maxWidth:200,textAlign:'center',border:`1px solid ${remote.color}`}}>{remote.lastChat}</div>
+          <SpeechBubble className="hermes-world-bubble" variant="party" accent={remote.color} compact>
+            {remote.lastChat}
+          </SpeechBubble>
         </Html>
       )}
     </group>

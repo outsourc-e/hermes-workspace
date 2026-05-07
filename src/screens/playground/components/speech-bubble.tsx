@@ -1,0 +1,134 @@
+import type { CSSProperties, ReactNode } from 'react'
+
+export type SpeechBubbleVariant =
+  | 'npc'
+  | 'player'
+  | 'system'
+  | 'whisper'
+  | 'party'
+export type SpeechBubbleTail = 'bottom' | 'left' | 'right' | 'none'
+
+type SpeechBubbleProps = {
+  children: ReactNode
+  variant?: SpeechBubbleVariant
+  tail?: SpeechBubbleTail
+  accent?: string
+  name?: string
+  className?: string
+  style?: CSSProperties
+  compact?: boolean
+}
+
+const VARIANT_TOKENS: Record<
+  SpeechBubbleVariant,
+  { ink: string; label: string; border: string; bg: string; glow: string }
+> = {
+  npc: {
+    ink: '#3d2a12',
+    label: '#8a5a10',
+    border: '#d9b35f',
+    bg: 'linear-gradient(180deg, rgba(255,244,205,.98), rgba(226,190,118,.96))',
+    glow: 'rgba(217,179,95,.48)',
+  },
+  player: {
+    ink: '#10251e',
+    label: '#166044',
+    border: '#86efac',
+    bg: 'linear-gradient(180deg, rgba(221,255,231,.98), rgba(154,230,180,.96))',
+    glow: 'rgba(134,239,172,.42)',
+  },
+  system: {
+    ink: '#29180a',
+    label: '#9a5f10',
+    border: '#facc15',
+    bg: 'linear-gradient(180deg, rgba(255,247,208,.98), rgba(245,211,121,.96))',
+    glow: 'rgba(250,204,21,.48)',
+  },
+  whisper: {
+    ink: '#241337',
+    label: '#7e4ec7',
+    border: '#c4b5fd',
+    bg: 'linear-gradient(180deg, rgba(246,241,255,.98), rgba(216,203,250,.95))',
+    glow: 'rgba(196,181,253,.42)',
+  },
+  party: {
+    ink: '#092432',
+    label: '#0e7490',
+    border: '#67e8f9',
+    bg: 'linear-gradient(180deg, rgba(230,253,255,.98), rgba(165,243,252,.95))',
+    glow: 'rgba(103,232,249,.44)',
+  },
+}
+
+function SpeechBubbleStyles() {
+  return (
+    <style>{`
+      @keyframes hermes-speech-bubble-in { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      @keyframes hermes-speech-tail-wag { 0%, 100% { transform: translateX(-50%) rotate(45deg); } 50% { transform: translateX(-50%) rotate(38deg); } }
+      @keyframes hermes-speech-tail-left-wag { 0%, 100% { transform: translateY(-50%) rotate(45deg); } 50% { transform: translateY(-50%) rotate(52deg); } }
+      .hermes-speech-bubble { position: relative; isolation: isolate; }
+      .hermes-speech-bubble::before { content: ''; position: absolute; inset: 4px; border-radius: inherit; border: 1px solid rgba(255,255,255,.55); pointer-events: none; opacity: .65; }
+      .hermes-speech-bubble[data-tail='bottom']::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 14px; height: 14px; border-right: 2px solid var(--speech-border); border-bottom: 2px solid var(--speech-border); background: var(--speech-tail-bg); transform: translateX(-50%) rotate(45deg); animation: hermes-speech-tail-wag 1.9s ease-in-out infinite; }
+      .hermes-speech-bubble[data-tail='left']::after { content: ''; position: absolute; left: -7px; top: 50%; width: 14px; height: 14px; border-left: 2px solid var(--speech-border); border-bottom: 2px solid var(--speech-border); background: var(--speech-tail-bg); transform: translateY(-50%) rotate(45deg); animation: hermes-speech-tail-left-wag 2.1s ease-in-out infinite; }
+      .hermes-speech-bubble[data-tail='right']::after { content: ''; position: absolute; right: -7px; top: 50%; width: 14px; height: 14px; border-right: 2px solid var(--speech-border); border-top: 2px solid var(--speech-border); background: var(--speech-tail-bg); transform: translateY(-50%) rotate(45deg); animation: hermes-speech-tail-left-wag 2.1s ease-in-out infinite reverse; }
+      @media (max-width: 760px) { .hermes-world-bubble { max-width: min(56vw, 220px) !important; font-size: 11px !important; line-height: 1.25 !important; } }
+    `}</style>
+  )
+}
+
+export function SpeechBubble({
+  children,
+  variant = 'npc',
+  tail = 'bottom',
+  accent,
+  name,
+  className = '',
+  style,
+  compact = false,
+}: SpeechBubbleProps) {
+  const tokens = VARIANT_TOKENS[variant]
+  const border = accent || tokens.border
+  return (
+    <>
+      <SpeechBubbleStyles />
+      <div
+        className={`hermes-speech-bubble ${className}`}
+        data-tail={tail}
+        data-variant={variant}
+        style={{
+          ['--speech-border' as any]: border,
+          ['--speech-tail-bg' as any]: tokens.bg,
+          maxWidth: compact ? 220 : 520,
+          border: `2px solid ${border}`,
+          borderRadius: compact ? 14 : 20,
+          padding: compact ? '7px 10px' : '12px 15px',
+          background: tokens.bg,
+          color: tokens.ink,
+          boxShadow: `0 10px 28px rgba(0,0,0,.34), 0 0 22px ${tokens.glow}, inset 0 2px 0 rgba(255,255,255,.55)`,
+          fontSize: compact ? 12 : 14,
+          fontWeight: 700,
+          lineHeight: 1.35,
+          textAlign: compact ? 'center' : 'left',
+          animation: 'hermes-speech-bubble-in 180ms cubic-bezier(.2,.8,.2,1)',
+          ...style,
+        }}
+      >
+        {name ? (
+          <div
+            style={{
+              color: accent || tokens.label,
+              fontSize: compact ? 9 : 10,
+              fontWeight: 900,
+              letterSpacing: '.16em',
+              textTransform: 'uppercase',
+              marginBottom: compact ? 2 : 5,
+            }}
+          >
+            {name}
+          </div>
+        ) : null}
+        <div>{children}</div>
+      </div>
+    </>
+  )
+}
