@@ -821,7 +821,7 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/tasks',
       icon: CheckListIcon,
-      label: t('nav.tasks'),
+      label: 'Kanban',
       active: isTasksActive,
     },
     {

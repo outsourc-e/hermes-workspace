@@ -114,6 +114,27 @@ async function tryServeStatic(req, res) {
   // Prevent directory traversal
   if (pathname.includes('..')) return false
 
+  // Asset requests should never fall through to the SSR handler. If a browser
+  // asks for a stale hashed JS/CSS chunk after a deploy or branch switch,
+  // returning the HTML shell with 200 text/html makes the SPA fail as a black
+  // screen. Return a real 404 instead so clients reload/recover correctly and
+  // health checks can detect the broken asset reference.
+  if (pathname.startsWith('/assets/')) {
+    const filePath = join(CLIENT_DIR, pathname)
+    if (!filePath.startsWith(CLIENT_DIR)) return false
+    try {
+      const fileStat = await stat(filePath)
+      if (!fileStat.isFile()) throw new Error('not a file')
+    } catch {
+      res.writeHead(404, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      })
+      res.end('Asset not found')
+      return true
+    }
+  }
+
   const filePath = join(CLIENT_DIR, pathname)
 
   // Make sure the resolved path is within CLIENT_DIR

@@ -12,7 +12,23 @@ export const Route = createFileRoute('/api/context-usage')({
         }
 
         const url = new URL(request.url)
-        const sessionId = url.searchParams.get('sessionId')?.trim() || ''
+        const sessionId =
+          url.searchParams.get('sessionId')?.trim() ||
+          url.searchParams.get('sessionKey')?.trim() ||
+          ''
+
+        if (sessionId === 'new' || sessionId === 'main') {
+          return json({
+            ok: true,
+            contextPercent: 0,
+            maxTokens: 0,
+            usedTokens: 0,
+            model: '',
+            staticTokens: 0,
+            conversationTokens: 0,
+          })
+        }
+
         const snapshot = await readContextUsage(sessionId)
         return json(snapshot)
       },

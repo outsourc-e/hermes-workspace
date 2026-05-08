@@ -213,19 +213,24 @@ function readSessionName(session: GatewaySession): string {
 
 function isAgentSession(session: GatewaySession): boolean {
   const key = readSessionKey(session).toLowerCase()
-
-  // Always exclude main sessions
-  if (key === 'main' || key.includes(':main')) return false
   const friendlyId = readString(session.friendlyId).toLowerCase()
-  if (friendlyId === 'main') return false
-
-  // Always exclude cron jobs
-  if (key.includes('cron')) return false
   const kind = readString(session.kind).toLowerCase()
-  if (kind === 'cron') return false
+  const label = readString(session.label).toLowerCase()
+  const title = readString(session.title).toLowerCase()
 
-  // Everything else is an agent session — inclusive by default (#37)
-  return true
+  // The right-side agent panel must only show actual delegated/worker runs.
+  // Normal Workspace chat sessions are also returned by /api/sessions with
+  // kind="chat" and transient api-* keys; treating them as agents creates
+  // phantom personas like "Nova — Security Specialist" during normal sends.
+  if (key === 'main' || key.includes(':main')) return false
+  if (friendlyId === 'main') return false
+  if (kind === 'cron' || key.includes('cron')) return false
+  // Normal chat sessions can have agent-like generated titles and can be
+  // transiently active while streaming, but they are not delegated workers.
+  // Never show them in the agent sidebar.
+  if (kind === 'chat') return false
+
+  return ['agent', 'worker', 'delegate', 'swarm', 'subagent'].includes(kind)
 }
 
 function readTaskText(session: GatewaySession): string {
