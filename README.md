@@ -1,5 +1,3 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/outsourc-e-hermes-workspace-badge.png)](https://mseep.ai/app/outsourc-e-hermes-workspace)
-
 <div align="center">
 
 <img src="./public/claude-avatar.webp" alt="Hermes Workspace" width="80" style="border-radius: 16px" />
@@ -9,7 +7,7 @@
 
 **Your AI agent's command center — chat, files, memory, skills, and terminal in one place.**
 
-[![Version](https://img.shields.io/badge/version-2.1.3-2557b7.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.0-2557b7.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6366F1.svg)](CONTRIBUTING.md)
@@ -309,6 +307,74 @@ For authenticated gateways, also set `HERMES_API_TOKEN` in the workspace environ
 All workspace features unlock automatically once both services are reachable — sessions persist, memory saves across chats, skills are available, and the dashboard shows real usage data.
 
 > **Works with any OpenAI-compatible server** — Atomic Chat, Ollama, LM Studio, vLLM, llama.cpp, LocalAI, etc. Just change the `base_url` and `model` in the config above.
+
+---
+
+## 🤝 Pair an Agent with the Workspace
+
+Workspace is the UI. **Hermes Agent** is the brain. They talk over two HTTP services on localhost (or any reachable network).
+
+```
+┌───────────────┐         :8642 gateway          ┌────────────────┐
+│   Workspace    │ ─────────────────────▶ │  Hermes Agent  │
+│   :3000 (UI)   │ ◀───────────────────── │  CLI / brain   │
+└───────────────┘         :9119 dashboard        └────────────────┘
+```
+
+### Two services, three commands
+
+```bash
+hermes gateway run     # terminal 1 · :8642 · chat, models, streaming, jobs
+hermes dashboard       # terminal 2 · :9119 · sessions, skills, config, MCP
+cd ~/hermes-workspace && pnpm dev   # terminal 3 · :3000 · the UI
+```
+
+> **Tip:** `pnpm start:all` starts gateway + dashboard + workspace in one shot if you've installed via the one-liner.
+
+### Verify the pairing
+
+```bash
+curl http://127.0.0.1:8642/health        # → {"status":"ok","platform":"hermes-agent"}
+curl http://127.0.0.1:9119/api/status    # → {"status":"ok", ...}
+```
+
+Both must return `200`. If either fails, the workspace will fall back to **portable mode** (chat works, sessions/skills/memory show "Not Available").
+
+### `.env` settings the workspace cares about
+
+```env
+# Required: where the gateway is
+HERMES_API_URL=http://127.0.0.1:8642
+
+# Recommended: where the dashboard is (unlocks sessions/skills/config/MCP/jobs)
+HERMES_DASHBOARD_URL=http://127.0.0.1:9119
+
+# Only if your gateway was started with API_SERVER_KEY=... — paste the same value:
+# HERMES_API_TOKEN=***
+
+# Optional: password-protect the web UI itself
+# HERMES_PASSWORD=***
+```
+
+### Common pairing scenarios
+
+| Scenario | Set this |
+|---|---|
+| Workspace + gateway on the same machine | `HERMES_API_URL=http://127.0.0.1:8642`, `HERMES_DASHBOARD_URL=http://127.0.0.1:9119` |
+| Gateway on a remote server (Tailscale / VPN) | Set both URLs to the reachable IP (e.g. `http://100.x.y.z:8642`) and add `API_SERVER_HOST=0.0.0.0` to the gateway's `~/.hermes/.env` |
+| Already-running `hermes-agent` from upstream installer | Just set `HERMES_API_URL` + `HERMES_DASHBOARD_URL` and skip the one-liner installer |
+| Multiple agent profiles | Profiles live under `~/.hermes/profiles/<name>` — the dashboard switches between them at runtime; workspace follows automatically |
+
+### Live re-pairing (no restart)
+
+If you've already started the workspace, change either URL from **Settings → Connection** without restarting. Values persist to `~/.hermes/workspace-overrides.json` and gateway capabilities are reprobed on save.
+
+### Troubleshooting
+
+- **`Could not reach Hermes gateway on 8645, 8642, or 8643`** — gateway isn't running, or `HERMES_API_URL` points somewhere unreachable. Run `hermes gateway run` and re-check.
+- **Workspace shows "portable mode" / extended APIs missing** — dashboard isn't running. Start `hermes dashboard` in another terminal and refresh.
+- **`Unauthorized` on every API call** — gateway has `API_SERVER_KEY` set but workspace is missing `HERMES_API_TOKEN`. Match them.
+- **`Could not connect` from your phone over Tailscale** — gateway is bound to loopback. Set `API_SERVER_HOST=0.0.0.0` in `~/.hermes/.env` and restart it.
 
 ---
 
