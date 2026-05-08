@@ -5,7 +5,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
+import {
+  dashboardFetch,
+  ensureGatewayProbed,
+} from '../../server/gateway-capabilities'
+import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
 
 let cachedSkill: string | null = null
 
@@ -33,8 +37,17 @@ function loadDispatchSkill(): string {
   const candidates = [
     resolve(repoRoot(), 'skills/workspace-dispatch/SKILL.md'),
     resolve(process.cwd(), 'skills/workspace-dispatch/SKILL.md'),
-    ...(home ? [resolve(home, '.hermes/skills/workspace-dispatch/SKILL.md')] : []),
-    ...(home ? [resolve(home, '.openclaw/workspace/skills/workspace-dispatch/SKILL.md')] : []),
+    ...(home
+      ? [resolve(home, '.hermes/skills/workspace-dispatch/SKILL.md')]
+      : []),
+    ...(home
+      ? [
+          resolve(
+            home,
+            '.openclaw/workspace/skills/workspace-dispatch/SKILL.md',
+          ),
+        ]
+      : []),
   ]
   for (const p of candidates) {
     try {
@@ -67,23 +80,39 @@ function buildOrchestratorPrompt(
   },
 ): string {
   const outputBase = options.projectsDir || '/tmp'
-  const outputPrefix = outputBase === '/tmp' ? '/tmp/dispatch-<slug>' : `${outputBase}/dispatch-<slug>`
+  const outputPrefix =
+    outputBase === '/tmp'
+      ? '/tmp/dispatch-<slug>'
+      : `${outputBase}/dispatch-<slug>`
   return [
     'You are a mission orchestrator. Execute this mission autonomously.',
     '',
     '## Dispatch Skill Instructions',
     '',
-    skill || '(workspace-dispatch skill not found locally; proceed using create_task to spawn workers)',
+    skill ||
+      '(workspace-dispatch skill not found locally; proceed using create_task to spawn workers)',
     '',
     '## Mission',
     '',
     `Goal: ${goal}`,
-    ...(options.orchestratorModel ? ['', `Use model: ${options.orchestratorModel} for the orchestrator`] : []),
-    ...(options.workerModel ? ['', `Use model: ${options.workerModel} for all workers`] : []),
+    ...(options.orchestratorModel
+      ? ['', `Use model: ${options.orchestratorModel} for the orchestrator`]
+      : []),
+    ...(options.workerModel
+      ? ['', `Use model: ${options.workerModel} for all workers`]
+      : []),
     ...(options.maxParallel > 1
-      ? ['', `Run up to ${options.maxParallel} workers in parallel when tasks are independent`]
-      : ['', 'Spawn workers one at a time. Do NOT wait for workers to finish — the UI handles tracking.']),
-    ...(options.supervised ? ['', 'Supervised mode is enabled. Require approval before each task.'] : []),
+      ? [
+          '',
+          `Run up to ${options.maxParallel} workers in parallel when tasks are independent`,
+        ]
+      : [
+          '',
+          'Spawn workers one at a time. Do NOT wait for workers to finish — the UI handles tracking.',
+        ]),
+    ...(options.supervised
+      ? ['', 'Supervised mode is enabled. Require approval before each task.']
+      : []),
     '',
     '## Critical Rules',
     '- Use create_task / delegate_task to create worker agents for each task',
@@ -98,7 +127,10 @@ function buildOrchestratorPrompt(
   ].join('\n')
 }
 
-async function createDashboardConductorMission(payload: { name: string; prompt: string }): Promise<{
+async function createDashboardConductorMission(payload: {
+  name: string
+  prompt: string
+}): Promise<{
   id?: string
   name?: string
   sessionKey?: string
@@ -110,7 +142,13 @@ async function createDashboardConductorMission(payload: { name: string; prompt: 
     body: JSON.stringify({ name: payload.name, prompt: payload.prompt }),
   })
   const text = await res.text()
-  let data: { id?: string; name?: string; session_id?: string; error?: string; detail?: string } = {}
+  let data: {
+    id?: string
+    name?: string
+    session_id?: string
+    error?: string
+    detail?: string
+  } = {}
   try {
     data = JSON.parse(text)
   } catch {
@@ -126,12 +164,19 @@ export const Route = createFileRoute('/api/conductor-spawn')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        if (!isAuthenticated(request))
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         const url = new URL(request.url)
         const missionId = url.searchParams.get('missionId')?.trim()
         const requestedLines = Number(url.searchParams.get('lines') || '200')
-        const lines = Number.isFinite(requestedLines) ? Math.min(2000, Math.max(1, requestedLines)) : 200
-        if (!missionId) return json({ ok: false, error: 'missionId required' }, { status: 400 })
+        const lines = Number.isFinite(requestedLines)
+          ? Math.min(2000, Math.max(1, requestedLines))
+          : 200
+        if (!missionId)
+          return json(
+            { ok: false, error: 'missionId required' },
+            { status: 400 },
+          )
 
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.conductor) {
@@ -145,34 +190,59 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           )
         }
 
-        const res = await dashboardFetch(`/api/conductor/missions/${encodeURIComponent(missionId)}?lines=${lines}`)
+        const res = await dashboardFetch(
+          `/api/conductor/missions/${encodeURIComponent(missionId)}?lines=${lines}`,
+        )
         const text = await res.text()
         let mission: Record<string, unknown> = {}
         try {
           mission = JSON.parse(text) as Record<string, unknown>
         } catch {
-          return json({ ok: false, error: text || `HTTP ${res.status}` }, { status: res.ok ? 502 : res.status })
+          return json(
+            { ok: false, error: text || `HTTP ${res.status}` },
+            { status: res.ok ? 502 : res.status },
+          )
         }
         if (!res.ok) {
-          const error = typeof mission.detail === 'string' ? mission.detail : typeof mission.error === 'string' ? mission.error : `HTTP ${res.status}`
+          const error =
+            typeof mission.detail === 'string'
+              ? mission.detail
+              : typeof mission.error === 'string'
+                ? mission.error
+                : `HTTP ${res.status}`
           return json({ ok: false, error }, { status: res.status })
         }
         return json({ ok: true, mission })
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        if (!isAuthenticated(request))
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
 
         try {
-          const body = (await request.json().catch(() => ({}))) as ConductorSpawnBody
-          const goal = readOptionalString(body.goal)
+          const body = (await request
+            .json()
+            .catch(() => ({}))) as ConductorSpawnBody
+          const rawGoal = readOptionalString(body.goal)
+          const goalSanitization = sanitizeConductorMissionGoal(rawGoal)
+          const goal = goalSanitization.goal
           const orchestratorModel = readOptionalString(body.orchestratorModel)
           const workerModel = readOptionalString(body.workerModel)
           const projectsDir = readOptionalString(body.projectsDir)
           const maxParallel = readMaxParallel(body.maxParallel)
           const supervised = body.supervised === true
-          if (!goal) return json({ ok: false, error: 'goal required' }, { status: 400 })
+          if (!goal)
+            return json(
+              {
+                ok: false,
+                error: goalSanitization.removedCloudflareErrorPage
+                  ? 'mission goal only contained a Cloudflare 5xx HTML error page; enter the original mission goal and retry'
+                  : 'goal required',
+                warnings: goalSanitization.warnings,
+              },
+              { status: 400 },
+            )
 
           const prompt = buildOrchestratorPrompt(goal, loadDispatchSkill(), {
             orchestratorModel,
@@ -195,11 +265,16 @@ export const Route = createFileRoute('/api/conductor-spawn')({
               jobId: null,
               jobName: missionName,
               runId: null,
+              warnings: goalSanitization.warnings,
             })
           }
 
-          const result = await createDashboardConductorMission({ name: missionName, prompt })
-          if (result.error) return json({ ok: false, error: result.error }, { status: 502 })
+          const result = await createDashboardConductorMission({
+            name: missionName,
+            prompt,
+          })
+          if (result.error)
+            return json({ ok: false, error: result.error }, { status: 502 })
           const missionId = result.id ?? missionName
           return json({
             ok: true,
@@ -211,9 +286,16 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             jobId: missionId,
             jobName: result.name ?? missionName,
             runId: null,
+            warnings: goalSanitization.warnings,
           })
         } catch (error) {
-          return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 })
+          return json(
+            {
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            { status: 500 },
+          )
         }
       },
     },
