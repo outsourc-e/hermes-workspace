@@ -218,7 +218,7 @@ Canonical spec:
 /swarm-specs/projects/swarm4.md
 ```
 
-Sage drafts; humans approve public posting.
+Sage drafts; humans approve public posting. Use normal research for evidence gathering and synthesis. Use autoresearch only for bounded optimization loops with an explicit Goal/Scope/Metric/Verify/Guard/Iterations contract; see [AUTORESEARCH.md](./AUTORESEARCH.md).
 
 ## Scribe
 
