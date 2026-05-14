@@ -130,21 +130,40 @@ export function PlaygroundHud({
             boxShadow: panelShadow,
           }}
         >
-          <div className="flex items-center gap-2">
-            <div
-              className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border"
-              style={{
-                borderColor: `${hudAccent}bb`,
-                background: `radial-gradient(circle at 35% 30%, ${HUD.parchment}55, transparent 28%), linear-gradient(180deg, ${HUD.bronze}, ${HUD.obsidian})`,
-                boxShadow: `0 0 18px ${hudAccent}44, inset 0 0 0 2px ${HUD.obsidian}`,
-              }}
-            >
-              <img src={HUD_SIGIL_SRC} alt="" className="h-9 w-9 object-contain opacity-90" />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div
+                className="h-14 w-14 overflow-hidden rounded-full border-2"
+                style={{
+                  borderColor: worldAccent,
+                  background: `linear-gradient(180deg, ${playerProfile.avatarConfig.outfitAccent || worldAccent}33, ${playerProfile.avatarConfig.outfit || '#0f172a'})`,
+                  boxShadow: `0 0 12px ${worldAccent}66`,
+                }}
+              >
+                <img
+                  src={`/avatars/${playerProfile.avatarConfig.portrait || 'hermes'}.png`}
+                  alt="Your avatar"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                />
+              </div>
+              <div
+                className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-black"
+                style={{
+                  borderColor: HUD.obsidian,
+                  background: `linear-gradient(180deg, ${HUD.gold}, ${HUD.bronze})`,
+                  color: HUD.obsidian,
+                }}
+              >
+                {playerProfile.level}
+              </div>
             </div>
             <div className="min-w-0 leading-tight">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em]" style={{ borderColor: `${hudAccent}66`, color: HUD.obsidian, background: `linear-gradient(180deg, ${HUD.gold}, ${HUD.bronze})` }}>LV {playerProfile.level}</span>
-                <span className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: HUD.parchment }}>{playerProfile.displayName || 'Builder'}</span>
+              <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: HUD.parchment }}>
+                {playerProfile.displayName || 'Builder'}
+              </div>
               </div>
               <div className="mt-1 max-w-[126px] truncate text-[9px] uppercase tracking-[0.18em]" style={{ color: HUD.stone }}>{title}</div>
               <div className="mt-2 flex items-center gap-2">

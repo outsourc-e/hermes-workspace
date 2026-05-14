@@ -155,7 +155,8 @@ export function usePlaygroundMultiplayer({
         const sameAvatar = avatarSig(cur.avatar) === avatarSig(msg.avatar)
         const noChat = (cur.lastChatAt || 0) === (msg.lastChatAt || 0)
         if (sameWorld && sameAvatar && noChat && dx < RENDER_POS_EPSILON && dz < RENDER_POS_EPSILON && dyaw < YAW_EPSILON) {
-          // tiny delta — keep ts fresh but skip render
+          // Tiny deltas should not repaint the world. Refresh the stale timer at most once per second.
+          if (msg.ts - cur.ts < 1000) return prev
           return { ...prev, [msg.id]: { ...cur, ts: msg.ts } }
         }
       }
@@ -180,6 +181,7 @@ export function usePlaygroundMultiplayer({
     let ws: WebSocket | null = null
     let stop = false
     let retry = 0
+    let retryTimer: number | null = null
     const open = () => {
       if (stop) return
       try {
@@ -245,7 +247,8 @@ export function usePlaygroundMultiplayer({
         console.log('[Hermes MP] WS close', { code: ev.code, reason: ev.reason, wasClean: ev.wasClean })
         if (!stop) {
           retry = Math.min(8, retry + 1)
-          window.setTimeout(open, retry * 500)
+          if (retryTimer != null) window.clearTimeout(retryTimer)
+          retryTimer = window.setTimeout(open, retry * 500)
         }
       })
       ws.addEventListener('error', (e) => {
@@ -257,7 +260,9 @@ export function usePlaygroundMultiplayer({
     open()
     return () => {
       stop = true
+      if (retryTimer != null) window.clearTimeout(retryTimer)
       try { ws?.close() } catch {}
+      wsOpenRef.current = false
       wsRef.current = null
     }
   }, [selfId, mergePresence])

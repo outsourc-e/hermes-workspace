@@ -177,6 +177,8 @@ export function PlaygroundDialog({
         <img
           src={`/avatars/${npc.id}.png`}
           alt={npc.name}
+          loading="lazy"
+          decoding="async"
           width={56}
           height={56}
           className="rounded-full"

@@ -68,11 +68,12 @@ function GlbInner({ url, scale, yOffset }: { url: string; scale: number; yOffset
     const s = (scene as THREE.Object3D).clone(true)
     s.traverse((obj: any) => {
       if (obj.isMesh) {
-        obj.castShadow = true
+        obj.frustumCulled = true
+        obj.castShadow = false
         obj.receiveShadow = false
         obj.raycast = () => {}
         if (obj.material && obj.material.map) {
-          obj.material.map.anisotropy = 4
+          obj.material.map.anisotropy = 2
         }
       }
     })

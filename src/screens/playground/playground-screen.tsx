@@ -1,32 +1,35 @@
-import { Component,  useEffect, useMemo, useRef, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
-import { PlaygroundAdminPanel } from './components/playground-admin-panel'
-import {  PlaygroundChat } from './components/playground-chat'
-import { PlaygroundCustomizer } from './components/playground-customizer'
-import { PlaygroundDialog } from './components/playground-dialog'
+import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
 import { PlaygroundHud } from './components/playground-hud'
-import { PlaygroundJournal } from './components/playground-journal'
-import { PlaygroundMap } from './components/playground-map'
 import { PlaygroundMinimap } from './components/playground-minimap'
-import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { Toast } from './components/toast'
 import { FpsCounter } from './components/fps-counter'
 import { KeyboardShortcutsOverlay } from './components/keyboard-shortcuts-overlay'
 import { PhotosensitiveWarningSplash } from './components/photosensitive-warning-splash'
-import { SettingsPanel } from './components/settings-panel'
 import { useHermesWorldSettings } from './components/hermesworld-settings'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
 import { autoNarrateWorld, cancelNarration, isNarrationMuted, narrateWorldNow, setNarrationMuted } from './lib/playground-narration'
 import { botsFor } from './lib/playground-bots'
-import { PLAYGROUND_WORLDS,   itemById } from './lib/playground-rpg'
-import type {ChatMessage} from './components/playground-chat';
-import type {ReactNode} from 'react';
-import type {PlaygroundItemId, PlaygroundWorldId} from './lib/playground-rpg';
+import { PLAYGROUND_WORLDS, itemById, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
 import type { RemotePlayer } from './hooks/use-playground-multiplayer'
 import { useWorkspaceStore } from '@/stores/workspace-store'
+
+
+const PlaygroundAdminPanel = lazy(() => import('./components/playground-admin-panel').then((module) => ({ default: module.PlaygroundAdminPanel })))
+const PlaygroundCustomizer = lazy(() => import('./components/playground-customizer').then((module) => ({ default: module.PlaygroundCustomizer })))
+const PlaygroundDialog = lazy(() => import('./components/playground-dialog').then((module) => ({ default: module.PlaygroundDialog })))
+const PlaygroundJournal = lazy(() => import('./components/playground-journal').then((module) => ({ default: module.PlaygroundJournal })))
+const PlaygroundMap = lazy(() => import('./components/playground-map').then((module) => ({ default: module.PlaygroundMap })))
+const PlaygroundSidePanel = lazy(() => import('./components/playground-sidepanel').then((module) => ({ default: module.PlaygroundSidePanel })))
+const SettingsPanel = lazy(() => import('./components/settings-panel').then((module) => ({ default: module.SettingsPanel })))
+
+function LazyPanelBoundary({ children }: { children: ReactNode }) {
+  return <Suspense fallback={null}>{children}</Suspense>
+}
 
 const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = {
   training: { name: 'Training Grounds', accent: '#5eead4' },
@@ -542,12 +545,16 @@ export function PlaygroundScreen() {
           onCustomize={() => setCustomizerOpen(true)}
           onEnter={() => setLaunched(true)}
         />
-        <PlaygroundCustomizer
-          open={customizerOpen}
-          onClose={() => setCustomizerOpen(false)}
-          value={rpg.state.playerProfile.avatarConfig}
-          onChange={rpg.setAvatarConfig}
-        />
+        {customizerOpen ? (
+          <LazyPanelBoundary>
+            <PlaygroundCustomizer
+              open={customizerOpen}
+              onClose={() => setCustomizerOpen(false)}
+              value={rpg.state.playerProfile.avatarConfig}
+              onChange={rpg.setAvatarConfig}
+            />
+          </LazyPanelBoundary>
+        ) : null}
       </>
     )
   }
@@ -583,37 +590,46 @@ export function PlaygroundScreen() {
           objectivePulseKey={objectivePulseKey}
         />
 
-        <PlaygroundDialog
-          npcId={dialogNpc}
-          activeQuest={activeQuest ?? null}
-          onClose={() => setDialogNpc(null)}
-          onCompleteQuest={(questId) => rpg.completeQuestById(questId)}
-          onGrantItems={(items) => rpg.grantItems(items)}
-          onGrantSkillXp={(skills) => rpg.grantSkillXp(skills)}
-          onChoice={onDialogChoice}
-        />
-        <PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} />
-        <PlaygroundCustomizer
-          open={customizerOpen}
-          onClose={() => setCustomizerOpen(false)}
-          value={rpg.state.playerProfile.avatarConfig}
-          onChange={rpg.setAvatarConfig}
-        />
-        <PlaygroundMap
-          open={mapOpen}
-          onClose={() => setMapOpen(false)}
-          currentWorld={world}
-          unlocked={rpg.state.unlockedWorlds}
-          onTravel={(id) => {
-            if (!rpg.state.unlockedWorlds.includes(id)) return
-            setTransitioning(true)
-            window.setTimeout(() => {
-              setWorld(id)
-              setMapOpen(false)
-              window.setTimeout(() => setTransitioning(false), 350)
-            }, 280)
-          }}
-        />
+        {dialogNpc ? (
+          <LazyPanelBoundary>
+            <PlaygroundDialog
+              npcId={dialogNpc}
+              activeQuest={activeQuest ?? null}
+              onClose={() => setDialogNpc(null)}
+              onCompleteQuest={(questId) => rpg.completeQuestById(questId)}
+              onGrantItems={(items) => rpg.grantItems(items)}
+              onGrantSkillXp={(skills) => rpg.grantSkillXp(skills)}
+              onChoice={onDialogChoice}
+            />
+          </LazyPanelBoundary>
+        ) : null}
+        {journalOpen ? (
+          <LazyPanelBoundary><PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} /></LazyPanelBoundary>
+        ) : null}
+        {customizerOpen ? (
+          <LazyPanelBoundary>
+            <PlaygroundCustomizer open={customizerOpen} onClose={() => setCustomizerOpen(false)} value={rpg.state.playerProfile.avatarConfig} onChange={rpg.setAvatarConfig} />
+          </LazyPanelBoundary>
+        ) : null}
+        {mapOpen ? (
+          <LazyPanelBoundary>
+            <PlaygroundMap
+              open={mapOpen}
+              onClose={() => setMapOpen(false)}
+              currentWorld={world}
+              unlocked={rpg.state.unlockedWorlds}
+              onTravel={(id) => {
+                if (!rpg.state.unlockedWorlds.includes(id)) return
+                setTransitioning(true)
+                window.setTimeout(() => {
+                  setWorld(id)
+                  setMapOpen(false)
+                  window.setTimeout(() => setTransitioning(false), 350)
+                }, 280)
+              }}
+            />
+          </LazyPanelBoundary>
+        ) : null}
         <PlaygroundChat
           worldId={world}
           messages={messages}
@@ -660,9 +676,10 @@ export function PlaygroundScreen() {
         />
         {/* Online chip removed — the chat header now shows live player count + NPC count. */}
         {!focusMode && <NearbyBuildersChip players={remotePlayersInZone} />}
-        {!focusMode && (
-          <PlaygroundSidePanel
-            state={rpg.state}
+        {!focusMode && (!isNarrow || mobileMenuOpen) ? (
+          <LazyPanelBoundary>
+            <PlaygroundSidePanel
+              state={rpg.state}
             currentWorld={world}
             worlds={PLAYGROUND_WORLDS}
             onSelectWorld={(next) => {
@@ -686,8 +703,51 @@ export function PlaygroundScreen() {
             worldAccent={WORLD_META[world].accent}
             open={!isNarrow || mobileMenuOpen}
             onOpenChange={setMobileMenuOpen}
-          />
-        )}
+            />
+          </LazyPanelBoundary>
+        ) : null}
+        {/* Focus mode toggle — eyeball icon (sits in the gap between minimap and quest tracker) */}
+        <button
+          type="button"
+          onClick={() => setFocusMode((v) => !v)}
+          aria-label={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
+          title={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
+          className="pointer-events-auto fixed right-3 top-[230px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[16px] text-white shadow-xl backdrop-blur-xl md:flex"
+          style={{
+            boxShadow: focusMode ? `0 0 14px ${WORLD_META[world].accent}88` : '0 8px 22px rgba(0,0,0,.55)',
+            borderColor: focusMode ? WORLD_META[world].accent : 'rgba(255,255,255,0.15)',
+          }}
+        >
+          <span aria-hidden="true" style={{ filter: focusMode ? 'none' : 'grayscale(0.4)' }}>
+            {focusMode ? '👁️' : '👁'}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Open settings"
+          title="Settings (Esc)"
+          className="pointer-events-auto fixed right-3 top-[314px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
+          style={{ boxShadow: '0 8px 22px rgba(0,0,0,.55)', borderColor: 'rgba(241,197,109,0.42)' }}
+        >
+          ⚙
+        </button>
+        <button
+          type="button"
+          onClick={toggleAdminMode}
+          aria-label={adminMode ? 'Hide admin panel' : 'Show admin panel'}
+          title={adminMode ? 'Hide admin panel' : 'Show admin panel'}
+          className="pointer-events-auto fixed right-3 top-[314px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
+          style={{
+            boxShadow: adminMode ? '0 0 14px rgba(251,191,36,0.55)' : '0 8px 22px rgba(0,0,0,.55)',
+            borderColor: adminMode ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            {adminMode ? <path d="m9 12 2 2 4-4" /> : null}
+          </svg>
+        </button>
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
@@ -699,9 +759,17 @@ export function PlaygroundScreen() {
         <MobileAbilityControls />
         <OnboardingHintCard open={onboardingHintOpen} />
         <PhotosensitiveWarningSplash onOpenSettings={() => setSettingsOpen(true)} />
-        <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} signedInName={rpg.state.playerProfile.displayName || null} />
+        {settingsOpen ? (
+          <LazyPanelBoundary>
+            <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} signedInName={rpg.state.playerProfile.displayName || null} />
+          </LazyPanelBoundary>
+        ) : null}
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
-        {adminMode ? <PlaygroundAdminPanel /> : null}
+        {adminMode ? (
+          <LazyPanelBoundary>
+            <PlaygroundAdminPanel />
+          </LazyPanelBoundary>
+        ) : null}
         <PlaygroundUtilityDock
           audioMuted={audioMuted}
           narrationMuted={narrationMuted}
@@ -916,6 +984,8 @@ function TitleScreen({
               alt="HermesWorld"
               width={760}
               height={228}
+              fetchPriority="high"
+              decoding="async"
               className="mt-2 w-[min(760px,82vw)] max-w-full"
               style={{
                 filter:

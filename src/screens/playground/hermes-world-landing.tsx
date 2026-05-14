@@ -353,7 +353,7 @@ function SigilsSection() {
         <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-[1.35rem] border border-[#d9b35f]/18 bg-[#04070c]">
           <div className="absolute h-64 w-64 rounded-full bg-[#d9b35f]/20 blur-3xl" />
           <div className="relative flex h-56 w-56 items-center justify-center rounded-full border border-[#d9b35f]/42 bg-[radial-gradient(circle,#f8e4ac_0%,#d9b35f_22%,#4b3516_68%,#120d08_100%)] shadow-[0_0_90px_rgba(217,179,95,.32)]">
-            <img src="/hermesworld-logo.svg" alt="Hermes Sigil" className="h-36 w-36 rounded-[2rem] shadow-[0_0_40px_rgba(34,211,238,.18)]" />
+            <img src="/hermesworld-logo.svg" alt="Hermes Sigil" loading="lazy" decoding="async" className="h-36 w-36 rounded-[2rem] shadow-[0_0_40px_rgba(34,211,238,.18)]" />
           </div>
         </div>
 
@@ -399,7 +399,7 @@ function Footer() {
   return (
     <footer className="mx-auto flex max-w-[1560px] flex-col gap-4 border-t border-[#d9b35f]/14 px-4 py-8 text-xs text-[#d7d0bd]/42 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
       <div className="flex items-center gap-3">
-        <img src="/hermesworld-logo.svg" alt="HermesWorld" className="h-8 w-8 rounded-xl" />
+        <img src="/hermesworld-logo.svg" alt="HermesWorld" loading="lazy" decoding="async" className="h-8 w-8 rounded-xl" />
         <span className="font-serif text-base text-[#f8e4ac]">Hermes<span className="text-cyan-200">World</span></span>
       </div>
       <div className="flex flex-wrap gap-4 uppercase tracking-[0.16em]">

@@ -37,6 +37,8 @@ export function QuestDialogPanel({ npcName = 'Athena', npcTitle = 'Oracle of the
               <img
                 alt={`${npcName} portrait`}
                 src="/avatars/athena.png"
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
                 onError={(event) => {
                   event.currentTarget.style.display = 'none'

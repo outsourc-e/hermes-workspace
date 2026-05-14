@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor } from '../lib/playground-bots'
@@ -20,7 +20,7 @@ type Props = {
   onToggle?: () => void
 }
 
-export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, onToggle }: Props) {
+function PlaygroundChatInner({ worldId, messages, onSend, collapsed = false, onToggle }: Props) {
   const [draft, setDraft] = useState('')
   const [softExpanded, setSoftExpanded] = useState(false)
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
@@ -29,7 +29,10 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
   const [filter, setFilter] = useState<'all' | 'humans' | 'npcs'>('all')
   const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    const id = window.setTimeout(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }, 50)
+    return () => window.clearTimeout(id)
   }, [messages.length, filter])
   // Live online count from the multiplayer hub (dispatched by playground-world-3d).
   // Fallback: include bots so the chat doesn't say "0 online" while you're offline.
@@ -59,9 +62,16 @@ export function PlaygroundChat({ worldId, messages, onSend, collapsed = false, o
   }, [])
   const liveConnected = transport === 'ws' || transport === 'both'
   const npcCount = botsFor(worldId).length
-  const humanMessages = messages.filter((m) => !(typeof m.authorId === 'string' && m.authorId.startsWith('bot:')))
-  const npcMessages = messages.filter((m) => typeof m.authorId === 'string' && m.authorId.startsWith('bot:'))
-  const visibleMessages = filter === 'humans' ? humanMessages : filter === 'npcs' ? npcMessages : messages
+  const { humanMessages, npcMessages } = useMemo(() => {
+    const humans: ChatMessage[] = []
+    const npcs: ChatMessage[] = []
+    for (const message of messages) {
+      if (typeof message.authorId === 'string' && message.authorId.startsWith('bot:')) npcs.push(message)
+      else humans.push(message)
+    }
+    return { humanMessages: humans, npcMessages: npcs }
+  }, [messages])
+  const visibleMessages = useMemo(() => (filter === 'humans' ? humanMessages : filter === 'npcs' ? npcMessages : messages), [filter, humanMessages, messages, npcMessages])
   const onlineCount = serverOnline != null && liveConnected ? serverOnline : 1 + npcCount
   const onlineLabel = serverOnline != null && liveConnected
     ? `${onlineCount} player${onlineCount === 1 ? '' : 's'}`
@@ -180,3 +190,5 @@ function FilterButton({ active, label, count, onClick }: { active: boolean; labe
     </button>
   )
 }
+
+export const PlaygroundChat = memo(PlaygroundChatInner)

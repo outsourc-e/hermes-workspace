@@ -2,7 +2,7 @@
  * Reusable scenery primitives for Hermes Playground worlds.
  * All Three.js primitives — no external assets. Looks intentional + low-poly.
  */
-import { useMemo, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useHermesWorldSettings } from './hermesworld-settings'
@@ -575,6 +575,21 @@ export function EnergyCore({ position, color = '#22d3ee' }: { position: [number,
   )
 }
 
+
+type SceneryInstance = { type: string; pos: [number, number, number]; color?: string; scale?: number }
+function InstancedRocks({ items }: { items: SceneryInstance[] }) {
+  const ref = useRef<THREE.InstancedMesh>(null)
+  const matrices = useMemo(() => { const dummy = new THREE.Object3D(); return items.map((item, index) => { const scale = item.scale ?? 0.8; dummy.position.set(item.pos[0], item.pos[1] + 0.16 * scale, item.pos[2]); dummy.rotation.set(0.2, index * 0.73, -0.1); dummy.scale.set(scale, scale * (0.7 + (index % 3) * 0.08), scale); dummy.updateMatrix(); return dummy.matrix.clone() }) }, [items])
+  useLayoutEffect(() => { matrices.forEach((matrix, index) => ref.current?.setMatrixAt(index, matrix)); if (ref.current) ref.current.instanceMatrix.needsUpdate = true }, [matrices])
+  return <instancedMesh ref={ref} args={[undefined, undefined, matrices.length]} castShadow={false} receiveShadow frustumCulled><dodecahedronGeometry args={[0.45, 0]} /><meshStandardMaterial color="#667085" roughness={0.82} /></instancedMesh>
+}
+function InstancedGrassTufts({ items }: { items: SceneryInstance[] }) {
+  const ref = useRef<THREE.InstancedMesh>(null)
+  const matrices = useMemo(() => { const dummy = new THREE.Object3D(); return items.map((item, index) => { const scale = 0.65 + (index % 4) * 0.08; dummy.position.set(item.pos[0], item.pos[1] + 0.16, item.pos[2]); dummy.rotation.set(0, index * 0.91, 0); dummy.scale.set(scale, scale, scale); dummy.updateMatrix(); return dummy.matrix.clone() }) }, [items])
+  useLayoutEffect(() => { matrices.forEach((matrix, index) => ref.current?.setMatrixAt(index, matrix)); if (ref.current) ref.current.instanceMatrix.needsUpdate = true }, [matrices])
+  return <instancedMesh ref={ref} args={[undefined, undefined, matrices.length]} castShadow={false} receiveShadow={false} frustumCulled><coneGeometry args={[0.12, 0.55, 5]} /><meshStandardMaterial color="#3aa86a" roughness={0.75} /></instancedMesh>
+}
+
 /* ── Scattered scenery cluster (auto-fills a world) ── */
 export function ScatteredScenery({
   worldId,
@@ -764,8 +779,12 @@ export function ScatteredScenery({
     return out
   }, [worldId, seed])
 
+  const rockItems = useMemo(() => items.filter((it) => it.type === 'rock'), [items])
+  const grassItems = useMemo(() => items.filter((it) => it.type === 'grass'), [items])
   return (
     <>
+      {rockItems.length ? <InstancedRocks items={rockItems} /> : null}
+      {grassItems.length ? <InstancedGrassTufts items={grassItems} /> : null}
       {items.map((it: any, i) => {
         switch (it.type) {
           case 'pine':
@@ -773,9 +792,8 @@ export function ScatteredScenery({
           case 'broadleaf':
             return <BroadleafTree key={i} position={it.pos} scale={it.scale} color={it.color} />
           case 'rock':
-            return <Rock key={i} position={it.pos} scale={it.scale} color={it.color} />
           case 'grass':
-            return <GrassTuft key={i} position={it.pos} color={it.color} />
+            return null
           case 'stall':
             return <MarketStall key={i} position={it.pos} awningColor={it.awningColor} />
           case 'townsfolk':

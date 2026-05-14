@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { botsFor } from '../lib/playground-bots'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 
@@ -51,10 +52,30 @@ type Props = {
 
 export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
   const npcs = NPC_POSITIONS[worldId]
-  const bots = botsFor(worldId)
+  const bots = useMemo(() => botsFor(worldId), [worldId])
+  const [playerPos, setPlayerPos] = useState({ x: 0, z: 0 })
   const frameAccent = worldId === 'agora' ? '#F1C56D' : worldAccent
   // Map world coords (-30..30) to minimap pixels (0..150)
   const map = (v: number) => 75 + (v / 30) * 70
+
+  useEffect(() => {
+    let raf = 0
+    let last = 0
+    const isMobile = window.matchMedia?.('(pointer: coarse), (max-width: 760px)').matches ?? false
+    const minFrameMs = isMobile ? 1000 / 30 : 1000 / 60
+    const sync = (now: number) => {
+      if (now - last >= minFrameMs) {
+        last = now
+        const player = (window as any).__hermesPlaygroundPlayerPos as { x?: number; z?: number } | undefined
+        const x = typeof player?.x === 'number' ? player.x : 0
+        const z = typeof player?.z === 'number' ? player.z : 0
+        setPlayerPos((prev) => (Math.abs(prev.x - x) < 0.15 && Math.abs(prev.z - z) < 0.15 ? prev : { x, z }))
+      }
+      raf = window.requestAnimationFrame(sync)
+    }
+    raf = window.requestAnimationFrame(sync)
+    return () => window.cancelAnimationFrame(raf)
+  }, [worldId])
 
   return (
     <div
@@ -82,8 +103,8 @@ export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
           className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border"
           style={{ left: 75, top: 75, borderColor: frameAccent + 'aa' }}
         />
-        {/* Player at 0,0 (always center for now since we map world coords) */}
-        <div className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: 75, top: 75, width: 8, height: 8, background: '#F4E9D3', boxShadow: '0 0 10px #F1C56D' }} />
+        {/* Player marker — sampled at 5 Hz so the minimap never repaints per frame. */}
+        <div className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: map(playerPos.x), top: map(playerPos.z), width: 8, height: 8, background: '#22d3ee', boxShadow: '0 0 8px #22d3ee' }} />
         {/* NPCs */}
         {npcs.map((n, i) => (
           <div

@@ -158,7 +158,8 @@ subprocess.run([
     'pnpm', 'exec', 'esbuild',
     'src/screens/playground/play-standalone.tsx',
     '--bundle', '--format=esm', '--platform=browser', '--target=es2020',
-    '--outfile=dist/static/assets/play-standalone.js',
+    '--splitting', '--chunk-names=chunks/[name]-[hash]',
+    '--outdir=dist/static/assets',
     f'--alias:@={root / "src"}',
     '--log-level=warning',
 ], cwd=root, check=True)
