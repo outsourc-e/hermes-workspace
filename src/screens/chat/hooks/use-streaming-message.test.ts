@@ -22,12 +22,24 @@ describe('shouldResolveStreamSession', () => {
     ).toBe(true)
   })
 
-  it('allows bootstrap main chats to resolve to an existing concrete session', () => {
+  it('keeps portable main chats pinned instead of promoting a backend session id', () => {
     expect(
       shouldResolveStreamSession({
         requestedSessionKey: 'main',
         currentSessionKey: 'main',
         resolvedSessionKey: 'existing-main-session',
+        pinMainSession: true,
+      }),
+    ).toBe(false)
+  })
+
+  it('still resolves main chats when the route is not pinned to a portable session', () => {
+    expect(
+      shouldResolveStreamSession({
+        requestedSessionKey: 'main',
+        currentSessionKey: 'main',
+        resolvedSessionKey: 'existing-main-session',
+        pinMainSession: false,
       }),
     ).toBe(true)
   })

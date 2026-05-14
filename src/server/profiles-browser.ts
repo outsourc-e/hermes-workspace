@@ -10,6 +10,7 @@ export type ProfileSummary = {
   exists: boolean
   model?: string
   provider?: string
+  description?: string
   skillCount: number
   sessionCount: number
   hasEnv: boolean
@@ -21,6 +22,7 @@ export type ProfileDetail = {
   path: string
   active: boolean
   config: Record<string, unknown>
+  description: string
   envPath?: string
   hasEnv: boolean
   sessionsDir?: string
@@ -149,6 +151,19 @@ function latestMtime(paths: Array<string>): string | undefined {
   return latest > 0 ? new Date(latest).toISOString() : undefined
 }
 
+function extractDescription(config: Record<string, unknown>): string {
+  const direct = config.description
+  if (typeof direct === 'string') return direct.trim()
+
+  const metadata = config.metadata
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    const nested = (metadata as Record<string, unknown>).description
+    if (typeof nested === 'string') return nested.trim()
+  }
+
+  return ''
+}
+
 export function getActiveProfileName(): string {
   const activePath = getActiveProfilePath()
   if (!fs.existsSync(activePath)) return 'default'
@@ -220,6 +235,7 @@ export function listProfiles(): Array<ProfileSummary> {
         exists: true,
         model: modelName,
         provider: providerName,
+        description: extractDescription(config) || undefined,
         skillCount,
         sessionCount,
         hasEnv: fs.existsSync(envPath),
@@ -260,6 +276,7 @@ export function listProfiles(): Array<ProfileSummary> {
     exists: true,
     model: defaultModel,
     provider: defaultProvider,
+    description: extractDescription(config) || undefined,
     skillCount: countFilesRecursive(
       path.join(root, 'skills'),
       (full) => path.basename(full) === 'SKILL.md',
@@ -291,11 +308,13 @@ export function readProfile(name: string): ProfileDetail {
   const envPath = path.join(profilePath, '.env')
   const sessionsDir = path.join(profilePath, 'sessions')
   const skillsDir = path.join(profilePath, 'skills')
+  const config = readYamlConfig(configPath)
   return {
     name: normalized,
     path: profilePath,
     active: normalized === active,
-    config: readYamlConfig(configPath),
+    config,
+    description: extractDescription(config),
     envPath: fs.existsSync(envPath) ? envPath : undefined,
     hasEnv: fs.existsSync(envPath),
     sessionsDir: fs.existsSync(sessionsDir) ? sessionsDir : undefined,

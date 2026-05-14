@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { newestCheckpointFromMessages, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
+import { newestCheckpointFromMessages, parseSwarmCheckpoint, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { createOrUpdateMission, markMissionAssignmentDispatched, recordMissionCheckpoint } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/swarm-memory'
@@ -390,18 +390,21 @@ export function checkpointFromRuntimeSnapshot(snapshot: RuntimeCheckpointSnapsho
   return checkpoint
 }
 
-function buildWorkerPrompt(input: {
+export function buildWorkerPrompt(input: {
   workerId: string
   task: string
   rationale?: string
   roster?: SwarmRosterWorker
   direct?: boolean
+  raw?: boolean
   missionId?: string | null
   taskTitle?: string | null
 }): string {
-  if (input.direct) return input.task
+  if (input.direct && input.raw) return input.task
   const roster = input.roster
+  const displayName = roster?.name?.trim() || input.workerId
   const role = roster?.role || 'Worker'
+  const humanLabel = `${displayName} — ${role}`
   const skills = roster?.skills?.length ? roster.skills.join(', ') : 'swarm-worker-core'
   const capabilities = roster?.capabilities?.length ? roster.capabilities.join(', ') : 'not declared'
   const mission = roster?.mission || 'Execute assigned swarm tasks and checkpoint progress.'
@@ -424,7 +427,8 @@ function buildWorkerPrompt(input: {
 
   const lines: Array<string> = [
     '## Swarm Orchestrator Dispatch',
-    `Worker: ${input.workerId} — ${role}`,
+    `Worker: ${humanLabel}`,
+    `Machine ID: ${input.workerId}`,
     `Specialty: ${specialty}`,
     `Mission: ${mission}`,
     `Skills: ${skills}`,
@@ -921,6 +925,48 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           exitCode: 0,
           delivery: 'oneshot',
         }
+        if (options?.waitForCheckpoint) {
+          const checkpoint = parseSwarmCheckpoint(out)
+          if (checkpoint) {
+            markCheckpointResult(workerId, checkpoint, options?.notifySessionKey ?? 'main')
+            recordMissionCheckpoint({
+              missionId: options?.missionId,
+              assignmentId: assignment.assignmentId ?? null,
+              workerId,
+              checkpoint,
+              source: 'swarm-dispatch',
+            })
+            appendSwarmMemoryEvent({
+              workerId,
+              missionId: options?.missionId ?? null,
+              assignmentId: assignment.assignmentId ?? null,
+              type: 'checkpoint',
+              summary: checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
+              checkpoint,
+              event: {
+                stateLabel: checkpoint.stateLabel,
+                filesChanged: checkpoint.filesChanged,
+                commandsRun: checkpoint.commandsRun,
+                blocker: checkpoint.blocker,
+                nextAction: checkpoint.nextAction,
+              },
+            })
+            publishSwarmCheckpointNotification({
+              workerId,
+              missionId: options?.missionId ?? null,
+              assignmentId: assignment.assignmentId ?? null,
+              checkpoint,
+              notifySessionKey: options?.notifySessionKey ?? 'main',
+            })
+            result.checkpoint = checkpoint
+            result.checkpointStatus = 'checkpointed'
+          } else {
+            result.checkpoint = null
+            result.checkpointStatus = 'timeout'
+          }
+        } else {
+          result.checkpointStatus = 'not-requested'
+        }
         markDispatchResult(workerId, result)
         resolve(result)
       },
@@ -942,6 +988,110 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
   })
 }
 
+export class SwarmDispatchError extends Error {
+  status: number
+
+  constructor(message: string, status = 400) {
+    super(message)
+    this.name = 'SwarmDispatchError'
+    this.status = status
+  }
+}
+
+export async function dispatchSwarmAssignments(body: DispatchRequest) {
+  let assignments = parseAssignments(body.assignments)
+  const promptRaw = typeof body.prompt === 'string' ? body.prompt : ''
+  const prompt = promptRaw.trim()
+  if (assignments.length === 0) {
+    const workerIdsRaw = Array.isArray(body.workerIds) ? body.workerIds : []
+    const workerIds = workerIdsRaw
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0 && validateWorkerId(value))
+    assignments = workerIds.map((workerId) => ({
+      workerId,
+      task: prompt,
+      rationale: 'Legacy broadcast dispatch.',
+      direct: body.direct === true,
+    }))
+  }
+
+  if (assignments.length === 0) {
+    throw new SwarmDispatchError('assignments[] or workerIds[] required')
+  }
+  if (assignments.length > 12) {
+    throw new SwarmDispatchError('Maximum 12 workers per dispatch')
+  }
+  if (assignments.some((assignment) => assignment.task.length === 0)) {
+    throw new SwarmDispatchError('assignment task required')
+  }
+  if (assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)) {
+    throw new SwarmDispatchError(`assignment task exceeds ${MAX_PROMPT_CHARS} characters`)
+  }
+
+  const timeoutRaw = typeof body.timeoutSeconds === 'number' ? body.timeoutSeconds : DEFAULT_TIMEOUT_S
+  const timeoutSeconds = Math.max(10, Math.min(MAX_TIMEOUT_S, Math.floor(timeoutRaw)))
+  const timeoutMs = timeoutSeconds * 1000
+  const waitForCheckpoint = !(body.waitForCheckpoint === false && body.allowAsync === true)
+  const pollRaw = typeof body.checkpointPollSeconds === 'number' ? body.checkpointPollSeconds : 90
+  const checkpointPollSeconds = Math.max(5, Math.min(300, Math.floor(pollRaw)))
+  const notifySessionKey = typeof body.notifySessionKey === 'string' && body.notifySessionKey.trim() ? body.notifySessionKey.trim() : 'main'
+
+  const requestedMissionId = typeof body.missionId === 'string' ? body.missionId.trim() : ''
+  const hasExplicitMissionTitle = typeof body.missionTitle === 'string' && body.missionTitle.trim()
+  const missionTitle = hasExplicitMissionTitle
+    ? (body.missionTitle as string).trim()
+    : requestedMissionId ? '' : assignments.length === 1 ? assignments[0].task.slice(0, 120) : `${assignments.length} assigned tasks`
+  const mission = createOrUpdateMission({
+    missionId: requestedMissionId || null,
+    title: missionTitle,
+    assignments,
+  })
+  if (mission._created) {
+    for (const workerId of new Set(assignments.map((a) => a.workerId))) {
+      try {
+        appendSwarmMemoryEvent({
+          workerId,
+          missionId: mission.id,
+          type: 'mission-start',
+          title: mission.title,
+          summary: `Mission started: ${mission.title}`,
+          event: { workers: [...new Set(assignments.map((a) => a.workerId))] },
+        })
+      } catch {}
+    }
+  }
+
+  const assignmentIdByKey = new Map(mission.assignments.map((item) => [`${item.workerId}\n${item.task}`, item.id]))
+  assignments = assignments.map((assignment) => ({
+    ...assignment,
+    assignmentId: assignmentIdByKey.get(`${assignment.workerId}\n${assignment.task}`),
+  }))
+
+  const dispatchedAt = Date.now()
+  const roster = rosterByWorkerId(assignments.map((assignment) => assignment.workerId))
+  const results = await Promise.all(assignments.map((assignment) => runWorker(
+    assignment,
+    timeoutMs,
+    roster.get(assignment.workerId),
+    { waitForCheckpoint, checkpointPollMs: checkpointPollSeconds * 1000, missionId: mission.id, notifySessionKey },
+  )))
+
+  return {
+    dispatchedAt,
+    completedAt: Date.now(),
+    missionId: mission.id,
+    mission,
+    prompt: assignments.length === 1 ? assignments[0].task : `${assignments.length} assigned tasks`,
+    assignments,
+    timeoutSeconds,
+    waitForCheckpoint,
+    checkpointPollSeconds,
+    notifySessionKey,
+    results,
+  }
+}
+
 export const Route = createFileRoute('/api/swarm-dispatch')({
   server: {
     handlers: {
@@ -957,97 +1107,14 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
           return json({ error: 'Invalid JSON body' }, { status: 400 })
         }
 
-        let assignments = parseAssignments(body.assignments)
-        const promptRaw = typeof body.prompt === 'string' ? body.prompt : ''
-        const prompt = promptRaw.trim()
-        if (assignments.length === 0) {
-          const workerIdsRaw = Array.isArray(body.workerIds) ? body.workerIds : []
-          const workerIds = workerIdsRaw
-            .filter((value): value is string => typeof value === 'string')
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0 && validateWorkerId(value))
-          assignments = workerIds.map((workerId) => ({ workerId, task: prompt, rationale: 'Legacy broadcast dispatch.', direct: body.direct === true }))
-        }
-
-        if (assignments.length === 0) {
-          return json({ error: 'assignments[] or workerIds[] required' }, { status: 400 })
-        }
-        if (assignments.length > 12) {
-          return json({ error: 'Maximum 12 workers per dispatch' }, { status: 400 })
-        }
-        if (assignments.some((assignment) => assignment.task.length === 0)) {
-          return json({ error: 'assignment task required' }, { status: 400 })
-        }
-        if (assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)) {
-          return json({ error: `assignment task exceeds ${MAX_PROMPT_CHARS} characters` }, { status: 400 })
-        }
-
-        const timeoutRaw = typeof body.timeoutSeconds === 'number' ? body.timeoutSeconds : DEFAULT_TIMEOUT_S
-        const timeoutSeconds = Math.max(10, Math.min(MAX_TIMEOUT_S, Math.floor(timeoutRaw)))
-        const timeoutMs = timeoutSeconds * 1000
-        // Swarm2 control-plane dispatches should be observable by default:
-        // wait for a fresh checkpoint so completion/blocker notifications can
-        // be published and worker progress cards can resolve. Callers that
-        // intentionally want fire-and-forget delivery must opt out with both
-        // waitForCheckpoint:false and allowAsync:true.
-        const waitForCheckpoint = !(body.waitForCheckpoint === false && body.allowAsync === true)
-        const pollRaw = typeof body.checkpointPollSeconds === 'number' ? body.checkpointPollSeconds : 90
-        const checkpointPollSeconds = Math.max(5, Math.min(300, Math.floor(pollRaw)))
-        const notifySessionKey = typeof body.notifySessionKey === 'string' && body.notifySessionKey.trim() ? body.notifySessionKey.trim() : 'main'
-
-        const requestedMissionId = typeof body.missionId === 'string' ? body.missionId.trim() : ''
-        const hasExplicitMissionTitle = typeof body.missionTitle === 'string' && body.missionTitle.trim()
-        const missionTitle = hasExplicitMissionTitle
-          ? (body.missionTitle as string).trim()
-          : requestedMissionId ? '' : assignments.length === 1 ? assignments[0].task.slice(0, 120) : `${assignments.length} assigned tasks` 
-        const mission = createOrUpdateMission({
-          missionId: requestedMissionId || null,
-          title: missionTitle,
-          assignments,
-        })
-        if (mission._created) {
-          for (const workerId of new Set(assignments.map((a) => a.workerId))) {
-            try {
-              appendSwarmMemoryEvent({
-                workerId,
-                missionId: mission.id,
-                type: 'mission-start',
-                title: mission.title,
-                summary: `Mission started: ${mission.title}`,
-                event: { workers: [...new Set(assignments.map((a) => a.workerId))] },
-              })
-            } catch { /* memory write best-effort */ }
+        try {
+          return json(await dispatchSwarmAssignments(body))
+        } catch (error) {
+          if (error instanceof SwarmDispatchError) {
+            return json({ error: error.message }, { status: error.status })
           }
+          return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 })
         }
-
-        const assignmentIdByKey = new Map(mission.assignments.map((item) => [`${item.workerId}\n${item.task}`, item.id]))
-        assignments = assignments.map((assignment) => ({
-          ...assignment,
-          assignmentId: assignmentIdByKey.get(`${assignment.workerId}\n${assignment.task}`),
-        }))
-
-        const dispatchedAt = Date.now()
-        const roster = rosterByWorkerId(assignments.map((assignment) => assignment.workerId))
-        const results = await Promise.all(assignments.map((assignment) => runWorker(
-          assignment,
-          timeoutMs,
-          roster.get(assignment.workerId),
-          { waitForCheckpoint, checkpointPollMs: checkpointPollSeconds * 1000, missionId: mission.id, notifySessionKey },
-        )))
-
-        return json({
-          dispatchedAt,
-          completedAt: Date.now(),
-          missionId: mission.id,
-          mission,
-          prompt: assignments.length === 1 ? assignments[0].task : `${assignments.length} assigned tasks`,
-          assignments,
-          timeoutSeconds,
-          waitForCheckpoint,
-          checkpointPollSeconds,
-          notifySessionKey,
-          results,
-        })
       },
     },
   },

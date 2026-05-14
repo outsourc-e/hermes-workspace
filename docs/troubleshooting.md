@@ -13,8 +13,8 @@ Common setup issues and how to fix them.
 **Fix:**
 
 ```bash
-# Find your claude env file
-claude config env-path
+# Find your Hermes env file
+hermes config env-path
 # Usually: ~/.hermes/.env
 
 # Check for the key
@@ -43,7 +43,7 @@ After fixing, restart the gateway: `hermes gateway run --replace`
 
 **Checklist (in order):**
 
-1. Is the gateway running? `pgrep -af "claude.*gateway"`
+1. Is the gateway running? `hermes gateway status` or `pgrep -af "hermes.*gateway"`
 2. Is port 8642 bound? `curl -sf http://127.0.0.1:8642/health`
 3. Is Workspace `.env` correct? `grep HERMES_API_URL ~/hermes-workspace/.env`
    - Should be: `HERMES_API_URL=http://127.0.0.1:8642`
@@ -122,10 +122,10 @@ This means the Vite SSR server tried `GET /api/gateway-status` which internally 
 If nothing above helps, run this and share the output:
 
 ```bash
-echo "=== claude version ===" && claude --version 2>&1
-echo "=== claude env path ===" && claude config env-path 2>&1
-echo "=== claude env (redacted) ===" && grep -E "^(API_SERVER|CLAUDE_)" "$(claude config env-path 2>/dev/null || echo ~/.hermes/.env)" 2>&1
-echo "=== gateway process ===" && pgrep -af "claude.*gateway" 2>&1 || echo "not running"
+echo "=== hermes version ===" && hermes --version 2>&1
+echo "=== hermes env path ===" && hermes config env-path 2>&1
+echo "=== hermes env (redacted) ===" && grep -E "^(API_SERVER|HERMES_|CLAUDE_)" "$(hermes config env-path 2>/dev/null || echo ~/.hermes/.env)" 2>&1
+echo "=== gateway process ===" && pgrep -af "hermes.*gateway" 2>&1 || echo "not running"
 echo "=== port 8642 ===" && (ss -tlnp 2>/dev/null || lsof -iTCP:8642 -sTCP:LISTEN 2>/dev/null) | grep 8642 || echo "not bound"
 echo "=== health check ===" && curl -sf http://127.0.0.1:8642/health 2>&1 || echo "not reachable"
 echo "=== workspace .env ===" && grep CLAUDE ~/hermes-workspace/.env 2>&1 || echo "no .env"

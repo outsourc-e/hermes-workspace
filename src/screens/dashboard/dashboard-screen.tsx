@@ -1,32 +1,17 @@
+import {
+  BubbleChatAddIcon,
+  CheckmarkCircle02Icon,
+  ConsoleIcon,
+  Edit02Icon,
+  Moon02Icon,
+  PuzzleIcon,
+  Settings02Icon,
+  Sun02Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import type { DashboardOverview } from '@/server/dashboard-aggregator'
-import { OpsStrip } from './components/ops-strip'
-import { AchievementsCard } from './components/achievements-card'
-import { HeroMetrics } from './components/hero-metrics'
-import {
-  AnalyticsChartCard,
-  type AnalyticsPeriod,
-} from './components/analytics-chart-card'
-import { TopModelsCard } from './components/top-models-card'
-import { LogsTailCard } from './components/logs-tail-card'
-import {
-  SessionsIntelligenceCard,
-  type SessionRowData,
-} from './components/sessions-intelligence-card'
-import { SkillsUsageCard } from './components/skills-usage-card'
-import { TokenMixHourCard } from './components/token-mix-hour-card'
-import { ActiveModelKpi } from './components/active-model-kpi'
-import { AttentionMarquee } from './components/attention-marquee'
-import { CacheEfficiencyCard } from './components/cache-efficiency-card'
-import { ProviderMixCard } from './components/provider-mix-card'
-import { VelocityCard } from './components/velocity-card'
-import { CostLedgerCard } from './components/cost-ledger-card'
-import { OperatorTipCard } from './components/operator-tip-card'
-import { WidgetShell } from './components/widget-shell'
-import { EditModePanel } from './components/edit-mode-panel'
-import { useDashboardLayout } from './lib/use-dashboard-layout'
 import {
   Area,
   AreaChart,
@@ -36,24 +21,36 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { AchievementsCard } from './components/achievements-card'
+import { ActiveModelKpi } from './components/active-model-kpi'
+import { AnalyticsChartCard } from './components/analytics-chart-card'
+import { AttentionMarquee } from './components/attention-marquee'
+import { CacheEfficiencyCard } from './components/cache-efficiency-card'
+import { CostLedgerCard } from './components/cost-ledger-card'
+import { EditModePanel } from './components/edit-mode-panel'
+import { HeroMetrics } from './components/hero-metrics'
+import { LogsTailCard } from './components/logs-tail-card'
+import { OperatorTipCard } from './components/operator-tip-card'
+import { OpsStrip } from './components/ops-strip'
+import { ProviderMixCard } from './components/provider-mix-card'
+import { SessionsIntelligenceCard } from './components/sessions-intelligence-card'
+import { SkillsUsageCard } from './components/skills-usage-card'
+import { TokenMixHourCard } from './components/token-mix-hour-card'
+import { TopModelsCard } from './components/top-models-card'
+import { VelocityCard } from './components/velocity-card'
+import { WidgetShell } from './components/widget-shell'
+import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
+import { useDashboardLayout } from './lib/use-dashboard-layout'
+import type { SessionRowData } from './components/sessions-intelligence-card'
+import type { AnalyticsPeriod } from './components/analytics-chart-card'
 import type { ReactNode } from 'react'
 import type { ClaudeSession } from '@/server/claude-api'
+import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { getUnavailableReason } from '@/lib/feature-gates'
-import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
-import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Moon02Icon,
-  Sun02Icon,
-  BubbleChatAddIcon,
-  ConsoleIcon,
-  PuzzleIcon,
-  Edit02Icon,
-  CheckmarkCircle02Icon,
-  Settings02Icon,
-} from '@hugeicons/core-free-icons'
+import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
 // `IconSvgObject` isn't exported from @hugeicons/react; reuse the
 // inferred type from a real icon import for prop typing.
@@ -420,14 +417,10 @@ function SkillsWidget({
   const installed = skills.length
   const enabled = skills.filter((s) => s.enabled !== false).length
   const usedThisWindow = usage?.distinctSkills ?? null
-  const topUsed = usage?.topSkills?.[0]
+  const topUsed = usage?.topSkills[0]
   const topInstalled =
-    skills.find((s) => s.enabled !== false) ?? skills[0]
-  const topName = topUsed?.skill
-    ? topUsed.skill
-    : topInstalled
-      ? String(topInstalled.name ?? '—')
-      : '—'
+    skills.find((s) => s.enabled !== false) ?? skills.at(0)
+  const topName = topUsed?.skill ?? String(topInstalled?.name ?? '—')
 
   return (
     <button
@@ -639,7 +632,6 @@ function SessionRow({
 
 export function DashboardScreen() {
   const navigate = useNavigate()
-  const sessionsAvailable = useFeatureAvailable('sessions')
   const skillsAvailable = useFeatureAvailable('skills')
   const sessionsQuery = useQuery({
     // Use a dedicated query key — NOT chatQueryKeys.sessions — to avoid
@@ -648,25 +640,32 @@ export function DashboardScreen() {
     // Also use the workspace proxy (/api/sessions) rather than the server-side
     // listSessions() — the latter calls the gateway via CLAUDE_API which is
     // only available server-side and returns nothing when called from the client.
+    // Do not gate this direct proof behind /api/gateway-status. That probe can
+    // be stale/loading while /api/sessions already works, which made the
+    // dashboard show a bogus “Enhanced API required” warning even though
+    // sessions were healthy.
     queryKey: ['dashboard', 'sessions'],
     queryFn: async () => {
       const res = await fetch('/api/sessions?limit=200&offset=0')
-      if (!res.ok) return [] as Array<Record<string, unknown>>
-      const data = (await res.json()) as {
-        sessions?: Array<Record<string, unknown>>
+      if (!res.ok) {
+        throw new Error(`Sessions API returned HTTP ${res.status}`)
       }
-      return data.sessions ?? []
+      const data = await res.json()
+      return normalizeDashboardSessionsPayload(data)
     },
     staleTime: 10_000,
     refetchInterval: 30_000,
-    enabled: sessionsAvailable,
+    retry: 1,
   })
+
+  const sessionsResult = sessionsQuery.data
 
   // Raw rows from the sessions endpoint. Used both for hero stats
   // (count/tokens) and for the SessionsIntelligenceCard below.
-  const rawSessions = (sessionsQuery.data ?? []) as Array<
-    Record<string, unknown>
-  >
+  const rawSessions = sessionsResult?.sessions ?? []
+  const sessionsUnavailable = Boolean(sessionsResult?.unavailable)
+  const sessionsUnavailableMessage =
+    sessionsResult?.message ?? getUnavailableReason('sessions')
 
   // Adapter shape kept for the legacy fallbacks that still reference
   // ClaudeSession (HeroMetrics fallback path, etc.).
@@ -1025,7 +1024,7 @@ export function DashboardScreen() {
            concern by giving the ticker its own visual chamber
            (warning gradient, separated border) so it doesn't blend
            into the gateway/version/cron line below it. */}
-      {(overview?.incidents?.length ?? 0) > 0 ? (
+      {(overview?.incidents.length ?? 0) > 0 ? (
         <AttentionMarquee overview={overview ?? null} />
       ) : null}
 
@@ -1142,13 +1141,17 @@ export function DashboardScreen() {
           {layout.isVisible('sessions_intelligence') ? (
             <div className="flex min-h-0 flex-1 flex-col">
               <WidgetShell id="sessions_intelligence" layout={layout}>
-                {sessionsAvailable ? (
-                  <SessionsIntelligenceCard sessions={sessionRows} />
-                ) : (
+                {sessionsQuery.isError || sessionsUnavailable ? (
                   <UnavailableWidget
                     title="Recent Sessions"
-                    description={getUnavailableReason('sessions')}
+                    description={
+                      sessionsQuery.isError
+                        ? getUnavailableReason('sessions')
+                        : sessionsUnavailableMessage
+                    }
                   />
+                ) : (
+                  <SessionsIntelligenceCard sessions={sessionRows} />
                 )}
               </WidgetShell>
             </div>

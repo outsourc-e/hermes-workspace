@@ -2,8 +2,8 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { homedir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import YAML from 'yaml'
+import { SWARM_CANONICAL_REPO, SWARM_MEMORY_HANDOFFS } from './swarm-environment'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
-import { SWARM_CANONICAL_REPO } from './swarm-environment'
 
 export type SwarmMemoryKind = 'profile' | 'mission' | 'episodic' | 'handoff' | 'shared'
 
@@ -51,8 +51,8 @@ export type SwarmMemorySearchResult = {
   snippet: string
 }
 
-export const SWARM_SHARED_MEMORY_ROOT = join(homedir(), '.openclaw', 'workspace', 'memory', 'swarm')
-export const SWARM_SHARED_HANDOFF_ROOT = join(homedir(), '.openclaw', 'workspace', 'memory', 'handoffs', 'swarm')
+export const SWARM_SHARED_MEMORY_ROOT = join(SWARM_MEMORY_HANDOFFS, 'swarm')
+export const SWARM_SHARED_HANDOFF_ROOT = join(SWARM_MEMORY_HANDOFFS, 'handoffs', 'swarm')
 export const SWARM_RUNTIME_ROOT = join(SWARM_CANONICAL_REPO, '.runtime')
 export const SWARM_PROJECT_CONTEXT_PATH = join(SWARM_SHARED_MEMORY_ROOT, 'PROJECT.md')
 
@@ -329,8 +329,7 @@ function memoryRootFor(input: { workerId?: string | null; kind: SwarmMemoryKind;
     return swarmWorkerMissionMemoryRoot(workerId, missionId)
   }
   if (input.kind === 'episodic') return swarmWorkerEpisodesRoot(workerId)
-  if (input.kind === 'handoff') return swarmWorkerHandoffsRoot(workerId)
-  return swarmWorkerMemoryRoot(workerId)
+  return swarmWorkerHandoffsRoot(workerId)
 }
 
 function listFiles(root: string, maxDepth = 2): Array<string> {
@@ -574,8 +573,8 @@ export function buildSwarmStartupSnapshot(input: SwarmStartupSnapshotInput): Swa
   renderedSections.push('### Memory locations')
   renderedSections.push(
     [
-      `Profile root: ~/.hermes/profiles/${workerId}/  (MEMORY.md, SOUL.md, USER.md cloned from main)`,
-      `Swarm memory: ~/.ocplatform/profiles/${workerId}/memory/  (IDENTITY.md, missions/, episodes/, handoffs/)`,
+      `Profile root: ~/.hermes/profiles/${workerId}/  (SOUL.md plus optional MEMORY.md / USER.md when cloned from main)`,
+      `Swarm memory: ~/.hermes/profiles/${workerId}/memory/  (IDENTITY.md, missions/, episodes/, handoffs/)`,
       `Shared handoff: ${sharedHandoffPath}`,
       `Shared swarm memory: ${SWARM_SHARED_MEMORY_ROOT}`,
       `Project context: ${SWARM_PROJECT_CONTEXT_PATH}`,

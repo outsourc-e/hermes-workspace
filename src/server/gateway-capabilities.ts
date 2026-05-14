@@ -36,8 +36,8 @@ function overridesPath(): string {
 function readOverrides(): WorkspaceOverrides {
   try {
     const raw = fs.readFileSync(overridesPath(), 'utf-8')
-    const parsed = JSON.parse(raw) as WorkspaceOverrides
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    const parsed = JSON.parse(raw) as unknown
+    return parsed !== null && typeof parsed === 'object' ? (parsed as WorkspaceOverrides) : {}
   } catch {
     return {}
   }
@@ -139,6 +139,9 @@ export function getResolvedUrls(): {
 export const CLAUDE_UPGRADE_INSTRUCTIONS =
   'For full features, install Hermes Agent from source (`git clone https://github.com/NousResearch/hermes-agent && cd hermes-agent && pip install -e .`), then start the gateway on :8642 (`hermes gateway run`). For the extended APIs (Sessions, Skills, Config, Jobs) also start the dashboard on :9119 (`hermes dashboard`).'
 
+export const DASHBOARD_REQUIRED_INSTRUCTIONS =
+  'Hermes gateway core APIs are healthy, but dashboard-backed APIs are unavailable. Start the dashboard on :9119 (`hermes dashboard`) or point HERMES_DASHBOARD_URL at the running dashboard service.'
+
 export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes backend does not support the sessions API. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
 
 const PROBE_TIMEOUT_MS = 3_000
@@ -155,7 +158,7 @@ function effectiveProbeTtl(caps: { health: boolean; chatCompletions: boolean }):
   return PROBE_TTL_DISCONNECTED_MS
 }
 const DASHBOARD_TOKEN_REGEX =
-  /window\.__(?:CLAUDE|HERMES)_SESSION_TOKEN__\s*=\s*["'](.+?)["']/
+  /window\._+(?:CLAUDE|HERMES)_+SESSION_+TOKEN__+\s*=\s*["']([^"']+)["']/
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -262,62 +265,29 @@ let dashboardTokenCache = ''
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
 
 /**
- * Optional explicit bearer token for dashboard API calls.
- *
- * Preferred over scraping the dashboard's root HTML for an inline token
- * (the legacy path, which creates a brittle trust boundary — see #124).
- * When set, the workspace uses this directly and never parses HTML.
- *
- * NOTE: do NOT fall back to CLAUDE_API_TOKEN here. The gateway and the
- * upstream Hermes Agent dashboard use independent token schemes — the gateway
- * accepts a long-lived bearer (CLAUDE_API_TOKEN), while the dashboard
- * issues an ephemeral session token at boot (web_server.py:_SESSION_TOKEN).
- * Treating them as interchangeable wedges the workspace into 401 loops on
- * /api/sessions, /api/skills, etc. against the official dashboard. If
- * CLAUDE_DASHBOARD_TOKEN isn't set, leave this empty and let
- * fetchDashboardToken() fall through to the HTML-scrape legacy path.
+ * Dashboard API auth uses the ephemeral session token injected into the
+ * dashboard root HTML at startup. Do not reuse gateway bearer tokens here and
+ * do not trust a manually copied dashboard token env var — it goes stale every
+ * time the dashboard restarts.
  */
-const DASHBOARD_BEARER_TOKEN = process.env.HERMES_DASHBOARD_TOKEN || process.env.CLAUDE_DASHBOARD_TOKEN || ''
-
 function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 }
 
-let loggedHtmlScrapeFallback = false
-
 /**
- * Resolve a bearer token for dashboard API calls.
- *
- * Lookup order:
- *   1.  CLAUDE_DASHBOARD_TOKEN / CLAUDE_API_TOKEN env (preferred)
- *   2.  Inline token injected into the dashboard's root HTML (legacy
- *      fallback — logs a deprecation warning; to be removed once all
- *      supported dashboards expose a first-class token endpoint). See #124.
+ * Resolve the current dashboard session token by scraping the dashboard root
+ * HTML. The dashboard injects a fresh ephemeral token at boot, so cached or
+ * manually copied env tokens become invalid after restarts.
  */
 export async function fetchDashboardToken(options?: {
   force?: boolean
 }): Promise<string> {
   const force = options?.force === true
 
-  // Prefer the explicit service-to-service token — no HTML scrape at all.
-  if (DASHBOARD_BEARER_TOKEN) {
-    dashboardTokenCache = DASHBOARD_BEARER_TOKEN
-    return DASHBOARD_BEARER_TOKEN
-  }
-
   if (!force && dashboardTokenCache) return dashboardTokenCache
   if (!force && dashboardTokenPromise) return dashboardTokenPromise
 
   dashboardTokenPromise = (async () => {
-    if (!loggedHtmlScrapeFallback) {
-      loggedHtmlScrapeFallback = true
-      console.warn(
-        '[gateway] CLAUDE_DASHBOARD_TOKEN is not set — falling back to the legacy ' +
-          'HTML-scrape token flow. This fallback will be removed in a future release. ' +
-          'Set CLAUDE_DASHBOARD_TOKEN (or CLAUDE_API_TOKEN) to a dashboard bearer ' +
-          'token to migrate. See #124.',
-      )
-    }
     // Dashboard injects the session token inline on `/` (root), not on
     // `/index.html` which serves the raw Vite-built HTML without the token.
     const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
@@ -621,7 +591,15 @@ async function probeConductor(dashboardAvailable: boolean): Promise<boolean> {
     if (res.status === 404 || res.status === 405) return false
     // 401 means the path exists but the auth token isn't accepted yet —
     // treat as available so token-gated setups don't hide the feature.
-    return true
+    if (res.status === 401) return true
+
+    const contentType = res.headers.get('content-type') ?? ''
+    // Vite/TanStack's SPA fallback returns HTTP 200 + text/html for missing
+    // API routes. Do not mark Conductor available unless the dashboard gives
+    // us a JSON API response; otherwise /api/conductor-spawn tries to POST to
+    // the dashboard and the user sees "Method Not Allowed".
+    if (!contentType.toLowerCase().includes('application/json')) return false
+    return res.ok
   } catch {
     return false
   }
@@ -667,6 +645,39 @@ const OPTIONAL_APIS = new Set([
   'mcpFallback',
 ])
 
+const DASHBOARD_BACKED_APIS = new Set([
+  'sessions',
+  'skills',
+  'config',
+  'jobs',
+  'mcp',
+  'mcpFallback',
+  'conductor',
+  'kanban',
+])
+
+export function getCapabilityWarningMessage(
+  next: GatewayCapabilities,
+  criticalMissing: string[],
+): string | null {
+  if (criticalMissing.length === 0 || (!next.health && !next.dashboard.available)) {
+    return null
+  }
+
+  const dashboardBackedMissing = criticalMissing.filter((key) =>
+    DASHBOARD_BACKED_APIS.has(key),
+  )
+  if (
+    !next.dashboard.available &&
+    next.chatCompletions &&
+    dashboardBackedMissing.length === criticalMissing.length
+  ) {
+    return `[gateway] ${DASHBOARD_REQUIRED_INSTRUCTIONS}`
+  }
+
+  return `[gateway] Missing Hermes APIs detected. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
+}
+
 function logCapabilities(next: GatewayCapabilities): void {
   const core: Array<string> = []
   const enhanced: Array<string> = []
@@ -705,10 +716,9 @@ function logCapabilities(next: GatewayCapabilities): void {
   console.log(summary)
 
   const criticalMissing = missing.filter((key) => !OPTIONAL_APIS.has(key))
-  if (criticalMissing.length > 0 && (next.health || next.dashboard.available)) {
-    console.warn(
-      `[gateway] Missing Hermes APIs detected. ${CLAUDE_UPGRADE_INSTRUCTIONS}`,
-    )
+  const warning = getCapabilityWarningMessage(next, criticalMissing)
+  if (warning) {
+    console.warn(warning)
   }
 }
 

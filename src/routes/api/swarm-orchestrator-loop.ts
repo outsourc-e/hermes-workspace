@@ -11,7 +11,7 @@ import { appendMissionContinuation, markMissionAssignmentsReviewedByWorker, reco
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { publishSwarmActionPrompt, publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { applySwarmModeToLoopFlags, readSwarmMode } from '../../server/swarm-mode'
-import { readSwarmRoster } from '../../server/swarm-roster'
+import { isSwarmWorkerId, readSwarmRoster } from '../../server/swarm-roster'
 
 type LoopRequest = {
   workerIds?: unknown
@@ -38,7 +38,7 @@ function validWorkerIds(value: unknown): Array<string> {
   return value
     .filter((item): item is string => typeof item === 'string')
     .map((item) => item.trim())
-    .filter((item) => /^swarm\d+$/i.test(item))
+    .filter((item) => isSwarmWorkerId(item))
 }
 
 function timestampFromRuntime(value: unknown): number | null {
@@ -230,7 +230,8 @@ function chooseByRole(workerIds: Array<string>, pattern: RegExp): string | null 
 }
 
 function chooseReviewer(workerIds: Array<string>, requested: unknown): string | null {
-  if (typeof requested === 'string' && /^swarm\d+$/i.test(requested.trim())) return requested.trim()
+  if (typeof requested === 'string' && isSwarmWorkerId(requested)) return requested.trim()
+  if (workerIds.includes('reviewer')) return 'reviewer'
   if (workerIds.includes('swarm6')) return 'swarm6'
   return chooseByRole(workerIds, /review|qa|critic/i)
 }

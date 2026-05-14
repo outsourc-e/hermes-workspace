@@ -496,12 +496,32 @@ export async function getSkillCategories(): Promise<unknown> {
 // ── Config ───────────────────────────────────────────────────────
 
 export async function getConfig(): Promise<ClaudeConfig> {
+  if (getCapabilities().dashboard.available) {
+    const res = await dashboardFetch('/api/config')
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`Hermes dashboard /api/config: ${res.status} ${body}`)
+    }
+    return res.json() as Promise<ClaudeConfig>
+  }
   return claudeGet<ClaudeConfig>('/api/config')
 }
 
 export async function patchConfig(
   patch: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  if (getCapabilities().dashboard.available) {
+    const res = await dashboardFetch('/api/config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`Hermes dashboard PATCH /api/config: ${res.status} ${body}`)
+    }
+    return res.json() as Promise<Record<string, unknown>>
+  }
   return claudePatch<Record<string, unknown>>('/api/config', patch)
 }
 

@@ -3,7 +3,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-export const SWARM_KANBAN_LANES = ['backlog', 'ready', 'running', 'review', 'blocked', 'done'] as const
+export const SWARM_KANBAN_LANES = ['backlog', 'todo', 'ready', 'running', 'review', 'blocked', 'done'] as const
 export type SwarmKanbanLane = (typeof SWARM_KANBAN_LANES)[number]
 
 export type SwarmKanbanCard = {
@@ -13,12 +13,16 @@ export type SwarmKanbanCard = {
   acceptanceCriteria: string[]
   assignedWorker: string | null
   reviewer: string | null
-  status: SwarmKanbanLane
+  status: SwarmKanbanLane | string
   missionId: string | null
   reportPath: string | null
   createdBy: string
   createdAt: number
   updatedAt: number
+  parents?: string[]
+  children?: string[]
+  latestRun?: { summary?: string | null; outcome?: string | null; status?: string | null } | null
+  source?: string
 }
 
 type SwarmKanbanFile = { cards: SwarmKanbanCard[] }
@@ -40,6 +44,8 @@ export type CreateSwarmKanbanCardInput = {
   missionId?: string | null
   reportPath?: string | null
   createdBy?: string | null
+  parents?: string[]
+  idempotencyKey?: string | null
 }
 
 export type UpdateSwarmKanbanCardInput = Partial<Omit<CreateSwarmKanbanCardInput, 'createdBy'>>
@@ -72,7 +78,6 @@ function writeKanbanFile(data: SwarmKanbanFile): void {
 }
 
 function normalizeStatus(value: unknown): SwarmKanbanLane {
-  if (value === 'todo') return 'ready'
   if (value === 'in_progress' || value === 'doing') return 'running'
   return SWARM_KANBAN_LANES.includes(value as SwarmKanbanLane) ? (value as SwarmKanbanLane) : 'backlog'
 }

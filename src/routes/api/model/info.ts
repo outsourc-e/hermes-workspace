@@ -47,7 +47,13 @@ export const Route = createFileRoute('/api/model/info')({
           )
         }
 
+        const passthrough =
+          rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
+            ? (rawPayload as Record<string, unknown>)
+            : {}
+
         return json({
+          ...passthrough,
           ...resolved,
           gatewayMode,
         })

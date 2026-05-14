@@ -183,7 +183,7 @@ export const Route = createFileRoute('/api/swarm-decompose')({
           if (!entry || typeof entry !== 'object') continue
           const obj = entry as Record<string, unknown>
           const id = typeof obj.id === 'string' ? obj.id.trim() : ''
-          if (!id) continue
+          if (!id || id === 'workspace') continue
           workers.push({
             id,
             role: typeof obj.role === 'string' ? obj.role : undefined,

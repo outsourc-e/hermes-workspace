@@ -159,6 +159,10 @@ type WorkspaceDetectionResponse = {
   last?: string
 }
 
+type ClaudeConfigApiResponse = {
+  config?: Record<string, unknown>
+}
+
 type ModelInfoApiResponse = {
   gatewayMode?: string | null
   supportsRuntimeSwitching?: boolean | null
@@ -680,12 +684,15 @@ async function readResponseError(response: Response): Promise<string> {
   }
 }
 
-async function fetchCurrentModelFromStatus(): Promise<string> {
+async function fetchCurrentModelFromStatus(sessionKey?: string): Promise<string> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 7000)
 
   try {
-    const response = await fetch('/api/session-status', {
+    const query = sessionKey?.trim()
+      ? `?sessionKey=${encodeURIComponent(sessionKey.trim())}`
+      : ''
+    const response = await fetch(`/api/session-status${query}`, {
       signal: controller.signal,
     })
     if (!response.ok) {
@@ -921,9 +928,21 @@ function ChatComposerComponent({
     },
   })
   const currentModelQuery = useQuery({
-    queryKey: ['claude', 'session-status-model'],
-    queryFn: fetchCurrentModelFromStatus,
+    queryKey: ['claude', 'session-status-model', sessionKey || 'main'],
+    queryFn: () => fetchCurrentModelFromStatus(sessionKey),
     refetchInterval: 30_000,
+    retry: false,
+  })
+  const sttConfigQuery = useQuery({
+    queryKey: ['claude', 'config', 'stt'],
+    queryFn: async () => {
+      const response = await fetch('/api/claude-config')
+      if (!response.ok) {
+        throw new Error(`Config request failed (${response.status})`)
+      }
+      return (await response.json()) as ClaudeConfigApiResponse
+    },
+    staleTime: 60_000,
     retry: false,
   })
   const gatewayModeQuery = useQuery({
@@ -1620,18 +1639,66 @@ function ChatComposerComponent({
   const _isWebSearchActive = webSearchEnabled ?? isWebSearchMode
   void _isWebSearchActive // retained for future use / external prop
 
+  const sttConfig =
+    (sttConfigQuery.data?.config?.stt as Record<string, unknown> | undefined) || {}
+  const sttProvider =
+    typeof sttConfig.provider === 'string' ? sttConfig.provider.trim() : 'local'
+  const useRemoteStt = sttProvider === 'groq' || sttProvider === 'openai'
+
+  const appendTextToDraft = useCallback(
+    (text: string, separator = ' ') => {
+      const normalized = text.trim()
+      if (!normalized) return
+      setValue((prev) => {
+        const next = prev.trim().length > 0 ? `${prev}${separator}${normalized}` : normalized
+        persistDraft(next)
+        return next
+      })
+    },
+    [persistDraft],
+  )
+
+  const transcribeVoiceBlob = useCallback(
+    async (blob: Blob) => {
+      if (!useRemoteStt) {
+        throw new Error('Remote STT is not enabled for this profile.')
+      }
+
+      const form = new FormData()
+      const extension = blob.type.includes('mp4') ? 'mp4' : 'webm'
+      form.set('file', blob, `voice-input.${extension}`)
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: form,
+      })
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean
+        text?: string
+        error?: string
+      }
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || `Transcription failed (${response.status})`)
+      }
+      return typeof payload.text === 'string' ? payload.text : ''
+    },
+    [useRemoteStt],
+  )
+
   // Voice input (tap = speech-to-text)
   const voiceInput = useVoiceInput({
+    transcribe: useRemoteStt ? transcribeVoiceBlob : undefined,
     onResult: useCallback(
       (text: string) => {
-        if (!text.trim()) return
-        setValue((prev) => {
-          const next = prev.trim().length > 0 ? `${prev} ${text}` : text
-          persistDraft(next)
-          return next
-        })
+        appendTextToDraft(text)
       },
-      [persistDraft],
+      [appendTextToDraft],
+    ),
+    onError: useCallback(
+      (error: string) => {
+        toast(error || 'Voice transcription failed', { type: 'error' })
+      },
+      [],
     ),
   })
 
@@ -1657,18 +1724,27 @@ function ChatComposerComponent({
               previewUrl: '',
             },
           ])
-          // Auto-add duration caption to message
-          setValue((prev) => {
-            const caption = `🎤 Voice note (${secs}s)`
-            const next =
-              prev.trim().length > 0 ? `${prev}\n${caption}` : caption
-            persistDraft(next)
-            return next
-          })
+          appendTextToDraft(`🎤 Voice note (${secs}s)`, '\n')
+          if (useRemoteStt) {
+            void transcribeVoiceBlob(blob)
+              .then((text) => {
+                if (text.trim()) {
+                  appendTextToDraft(`Transcript: ${text.trim()}`, '\n')
+                }
+              })
+              .catch((error) => {
+                toast(
+                  error instanceof Error
+                    ? error.message
+                    : 'Voice note transcription failed',
+                  { type: 'error' },
+                )
+              })
+          }
         }
         reader.readAsDataURL(blob)
       },
-      [persistDraft],
+      [appendTextToDraft, transcribeVoiceBlob, useRemoteStt],
     ),
   })
 

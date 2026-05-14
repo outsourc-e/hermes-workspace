@@ -9,8 +9,11 @@ import {
   CLAUDE_UPGRADE_INSTRUCTIONS,
   dashboardFetch,
   ensureGatewayProbed,
-  getCapabilities,
 } from '../../server/gateway-capabilities'
+import {
+  createProfileCronJob,
+  listProfileCronJobs,
+} from '../../server/hermes-cron-profiles'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 function authHeaders(): Record<string, string> {
@@ -56,6 +59,14 @@ export const Route = createFileRoute('/api/claude-jobs')({
             status: 401,
           })
         }
+        const url = new URL(request.url)
+        const aggregateProfiles = url.searchParams.get('profiles') !== 'active'
+        if (aggregateProfiles) {
+          return new Response(JSON.stringify({ jobs: listProfileCronJobs() }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.jobs) {
           return new Response(
@@ -67,7 +78,6 @@ export const Route = createFileRoute('/api/claude-jobs')({
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           )
         }
-        const url = new URL(request.url)
         const params = url.searchParams.toString()
         const res = capabilities.dashboard.available
           ? await dashboardFetch(`/api/cron/jobs${params ? `?${params}` : ''}`)
@@ -82,6 +92,37 @@ export const Route = createFileRoute('/api/claude-jobs')({
             status: 401,
           })
         }
+        const body = await request.text()
+        let parsedBody: Record<string, unknown> = {}
+        try {
+          parsedBody = body ? (JSON.parse(body) as Record<string, unknown>) : {}
+        } catch {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Invalid JSON body' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        const profile =
+          typeof parsedBody.profile === 'string' && parsedBody.profile.trim()
+            ? parsedBody.profile.trim()
+            : null
+        if (profile) {
+          try {
+            const result = createProfileCronJob(profile, parsedBody)
+            return new Response(JSON.stringify(result), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          } catch (error) {
+            return new Response(
+              JSON.stringify({
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              }),
+              { status: 400, headers: { 'Content-Type': 'application/json' } },
+            )
+          }
+        }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.jobs) {
           return new Response(
@@ -93,7 +134,6 @@ export const Route = createFileRoute('/api/claude-jobs')({
             { status: 503, headers: { 'Content-Type': 'application/json' } },
           )
         }
-        const body = await request.text()
         const res = capabilities.dashboard.available
           ? await dashboardFetch('/api/cron/jobs', {
               method: 'POST',

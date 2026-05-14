@@ -2,6 +2,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   CheckmarkCircle02Icon,
   CloudIcon,
+  Delete02Icon,
   Link01Icon,
   MessageMultiple01Icon,
   Mic01Icon,
@@ -994,6 +995,177 @@ type AvailableModelsResponse = {
   providers: Array<{ id: string; label: string; authenticated: boolean }>
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+/**
+ * Best-effort URL for an OpenAI-compatible stack: manifest/custom block,
+ * custom_providers row matching the active provider (case-insensitive), then
+ * top-level base_url (used by named providers like ECLIPSE + remote Ollama).
+ */
+function resolveCustomBaseUrlFromConfig(
+  config: Record<string, unknown>,
+  activeProvider: string,
+): string {
+  const providersConfig = config.providers as Record<string, unknown> | undefined
+  const customBlock = (providersConfig?.manifest || providersConfig?.custom) as
+    | Record<string, unknown>
+    | undefined
+  let url = typeof customBlock?.base_url === 'string' ? customBlock.base_url.trim() : ''
+  if (!url && Array.isArray(config.custom_providers)) {
+    const aid = activeProvider.trim().toLowerCase()
+    for (const e of config.custom_providers) {
+      if (!e || typeof e !== 'object' || Array.isArray(e)) continue
+      const rec = e as Record<string, unknown>
+      const name = String(rec.name ?? '').trim().toLowerCase()
+      if (name && name === aid && typeof rec.base_url === 'string') {
+        url = rec.base_url.trim()
+        break
+      }
+    }
+  }
+  if (!url && typeof config.base_url === 'string') {
+    const top = config.base_url.trim()
+    if (top) url = top
+  }
+  return url
+}
+
+function readFallbackInputsFromConfig(config: Record<string, unknown>): {
+  provider: string
+  model: string
+  baseUrl: string
+} {
+  const fb = config.fallback_model
+  if (!fb || typeof fb !== 'object' || Array.isArray(fb)) {
+    return { provider: '', model: '', baseUrl: '' }
+  }
+  const o = fb as Record<string, unknown>
+  return {
+    provider: typeof o.provider === 'string' ? o.provider : '',
+    model: typeof o.model === 'string' ? o.model : '',
+    baseUrl: typeof o.base_url === 'string' ? o.base_url : '',
+  }
+}
+
+function normalizeCustomProviderEntry(
+  entry: Record<string, unknown>,
+): {
+  name: string
+  title: string
+  base_url: string
+  api_key?: string
+  api_mode?: string
+} {
+  const name = typeof entry.name === 'string' ? entry.name.trim() : ''
+  const title = typeof entry.title === 'string' ? entry.title.trim() : ''
+  const base_url = typeof entry.base_url === 'string' ? entry.base_url.trim() : ''
+  const api_key = typeof entry.api_key === 'string' ? entry.api_key : undefined
+  const api_mode = typeof entry.api_mode === 'string' ? entry.api_mode : undefined
+  return { name, title, base_url, api_key, api_mode }
+}
+
+function urlNormForDedupe(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, '')
+}
+
+/** True if this name or base URL already appears in custom_providers. */
+function entryCoveredByCustomProviderList(
+  name: string,
+  baseUrl: string,
+  list: Array<Record<string, unknown>>,
+): boolean {
+  const n = name.trim().toLowerCase()
+  const u = baseUrl.trim() ? urlNormForDedupe(baseUrl) : ''
+  for (const raw of list) {
+    const e = normalizeCustomProviderEntry(raw)
+    const en = e.name.toLowerCase()
+    const eu = e.base_url ? urlNormForDedupe(e.base_url) : ''
+    if (n && en && n === en) return true
+    if (u && eu && u === eu) return true
+  }
+  return false
+}
+
+function readManifestBlockBaseUrl(config: Record<string, unknown>): string {
+  const providersConfig = config.providers as Record<string, unknown> | undefined
+  const customBlock = (providersConfig?.manifest || providersConfig?.custom) as
+    | Record<string, unknown>
+    | undefined
+  return typeof customBlock?.base_url === 'string' ? customBlock.base_url.trim() : ''
+}
+
+function deriveCustomProviderNameFromBaseUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/[^a-zA-Z0-9-]+/g, '-')
+    return host ? `ep-${host}` : 'custom-endpoint'
+  } catch {
+    return 'custom-endpoint'
+  }
+}
+
+/** e.g. Qwen3.6.Eclipse from model filename + URL hostname first label */
+function suggestCustomProviderTitle(model: string, baseUrl: string): string {
+  let modelPart = (model || '').trim()
+  const lastSeg = modelPart.includes('/') ? modelPart.split('/').pop() || modelPart : modelPart
+  modelPart = (lastSeg || 'model').replace(/\.gguf$/i, '')
+  const dashIdx = modelPart.indexOf('-')
+  if (dashIdx > 0) modelPart = modelPart.slice(0, dashIdx)
+  modelPart = modelPart.replace(/[^a-zA-Z0-9.]/g, '') || 'Model'
+  let hostPart = 'Host'
+  try {
+    const h = new URL(baseUrl.trim()).hostname
+    hostPart = h.split('.')[0] || h
+  } catch {
+    /* keep Host */
+  }
+  const capHost = hostPart
+    ? hostPart.charAt(0).toUpperCase() + hostPart.slice(1).toLowerCase()
+    : 'Host'
+  return `${modelPart}.${capHost}`
+}
+
+function slugifyCustomProviderId(title: string, baseUrl: string): string {
+  const t = title.trim()
+  if (t) {
+    let s = t
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-_]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+    if (s.length > 56) s = s.slice(0, 56)
+    if (s) return s
+  }
+  return deriveCustomProviderNameFromBaseUrl(baseUrl || 'http://127.0.0.1')
+}
+
+function mergeModelForManifestSave(
+  config: Record<string, unknown>,
+  modelInputTrimmed: string,
+): Record<string, unknown> {
+  const existing = config.model
+  if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
+    const o = { ...(existing as Record<string, unknown>) }
+    o.provider = 'manifest'
+    if (typeof o.default !== 'string' || !o.default.trim()) {
+      if (modelInputTrimmed) o.default = modelInputTrimmed
+    }
+    return o
+  }
+  if (typeof existing === 'string' && existing.trim()) {
+    return { default: existing.trim(), provider: 'manifest' }
+  }
+  if (modelInputTrimmed) {
+    return { default: modelInputTrimmed, provider: 'manifest' }
+  }
+  return { provider: 'manifest' }
+}
+
 function ClaudeConfigSection({
   activeView = 'claude',
 }: {
@@ -1012,6 +1184,14 @@ function ClaudeConfigSection({
   const [customBaseUrl, setCustomBaseUrl] = useState('')
   const [editingCustomKey, setEditingCustomKey] = useState(false)
   const [editingCustomBaseUrl, setEditingCustomBaseUrl] = useState(false)
+  const [addCpTitle, setAddCpTitle] = useState('')
+  const [addCpProviderId, setAddCpProviderId] = useState('')
+  const [addCpBaseUrl, setAddCpBaseUrl] = useState('')
+  const [addCpYamlKey, setAddCpYamlKey] = useState('')
+  const [fallbackProviderInput, setFallbackProviderInput] = useState('')
+  const [fallbackModelInput, setFallbackModelInput] = useState('')
+  const [fallbackBaseUrlInput, setFallbackBaseUrlInput] = useState('')
+  const [showFallbackRow, setShowFallbackRow] = useState(false)
 
   const [availableProviders, setAvailableProviders] = useState<
     Array<{ id: string; label: string; authenticated: boolean }>
@@ -1022,12 +1202,17 @@ function ClaudeConfigSection({
   const [loadingModels, setLoadingModels] = useState(false)
 
   const syncInputsFromData = useCallback((configData: ClaudeConfigData) => {
+    const cfg = configData.config
     setModelInput(configData.activeModel || '')
     setProviderInput(configData.activeProvider || '')
-    setBaseUrlInput((configData.config?.base_url as string) || '')
-    const providersConfig = configData.config?.providers as Record<string, unknown> | undefined
-    const customConfig = (providersConfig?.manifest || providersConfig?.custom) as Record<string, unknown> | undefined
-    setCustomBaseUrl((customConfig?.base_url as string) || '')
+    setBaseUrlInput((cfg.base_url as string) || '')
+    const fb = readFallbackInputsFromConfig(cfg)
+    setFallbackProviderInput(fb.provider)
+    setFallbackModelInput(fb.model)
+    setFallbackBaseUrlInput(fb.baseUrl)
+    setShowFallbackRow(Boolean(fb.provider || fb.model || fb.baseUrl))
+
+    setCustomBaseUrl(readManifestBlockBaseUrl(cfg))
   }, [])
 
   const fetchConfig = useCallback(async () => {
@@ -1050,8 +1235,8 @@ function ClaudeConfigSection({
       )
       if (res.ok) {
         const result = (await res.json()) as AvailableModelsResponse
-        setAvailableModels(result.models || [])
-        if (result.providers?.length) setAvailableProviders(result.providers)
+        setAvailableModels(result.models)
+        if (result.providers.length > 0) setAvailableProviders(result.providers)
       }
     } catch {
       // ignore
@@ -1072,7 +1257,7 @@ function ClaudeConfigSection({
 
   const saveConfig = async (updates: {
     config?: Record<string, unknown>
-    env?: Record<string, string>
+    env?: Record<string, string | null>
   }) => {
     setSaving(true)
     setSaveMessage(null)
@@ -1150,25 +1335,156 @@ function ClaudeConfigSection({
     )
   }
 
-  const memoryConfig = (data.config.memory as Record<string, unknown>) || {}
-  const terminalConfig = (data.config.terminal as Record<string, unknown>) || {}
-  const displayConfig = (data.config.display as Record<string, unknown>) || {}
-  const agentConfig = (data.config.agent as Record<string, unknown>) || {}
-  const smartRouting =
-    (data.config.smart_model_routing as Record<string, unknown>) || {}
-  const ttsConfig = (data.config.tts as Record<string, unknown>) || {}
-  const sttConfig = (data.config.stt as Record<string, unknown>) || {}
+  const memoryConfig = asRecord(data.config.memory)
+  const terminalConfig = asRecord(data.config.terminal)
+  const displayConfig = asRecord(data.config.display)
+  const agentConfig = asRecord(data.config.agent)
+  const smartRouting = asRecord(data.config.smart_model_routing)
+  const ttsConfig = asRecord(data.config.tts)
+  const sttConfig = asRecord(data.config.stt)
   const customProviders = Array.isArray(data.config.custom_providers)
     ? (data.config.custom_providers as Array<Record<string, unknown>>)
     : []
 
+  const resolvedCustomBaseUrl = resolveCustomBaseUrlFromConfig(
+    data.config,
+    data.activeProvider,
+  )
+  const customProviderCatalogEntry = data.providers.find((p) => p.id === 'custom')
+  const customApiKeyConfigured = Boolean(customProviderCatalogEntry?.configured)
+  const customEndpointConfigured =
+    customApiKeyConfigured || Boolean(resolvedCustomBaseUrl)
+
+  const manifestBlockOnlyUrl = readManifestBlockBaseUrl(data.config)
+  const primaryConfigBaseUrl =
+    typeof data.config.base_url === 'string' ? data.config.base_url.trim() : ''
+  const primaryConfigProvider = (data.activeProvider || '').trim()
+
+  const extraPrimaryNotInList =
+    primaryConfigProvider &&
+    primaryConfigBaseUrl &&
+    !entryCoveredByCustomProviderList(
+      primaryConfigProvider,
+      primaryConfigBaseUrl,
+      customProviders,
+    )
+      ? { name: primaryConfigProvider, base_url: primaryConfigBaseUrl }
+      : null
+
+  const extraManifestNotInList =
+    manifestBlockOnlyUrl &&
+    !entryCoveredByCustomProviderList('', manifestBlockOnlyUrl, customProviders) &&
+    urlNormForDedupe(manifestBlockOnlyUrl) !==
+      urlNormForDedupe(primaryConfigBaseUrl || '') &&
+    !(
+      extraPrimaryNotInList &&
+      urlNormForDedupe(manifestBlockOnlyUrl) ===
+        urlNormForDedupe(extraPrimaryNotInList.base_url)
+    )
+      ? { base_url: manifestBlockOnlyUrl }
+      : null
+
+  function persistCustomProviderRow(
+    name: string,
+    base_url: string,
+    opts?: { title?: string; yamlApiKey?: string },
+  ) {
+    const n = name.trim()
+    const u = base_url.trim()
+    if (!n || !u) {
+      setSaveMessage('Provider id and base URL are both required to save a row.')
+      setTimeout(() => setSaveMessage(null), 4000)
+      return
+    }
+    const others = customProviders.filter((e) => String(e.name ?? '').trim() !== n)
+    const prev = customProviders.find((e) => String(e.name ?? '').trim() === n)
+    const api_mode =
+      prev && typeof prev.api_mode === 'string' && prev.api_mode
+        ? prev.api_mode
+        : 'chat_completions'
+
+    let rowApi: string | undefined
+    if (opts && 'yamlApiKey' in opts) {
+      const trimmed = opts.yamlApiKey?.trim() ?? ''
+      rowApi = trimmed || undefined
+    } else if (prev && typeof prev.api_key === 'string' && prev.api_key) {
+      rowApi = prev.api_key
+    } else if (n === 'ollama' || n === 'atomic-chat') {
+      rowApi = n
+    }
+
+    const row: Record<string, unknown> = { name: n, base_url: u, api_mode }
+    if (opts?.title?.trim()) row.title = opts.title.trim()
+    else if (prev && typeof prev.title === 'string' && prev.title.trim()) {
+      row.title = prev.title.trim()
+    }
+    if (rowApi) row.api_key = rowApi
+
+    void saveConfig({
+      config: {
+        custom_providers: [row, ...others],
+      },
+    })
+  }
+
+  function submitAddCustomProviderForm() {
+    const title = addCpTitle.trim()
+    const url = addCpBaseUrl.trim()
+    if (!title) {
+      setSaveMessage('Add a title so you can recognize this endpoint (e.g. Qwen3.6.Eclipse).')
+      setTimeout(() => setSaveMessage(null), 4000)
+      return
+    }
+    if (!url) {
+      setSaveMessage('Base URL is required.')
+      setTimeout(() => setSaveMessage(null), 4000)
+      return
+    }
+    const id = addCpProviderId.trim() || slugifyCustomProviderId(title, url)
+    persistCustomProviderRow(id, url, {
+      title,
+      yamlApiKey: addCpYamlKey,
+    })
+    setAddCpTitle('')
+    setAddCpProviderId('')
+    setAddCpBaseUrl('')
+    setAddCpYamlKey('')
+  }
+
+  function saveCurrentToCustomProvidersList() {
+    if (!providerInput.trim() || !baseUrlInput.trim()) {
+      setSaveMessage('Enter both provider and base URL in Model & Provider, then try again.')
+      setTimeout(() => setSaveMessage(null), 4000)
+      return
+    }
+    const bu = baseUrlInput.trim()
+    persistCustomProviderRow(providerInput.trim(), bu, {
+      title: suggestCustomProviderTitle(modelInput, bu),
+    })
+  }
+
+  function applyCustomProviderFromList(entry: Record<string, unknown>) {
+    const n = normalizeCustomProviderEntry(entry)
+    if (!n.name) return
+    setProviderInput(n.name)
+    setBaseUrlInput(n.base_url)
+    void fetchModelsForProvider(n.name)
+  }
+
+  function removeCustomProviderAt(index: number) {
+    const next = customProviders.filter((_, i) => i !== index)
+    void saveConfig({ config: { custom_providers: next } })
+  }
+
   const ttsProvider = (ttsConfig.provider as string) || 'edge'
-  const ttsEdge = (ttsConfig.edge as Record<string, unknown>) || {}
-  const ttsElevenLabs = (ttsConfig.elevenlabs as Record<string, unknown>) || {}
-  const ttsOpenAi = (ttsConfig.openai as Record<string, unknown>) || {}
+  const ttsEdge = asRecord(ttsConfig.edge)
+  const ttsElevenLabs = asRecord(ttsConfig.elevenlabs)
+  const ttsOpenAi = asRecord(ttsConfig.openai)
   const sttProvider = (sttConfig.provider as string) || 'local'
-  const sttLocal = (sttConfig.local as Record<string, unknown>) || {}
-  const sttGroq = (sttConfig.groq as Record<string, unknown>) || {}
+  const sttLocal = asRecord(sttConfig.local)
+  const sttGroq = asRecord(sttConfig.groq)
+
+  const manifestBaseUrlOnly = readManifestBlockBaseUrl(data.config)
 
   const renderClaudeOverview = () => (
     <>
@@ -1263,15 +1579,91 @@ function ClaudeConfigSection({
             />
           </div>
         </SettingsRow>
+
+        <div className="rounded-xl border border-primary-200 bg-white/80 px-3 py-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium text-primary-900">
+                Fallback model (optional)
+              </p>
+              <p className="text-xs text-primary-600">
+                Used only if the primary model fails. Keep empty to disable — avoids mixing this
+                up with your main provider (for example OpenRouter only here, local primary above).
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => setShowFallbackRow((v) => !v)}
+            >
+              {showFallbackRow ? 'Hide fallback fields' : 'Show fallback fields'}
+            </Button>
+          </div>
+          {showFallbackRow ? (
+            <div className="mt-3 space-y-3 border-t border-primary-200 pt-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-xs font-medium text-primary-600">Fallback provider</span>
+                  <Input
+                    value={fallbackProviderInput}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setFallbackProviderInput(e.target.value)
+                    }
+                    placeholder="e.g. openrouter"
+                    className="font-mono text-sm"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-medium text-primary-600">Fallback model id</span>
+                  <Input
+                    value={fallbackModelInput}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setFallbackModelInput(e.target.value)
+                    }
+                    placeholder="provider/model or model id"
+                    className="font-mono text-sm"
+                  />
+                </label>
+              </div>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-primary-600">Fallback base URL</span>
+                <Input
+                  value={fallbackBaseUrlInput}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setFallbackBaseUrlInput(e.target.value)
+                  }
+                  placeholder="Leave blank for hosted APIs"
+                  className="font-mono text-sm"
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
+
         <div className="flex justify-end pt-2">
           <Button
             size="sm"
             disabled={saving}
             onClick={() => {
+              const hasFallback =
+                fallbackProviderInput.trim() ||
+                fallbackModelInput.trim() ||
+                fallbackBaseUrlInput.trim()
               const configUpdate: Record<string, unknown> = {
                 model: modelInput.trim(),
                 provider: providerInput.trim(),
                 base_url: baseUrlInput.trim() || null,
+              }
+              if (hasFallback) {
+                configUpdate.fallback_model = {
+                  provider: fallbackProviderInput.trim(),
+                  model: fallbackModelInput.trim(),
+                  base_url: fallbackBaseUrlInput.trim() || null,
+                }
+              } else {
+                configUpdate.fallback_model = null
               }
               void saveConfig({ config: configUpdate })
             }}
@@ -1422,138 +1814,467 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="Custom Providers"
-        description="Configure a custom OpenAI-compatible endpoint."
+        description="Configure a custom OpenAI-compatible endpoint. Add named rows (with a title like Qwen3.6.Eclipse) to custom_providers; optional manifest env key and URL below only apply if you use that path."
         icon={CloudIcon}
       >
+        <div className="space-y-4 rounded-xl border border-primary-200 bg-primary-50/80 p-4">
+          <div>
+            <p className="text-sm font-medium text-primary-900">Add custom provider</p>
+            <p className="mt-1 text-xs text-primary-600">
+              <span className="font-medium">Title</span> is for your list only (e.g.{' '}
+              <span className="font-mono">Qwen3.6.Eclipse</span> = model + host).{' '}
+              <span className="font-medium">Provider id</span> is the config name Hermes uses — leave
+              blank to derive a safe id from the title. Optional row API key is stored on this
+              provider entry, not in .env.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1 md:col-span-2">
+              <span className="text-xs font-medium text-primary-600">Title</span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  value={addCpTitle}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setAddCpTitle(e.target.value)
+                  }
+                  placeholder="e.g. Qwen3.6.Eclipse"
+                  className="font-mono text-sm sm:flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() =>
+                    setAddCpTitle(
+                      suggestCustomProviderTitle(
+                        modelInput,
+                        addCpBaseUrl.trim() || baseUrlInput,
+                      ),
+                    )
+                  }
+                >
+                  Suggest from model + URL
+                </Button>
+              </div>
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-primary-600">Provider id (optional)</span>
+              <Input
+                value={addCpProviderId}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setAddCpProviderId(e.target.value)
+                }
+                placeholder="e.g. ECLIPSE"
+                className="font-mono text-sm"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-primary-600">Base URL</span>
+              <Input
+                value={addCpBaseUrl}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setAddCpBaseUrl(e.target.value)
+                }
+                placeholder="http://host:11434/v1"
+                className="font-mono text-sm"
+              />
+            </label>
+            <div className="md:col-span-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto px-0 py-0 text-xs text-primary-700 underline"
+                onClick={() => {
+                  setAddCpBaseUrl(baseUrlInput.trim())
+                  setAddCpTitle((t) =>
+                    t.trim()
+                      ? t
+                      : suggestCustomProviderTitle(modelInput, baseUrlInput.trim()),
+                  )
+                }}
+              >
+                Prefill from Model &amp; Provider above
+              </Button>
+            </div>
+            <label className="space-y-1 md:col-span-2">
+              <span className="text-xs font-medium text-primary-600">
+                Optional API key (this row only)
+              </span>
+              <Input
+                type="password"
+                value={addCpYamlKey}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setAddCpYamlKey(e.target.value)
+                }
+                placeholder="Leave blank if the server needs no key"
+                className="font-mono text-sm"
+              />
+            </label>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={saving}
+            onClick={() => submitAddCustomProviderForm()}
+          >
+            Add to custom providers list
+          </Button>
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-primary-200 bg-white/90">
+          <div className="flex flex-col gap-2 border-b border-primary-200 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-primary-700">
+              <span className="font-medium text-primary-900">Saved &amp; detected endpoints</span>
+              <span className="text-primary-600">
+                {' '}
+                (
+                {customProviders.length +
+                  (extraPrimaryNotInList ? 1 : 0) +
+                  (extraManifestNotInList ? 1 : 0)}
+                )
+              </span>
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={saving}
+              onClick={() => saveCurrentToCustomProvidersList()}
+            >
+              Save current model setup to list
+            </Button>
+          </div>
+          <table className="w-full min-w-[720px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-primary-200 bg-primary-100/70 text-left text-[11px] font-semibold uppercase tracking-wide text-primary-600">
+                <th className="px-3 py-2">Source</th>
+                <th className="px-3 py-2">Title</th>
+                <th className="px-3 py-2">Provider id</th>
+                <th className="px-3 py-2">Base URL</th>
+                <th className="px-3 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customProviders.length === 0 &&
+              !extraPrimaryNotInList &&
+              !extraManifestNotInList ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-3 py-4 text-xs leading-relaxed text-primary-600"
+                  >
+                    No rows in <span className="font-mono">custom_providers</span> yet, and no
+                    primary base URL or manifest URL was detected. Use{' '}
+                    <span className="font-medium">Add custom provider</span>, or set Model &amp;
+                    Provider and click &quot;Save current model setup to list&quot;.
+                  </td>
+                </tr>
+              ) : null}
+              {customProviders.map((raw, index) => {
+                const entry = normalizeCustomProviderEntry(raw)
+                const key = entry.name || `idx-${index}`
+                return (
+                  <tr
+                    key={`saved-${key}-${index}`}
+                    className="border-b border-primary-100 odd:bg-primary-50/40"
+                  >
+                    <td className="px-3 py-2 align-top text-xs text-primary-600">Saved</td>
+                    <td className="max-w-[160px] px-3 py-2 align-top text-xs font-medium text-primary-900 break-words">
+                      {entry.title || '—'}
+                    </td>
+                    <td className="px-3 py-2 align-top font-mono text-xs text-primary-800">
+                      {entry.name || '—'}
+                    </td>
+                    <td className="max-w-[240px] px-3 py-2 align-top font-mono text-xs text-primary-700 break-all">
+                      {entry.base_url || '—'}
+                    </td>
+                    <td className="px-3 py-2 align-top text-right">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={saving || !entry.name}
+                          onClick={() => applyCustomProviderFromList(raw)}
+                        >
+                          Apply
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-700 hover:text-red-800"
+                          disabled={saving}
+                          onClick={() => removeCustomProviderAt(index)}
+                          aria-label={`Remove ${entry.name || 'custom provider'}`}
+                        >
+                          <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.5} />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {extraPrimaryNotInList ? (
+                <tr className="border-b border-primary-100 bg-amber-50/50">
+                  <td className="px-3 py-2 align-top text-xs text-amber-900">Active (not in list)</td>
+                  <td className="max-w-[160px] px-3 py-2 align-top text-xs text-primary-800 break-words">
+                    {suggestCustomProviderTitle(modelInput, extraPrimaryNotInList.base_url)}
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono text-xs font-medium text-primary-900">
+                    {extraPrimaryNotInList.name}
+                  </td>
+                  <td className="max-w-[240px] px-3 py-2 align-top font-mono text-xs text-primary-700 break-all">
+                    {extraPrimaryNotInList.base_url}
+                  </td>
+                  <td className="px-3 py-2 align-top text-right">
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={saving}
+                        onClick={() => {
+                          setProviderInput(extraPrimaryNotInList.name)
+                          setBaseUrlInput(extraPrimaryNotInList.base_url)
+                          void fetchModelsForProvider(extraPrimaryNotInList.name)
+                        }}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={saving}
+                        onClick={() =>
+                          persistCustomProviderRow(
+                            extraPrimaryNotInList.name,
+                            extraPrimaryNotInList.base_url,
+                            {
+                              title: suggestCustomProviderTitle(
+                                modelInput,
+                                extraPrimaryNotInList.base_url,
+                              ),
+                            },
+                          )
+                        }
+                      >
+                        Add to list
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+              {extraManifestNotInList ? (
+                <tr className="border-b border-primary-100 bg-sky-50/50">
+                  <td className="px-3 py-2 align-top text-xs text-sky-900">Manifest block</td>
+                  <td className="max-w-[160px] px-3 py-2 align-top text-xs text-primary-800 break-words">
+                    {(() => {
+                      try {
+                        const h = new URL(extraManifestNotInList.base_url).hostname
+                        const short = h.split('.')[0] || h
+                        return `Manifest.${short.charAt(0).toUpperCase()}${short.slice(1).toLowerCase()}`
+                      } catch {
+                        return 'Manifest'
+                      }
+                    })()}
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono text-xs text-primary-600">
+                    (env key path)
+                  </td>
+                  <td className="max-w-[240px] px-3 py-2 align-top font-mono text-xs text-primary-700 break-all">
+                    {extraManifestNotInList.base_url}
+                  </td>
+                  <td className="px-3 py-2 align-top text-right">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => {
+                        const u = extraManifestNotInList.base_url
+                        persistCustomProviderRow(deriveCustomProviderNameFromBaseUrl(u), u, {
+                          title: (() => {
+                            try {
+                              const h = new URL(u).hostname
+                              const short = h.split('.')[0] || h
+                              return `Manifest.${short.charAt(0).toUpperCase()}${short.slice(1).toLowerCase()}`
+                            } catch {
+                              return 'Manifest'
+                            }
+                          })(),
+                        })
+                      }}
+                    >
+                      Add to list
+                    </Button>
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
         <SettingsRow
-          label="Custom OpenAI-compatible"
+          label="Manifest: CUSTOM_API_KEY"
           description={
-            data.providers.find((p) => p.envKeys.includes('CUSTOM_API_KEY'))
-              ?.configured
-              ? '✅ Configured'
-              : '❌ Not configured'
+            customApiKeyConfigured
+              ? '✅ Saved in ~/.hermes/.env for the manifest OpenAI provider.'
+              : customEndpointConfigured
+                ? '○ Not set — optional when your endpoint is local or needs no env key.'
+                : '○ Optional. Leave blank if you do not use providers.manifest + CUSTOM_API_KEY.'
           }
         >
-          <div className="flex w-full max-w-sm items-center gap-2">
-            <div className="flex-1">
-              {editingCustomKey ? (
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    value={customApiKey}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setCustomApiKey(e.target.value)
-                    }
-                    placeholder="Enter CUSTOM_API_KEY"
-                    className="flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      void saveConfig({ env: { CUSTOM_API_KEY: customApiKey } })
-                      setEditingCustomKey(false)
-                    }}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingCustomKey(false)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-xs font-mono"
-                    style={{ color: 'var(--theme-muted)' }}
-                  >
-                    {data.providers.find((p) =>
-                      p.envKeys.includes('CUSTOM_API_KEY'),
-                    )?.maskedKeys?.['CUSTOM_API_KEY'] || 'Not set'}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditingCustomKey(true)
-                      setCustomApiKey('')
-                    }}
-                  >
-                    {data.providers.find((p) =>
-                      p.envKeys.includes('CUSTOM_API_KEY'),
-                    )?.configured
-                      ? 'Change'
-                      : 'Add'}
-                  </Button>
-                </div>
-              )}
+          <div className="flex w-full max-w-sm flex-col gap-1">
+            <p className="text-[11px] text-primary-500">
+              Leave blank if unused. Add only when your manifest integration requires this key.
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                {editingCustomKey ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      type="password"
+                      value={customApiKey}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setCustomApiKey(e.target.value)
+                      }
+                      placeholder="Leave blank to clear saved key"
+                      className="min-w-[12rem] flex-1"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        void saveConfig({
+                          env: {
+                            CUSTOM_API_KEY: customApiKey.trim() ? customApiKey.trim() : null,
+                          },
+                        })
+                        setEditingCustomKey(false)
+                      }}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingCustomKey(false)}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-xs font-mono"
+                      style={{ color: 'var(--theme-muted)' }}
+                    >
+                      {customApiKeyConfigured
+                        ? customProviderCatalogEntry.maskedKeys['CUSTOM_API_KEY'] || 'Set'
+                        : 'Not set'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingCustomKey(true)
+                        setCustomApiKey('')
+                      }}
+                    >
+                      {customApiKeyConfigured ? 'Change' : 'Add'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </SettingsRow>
         <SettingsRow
-          label="Custom Base URL"
-          description={customBaseUrl ? `✅ ${customBaseUrl}` : '❌ Not configured'}
+          label="Manifest: base URL"
+          description={
+            manifestBaseUrlOnly
+              ? `✅ ${manifestBaseUrlOnly}`
+              : '○ Optional — only if you use providers.manifest (separate from primary base URL).'
+          }
         >
-          <div className="flex w-full max-w-sm items-center gap-2">
-            <div className="flex-1">
-              {editingCustomBaseUrl ? (
-                <div className="flex gap-2">
-                  <Input
-                    value={customBaseUrl}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setCustomBaseUrl(e.target.value)
-                    }
-                    placeholder="https://api.example.com/v1"
-                    className="flex-1 font-mono text-sm"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      void saveConfig({
-                        config: {
-                          model: { provider: 'manifest' },
-                          providers: {
-                            manifest: {
-                              type: 'openai',
-                              base_url: customBaseUrl,
-                              key_env: 'CUSTOM_API_KEY',
+          <div className="flex w-full max-w-sm flex-col gap-1">
+            <p className="text-[11px] text-primary-500">
+              This updates <span className="font-mono">providers.manifest</span> only. Primary model
+              base URL stays under Model &amp; Provider.
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                {editingCustomBaseUrl ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      value={customBaseUrl}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setCustomBaseUrl(e.target.value)
+                      }
+                      placeholder="http://127.0.0.1:8080/v1"
+                      className="min-w-[12rem] flex-1 font-mono text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const u = customBaseUrl.trim()
+                        if (!u) {
+                          setSaveMessage('Enter a manifest base URL, or cancel.')
+                          setTimeout(() => setSaveMessage(null), 3000)
+                          return
+                        }
+                        void saveConfig({
+                          config: {
+                            model: mergeModelForManifestSave(data.config, modelInput.trim()),
+                            providers: {
+                              manifest: {
+                                type: 'openai',
+                                base_url: u,
+                                key_env: 'CUSTOM_API_KEY',
+                              },
                             },
                           },
-                        },
-                      })
-                      setEditingCustomBaseUrl(false)
-                    }}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingCustomBaseUrl(false)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-xs font-mono"
-                    style={{ color: 'var(--theme-muted)' }}
-                  >
-                    {customBaseUrl || 'Not set'}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingCustomBaseUrl(true)}
-                  >
-                    {customBaseUrl ? 'Edit' : 'Add'}
-                  </Button>
-                </div>
-              )}
+                        })
+                        setEditingCustomBaseUrl(false)
+                      }}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingCustomBaseUrl(false)
+                        setCustomBaseUrl(manifestBaseUrlOnly)
+                      }}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-xs font-mono"
+                      style={{ color: 'var(--theme-muted)' }}
+                    >
+                      {manifestBaseUrlOnly || 'Not set'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setCustomBaseUrl(manifestBaseUrlOnly)
+                        setEditingCustomBaseUrl(true)
+                      }}
+                    >
+                      {manifestBaseUrlOnly ? 'Edit' : 'Add'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </SettingsRow>

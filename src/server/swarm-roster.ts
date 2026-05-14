@@ -6,17 +6,36 @@ import { SWARM_CANONICAL_REPO } from './swarm-environment'
 
 export const SWARM_ROSTER_PATH = join(SWARM_CANONICAL_REPO, 'swarm.yaml')
 
+const WORKER_ID_PATTERN = /^(swarm\d+|[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/i
+
+export function isSwarmWorkerId(value: unknown): value is string {
+  return typeof value === 'string' && WORKER_ID_PATTERN.test(value.trim())
+}
+
+const WorkerIdSchema = z
+  .string()
+  .trim()
+  .regex(WORKER_ID_PATTERN, 'worker id must look like swarm13 or a semantic profile id')
+
 export const SwarmRosterWorkerSchema = z.object({
-  id: z.string(),
+  id: WorkerIdSchema,
   name: z.string().default(''),
   role: z.string().default('Worker'),
   specialty: z.string().default(''),
   model: z.string().default('Worker'),
   mission: z.string().default('Awaiting orchestrator dispatch.'),
+  profile: WorkerIdSchema.optional(),
+  modes: z.array(z.string()).default([]),
+  tools: z.array(z.string()).default([]),
   skills: z.array(z.string()).default([]),
+  plugins: z.array(z.string()).default([]),
+  pluginToolsets: z.array(z.string()).default([]),
+  mcpServers: z.array(z.string()).default([]),
+  wrapper: z.string().optional(),
   capabilities: z.array(z.string()).default([]),
   defaultCwd: z.string().optional(),
   preferredTaskTypes: z.array(z.string()).default([]),
+  greenlightRequiredFor: z.array(z.string()).default([]),
   maxConcurrentTasks: z.number().int().positive().default(1),
   acceptsBroadcast: z.boolean().default(true),
   reviewRequired: z.boolean().default(false),
@@ -31,10 +50,18 @@ export type SwarmRosterWorker = z.infer<typeof SwarmRosterWorkerSchema>
 export type SwarmRoster = z.infer<typeof SwarmRosterSchema>
 
 export const SwarmRosterUpsertSchema = SwarmRosterWorkerSchema.extend({
-  id: z.string().regex(/^swarm\d+$/i, 'worker id must look like swarm13'),
+  id: WorkerIdSchema,
 })
 
 export type SwarmRosterUpsert = z.infer<typeof SwarmRosterUpsertSchema>
+
+function titleCase(value: string): string {
+  return value
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
 
 function defaultRoleFromId(id: string): string {
   const n = id.match(/(\d+)/)?.[1] ?? ''
@@ -76,6 +103,12 @@ export function fallbackRoster(ids: Array<string> = []): SwarmRoster {
       model: 'Worker',
       mission: 'Awaiting orchestrator dispatch.',
       skills: [],
+      capabilities: [],
+      defaultCwd: undefined,
+      preferredTaskTypes: [],
+      maxConcurrentTasks: 1,
+      acceptsBroadcast: true,
+      reviewRequired: false,
     })),
   }
 }
@@ -120,4 +153,17 @@ export function upsertSwarmRosterWorker(input: SwarmRosterUpsert, ids: Array<str
 
 export function rosterByWorkerId(ids: Array<string> = []): Map<string, SwarmRosterWorker> {
   return new Map(readSwarmRoster(ids).workers.map((worker) => [worker.id, worker]))
+}
+
+export function resolveSwarmWorkerDisplayName(workerId: string, worker?: Pick<SwarmRosterWorker, 'name'> | null): string {
+  return worker ? worker.name.trim() || titleCase(workerId) : titleCase(workerId)
+}
+
+export function formatSwarmWorkerLabel(
+  workerId: string,
+  worker?: Pick<SwarmRosterWorker, 'name' | 'role'> | null,
+): string {
+  const displayName = resolveSwarmWorkerDisplayName(workerId, worker)
+  const role = worker ? worker.role.trim() || defaultRoleFromId(workerId) : defaultRoleFromId(workerId)
+  return `${displayName} — ${role}`
 }

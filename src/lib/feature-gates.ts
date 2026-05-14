@@ -23,6 +23,17 @@ const FEATURE_LABELS: Record<EnhancedFeature, string> = {
   kanban: 'Kanban (Hermes plugin)',
 }
 
+const FEATURE_PROBES: Record<EnhancedFeature, Array<string>> = {
+  sessions: ['/api/sessions'],
+  skills: ['/api/gateway-status', '/api/skills'],
+  memory: ['/api/gateway-status', '/api/memory/list'],
+  config: ['/api/gateway-status', '/api/claude-config'],
+  jobs: ['/api/gateway-status', '/api/claude-jobs'],
+  mcp: ['/api/gateway-status', '/api/mcp'],
+  mcpFallback: ['/api/gateway-status', '/api/mcp'],
+  kanban: ['/api/gateway-status', '/api/swarm-kanban'],
+}
+
 function normalizeFeature(
   feature: EnhancedFeature | string,
 ): EnhancedFeature | null {
@@ -52,7 +63,11 @@ export function getFeatureLabel(feature: EnhancedFeature | string): string {
 export function getUnavailableReason(
   feature: EnhancedFeature | string,
 ): string {
-  return `${getFeatureLabel(feature)} requires a Hermes gateway that exposes the extended APIs. Check that Hermes Agent is installed and running with \`hermes gateway run\`.`
+  const normalized = normalizeFeature(feature)
+  const probes = normalized
+    ? FEATURE_PROBES[normalized].join(' or ')
+    : '/api/gateway-status'
+  return `${getFeatureLabel(feature)} is not reachable through the local Hermes Workspace probes yet. Verify ${probes} before starting another gateway; if those endpoints pass, refresh or reprobe the Workspace UI.`
 }
 
 export function createCapabilityUnavailablePayload(

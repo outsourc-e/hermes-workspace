@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -62,7 +63,7 @@ export function createTerminalSession(params: {
   const emitter = new EventEmitter()
   const sessionId = randomUUID()
 
-  const home = process.env.HOME ?? homedir() ?? '/tmp'
+  const home = process.env.HOME || homedir() || '/tmp'
   const defaultShell =
     process.platform === 'win32'
       ? 'powershell.exe'
@@ -75,6 +76,9 @@ export function createTerminalSession(params: {
   let cwd = params.cwd ?? home
   if (cwd.startsWith('~')) {
     cwd = cwd.replace('~', home)
+  }
+  if (!existsSync(cwd)) {
+    cwd = home
   }
 
   const cols = params.cols ?? 80

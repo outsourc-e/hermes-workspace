@@ -22,7 +22,11 @@ import {
 } from './utils'
 import {
   advanceStickyStreamingText,
+  createResponseWaitSnapshot,
   createOptimisticMessage,
+  isTerminalActiveRunStatus,
+  shouldClearWaitingForAssistantMessage,
+  type ResponseWaitSnapshot,
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
@@ -910,10 +914,8 @@ export function ChatScreen({
         if (!data.ok) return
         // Run not yet registered (gateway lag during silent processing) → keep waiting
         if (!data.run) return
-        const status = data.run.status
         // Treat unknown / transient statuses as still-active to avoid premature teardown
-        const terminalStatuses = ['completed', 'failed', 'cancelled', 'error']
-        if (terminalStatuses.includes(status)) {
+        if (isTerminalActiveRunStatus(data.run.status)) {
           streamFinish()
           refreshHistoryRef.current()
         }
@@ -947,10 +949,18 @@ export function ChatScreen({
   })
 
   const currentModelQuery = useQuery({
-    queryKey: ['claude', 'session-status-model'],
+    queryKey: [
+      'claude',
+      'session-status-model',
+      resolvedSessionKey || activeFriendlyId || 'main',
+    ],
     queryFn: async () => {
       try {
-        const res = await fetch('/api/session-status')
+        const statusSessionKey = resolvedSessionKey || activeFriendlyId || 'main'
+        const query = statusSessionKey
+          ? `?sessionKey=${encodeURIComponent(statusSessionKey)}`
+          : ''
+        const res = await fetch(`/api/session-status${query}`)
         if (!res.ok) return ''
         const data = await res.json()
         const payload = data.payload ?? data
@@ -1035,6 +1045,9 @@ export function ChatScreen({
     startStreaming,
     cancelStreaming,
   } = useStreamingMessage({
+    pinMainSession:
+      activeFriendlyId === 'main' &&
+      (resolvedSessionKey || activeFriendlyId || 'main') === 'main',
     onSessionResolved: useCallback(
       ({
         sessionKey,
@@ -1398,8 +1411,7 @@ export function ChatScreen({
     localStreamingMessageId,
   ])
 
-  const messageCountAtSendRef = useRef(0)
-  const lastAssistantIdAtSendRef = useRef<string | null>(null)
+  const responseWaitSnapshotRef = useRef<ResponseWaitSnapshot | null>(null)
   const prevIsRealtimeStreamingRef = useRef(activeIsRealtimeStreaming)
   const activeRealtimeStreamingRef = useRef(activeIsRealtimeStreaming)
 
@@ -1408,22 +1420,13 @@ export function ChatScreen({
   }, [activeIsRealtimeStreaming])
 
   useEffect(() => {
-    if (waitingForResponse) {
-      messageCountAtSendRef.current = finalDisplayMessages.length
-      const lastMsg = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (lastMsg?.role === 'assistant') {
-        const raw = lastMsg as Record<string, unknown>
-        lastAssistantIdAtSendRef.current = String(
-          raw.__optimisticId ??
-            raw.id ??
-            raw.messageId ??
-            raw.__realtimeSequence ??
-            '',
-        )
-      } else {
-        lastAssistantIdAtSendRef.current = null
-      }
+    if (!waitingForResponse) {
+      responseWaitSnapshotRef.current = null
+      return
     }
+    if (responseWaitSnapshotRef.current) return
+    responseWaitSnapshotRef.current =
+      createResponseWaitSnapshot(finalDisplayMessages)
   }, [waitingForResponse, finalDisplayMessages])
 
   useEffect(() => {
@@ -1434,24 +1437,9 @@ export function ChatScreen({
       }
       return
     }
-    const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-    if (!last || last.role !== 'assistant') return
-    if ((last as any).__streamingStatus === 'streaming') return
-    const countGrew =
-      finalDisplayMessages.length > messageCountAtSendRef.current
-    const raw = last as Record<string, unknown>
-    const currentId = String(
-      raw.__optimisticId ??
-        raw.id ??
-        raw.messageId ??
-        raw.__realtimeSequence ??
-        '',
-    )
-    const identityChanged =
-      currentId.length > 0 &&
-      currentId !== (lastAssistantIdAtSendRef.current ?? '')
-    const noAssistantAtSend = lastAssistantIdAtSendRef.current === null
-    if (countGrew || identityChanged || noAssistantAtSend) {
+    const snapshot = responseWaitSnapshotRef.current
+    if (!snapshot) return
+    if (shouldClearWaitingForAssistantMessage(finalDisplayMessages, snapshot)) {
       if (clearTimerRef.current) return
       clearTimerRef.current = window.setTimeout(() => {
         clearTimerRef.current = null
@@ -2701,7 +2689,10 @@ export function ChatScreen({
           {hideUi ? null : (
             <ContextBar
               sessionId={
-                activeSession?.key || activeSessionKey || resolvedSessionKey
+                resolvedSessionKey ||
+                activeCanonicalKey ||
+                activeSession?.key ||
+                activeSessionKey
               }
             />
           )}
@@ -2762,7 +2753,10 @@ export function ChatScreen({
               sessionKey={
                 isNewChat
                   ? undefined
-                  : forcedSessionKey || resolvedSessionKey || activeSessionKey
+                  : forcedSessionKey ||
+                    resolvedSessionKey ||
+                    activeCanonicalKey ||
+                    activeSessionKey
               }
               wrapperRef={composerRef}
               composerRef={composerHandleRef}

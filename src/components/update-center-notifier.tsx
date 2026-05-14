@@ -75,7 +75,7 @@ function shortSha(value: string | null | undefined): string {
 }
 
 function productDismissKey(product: ProductUpdateStatus): string {
-  return `${product.id}:${product.latestHead ?? product.version ?? 'unknown'}`
+  return `${product.id}:${product.latestHead ?? product.version}`
 }
 
 function notesId(sections: Array<ReleaseNoteSection>): string {
@@ -98,8 +98,8 @@ function storeNotes(sections: Array<ReleaseNoteSection>): Notes | null {
   try {
     const raw = localStorage.getItem(NOTES_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as Notes
-      existingId = parsed?.id ?? null
+      const parsed = JSON.parse(raw) as Partial<Notes>
+      existingId = typeof parsed.id === 'string' ? parsed.id : null
     }
   } catch {
     existingId = null
@@ -109,19 +109,6 @@ function storeNotes(sections: Array<ReleaseNoteSection>): Notes | null {
   }
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
   return notes
-}
-
-function readNotes(): Notes | null {
-  try {
-    const raw = localStorage.getItem(NOTES_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Notes
-    if (!parsed?.id || !Array.isArray(parsed.sections)) return null
-    if (localStorage.getItem(NOTES_SEEN_KEY) === parsed.id) return null
-    return parsed
-  } catch {
-    return null
-  }
 }
 
 export function UpdateCenterNotifier() {
@@ -144,7 +131,9 @@ export function UpdateCenterNotifier() {
         values.add(localStorage.getItem(key) || '')
     }
     setDismissed(values)
-    setNotes(readNotes())
+    // Do not open historical release notes on startup. Successful in-app
+    // updates still call setNotes immediately after apply, but a routine
+    // status poll should not interrupt users with stale "what changed" copy.
   }, [])
 
   const { data } = useQuery({

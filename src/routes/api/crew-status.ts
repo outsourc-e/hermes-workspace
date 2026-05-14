@@ -7,11 +7,17 @@ import { join } from 'node:path'
 import * as yaml from 'yaml'
 import { BEARER_TOKEN, CLAUDE_API, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { getClaudeRoot, getProfileClaudeHome, getWorkspaceClaudeHome } from '../../server/claude-paths'
+import { formatSwarmWorkerLabel, rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
 
 type CrewDefinition = {
   id: string
   displayName: string
+  humanLabel: string
   role: string
+  specialty?: string
+  mission?: string
+  skills?: Array<string>
+  capabilities?: Array<string>
   profilePath: string | null
 }
 
@@ -33,6 +39,22 @@ function titleCase(value: string): string {
     .join(' ')
 }
 
+function buildCrewDefinitionFromRoster(profile: string, worker: SwarmRosterWorker | null | undefined): CrewDefinition {
+  const displayName = worker?.name || titleCase(profile)
+  const role = worker?.role || 'Profile'
+  return {
+    id: profile,
+    displayName,
+    humanLabel: formatSwarmWorkerLabel(profile, worker),
+    role,
+    specialty: worker?.specialty || undefined,
+    mission: worker?.mission || undefined,
+    skills: worker?.skills?.length ? worker.skills : undefined,
+    capabilities: worker?.capabilities?.length ? worker.capabilities : undefined,
+    profilePath: profile,
+  }
+}
+
 function buildCrewDefinitions(): CrewDefinition[] {
   const profilesDir = join(getClaudeRoot(), 'profiles')
   const dynamicProfiles = existsSync(profilesDir)
@@ -51,14 +73,10 @@ function buildCrewDefinitions(): CrewDefinition[] {
         .sort()
     : []
 
+  const roster = rosterByWorkerId(dynamicProfiles)
   return [
-    { id: 'workspace', displayName: 'Workspace', role: 'Primary profile', profilePath: null },
-    ...dynamicProfiles.map((profile) => ({
-      id: profile,
-      displayName: titleCase(profile),
-      role: 'Profile',
-      profilePath: profile,
-    })),
+    { id: 'workspace', displayName: 'Workspace', humanLabel: 'Workspace — Primary profile', role: 'Primary profile', profilePath: null },
+    ...dynamicProfiles.map((profile) => buildCrewDefinitionFromRoster(profile, /^swarm\d+$/i.test(profile) ? roster.get(profile) : null)),
   ]
 }
 
@@ -246,7 +264,12 @@ export const Route = createFileRoute('/api/crew-status')({
             return {
               id: member.id,
               displayName: member.displayName,
+              humanLabel: member.humanLabel,
               role: member.role,
+              specialty: member.specialty,
+              mission: member.mission,
+              skills: member.skills,
+              capabilities: member.capabilities,
               profileFound: false,
               gatewayState: 'unknown',
               processAlive: false,
@@ -272,7 +295,12 @@ export const Route = createFileRoute('/api/crew-status')({
           return {
             id: member.id,
             displayName: member.displayName,
+            humanLabel: member.humanLabel,
             role: member.role,
+            specialty: member.specialty,
+            mission: member.mission,
+            skills: member.skills,
+            capabilities: member.capabilities,
             profileFound: true,
             gatewayState: gatewayInfo.gatewayState,
             processAlive: checkProcessAlive(gatewayInfo.pid),

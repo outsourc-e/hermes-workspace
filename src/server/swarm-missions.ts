@@ -3,8 +3,8 @@ import { dirname, join } from 'node:path'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
-export type SwarmMissionAssignmentState = 'queued' | 'dispatched' | 'checkpointed' | 'blocked' | 'needs_input' | 'reviewing' | 'done'
-export type SwarmMissionState = 'planning' | 'dispatching' | 'executing' | 'reviewing' | 'blocked' | 'complete'
+export type SwarmMissionAssignmentState = 'queued' | 'dispatched' | 'checkpointed' | 'blocked' | 'needs_input' | 'reviewing' | 'done' | 'cancelled'
+export type SwarmMissionState = 'planning' | 'dispatching' | 'executing' | 'reviewing' | 'blocked' | 'complete' | 'cancelled'
 
 export type SwarmMissionAssignment = {
   id: string
@@ -23,7 +23,7 @@ export type SwarmMissionAssignment = {
 
 export type SwarmMissionEvent = {
   id: string
-  type: 'created' | 'assignment_dispatched' | 'checkpoint' | 'continuation' | 'review' | 'blocked'
+  type: 'created' | 'assignment_dispatched' | 'checkpoint' | 'continuation' | 'review' | 'blocked' | 'assignment_cancelled' | 'mission_cancelled'
   at: number
   workerId?: string
   assignmentId?: string
@@ -118,11 +118,18 @@ function reportFromCheckpoint(input: {
 }
 
 function deriveMissionState(assignments: Array<SwarmMissionAssignment>): SwarmMissionState {
+  if (assignments.length > 0 && assignments.every((item) => item.state === 'cancelled')) return 'cancelled'
   if (assignments.some((item) => item.state === 'blocked' || item.state === 'needs_input')) return 'blocked'
-  if (assignments.length > 0 && assignments.every((item) => item.state === 'done' || (item.state === 'checkpointed' && !item.reviewRequired))) return 'complete'
+  if (assignments.length > 0 && assignments.every((item) => item.state === 'done' || item.state === 'cancelled' || (item.state === 'checkpointed' && !item.reviewRequired))) return 'complete'
   if (assignments.some((item) => item.state === 'reviewing' || (item.state === 'checkpointed' && item.reviewRequired))) return 'reviewing'
   if (assignments.some((item) => item.state === 'dispatched' || item.state === 'checkpointed')) return 'executing'
   return 'planning'
+}
+
+const TERMINAL_ASSIGNMENT_STATES = new Set<SwarmMissionAssignmentState>(['done', 'cancelled'])
+
+function isTerminalAssignment(assignment: SwarmMissionAssignment): boolean {
+  return TERMINAL_ASSIGNMENT_STATES.has(assignment.state)
 }
 
 export function listSwarmMissions(limit = 20): Array<SwarmMission> {
@@ -135,10 +142,10 @@ export function getSwarmMission(missionId: string): SwarmMission | null {
   return readStore().missions.find((mission) => mission.id === missionId) ?? null
 }
 
-export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): { archivedIds: string[]; count: number } {
+export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): { archivedIds: Array<string>; count: number } {
   const store = readStore()
   const now = Date.now()
-  const archivedIds: string[] = []
+  const archivedIds: Array<string> = []
   for (const mission of store.missions) {
     if (mission.state !== 'executing' && mission.state !== 'planning') continue
     if ((now - mission.updatedAt) < staleMs) continue
@@ -215,8 +222,10 @@ export function markMissionAssignmentDispatched(input: {
   const store = readStore()
   const mission = store.missions.find((item) => item.id === input.missionId)
   if (!mission) return null
+  if (mission.state === 'cancelled' || mission.state === 'complete') return mission
   const assignment = mission.assignments.find((item) => item.workerId === input.workerId && item.task === input.task)
   if (!assignment) return null
+  if (isTerminalAssignment(assignment)) return mission
   assignment.state = 'dispatched'
   assignment.dispatchedAt = now()
   mission.events.push(event('assignment_dispatched', `Dispatched ${assignment.id} to ${input.workerId}`, {
@@ -234,7 +243,7 @@ export function markMissionAssignmentDispatched(input: {
   return mission
 }
 
-export type RecordCheckpointResult = (SwarmMission & { _completed?: boolean }) | null
+export type RecordCheckpointResult = (SwarmMission & { _completed?: boolean; _ignoredReason?: string }) | null
 
 export function recordMissionCheckpoint(input: {
   missionId?: string | null
@@ -247,12 +256,15 @@ export function recordMissionCheckpoint(input: {
   const store = readStore()
   const mission = store.missions.find((item) => item.id === input.missionId)
   if (!mission) return null
+  if (mission.state === 'cancelled') return Object.assign(mission, { _ignoredReason: 'mission cancelled' })
   const assignment = (input.assignmentId
     ? mission.assignments.find((item) => item.id === input.assignmentId)
     : null)
     ?? [...mission.assignments].reverse().find((item) => item.workerId === input.workerId && item.state !== 'done')
     ?? [...mission.assignments].reverse().find((item) => item.workerId === input.workerId)
   if (!assignment) return null
+  if (assignment.state === 'cancelled') return Object.assign(mission, { _ignoredReason: 'assignment cancelled' })
+  if (assignment.state === 'done') return Object.assign(mission, { _ignoredReason: 'assignment done' })
   if (assignment.checkpoint?.raw === input.checkpoint.raw) {
     return Object.assign(mission, { _completed: mission.state === 'complete' })
   }
@@ -295,6 +307,7 @@ export function appendMissionContinuation(input: {
   const store = readStore()
   const mission = store.missions.find((item) => item.id === input.missionId)
   if (!mission) return null
+  if (mission.state === 'cancelled') return null
   const id = shortId('assign')
   mission.assignments.push({
     id,
@@ -322,6 +335,75 @@ export function readyQueuedAssignments(missionId: string): Array<SwarmMissionAss
   if (!mission) return []
   const doneIds = new Set(mission.assignments.filter((item) => ['checkpointed', 'done'].includes(item.state)).map((item) => item.id))
   return mission.assignments.filter((item) => item.state === 'queued' && item.dependsOn.every((id) => doneIds.has(id)))
+}
+
+export function cancelSwarmAssignment(input: {
+  missionId?: string | null
+  assignmentId?: string | null
+  workerId?: string | null
+  actor?: string | null
+  reason?: string | null
+}): { mission: SwarmMission; assignment: SwarmMissionAssignment; changed: boolean } | null {
+  if (!input.missionId) return null
+  const store = readStore()
+  const mission = store.missions.find((item) => item.id === input.missionId)
+  if (!mission) return null
+  const assignment = (input.assignmentId
+    ? mission.assignments.find((item) => item.id === input.assignmentId)
+    : null)
+    ?? (input.workerId ? [...mission.assignments].reverse().find((item) => item.workerId === input.workerId && !isTerminalAssignment(item)) : null)
+    ?? null
+  if (!assignment) return null
+  if (assignment.state === 'cancelled') return { mission, assignment, changed: false }
+  const cancelledAt = now()
+  assignment.state = 'cancelled'
+  assignment.completedAt = cancelledAt
+  assignment.reviewedAt = cancelledAt
+  assignment.reviewedBy = input.actor?.trim() || 'system-cancel'
+  mission.events.push(event('assignment_cancelled', `Cancelled ${assignment.id}${input.reason ? `: ${input.reason}` : ''}`, {
+    workerId: assignment.workerId,
+    assignmentId: assignment.id,
+    data: {
+      actor: input.actor?.trim() || 'system-cancel',
+      reason: input.reason?.trim() || null,
+    },
+  }))
+  mission.updatedAt = cancelledAt
+  mission.state = deriveMissionState(mission.assignments)
+  writeStore(store)
+  return { mission, assignment, changed: true }
+}
+
+export function cancelSwarmMission(input: {
+  missionId?: string | null
+  actor?: string | null
+  reason?: string | null
+}): { mission: SwarmMission; cancelledAssignmentIds: Array<string>; changed: boolean } | null {
+  if (!input.missionId) return null
+  const store = readStore()
+  const mission = store.missions.find((item) => item.id === input.missionId)
+  if (!mission) return null
+  const cancelledAt = now()
+  const cancelledAssignmentIds: Array<string> = []
+  for (const assignment of mission.assignments) {
+    if (isTerminalAssignment(assignment)) continue
+    assignment.state = 'cancelled'
+    assignment.completedAt = cancelledAt
+    assignment.reviewedAt = cancelledAt
+    assignment.reviewedBy = input.actor?.trim() || 'system-cancel'
+    cancelledAssignmentIds.push(assignment.id)
+  }
+  mission.state = 'cancelled'
+  mission.updatedAt = cancelledAt
+  mission.events.push(event('mission_cancelled', `Cancelled mission${input.reason ? `: ${input.reason}` : ''}`, {
+    data: {
+      actor: input.actor?.trim() || 'system-cancel',
+      reason: input.reason?.trim() || null,
+      cancelledAssignmentIds,
+    },
+  }))
+  writeStore(store)
+  return { mission, cancelledAssignmentIds, changed: cancelledAssignmentIds.length > 0 }
 }
 
 export function markMissionAssignmentReviewed(input: { missionId?: string | null; assignmentId: string; reviewerId?: string }): SwarmMission | null {

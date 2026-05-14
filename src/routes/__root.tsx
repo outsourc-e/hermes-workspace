@@ -221,11 +221,7 @@ export function wrapInlineScript(source: string): string {
 }
 
 type ServiceWorkerLike = {
-  getRegistrations: () => Promise<
-    ReadonlyArray<{
-      unregister: () => boolean | Promise<boolean> | void | Promise<void>
-    }>
-  >
+  register: (scriptURL: string, options?: RegistrationOptions) => Promise<unknown>
 }
 
 type CachesLike = {
@@ -233,28 +229,25 @@ type CachesLike = {
   delete: (name: string) => Promise<boolean> | boolean
 }
 
-export async function unregisterServiceWorkers({
+export async function registerAppServiceWorker({
   serviceWorker,
   cachesApi,
 }: {
   serviceWorker?: ServiceWorkerLike
   cachesApi?: CachesLike
 }): Promise<void> {
-  await serviceWorker
-    ?.getRegistrations()
-    .then((registrations) =>
-      Promise.allSettled(
-        registrations.map((registration) => registration.unregister()),
-      ),
-    )
-    .catch(() => undefined)
-
   await cachesApi
     ?.keys()
     .then((names) =>
       Promise.allSettled(names.map((name) => cachesApi.delete(name))),
     )
     .catch(() => undefined)
+
+  await serviceWorker
+    ?.register('/sw.js', { scope: '/' })
+    .catch((error: unknown) => {
+      console.warn('PWA service worker registration failed', error)
+    })
 }
 
 function RootLayout() {
@@ -323,7 +316,7 @@ function RootLayout() {
       handleOnboardingCompleteChanged,
     )
 
-    void unregisterServiceWorkers({
+    void registerAppServiceWorker({
       serviceWorker:
         'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
       cachesApi: 'caches' in window ? caches : undefined,

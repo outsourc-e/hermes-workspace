@@ -10,9 +10,7 @@ import {
 describe('Swarm2 surface contract', () => {
   it('keeps Aurora as the primary hub above wired operational worker cards', () => {
     expect(SWARM2_INFORMATION_HIERARCHY[0]).toContain('Status header')
-    expect(SWARM2_INFORMATION_HIERARCHY[1]).toContain(
-      'Aurora/orchestrator hub card',
-    )
+    expect(SWARM2_INFORMATION_HIERARCHY[1]).toContain('Orchestrator hub card')
     expect(SWARM2_INFORMATION_HIERARCHY[2]).toContain('Visible routing wires')
     expect(SWARM2_INFORMATION_HIERARCHY[3]).toContain(
       'Operations-style worker node cards',

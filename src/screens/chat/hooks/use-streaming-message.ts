@@ -15,15 +15,20 @@ export function shouldResolveStreamSession({
   requestedSessionKey,
   currentSessionKey,
   resolvedSessionKey,
+  pinMainSession = false,
 }: {
   requestedSessionKey: string
   currentSessionKey: string
   resolvedSessionKey: string
+  pinMainSession?: boolean
 }): boolean {
   // No change → nothing to resolve
   if (resolvedSessionKey === currentSessionKey) return false
-  // Bootstrap keys (new, main) should resolve once to a concrete session
-  if (requestedSessionKey === 'new' || requestedSessionKey === 'main') return true
+  // "new" should resolve once to a concrete session.
+  if (requestedSessionKey === 'new') return true
+  // "main" only stays pinned when the current route is intentionally bound to
+  // the portable Workspace session in zero-fork mode.
+  if (requestedSessionKey === 'main') return !pinMainSession
   // Concrete session → never promote a different backend ID
   return false
 }
@@ -66,6 +71,7 @@ type PortableHistoryMessage = {
 }
 
 type UseStreamingMessageOptions = {
+  pinMainSession?: boolean
   onStarted?: (payload: { runId: string | null }) => void
   onChunk?: (text: string, fullText: string) => void
   onComplete?: (message: ChatMessage) => void
@@ -88,6 +94,7 @@ type UseStreamingMessageOptions = {
 
 export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const {
+    pinMainSession = false,
     onStarted,
     onChunk,
     onComplete,
@@ -887,6 +894,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
               requestedSessionKey: params.sessionKey,
               currentSessionKey: activeSessionKeyRef.current,
               resolvedSessionKey,
+              pinMainSession,
             })
           ) {
             activeSessionKeyRef.current = resolvedSessionKey
@@ -986,6 +994,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             ...prev,
             isStreaming: false,
           }))
+          const abortedPhase = lifecyclePhaseRef.current as StreamLifecyclePhase
+          if (abortedPhase === 'handoff') {
+            schedulePostAcceptanceTimeout('handoff')
+            return
+          }
           onAbort?.()
           return
         }
@@ -1000,6 +1013,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       onAbort,
       onMessageAccepted,
       onSessionResolved,
+      pinMainSession,
       processEvent,
       resetActiveStreamState,
       schedulePostAcceptanceTimeout,
@@ -1007,13 +1021,22 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   )
 
   const cancelStreaming = useCallback(() => {
+    if (
+      lifecyclePhaseRef.current === 'accepted' ||
+      lifecyclePhaseRef.current === 'active' ||
+      lifecyclePhaseRef.current === 'handoff'
+    ) {
+      transitionToHandoff()
+    }
     if (eventSourceRef.current) {
       eventSourceRef.current.abort()
       eventSourceRef.current = null
     }
-    finishedRef.current = true
-    resetActiveStreamState()
-  }, [resetActiveStreamState])
+    finishedRef.current = lifecyclePhaseRef.current !== 'handoff'
+    if (lifecyclePhaseRef.current !== 'handoff') {
+      resetActiveStreamState()
+    }
+  }, [resetActiveStreamState, transitionToHandoff])
 
   const resetStreaming = useCallback(() => {
     cancelStreaming()

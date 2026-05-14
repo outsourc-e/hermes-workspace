@@ -19,8 +19,16 @@ type WorkerHealth = {
   model: string
   provider: string
   recentAuthErrors: number
+  recentFallbacks: number
   lastErrorAt: string | null
   lastErrorMessage: string | null
+  lastFallbackAt: string | null
+  lastFallbackMessage: string | null
+  modelAuthStatus: 'ready' | 'primary-auth-failed' | 'fallback-active' | 'not-configured' | 'unknown'
+  primaryAuthOk: boolean | null
+  fallbackActive: boolean
+  fallbackProvider: string | null
+  fallbackModel: string | null
 }
 
 type HealthResponse = {
@@ -33,6 +41,11 @@ type HealthResponse = {
     totalWorkers: number
     wrappersConfigured: number
     totalAuthErrors24h: number
+    totalFallbacks24h: number
+    workersUsingFallback: number
+    workersPrimaryAuthFailed: number
+    degraded: boolean
+    warnings: string[]
     distinctModels: string[]
     distinctProviders: string[]
   }
@@ -110,6 +123,9 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
   const workspaceModel = data?.workspaceModel ?? '—'
   const apiUrl = data?.agentApiUrl ?? data?.claudeApiUrl ?? '—'
   const totalAuthErrors = data?.summary.totalAuthErrors24h ?? 0
+  const totalFallbacks = data?.summary.totalFallbacks24h ?? 0
+  const degraded = data?.summary.degraded ?? false
+  const warnings = data?.summary.warnings ?? []
   const wrappersConfigured = data?.summary.wrappersConfigured ?? 0
   const totalWorkers = data?.summary.totalWorkers ?? 0
   const distinctModels = data?.summary.distinctModels ?? []
@@ -120,7 +136,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
     <div className="rounded-2xl border border-emerald-400/15 bg-[#08110d] p-4 text-emerald-50/85">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={CheckmarkCircle02Icon} size={14} className="text-emerald-300" />
+          <HugeiconsIcon icon={degraded ? AlertCircleIcon : CheckmarkCircle02Icon} size={14} className={degraded ? 'text-amber-300' : 'text-emerald-300'} />
           <span className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/80">Swarm health</span>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-emerald-100/55">
@@ -148,12 +164,22 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
         <HealthTile icon={FlashIcon} label="Provider" value={provider} />
         <HealthTile icon={FlashIcon} label="Wrappers" value={`${wrappersConfigured}/${totalWorkers}`} />
         <HealthTile
-          icon={totalAuthErrors === 0 ? CheckmarkCircle02Icon : AlertCircleIcon}
-          label="Auth errors 24h"
-          value={String(totalAuthErrors)}
-          tone={totalAuthErrors === 0 ? 'good' : 'warn'}
+          icon={totalFallbacks === 0 ? CheckmarkCircle02Icon : AlertCircleIcon}
+          label="Fallbacks 24h"
+          value={String(totalFallbacks)}
+          tone={totalFallbacks === 0 ? 'good' : 'warn'}
         />
       </div>
+
+      {degraded ? (
+        <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          <div className="font-semibold">Primary model readiness degraded.</div>
+          <div className="mt-1 text-amber-100/80">
+            Auth errors: {totalAuthErrors}. Fallbacks: {totalFallbacks}. Reply smoke tests can pass on fallback; fix primary auth before production swarm work.
+          </div>
+          {warnings.length > 0 ? <div className="mt-1 text-amber-100/70">{warnings.join(' ')}</div> : null}
+        </div>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-emerald-100/55">
         <span>Gateway: <span className="text-emerald-50">{apiUrl}</span></span>
@@ -164,8 +190,8 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-400/15 bg-emerald-500/5 px-3 py-2">
         <div className="text-[11px] text-emerald-100/70">
-          Smoke test: dispatch a tiny prompt to{' '}
-          <span className="font-semibold text-emerald-100">{pingTarget ?? 'no worker'}</span> and confirm a real reply.
+          Reply smoke test: dispatch a tiny prompt to{' '}
+          <span className="font-semibold text-emerald-100">{pingTarget ?? 'no worker'}</span>. This confirms a reply, not primary-model readiness.
         </div>
         <button
           type="button"

@@ -33,6 +33,9 @@ async function probeBackend(base: string): Promise<number> {
   try {
     const res = await fetch(base, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return 0
+    // Guard against HTML catch-all responses (route not found returns 200 HTML)
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) return -1
     const data = await res.json()
     return Array.isArray(data.tasks) ? data.tasks.length : 0
   } catch {
@@ -50,9 +53,11 @@ async function resolveBackend(): Promise<BackendResolution> {
       probeBackend(CLAUDE_BASE),
     ])
 
-    // Prefer hermes if it has data; fall back to claude if only claude has data;
-    // default to hermes when both are empty (it is the canonical store agents write to).
-    const useHermes = hermesCount >= claudeCount
+    // Prefer hermes if it has real data (> 0); fall back to claude if hermes is
+    // missing (returns -1 for non-JSON / route-not-found) or empty.
+    // Default to claude when both are empty — it is the active backend after the
+    // hermes-tasks → claude-tasks route rename (commit efcb7d14).
+    const useHermes = hermesCount > 0 && hermesCount >= claudeCount
     _resolved = {
       base: useHermes ? HERMES_BASE : CLAUDE_BASE,
       assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',

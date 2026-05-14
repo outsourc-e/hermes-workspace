@@ -30,7 +30,7 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl tini python3 \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r workspace && useradd -r -g workspace -u 10010 workspace
+    && groupadd -r workspace && useradd -r -g workspace -u 10010 -m workspace
 
 WORKDIR /app
 

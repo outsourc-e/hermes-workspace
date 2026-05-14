@@ -62,7 +62,8 @@ type TerminalSessionResponse = {
   sessionId?: string
 }
 
-const DEFAULT_TERMINAL_CWD = '~/.hermes'
+// See terminal-panel.tsx — ~/.hermes is not guaranteed to exist in the workspace image.
+const DEFAULT_TERMINAL_CWD = '~'
 const TERMINAL_BG = '#0d0d0d'
 
 function toDebugAnalysis(value: unknown): DebugAnalysis | null {
@@ -460,7 +461,7 @@ export function TerminalWorkspace({
       }
 
       // Flush any remaining buffered writes
-      if (flushTimer) clearTimeout(flushTimer)
+      clearTimeout(flushTimer as ReturnType<typeof setTimeout>)
       flushWrites()
 
       const latestTab = useTerminalPanelStore

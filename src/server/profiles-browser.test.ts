@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { listProfiles } from './profiles-browser'
+import { listProfiles, readProfile, updateProfileConfig } from './profiles-browser'
 
 describe('listProfiles', () => {
   let tempHome: string
@@ -11,6 +11,8 @@ describe('listProfiles', () => {
   beforeEach(() => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-profiles-'))
     vi.spyOn(os, 'homedir').mockReturnValue(tempHome)
+    delete process.env.HERMES_HOME
+    delete process.env.CLAUDE_HOME
   })
 
   afterEach(() => {
@@ -25,8 +27,16 @@ describe('listProfiles', () => {
 
     fs.mkdirSync(namedProfileRoot, { recursive: true })
     fs.writeFileSync(path.join(hermesRoot, 'active_profile'), 'jarvis\n', 'utf-8')
-    fs.writeFileSync(path.join(hermesRoot, 'config.yaml'), 'model: default-model\n', 'utf-8')
-    fs.writeFileSync(path.join(namedProfileRoot, 'config.yaml'), 'model: named-model\n', 'utf-8')
+    fs.writeFileSync(
+      path.join(hermesRoot, 'config.yaml'),
+      'model: default-model\ndescription: Default operator\n',
+      'utf-8',
+    )
+    fs.writeFileSync(
+      path.join(namedProfileRoot, 'config.yaml'),
+      'model: named-model\ndescription: Named operator\n',
+      'utf-8',
+    )
 
     const profiles = listProfiles()
     const names = profiles.map((profile) => profile.name)
@@ -35,5 +45,27 @@ describe('listProfiles', () => {
     expect(names).toContain('jarvis')
     expect(profiles.find((profile) => profile.name === 'default')?.active).toBe(false)
     expect(profiles.find((profile) => profile.name === 'jarvis')?.active).toBe(true)
+    expect(profiles.find((profile) => profile.name === 'default')?.description).toBe('Default operator')
+    expect(profiles.find((profile) => profile.name === 'jarvis')?.description).toBe('Named operator')
+  })
+
+  it('reads and updates profile descriptions from config.yaml', () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const profileRoot = path.join(hermesRoot, 'profiles', 'builder')
+
+    fs.mkdirSync(profileRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(profileRoot, 'config.yaml'),
+      'model: named-model\ndescription: Initial description\n',
+      'utf-8',
+    )
+
+    expect(readProfile('builder').description).toBe('Initial description')
+
+    updateProfileConfig('builder', { description: 'Updated description' })
+    expect(readProfile('builder').description).toBe('Updated description')
+
+    updateProfileConfig('builder', { description: null })
+    expect(readProfile('builder').description).toBe('')
   })
 })

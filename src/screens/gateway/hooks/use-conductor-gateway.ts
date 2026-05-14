@@ -89,7 +89,7 @@ type StreamEvent =
 
 type ConductorSpawnResponse = {
   ok?: boolean
-  mode?: 'dashboard' | 'portable'
+  mode?: 'dashboard' | 'portable' | 'native-swarm'
   prompt?: string | null
   missionId?: string | null
   sessionKey?: string | null
@@ -594,6 +594,10 @@ function isFailedMissionStatus(status: string | null): boolean {
   return status === 'failed' || status === 'error' || status === 'errored' || status === 'cancelled' || status === 'canceled'
 }
 
+function isCompletedMissionStatus(status: string | null): boolean {
+  return status === 'completed' || status === 'complete' || status === 'done' || status === 'success'
+}
+
 async function fetchConductorMission(missionId: string): Promise<ConductorMissionRecord> {
   const response = await fetch(`/api/conductor-spawn?missionId=${encodeURIComponent(missionId)}&lines=400`)
   const payload = (await response.json().catch(() => ({}))) as ConductorMissionResponse
@@ -1041,6 +1045,13 @@ export function useConductorGateway() {
       setStreamText((current) => (current === missionLog ? current : missionLog))
       lastActivityAtRef.current = Date.now()
       setTimeoutWarning(false)
+    }
+
+    if (isCompletedMissionStatus(status)) {
+      doneRef.current = true
+      setCompletedAt((value) => value ?? new Date().toISOString())
+      setPhase('complete')
+      return
     }
 
     if (isFailedMissionStatus(status)) {

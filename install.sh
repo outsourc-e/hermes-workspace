@@ -213,6 +213,47 @@ if [[ -d "$INSTALL_DIR/skills" ]]; then
   done
 fi
 
+# ─── macOS LaunchAgent (plist) ───────────────────────────────────────────
+# Best-effort convenience for local macOS installs. This keeps the source of
+# truth in-repo and makes sure launchd runs server-entry.js (the thin HTTP
+# wrapper), not dist/server/server.js directly.
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  cyan "→ Installing macOS LaunchAgent (com.hermes.workspace)…"
+
+  PLIST_TEMPLATE="$INSTALL_DIR/macos/com.hermes.workspace.plist.template"
+  PLIST_DEST="$HOME/Library/LaunchAgents/com.hermes.workspace.plist"
+  mkdir -p "$HOME/Library/LaunchAgents"
+
+  NODE_BIN="$(command -v node)"
+  HERMES_PORT="${PORT:-3000}"
+  HERMES_API_GATEWAY="http://127.0.0.1:${GATEWAY_PORT}"
+  TOKEN=""
+
+  if [[ -f "$HOME/.hermes/.env" ]]; then
+    TOKEN="$(grep -E '^(HERMES_API_TOKEN|CLAUDE_API_TOKEN)=' "$HOME/.hermes/.env" | head -1 | cut -d= -f2- | tr -d '"' || true)"
+  fi
+  if [[ -z "$TOKEN" && -f "$INSTALL_DIR/.env" ]]; then
+    TOKEN="$(grep -E '^(HERMES_API_TOKEN|CLAUDE_API_TOKEN)=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2- | tr -d '"' || true)"
+  fi
+
+  sed \
+    -e "s|{{NODE_BIN}}|${NODE_BIN}|g" \
+    -e "s|{{INSTALL_DIR}}|${INSTALL_DIR}|g" \
+    -e "s|{{PORT}}|${HERMES_PORT}|g" \
+    -e "s|{{HERMES_API_URL}}|${HERMES_API_GATEWAY}|g" \
+    -e "s|{{HERMES_API_TOKEN}}|${TOKEN}|g" \
+    "$PLIST_TEMPLATE" > "$PLIST_DEST"
+
+  launchctl unload "$PLIST_DEST" 2>/dev/null || true
+  if launchctl load -w "$PLIST_DEST" 2>/dev/null; then
+    green "  LaunchAgent loaded ✓ (com.hermes.workspace)"
+  else
+    yellow "  Could not load LaunchAgent now — it will still be available for next login."
+  fi
+  green "  Plist installed: $PLIST_DEST ✓"
+fi
+
 # ─── done ─────────────────────────────────────────────────────────────────
 
 bold ""

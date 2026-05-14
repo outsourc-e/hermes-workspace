@@ -4,6 +4,11 @@
 
 const CLAUDE_API = '/api/claude-jobs'
 
+export type JobProfileOption = {
+  name: string
+  active?: boolean
+}
+
 export type ClaudeJob = {
   id: string
   name: string
@@ -23,6 +28,9 @@ export type ClaudeJob = {
   skills?: Array<string>
   repeat?: { times?: number; completed?: number }
   run_count?: number
+  profile?: string
+  profile_name?: string
+  jobId?: string
 }
 
 export type HermesJob = ClaudeJob
@@ -56,7 +64,9 @@ export function findJobById(
 }
 
 export function normalizeJobState(state: unknown): string | null {
-  return typeof state === 'string' && state.trim() ? state.trim().toLowerCase() : null
+  return typeof state === 'string' && state.trim()
+    ? state.trim().toLowerCase()
+    : null
 }
 
 export function isFailedJobState(state: unknown): boolean {
@@ -89,7 +99,8 @@ export function getLatestJobOutputText(outputs: Array<JobOutput>): string {
   let latestTimestamp = Number.NEGATIVE_INFINITY
 
   for (const output of outputs) {
-    const content = typeof output.content === 'string' ? output.content.trim() : ''
+    const content =
+      typeof output.content === 'string' ? output.content.trim() : ''
     if (!content) continue
 
     const timestamp = new Date(output.timestamp).getTime()
@@ -102,7 +113,9 @@ export function getLatestJobOutputText(outputs: Array<JobOutput>): string {
   return latestContent
 }
 
-export function getJobErrorText(job: ClaudeJob | null | undefined): string | null {
+export function getJobErrorText(
+  job: ClaudeJob | null | undefined,
+): string | null {
   if (!job) return null
 
   const candidates = [job.last_run_error, job.error]
@@ -116,7 +129,7 @@ export function getJobErrorText(job: ClaudeJob | null | undefined): string | nul
 }
 
 export async function fetchJobs(): Promise<Array<ClaudeJob>> {
-  const res = await fetch(`${CLAUDE_API}?include_disabled=true`)
+  const res = await fetch(`${CLAUDE_API}?include_disabled=true&profiles=all`)
   if (!res.ok) throw new Error(`Failed to fetch jobs: ${res.status}`)
   const data = await res.json()
   return normalizeJobsResponse(data)
@@ -139,8 +152,9 @@ function errorMessageFromBody(body: unknown, fallback: string): string {
         .map((item) => {
           if (typeof item === 'string') return item
           if (item && typeof item === 'object') {
-            const msg = (item as { msg?: unknown; message?: unknown }).msg
-              ?? (item as { message?: unknown }).message
+            const msg =
+              (item as { msg?: unknown; message?: unknown }).msg ??
+              (item as { message?: unknown }).message
             if (typeof msg === 'string') return msg
           }
           return JSON.stringify(item)
@@ -166,17 +180,32 @@ type JobMutationInput = {
   schedule: string
   prompt: string
   name?: string
-  deliver?: Array<string>
+  deliver?: string | Array<string>
   skills?: Array<string>
   repeat?: number
+  profile?: string
 }
 
-export function buildJobMutationPayload(input: JobMutationInput): JobMutationInput & { input: string } {
+function serializeDeliveryTargets(deliver?: string | Array<string>): string | undefined {
+  if (typeof deliver === 'string') {
+    const normalized = deliver.trim()
+    return normalized || undefined
+  }
+  if (!Array.isArray(deliver)) return undefined
+  const normalized = deliver.map((value) => value.trim()).filter(Boolean)
+  return normalized.length > 0 ? normalized.join(',') : undefined
+}
+
+export function buildJobMutationPayload(
+  input: JobMutationInput,
+): JobMutationInput & { input: string; deliver?: string } {
   const prompt = typeof input.prompt === 'string' ? input.prompt : ''
+  const deliver = serializeDeliveryTargets(input.deliver)
   return {
     ...input,
     prompt,
     input: prompt,
+    deliver,
   }
 }
 
@@ -188,7 +217,9 @@ export async function createJob(input: JobMutationInput): Promise<ClaudeJob> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(errorMessageFromBody(body, `Failed to create job: ${res.status}`))
+    throw new Error(
+      errorMessageFromBody(body, `Failed to create job: ${res.status}`),
+    )
   }
   return (await res.json()).job
 }
@@ -197,10 +228,17 @@ export async function updateJob(
   jobId: string,
   updates: Record<string, unknown>,
 ): Promise<ClaudeJob> {
-  const payload =
-    typeof updates.prompt === 'string'
-      ? { ...updates, input: updates.prompt }
-      : updates
+  const payload = {
+    ...updates,
+    ...(typeof updates.prompt === 'string' ? { input: updates.prompt } : {}),
+    ...(Object.prototype.hasOwnProperty.call(updates, 'deliver')
+      ? {
+          deliver: serializeDeliveryTargets(
+            (updates as { deliver?: string | Array<string> }).deliver,
+          ),
+        }
+      : {}),
+  }
   const res = await fetch(`${CLAUDE_API}/${jobId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -208,7 +246,9 @@ export async function updateJob(
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(errorMessageFromBody(body, `Failed to update job: ${res.status}`))
+    throw new Error(
+      errorMessageFromBody(body, `Failed to update job: ${res.status}`),
+    )
   }
   return (await res.json()).job
 }
@@ -217,7 +257,9 @@ export async function deleteJob(jobId: string): Promise<void> {
   const res = await fetch(`${CLAUDE_API}/${jobId}`, { method: 'DELETE' })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(errorMessageFromBody(body, `Failed to delete job: ${res.status}`))
+    throw new Error(
+      errorMessageFromBody(body, `Failed to delete job: ${res.status}`),
+    )
   }
 }
 
@@ -227,7 +269,9 @@ export async function pauseJob(jobId: string): Promise<ClaudeJob> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(errorMessageFromBody(body, `Failed to pause job: ${res.status}`))
+    throw new Error(
+      errorMessageFromBody(body, `Failed to pause job: ${res.status}`),
+    )
   }
   return (await res.json()).job
 }
@@ -238,7 +282,9 @@ export async function resumeJob(jobId: string): Promise<ClaudeJob> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(errorMessageFromBody(body, `Failed to resume job: ${res.status}`))
+    throw new Error(
+      errorMessageFromBody(body, `Failed to resume job: ${res.status}`),
+    )
   }
   return (await res.json()).job
 }
@@ -249,9 +295,33 @@ export async function triggerJob(jobId: string): Promise<ClaudeJob> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(errorMessageFromBody(body, `Failed to trigger job: ${res.status}`))
+    throw new Error(
+      errorMessageFromBody(body, `Failed to trigger job: ${res.status}`),
+    )
   }
   return (await res.json()).job
+}
+
+export async function fetchJobProfiles(): Promise<Array<JobProfileOption>> {
+  const res = await fetch('/api/profiles/list')
+  if (!res.ok) throw new Error(`Failed to fetch profiles: ${res.status}`)
+  const cronProfileNamePattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
+  const data = (await res.json()) as {
+    profiles?: Array<{ name?: unknown; active?: unknown; exists?: unknown }>
+  }
+  return Array.isArray(data.profiles)
+    ? data.profiles
+        .map((profile) => ({
+          name: typeof profile.name === 'string' ? profile.name : '',
+          active: profile.active === true,
+          exists: profile.exists !== false,
+        }))
+        .filter(
+          (profile) =>
+            profile.exists && cronProfileNamePattern.test(profile.name),
+        )
+        .map(({ name, active }) => ({ name, active }))
+    : []
 }
 
 export async function fetchJobOutput(

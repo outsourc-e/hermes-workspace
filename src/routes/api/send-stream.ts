@@ -24,12 +24,9 @@ import {
 import { getChatMode } from '../../server/gateway-capabilities'
 import { ensureLocalSession, appendLocalMessage, getLocalMessages, touchLocalSession } from '../../server/local-session-store'
 import { getLocalProviderDef, getDiscoveredModels } from '../../server/local-provider-discovery'
-import {
-  
-  
-  openaiChat
-} from '../../server/openai-compat-api'
+import { openaiChat } from '../../server/openai-compat-api'
 import { streamResponses } from '../../server/responses-api'
+import { selectPortableConversationHistory } from '../../server/portable-history'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   createSession,
@@ -528,9 +525,13 @@ export const Route = createFileRoute('/api/send-stream')({
                   const localeSystemMsg: Array<OpenAICompatMessage> = locale && locale !== 'en'
                     ? [{ role: 'system', content: `Respond in ${locale === 'es' ? 'Spanish' : locale === 'fr' ? 'French' : locale === 'zh' ? 'Chinese' : locale === 'de' ? 'German' : locale === 'ja' ? 'Japanese' : locale === 'ko' ? 'Korean' : locale === 'pt' ? 'Portuguese' : locale === 'ru' ? 'Russian' : locale === 'ar' ? 'Arabic' : 'English'}. The user's interface is set to this language.` }]
                     : []
-                  // Load persisted history for this session, then append user message
+                  // Load persisted history for this session, then append user message.
+                  // When the gateway can bind portable chat to a server-side session
+                  // via X-Claude-Session-Id, replaying the entire local transcript on
+                  // every turn duplicates prompt context and can trip model limits
+                  // on otherwise simple tasks (#405).
                   const persistedMessages = getLocalMessages(portableSessionKey)
-                  const persistedHistory = persistedMessages.map(m => ({
+                  const persistedHistory = persistedMessages.map((m) => ({
                     role: m.role as 'user' | 'assistant' | 'system',
                     content: m.content,
                   }))
@@ -541,8 +542,11 @@ export const Route = createFileRoute('/api/send-stream')({
                     content: typeof body.message === 'string' ? body.message : '',
                     timestamp: Date.now(),
                   })
-                  // Use persisted history if available, otherwise fall back to client-sent history
-                  const effectiveHistory = persistedHistory.length > 0 ? persistedHistory : history
+                  const effectiveHistory = selectPortableConversationHistory(
+                    persistedHistory,
+                    history,
+                    { localBaseUrl },
+                  )
                   const portableMessages: Array<OpenAICompatMessage> = [
                     ...localeSystemMsg,
                     ...effectiveHistory,

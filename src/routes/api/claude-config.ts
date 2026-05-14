@@ -305,7 +305,7 @@ export const Route = createFileRoute('/api/claude-config')({
 
         return Response.json({
           ok: true,
-          message: 'Config updated. Restart Claude to apply changes.',
+          message: 'Config updated. Restart Hermes Agent to apply changes.',
         })
       },
     },

@@ -1,36 +1,42 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProfilesDir } from '../../server/claude-paths'
 import {
+
+
+
+
+
+
+
+
+
+
+
   buildSwarmDispatchMetadata,
   buildSwarmSessionMetadata,
   getSwarmTmuxSessionName,
   getSwarmWrapperPath,
   listSwarmWorkerIds,
-  readSwarmRuntimeFile,
-  type SwarmArtifactMetadata,
-  type SwarmBoundary,
-  type SwarmCheckpointStatus,
-  type SwarmDispatchMetadata,
-  type SwarmLifecycleMetadata,
-  type SwarmPreviewMetadata,
-  type SwarmRuntimeSource,
-  type SwarmSessionMetadata,
-  type SwarmTaskMetadata,
-  type SwarmTerminalKind,
-  type SwarmWorkerState,
+  readSwarmRuntimeFile
 } from '../../server/swarm-foundation'
-import { rosterByWorkerId } from '../../server/swarm-roster'
+import { formatSwarmWorkerLabel, resolveSwarmWorkerDisplayName, rosterByWorkerId } from '../../server/swarm-roster'
 import { readSwarmMode, writeSwarmMode } from '../../server/swarm-mode'
+import type {SwarmArtifactMetadata, SwarmBoundary, SwarmCheckpointStatus, SwarmDispatchMetadata, SwarmLifecycleMetadata, SwarmPreviewMetadata, SwarmRuntimeSource, SwarmSessionMetadata, SwarmTaskMetadata, SwarmTerminalKind, SwarmWorkerState} from '../../server/swarm-foundation';
 
 type RuntimeEntry = {
   workerId: string
   displayName: string
+  humanLabel: string
   role: string
+  specialty: string | null
+  mission: string | null
+  skills: Array<string>
+  capabilities: Array<string>
   source: SwarmRuntimeSource
   pid: number | null
   startedAt: number | null
@@ -66,15 +72,7 @@ type RuntimeEntry = {
   previews: Array<SwarmPreviewMetadata>
 }
 
-function titleCase(value: string): string {
-  return value
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
-function listWorkerIds(): string[] {
+function listWorkerIds(): Array<string> {
   return listSwarmWorkerIds()
 }
 
@@ -188,8 +186,13 @@ async function buildEntry(
 
   return {
     workerId,
-    displayName: roster?.name || titleCase(workerId),
+    displayName: resolveSwarmWorkerDisplayName(workerId, roster),
+    humanLabel: formatSwarmWorkerLabel(workerId, roster),
     role: roster?.role || runtime.role,
+    specialty: roster?.specialty || null,
+    mission: roster?.mission || null,
+    skills: roster.skills.length ? roster.skills : [],
+    capabilities: roster.capabilities.length ? roster.capabilities : [],
     source,
     pid: lifecycle.pid,
     startedAt: runtime.startedAt,

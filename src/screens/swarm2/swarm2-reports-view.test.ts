@@ -123,4 +123,37 @@ describe('Swarm2 reports view model', () => {
     expect(rows[0].stateLabel).toBe('Blocked')
     expect(rows[0].summary).toBe('Missing token')
   })
+
+  it('does not classify BLOCKER: none checkpoints as blocked', () => {
+    const rows = buildSwarm2ReportRows({
+      missions: [
+        {
+          id: 'mission-3',
+          title: 'Completed mission',
+          state: 'complete',
+          updatedAt: 300,
+          assignments: [
+            {
+              id: 'assign-3',
+              workerId: 'swarm8',
+              task: 'Ship patch',
+              state: 'done',
+              reviewRequired: false,
+              checkpoint: {
+                stateLabel: 'DONE',
+                checkpointStatus: 'done',
+                result: 'Patch shipped',
+                blocker: 'none',
+              },
+            },
+          ],
+        },
+      ],
+      runtimes: [],
+    })
+
+    expect(rows[0].state).toBe('ready')
+    expect(rows[0].stateLabel).toBe('Ready')
+    expect(rows[0].summary).toBe('Patch shipped')
+  })
 })

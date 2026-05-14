@@ -1,29 +1,60 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
 import * as yaml from 'yaml'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getLocalBinDir, getProfilesDir } from '../../server/claude-paths'
+import { formatSwarmWorkerLabel, isSwarmWorkerId, resolveSwarmWorkerDisplayName, rosterByWorkerId } from '../../server/swarm-roster'
 
-type WorkerHealth = {
+export type WorkerModelAuthStatus = 'ready' | 'primary-auth-failed' | 'fallback-active' | 'not-configured' | 'unknown'
+
+export type WorkerHealth = {
   workerId: string
+  displayName: string
+  humanLabel: string
+  role: string
+  specialty: string | null
+  mission: string | null
+  skills: Array<string>
+  capabilities: Array<string>
   profileFound: boolean
   wrapperFound: boolean
   model: string
   provider: string
   recentAuthErrors: number
+  recentFallbacks: number
   lastErrorAt: string | null
   lastErrorMessage: string | null
+  lastFallbackAt: string | null
+  lastFallbackMessage: string | null
+  modelAuthStatus: WorkerModelAuthStatus
+  primaryAuthOk: boolean | null
+  fallbackActive: boolean
+  fallbackProvider: string | null
+  fallbackModel: string | null
 }
 
-function listSwarmIds(): string[] {
+export type SwarmHealthSummary = {
+  totalWorkers: number
+  wrappersConfigured: number
+  totalAuthErrors24h: number
+  totalFallbacks24h: number
+  workersUsingFallback: number
+  workersPrimaryAuthFailed: number
+  distinctModels: Array<string>
+  distinctProviders: Array<string>
+  degraded: boolean
+  warnings: Array<string>
+}
+
+function listSwarmIds(): Array<string> {
   const dir = getProfilesDir()
   if (!existsSync(dir)) return []
   return readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .filter((name) => /^swarm\d+$/i.test(name))
+    .filter((name) => isSwarmWorkerId(name))
     .sort()
 }
 
@@ -49,7 +80,6 @@ function readWorkerConfig(profilePath: string): { model: string; provider: strin
   }
 }
 
-
 function formatModelDisplay(model: string, provider: string): string {
   const value = `${model} ${provider}`.toLowerCase()
   if (value.includes('claude-opus-4-7') || value.includes('opus-4-7')) return 'Opus 4.7'
@@ -68,41 +98,126 @@ function formatProviderDisplay(provider: string): string {
   return provider.replace(/^custom:/, '').replace(/[-_]/g, ' ')
 }
 
-function scanRecentAuthErrors(profilePath: string): {
-  count: number
-  lastAt: string | null
-  lastMessage: string | null
+export function parseModelAuthEventsFromText(text: string): {
+  authErrorCount: number
+  fallbackCount: number
+  lastAuthErrorAt: string | null
+  lastAuthErrorMessage: string | null
+  lastFallbackAt: string | null
+  lastFallbackMessage: string | null
+  fallbackProvider: string | null
+  fallbackModel: string | null
+  modelAuthStatus: WorkerModelAuthStatus
+  primaryAuthOk: boolean | null
 } {
+  const authPatterns = [
+    /primary provider auth failed/i,
+    /no codex credentials/i,
+    /no .*oauth token found/i,
+    /copilot token validation failed/i,
+    /classic pat|classic personal access token/i,
+    /\b401\b/i,
+    /\bunauthorized\b/i,
+    /\bauthentication\b/i,
+  ]
+  const fallbackPatterns = [
+    /falling through to fallback:\s*([^/\s]+)\/([^\s]+)/i,
+    /fallback:\s*([^/\s]+)\/([^\s]+)/i,
+  ]
+  let authErrorCount = 0
+  let fallbackCount = 0
+  let lastAuthErrorAt: string | null = null
+  let lastAuthErrorMessage: string | null = null
+  let lastFallbackAt: string | null = null
+  let lastFallbackMessage: string | null = null
+  let fallbackProvider: string | null = null
+  let fallbackModel: string | null = null
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue
+    const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:,\d{3})?/)
+    const ts = tsMatch?.[1] ?? null
+    if (authPatterns.some((pattern) => pattern.test(line))) {
+      authErrorCount += 1
+      lastAuthErrorAt = ts
+      lastAuthErrorMessage = line.slice(0, 320)
+    }
+    for (const pattern of fallbackPatterns) {
+      const match = line.match(pattern)
+      if (!match) continue
+      fallbackCount += 1
+      fallbackProvider = match[1]
+      fallbackModel = match[2]
+      lastFallbackAt = ts
+      lastFallbackMessage = line.slice(0, 320)
+      break
+    }
+  }
+  const fallbackActive = fallbackCount > 0
+  const authFailed = authErrorCount > 0
+  return {
+    authErrorCount,
+    fallbackCount,
+    lastAuthErrorAt,
+    lastAuthErrorMessage,
+    lastFallbackAt,
+    lastFallbackMessage,
+    fallbackProvider,
+    fallbackModel,
+    modelAuthStatus: fallbackActive ? 'fallback-active' : authFailed ? 'primary-auth-failed' : 'unknown',
+    primaryAuthOk: authFailed || fallbackActive ? false : null,
+  }
+}
+
+function scanRecentAuthErrors(profilePath: string): ReturnType<typeof parseModelAuthEventsFromText> {
   const errorsLog = join(profilePath, 'logs', 'errors.log')
-  if (!existsSync(errorsLog)) return { count: 0, lastAt: null, lastMessage: null }
+  if (!existsSync(errorsLog)) {
+    return parseModelAuthEventsFromText('')
+  }
   try {
-    const stat = statSync(errorsLog)
     const buffer = readFileSync(errorsLog, 'utf-8')
     const tail = buffer.length > 64_000 ? buffer.slice(-64_000) : buffer
-    const lines = tail.split('\n')
-    const cutoffMs = Date.now() - 24 * 60 * 60 * 1000
-    let count = 0
-    let lastAt: string | null = null
-    let lastMessage: string | null = null
-    for (const line of lines) {
-      if (!line.includes('401') && !line.toLowerCase().includes('authentication')) continue
-      const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/)
-      if (!tsMatch) continue
-      const ts = new Date(tsMatch[1].replace(' ', 'T') + 'Z')
-      if (Number.isFinite(ts.getTime()) && ts.getTime() < cutoffMs) continue
-      count += 1
-      lastAt = tsMatch[1]
-      lastMessage = line.slice(0, 320)
-    }
-    if (count === 0) {
-      // Honor last-modified file timestamp as a hint if no parseable lines but file changed recently.
-      if (Date.now() - stat.mtimeMs < 24 * 60 * 60 * 1000) {
-        // Leave count 0; UI shows fresh log activity separately if needed.
-      }
-    }
-    return { count, lastAt, lastMessage }
+    return parseModelAuthEventsFromText(tail)
   } catch {
-    return { count: 0, lastAt: null, lastMessage: null }
+    return parseModelAuthEventsFromText('')
+  }
+}
+
+export function summarizeSwarmHealth(workers: Array<WorkerHealth>): SwarmHealthSummary {
+  const totalAuthErrors = workers.reduce((sum, worker) => sum + worker.recentAuthErrors, 0)
+  const totalFallbacks = workers.reduce((sum, worker) => sum + worker.recentFallbacks, 0)
+  const workersUsingFallback = workers.filter((worker) => worker.fallbackActive).length
+  const workersPrimaryAuthFailed = workers.filter((worker) => worker.primaryAuthOk === false || worker.modelAuthStatus === 'primary-auth-failed' || worker.modelAuthStatus === 'fallback-active').length
+  const distinctModels = Array.from(new Set(workers.map((w) => formatModelDisplay(w.model, w.provider)))).filter((value) => value !== 'unknown')
+  const distinctProviders = Array.from(new Set(workers.map((w) => formatProviderDisplay(w.provider)))).filter((value) => value !== 'unknown')
+  const warnings: Array<string> = []
+  if (workersUsingFallback > 0) warnings.push(`${workersUsingFallback} worker(s) used fallback model; primary model auth is degraded.`)
+  if (workersPrimaryAuthFailed > 0) warnings.push(`${workersPrimaryAuthFailed} worker(s) have primary auth failures.`)
+  return {
+    totalWorkers: workers.length,
+    wrappersConfigured: workers.filter((w) => w.wrapperFound).length,
+    totalAuthErrors24h: totalAuthErrors,
+    totalFallbacks24h: totalFallbacks,
+    workersUsingFallback,
+    workersPrimaryAuthFailed,
+    distinctModels,
+    distinctProviders,
+    degraded: totalAuthErrors > 0 || totalFallbacks > 0 || workersPrimaryAuthFailed > 0,
+    warnings,
+  }
+}
+
+function hasOpenAiCodexAuth(profilePath: string): boolean {
+  const authPath = join(profilePath, 'auth.json')
+  if (!existsSync(authPath)) return false
+  try {
+    const raw = JSON.parse(readFileSync(authPath, 'utf-8')) as Record<string, unknown>
+    const providers = raw.providers && typeof raw.providers === 'object' ? raw.providers as Record<string, unknown> : raw
+    const codex = providers['openai-codex']
+    if (!codex || typeof codex !== 'object') return false
+    const tokens = (codex as Record<string, unknown>).tokens
+    return Boolean(tokens && typeof tokens === 'object' && (tokens as Record<string, unknown>).access_token && (tokens as Record<string, unknown>).refresh_token)
+  } catch {
+    return false
   }
 }
 
@@ -119,27 +234,43 @@ export const Route = createFileRoute('/api/swarm-health')({
         const profilesBase = getProfilesDir()
         const swarmIds = listSwarmIds()
         const wrapperBase = getLocalBinDir()
+        const roster = rosterByWorkerId(swarmIds)
 
-        const workers: WorkerHealth[] = swarmIds.map((id) => {
+        const workers: Array<WorkerHealth> = swarmIds.map((id) => {
+          const worker = roster.get(id)
           const profilePath = join(profilesBase, id)
           const wrapperPath = join(wrapperBase, id)
           const config = readWorkerConfig(profilePath)
           const errs = scanRecentAuthErrors(profilePath)
+          const primaryReady = errs.authErrorCount === 0 && errs.fallbackCount === 0 && (config.provider !== 'openai-codex' || hasOpenAiCodexAuth(profilePath))
           return {
             workerId: id,
+            displayName: resolveSwarmWorkerDisplayName(id, worker),
+            humanLabel: formatSwarmWorkerLabel(id, worker),
+            role: worker?.role?.trim() || 'Worker',
+            specialty: worker?.specialty?.trim() || null,
+            mission: worker?.mission?.trim() || null,
+            skills: worker?.skills?.length ? worker.skills : [],
+            capabilities: worker?.capabilities?.length ? worker.capabilities : [],
             profileFound: existsSync(profilePath),
             wrapperFound: existsSync(wrapperPath),
             model: config.model,
             provider: config.provider,
-            recentAuthErrors: errs.count,
-            lastErrorAt: errs.lastAt,
-            lastErrorMessage: errs.lastMessage,
+            recentAuthErrors: errs.authErrorCount,
+            recentFallbacks: errs.fallbackCount,
+            lastErrorAt: errs.lastAuthErrorAt,
+            lastErrorMessage: errs.lastAuthErrorMessage,
+            lastFallbackAt: errs.lastFallbackAt,
+            lastFallbackMessage: errs.lastFallbackMessage,
+            modelAuthStatus: primaryReady ? 'ready' : errs.modelAuthStatus,
+            primaryAuthOk: primaryReady ? true : errs.primaryAuthOk,
+            fallbackActive: errs.fallbackCount > 0,
+            fallbackProvider: errs.fallbackProvider,
+            fallbackModel: errs.fallbackModel,
           }
         })
 
-        const totalAuthErrors = workers.reduce((sum, worker) => sum + worker.recentAuthErrors, 0)
-        const distinctModels = Array.from(new Set(workers.map((w) => formatModelDisplay(w.model, w.provider)))).filter((value) => value !== 'unknown')
-        const distinctProviders = Array.from(new Set(workers.map((w) => formatProviderDisplay(w.provider)))).filter((value) => value !== 'unknown')
+        const summary = summarizeSwarmHealth(workers)
 
         return json({
           checkedAt: Date.now(),
@@ -147,13 +278,7 @@ export const Route = createFileRoute('/api/swarm-health')({
           agentApiUrl: apiUrl,
           claudeApiUrl: apiUrl,
           workers,
-          summary: {
-            totalWorkers: workers.length,
-            wrappersConfigured: workers.filter((w) => w.wrapperFound).length,
-            totalAuthErrors24h: totalAuthErrors,
-            distinctModels,
-            distinctProviders,
-          },
+          summary,
         })
       },
     },

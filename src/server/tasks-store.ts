@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
+export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done' | 'deleted'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
 export type TaskRecord = {
@@ -19,6 +19,7 @@ export type TaskRecord = {
   created_by: string
   created_at: string
   updated_at: string
+  session_id?: string | null
 }
 
 type TaskFile = { tasks: TaskRecord[] }
@@ -74,6 +75,7 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     created_by: task.created_by,
     created_at: task.created_at,
     updated_at: task.updated_at,
+    session_id: task.session_id ?? null,
   }
 }
 
@@ -151,4 +153,8 @@ export function deleteTask(taskId: string): boolean {
   if (nextTasks.length === file.tasks.length) return false
   writeTaskFile({ tasks: nextTasks.map((task) => normalizeTask(task as TaskRecord)) })
   return true
+}
+
+export function linkTaskSession(taskId: string, sessionId: string | null): TaskRecord | null {
+  return updateTask(taskId, { session_id: sessionId })
 }

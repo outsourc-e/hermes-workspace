@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import * as YAML from 'yaml'
 import { z } from 'zod'
 import { getLocalBinDir, getProfilesDir } from './claude-paths'
+import { isSwarmWorkerId } from './swarm-roster'
 
 export const SwarmWorkerStateSchema = z.enum([
   'idle',
@@ -456,7 +457,7 @@ export function listSwarmWorkerIds(options?: { swarmOnly?: boolean }): Array<str
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .filter((name) => (options?.swarmOnly ?? false ? /^swarm\d+$/i.test(name) : true))
+    .filter((name) => (options?.swarmOnly ?? false ? isSwarmWorkerId(name) : true))
     .sort()
 }
 

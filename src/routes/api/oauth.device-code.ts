@@ -3,7 +3,7 @@ import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 
 const BodySchema = z.object({
-  provider: z.string(),
+  provider: z.string().min(1),
 })
 
 export const Route = createFileRoute('/api/oauth/device-code')({

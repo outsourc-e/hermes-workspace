@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -17,11 +17,14 @@ import {
   updateTask,
   deleteTask,
   moveTask,
+  launchSession,
+  linkSession,
   COLUMN_LABELS,
   COLUMN_ORDER,
   COLUMN_COLORS,
   isOverdue,
 } from '@/lib/tasks-api'
+import { stashPendingSend } from '@/screens/chat/pending-send'
 import type { ClaudeTask, TaskColumn, CreateTaskInput, TaskAssignee } from '@/lib/tasks-api'
 
 const QUERY_KEY = ['claude', 'tasks'] as const
@@ -54,6 +57,7 @@ export function TasksScreen() {
   const [showDone, setShowDone] = useState(false)
 
   const search = useSearch({ from: '/tasks' })
+  const navigate = useNavigate()
   const initialAssignee = typeof search.assignee === 'string' ? search.assignee : null
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee)
 
@@ -85,7 +89,7 @@ export function TasksScreen() {
 
   const tasksByColumn = useMemo(() => {
     const map: Record<TaskColumn, Array<ClaudeTask>> = {
-      backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [],
+      backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [], deleted: [],
     }
     for (const t of tasks) {
       if (assigneeFilter && t.assignee !== assigneeFilter) continue

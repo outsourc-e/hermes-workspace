@@ -1,42 +1,51 @@
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
+import { dashboardFetch } from '../../server/gateway-capabilities'
 
 const BodySchema = z.object({
-  provider: z.string(),
-  deviceCode: z.string(),
+  provider: z.string().min(1),
+  deviceCode: z.string().min(1),
 })
 
-function saveNousTokens(accessToken: string, refreshToken?: string) {
-  const claudeDir =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-  const authPath = path.join(claudeDir, 'auth.json')
+type DashboardOAuthPollResponse = {
+  status?: unknown
+  error_message?: unknown
+  message?: unknown
+}
 
-  let existing: Record<string, unknown> = {}
-  try {
-    existing = JSON.parse(fs.readFileSync(authPath, 'utf8'))
-  } catch {
-    // File doesn't exist or is invalid — start fresh
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+// Dashboard OAuth poll statuses we forward as still-in-flight. `slow_down` and
+// `authorization_pending` are RFC 8628 device-flow intermediate states; the
+// dashboard relays them through, and treating them as errors halts polling
+// prematurely.
+const PENDING_STATUSES = new Set(['pending', 'authorization_pending', 'slow_down'])
+
+export function mapDashboardOAuthPoll(data: DashboardOAuthPollResponse) {
+  const status = readString(data.status)
+  if (status === 'approved') return { status: 'success' }
+  if (PENDING_STATUSES.has(status)) return { status: 'pending' }
+
+  return {
+    status: 'error',
+    message:
+      readString(data.error_message) ||
+      readString(data.message) ||
+      (status ? `OAuth ${status}` : 'OAuth authorization failed'),
   }
+}
 
-  const providers = (existing.providers as Record<string, unknown>) || {}
-  providers['nous'] = {
-    access_token: accessToken,
-    refresh_token: refreshToken || null,
-    saved_at: new Date().toISOString(),
+function readError(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>
+    if (typeof record.detail === 'string') return record.detail
+    if (typeof record.error === 'string') return record.error
+    if (typeof record.message === 'string') return record.message
   }
-
-  const updated = {
-    ...existing,
-    providers,
-    active_provider: 'nous',
-  }
-
-  fs.mkdirSync(claudeDir, { recursive: true })
-  fs.writeFileSync(authPath, JSON.stringify(updated, null, 2), 'utf8')
+  return fallback
 }
 
 export const Route = createFileRoute('/api/oauth/poll-token')({
@@ -58,70 +67,29 @@ export const Route = createFileRoute('/api/oauth/poll-token')({
           )
         }
 
-        const { provider, deviceCode } = parsed.data
+        const provider = parsed.data.provider.trim()
+        const sessionId = parsed.data.deviceCode.trim()
 
-        if (provider === 'nous') {
-          try {
-            const params = new URLSearchParams({
-              grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-              client_id: 'claude-cli',
-              device_code: deviceCode,
-            })
+        try {
+          const res = await dashboardFetch(
+            `/api/providers/oauth/${encodeURIComponent(provider)}/poll/${encodeURIComponent(sessionId)}`,
+          )
+          const data = await res.json().catch(() => ({}))
 
-            const res = await fetch(
-              'https://portal.nousresearch.com/api/oauth/token',
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: params.toString(),
-              },
-            )
-
-            const data = (await res.json()) as Record<string, unknown>
-
-            if (
-              data.error === 'authorization_pending' ||
-              data.error === 'slow_down'
-            ) {
-              return json({ status: 'pending' })
-            }
-
-            if (data.error) {
-              return json({
-                status: 'error',
-                message: String(data.error_description || data.error),
-              })
-            }
-
-            if (data.access_token) {
-              saveNousTokens(
-                String(data.access_token),
-                data.refresh_token ? String(data.refresh_token) : undefined,
-              )
-              return json({
-                status: 'success',
-                accessToken: String(data.access_token),
-              })
-            }
-
+          if (!res.ok) {
             return json({
               status: 'error',
-              message: 'Unexpected response from token endpoint',
-            })
-          } catch (err) {
-            return json({
-              status: 'error',
-              message: err instanceof Error ? err.message : 'Network error',
+              message: readError(data, 'OAuth polling failed'),
             })
           }
-        }
 
-        return json({
-          status: 'error',
-          message: `OAuth device flow not supported for provider: ${provider}`,
-        })
+          return json(mapDashboardOAuthPoll(data as DashboardOAuthPollResponse))
+        } catch (err) {
+          return json({
+            status: 'error',
+            message: err instanceof Error ? err.message : 'Network error',
+          })
+        }
       },
     },
   },

@@ -842,6 +842,7 @@ export function UsageMeter() {
       <MenuRoot>
         <MenuTrigger
           className={cn(
+            "absolute bottom-2 right-2",
             'ml-auto rounded-full border px-3 py-1 text-xs font-medium',
             'flex items-center gap-3 transition hover:bg-primary-100 cursor-pointer',
             alertTone,

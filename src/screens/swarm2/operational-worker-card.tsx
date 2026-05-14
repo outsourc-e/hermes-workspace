@@ -551,10 +551,11 @@ export function OperationalWorkerCard({
         <button
           type="button"
           onClick={onOpenTasks}
+          title={`Route work to ${member.displayName || member.id}`}
           className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
         >
           <HugeiconsIcon icon={CheckListIcon} size={11} />
-          Route work
+          Route to agent
         </button>
         <button
           type="button"

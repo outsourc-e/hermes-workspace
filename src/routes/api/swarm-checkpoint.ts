@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getSwarmProfilePath } from '../../server/swarm-foundation'
+import { isSwarmWorkerId } from '../../server/swarm-roster'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { checkpointFromRuntimeSnapshot, readRuntimeCheckpointSnapshot } from './swarm-dispatch'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
@@ -26,7 +27,7 @@ type CheckpointRequest = {
 }
 
 const CheckpointBodySchema = z.object({
-  workerId: z.string().regex(/^swarm\d+$/i),
+  workerId: z.string().trim().refine(isSwarmWorkerId, 'worker id must look like swarm13 or a semantic profile id'),
   state: z.enum(['idle', 'executing', 'thinking', 'writing', 'waiting', 'blocked', 'syncing', 'reviewing', 'offline']).optional(),
   phase: z.string().trim().max(200).nullable().optional(),
   currentTask: z.string().trim().max(16_000).nullable().optional(),
@@ -45,7 +46,7 @@ const ALLOWED_STATES = new Set(['idle', 'executing', 'thinking', 'writing', 'wai
 const ALLOWED_CHECKPOINTS = new Set(['none', 'in_progress', 'done', 'blocked', 'handoff', 'needs_input'])
 
 function validateWorkerId(value: string): boolean {
-  return /^swarm\d+$/i.test(value)
+  return isSwarmWorkerId(value)
 }
 
 function cleanString(value: unknown): string | null | undefined {

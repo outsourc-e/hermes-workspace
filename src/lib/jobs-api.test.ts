@@ -82,7 +82,24 @@ describe('job mutation payloads', () => {
       schedule: 'every 30m',
       prompt: 'summarize the latest notes',
       input: 'summarize the latest notes',
-      deliver: ['local'],
+      deliver: 'local',
+    })
+  })
+
+  it('serializes multiple delivery targets into the string format expected by Hermes cron APIs', () => {
+    expect(
+      buildJobMutationPayload({
+        name: 'Push updates',
+        schedule: '0 9 * * *',
+        prompt: 'send the daily sync',
+        deliver: ['local', 'discord'],
+      }),
+    ).toEqual({
+      name: 'Push updates',
+      schedule: '0 9 * * *',
+      prompt: 'send the daily sync',
+      input: 'send the daily sync',
+      deliver: 'local,discord',
     })
   })
 })

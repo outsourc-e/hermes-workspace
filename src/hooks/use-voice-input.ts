@@ -5,15 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 type VoiceInputState = 'idle' | 'listening' | 'processing' | 'error'
 
 type UseVoiceInputOptions = {
-  /** Language for speech recognition (BCP-47). Default: 'en-US' */
   lang?: string
-  /** Insert interim (partial) results as they arrive */
   interim?: boolean
-  /** Called with final transcript text */
+  transcribe?: (blob: Blob) => Promise<string>
   onResult?: (text: string) => void
-  /** Called with interim transcript text */
   onInterim?: (text: string) => void
-  /** Called on error */
   onError?: (error: string) => void
 }
 
@@ -27,8 +23,6 @@ type UseVoiceInputReturn = {
   toggle: () => void
 }
 
-// Web Speech API types (not available in all TS configs)
-
 type SpeechRecognitionInstance = any
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance
 
@@ -39,12 +33,35 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | null {
   return win.SpeechRecognition ?? win.webkitSpeechRecognition ?? null
 }
 
+function supportsRecorderTranscription() {
+  if (
+    typeof window === 'undefined' ||
+    typeof navigator === 'undefined' ||
+    typeof MediaRecorder === 'undefined'
+  ) {
+    return false
+  }
+  return 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices
+}
+
+function pickRecorderMimeType(): string {
+  if (typeof MediaRecorder === 'undefined') return 'audio/webm'
+  if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+    return 'audio/webm;codecs=opus'
+  }
+  if (MediaRecorder.isTypeSupported('audio/webm')) {
+    return 'audio/webm'
+  }
+  return 'audio/mp4'
+}
+
 export function useVoiceInput(
   options: UseVoiceInputOptions = {},
 ): UseVoiceInputReturn {
   const {
     lang = 'en-US',
     interim = true,
+    transcribe,
     onResult,
     onInterim,
     onError,
@@ -52,14 +69,38 @@ export function useVoiceInput(
   const [state, setState] = useState<VoiceInputState>('idle')
   const [transcript, setTranscript] = useState('')
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
-  const isSupported =
-    typeof window !== 'undefined' && Boolean(getSpeechRecognition())
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Array<Blob>>([])
+  const recorderMimeTypeRef = useRef('audio/webm')
+  const isSupported = transcribe
+    ? supportsRecorderTranscription()
+    : typeof window !== 'undefined' && Boolean(getSpeechRecognition())
 
-  // Keep callbacks fresh without re-creating recognition
-  const callbacksRef = useRef({ onResult, onInterim, onError })
-  callbacksRef.current = { onResult, onInterim, onError }
+  const callbacksRef = useRef({ onResult, onInterim, onError, transcribe })
+  callbacksRef.current = { onResult, onInterim, onError, transcribe }
+
+  const cleanupRecorder = useCallback(() => {
+    const recorder = recorderRef.current
+    if (recorder) {
+      recorder.stream.getTracks().forEach((track) => track.stop())
+    }
+    recorderRef.current = null
+    recordedChunksRef.current = []
+  }, [])
 
   const stop = useCallback(() => {
+    if (callbacksRef.current.transcribe) {
+      const recorder = recorderRef.current
+      if (!recorder || recorder.state === 'inactive') {
+        setState('idle')
+        cleanupRecorder()
+        return
+      }
+      setState('processing')
+      recorder.stop()
+      return
+    }
+
     const recognition = recognitionRef.current
     if (!recognition) return
     try {
@@ -68,9 +109,85 @@ export function useVoiceInput(
       // already stopped
     }
     setState('idle')
-  }, [])
+  }, [cleanupRecorder])
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
+    if (callbacksRef.current.transcribe) {
+      if (!supportsRecorderTranscription()) {
+        callbacksRef.current.onError?.('Audio recording not supported in this browser')
+        setState('error')
+        return
+      }
+
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        recorderRef.current.stop()
+        cleanupRecorder()
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const mimeType = pickRecorderMimeType()
+        recorderMimeTypeRef.current = mimeType
+        const recorder = new MediaRecorder(stream, { mimeType })
+        recordedChunksRef.current = []
+
+        recorder.onstart = () => {
+          setState('listening')
+          setTranscript('')
+        }
+
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunksRef.current.push(event.data)
+          }
+        }
+
+        recorder.onerror = () => {
+          cleanupRecorder()
+          setState('error')
+          callbacksRef.current.onError?.('Recording failed')
+        }
+
+        recorder.onstop = async () => {
+          const blob = new Blob(recordedChunksRef.current, {
+            type: recorderMimeTypeRef.current,
+          })
+          cleanupRecorder()
+
+          if (blob.size === 0) {
+            setState('idle')
+            return
+          }
+
+          setState('processing')
+          try {
+            const text = await callbacksRef.current.transcribe!(blob)
+            const trimmed = text.trim()
+            setTranscript(trimmed)
+            if (trimmed) {
+              callbacksRef.current.onResult?.(trimmed)
+            }
+            setState('idle')
+          } catch (error) {
+            setState('error')
+            callbacksRef.current.onError?.(
+              error instanceof Error ? error.message : 'Transcription failed',
+            )
+          }
+        }
+
+        recorderRef.current = recorder
+        recorder.start(100)
+        return
+      } catch (error) {
+        setState('error')
+        callbacksRef.current.onError?.(
+          error instanceof Error ? error.message : 'Microphone access denied',
+        )
+        return
+      }
+    }
+
     const SpeechRecognition = getSpeechRecognition()
     if (!SpeechRecognition) {
       callbacksRef.current.onError?.(
@@ -80,7 +197,6 @@ export function useVoiceInput(
       return
     }
 
-    // Stop existing
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
@@ -141,17 +257,16 @@ export function useVoiceInput(
 
     recognitionRef.current = recognition
     recognition.start()
-  }, [lang, interim])
+  }, [cleanupRecorder, interim, lang])
 
   const toggle = useCallback(() => {
     if (state === 'listening') {
       stop()
     } else {
-      start()
+      void start()
     }
   }, [state, start, stop])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -161,15 +276,25 @@ export function useVoiceInput(
           /* */
         }
       }
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.stop()
+        } catch {
+          /* */
+        }
+      }
+      cleanupRecorder()
     }
-  }, [])
+  }, [cleanupRecorder])
 
   return {
     state,
     isListening: state === 'listening',
     isSupported,
     transcript,
-    start,
+    start: () => {
+      void start()
+    },
     stop,
     toggle,
   }

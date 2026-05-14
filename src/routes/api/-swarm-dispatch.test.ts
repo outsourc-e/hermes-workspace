@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildHermesTmuxLaunchCommand,
+  buildWorkerPrompt,
   checkpointFromRuntimeSnapshot,
   runtimeCheckpointSignature,
   runtimeSnapshotIsFresh,
@@ -45,21 +46,6 @@ describe('checkpointFromRuntimeSnapshot', () => {
   })
 })
 
-describe('buildHermesTmuxLaunchCommand', () => {
-  it('keeps the tmux shell alive so startup failures leave readable output', () => {
-    const command = buildHermesTmuxLaunchCommand({
-      profilePath: '/tmp/hermes profiles/swarm1',
-      hermesBin: '/opt/homebrew/bin/hermes',
-      ghToken: 'ghp_testtokenvalue123456',
-    })
-
-    expect(command).toContain("HERMES_HOME='/tmp/hermes profiles/swarm1'")
-    expect(command).toContain("'/opt/homebrew/bin/hermes' chat --tui")
-    expect(command).toContain('[Hermes worker exited with status %s]')
-    expect(command).not.toContain('exec ')
-  })
-})
-
 describe('runtimeSnapshotIsFresh', () => {
   it('requires a changed snapshot with post-dispatch activity', () => {
     const baseline = {
@@ -87,5 +73,95 @@ describe('runtimeSnapshotIsFresh', () => {
     }
 
     expect(runtimeSnapshotIsFresh(updated, runtimeCheckpointSignature(baseline), dispatchedAt)).toBe(true)
+  })
+})
+
+describe('checkpoint filtering', () => {
+  it('still parses IN_PROGRESS runtime snapshots but leaves terminal filtering to the poller', () => {
+    const checkpoint = checkpointFromRuntimeSnapshot({
+      checkpointStatus: 'in_progress',
+      state: 'executing',
+      lastSummary: 'Task is running',
+      lastResult: null,
+      nextAction: 'Wait for worker output',
+      blockedReason: null,
+      lastCheckIn: '2026-04-28T20:00:01.000Z',
+      lastOutputAt: 1_746_000_001_000,
+      checkpointRaw: null,
+    })
+
+    expect(checkpoint?.stateLabel).toBe('IN_PROGRESS')
+  })
+})
+
+describe('buildHermesTmuxLaunchCommand', () => {
+  it('keeps the tmux shell alive so startup failures leave readable output', () => {
+    const command = buildHermesTmuxLaunchCommand({
+      profilePath: '/tmp/hermes profiles/swarm1',
+      hermesBin: '/opt/homebrew/bin/hermes',
+      ghToken: 'ghp_te...3456',
+    })
+
+    expect(command).toContain("HERMES_HOME='/tmp/hermes profiles/swarm1'")
+    expect(command).toContain("'/opt/homebrew/bin/hermes' chat --tui")
+    expect(command).toContain('[Hermes worker exited with status %s]')
+    expect(command).not.toContain('exec ')
+  })
+})
+
+describe('buildWorkerPrompt', () => {
+  const roster = {
+    id: 'swarm5',
+    name: 'Builder',
+    role: 'Primary Builder',
+    specialty: 'full-stack implementation across Hermes Workspace and Swarm2',
+    model: 'GPT-5.5',
+    mission: 'Ship focused product slices with tests and clean diffs.',
+    skills: ['swarm-ui-worker', 'swarm-worker-core'],
+    capabilities: ['code-editing', 'ui-implementation', 'build-verification'],
+    preferredTaskTypes: ['implementation'],
+    maxConcurrentTasks: 1,
+    acceptsBroadcast: true,
+    reviewRequired: false,
+  }
+
+  it('uses Name — Role as the human-facing label while preserving swarmN as machine ID', () => {
+    const prompt = buildWorkerPrompt({
+      workerId: 'swarm5',
+      task: 'Patch the conductor card copy.',
+      rationale: 'Builder executes implementation work.',
+      roster,
+    })
+
+    expect(prompt).toContain('Worker: Builder — Primary Builder')
+    expect(prompt).toContain('Machine ID: swarm5')
+    expect(prompt).toContain('Mission: Ship focused product slices with tests and clean diffs.')
+    expect(prompt).toContain('Capabilities: code-editing, ui-implementation, build-verification')
+    expect(prompt).toContain('Skills: swarm-ui-worker, swarm-worker-core')
+  })
+
+  it('still injects role context for direct one-shot dispatch unless raw mode is explicit', () => {
+    const prompt = buildWorkerPrompt({
+      workerId: 'swarm5',
+      task: 'Reply with exactly: BUILDER_OK',
+      roster,
+      direct: true,
+    })
+
+    expect(prompt).toContain('Worker: Builder — Primary Builder')
+    expect(prompt).toContain('## Assigned Task')
+    expect(prompt).toContain('Reply with exactly: BUILDER_OK')
+  })
+
+  it('keeps explicit raw/smoke dispatch unwrapped for minimal probes', () => {
+    const prompt = buildWorkerPrompt({
+      workerId: 'swarm5',
+      task: 'RAW_PING_ONLY',
+      roster,
+      direct: true,
+      raw: true,
+    })
+
+    expect(prompt).toBe('RAW_PING_ONLY')
   })
 })
