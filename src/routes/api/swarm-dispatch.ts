@@ -96,7 +96,9 @@ function getProfilesDir(): string {
 }
 
 function getWrapperPath(workerId: string): string {
-  return join(homedir(), '.local', 'bin', workerId)
+  const worker = rosterByWorkerId([workerId]).get(workerId)
+  const wrapperName = worker?.wrapper?.trim() || workerId
+  return join(homedir(), '.local', 'bin', wrapperName)
 }
 
 function getProfilePath(workerId: string): string {

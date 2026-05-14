@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { parseModelAuthEventsFromText, summarizeSwarmHealth } from './swarm-health'
+import { parseModelAuthEventsFromText, resolveWorkerWrapperName, summarizeSwarmHealth } from './swarm-health'
 
 describe('swarm-health model/auth readiness', () => {
+  it('uses roster wrapper aliases when resolving semantic worker wrappers', () => {
+    expect(resolveWorkerWrapperName('builder', { wrapper: 'builder:task' })).toBe('builder:task')
+    expect(resolveWorkerWrapperName('builder', { wrapper: '  ' })).toBe('builder')
+    expect(resolveWorkerWrapperName('swarm5', null)).toBe('swarm5')
+  })
+
   it('detects primary auth failure and fallback provider from Hermes logs', () => {
     const events = parseModelAuthEventsFromText(`
 2026-05-04 18:37:56,770 WARNING cli: Primary provider auth failed (No Codex credentials stored. Run \`hermes auth\` to authenticate.). Falling through to fallback: minimax/MiniMax-M2.7

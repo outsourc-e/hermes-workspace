@@ -4,6 +4,7 @@ import {
   buildSwarmSessionMetadata,
   classifySwarmPluginBoundary,
   deriveSwarmBoundary,
+  getSwarmWrapperPath,
   normalizeSwarmRuntime,
   parseSwarmPluginManifest,
 } from './swarm-foundation'
@@ -12,6 +13,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 
 describe('normalizeSwarmRuntime', () => {
+  it('resolves semantic wrapper aliases from the roster', () => {
+    expect(getSwarmWrapperPath('builder')).toMatch(/\/builder:task$/)
+    expect(getSwarmWrapperPath('swarm5')).toMatch(/\/swarm5$/)
+  })
+
   it('fills legacy or sparse runtime.json values with stable defaults', () => {
     const runtime = normalizeSwarmRuntime(
       'swarm7',

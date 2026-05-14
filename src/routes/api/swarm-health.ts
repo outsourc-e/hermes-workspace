@@ -6,6 +6,7 @@ import * as yaml from 'yaml'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getLocalBinDir, getProfilesDir } from '../../server/claude-paths'
 import { formatSwarmWorkerLabel, isSwarmWorkerId, resolveSwarmWorkerDisplayName, rosterByWorkerId } from '../../server/swarm-roster'
+import type { SwarmRosterWorker } from '../../server/swarm-roster'
 
 export type WorkerModelAuthStatus = 'ready' | 'primary-auth-failed' | 'fallback-active' | 'not-configured' | 'unknown'
 
@@ -46,6 +47,10 @@ export type SwarmHealthSummary = {
   distinctProviders: Array<string>
   degraded: boolean
   warnings: Array<string>
+}
+
+export function resolveWorkerWrapperName(workerId: string, worker?: Pick<SwarmRosterWorker, 'wrapper'> | null): string {
+  return worker?.wrapper?.trim() || workerId
 }
 
 function listSwarmIds(): Array<string> {
@@ -239,7 +244,8 @@ export const Route = createFileRoute('/api/swarm-health')({
         const workers: Array<WorkerHealth> = swarmIds.map((id) => {
           const worker = roster.get(id)
           const profilePath = join(profilesBase, id)
-          const wrapperPath = join(wrapperBase, id)
+          const wrapperName = resolveWorkerWrapperName(id, worker)
+          const wrapperPath = join(wrapperBase, wrapperName)
           const config = readWorkerConfig(profilePath)
           const errs = scanRecentAuthErrors(profilePath)
           const primaryReady = errs.authErrorCount === 0 && errs.fallbackCount === 0 && (config.provider !== 'openai-codex' || hasOpenAiCodexAuth(profilePath))

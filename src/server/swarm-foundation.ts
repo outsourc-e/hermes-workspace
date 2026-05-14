@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import * as YAML from 'yaml'
 import { z } from 'zod'
 import { getLocalBinDir, getProfilesDir } from './claude-paths'
-import { isSwarmWorkerId } from './swarm-roster'
+import { isSwarmWorkerId, rosterByWorkerId } from './swarm-roster'
 
 export const SwarmWorkerStateSchema = z.enum([
   'idle',
@@ -466,7 +466,9 @@ export function getSwarmProfilePath(workerId: string): string {
 }
 
 export function getSwarmWrapperPath(workerId: string): string {
-  return path.join(getLocalBinDir(), workerId)
+  const worker = rosterByWorkerId([workerId]).get(workerId)
+  const wrapperName = worker?.wrapper?.trim() || workerId
+  return path.join(getLocalBinDir(), wrapperName)
 }
 
 export function getSwarmTmuxSessionName(workerId: string): string {
