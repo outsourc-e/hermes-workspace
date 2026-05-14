@@ -51,6 +51,20 @@ ensure_path() {
   esac
 }
 
+pnpm_cmd() {
+  if command -v pnpm &>/dev/null; then
+    pnpm "$@"
+    return
+  fi
+  if command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null; then
+    corepack pnpm "$@"
+    return
+  fi
+  red "pnpm is not available in this shell."
+  red "Try opening a new shell, or install pnpm manually: https://pnpm.io/installation"
+  exit 1
+}
+
 ensure_env_key() {
   local file="$1"
   local key="$2"
@@ -104,9 +118,15 @@ green "  curl ✓"
 
 if ! command -v pnpm &>/dev/null; then
   yellow "  pnpm not found — installing via corepack…"
-  corepack enable 2>/dev/null || npm install -g pnpm
+  if command -v corepack &>/dev/null; then
+    corepack enable 2>/dev/null || true
+    corepack prepare pnpm@latest --activate 2>/dev/null || true
+  fi
+  if ! command -v pnpm &>/dev/null && ! (command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null); then
+    npm install -g pnpm
+  fi
 fi
-green "  pnpm $(pnpm --version) ✓"
+green "  pnpm $(pnpm_cmd --version) ✓"
 
 # ─── install hermes-agent (delegate to Nous upstream installer) ──────────
 # hermes-agent is NOT on PyPI. It installs from source via Nous's own
@@ -193,7 +213,7 @@ if [[ -f "$HERMES_ENV_PATH" ]]; then
 fi
 
 cyan "→ Installing npm deps (pnpm install)…"
-pnpm install --silent
+pnpm_cmd install --silent
 green "  deps installed ✓"
 
 # ─── seed Hermes skills (Conductor needs workspace-dispatch) ─────────────

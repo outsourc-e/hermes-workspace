@@ -9,7 +9,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",
-    "build": "vite build",
+    "build": "NODE_OPTIONS=\"--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE:-2048}\" vite build",
     "start:all": "concurrently \"hermes gateway run\" \"pnpm dev\"",
     "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node server-entry.js",
     "start:dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev",

@@ -8,30 +8,30 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Add01Icon, CheckListIcon, RefreshIcon } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
+import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn } from '@/lib/tasks-api'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import {
-  fetchTasks,
-  fetchAssignees,
-  createTask,
-  updateTask,
-  deleteTask,
-  moveTask,
-  launchSession,
-  linkSession,
+  COLUMN_COLORS,
   COLUMN_LABELS,
   COLUMN_ORDER,
-  COLUMN_COLORS,
+  createTask,
+  deleteTask,
+  fetchAssignees,
+  fetchTasks,
   isOverdue,
+  launchSession,
+  linkSession,
+  moveTask,
+  updateTask,
 } from '@/lib/tasks-api'
 import { stashPendingSend } from '@/screens/chat/pending-send'
-import type { ClaudeTask, TaskColumn, CreateTaskInput, TaskAssignee } from '@/lib/tasks-api'
 
 const QUERY_KEY = ['claude', 'tasks'] as const
 const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
 
 export const TASKS_BOARD_HELP_TEXT =
-  'Drag cards to change status. Open a card to set assignee and due date.'
+  'Workspace Tasks is a lightweight task board. Drag cards to change status. Use Dashboard Kanban for native multi-board controls.'
 
 function SkeletonCard() {
   return (
@@ -93,7 +93,7 @@ export function TasksScreen() {
     }
     for (const t of tasks) {
       if (assigneeFilter && t.assignee !== assigneeFilter) continue
-      if (map[t.column]) map[t.column].push(t)
+      map[t.column].push(t)
     }
     for (const col of COLUMN_ORDER) {
       map[col].sort((a, b) => a.position - b.position)
