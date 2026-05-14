@@ -875,6 +875,18 @@ function ChatDisplaySection() {
             aria-label="Expand sidebar on hover"
           />
         </SettingsRow>
+        <SettingsRow
+          label="Show usage meter"
+          description="Show the floating usage/provider pill in chat. Off by default to keep the composer clean."
+        >
+          <Switch
+            checked={settings.showUsageMeter}
+            onCheckedChange={(checked) =>
+              updateSettings({ showUsageMeter: checked })
+            }
+            aria-label="Show usage meter"
+          />
+        </SettingsRow>
       </SettingsSection>
       {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>

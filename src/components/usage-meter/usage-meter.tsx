@@ -1,8 +1,14 @@
 'use client'
 
+import { useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UsageDetailsModal } from './usage-details-modal'
 import { ContextAlertModal } from './context-alert-modal'
+import {
+  resolveContextAlertThreshold,
+  resolveUsageMeterSessionKey,
+  shouldShowUsageMeterContextAlert,
+} from './usage-meter-session'
 import { DialogContent, DialogRoot } from '@/components/ui/dialog'
 import {
   MenuContent,
@@ -434,7 +440,16 @@ type AgentActivity = {
   totalAgentCost: number
 }
 
-export function UsageMeter() {
+export function UsageMeter({ visible = true }: { visible?: boolean }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const statusSessionKey = useMemo(
+    () => resolveUsageMeterSessionKey(pathname),
+    [pathname],
+  )
+  const contextAlertsEnabled = useMemo(
+    () => shouldShowUsageMeterContextAlert({ pathname, visible }),
+    [pathname, visible],
+  )
   const [usage, setUsage] = useState<UsageSummary>(() =>
     parseSessionStatus(null),
   )
@@ -458,10 +473,14 @@ export function UsageMeter() {
     threshold: number
   }>({ open: false, threshold: 0 })
   const alertStateRef = useRef(getAlertState())
+  const previousContextPercentRef = useRef<number | null>(null)
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/session-status')
+      const query = statusSessionKey
+        ? `?sessionKey=${encodeURIComponent(statusSessionKey)}`
+        : ''
+      const res = await fetch(`/api/session-status${query}`)
       if (!res.ok) {
         const data = await res.json().catch(() => null)
         throw new Error(
@@ -478,7 +497,7 @@ export function UsageMeter() {
       setError(errorMessage)
       toast('Failed to fetch usage data', { type: 'error' })
     }
-  }, [])
+  }, [statusSessionKey])
 
   const refreshProviders = useCallback(async () => {
     try {
@@ -546,28 +565,43 @@ export function UsageMeter() {
   }, [refreshAgentActivity])
 
   useEffect(() => {
+    if (!contextAlertsEnabled && contextAlert.open) {
+      setContextAlert({ open: false, threshold: 0 })
+    }
+  }, [contextAlert.open, contextAlertsEnabled])
+
+  useEffect(() => {
+    if (!contextAlertsEnabled) {
+      previousContextPercentRef.current = usage.contextPercent
+      return
+    }
     if (typeof window === 'undefined') return
     const current = usage.contextPercent
     if (!Number.isFinite(current)) return
+    const previous = previousContextPercentRef.current
+    previousContextPercentRef.current = current
     const state = alertStateRef.current
     if (state.date !== getTodayKey()) {
       state.date = getTodayKey()
       state.sent = {}
     }
-    const eligible = THRESHOLDS.filter((threshold) => current >= threshold)
-    if (eligible.length === 0) return
-    for (const threshold of eligible) {
-      if (state.sent[threshold]) continue
-      state.sent[threshold] = true
-      saveAlertState(state)
-      // Show in-app modal instead of browser notification
-      setContextAlert({ open: true, threshold })
-      break // Only show one alert at a time
-    }
-  }, [usage.contextPercent])
+    const threshold = resolveContextAlertThreshold({
+      previous,
+      current,
+      thresholds: THRESHOLDS,
+      sent: state.sent,
+    })
+    if (!threshold) return
+    state.sent[threshold] = true
+    saveAlertState(state)
+    // Show in-app modal instead of browser notification
+    setContextAlert({ open: true, threshold })
+  }, [contextAlertsEnabled, usage.contextPercent])
 
   useEffect(() => {
     function handleOpenUsageFromSearch() {
+      void refresh()
+      void refreshProviders()
       setOpen(true)
     }
 
@@ -581,7 +615,7 @@ export function UsageMeter() {
         handleOpenUsageFromSearch,
       )
     }
-  }, [])
+  }, [refresh, refreshProviders])
 
   // Find the preferred provider for the status bar display
   const [preferredProvider, setPreferredProvider] = useState<string | null>(
@@ -839,39 +873,41 @@ export function UsageMeter() {
 
   return (
     <>
-      <MenuRoot>
-        <MenuTrigger
-          className={cn(
-            "absolute bottom-2 right-2",
-            'ml-auto rounded-full border px-3 py-1 text-xs font-medium',
-            'flex items-center gap-3 transition hover:bg-primary-100 cursor-pointer',
-            alertTone,
-          )}
-          data-tour="usage-meter"
-        >
-          <span className="text-[9px] uppercase tracking-widest text-primary-500 opacity-75">
-            {STATS_VIEW_LABELS[statsView].split(' ')[0]}
-          </span>
-          <span className="text-primary-300">|</span>
-          {renderPillContent()}
-        </MenuTrigger>
-        <MenuContent align="end" className="min-w-[180px]">
-          {(['session', 'provider', 'cost', 'agents'] as const).map((view) => (
-            <MenuItem
-              key={view}
-              onClick={() => handleStatsViewChange(view)}
-              className={cn(
-                statsView === view && 'bg-amber-100 text-amber-800',
-              )}
-            >
-              <span className="flex-1">{STATS_VIEW_LABELS[view]}</span>
-              {statsView === view && <span className="text-amber-600">✓</span>}
-            </MenuItem>
-          ))}
-          <div className="my-1 h-px bg-primary-100" />
-          <MenuItem onClick={() => setOpen(true)}>View Details…</MenuItem>
-        </MenuContent>
-      </MenuRoot>
+      {visible ? (
+        <MenuRoot>
+          <MenuTrigger
+            className={cn(
+              "absolute bottom-2 right-2",
+              'ml-auto rounded-full border px-3 py-1 text-xs font-medium',
+              'flex items-center gap-3 transition hover:bg-primary-100 cursor-pointer',
+              alertTone,
+            )}
+            data-tour="usage-meter"
+          >
+            <span className="text-[9px] uppercase tracking-widest text-primary-500 opacity-75">
+              {STATS_VIEW_LABELS[statsView].split(' ')[0]}
+            </span>
+            <span className="text-primary-300">|</span>
+            {renderPillContent()}
+          </MenuTrigger>
+          <MenuContent align="end" className="min-w-[180px]">
+            {(['session', 'provider', 'cost', 'agents'] as const).map((view) => (
+              <MenuItem
+                key={view}
+                onClick={() => handleStatsViewChange(view)}
+                className={cn(
+                  statsView === view && 'bg-amber-100 text-amber-800',
+                )}
+              >
+                <span className="flex-1">{STATS_VIEW_LABELS[view]}</span>
+                {statsView === view && <span className="text-amber-600">✓</span>}
+              </MenuItem>
+            ))}
+            <div className="my-1 h-px bg-primary-100" />
+            <MenuItem onClick={() => setOpen(true)}>View Details…</MenuItem>
+          </MenuContent>
+        </MenuRoot>
+      ) : null}
 
       <DialogRoot open={open} onOpenChange={setOpen}>
         <DialogContent className="w-[min(720px,94vw)]">

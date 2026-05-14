@@ -18,7 +18,7 @@ import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { UpdateCenterNotifier } from '@/components/update-center-notifier'
-import { initializeSettingsAppearance } from '@/hooks/use-settings'
+import { initializeSettingsAppearance, useSettings } from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import {
   ClaudeOnboarding,
@@ -251,6 +251,7 @@ export async function registerAppServiceWorker({
 }
 
 function RootLayout() {
+  const { settings } = useSettings()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const isHermesWorldLandingRoute =
     pathname === '/hermes-world' ||
@@ -369,10 +370,8 @@ function RootLayout() {
             </ErrorBoundary>
           </WorkspaceShell>
           {!isHermesWorldLandingRoute ? <SearchModal /> : null}
-          {/* UsageMeter must be mounted at root so the OPEN_USAGE event from
-              the search modal's Usage tile has a listener. See #258.
-              But public launch surfaces like HermesWorld should not show app usage chrome. */}
-          {!isGameSurfaceRoute ? <UsageMeter /> : null}
+          {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
+          {!isGameSurfaceRoute ? <UsageMeter visible={settings.showUsageMeter} /> : null}
           {!isHermesWorldLandingRoute ? <KeyboardShortcutsModal /> : null}
           {!isHermesWorldLandingRoute ? <UpdateCenterNotifier /> : null}
           {rootSurfaceState.showPostOnboardingOverlays && !isGameSurfaceRoute ? (

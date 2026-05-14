@@ -11,6 +11,7 @@ export type StudioSettings = {
   claudeToken: string
   theme: SettingsThemeMode
   accentColor: AccentColor
+  showUsageMeter: boolean
   editorFontSize: number
   editorWordWrap: boolean
   editorMinimap: boolean
@@ -35,6 +36,7 @@ export const defaultStudioSettings: StudioSettings = {
   claudeToken: '',
   theme: 'system',
   accentColor: 'blue',
+  showUsageMeter: false,
   editorFontSize: 13,
   editorWordWrap: true,
   editorMinimap: false,
