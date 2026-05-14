@@ -60,7 +60,7 @@ When to use:
 Canonical spec:
 
 ```text
-/swarm-specs/projects/swarm3.md
+/swarm-specs/projects/orchestrator.md
 ```
 
 Good checkpoint:

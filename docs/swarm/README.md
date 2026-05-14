@@ -25,7 +25,7 @@ This is not a chat wrapper with tabs. It is the operating surface for a local ag
 Eric talks to Aurora. Aurora turns intent into a brief. The orchestrator routes that brief to the right Hermes Agent. Workers execute inside persistent tmux sessions, checkpoint with proof, and the orchestrator decides whether to continue, repair, escalate, or put a card in the Inbox.
 
 ```text
-Eric -> Aurora -> swarm3/orchestrator -> role workers -> checkpoints -> reports/inbox -> review/escalation
+Eric -> Aurora -> orchestrator -> role workers -> checkpoints -> reports/inbox -> review/escalation
 ```
 
 The important move is that dispatch becomes a system, not a vibe. The worker is not just "another model call." It is a named lane with memory, runtime state, default skills, a profile, and a job.
