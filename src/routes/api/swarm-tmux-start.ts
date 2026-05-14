@@ -135,7 +135,9 @@ function startSession(
 }
 
 function resolveWorkerCwd(workerId: string): string {
-  const wrapperPath = join(homedir(), '.local', 'bin', workerId)
+  const worker = rosterByWorkerId([workerId]).get(workerId)
+  const wrapperName = worker?.wrapper?.trim() || workerId
+  const wrapperPath = join(homedir(), '.local', 'bin', wrapperName)
   if (existsSync(wrapperPath)) {
     try {
       const text = readFileSync(wrapperPath, 'utf8')
@@ -178,7 +180,9 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
         // path is bogus, and the sandbox quirks on this host make existsSync
         // unreliable for parent dirs even when leaf paths work.
         // We still verify the wrapper exists as a sanity check.
-        const wrapper = join(homedir(), '.local', 'bin', workerId)
+        const worker = rosterByWorkerId([workerId]).get(workerId)
+        const wrapperName = worker?.wrapper?.trim() || workerId
+        const wrapper = join(homedir(), '.local', 'bin', wrapperName)
         if (!existsSync(wrapper)) {
           return json(
             { error: `No wrapper for ${workerId} at ${wrapper}` },

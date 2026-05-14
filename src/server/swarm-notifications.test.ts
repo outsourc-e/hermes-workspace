@@ -75,9 +75,9 @@ describe('swarm-notifications', () => {
       notifySessionKey: 'qa-main',
     })
 
-    // DONE checkpoints route to the orchestrator (swarm3 tmux), not main.
+    // DONE checkpoints route to the orchestrator tmux session, not main.
     expect(first).toMatchObject({ published: true, sessionKey: 'qa-main', route: 'orchestrator' })
-    expect(first.orchestrator).toMatchObject({ sent: true, session: 'swarm-swarm3' })
+    expect(first.orchestrator).toMatchObject({ sent: true, session: 'swarm-orchestrator' })
     // Same raw is deduped on the second call.
     expect(second).toMatchObject({ published: false, sessionKey: 'qa-main', route: 'noop' })
     // No chat event was published — DONE goes to orchestrator only.
@@ -159,7 +159,7 @@ describe('swarm-notifications', () => {
     })
 
     expect(result).toMatchObject({ published: true, sessionKey: 'qa-main', route: 'main' })
-    expect(result.orchestrator).toMatchObject({ sent: true, session: 'swarm-swarm3' })
+    expect(result.orchestrator).toMatchObject({ sent: true, session: 'swarm-orchestrator' })
     // Both the orchestrator AND main were notified.
     expect(publishChatEvent).toHaveBeenCalledTimes(2)
     expect(publishChatEvent).toHaveBeenNthCalledWith(
@@ -201,7 +201,7 @@ describe('swarm-notifications', () => {
     })
 
     expect(result).toMatchObject({ published: true, sessionKey: 'qa-main', route: 'main' })
-    expect(result.orchestrator).toMatchObject({ sent: false, session: 'swarm-swarm3' })
+    expect(result.orchestrator).toMatchObject({ sent: false, session: 'swarm-orchestrator' })
     expect(publishChatEvent).toHaveBeenCalled()
   })
 
@@ -218,15 +218,15 @@ describe('swarm-notifications', () => {
       nextAction: 'Continue loop',
       raw: 'STATE: DONE\nRESULT: Orchestrator self-report\nNEXT_ACTION: Continue loop',
     }
-    mkdirSync(join(tempRoot, 'swarm3'), { recursive: true })
+    mkdirSync(join(tempRoot, 'orchestrator'), { recursive: true })
 
     const result = mod.publishSwarmCheckpointNotification({
-      workerId: 'swarm3',
+      workerId: 'orchestrator',
       checkpoint,
       notifySessionKey: 'qa-main',
     })
 
     // skippedSelf -> orchestrator route is treated as 'orchestrator' (self-report doesn't escalate either).
-    expect(result.orchestrator).toMatchObject({ sent: false, session: 'swarm-swarm3', skippedSelf: true })
+    expect(result.orchestrator).toMatchObject({ sent: false, session: 'swarm-orchestrator', skippedSelf: true })
   })
 })

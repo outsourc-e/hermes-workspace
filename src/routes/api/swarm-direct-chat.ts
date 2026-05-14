@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { readWorkerMessages, type SwarmChatMessage } from '../../server/swarm-chat-reader'
+import { rosterByWorkerId } from '../../server/swarm-roster'
 
 type DirectChatRequest = {
   workerId?: unknown
@@ -60,7 +61,9 @@ function getProfilePath(workerId: string): string {
 }
 
 function getWrapperPath(workerId: string): string {
-  return join(homedir(), '.local', 'bin', workerId)
+  const worker = rosterByWorkerId([workerId]).get(workerId)
+  const wrapperName = worker?.wrapper?.trim() || workerId
+  return join(homedir(), '.local', 'bin', wrapperName)
 }
 
 function resolveWorkerCwd(workerId: string): string {

@@ -5,7 +5,7 @@ import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 import { getSwarmProfilePath } from './swarm-foundation'
 import { publishChatEvent } from './chat-event-bus'
 
-const ORCHESTRATOR_WORKER_ID = process.env.SWARM_ORCHESTRATOR_WORKER_ID?.trim() || 'swarm3'
+const ORCHESTRATOR_WORKER_ID = process.env.SWARM_ORCHESTRATOR_WORKER_ID?.trim() || 'orchestrator'
 const ORCHESTRATOR_TMUX_SESSION = `swarm-${ORCHESTRATOR_WORKER_ID}`
 const MAIN_SESSION_KEY = process.env.SWARM_MAIN_SESSION_KEY?.trim() || 'main'
 
@@ -187,7 +187,7 @@ export function publishSwarmCheckpointNotification(input: {
     checkpointSummary(input.checkpoint),
   ].filter(Boolean).join(' — ')
 
-  // 1. Route to orchestrator (swarm3) by default.
+  // 1. Route to orchestrator by default.
   const orchestratorResult = publishCheckpointToOrchestrator({
     workerId: input.workerId,
     checkpoint: input.checkpoint,
