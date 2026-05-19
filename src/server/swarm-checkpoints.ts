@@ -42,7 +42,11 @@ export function parseSwarmCheckpoint(text: string): ParsedSwarmCheckpoint | null
   const lines = text.replace(/\r\n/g, '\n').split('\n')
 
   for (const line of lines) {
-    const match = line.match(/^\s*([A-Z_ -]{3,24})\s*:\s*(.*)$/i)
+    // Handle both plain (STATE:) and bold markdown (**STATE:**) formats.
+    // Strip Markdown bold markers so the label always sits at start-of-value
+    // position regardless of formatting.
+    const cleanLine = line.replace(/\*\*/g, '')
+    const match = cleanLine.match(/^\s*([A-Z_ -]{3,24})\s*:\s*(.*)$/i)
     const label = match ? normalizeLabel(match[1]) : null
     if (label) {
       current = label

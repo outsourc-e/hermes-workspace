@@ -19,16 +19,18 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 // ---------------------------------------------------------------------------
 
 /** Resolve the hermes-agent directory using a priority-ordered fallback chain:
- *  1. CLAUDE_AGENT_PATH env var (explicit override)
- *  2. ../hermes-agent  — sibling clone (standard README setup)
- *  3. ../../hermes-agent — one level up (monorepo / nested workspace)
+ *  1. HERMES_AGENT_PATH env var (explicit override)
+ *  2. CLAUDE_AGENT_PATH env var (legacy override)
+ *  3. ../hermes-agent  — sibling clone (standard README setup)
+ *  4. ../../hermes-agent — one level up (monorepo / nested workspace)
  *  Returns null if none found.
  */
 function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   const candidates: string[] = []
 
-  if (env.CLAUDE_AGENT_PATH?.trim()) {
-    candidates.push(env.CLAUDE_AGENT_PATH.trim())
+  const explicitAgentPath = env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
+  if (explicitAgentPath) {
+    candidates.push(explicitAgentPath)
   }
 
   // Resolve relative to the workspace root (parent of hermes-workspace/)
@@ -155,7 +157,7 @@ const config = defineConfig(({ mode, command }) => {
         '[hermes-agent] Could not find hermes-agent installation.\n' +
           '  Run the installer:\n' +
           '    curl -fsSL https://hermes-workspace.com/install.sh | bash\n' +
-          '  Or set CLAUDE_AGENT_PATH in .env to point at your hermes-agent clone.',
+          '  Or set HERMES_AGENT_PATH (or legacy CLAUDE_AGENT_PATH) in .env to point at your hermes-agent clone.',
       )
       return
     }

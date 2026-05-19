@@ -35,12 +35,16 @@ import type {
   SlashCommandMenuHandle,
 } from '@/components/slash-command-menu'
 import {
+  DEFAULT_SLASH_COMMANDS,
+  mergeSlashCommands,
+  SlashCommandMenu,
+} from '@/components/slash-command-menu'
+import {
   PromptInput,
   PromptInputAction,
   PromptInputActions,
   PromptInputTextarea,
 } from '@/components/prompt-kit/prompt-input'
-import { SlashCommandMenu } from '@/components/slash-command-menu'
 import { useSettings } from '@/hooks/use-settings'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -209,6 +213,39 @@ type ClaudeAvailableModelsResponse = {
   provider: string
   models: Array<{ id: string; description: string }>
   providers: Array<ClaudeProviderOption>
+}
+
+type InstalledSkillSummary = {
+  id: string
+  name: string
+  description: string
+  installed: boolean
+  enabled: boolean
+}
+
+async function fetchInstalledSkills(): Promise<Array<InstalledSkillSummary>> {
+  const response = await fetch('/api/skills?tab=installed&limit=120')
+  if (!response.ok) {
+    throw new Error(`Skills request failed (${response.status})`)
+  }
+
+  const payload = (await response.json()) as {
+    skills?: Array<Record<string, unknown>>
+    ok?: boolean
+  }
+  const skills = Array.isArray(payload.skills) ? payload.skills : []
+
+  return skills
+    .map((entry) => {
+      const id = readModelText(entry.id) || readModelText(entry.slug) || readModelText(entry.name)
+      if (!id) return null
+      const name = readModelText(entry.name) || id
+      const description = readModelText(entry.description)
+      const installed = entry.installed !== false
+      const enabled = entry.enabled !== false
+      return { id, name, description, installed, enabled }
+    })
+    .filter((entry): entry is InstalledSkillSummary => entry !== null)
 }
 
 async function fetchModels(): Promise<{
@@ -968,6 +1005,12 @@ function ChatComposerComponent({
     retry: false,
     staleTime: 15_000,
   })
+  const installedSkillsQuery = useQuery({
+    queryKey: ['chat', 'composer', 'installed-skills'],
+    queryFn: fetchInstalledSkills,
+    retry: false,
+    staleTime: 60_000,
+  })
   const workspaceContextQuery = useQuery({
     queryKey: ['workspace', 'composer-context'],
     queryFn: fetchWorkspaceContext,
@@ -1628,6 +1671,19 @@ function ChatComposerComponent({
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
     : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
+  const slashCommands = useMemo(
+    () =>
+      mergeSlashCommands(
+        DEFAULT_SLASH_COMMANDS,
+        (installedSkillsQuery.data ?? [])
+          .filter((skill) => skill.installed && skill.enabled)
+          .map((skill) => ({
+            command: `/${skill.id}`,
+            description: skill.description || `Run ${skill.name}`,
+          })),
+      ),
+    [installedSkillsQuery.data],
+  )
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
     slashCommandQuery !== null && !disabled && !isSlashMenuDismissed
@@ -2076,6 +2132,7 @@ function ChatComposerComponent({
           ref={slashMenuRef}
           open={isSlashMenuOpen}
           query={slashCommandQuery ?? ''}
+          commands={slashCommands}
           onSelect={handleSelectSlashCommand}
         />
 

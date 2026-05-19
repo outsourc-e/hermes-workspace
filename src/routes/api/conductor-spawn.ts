@@ -8,8 +8,12 @@ import { requireJsonContentType } from '../../server/rate-limit'
 import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
 import { getSwarmMission } from '../../server/swarm-missions'
-import { dispatchSwarmAssignments } from './swarm-dispatch'
+import { dispatchSwarmAssignments, readRuntimeCheckpointSnapshot, checkpointFromRuntimeSnapshot, runtimeCheckpointSignature } from './swarm-dispatch'
 import type { SwarmMission } from '../../server/swarm-missions'
+import { recordMissionCheckpoint } from '../../server/swarm-missions'
+import { getSwarmProfilePath } from '../../server/swarm-foundation'
+import { readWorkerMessages } from '../../server/swarm-chat-reader'
+import { newestCheckpointFromMessages } from '../../server/swarm-checkpoints'
 
 let cachedSkill: string | null = null
 
@@ -321,7 +325,50 @@ export const Route = createFileRoute('/api/conductor-spawn')({
 
         const nativeMission = getSwarmMission(missionId)
         if (nativeMission) {
-          return json({ ok: true, mode: 'native-swarm', mission: toNativeConductorMissionRecord(nativeMission, lines) })
+          // For active native missions, check worker runtime.json for fresh
+          // checkpoints that haven't been written back to the mission store yet.
+          // This bridges the gap between fire-and-forget dispatch (waitForCheckpoint=false)
+          // and the conductor UI polling for live status.
+          if (nativeMission.state === 'executing') {
+            for (const assignment of nativeMission.assignments) {
+              if (assignment.state === 'dispatched' && assignment.workerId) {
+                try {
+                  const profilePath = getSwarmProfilePath(assignment.workerId)
+                  // Check runtime.json first
+                  const snapshot = readRuntimeCheckpointSnapshot(profilePath)
+                  let checkpoint = checkpointFromRuntimeSnapshot(snapshot)
+
+                  // Also check the worker's chat SQLite DB for checkpoint messages
+                  // (tmux workers write checkpoints there)
+                  if (!checkpoint || checkpoint.stateLabel === 'IN_PROGRESS') {
+                    const chat = readWorkerMessages(profilePath, 50)
+                    if (chat.ok) {
+                      const msgCheckpoint = newestCheckpointFromMessages(chat.messages)
+                      if (msgCheckpoint && msgCheckpoint.raw !== snapshot.checkpointRaw) {
+                        checkpoint = msgCheckpoint
+                      }
+                    }
+                  }
+
+                  if (checkpoint && (checkpoint.stateLabel === 'DONE' || checkpoint.stateLabel === 'BLOCKED' || checkpoint.stateLabel === 'HANDOFF' || checkpoint.stateLabel === 'NEEDS_INPUT')) {
+                    recordMissionCheckpoint({
+                      missionId: nativeMission.id,
+                      assignmentId: assignment.id,
+                      workerId: assignment.workerId,
+                      checkpoint,
+                      source: 'conductor-poll',
+                    })
+                  }
+                } catch {
+                  // runtime.json might not exist yet or be temporarily unreadable
+                }
+              }
+            }
+          }
+          // Re-read the mission from the store so the response reflects any
+          // checkpoints just synced via recordMissionCheckpoint above.
+          const updatedNative = getSwarmMission(missionId) ?? nativeMission
+          return json({ ok: true, mode: 'native-swarm', mission: toNativeConductorMissionRecord(updatedNative, lines) })
         }
 
         const capabilities = await ensureGatewayProbed()

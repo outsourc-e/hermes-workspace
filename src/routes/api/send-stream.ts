@@ -390,6 +390,31 @@ export const Route = createFileRoute('/api/send-stream')({
           streamClosed = true
         }
 
+        const persistRunStarted = (
+          runId: string | undefined,
+          runSessionKey: string,
+          friendlyId: string,
+        ) => {
+          if (!runId || persistedRunReady) return
+          activeRunSessionKey = runSessionKey
+          persistedRunReady = createPersistedRun({
+            runId,
+            sessionKey: runSessionKey,
+            friendlyId,
+          }).catch(() => null)
+        }
+
+        const persistActiveRun = (
+          write: (sessionKey: string, runId: string) => Promise<unknown>,
+        ) => {
+          if (!activeRunId || !activeRunSessionKey) return
+          const runId = activeRunId
+          const runSessionKey = activeRunSessionKey
+          void (persistedRunReady ?? Promise.resolve())
+            .then(() => write(runSessionKey, runId))
+            .catch(() => null)
+        }
+
         const stream = new ReadableStream({
           async start(controller) {
             let heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -460,31 +485,6 @@ export const Route = createFileRoute('/api/send-stream')({
               sendEvent('heartbeat', { timestamp: Date.now() })
             }, 30_000)
 
-            const persistRunStarted = (
-              runId: string | undefined,
-              runSessionKey: string,
-              friendlyId: string,
-            ) => {
-              if (!runId || persistedRunReady) return
-              activeRunSessionKey = runSessionKey
-              persistedRunReady = createPersistedRun({
-                runId,
-                sessionKey: runSessionKey,
-                friendlyId,
-              }).catch(() => null)
-            }
-
-            const persistActiveRun = (
-              write: (sessionKey: string, runId: string) => Promise<unknown>,
-            ) => {
-              if (!activeRunId || !activeRunSessionKey) return
-              const runId = activeRunId
-              const runSessionKey = activeRunSessionKey
-              void (persistedRunReady ?? Promise.resolve())
-                .then(() => write(runSessionKey, runId))
-                .catch(() => null)
-            }
-
             try {
               if (chatMode === 'portable') {
                 const runId = crypto.randomUUID()
@@ -527,7 +527,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     : []
                   // Load persisted history for this session, then append user message.
                   // When the gateway can bind portable chat to a server-side session
-                  // via X-Claude-Session-Id, replaying the entire local transcript on
+                  // via X-Hermes-Session-Id, replaying the entire local transcript on
                   // every turn duplicates prompt context and can trip model limits
                   // on otherwise simple tasks (#405).
                   const persistedMessages = getLocalMessages(portableSessionKey)

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useChatStore } from '../../../stores/chat-store'
 
 type ActiveRunStatus =
@@ -37,13 +37,17 @@ const ACTIVE_STATUSES: ReadonlySet<string> = new Set([
 export function useActiveRunCheck({
   sessionKey,
   enabled,
+  onCheckComplete,
 }: {
   sessionKey: string
   enabled: boolean
+  onCheckComplete?: () => void
 }): void {
   const hasCheckedRef = useRef(false)
   const sessionKeyRef = useRef(sessionKey)
   sessionKeyRef.current = sessionKey
+  const onCompleteRef = useRef(onCheckComplete)
+  onCompleteRef.current = onCheckComplete
 
   useEffect(() => {
     if (!enabled || !sessionKey || sessionKey === 'new') return
@@ -72,6 +76,8 @@ export function useActiveRunCheck({
         }
       } catch {
         // Network error or abort — ignore
+      } finally {
+        onCompleteRef.current?.()
       }
     }
 

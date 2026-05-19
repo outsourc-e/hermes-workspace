@@ -108,6 +108,7 @@ function storeNotes(sections: Array<ReleaseNoteSection>): Notes | null {
     localStorage.removeItem(NOTES_SEEN_KEY)
   }
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
+  if (localStorage.getItem(NOTES_SEEN_KEY) === id) return null
   return notes
 }
 
@@ -519,4 +520,9 @@ function ReleaseNotes({
       </motion.div>
     </AnimatePresence>
   )
+}
+
+export const __updateReleaseNotesStorageForTests = {
+  NOTES_SEEN_KEY,
+  storeNotes,
 }

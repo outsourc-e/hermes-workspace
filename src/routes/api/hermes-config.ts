@@ -1,8 +1,6 @@
 /**
- * Legacy config route shim.
- *
- * The frontend still calls /api/claude-config in a few places, but the real
- * implementation now lives in the shared Hermes config handlers.
+ * Hermes Config API — proxy route for hermes-config-route handlers.
+ * Maps GET and PATCH/POST to the server-side config read/write logic.
  */
 import { createFileRoute } from '@tanstack/react-router'
 import {
@@ -10,7 +8,7 @@ import {
   handleHermesConfigPatch,
 } from '../../server/hermes-config-route'
 
-export const Route = createFileRoute('/api/claude-config')({
+export const Route = createFileRoute('/api/hermes-config')({
   server: {
     handlers: {
       GET: handleHermesConfigGet,

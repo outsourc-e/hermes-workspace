@@ -1,10 +1,8 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { SWARM_MISSIONS_PATH, cancelSwarmAssignment, cancelSwarmMission, getSwarmMission, listSwarmMissions, listSwarmReports } from '../../server/swarm-missions'
-import { getProfilesDir } from '../../server/claude-paths'
+import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 
 type CancelPostBody = {
   action?: unknown
@@ -18,41 +16,6 @@ type CancelPostBody = {
 
 function cleanString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
-}
-
-function resetWorkerRuntime(workerId: string, reason: string, actor: string): { workerId: string; ok: boolean; error?: string } {
-  if (!/^swarm\d+$/i.test(workerId)) return { workerId, ok: false, error: 'invalid worker id' }
-  const runtimePath = join(getProfilesDir(), workerId, 'runtime.json')
-  if (!existsSync(runtimePath)) return { workerId, ok: true }
-  try {
-    const raw = JSON.parse(readFileSync(runtimePath, 'utf-8')) as Record<string, unknown>
-    const next = {
-      ...raw,
-      state: 'idle',
-      phase: 'cancelled',
-      currentTask: null,
-      currentMissionId: null,
-      currentAssignmentId: null,
-      checkpointStatus: 'none',
-      needsHuman: false,
-      blockedReason: null,
-      activeTool: null,
-      checkpointRaw: null,
-      orchestratorProcessedRaw: null,
-      lastSummary: `Cancelled by ${actor}: ${reason}`,
-      lastControlMessage: `Cancelled by ${actor}: ${reason}`,
-      nextAction: 'Idle. Do not continue cancelled Workspace swarm work unless explicitly re-dispatched.',
-      cancelledAt: new Date().toISOString(),
-      cancellationReason: reason,
-      cancelledBy: actor,
-    }
-    const tmp = `${runtimePath}.${process.pid}.${Date.now()}.tmp`
-    writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n')
-    renameSync(tmp, runtimePath)
-    return { workerId, ok: true }
-  } catch (err) {
-    return { workerId, ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
 }
 
 export const Route = createFileRoute('/api/swarm-missions')({
@@ -106,9 +69,9 @@ export const Route = createFileRoute('/api/swarm-missions')({
             if (cancelledIds.has(assignment.id)) workerIds.add(assignment.workerId)
           }
         }
-        if (workerId && /^swarm\d+$/i.test(workerId)) workerIds.add(workerId)
+        if (workerId) workerIds.add(workerId)
         const runtimeResets = body.resetWorkers !== false
-          ? Array.from(workerIds).map((id) => resetWorkerRuntime(id, reason, actor))
+          ? Array.from(workerIds).map((id) => resetSwarmWorkerRuntime(id, { actor, reason }))
           : []
 
         return json({

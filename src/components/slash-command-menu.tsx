@@ -22,6 +22,7 @@ export type SlashCommandMenuProps = {
   open: boolean
   query: string
   onSelect: (command: SlashCommandDefinition) => void
+  commands?: Array<SlashCommandDefinition>
 }
 
 export type SlashCommandMenuHandle = {
@@ -41,8 +42,28 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/help', description: 'Show available commands' },
 ]
 
+export function mergeSlashCommands(
+  base: Array<SlashCommandDefinition>,
+  additions: Array<SlashCommandDefinition>,
+): Array<SlashCommandDefinition> {
+  const merged: Array<SlashCommandDefinition> = []
+  const seen = new Set<string>()
+
+  for (const entry of [...base, ...additions]) {
+    const command = entry.command.trim()
+    if (!command || seen.has(command)) continue
+    seen.add(command)
+    merged.push({
+      command,
+      description: entry.description.trim() || 'Run command',
+    })
+  }
+
+  return merged
+}
+
 const SlashCommandMenu = forwardRef(function SlashCommandMenu(
-  { open, query, onSelect }: SlashCommandMenuProps,
+  { open, query, onSelect, commands = DEFAULT_SLASH_COMMANDS }: SlashCommandMenuProps,
   ref: Ref<SlashCommandMenuHandle>,
 ) {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -50,16 +71,16 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
 
   const filteredCommands = useMemo(() => {
     const normalizedQuery = query.trim()
-    if (!normalizedQuery) return DEFAULT_SLASH_COMMANDS
+    if (!normalizedQuery) return commands
 
-    return DEFAULT_SLASH_COMMANDS.filter((item) =>
+    return commands.filter((item) =>
       filter.contains(
         item,
         normalizedQuery,
         (target) => `${target.command} ${target.description}`,
       ),
     )
-  }, [filter, query])
+  }, [commands, filter, query])
 
   useEffect(() => {
     setActiveIndex(0)

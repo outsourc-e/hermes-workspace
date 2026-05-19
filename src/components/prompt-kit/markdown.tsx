@@ -1,6 +1,8 @@
 import { marked } from 'marked'
 import { createContext, memo, useContext, useId, useMemo, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { CodeBlock } from './code-block'
@@ -214,6 +216,9 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     return <li className="leading-relaxed">{children}</li>
   },
   a: function AComponent({ children, href }) {
+    if (!href) {
+      return <span className="text-primary-950">{children}</span>
+    }
     return (
       <a
         href={href}
@@ -224,6 +229,12 @@ const INITIAL_COMPONENTS: Partial<Components> = {
         {children}
       </a>
     )
+  },
+  img: function ImgComponent({ src, alt, ...props }) {
+    if (!src) {
+      return null
+    }
+    return <img src={src} alt={alt ?? ''} {...props} />
   },
   blockquote: function BlockquoteComponent({ children }) {
     return (
@@ -334,6 +345,101 @@ const INITIAL_COMPONENTS: Partial<Components> = {
   },
 }
 
+const HTML_SANITIZE_SCHEMA = {
+  tagNames: [
+    'a',
+    'abbr',
+    'article',
+    'b',
+    'bdi',
+    'blockquote',
+    'br',
+    'caption',
+    'center',
+    'cite',
+    'code',
+    'col',
+    'colgroup',
+    'data',
+    'dd',
+    'del',
+    'details',
+    'dfn',
+    'div',
+    'dl',
+    'dt',
+    'em',
+    'figcaption',
+    'figure',
+    'footer',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'header',
+    'hgroup',
+    'hr',
+    'i',
+    'img',
+    'ins',
+    'kbd',
+    'li',
+    'main',
+    'mark',
+    'nav',
+    'ol',
+    'p',
+    'pre',
+    'q',
+    'rp',
+    'rt',
+    'ruby',
+    's',
+    'samp',
+    'section',
+    'small',
+    'span',
+    'strong',
+    'sub',
+    'summary',
+    'sup',
+    'table',
+    'tbody',
+    'td',
+    'tfoot',
+    'th',
+    'thead',
+    'time',
+    'tr',
+    'u',
+    'ul',
+    'var',
+    'wbr',
+  ],
+  attributes: {
+    '*': ['className', 'class', 'title', 'lang', 'dir'],
+    a: ['href', 'target', 'rel', 'download'],
+    img: ['src', 'alt', 'width', 'height', 'loading'],
+    td: ['colspan', 'rowspan', 'headers'],
+    th: ['colspan', 'rowspan', 'headers', 'scope'],
+    col: ['span'],
+    colgroup: ['span'],
+    ol: ['start', 'type'],
+    li: ['value'],
+    details: ['open'],
+    time: ['datetime'],
+    data: ['value'],
+    del: ['datetime'],
+    ins: ['datetime'],
+  },
+  protocols: {
+    a: { href: ['http', 'https', 'mailto', 'tel'] },
+    img: { src: ['http', 'https', 'data'] },
+  },
+}
+
 const MemoizedMarkdownBlock = memo(
   function MarkdownBlock({
     content,
@@ -345,6 +451,7 @@ const MemoizedMarkdownBlock = memo(
     return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, HTML_SANITIZE_SCHEMA]]}
         components={components}
       >
         {content}

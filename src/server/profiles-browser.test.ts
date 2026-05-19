@@ -49,6 +49,35 @@ describe('listProfiles', () => {
     expect(profiles.find((profile) => profile.name === 'jarvis')?.description).toBe('Named operator')
   })
 
+  it('skips profiles/default so only the root-backed default card renders', () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const defaultDirRoot = path.join(hermesRoot, 'profiles', 'default')
+    const namedProfileRoot = path.join(hermesRoot, 'profiles', 'builder')
+
+    fs.mkdirSync(defaultDirRoot, { recursive: true })
+    fs.mkdirSync(namedProfileRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(hermesRoot, 'config.yaml'),
+      'model: root-model\nprovider: openai\ndescription: Root default\n',
+      'utf-8',
+    )
+    fs.writeFileSync(
+      path.join(namedProfileRoot, 'config.yaml'),
+      'model: named-model\nprovider: anthropic\ndescription: Named operator\n',
+      'utf-8',
+    )
+
+    const profiles = listProfiles()
+    const defaultProfiles = profiles.filter((profile) => profile.name === 'default')
+
+    expect(defaultProfiles).toHaveLength(1)
+    expect(defaultProfiles[0]?.path).toBe(hermesRoot)
+    expect(defaultProfiles[0]?.model).toBe('root-model')
+    expect(defaultProfiles[0]?.provider).toBe('openai')
+    expect(defaultProfiles[0]?.description).toBe('Root default')
+    expect(profiles.find((profile) => profile.name === 'builder')?.provider).toBe('anthropic')
+  })
+
   it('reads and updates profile descriptions from config.yaml', () => {
     const hermesRoot = path.join(tempHome, '.hermes')
     const profileRoot = path.join(hermesRoot, 'profiles', 'builder')

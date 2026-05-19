@@ -324,31 +324,85 @@ export function useRealtimeChatHistory({
             const prevCount =
               (prevData?.messages as Array<unknown> | undefined)?.length ?? 0
 
-            // Refetch immediately — done event message is already in realtime store
-            queryClient.invalidateQueries({ queryKey: key }).then(() => {
-              clearCompletedStreaming()
+            // Issue #441 fix: Directly merge realtime buffer into history cache
+            // INSTEAD of invalidateQueries. The old approach caused a race:
+            // invalidateQueries → refetch (async) → merge runs with stale data
+            // → duplicates appear briefly → refetch completes → fixed.
+            //
+            // New approach: merge realtime messages into the cache synchronously,
+            // then clear the realtime buffer in the same tick. A background
+            // refetch runs after for consistency but doesn't block rendering.
+            const store = useChatStore.getState()
+            const realtimeMessages =
+              store.realtimeMessages.get(effectiveSessionKey) ?? []
+            const historyMessages = prevData?.messages as
+              | Array<unknown>
+              | undefined
 
-              // Check for compaction — significant message count drop
-              const newData =
-                queryClient.getQueryData<Record<string, unknown>>(key)
-              const newCount =
-                (newData?.messages as Array<unknown> | undefined)?.length ?? 0
-              if (
-                prevCount > 10 &&
-                newCount > 0 &&
-                newCount < prevCount * 0.6
-              ) {
-                onCompactionEnd?.()
-                toast(
-                  'Context compacted — older messages were summarized to free up space',
-                  {
-                    type: 'info',
-                    icon: '🗜️',
-                    duration: 8000,
+            if (realtimeMessages.length > 0 && Array.isArray(historyMessages)) {
+              // Deduplicate: remove any realtime messages already in history
+              const historyTexts = new Set(
+                historyMessages.map((m: unknown) => {
+                  const raw = m as Record<string, unknown>
+                  const content = raw.content ?? raw.text ?? ''
+                  return `${raw.role ?? ''}:${JSON.stringify(content)}`
+                }),
+              )
+              const dedupedRealtime = realtimeMessages.filter((m: unknown) => {
+                const raw = m as Record<string, unknown>
+                const content = raw.content ?? raw.text ?? ''
+                const sig = `${raw.role ?? ''}:${JSON.stringify(content)}`
+                return !historyTexts.has(sig)
+              })
+
+              if (dedupedRealtime.length > 0) {
+                const merged = [...historyMessages, ...dedupedRealtime].sort(
+                  (a: unknown, b: unknown) => {
+                    const aTs = (a as Record<string, unknown>).createdAt as
+                      | number
+                      | undefined
+                    const bTs = (b as Record<string, unknown>).createdAt as
+                      | number
+                      | undefined
+                    if (typeof aTs === 'number' && typeof bTs === 'number')
+                      return aTs - bTs
+                    return 0
                   },
                 )
+                queryClient.setQueryData(key, {
+                  ...(prevData ?? {}),
+                  messages: merged,
+                })
               }
-            })
+            }
+
+            // Clear realtime buffer immediately — no more stale data in render
+            store.clearRealtimeBuffer(effectiveSessionKey)
+            clearCompletedStreaming()
+
+            // Background refetch for long-term consistency — doesn't block render
+            queryClient.invalidateQueries({ queryKey: key, refetchType: 'all' })
+
+            // Check for compaction — significant message count drop
+            const newData =
+              queryClient.getQueryData<Record<string, unknown>>(key)
+            const newCount =
+              (newData?.messages as Array<unknown> | undefined)?.length ?? 0
+            if (
+              prevCount > 10 &&
+              newCount > 0 &&
+              newCount < prevCount * 0.6
+            ) {
+              onCompactionEnd?.()
+              toast(
+                'Context compacted — older messages were summarized to free up space',
+                {
+                  type: 'info',
+                  icon: '🗜️',
+                  duration: 8000,
+                },
+              )
+            }
           }
         }
       },

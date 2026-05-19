@@ -120,10 +120,6 @@ function ContextAlertModalComponent({
                 />
               )}
               <Recommendation
-                icon="🗜️"
-                text="Enable auto-compaction in Settings → Config to automatically manage context"
-              />
-              <Recommendation
                 icon="📋"
                 text="Summarize important details before starting a new chat"
               />

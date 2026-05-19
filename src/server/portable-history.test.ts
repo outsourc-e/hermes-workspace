@@ -6,7 +6,7 @@ import {
 } from './portable-history'
 
 describe('portable history replay', () => {
-  it('skips replay when the gateway can bind portable chat to a server session', () => {
+  it('skips replay when the Hermes gateway can continue the server-side session', () => {
     expect(
       shouldReplayPortableHistory({
         bearerToken: 'token',
@@ -32,12 +32,12 @@ describe('portable history replay', () => {
     ).toEqual([{ role: 'assistant', content: 'old reply' }])
   })
 
-  it('falls back to client-sent history when no persisted local session exists', () => {
+  it('falls back to client-sent history for direct local-provider requests when no persisted local session exists', () => {
     expect(
       selectPortableConversationHistory(
         [],
         [{ role: 'user', content: 'fallback' }],
-        { bearerToken: '' },
+        { localBaseUrl: 'http://127.0.0.1:11434', bearerToken: '' },
       ),
     ).toEqual([{ role: 'user', content: 'fallback' }])
   })

@@ -1,5 +1,3 @@
-import { BEARER_TOKEN } from './gateway-capabilities'
-
 export type PortableHistoryMessage = {
   role: string
   content: string
@@ -10,12 +8,15 @@ export function shouldReplayPortableHistory(options?: {
   bearerToken?: string
 }): boolean {
   const localBaseUrl = options?.localBaseUrl?.trim() || ''
+  // Direct local-provider / custom-base-url requests remain stateless from the
+  // workspace perspective, so replay the transcript there.
   if (localBaseUrl) return true
 
-  const bearerToken =
-    typeof options?.bearerToken === 'string' ? options.bearerToken : BEARER_TOKEN
-
-  return !bearerToken.trim()
+  // When portable chat targets the Hermes gateway, Workspace now forwards a
+  // stable X-Hermes-Session-Id / X-Claude-Session-Id for server-side session
+  // continuity. Replaying the full transcript on every turn would duplicate
+  // prompt context and can explode token usage.
+  return false
 }
 
 export function selectPortableConversationHistory(

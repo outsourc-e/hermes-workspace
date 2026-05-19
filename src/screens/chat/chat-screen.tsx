@@ -485,11 +485,29 @@ export function ChatScreen({
   // resolvedSessionKey isn't available yet (defined below), so we track it via
   // a ref that's updated once it resolves. The memo/callback read the ref.
   const sessionKeyForWaiting = useRef<string | undefined>(undefined)
+  const [activeRunCheckDone, setActiveRunCheckDone] = useState(false)
+
+  // Track stale-restored sessions that need API verification before showing thinking.
+  // On page reload, sessionStorage may contain stale "waiting" flags from a
+  // previous session. We must not show the thinking indicator until the
+  // active-run API check confirms the run is genuinely active. (Issue #449)
+  const pendingVerifySessionKeyRef = useRef<string | undefined>(undefined)
   const waitingForResponse = useMemo(() => {
     const key = sessionKeyForWaiting.current
     if (!key) return hasPendingSend() || hasPendingGeneration()
+
+    // If we restored waiting state from sessionStorage but haven't verified
+    // with the API yet, don't show thinking — it might be stale (Issue #449).
+    if (
+      storeWaiting.has(key) &&
+      pendingVerifySessionKeyRef.current === key &&
+      !activeRunCheckDone
+    ) {
+      return false
+    }
+
     return storeWaiting.has(key)
-  }, [storeWaiting])
+  }, [storeWaiting, activeRunCheckDone])
 
   const setWaitingForResponse = useCallback((waiting: boolean) => {
     const store = useChatStore.getState()
@@ -595,11 +613,30 @@ export function ChatScreen({
   // Keep the waiting-state ref in sync with the resolved session key
   sessionKeyForWaiting.current = resolvedSessionKey
 
+  // Detect stale restored waiting state from sessionStorage — we need API
+  // verification before showing thinking (Issue #449).
+  useEffect(() => {
+    const currentSessionKey = resolvedSessionKey
+    if (!currentSessionKey || isNewChat) return
+    const store = useChatStore.getState()
+    if (store.isSessionWaiting(currentSessionKey)) {
+      pendingVerifySessionKeyRef.current = currentSessionKey
+      setActiveRunCheckDone(false)
+    } else {
+      // No restored waiting state — no need to verify
+      pendingVerifySessionKeyRef.current = undefined
+      setActiveRunCheckDone(true)
+    }
+  }, [resolvedSessionKey, isNewChat])
+
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
     sessionKey: resolvedSessionKey ?? '',
     enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
+    onCheckComplete: useCallback(() => {
+      setActiveRunCheckDone(true)
+    }, []),
   })
 
   // Wire SSE realtime stream for instant message delivery

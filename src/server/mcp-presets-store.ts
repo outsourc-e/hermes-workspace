@@ -22,12 +22,12 @@ import {
   unlinkSync,
   writeSync,
 } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join, resolve as pathResolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomBytes } from 'node:crypto'
 import type { McpClientInput } from '../types/mcp'
 import { parseMcpServerInput } from './mcp-input-validate'
+import { getStateDir } from './workspace-state-dir'
 
 export interface McpPreset {
   id: string
@@ -92,16 +92,8 @@ const TOP_KNOWN_FIELDS = new Set(['version', 'presets'])
 
 let _cache: CacheEntry | null = null
 
-function hermesHome(): string {
-  const override = process.env.HERMES_HOME?.trim()
-  if (override) return override
-  const claudeHome = process.env.CLAUDE_HOME?.trim()
-  if (claudeHome) return claudeHome
-  return join(homedir(), '.hermes')
-}
-
 export function presetsFilePath(): string {
-  return join(hermesHome(), 'mcp-presets.json')
+  return join(getStateDir(), 'mcp-presets.json')
 }
 
 /**

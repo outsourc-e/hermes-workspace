@@ -1,5 +1,3 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -7,36 +5,7 @@ import { requireJsonContentType } from '../../server/rate-limit'
 import { deleteSession } from '../../server/claude-api'
 import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { cancelSwarmMission } from '../../server/swarm-missions'
-import { getProfilesDir } from '../../server/claude-paths'
-
-function resetNativeWorkerRuntime(workerId: string, missionId: string): boolean {
-  const runtimePath = join(getProfilesDir(), workerId, 'runtime.json')
-  let current: Record<string, unknown> = {}
-  if (existsSync(runtimePath)) {
-    try {
-      current = JSON.parse(readFileSync(runtimePath, 'utf8')) as Record<string, unknown>
-    } catch {
-      current = {}
-    }
-  }
-  const now = new Date().toISOString()
-  writeFileSync(runtimePath, JSON.stringify({
-    ...current,
-    workerId,
-    state: 'idle',
-    phase: 'cancelled',
-    currentTask: null,
-    currentMissionId: null,
-    currentAssignmentId: null,
-    checkpointStatus: 'none',
-    needsHuman: false,
-    blockedReason: null,
-    lastCheckIn: now,
-    lastSummary: `Cancelled native Conductor mission ${missionId}`,
-    nextAction: 'Idle; ready for next Conductor or Swarm dispatch.',
-  }, null, 2) + '\n')
-  return true
-}
+import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 
 export const Route = createFileRoute('/api/conductor-stop')({
   server: {
@@ -78,7 +47,10 @@ export const Route = createFileRoute('/api/conductor-stop')({
                 cancelledNativeMissions += 1
                 for (const workerId of Array.from(new Set(cancelled.mission.assignments.map((assignment) => assignment.workerId)))) {
                   try {
-                    resetNativeWorkerRuntime(workerId, missionId)
+                    resetSwarmWorkerRuntime(workerId, {
+                      actor: 'conductor-stop',
+                      reason: `Cancelled native Conductor mission ${missionId}`,
+                    })
                   } catch {
                     // Runtime reset is best-effort; cancellation state is still durable.
                   }

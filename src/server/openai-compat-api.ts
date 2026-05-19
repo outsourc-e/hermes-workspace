@@ -283,9 +283,14 @@ export async function openaiChat(
   if (bearer) {
     headers['Authorization'] = `Bearer ${bearer}`
   }
-  // Only send session header when authenticated — gateways without
-  // API_SERVER_KEY reject this header with an auth error.
-  if (options.sessionId && bearer) {
+  // Session continuity is part of request routing, not authentication.
+  // If the gateway requires auth, _check_auth has already validated the
+  // bearer above; when it does not, dropping these headers forces Hermes
+  // Agent to derive a fresh api-* session from each message payload.
+  if (options.sessionId) {
+    headers['X-Hermes-Session-Id'] = options.sessionId
+    // Back-compat for older/Claude-compatible adapters that still look for
+    // the pre-Hermes header name.  Hermes Agent ignores this alias.
     headers['X-Claude-Session-Id'] = options.sessionId
   }
 

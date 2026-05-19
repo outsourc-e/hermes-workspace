@@ -159,45 +159,71 @@ export const Route = createFileRoute('/api/session-status')({
             })
           }
 
-          const session = await getSession(sessionKey)
-          const config = capabilities.config
-            ? await getConfig()
-            : ({ model: '', provider: '' } as const)
+          try {
+            const session = await getSession(sessionKey)
+            const config = capabilities.config
+              ? await getConfig()
+              : ({ model: '', provider: '' } as const)
 
-          const inputTokens = session.input_tokens ?? 0
-          const outputTokens = session.output_tokens ?? 0
-          const contextUsage = await readContextUsage(session.id)
+            const inputTokens = session.input_tokens ?? 0
+            const outputTokens = session.output_tokens ?? 0
+            const contextUsage = await readContextUsage(session.id)
 
-          return json({
-            ok: true,
-            payload: {
-              status: session.ended_at ? 'ended' : 'idle',
-              sessionKey: session.id,
-              sessionLabel: session.title ?? '',
-              model: session.model ?? config.model ?? '',
-              modelProvider: config.provider ?? '',
-              inputTokens,
-              outputTokens,
-              totalTokens: inputTokens + outputTokens,
-              contextPercent: contextUsage.contextPercent,
-              maxTokens: contextUsage.maxTokens,
-              usedTokens: contextUsage.usedTokens,
-              sessions: [
-                {
-                  key: session.id,
-                  agentId: session.id,
-                  label: session.title ?? session.id,
-                  model: session.model ?? config.model ?? '',
-                  modelProvider: config.provider ?? '',
-                  updatedAt: session.last_active ?? session.started_at ?? 0,
-                  usage: {
-                    input: inputTokens,
-                    output: outputTokens,
+            return json({
+              ok: true,
+              payload: {
+                status: session.ended_at ? 'ended' : 'idle',
+                sessionKey: session.id,
+                sessionLabel: session.title ?? '',
+                model: session.model ?? config.model ?? '',
+                modelProvider: config.provider ?? '',
+                inputTokens,
+                outputTokens,
+                totalTokens: inputTokens + outputTokens,
+                contextPercent: contextUsage.contextPercent,
+                maxTokens: contextUsage.maxTokens,
+                usedTokens: contextUsage.usedTokens,
+                sessions: [
+                  {
+                    key: session.id,
+                    agentId: session.id,
+                    label: session.title ?? session.id,
+                    model: session.model ?? config.model ?? '',
+                    modelProvider: config.provider ?? '',
+                    updatedAt: session.last_active ?? session.started_at ?? 0,
+                    usage: {
+                      input: inputTokens,
+                      output: outputTokens,
+                    },
                   },
-                },
-              ],
-            },
-          })
+                ],
+              },
+            })
+          } catch (sessionErr) {
+            const message =
+              sessionErr instanceof Error ? sessionErr.message : String(sessionErr)
+            if (!/not found|404/i.test(message)) {
+              throw sessionErr
+            }
+            const contextUsage = await readContextUsage(sessionKey)
+            return json({
+              ok: true,
+              payload: {
+                status: 'idle',
+                sessionKey,
+                sessionLabel: '',
+                model: contextUsage.model,
+                modelProvider: '',
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                contextPercent: contextUsage.contextPercent,
+                maxTokens: contextUsage.maxTokens,
+                usedTokens: contextUsage.usedTokens,
+                sessions: [],
+              },
+            })
+          }
         } catch (err) {
           return json(
             {

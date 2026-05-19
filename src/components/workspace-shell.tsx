@@ -375,7 +375,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               'h-full min-h-0 min-w-0 overflow-x-hidden bg-[var(--theme-bg)] relative',
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
-                ? 'pb-[calc(var(--tabbar-h,0px)+0.5rem)]'
+                ? 'pb-[calc(var(--tabbar-h,80px)+0.5rem)]'
                 : !isMobile &&
                     !isChromeFreeSurface &&
                     !isOnChatRoute &&
@@ -454,6 +454,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       </div>
 
       {!isChromeFreeSurface ? <MobileHamburgerMenu /> : null}
+      {!isChromeFreeSurface ? <MobileTabBar /> : null}
       {!isChromeFreeSurface && !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}

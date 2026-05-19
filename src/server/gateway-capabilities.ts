@@ -19,18 +19,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { getStateDir } from './workspace-state-dir'
 
 type WorkspaceOverrides = {
   claudeApiUrl?: string
   claudeDashboardUrl?: string
 }
 
-function hermesHome(): string {
-  return process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-}
-
 function overridesPath(): string {
-  return path.join(hermesHome(), 'workspace-overrides.json')
+  return path.join(getStateDir(), 'workspace-overrides.json')
 }
 
 function readOverrides(): WorkspaceOverrides {

@@ -72,10 +72,32 @@ function roleFromId(id: string): string {
   }
 }
 
-function deriveWorkerState(member: CrewMember, currentTask: string | null): WorkerState {
+function deriveWorkerState(
+  member: CrewMember,
+  currentTask: string | null,
+  checkpointStatus?: string | null,
+  runtimeState?: string | null,
+): WorkerState {
   const status = getOnlineStatus(member)
   if (status === 'offline') return 'offline'
+
+  // Authoritative runtime state takes precedence over the title heuristic.
+  // SwarmCheckpointStatus: 'none' | 'in_progress' | 'done' | 'blocked' | 'handoff' | 'needs_input'
+  // SwarmWorkerState: 'idle' | 'executing' | 'thinking' | 'writing' | 'waiting' | 'blocked' | 'syncing' | 'reviewing' | 'offline'
+  const cs = checkpointStatus ?? null
+  const rs = runtimeState ?? null
+
+  // Terminal-done: a finished worker renders as Idle (there is no 'done' WorkerState).
+  if (cs === 'done' || cs === 'handoff' || rs === 'idle') return 'idle'
+  // Blocked from either authoritative source.
+  if (cs === 'blocked' || rs === 'blocked') return 'error'
+  // Needs human input / waiting.
+  if (cs === 'needs_input' || rs === 'waiting') return 'waiting'
+
   if (!currentTask) return 'idle'
+
+  // Safety: a set, non-in-progress checkpoint must never render as active.
+  if (cs && cs !== 'none' && cs !== 'in_progress') return 'idle'
 
   const lc = currentTask.toLowerCase()
   if (lc.includes('review')) return 'reviewing'
@@ -191,6 +213,8 @@ const AVATAR_OPTIONS = ['','🤖','🧠','🛠️','📊','🧪','📝','⚙️'
 export type OperationalWorkerCardProps = {
   member: CrewMember
   currentTask?: string | null
+  checkpointStatus?: string | null
+  runtimeState?: string | null
   recentLines?: Array<string>
   recentOutputAt?: number | null
   recentSummary?: string | null
@@ -208,6 +232,8 @@ export type OperationalWorkerCardProps = {
 export function OperationalWorkerCard({
   member,
   currentTask = null,
+  checkpointStatus = null,
+  runtimeState = null,
   recentOutputAt = null,
   recentSummary = null,
   artifacts = [],
@@ -228,7 +254,7 @@ export function OperationalWorkerCard({
   const [draftModel, setDraftModel] = useState('')
   const [draftAvatar, setDraftAvatar] = useState('')
   const [taskComposerOpen, setTaskComposerOpen] = useState(false)
-  const state = deriveWorkerState(member, currentTask)
+  const state = deriveWorkerState(member, currentTask, checkpointStatus, runtimeState)
   const status = statusStyles(state)
   const role = settings.role || member.role || roleFromId(member.id)
   const displayName = settings.displayName || member.displayName || member.id

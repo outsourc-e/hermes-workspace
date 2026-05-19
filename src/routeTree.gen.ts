@@ -88,6 +88,7 @@ import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-provid
 import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
+import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
@@ -96,6 +97,7 @@ import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
 import { Route as ApiConnectionSettingsRouteImport } from './routes/api/connection-settings'
+import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
 import { Route as ApiConductorStopRouteImport } from './routes/api/conductor-stop'
 import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-spawn'
 import { Route as ApiClaudeUpdateRouteImport } from './routes/api/claude-update'
@@ -110,6 +112,7 @@ import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
+import { Route as ApiSwarmRuntimeResetRouteImport } from './routes/api/swarm-runtime.reset'
 import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
@@ -552,6 +555,11 @@ const ApiHermesTasksRoute = ApiHermesTasksRouteImport.update({
   path: '/api/hermes-tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
+  id: '/api/hermes-config',
+  path: '/api/hermes-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   id: '/api/gateway-status',
   path: '/api/gateway-status',
@@ -590,6 +598,11 @@ const ApiConnectionStatusRoute = ApiConnectionStatusRouteImport.update({
 const ApiConnectionSettingsRoute = ApiConnectionSettingsRouteImport.update({
   id: '/api/connection-settings',
   path: '/api/connection-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiConfigPatchRoute = ApiConfigPatchRouteImport.update({
+  id: '/api/config-patch',
+  path: '/api/config-patch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiConductorStopRoute = ApiConductorStopRouteImport.update({
@@ -661,6 +674,11 @@ const ApiUpdateAgentRoute = ApiUpdateAgentRouteImport.update({
   id: '/api/update/agent',
   path: '/api/update/agent',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmRuntimeResetRoute = ApiSwarmRuntimeResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
+  getParentRoute: () => ApiSwarmRuntimeRoute,
 } as any)
 const ApiSwarmMemorySearchRoute = ApiSwarmMemorySearchRouteImport.update({
   id: '/search',
@@ -927,6 +945,7 @@ export interface FileRoutesByFullPath {
   '/api/claude-update': typeof ApiClaudeUpdateRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
+  '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
@@ -935,6 +954,7 @@ export interface FileRoutesByFullPath {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -974,7 +994,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-project': typeof ApiSwarmProjectRoute
   '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
-  '/api/swarm-runtime': typeof ApiSwarmRuntimeRoute
+  '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
@@ -1031,6 +1051,7 @@ export interface FileRoutesByFullPath {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
@@ -1074,6 +1095,7 @@ export interface FileRoutesByTo {
   '/api/claude-update': typeof ApiClaudeUpdateRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
+  '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
@@ -1082,6 +1104,7 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -1121,7 +1144,7 @@ export interface FileRoutesByTo {
   '/api/swarm-project': typeof ApiSwarmProjectRoute
   '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
-  '/api/swarm-runtime': typeof ApiSwarmRuntimeRoute
+  '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
@@ -1178,6 +1201,7 @@ export interface FileRoutesByTo {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
@@ -1223,6 +1247,7 @@ export interface FileRoutesById {
   '/api/claude-update': typeof ApiClaudeUpdateRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
+  '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
@@ -1231,6 +1256,7 @@ export interface FileRoutesById {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -1270,7 +1296,7 @@ export interface FileRoutesById {
   '/api/swarm-project': typeof ApiSwarmProjectRoute
   '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
-  '/api/swarm-runtime': typeof ApiSwarmRuntimeRoute
+  '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
@@ -1327,6 +1353,7 @@ export interface FileRoutesById {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
@@ -1373,6 +1400,7 @@ export interface FileRouteTypes {
     | '/api/claude-update'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
+    | '/api/config-patch'
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
@@ -1381,6 +1409,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/hermes-config'
     | '/api/hermes-tasks'
     | '/api/history'
     | '/api/integrations'
@@ -1477,6 +1506,7 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/swarm-runtime/reset'
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
@@ -1520,6 +1550,7 @@ export interface FileRouteTypes {
     | '/api/claude-update'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
+    | '/api/config-patch'
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
@@ -1528,6 +1559,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/hermes-config'
     | '/api/hermes-tasks'
     | '/api/history'
     | '/api/integrations'
@@ -1624,6 +1656,7 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/swarm-runtime/reset'
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
@@ -1668,6 +1701,7 @@ export interface FileRouteTypes {
     | '/api/claude-update'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
+    | '/api/config-patch'
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
@@ -1676,6 +1710,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/hermes-config'
     | '/api/hermes-tasks'
     | '/api/history'
     | '/api/integrations'
@@ -1772,6 +1807,7 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/swarm-runtime/reset'
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
@@ -1817,6 +1853,7 @@ export interface RootRouteChildren {
   ApiClaudeUpdateRoute: typeof ApiClaudeUpdateRoute
   ApiConductorSpawnRoute: typeof ApiConductorSpawnRoute
   ApiConductorStopRoute: typeof ApiConductorStopRoute
+  ApiConfigPatchRoute: typeof ApiConfigPatchRoute
   ApiConnectionSettingsRoute: typeof ApiConnectionSettingsRoute
   ApiConnectionStatusRoute: typeof ApiConnectionStatusRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
@@ -1825,6 +1862,7 @@ export interface RootRouteChildren {
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
+  ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHermesTasksRoute: typeof ApiHermesTasksRouteWithChildren
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiIntegrationsRoute: typeof ApiIntegrationsRoute
@@ -1864,7 +1902,7 @@ export interface RootRouteChildren {
   ApiSwarmProjectRoute: typeof ApiSwarmProjectRoute
   ApiSwarmReportsRoute: typeof ApiSwarmReportsRoute
   ApiSwarmRosterRoute: typeof ApiSwarmRosterRoute
-  ApiSwarmRuntimeRoute: typeof ApiSwarmRuntimeRoute
+  ApiSwarmRuntimeRoute: typeof ApiSwarmRuntimeRouteWithChildren
   ApiSwarmTmuxScrollRoute: typeof ApiSwarmTmuxScrollRoute
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
   ApiSwarmTmuxStopRoute: typeof ApiSwarmTmuxStopRoute
@@ -2457,6 +2495,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesTasksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hermes-config': {
+      id: '/api/hermes-config'
+      path: '/api/hermes-config'
+      fullPath: '/api/hermes-config'
+      preLoaderRoute: typeof ApiHermesConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gateway-status': {
       id: '/api/gateway-status'
       path: '/api/gateway-status'
@@ -2511,6 +2556,13 @@ declare module '@tanstack/react-router' {
       path: '/api/connection-settings'
       fullPath: '/api/connection-settings'
       preLoaderRoute: typeof ApiConnectionSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/config-patch': {
+      id: '/api/config-patch'
+      path: '/api/config-patch'
+      fullPath: '/api/config-patch'
+      preLoaderRoute: typeof ApiConfigPatchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/conductor-stop': {
@@ -2610,6 +2662,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/update/agent'
       preLoaderRoute: typeof ApiUpdateAgentRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-runtime/reset': {
+      id: '/api/swarm-runtime/reset'
+      path: '/reset'
+      fullPath: '/api/swarm-runtime/reset'
+      preLoaderRoute: typeof ApiSwarmRuntimeResetRouteImport
+      parentRoute: typeof ApiSwarmRuntimeRoute
     }
     '/api/swarm-memory/search': {
       id: '/api/swarm-memory/search'
@@ -3112,6 +3171,18 @@ const ApiSwarmMemoryRouteWithChildren = ApiSwarmMemoryRoute._addFileChildren(
   ApiSwarmMemoryRouteChildren,
 )
 
+interface ApiSwarmRuntimeRouteChildren {
+  ApiSwarmRuntimeResetRoute: typeof ApiSwarmRuntimeResetRoute
+}
+
+const ApiSwarmRuntimeRouteChildren: ApiSwarmRuntimeRouteChildren = {
+  ApiSwarmRuntimeResetRoute: ApiSwarmRuntimeResetRoute,
+}
+
+const ApiSwarmRuntimeRouteWithChildren = ApiSwarmRuntimeRoute._addFileChildren(
+  ApiSwarmRuntimeRouteChildren,
+)
+
 interface ApiHermesworldReservationsRouteChildren {
   ApiHermesworldReservationsConfirmRoute: typeof ApiHermesworldReservationsConfirmRoute
 }
@@ -3162,6 +3233,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClaudeUpdateRoute: ApiClaudeUpdateRoute,
   ApiConductorSpawnRoute: ApiConductorSpawnRoute,
   ApiConductorStopRoute: ApiConductorStopRoute,
+  ApiConfigPatchRoute: ApiConfigPatchRoute,
   ApiConnectionSettingsRoute: ApiConnectionSettingsRoute,
   ApiConnectionStatusRoute: ApiConnectionStatusRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
@@ -3170,6 +3242,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
+  ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHermesTasksRoute: ApiHermesTasksRouteWithChildren,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiIntegrationsRoute: ApiIntegrationsRoute,
@@ -3209,7 +3282,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmProjectRoute: ApiSwarmProjectRoute,
   ApiSwarmReportsRoute: ApiSwarmReportsRoute,
   ApiSwarmRosterRoute: ApiSwarmRosterRoute,
-  ApiSwarmRuntimeRoute: ApiSwarmRuntimeRoute,
+  ApiSwarmRuntimeRoute: ApiSwarmRuntimeRouteWithChildren,
   ApiSwarmTmuxScrollRoute: ApiSwarmTmuxScrollRoute,
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
   ApiSwarmTmuxStopRoute: ApiSwarmTmuxStopRoute,

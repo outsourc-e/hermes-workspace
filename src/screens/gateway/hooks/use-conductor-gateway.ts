@@ -27,6 +27,16 @@ type ConductorMissionRecord = {
   session_id?: string | null
   lines?: unknown
   exit_code?: number | null
+  // Native-swarm fields returned by the conductor-spawn GET handler
+  nativeSwarm?: boolean
+  updatedAt?: number
+  assignments?: Array<{
+    id?: string
+    workerId: string
+    task?: string
+    state?: string
+    checkpoint?: { stateLabel?: string; result?: string; nextAction?: string } | null
+  }>
 }
 
 type ConductorMissionResponse = {
@@ -1013,7 +1023,52 @@ export function useConductorGateway() {
     refetchInterval: phase === 'decomposing' || phase === 'running' ? 2_500 : false,
   })
 
-  const workers = sessionsQuery.data ?? []
+  const sessionWorkers = sessionsQuery.data ?? []
+
+  // For native-swarm missions, build virtual worker cards from the mission
+  // assignments so the UI shows progress instead of "Spawning workers..." forever.
+  const swarmAssignments = missionStatusQuery.data?.assignments
+  const isNativeSwarm = missionStatusQuery.data?.nativeSwarm === true
+  const virtualWorkers = useMemo<ConductorWorker[]>(() => {
+    if (!isNativeSwarm || !swarmAssignments || swarmAssignments.length === 0) return []
+    const missionUpdatedAt = new Date(missionStatusQuery.data?.updatedAt ?? Date.now()).toISOString()
+    return swarmAssignments.map((assignment, index) => {
+      const workerId = assignment.workerId
+      const state = assignment.state ?? 'dispatched'
+      const checkpoint = assignment.checkpoint
+      const isComplete = state === 'checkpointed' || state === 'done' || state === 'cancelled'
+      const isBlocked = state === 'blocked' || state === 'needs_input'
+      const personaNames = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift', 'Flux', 'Volt']
+      const persona = personaNames[index % personaNames.length]
+      return {
+        key: workerId,
+        label: workerId,
+        model: 'native-swarm',
+        status: isComplete ? 'complete' : isBlocked ? 'stale' : 'running',
+        updatedAt: missionUpdatedAt,
+        displayName: `${persona} · ${state}`,
+        totalTokens: 0,
+        contextTokens: 0,
+        tokenUsageLabel: state,
+        raw: {
+          key: workerId,
+          label: workerId,
+          friendlyId: workerId,
+          status: isComplete ? 'completed' : 'running',
+          model: 'native-swarm',
+          lastMessage: null,
+          createdAt: missionStatusQuery.data?.updatedAt ?? Date.now(),
+          startedAt: missionStatusQuery.data?.updatedAt ?? Date.now(),
+          updatedAt: Date.now(),
+        } as GatewaySession,
+      }
+    })
+  }, [isNativeSwarm, swarmAssignments])
+
+  const workers = useMemo(() => {
+    if (sessionWorkers.length > 0) return sessionWorkers
+    return virtualWorkers
+  }, [sessionWorkers, virtualWorkers])
   const activeWorkers = useMemo(() => workers.filter((worker) => worker.status === 'running' || worker.status === 'idle'), [workers])
   const hasPersistedMission = initialMission !== null
 

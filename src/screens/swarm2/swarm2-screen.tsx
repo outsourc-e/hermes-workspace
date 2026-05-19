@@ -153,6 +153,7 @@ type RuntimeEntry = {
   lastResult?: string | null
   blockedReason?: string | null
   checkpointStatus?: string | null
+  state?: string | null
   needsHuman?: boolean | null
   assignedTaskCount?: number | null
   cronJobCount?: number | null
@@ -839,6 +840,8 @@ function ControlPlaneStage({
                       cardRef={setWorkerRef(member.id)}
                       member={member}
                       currentTask={runtime?.currentTask ?? null}
+                      checkpointStatus={runtime?.checkpointStatus ?? null}
+                      runtimeState={runtime?.state ?? null}
                       recentLines={recentLines(runtime)}
                       recentOutputAt={runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? null}
                       recentSummary={runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? null}
