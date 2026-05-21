@@ -72,13 +72,24 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
 
 function normalizeDeliver(value: unknown): Array<string> {
   if (Array.isArray(value)) {
-    return value.filter(
-      (entry): entry is string =>
-        typeof entry === 'string' && entry.trim().length > 0,
-    )
+    return value
+      .flatMap((entry) =>
+        typeof entry === 'string' ? entry.split(',') : [],
+      )
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
   }
-  if (typeof value === 'string' && value.trim()) return [value.trim()]
+  if (typeof value === 'string' && value.trim()) {
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+  }
   return []
+}
+
+function readDeliverTargets(value: unknown): Array<string> {
+  return Array.from(new Set(normalizeDeliver(value)))
 }
 
 function lastRunSuccess(job: RawCronJob): boolean | null {
@@ -214,11 +225,7 @@ function normalizeCreateArgs(
   const args = ['--profile', profile, 'cron', 'create']
   const name = readString(input.name)
   if (name) args.push('--name', name)
-  const deliver = Array.isArray(input.deliver)
-    ? input.deliver
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .filter((value) => value.length > 0)
-    : []
+  const deliver = readDeliverTargets(input.deliver)
   if (deliver.length > 0) args.push('--deliver', deliver.join(','))
   const skills = Array.isArray(input.skills)
     ? input.skills
@@ -293,11 +300,7 @@ export function updateProfileCronJob(
   const name = readString(updates.name)
   const schedule = readString(updates.schedule)
   const prompt = readString(updates.prompt, updates.input)
-  const deliver = Array.isArray(updates.deliver)
-    ? updates.deliver
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .filter((value) => value.length > 0)
-    : []
+  const deliver = readDeliverTargets(updates.deliver)
   if (name) args.push('--name', name)
   if (schedule) args.push('--schedule', schedule)
   if (prompt !== null) args.push('--prompt', prompt)
