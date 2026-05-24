@@ -82,7 +82,7 @@ function validateProfileName(name: string): string {
 }
 
 /**
- * Validate a profile name that will only be *read* (e.g. \`cloneFrom\` source).
+ * Validate a profile name that will only be *read* (e.g. `cloneFrom` source).
  * Any existing profile name is allowed, including 'default'.
  */
 function validateProfileIdentifier(name: string): string {
@@ -166,6 +166,177 @@ function extractDescription(config: Record<string, unknown>): string {
   }
 
   return ''
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard API fallback for split-host deployments
+// ---------------------------------------------------------------------------
+
+function getDashboardUrl(): string | undefined {
+  const url = process.env.HERMES_DASHBOARD_URL?.trim()
+  return url || undefined
+}
+
+function getDashboardToken(): string | undefined {
+  return (
+    process.env.HERMES_API_TOKEN?.trim() ||
+    process.env.CLAUDE_API_TOKEN?.trim() ||
+    process.env.CLAUDE_DASHBOARD_TOKEN?.trim() ||
+    undefined
+  )
+}
+
+async function fetchDashboardProfiles(): Promise<{
+  profiles: Array<ProfileSummary>
+  activeProfile: string
+} | null> {
+  const dashboardUrl = getDashboardUrl()
+  if (!dashboardUrl) return null
+
+  try {
+    const token = getDashboardToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(`${dashboardUrl}/api/profiles`, {
+      headers,
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!response.ok) return null
+
+    const data = (await response.json()) as {
+      profiles?: Array<{
+        name: string
+        model?: string
+        provider?: string
+        description?: string
+        is_default?: boolean
+        skill_count?: number
+        session_count?: number
+        has_env?: boolean
+        updated_at?: string
+      }>
+    }
+
+    if (!data.profiles || !Array.isArray(data.profiles)) return null
+
+    const activeProfile =
+      data.profiles.find((p) => p.is_default)?.name || 'default'
+
+    const profiles: Array<ProfileSummary> = data.profiles.map((p) => ({
+      name: p.name,
+      path: p.is_default
+        ? getClaudeRoot()
+        : path.join(getProfilesRoot(), p.name),
+      active: p.name === activeProfile,
+      exists: true,
+      model: p.model,
+      provider: p.provider,
+      description: p.description,
+      skillCount: p.skill_count ?? 0,
+      sessionCount: p.session_count ?? 0,
+      hasEnv: p.has_env ?? false,
+      updatedAt: p.updated_at,
+    }))
+
+    profiles.sort((a, b) => {
+      if (a.active && !b.active) return -1
+      if (!a.active && b.active) return 1
+      return Date.parse(b.updatedAt || '') - Date.parse(a.updatedAt || '')
+    })
+
+    return { profiles, activeProfile }
+  } catch (error) {
+    // Dashboard unreachable or returned unexpected data — fall back to filesystem
+    return null
+  }
+}
+
+/**
+ * List profiles with dashboard API fallback for split-host deployments.
+ * When HERMES_DASHBOARD_URL is set and reachable, fetches from the dashboard
+ * API. Falls back to filesystem reads for colocated deployments.
+ */
+export async function listProfilesWithFallback(): Promise<{
+  profiles: Array<ProfileSummary>
+  activeProfile: string
+}> {
+  // Try dashboard first for split-host deployments
+  const dashboardResult = await fetchDashboardProfiles()
+  if (dashboardResult) return dashboardResult
+
+  // Fall back to filesystem (colocated deployment)
+  return {
+    profiles: listProfiles(),
+    activeProfile: getActiveProfileName(),
+  }
+}
+
+/**
+ * Read a single profile with dashboard API fallback for split-host deployments.
+ */
+export async function readProfileWithFallback(
+  name: string,
+): Promise<ProfileDetail> {
+  // Try filesystem first (fast path for colocated deployments)
+  const normalized = name.trim() || 'default'
+  const profilePath =
+    normalized === 'default'
+      ? getClaudeRoot()
+      : path.join(getProfilesRoot(), validateProfileIdentifier(normalized))
+
+  if (fs.existsSync(profilePath)) {
+    return readProfile(normalized)
+  }
+
+  // Filesystem miss — try dashboard API for split-host deployments
+  const dashboardUrl = getDashboardUrl()
+  if (dashboardUrl) {
+    try {
+      const token = getDashboardToken()
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const response = await fetch(`${dashboardUrl}/api/profiles`, {
+        headers,
+        signal: AbortSignal.timeout(5000),
+      })
+      if (response.ok) {
+        const data = (await response.json()) as {
+          profiles?: Array<{
+            name: string
+            model?: string
+            provider?: string
+            description?: string
+            is_default?: boolean
+          }>
+        }
+        const match = data.profiles?.find(
+          (p) => p.name === normalized || (normalized === 'default' && p.is_default),
+        )
+        if (match) {
+          const active = getActiveProfileName()
+          return {
+            name: match.name,
+            path: match.is_default
+              ? getClaudeRoot()
+              : path.join(getProfilesRoot(), match.name),
+            active: match.name === active,
+            config: {
+              ...(match.model ? { model: match.model } : {}),
+              ...(match.provider ? { provider: match.provider } : {}),
+            },
+            description: match.description || '',
+            hasEnv: false,
+          }
+        }
+      }
+    } catch {
+      // Dashboard unreachable — fall through to error
+    }
+  }
+
+  throw new Error('Profile not found')
 }
 
 export function getActiveProfileName(): string {
