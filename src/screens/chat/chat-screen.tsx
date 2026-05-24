@@ -49,6 +49,7 @@ import {
   isRecentSession,
   resetPendingSend,
   setPendingGeneration,
+  clearPendingSendForSession,
 } from './pending-send'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
@@ -100,7 +101,7 @@ import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
-import { useChatStore } from '@/stores/chat-store'
+import { useChatStore, persistRecoveryMessage } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
@@ -1128,7 +1129,7 @@ export function ChatScreen({
       },
       [queryClient],
     ),
-    onComplete: useCallback(() => {
+    onComplete: useCallback((message: ChatMessage) => {
       const activeSend = activeSendRef.current
       if (activeSend?.clientId) {
         updateHistoryMessageByClientIdEverywhere(
@@ -1138,6 +1139,13 @@ export function ChatScreen({
             ...message,
             status: 'done',
           }),
+        )
+      }
+      if (activeSend?.sessionKey) {
+        persistRecoveryMessage(activeSend.sessionKey, message)
+        clearPendingSendForSession(
+          activeSend.sessionKey,
+          activeSend.friendlyId,
         )
       }
       activeSendRef.current = null

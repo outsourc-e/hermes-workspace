@@ -6,6 +6,7 @@ import type {
   SessionTitleStatus,
   ToolCallContent,
 } from './types'
+import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 
 export function deriveFriendlyIdFromKey(key: string | undefined): string {
   if (!key) return 'main'
@@ -52,7 +53,7 @@ function stripChannelPrefix(text: string): string {
  * and [Telegram/Signal/etc ...] headers, leaving just the user's text.
  */
 function cleanUserText(raw: string): string {
-  let text = raw
+  let text = stripWorkspaceDirective(raw)
 
   // Remove "Conversation info (untrusted metadata):" headers + JSON block
   // Format: "Conversation info (untrusted metadata):\n```json\n{...}\n```\n\n"
@@ -226,15 +227,15 @@ export function normalizeSessions(
         : undefined
     const explicitTitle =
       typeof session.title === 'string' && session.title.trim().length > 0
-        ? session.title.trim()
+        ? cleanUserText(session.title.trim()) || session.title.trim()
         : undefined
     const derivedTitle =
       typeof session.derivedTitle === 'string' &&
         session.derivedTitle.trim().length > 0
-        ? session.derivedTitle.trim()
+        ? cleanUserText(session.derivedTitle.trim()) || session.derivedTitle.trim()
         : typeof session.preview === 'string' &&
           session.preview.trim().length > 0
-          ? session.preview.trim()
+          ? cleanUserText(session.preview.trim()) || session.preview.trim()
           : undefined
     const titleStatus = deriveTitleStatus(
       label,
@@ -261,7 +262,10 @@ export function normalizeSessions(
       titleStatus,
       titleSource,
       titleError: session.titleError ?? null,
-      preview: session.preview ?? null,
+      preview:
+        typeof session.preview === 'string'
+          ? cleanUserText(session.preview) || session.preview.trim() || null
+          : session.preview ?? null,
     }
   })
 }

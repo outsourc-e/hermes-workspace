@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildWorkspaceScopedTextMessage } from './workspace-message-scope'
+import {
+  buildWorkspaceScopedTextMessage,
+  stripWorkspaceDirective,
+} from './workspace-message-scope'
 
 describe('buildWorkspaceScopedTextMessage', () => {
   it('prepends an explicit active workspace directive to plain text chat messages', () => {
@@ -38,5 +41,13 @@ describe('buildWorkspaceScopedTextMessage', () => {
         isValid: false,
       }),
     ).toBe('hello')
+  })
+
+  it('strips the workspace directive back out for user-visible rendering', () => {
+    expect(
+      stripWorkspaceDirective(
+        '<workspace_context active="true" name="Home" path="/Users/aurora/workspace" />\n\nRun the tests',
+      ),
+    ).toBe('Run the tests')
   })
 })

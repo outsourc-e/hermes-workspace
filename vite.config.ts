@@ -478,7 +478,10 @@ const config = defineConfig(({ mode, command }) => {
       //   2. $PORT env var (for containers, reverse proxies, WhatsApp bridge collisions, etc. — see #96)
       //   3. default 3000 (matches README/docs/docker-compose expectations)
       port: process.env.PORT ? Number(process.env.PORT) : 3000,
-      strictPort: false, // allow fallback if port is taken, but log clearly
+      // Managed Workspace launchers expect a stable port. Fail loudly instead
+      // of silently hopping to 3001+ so launchctl/service health matches the
+      // actual listening socket.
+      strictPort: true,
       allowedHosts: true,
       watch: {
         ignored: [

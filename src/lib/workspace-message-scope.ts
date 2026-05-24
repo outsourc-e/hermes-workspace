@@ -4,6 +4,9 @@ export type WorkspaceScope = {
   isValid?: boolean
 }
 
+const WORKSPACE_DIRECTIVE_RE =
+  /^\s*<workspace_context\s+active="true"\s+name="[^"]*"\s+path="[^"]*"\s*\/?>\s*/i
+
 function escapeAttribute(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -27,4 +30,9 @@ export function buildWorkspaceScopedTextMessage(
   const directive = workspace ? buildWorkspaceDirective(workspace) : ''
   if (!directive) return message
   return `${directive}\n\n${message}`
+}
+
+export function stripWorkspaceDirective(message: string): string {
+  if (!message.includes('<workspace_context active="true"')) return message
+  return message.replace(WORKSPACE_DIRECTIVE_RE, '').trimStart()
 }

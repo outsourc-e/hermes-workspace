@@ -9,7 +9,7 @@
 # Or pull pre-built:
 #   docker pull ghcr.io/outsourc-e/hermes-workspace:latest
 #
-FROM tianon/gosu:1.19-bookworm AS gosu_source
+FROM tianon/gosu:1.17-bookworm AS gosu_source
 # ─── build stage ─────────────────────────────────────────────────────────
 FROM node:22-slim AS build
 RUN corepack enable && apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
