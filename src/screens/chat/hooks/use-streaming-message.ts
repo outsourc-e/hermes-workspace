@@ -983,7 +983,21 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
         const lifecyclePhase = lifecyclePhaseRef.current as StreamLifecyclePhase
         if (!finishedRef.current && lifecyclePhase !== 'handoff') {
-          finishStream()
+          // If the stream ended cleanly (no 'done' event) but we never received
+          // any response text, treat it as a failure rather than a successful
+          // empty completion. This happens when a proxy (e.g., Tailscale Serve)
+          // closes the connection after an idle timeout — the reader returns
+          // { done: true } but the model was still generating. Fixes #512.
+          if (
+            !fullTextRef.current &&
+            (lifecyclePhase === 'accepted' || lifecyclePhase === 'active')
+          ) {
+            markFailed(
+              'Connection closed before response was received. The backend may still be processing — check server logs or retry.',
+            )
+          } else {
+            finishStream()
+          }
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
