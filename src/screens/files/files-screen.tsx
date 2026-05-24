@@ -981,7 +981,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
           {header}
           <ScrollAreaRoot className="flex-1 min-h-0">
             <ScrollAreaViewport>
-              <pre className="code-viewer px-4 py-4 text-xs font-mono leading-relaxed text-primary-800 dark:text-neutral-300">
+              <pre className="code-viewer whitespace-pre-wrap break-words px-4 py-4 text-xs font-mono leading-relaxed text-primary-800 dark:text-neutral-300">
                 <code>{displayContent}</code>
               </pre>
             </ScrollAreaViewport>

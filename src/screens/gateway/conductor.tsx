@@ -1293,15 +1293,16 @@ export function Conductor() {
 
     return (
       <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col items-stretch justify-center px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-6">
+        <main className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col items-stretch justify-start px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-6">
           <div className="w-full space-y-6">
-            <div className="space-y-2 text-center">
-              <div className="relative flex items-center justify-center">
-                <div className="inline-flex items-center gap-2.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
-                  Conductor
-                  <span className="size-2.5 rounded-full bg-emerald-400" />
+            <div className="space-y-2 md:text-center">
+              <div className="flex items-center gap-2">
+                <div className="hidden md:block flex-1" />
+                <div className="hidden md:inline-flex shrink-0 items-center gap-2.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
+                  <span>Conductor</span>
+                  <span className="size-2.5 shrink-0 rounded-full bg-emerald-400" />
                 </div>
-                <div className="absolute right-0 flex items-center gap-2">
+                <div className="flex md:flex-1 items-center justify-end gap-2 ml-auto md:ml-0">
                   <WorkflowHelpModal
                     compact
                     eyebrow="Conductor"
@@ -1351,7 +1352,7 @@ export function Conductor() {
               <p className="text-sm text-[var(--theme-muted-2)]">Launch a mission and watch your agent team build it live.</p>
             </div>
 
-            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)] md:h-[520px]">
+            <section className="h-[280px] overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)] md:h-[520px]">
               <OfficeView
                 agentRows={homeOfficeRows}
                 missionRunning={homeOfficeRows.some((a) => a.status === 'active')}
@@ -1421,19 +1422,19 @@ export function Conductor() {
                               key={entry.id}
                               type="button"
                               onClick={() => conductor.setSelectedHistoryEntry(entry)}
-                              className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-left text-sm transition-colors hover:border-[var(--theme-accent)]"
+                              className="flex w-full items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-left text-sm transition-colors hover:border-[var(--theme-accent)] sm:gap-3"
                             >
                               <span className="min-w-0 flex-1 truncate font-medium text-[var(--theme-text)]">{entry.goal}</span>
                               <span
                                 className={cn(
-                                  'w-[76px] shrink-0 rounded-full border px-2 py-0.5 text-center text-[10px] font-medium uppercase tracking-[0.12em]',
+                                  'w-[72px] shrink-0 rounded-full border px-2 py-0.5 text-center text-[10px] font-medium uppercase tracking-[0.12em]',
                                   entry.status === 'completed' ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300' : 'border-red-400/35 bg-red-500/10 text-red-300',
                                 )}
                               >
                                 {entry.status === 'completed' ? 'Complete' : 'Failed'}
                               </span>
-                              <span className="w-[52px] shrink-0 text-right text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(entry.completedAt, now)}</span>
-                              <span className="w-[72px] shrink-0 text-right text-xs text-[var(--theme-muted)]">{entry.totalTokens.toLocaleString()} tok</span>
+                              <span className="w-[48px] shrink-0 text-right text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(entry.completedAt, now)}</span>
+                              <span className="hidden shrink-0 text-right text-xs text-[var(--theme-muted)] sm:inline">{entry.totalTokens.toLocaleString()} tok</span>
                             </button>
                           )
                         })
@@ -1455,7 +1456,7 @@ export function Conductor() {
                           const dotClass = sessionStatus === 'completed' ? 'bg-emerald-400' : sessionStatus === 'failed' ? 'bg-red-400' : 'bg-sky-400 animate-pulse'
 
                           return (
-                            <div key={recentSession.key} className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm">
+                            <div key={recentSession.key} className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm sm:gap-3">
                               <span className="min-w-0 flex-1 truncate font-medium capitalize text-[var(--theme-text)]">{displayName}</span>
                               <span
                                 className={cn(
@@ -1471,7 +1472,7 @@ export function Conductor() {
                                 {sessionStatus}
                               </span>
                               <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(updatedAt, now)}</span>
-                              <span className="shrink-0 text-xs text-[var(--theme-muted)]">{tokens.toLocaleString()} tok</span>
+                              <span className="hidden shrink-0 text-xs text-[var(--theme-muted)] sm:inline">{tokens.toLocaleString()} tok</span>
                               <span className="hidden shrink-0 text-xs text-[var(--theme-muted)] sm:inline">{model}</span>
                             </div>
                           )
@@ -1834,7 +1835,7 @@ export function Conductor() {
       <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
           <div className="space-y-6">
-            <div className="space-y-2 text-center">
+            <div className="text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Decomposition</p>
               <h1 className="text-2xl font-semibold tracking-tight">{conductor.goal}</h1>
               <p className="text-sm text-[var(--theme-muted-2)]">The agent is breaking the mission into workers. Once they spawn, this view flips into the active board.</p>

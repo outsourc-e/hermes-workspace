@@ -107,6 +107,7 @@ type ConductorSpawnResponse = {
   jobId?: string | null
   jobName?: string | null
   runId?: string | null
+  assignments?: Array<{ workerId: string; task: string; rationale: string }>
   error?: string
 }
 
@@ -1021,6 +1022,8 @@ export function useConductorGateway() {
     },
     enabled: Boolean(missionId) && phase !== 'idle',
     refetchInterval: phase === 'decomposing' || phase === 'running' ? 2_500 : false,
+    retry: Infinity,
+    retryDelay: (attemptIndex: number) => Math.min(2000 * 2 ** attemptIndex, 10_000),
   })
 
   const sessionWorkers = sessionsQuery.data ?? []
@@ -1589,6 +1592,27 @@ export function useConductorGateway() {
         return
       }
 
+      // native-swarm mode: local swarm workers handle the mission, no orchestrator session
+      if (result.mode === 'native-swarm') {
+        const missionId = result.missionId ?? null
+        setMissionId(missionId)
+        setMissionJobId(result.jobId ?? null)
+        setOrchestratorSessionKey(missionId)
+        if (missionId) {
+          setMissionWorkerKeys((current) => {
+            if (current.has(missionId)) return current
+            const next = new Set(current)
+            next.add(missionId)
+            return next
+          })
+        }
+        setPlanText(result.assignments?.length
+          ? `Native swarm mission launched with ${result.assignments.length} workers. Watching for swarm activity...`
+          : 'Native swarm mission launched. Decomposing and spawning workers...')
+        setPhase('running')
+        return
+      }
+
       if (!result.sessionKey && !result.sessionKeyPrefix && !result.missionId && !result.jobId) {
         throw new Error(result.error ?? 'Failed to spawn orchestrator')
       }
@@ -1609,7 +1633,7 @@ export function useConductorGateway() {
         })
       }
 
-      if (prefix && orchestratorKey) {
+      if (prefix) {
         // Async: resolve the placeholder to the real session key once it exists.
         const resolveOrchestrator = async () => {
           for (let attempt = 0; attempt < 30; attempt += 1) {

@@ -927,7 +927,7 @@ export function DashboardScreen() {
         {/* Action row: hierarchy per Hermes Agent review.
            New Chat is primary (full button + accent), Terminal +
            Skills are secondary, Settings collapses to icon-only. */}
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:max-w-xl">
+        <div className="flex w-full flex-wrap items-center gap-2 lg:justify-end lg:max-w-xl">
           <button
             type="button"
             onClick={() =>
@@ -936,7 +936,7 @@ export function DashboardScreen() {
                 params: { sessionKey: 'new' },
               })
             }
-            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3.5 py-2 text-sm font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99]"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99] sm:px-3.5 sm:py-2 sm:text-sm"
             style={{
               background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentSecondary})`,
               color: 'var(--theme-on-accent, white)',

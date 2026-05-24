@@ -113,7 +113,7 @@ export function OpsStrip({
       style={{ borderColor: 'var(--theme-border)' }}
     >
       {/* Gateway block: state + version + active agents */}
-      <div className="flex items-center gap-3 text-[11px]">
+      <div className="flex flex-wrap items-center gap-3 text-[11px]">
         <span className="flex items-center gap-2">
           <span
             className={cn(
