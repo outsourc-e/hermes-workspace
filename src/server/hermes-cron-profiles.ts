@@ -1,10 +1,29 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { getHermesRoot, getProfilesDir } from './claude-paths'
 
 const PROFILE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 const JOB_ID_RE = /^[A-Fa-f0-9]{8,64}$/
+
+const HERMES_BIN_CANDIDATES = [
+  process.env.HERMES_CLI_BIN,
+  join(homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'hermes'),
+  join(homedir(), '.local', 'bin', 'hermes'),
+  'hermes',
+].filter((value): value is string => Boolean(value))
+
+function resolveHermesBin(): string {
+  for (const candidate of HERMES_BIN_CANDIDATES) {
+    if (candidate.includes('/')) {
+      if (existsSync(candidate)) return candidate
+      continue
+    }
+    return candidate
+  }
+  return 'hermes'
+}
 
 type RawCronJob = Record<string, unknown>
 
@@ -53,13 +72,24 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
 
 function normalizeDeliver(value: unknown): Array<string> {
   if (Array.isArray(value)) {
-    return value.filter(
-      (entry): entry is string =>
-        typeof entry === 'string' && entry.trim().length > 0,
-    )
+    return value
+      .flatMap((entry) =>
+        typeof entry === 'string' ? entry.split(',') : [],
+      )
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
   }
-  if (typeof value === 'string' && value.trim()) return [value.trim()]
+  if (typeof value === 'string' && value.trim()) {
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+  }
   return []
+}
+
+function readDeliverTargets(value: unknown): Array<string> {
+  return Array.from(new Set(normalizeDeliver(value)))
 }
 
 function lastRunSuccess(job: RawCronJob): boolean | null {
@@ -195,11 +225,7 @@ function normalizeCreateArgs(
   const args = ['--profile', profile, 'cron', 'create']
   const name = readString(input.name)
   if (name) args.push('--name', name)
-  const deliver = Array.isArray(input.deliver)
-    ? input.deliver
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .filter((value) => value.length > 0)
-    : []
+  const deliver = readDeliverTargets(input.deliver)
   if (deliver.length > 0) args.push('--deliver', deliver.join(','))
   const skills = Array.isArray(input.skills)
     ? input.skills
@@ -224,7 +250,7 @@ export function createProfileCronJob(
   profile: string,
   input: Record<string, unknown>,
 ): Record<string, unknown> {
-  const output = execFileSync('hermes', normalizeCreateArgs(profile, input), {
+  const output = execFileSync(resolveHermesBin(), normalizeCreateArgs(profile, input), {
     encoding: 'utf8',
     timeout: 30_000,
   })
@@ -250,7 +276,7 @@ export function runProfileCronAction(
   validateProfileAndMaybeJob(profile, jobId)
   const cliAction = action === 'remove' ? 'remove' : action
   const output = execFileSync(
-    'hermes',
+    resolveHermesBin(),
     ['--profile', profile, 'cron', cliAction, jobId],
     {
       encoding: 'utf8',
@@ -274,11 +300,7 @@ export function updateProfileCronJob(
   const name = readString(updates.name)
   const schedule = readString(updates.schedule)
   const prompt = readString(updates.prompt, updates.input)
-  const deliver = Array.isArray(updates.deliver)
-    ? updates.deliver
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .filter((value) => value.length > 0)
-    : []
+  const deliver = readDeliverTargets(updates.deliver)
   if (name) args.push('--name', name)
   if (schedule) args.push('--schedule', schedule)
   if (prompt !== null) args.push('--prompt', prompt)
@@ -288,7 +310,7 @@ export function updateProfileCronJob(
       ? String(updates.repeat)
       : null
   if (repeat) args.push('--repeat', repeat)
-  const output = execFileSync('hermes', args, {
+  const output = execFileSync(resolveHermesBin(), args, {
     encoding: 'utf8',
     timeout: 30_000,
   })
