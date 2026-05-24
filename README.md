@@ -451,6 +451,57 @@ Open `http://localhost:3000` and complete the onboarding.
 
 > **Verify:** Check the Docker logs for `[gateway] Connected to Hermes Agent` — this confirms the workspace successfully connected to the agent.
 
+### Remote Access (LAN / Tailscale / VPN)
+
+The default compose file binds ports to `127.0.0.1` (localhost only). To access the workspace from other devices on your network, you need to:
+
+**1. Publish ports without the loopback restriction.** Create a `docker-compose.override.yml`:
+
+```yaml
+services:
+  hermes-agent:
+    ports:
+      - '8642:8642'
+  hermes-workspace:
+    ports:
+      - '3000:3000'
+```
+
+**2. Add these env vars to `.env`:**
+
+```env
+# Required: workspace session password (the workspace refuses to start on 0.0.0.0 without it)
+HERMES_PASSWORD=your-strong-secret-here
+
+# Required for plain-HTTP LAN access (browsers drop Secure cookies over http://)
+COOKIE_SECURE=0
+
+# Recommended: gateway auth token (prevents unauthenticated API access on your LAN)
+API_SERVER_KEY=***
+
+# If the gateway refuses to start with "No user allowlists configured":
+GATEWAY_ALLOW_ALL_USERS=true
+```
+
+**3. Restart the stack:**
+
+```bash
+docker compose down && docker compose up -d
+```
+
+> **HTTPS behind a reverse proxy?** If you terminate TLS at a reverse proxy (Traefik, Nginx, Caddy, Tailscale Funnel), set `COOKIE_SECURE=1` instead and add `TRUST_PROXY=1` so IP classification works correctly.
+
+### Troubleshooting Docker
+
+| Symptom | Fix |
+|---|---|
+| `[workspace] refusing to start — HERMES_PASSWORD is unset` | Add `HERMES_PASSWORD=<secret>` to `.env` |
+| Login silently fails (no error, page reloads) | Add `COOKIE_SECURE=0` for HTTP, or `COOKIE_SECURE=1` + HTTPS |
+| `[Api_Server] Refusing to start: binding to 0.0.0.0 requires API_SERVER_KEY` | Add `API_SERVER_KEY=*** to `.env` |
+| `No user allowlists configured. All unauthorized users will be denied.` | Add `GATEWAY_ALLOW_ALL_USERS=true` to `.env` |
+| `CLAUDE_DASHBOARD_TOKEN is not set` warning | Set `CLAUDE_DASHBOARD_TOKEN` to the same value as `API_SERVER_KEY` |
+| 500 Internal Server Error on login after setting all the above | Clear browser cookies for the workspace domain, then retry |
+
 ### Building from source
 
 Want to hack on the workspace and have local changes hot-built into the
