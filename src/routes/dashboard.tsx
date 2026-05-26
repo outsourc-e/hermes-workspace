@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useHUDSnapshot } from '../components/hud/hooks/useHUDSnapshot';
+import { useHUDConfig, useHUDConfigPatch } from '../components/hud/hooks/useHUDConfig';
 
 export const Route = createFileRoute('/dashboard')({ component: DashboardPage, ssr: false });
 
@@ -20,9 +21,8 @@ interface CalendarEventLite {
   is_all_day: boolean;
 }
 
-interface TodayResponse {
-  events: CalendarEventLite[];
-}
+interface TodayResponse { events: CalendarEventLite[] }
+interface WeekResponse { events: CalendarEventLite[] }
 
 interface Deadline {
   id: string;
@@ -36,10 +36,7 @@ interface Deadline {
   days_away: number;
 }
 
-interface DeadlinesResponse {
-  deadlines: Deadline[];
-  semester_name: string;
-}
+interface DeadlinesResponse { deadlines: Deadline[]; semester_name: string }
 
 interface RecoveryData {
   label?: string;
@@ -53,10 +50,7 @@ interface RecoveryData {
     sleep_performance_pct: number;
     day_strain: number;
   };
-  recommendation?: {
-    activity: string;
-    reason: string;
-  };
+  recommendation?: { activity: string; reason: string };
 }
 
 interface InboxItemData {
@@ -68,15 +62,19 @@ interface InboxItemData {
   href?: string;
 }
 
-interface TomorrowData {
-  label?: string;
-  title?: string;
-  sub?: string;
-}
+// ── Theme tokens ──────────────────────────────────────────────────────────
+//
+// Praxentis brand: deep navy + purple. ONE accent (purple) is reserved for
+// "Hermes is talking to you" — interactive UI, key headings, the brand chip.
+// Everything else lives on the slate scale.
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+const ACCENT = '#7A5CFF'; // Praxentis purple
+const ACCENT_LIGHT = '#B191FF';
+const FONT_STACK = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 const TZ = 'Australia/Adelaide';
+
+// ── Helpers ───────────────────────────────────────────────────────────────
 
 function getGreeting(now: Date): string {
   const hour = Number(
@@ -107,24 +105,6 @@ function formatTime(iso: string): string {
   });
 }
 
-function calendarToken(category: string): { bg: string; border: string; text: string; label: string } {
-  // Normalised across the user's feeds: personal → Life, family, uni, clinic, projects.
-  const c = category.toLowerCase();
-  if (c === 'uni' || c === 'university' || c === 'study') {
-    return { bg: 'rgba(0,255,128,0.12)', border: 'rgba(0,255,128,0.45)', text: '#5cffb1', label: 'UNI' };
-  }
-  if (c === 'clinic' || c === 'tadc' || c === 'hcc') {
-    return { bg: 'rgba(255,170,0,0.12)', border: 'rgba(255,170,0,0.45)', text: '#ffcb5c', label: 'CLINIC' };
-  }
-  if (c === 'family') {
-    return { bg: 'rgba(157,0,255,0.14)', border: 'rgba(157,0,255,0.5)', text: '#c194ff', label: 'FAMILY' };
-  }
-  if (c === 'work' || c === 'project' || c === 'projects' || c === 'praxentis') {
-    return { bg: 'rgba(255,0,128,0.12)', border: 'rgba(255,0,128,0.45)', text: '#ff77b5', label: 'WORK' };
-  }
-  return { bg: 'rgba(0,217,255,0.10)', border: 'rgba(0,217,255,0.4)', text: '#7ee0ff', label: 'LIFE' };
-}
-
 function firstActionFromBrief(briefText: string | undefined): string | null {
   if (!briefText) return null;
   const lines = briefText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -135,150 +115,200 @@ function firstActionFromBrief(briefText: string | undefined): string | null {
   return null;
 }
 
-// ── Small primitives ──────────────────────────────────────────────────────
+/** Map every feed category to a single-letter glyph. The eye doesn't need
+ * to learn 5 colour codes — one letter + neutral slate is faster to scan. */
+function categoryGlyph(category: string): { letter: string; full: string } {
+  const c = category.toLowerCase();
+  if (c === 'uni' || c === 'university' || c === 'study') return { letter: 'U', full: 'University' };
+  if (c === 'clinic' || c === 'tadc' || c === 'hcc') return { letter: 'C', full: 'Clinic' };
+  if (c === 'family') return { letter: 'F', full: 'Family' };
+  if (c === 'work' || c === 'project' || c === 'projects' || c === 'praxentis') return { letter: 'W', full: 'Work' };
+  return { letter: 'L', full: 'Life' };
+}
+
+function isToday(iso: string, now: Date): boolean {
+  const d = new Date(iso);
+  const localDate = new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  return localDate.format(d) === localDate.format(now);
+}
+
+function isTomorrow(iso: string, now: Date): boolean {
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const d = new Date(iso);
+  const localDate = new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  return localDate.format(d) === localDate.format(tomorrow);
+}
+
+// ── Primitives ────────────────────────────────────────────────────────────
 
 function Card({
   title,
-  icon,
   children,
   className = '',
   action,
+  emphasis = false,
 }: {
-  title: string;
-  icon?: string;
+  title?: string;
   children: React.ReactNode;
   className?: string;
   action?: React.ReactNode;
+  emphasis?: boolean;
 }) {
+  const borderColor = emphasis ? `rgba(122,92,255,0.35)` : 'rgba(122,92,255,0.12)';
   return (
     <section
-      className={`rounded-xl border border-cyan-500/20 bg-[#0d1320]/70 backdrop-blur-sm ${className}`}
+      className={`rounded-xl border bg-[#0a0f1d]/80 backdrop-blur-sm ${className}`}
+      style={{ borderColor }}
     >
-      <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-cyan-500/15">
-        <div className="flex items-center gap-2.5">
-          {icon && <span className="text-base">{icon}</span>}
-          <h2 className="text-xs uppercase tracking-[0.2em] text-cyan-300 font-semibold">{title}</h2>
-        </div>
-        {action}
-      </header>
+      {title && (
+        <header
+          className="flex items-center justify-between px-5 pt-4 pb-3 border-b"
+          style={{ borderColor: 'rgba(122,92,255,0.10)' }}
+        >
+          <h2 className="text-[11px] uppercase tracking-[0.18em] font-semibold text-slate-300">
+            {title}
+          </h2>
+          {action}
+        </header>
+      )}
       <div className="p-5">{children}</div>
     </section>
   );
 }
 
-function StatTile({
-  label,
-  value,
-  sub,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: 'good' | 'warn' | 'bad' | 'neutral';
-}) {
-  const valueColor =
-    tone === 'good' ? 'text-emerald-300' :
-    tone === 'warn' ? 'text-amber-300' :
-    tone === 'bad' ? 'text-rose-300' :
-    'text-cyan-200';
-  return (
-    <div className="rounded-lg border border-cyan-500/15 bg-[#0a1018]/60 px-4 py-3">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-medium">{label}</div>
-      <div className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueColor}`}>{value}</div>
-      {sub && <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
-function CalendarTag({ category }: { category: string }) {
-  const t = calendarToken(category);
+function CategoryGlyph({ category }: { category: string }) {
+  const g = categoryGlyph(category);
   return (
     <span
-      className="inline-block text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded uppercase"
-      style={{ background: t.bg, border: `1px solid ${t.border}`, color: t.text }}
+      title={g.full}
+      className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold tabular-nums bg-slate-800/60 border border-slate-700/60 text-slate-300"
     >
-      {t.label}
+      {g.letter}
     </span>
   );
 }
 
 function EventRow({ ev }: { ev: CalendarEventLite }) {
   return (
-    <li className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-transparent hover:border-cyan-500/20 hover:bg-cyan-500/5 transition-colors">
+    <li className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-900/40 transition-colors">
       <div className="flex-shrink-0 w-14 text-right">
-        <div className="text-sm font-semibold text-cyan-300 tabular-nums">
+        <div className="text-sm font-semibold tabular-nums" style={{ color: ACCENT_LIGHT, fontFamily: "'JetBrains Mono', monospace" }}>
           {ev.is_all_day ? 'ALL' : formatTime(ev.start)}
         </div>
         {!ev.is_all_day && (
-          <div className="text-[10px] text-slate-500 tabular-nums">→ {formatTime(ev.end)}</div>
+          <div className="text-[10px] text-slate-500 tabular-nums" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            → {formatTime(ev.end)}
+          </div>
         )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-0.5">
+          <CategoryGlyph category={ev.category} />
           <span className="text-sm font-medium text-slate-100 truncate">{ev.summary}</span>
-          <CalendarTag category={ev.category} />
         </div>
-        {ev.location && (
-          <div className="text-[11px] text-slate-500 truncate">{ev.location}</div>
-        )}
+        {ev.location && <div className="text-[11px] text-slate-500 truncate pl-7">{ev.location}</div>}
       </div>
     </li>
   );
 }
 
 function DeadlineRow({ d }: { d: Deadline }) {
-  const isUrgent = d.days_away <= 3 && d.days_away >= 0;
-  const isSoon = d.days_away > 3 && d.days_away <= 7;
-  const isPast = d.days_away < 0;
-  const badge = isPast
-    ? { text: 'PASSED', cls: 'text-slate-500 border-slate-700/50 bg-slate-800/30' }
-    : d.days_away === 0
-    ? { text: 'TODAY', cls: 'text-rose-300 border-rose-500/50 bg-rose-500/10' }
-    : d.days_away === 1
-    ? { text: 'TOMORROW', cls: 'text-orange-300 border-orange-500/50 bg-orange-500/10' }
-    : isUrgent
-    ? { text: `${d.days_away} DAYS`, cls: 'text-amber-300 border-amber-500/50 bg-amber-500/10' }
-    : isSoon
-    ? { text: `${d.days_away} DAYS`, cls: 'text-yellow-300 border-yellow-500/30 bg-yellow-500/5' }
-    : { text: `${d.days_away} DAYS`, cls: 'text-cyan-200 border-cyan-500/20 bg-cyan-500/5' };
+  let pillClass: string;
+  let pillText: string;
+  if (d.days_away < 0) {
+    pillClass = 'text-slate-500 border-slate-700/50 bg-slate-800/30';
+    pillText = 'PASSED';
+  } else if (d.days_away === 0) {
+    pillClass = 'text-rose-200 border-rose-500/50 bg-rose-500/15';
+    pillText = 'TODAY';
+  } else if (d.days_away === 1) {
+    pillClass = 'text-amber-200 border-amber-500/50 bg-amber-500/15';
+    pillText = 'TOMORROW';
+  } else if (d.days_away <= 7) {
+    pillClass = 'text-amber-200 border-amber-500/30 bg-amber-500/10';
+    pillText = `${d.days_away} DAYS`;
+  } else {
+    pillClass = 'text-slate-300 border-slate-600/30 bg-slate-700/20';
+    pillText = `${d.days_away} DAYS`;
+  }
 
   return (
-    <li className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg border border-transparent hover:border-cyan-500/20 hover:bg-cyan-500/5 transition-colors">
+    <li className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-900/40 transition-colors">
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-slate-100 truncate">
-          <span className="text-cyan-300 font-semibold mr-1.5">{d.unit}</span>
+        <div className="text-sm text-slate-100 truncate">
+          <span className="font-semibold mr-1.5" style={{ color: ACCENT_LIGHT }}>{d.unit}</span>
           {d.assessment}
         </div>
         <div className="text-[11px] text-slate-500 mt-0.5">
           {d.type}
-          {d.is_hurdle && <span className="ml-2 text-rose-400">· Hurdle</span>}
-          {!d.is_hurdle && d.weight && <span className="ml-2 text-slate-400">· {d.weight}</span>}
+          {d.is_hurdle && <span className="ml-2 text-rose-300">· Hurdle</span>}
+          {!d.is_hurdle && d.weight && <span className="ml-2">· {d.weight}</span>}
         </div>
       </div>
-      <span
-        className={`flex-shrink-0 inline-block text-[10px] font-bold tracking-wider px-2 py-1 rounded border uppercase ${badge.cls}`}
-      >
-        {badge.text}
+      <span className={`flex-shrink-0 text-[10px] font-bold tracking-wider px-2 py-1 rounded border uppercase ${pillClass}`}>
+        {pillText}
       </span>
     </li>
   );
 }
 
-function InboxRow({ item }: { item: InboxItemData }) {
+function MissionObjectiveRow({
+  item,
+  onDismiss,
+  dismissPending,
+}: {
+  item: InboxItemData;
+  onDismiss: (id: string) => void;
+  dismissPending: boolean;
+}) {
   const tone =
-    item.severity === 'urgent' ? 'border-l-rose-500' :
-    item.severity === 'warn' ? 'border-l-amber-500' :
-    item.severity === 'info' ? 'border-l-cyan-500' :
+    item.severity === 'urgent' ? 'border-l-rose-400' :
+    item.severity === 'warn' ? 'border-l-amber-400' :
+    item.severity === 'info' ? 'border-l-[#B191FF]' :
     'border-l-slate-600';
   return (
-    <li className={`px-3 py-2.5 border-l-2 ${tone} bg-[#0a1018]/50 rounded-r-lg flex items-center justify-between gap-3`}>
+    <li className={`group flex items-center gap-3 pl-3 pr-2 py-2.5 border-l-2 ${tone} bg-slate-900/30 rounded-r-lg`}>
       <div className="min-w-0 flex-1">
-        <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">{item.tag}</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">{item.tag}</div>
         <div className="text-sm text-slate-100">{item.body}</div>
       </div>
-      <div className="text-[10px] text-slate-500 whitespace-nowrap">{item.when}</div>
+      <div className="text-[10px] text-slate-500 whitespace-nowrap mr-1">{item.when}</div>
+      <button
+        type="button"
+        onClick={() => onDismiss(item.id)}
+        disabled={dismissPending}
+        className="opacity-40 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-emerald-300 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-emerald-500/10"
+        aria-label={`Mark "${item.body}" as done`}
+        title="Mark done"
+      >
+        ✓
+      </button>
     </li>
+  );
+}
+
+function StatTile({
+  label, value, sub, tone = 'neutral',
+}: {
+  label: string; value: string; sub?: string; tone?: 'good' | 'warn' | 'bad' | 'neutral';
+}) {
+  const valueColor =
+    tone === 'good' ? 'text-emerald-300' :
+    tone === 'warn' ? 'text-amber-300' :
+    tone === 'bad' ? 'text-rose-300' :
+    'text-slate-100';
+  return (
+    <div className="rounded-lg border bg-slate-900/40 px-4 py-3" style={{ borderColor: 'rgba(122,92,255,0.10)' }}>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold">{label}</div>
+      <div className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueColor}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        {value}
+      </div>
+      {sub && <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>}
+    </div>
   );
 }
 
@@ -286,7 +316,8 @@ function QuickAction({ href, icon, label }: { href: string; icon: string; label:
   return (
     <Link
       to={href}
-      className="flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-lg border border-cyan-500/15 bg-[#0a1018]/60 hover:border-cyan-400/50 hover:bg-cyan-500/10 transition-colors"
+      className="flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-lg border bg-slate-900/40 hover:bg-slate-800/60 transition-colors"
+      style={{ borderColor: 'rgba(122,92,255,0.12)' }}
     >
       <span className="text-xl">{icon}</span>
       <span className="text-[11px] font-medium text-slate-300 tracking-wide">{label}</span>
@@ -296,8 +327,13 @@ function QuickAction({ href, icon, label }: { href: string; icon: string; label:
 
 // ── Page ──────────────────────────────────────────────────────────────────
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
 function DashboardPage() {
   const { data: snapshot } = useHUDSnapshot();
+  const { data: cfg } = useHUDConfig();
+  const patchConfig = useHUDConfigPatch();
+
   const todayQuery = useQuery<TodayResponse>({
     queryKey: ['calendar', 'today'],
     queryFn: async () => {
@@ -307,6 +343,16 @@ function DashboardPage() {
     },
     refetchInterval: 60_000,
     staleTime: 55_000,
+  });
+  const weekQuery = useQuery<WeekResponse>({
+    queryKey: ['calendar', 'week'],
+    queryFn: async () => {
+      const res = await fetch('/api/calendar/week');
+      if (!res.ok) throw new Error('week fetch failed');
+      return res.json();
+    },
+    refetchInterval: 5 * 60_000,
+    staleTime: 4 * 60_000,
   });
   const deadlinesQuery = useQuery<DeadlinesResponse>({
     queryKey: ['calendar', 'deadlines'],
@@ -321,7 +367,6 @@ function DashboardPage() {
 
   const widgets = (snapshot?.widgets ?? {}) as WidgetMap;
   const recovery = widgets['recovery']?.data as RecoveryData | undefined;
-  const tomorrow = widgets['tomorrow']?.data as TomorrowData | undefined;
   const inboxItems = (widgets['inbox']?.data ?? []) as InboxItemData[];
   const briefText = (widgets['brief']?.data as { text?: string } | undefined)?.text;
 
@@ -335,90 +380,145 @@ function DashboardPage() {
     return [...evs].sort((a, b) => a.start.localeCompare(b.start));
   }, [todayQuery.data]);
 
-  const deadlines = useMemo(() => {
-    return (deadlinesQuery.data?.deadlines ?? []).slice(0, 5);
-  }, [deadlinesQuery.data]);
+  // Tomorrow events derived from the week list — saves a separate endpoint
+  // and gives us the full ranked list (the snapshot's tomorrow widget is
+  // single-line summary only).
+  const tomorrowEvents = useMemo(() => {
+    const evs = weekQuery.data?.events ?? [];
+    return evs.filter((e) => isTomorrow(e.start, now))
+      .sort((a, b) => a.start.localeCompare(b.start));
+  }, [weekQuery.data, now]);
 
-  // Recovery tone for stat colour.
+  const deadlines = useMemo(() => (deadlinesQuery.data?.deadlines ?? []).slice(0, 5), [deadlinesQuery.data]);
+
   const recoveryPct = recovery?.details?.recovery_pct ?? 0;
   const recoveryTone: 'good' | 'warn' | 'bad' = recoveryPct >= 67 ? 'good' : recoveryPct >= 34 ? 'warn' : 'bad';
+  const rec = recovery?.recommendation;
+
+  const handleDismiss = (id: string) => {
+    const next = { ...(cfg?.dismissed_inbox_items ?? {}), [id]: Date.now() + ONE_DAY_MS };
+    patchConfig.mutate({ dismissed_inbox_items: next });
+  };
+
+  const hour = formatTime(now.toISOString());
+
+  // Show only first 3 tomorrow events with "+N more" link
+  const TOMORROW_CAP = 3;
+  const tomorrowVisible = tomorrowEvents.slice(0, TOMORROW_CAP);
+  const tomorrowOverflow = Math.max(0, tomorrowEvents.length - TOMORROW_CAP);
 
   return (
-    <div className="min-h-screen bg-[#070b13] text-slate-100">
-      {/* Subtle radial glow — no animations, no scanlines */}
+    <div
+      className="min-h-screen text-slate-100"
+      style={{
+        fontFamily: FONT_STACK,
+        background: '#050810',
+      }}
+    >
+      {/* One static purple wash at the top — no animations */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0"
         style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,217,255,0.06) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(122,92,255,0.10) 0%, transparent 65%)',
         }}
       />
 
-      <main className="relative max-w-7xl mx-auto px-6 py-8 space-y-6">
-        {/* Greeting */}
-        <header className="flex items-end justify-between gap-4 pb-2 border-b border-cyan-500/15">
-          <div>
-            <h1 className="text-4xl font-semibold tracking-tight text-slate-50">
-              {greeting}, <span className="text-cyan-300">Nick</span>
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">{dateLabel}</p>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-mono tabular-nums text-cyan-200">
-              {now.toLocaleTimeString('en-AU', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false })}
-            </div>
-            <div className="text-[10px] text-slate-500 tracking-widest uppercase mt-0.5">ACST</div>
-          </div>
+      <main className="relative max-w-4xl mx-auto px-6 py-8 space-y-5">
+        {/* Slim header strip — brand on left, clock on right */}
+        <header className="flex items-center justify-between text-[11px] tracking-[0.18em] uppercase text-slate-500 pb-2">
+          <span className="font-semibold" style={{ color: ACCENT_LIGHT }}>Hermes Workspace</span>
+          <span className="tabular-nums" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            {dateLabel.toUpperCase()} · {hour} ACST
+          </span>
         </header>
 
-        {/* First action callout */}
-        {firstAction && (
-          <section className="rounded-xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 px-5 py-4">
-            <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-300 mb-1.5 font-semibold">
-              First action
-            </div>
-            <p className="text-base text-slate-100">{firstAction}</p>
-          </section>
-        )}
-
-        {/* Today + Tomorrow column */}
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5">
-          <Card title="Today's Schedule" icon="📅" action={<span className="text-[10px] text-slate-500">{todayEvents.length} events</span>}>
-            {todayQuery.isLoading && <div className="text-sm text-slate-500">Loading calendar…</div>}
-            {!todayQuery.isLoading && todayEvents.length === 0 && (
-              <div className="text-sm text-slate-500 py-6 text-center">No events scheduled today</div>
-            )}
-            <ul className="space-y-1">
-              {todayEvents.map((ev) => <EventRow key={ev.id} ev={ev} />)}
-            </ul>
-          </Card>
-
-          <Card title="Tomorrow" icon="🌅">
-            {tomorrow && tomorrow.title && tomorrow.title !== 'Nothing scheduled' ? (
-              <div className="space-y-2">
-                <div className="text-[11px] uppercase tracking-wider text-slate-400">{tomorrow.label}</div>
-                <div className="text-base font-medium text-slate-100">{tomorrow.title}</div>
-                {tomorrow.sub && <div className="text-[12px] text-slate-500">{tomorrow.sub}</div>}
-              </div>
-            ) : (
-              <div className="text-sm text-slate-500 text-center py-4">Nothing scheduled</div>
-            )}
-          </Card>
+        {/* Greeting — smaller, secondary now */}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-100">
+            {greeting}, Nick
+          </h1>
         </div>
+
+        {/* HERO: First action + Body recommendation — the prescriptive zone */}
+        <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
+          {firstAction ? (
+            <Card emphasis>
+              <div className="text-[10px] uppercase tracking-[0.22em] font-semibold mb-2" style={{ color: ACCENT_LIGHT }}>
+                First action
+              </div>
+              <p className="text-lg leading-snug text-slate-50 font-medium">{firstAction}</p>
+            </Card>
+          ) : (
+            <Card>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold mb-2">First action</div>
+              <p className="text-sm text-slate-500">No brief available yet — regen the morning brief to set today's lead action.</p>
+            </Card>
+          )}
+          {rec ? (
+            <Card emphasis>
+              <div className="text-[10px] uppercase tracking-[0.22em] font-semibold mb-2" style={{ color: ACCENT_LIGHT }}>
+                Body says
+              </div>
+              <p className="text-lg font-semibold text-slate-50">{rec.activity}</p>
+              <p className="text-[12px] text-slate-400 mt-1">{rec.reason}</p>
+            </Card>
+          ) : (
+            <Card>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold mb-2">Body says</div>
+              <p className="text-sm text-slate-500">No WHOOP data yet today.</p>
+            </Card>
+          )}
+        </div>
+
+        {/* Today */}
+        <Card
+          title="Today"
+          action={<span className="text-[10px] text-slate-500">{todayEvents.length} event{todayEvents.length === 1 ? '' : 's'}</span>}
+        >
+          {todayQuery.isLoading && <div className="text-sm text-slate-500 py-2">Loading calendar…</div>}
+          {!todayQuery.isLoading && todayEvents.length === 0 && (
+            <div className="text-sm text-slate-500 py-4 text-center">No events scheduled today</div>
+          )}
+          <ul className="space-y-0.5">
+            {todayEvents.map((ev) => <EventRow key={ev.id} ev={ev} />)}
+          </ul>
+        </Card>
+
+        {/* Tomorrow — same EventRow as Today, capped */}
+        <Card
+          title="Tomorrow"
+          action={<span className="text-[10px] text-slate-500">{tomorrowEvents.length} event{tomorrowEvents.length === 1 ? '' : 's'}</span>}
+        >
+          {weekQuery.isLoading && <div className="text-sm text-slate-500 py-2">Loading…</div>}
+          {!weekQuery.isLoading && tomorrowVisible.length === 0 && (
+            <div className="text-sm text-slate-500 py-4 text-center">Nothing scheduled</div>
+          )}
+          <ul className="space-y-0.5">
+            {tomorrowVisible.map((ev) => <EventRow key={ev.id} ev={ev} />)}
+          </ul>
+          {tomorrowOverflow > 0 && (
+            <div className="pt-2 pl-3 text-[11px] text-slate-500">
+              + {tomorrowOverflow} more
+            </div>
+          )}
+        </Card>
 
         {/* Deadlines */}
         {deadlines.length > 0 && (
-          <Card title="Academic Deadlines" icon="📚" action={<span className="text-[10px] text-slate-500">{deadlinesQuery.data?.semester_name}</span>}>
-            <ul className="space-y-1">
+          <Card
+            title="Deadlines"
+            action={<span className="text-[10px] text-slate-500">{deadlinesQuery.data?.semester_name}</span>}
+          >
+            <ul className="space-y-0.5">
               {deadlines.map((d) => <DeadlineRow key={d.id} d={d} />)}
             </ul>
           </Card>
         )}
 
-        {/* Status — Recovery / Strain / Sleep / Activity recommendation */}
-        <Card title="Status" icon="📊">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Status — 3 numeric tiles (recommended moved up to hero) */}
+        <Card title="Status">
+          <div className="grid grid-cols-3 gap-3">
             <StatTile
               label="Recovery"
               value={`${Math.round(recoveryPct)}%`}
@@ -435,29 +535,35 @@ function DashboardPage() {
               value={recovery?.details?.sleep_hours ? `${recovery.details.sleep_hours.toFixed(1)}h` : '—'}
               sub={recovery?.details?.sleep_performance_pct ? `${Math.round(recovery.details.sleep_performance_pct)}% performance` : undefined}
             />
-            <StatTile
-              label="Recommended"
-              value={recovery?.recommendation?.activity ?? '—'}
-              sub={recovery?.recommendation?.reason ?? undefined}
-              tone={recovery?.recommendation?.activity === 'Gym' ? 'good' :
-                    recovery?.recommendation?.activity === 'Walk' ? 'warn' :
-                    recovery?.recommendation?.activity === 'Rest' || recovery?.recommendation?.activity === 'Yoga' ? 'bad' :
-                    'neutral'}
-            />
           </div>
         </Card>
 
-        {/* Mission Objectives — repurposed inbox */}
+        {/* Mission Objectives — interactive: ✓ done dismisses for 24h */}
         {inboxItems.length > 0 && (
-          <Card title="Mission Objectives" icon="✅" action={<span className="text-[10px] text-slate-500">{inboxItems.length} item{inboxItems.length === 1 ? '' : 's'}</span>}>
+          <Card
+            title="Mission Objectives"
+            action={
+              <span className="text-[10px] text-slate-500">
+                {inboxItems.length} active
+                {patchConfig.isPending && <span className="ml-2 text-slate-400">· saving…</span>}
+              </span>
+            }
+          >
             <ul className="space-y-2">
-              {inboxItems.map((item) => <InboxRow key={item.id} item={item} />)}
+              {inboxItems.map((item) => (
+                <MissionObjectiveRow
+                  key={item.id}
+                  item={item}
+                  onDismiss={handleDismiss}
+                  dismissPending={patchConfig.isPending}
+                />
+              ))}
             </ul>
           </Card>
         )}
 
         {/* Quick Access */}
-        <Card title="Quick Access" icon="⚡">
+        <Card title="Quick Access">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <QuickAction href="/chat" icon="💬" label="Chat" />
             <QuickAction href="/files" icon="📁" label="Files" />
@@ -466,8 +572,8 @@ function DashboardPage() {
           </div>
         </Card>
 
-        <footer className="text-center text-[10px] text-slate-600 tracking-widest uppercase pt-4 pb-2">
-          Hermes Workspace · Morning Dashboard
+        <footer className="text-center text-[10px] text-slate-700 tracking-[0.2em] uppercase pt-4 pb-2">
+          Powered by Hermes
         </footer>
       </main>
     </div>
