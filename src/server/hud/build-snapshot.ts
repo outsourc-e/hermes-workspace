@@ -69,6 +69,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'PLAUD',
       body: `${plaudCount} untranscribed recording${plaudCount === 1 ? '' : 's'}`,
       when: 'now',
+      href: 'https://app.plaud.ai/',
     });
   }
 
@@ -199,6 +200,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'UNI',
       body: uniData.title + ' ' + uniData.sub,
       when: uniData.label.replace('UNI · ', ''),
+      href: '/uni/calendar',
     });
   }
 

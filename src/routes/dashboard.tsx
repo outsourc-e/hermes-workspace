@@ -130,16 +130,38 @@ function formatDateLong(now: Date): string {
   }).format(now)
 }
 
-function isTomorrow(iso: string, now: Date): boolean {
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-  const d = new Date(iso)
-  const localDate = new Intl.DateTimeFormat('en-AU', {
+function localDateKey(d: Date): string {
+  return new Intl.DateTimeFormat('en-AU', {
     timeZone: TZ,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  })
-  return localDate.format(d) === localDate.format(tomorrow)
+  }).format(d)
+}
+
+function isTodayLocal(iso: string, now: Date): boolean {
+  return localDateKey(new Date(iso)) === localDateKey(now)
+}
+
+function isTomorrow(iso: string, now: Date): boolean {
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  return localDateKey(new Date(iso)) === localDateKey(tomorrow)
+}
+
+// Open Google Calendar at the event's local date. We can't construct a true
+// event deep-link from just the raw id (Google needs base64(event_id+cal_id))
+// — day view is the next best and always works.
+function googleCalendarDayUrl(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(new Date(iso))
+  const y = parts.find((p) => p.type === 'year')?.value ?? '2026'
+  const m = parts.find((p) => p.type === 'month')?.value ?? '1'
+  const d = parts.find((p) => p.type === 'day')?.value ?? '1'
+  return `https://calendar.google.com/calendar/u/0/r/day/${y}/${m}/${d}`
 }
 
 function formatCountdown(target: Date, now: Date): string {
@@ -320,7 +342,7 @@ function DayTimeline({
           return (
             <a
               key={ev.id}
-              href={`https://calendar.google.com/calendar/event?id=${ev.id}`}
+              href={googleCalendarDayUrl(ev.start)}
               target="_blank"
               rel="noopener noreferrer"
               title={tooltip}
@@ -449,7 +471,7 @@ function NextUp({
         {meta}
       </div>
       <a
-        href={`https://calendar.google.com/calendar/event?id=${next.ev.id}`}
+        href={googleCalendarDayUrl(next.ev.start)}
         target="_blank"
         rel="noopener noreferrer"
         className="block group"
@@ -547,66 +569,75 @@ function Hero({
   )
 }
 
-// ── Status numeric strip ──────────────────────────────────────────────────
+// ── Body / Whoop status tiles ─────────────────────────────────────────────
+// Three clearly labelled, separated tiles. Lighter chrome than the hero so
+// they don't re-establish a card grid with the rest of the page.
 
-function StatusStrip({ recovery }: { recovery: RecoveryData }) {
+function StatusTile({
+  label,
+  value,
+  sub,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  sub?: string
+  tone?: 'good' | 'warn' | 'bad' | 'neutral'
+}) {
+  const valueColor =
+    tone === 'good'
+      ? 'text-emerald-300'
+      : tone === 'warn'
+        ? 'text-amber-300'
+        : tone === 'bad'
+          ? 'text-rose-300'
+          : 'text-slate-100'
+  return (
+    <div className="rounded-xl border border-slate-800/80 bg-slate-900/30 px-5 py-4">
+      <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400 font-semibold">
+        {label}
+      </div>
+      <div
+        className={`mt-2 text-3xl font-semibold tabular-nums leading-none ${valueColor}`}
+        style={{ fontFamily: MONO_STACK }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div className="text-[11px] text-slate-500 mt-2 leading-snug">
+          {sub}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BodyStatus({ recovery }: { recovery: RecoveryData }) {
   const d = recovery.details
   if (!d) return null
-  const recoveryColor =
-    d.recovery_pct >= 67
-      ? 'text-emerald-300'
-      : d.recovery_pct >= 34
-        ? 'text-amber-300'
-        : 'text-rose-300'
-  const items: Array<{
-    label: string
-    value: string
-    valueClass: string
-    sub?: string
-  }> = [
-    {
-      label: 'Recovery',
-      value: `${Math.round(d.recovery_pct)}%`,
-      valueClass: recoveryColor,
-      sub: `HRV ${Math.round(d.hrv_ms)} · RHR ${Math.round(d.resting_hr_bpm)}`,
-    },
-    {
-      label: 'Strain',
-      value: d.day_strain.toFixed(1),
-      valueClass: 'text-slate-100',
-      sub: 'yesterday',
-    },
-    {
-      label: 'Sleep',
-      value: `${d.sleep_hours.toFixed(1)}h`,
-      valueClass: 'text-slate-100',
-      sub: `${Math.round(d.sleep_performance_pct)}% perf`,
-    },
-  ]
+  const recoveryTone: 'good' | 'warn' | 'bad' =
+    d.recovery_pct >= 67 ? 'good' : d.recovery_pct >= 34 ? 'warn' : 'bad'
   return (
-    <div className="flex items-baseline flex-wrap gap-x-8 gap-y-3 py-1">
-      {items.map((it, i) => (
-        <div key={it.label} className="flex items-baseline gap-3">
-          <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold">
-            {it.label}
-          </span>
-          <span
-            className={`text-2xl font-semibold tabular-nums leading-none ${it.valueClass}`}
-            style={{ fontFamily: MONO_STACK }}
-          >
-            {it.value}
-          </span>
-          {it.sub && (
-            <span className="text-[10px] text-slate-500 hidden md:inline">
-              {it.sub}
-            </span>
-          )}
-          {i < items.length - 1 && (
-            <span className="text-slate-800 hidden md:inline">·</span>
-          )}
-        </div>
-      ))}
-    </div>
+    <Section title="Body">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatusTile
+          label="Recovery"
+          value={`${Math.round(d.recovery_pct)}%`}
+          sub={`HRV ${Math.round(d.hrv_ms)} ms · RHR ${Math.round(d.resting_hr_bpm)} bpm`}
+          tone={recoveryTone}
+        />
+        <StatusTile
+          label="Day strain"
+          value={d.day_strain.toFixed(1)}
+          sub="Yesterday"
+        />
+        <StatusTile
+          label="Sleep"
+          value={`${d.sleep_hours.toFixed(1)}h`}
+          sub={`${Math.round(d.sleep_performance_pct)}% performance`}
+        />
+      </div>
+    </Section>
   )
 }
 
@@ -617,7 +648,7 @@ function TomorrowRow({ ev }: { ev: CalendarEventLite }) {
   return (
     <li>
       <a
-        href={`https://calendar.google.com/calendar/event?id=${ev.id}`}
+        href={googleCalendarDayUrl(ev.start)}
         target="_blank"
         rel="noopener noreferrer"
         title={ev.location ? `${ev.summary} · ${ev.location}` : ev.summary}
@@ -744,10 +775,10 @@ function MissionObjectiveRow({
         : item.severity === 'info'
           ? ACCENT_LIGHT
           : '#475569'
-  return (
-    <li
-      className={`group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${fill}`}
-    >
+
+  const isExternal = item.href?.startsWith('http')
+  const bodyContent = (
+    <>
       <span
         aria-hidden="true"
         className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -757,16 +788,43 @@ function MissionObjectiveRow({
         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mb-0.5 font-semibold">
           {item.tag}
         </div>
-        <div className="text-sm text-slate-100">{item.body}</div>
+        <div className="text-sm text-slate-100 group-hover/link:text-white transition-colors">
+          {item.body}
+        </div>
       </div>
-      <div className="text-[10px] text-slate-500 whitespace-nowrap mr-1">
+      <div className="text-[10px] text-slate-500 whitespace-nowrap">
         {item.when}
       </div>
+    </>
+  )
+
+  const clickableBody = item.href ? (
+    <a
+      href={item.href}
+      target={isExternal ? '_blank' : undefined}
+      rel={isExternal ? 'noopener noreferrer' : undefined}
+      className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group/link"
+      title={`Open ${item.tag.toLowerCase()}`}
+    >
+      {bodyContent}
+    </a>
+  ) : (
+    <div className="flex items-center gap-3 min-w-0 flex-1">{bodyContent}</div>
+  )
+
+  return (
+    <li
+      className={`group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${fill}`}
+    >
+      {clickableBody}
       <button
         type="button"
-        onClick={() => onDismiss(item.id)}
+        onClick={(e) => {
+          e.stopPropagation()
+          onDismiss(item.id)
+        }}
         disabled={dismissPending}
-        className="opacity-40 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-emerald-300 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-emerald-500/10"
+        className="ml-1 opacity-40 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-emerald-300 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-emerald-500/10 flex-shrink-0"
         aria-label={`Mark "${item.body}" as done`}
         title="Mark done"
       >
@@ -837,10 +895,14 @@ function DashboardPage() {
     [briefText],
   )
 
+  // Defensive: /api/calendar/today has historically returned multi-day events.
+  // Filter to actual today (Adelaide local) so the timeline can't be polluted.
   const todayEvents = useMemo(() => {
     const evs = todayQuery.data?.events ?? []
-    return [...evs].sort((a, b) => a.start.localeCompare(b.start))
-  }, [todayQuery.data])
+    return [...evs]
+      .filter((e) => isTodayLocal(e.start, now))
+      .sort((a, b) => a.start.localeCompare(b.start))
+  }, [todayQuery.data, now])
 
   const tomorrowEvents = useMemo(() => {
     const evs = weekQuery.data?.events ?? []
@@ -931,14 +993,14 @@ function DashboardPage() {
           nextEventId={nextEventId}
         />
 
-        {/* Next up — the imminent thing */}
-        <NextUp next={nextUp} now={now} />
-
         {/* First action hero — drenched panel, composes Body says */}
         <Hero firstAction={firstAction} rec={rec} />
 
-        {/* Inline numeric status strip */}
-        {recovery && <StatusStrip recovery={recovery} />}
+        {/* Next up — the imminent thing */}
+        <NextUp next={nextUp} now={now} />
+
+        {/* Body — labelled, separated tiles */}
+        {recovery && <BodyStatus recovery={recovery} />}
 
         {/* Tomorrow */}
         <Section
