@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { HUDShell, Brief, BentoRow, Timeline, MissionControl, InboxRail, type InboxItemData } from '../components/hud';
@@ -21,6 +22,7 @@ const PRETTY: Record<string, string> = {
   'errors': 'Errors',
   'calendar-feeds': 'Calendars',
 };
+const TILE_IDS = ['agents', 'jobs', 'sessions', 'vm-health', 'prs', 'ci', 'sms', 'telegram', 'plaud', 'cliniko', 'errors', 'calendar-feeds'] as const;
 
 function DashboardPage() {
   const { data, isLoading, error } = useHUDSnapshot();
@@ -41,8 +43,6 @@ function DashboardPage() {
       return r.json();
     },
     onSuccess: () => {
-      // Poll snapshot for the new brief; the brief job runs async so the snapshot
-      // may take a few seconds to reflect the new output. Refetch every 5s for 30s.
       let tries = 0;
       const iv = setInterval(() => {
         tries++;
@@ -51,6 +51,71 @@ function DashboardPage() {
       }, 5000);
     },
   });
+
+  // Snapshot widgets — undefined-safe so the hooks below can run before data arrives.
+  const w = data?.widgets;
+  const widgetEnabled = (id: string) => cfg?.widgets?.[id] !== false;
+
+  // Slice each region's props with useMemo so the snapshot reference churning
+  // every SSE tick doesn't bust the memoized region components. Each useMemo
+  // key list captures only the *individual widget references* it consumes,
+  // and SSE deltas preserve untouched widget refs, so unrelated updates
+  // become pure no-ops downstream.
+  const briefText = useMemo(
+    () => (w?.['brief']?.data as { text?: string } | undefined)?.text
+      ?? '_No brief available yet — click ↻ regen to trigger the morning brief job._',
+    [w?.['brief']?.data],
+  );
+
+  const bentoProps = useMemo(() => ({
+    upNext: widgetEnabled('up-next') ? ((w?.['up-next']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER,
+    recovery: widgetEnabled('recovery') ? ((w?.['recovery']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER,
+    nextDeadline: widgetEnabled('next-deadline') ? ((w?.['next-deadline']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER,
+    tomorrow: widgetEnabled('tomorrow') ? ((w?.['tomorrow']?.data as any) ?? PLACEHOLDER) : undefined,
+  }), [
+    w?.['up-next']?.data,
+    w?.['recovery']?.data,
+    w?.['next-deadline']?.data,
+    w?.['tomorrow']?.data,
+    cfg?.widgets,
+  ]);
+
+  const timelineEvents = useMemo(
+    () => (w?.['timeline']?.data as { timelineEvents?: any[] } | undefined)?.timelineEvents ?? [],
+    [w?.['timeline']?.data],
+  );
+
+  // nowMin only progresses one notch per minute, so deriving it inline would
+  // still produce the same reference within the same minute. Use a Date.now
+  // bucket so it stays stable across SSE ticks within the same minute.
+  const nowMin = useMemo(() => {
+    const d = new Date();
+    return Math.max(0, Math.min(840, (d.getHours() - 6) * 60 + d.getMinutes()));
+  }, [
+    // Re-evaluate at most once per minute. Math.floor / 60000 buckets ticks.
+    Math.floor(Date.now() / 60_000),
+  ]);
+
+  const mcTiles = useMemo(() => {
+    if (!w) return [];
+    return TILE_IDS
+      .filter((id) => widgetEnabled(id))
+      .filter((id) => w[id] && w[id].state !== 'disabled')
+      .map((id) => ({ id, label: PRETTY[id] ?? id, snapshot: w[id] }));
+  }, [
+    // One key per tile widget so adding e.g. agent activity only re-derives
+    // the tiles array when an actual tile widget changes, not when brief
+    // or timeline tick.
+    w?.['agents'], w?.['jobs'], w?.['sessions'], w?.['vm-health'],
+    w?.['prs'], w?.['ci'], w?.['sms'], w?.['telegram'],
+    w?.['plaud'], w?.['cliniko'], w?.['errors'], w?.['calendar-feeds'],
+    cfg?.widgets,
+  ]);
+
+  const inboxItems = useMemo<InboxItemData[]>(
+    () => (w?.['inbox']?.data ?? []) as InboxItemData[],
+    [w?.['inbox']?.data],
+  );
 
   if (isLoading && !data) {
     return (
@@ -75,23 +140,6 @@ function DashboardPage() {
     );
   }
 
-  const w = data.widgets as Record<string, any>;
-  const d = new Date();
-  const nowMin = (d.getHours() - 6) * 60 + d.getMinutes();
-  const widgetEnabled = (id: string) => cfg?.widgets?.[id] !== false;
-
-  const tileIds = ['agents', 'jobs', 'sessions', 'vm-health', 'prs', 'ci', 'sms', 'telegram', 'plaud', 'cliniko', 'errors', 'calendar-feeds'];
-  const mcTiles = tileIds
-    .filter(id => widgetEnabled(id))
-    .filter(id => w[id] && w[id].state !== 'disabled')
-    .map(id => ({ id, label: PRETTY[id] ?? id, snapshot: w[id] }));
-
-  const calData = w['timeline']?.data;
-  const events = calData?.timelineEvents ?? [];
-  const inboxItems: InboxItemData[] = (w['inbox']?.data ?? []) as InboxItemData[];
-
-  const briefText = (w['brief']?.data as any)?.text ?? '_No brief available yet — click ↻ regen to trigger the morning brief job._';
-
   return (
     <HUDShell
       brief={widgetEnabled('brief') ? (
@@ -103,15 +151,10 @@ function DashboardPage() {
         />
       ) : null}
       bento={(widgetEnabled('up-next') || widgetEnabled('recovery') || widgetEnabled('next-deadline') || widgetEnabled('tomorrow')) ? (
-        <BentoRow
-          upNext={widgetEnabled('up-next') ? ((w['up-next']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER}
-          recovery={widgetEnabled('recovery') ? ((w['recovery']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER}
-          nextDeadline={widgetEnabled('next-deadline') ? ((w['next-deadline']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER}
-          tomorrow={widgetEnabled('tomorrow') ? ((w['tomorrow']?.data as any) ?? PLACEHOLDER) : undefined}
-        />
+        <BentoRow {...bentoProps} />
       ) : null}
       timeline={widgetEnabled('timeline') ? (
-        <Timeline events={events} nowMin={Math.max(0, Math.min(840, nowMin))} />
+        <Timeline events={timelineEvents} nowMin={nowMin} />
       ) : null}
       missionControl={<MissionControl tiles={mcTiles} />}
       inbox={widgetEnabled('inbox') ? <InboxRail items={inboxItems} /> : null}

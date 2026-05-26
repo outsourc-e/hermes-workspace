@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { Tile } from './Tile';
 import type { WidgetSnapshot } from '../../server/hud/types';
 import { useHUDConfig } from './hooks/useHUDConfig';
@@ -9,6 +9,26 @@ export interface MCTileSpec {
   label: string;
 }
 interface MissionControlProps { tiles: MCTileSpec[]; }
+
+const STORAGE_KEY = 'hud.mc.showHealthy';
+
+function readInitialShowHealthy(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function persistShowHealthy(value: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
+  } catch {
+    // ignore
+  }
+}
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -21,33 +41,101 @@ function useIsMobile() {
   return isMobile;
 }
 
-export function MissionControl({ tiles }: MissionControlProps) {
+/**
+ * A tile is "healthy" if it has loaded data with tone='ok' (the explicit
+ * green-light state in the Tile component'"'"'s contract). Loading / errored
+ * widgets are surfaced regardless because they want attention.
+ */
+function isHealthy(tile: MCTileSpec): boolean {
+  if (tile.snapshot.state !== 'loaded') return false;
+  return tile.snapshot.data?.tone === 'ok';
+}
+
+function MissionControlImpl({ tiles }: MissionControlProps) {
   const { data: cfg } = useHUDConfig();
   const isMobile = useIsMobile();
-  const mobileSet = new Set(cfg?.mobile_tiles ?? []);
-  const visible = isMobile && cfg?.mobile_tiles?.length
-    ? tiles.filter(t => mobileSet.has(t.id as any))
-    : tiles;
+  const [showHealthy, setShowHealthy] = useState(readInitialShowHealthy);
+
+  const visible = useMemo(() => {
+    const mobileSet = new Set(cfg?.mobile_tiles ?? []);
+    return isMobile && cfg?.mobile_tiles?.length
+      ? tiles.filter((t) => mobileSet.has(t.id as any))
+      : tiles;
+  }, [isMobile, cfg?.mobile_tiles, tiles]);
+
+  const { problems, healthy } = useMemo(() => {
+    const p: MCTileSpec[] = [];
+    const h: MCTileSpec[] = [];
+    for (const t of visible) (isHealthy(t) ? h : p).push(t);
+    return { problems: p, healthy: h };
+  }, [visible]);
+
+  const toggleHealthy = () => {
+    setShowHealthy((prev) => {
+      const next = !prev;
+      persistShowHealthy(next);
+      return next;
+    });
+  };
+
+  const renderedTiles = showHealthy ? visible : problems;
+  const hasHealthyCollapsed = !showHealthy && healthy.length > 0;
 
   return (
     <div className="bg-[#0d1117] border border-[#21262d] rounded p-2.5">
-      <div className="text-[8px] text-[#8b949e] tracking-wider mb-2 flex justify-between">
-        <span>MISSION CONTROL</span><span>live</span>
+      <div className="text-[8px] text-[#8b949e] tracking-wider mb-2 flex justify-between items-center">
+        <span>MISSION CONTROL</span>
+        <span className="flex items-center gap-3">
+          <span>live</span>
+          {healthy.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleHealthy}
+              className="text-[#58a6ff] hover:underline normal-case tracking-normal text-[9px]"
+              aria-expanded={showHealthy}
+            >
+              {showHealthy
+                ? `Hide ${healthy.length} OK ▴`
+                : `Show ${healthy.length} OK ▾`}
+            </button>
+          )}
+        </span>
       </div>
-      <div className="grid grid-cols-3 md:grid-cols-4 gap-1.5">
-        {visible.map(t => (
-          <Tile
-            key={t.id}
-            state={t.snapshot.state}
-            label={t.label}
-            value={t.snapshot.data?.value ?? '—'}
-            sub={t.snapshot.data?.sub}
-            tone={t.snapshot.data?.tone}
-            fetchedAt={t.snapshot.fetchedAt}
-            error={t.snapshot.error}
-          />
-        ))}
-      </div>
+
+      {renderedTiles.length === 0 && hasHealthyCollapsed && (
+        <button
+          type="button"
+          onClick={toggleHealthy}
+          className="w-full text-center py-3 text-[10px] text-[#3fb950] hover:text-white hover:bg-[#161b22] rounded transition-colors"
+        >
+          ✓ All systems · {healthy.length} OK
+        </button>
+      )}
+
+      {renderedTiles.length === 0 && !hasHealthyCollapsed && (
+        <div className="text-center py-3 text-[10px] text-[#6e7681]">
+          No widgets to show
+        </div>
+      )}
+
+      {renderedTiles.length > 0 && (
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-1.5">
+          {renderedTiles.map((t) => (
+            <Tile
+              key={t.id}
+              state={t.snapshot.state}
+              label={t.label}
+              value={t.snapshot.data?.value ?? '—'}
+              sub={t.snapshot.data?.sub}
+              tone={t.snapshot.data?.tone}
+              fetchedAt={t.snapshot.fetchedAt}
+              error={t.snapshot.error}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
+
+export const MissionControl = memo(MissionControlImpl);

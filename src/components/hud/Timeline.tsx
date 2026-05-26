@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 export interface TimelineEvent {
   id: string;
   startMin: number;
@@ -8,7 +10,8 @@ export interface TimelineEvent {
 interface TimelineProps { events: TimelineEvent[]; nowMin: number; }
 const COLORS = { work: '#3b82f6', uni: '#f59e0b', clinic: '#10b981', personal: '#a855f7', urgent: '#ef4444' };
 const WINDOW_MIN = 840;
-export function Timeline({ events, nowMin }: TimelineProps) {
+
+function TimelineImpl({ events, nowMin }: TimelineProps) {
   const pct = (m: number) => `${(m / WINDOW_MIN) * 100}%`;
   return (
     <div className="bg-[#161b22] rounded p-2 relative h-14">
@@ -29,3 +32,5 @@ export function Timeline({ events, nowMin }: TimelineProps) {
     </div>
   );
 }
+
+export const Timeline = memo(TimelineImpl);

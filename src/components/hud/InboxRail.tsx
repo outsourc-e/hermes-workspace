@@ -1,6 +1,9 @@
+import { memo } from 'react';
 import { InboxItem, type InboxItemData } from './InboxItem';
+
 interface InboxRailProps { items: InboxItemData[]; }
-export function InboxRail({ items }: InboxRailProps) {
+
+function InboxRailImpl({ items }: InboxRailProps) {
   const urgentCount = items.filter(i => i.severity === 'urgent').length;
   if (items.length === 0) {
     return (
@@ -19,3 +22,5 @@ export function InboxRail({ items }: InboxRailProps) {
     </div>
   );
 }
+
+export const InboxRail = memo(InboxRailImpl);
