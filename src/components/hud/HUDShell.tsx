@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { CustomisePanel } from './CustomisePanel';
+
 interface HUDShellProps {
   brief: ReactNode;
   bento: ReactNode;
@@ -6,13 +8,23 @@ interface HUDShellProps {
   missionControl: ReactNode;
   inbox: ReactNode;
 }
+
 export function HUDShell({ brief, bento, timeline, missionControl, inbox }: HUDShellProps) {
+  const [customiseOpen, setCustomiseOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#0a0e14] text-[#c9d1d9] font-mono p-3">
       <header className="flex justify-between items-center pb-2 border-b border-[#21262d] mb-3">
         <div className="font-bold text-[#c4b5fd] tracking-widest text-sm">HERMES · HUD</div>
-        <div className="text-[#6e7681] text-xs">
-          {new Date().toLocaleString('en-AU', { timeZone: 'Australia/Adelaide' })}
+        <div className="flex items-center gap-3 text-[#6e7681] text-xs">
+          <span>{new Date().toLocaleString('en-AU', { timeZone: 'Australia/Adelaide' })}</span>
+          <button
+            onClick={() => setCustomiseOpen(true)}
+            className="hover:text-[#c4b5fd]"
+            aria-label="customise"
+          >
+            ⚙
+          </button>
         </div>
       </header>
       <div className="grid grid-cols-1 lg:grid-cols-[2.2fr_1fr] gap-3">
@@ -24,6 +36,7 @@ export function HUDShell({ brief, bento, timeline, missionControl, inbox }: HUDS
         </div>
         <section role="region" aria-label="inbox">{inbox}</section>
       </div>
+      <CustomisePanel open={customiseOpen} onClose={() => setCustomiseOpen(false)} />
     </div>
   );
 }
