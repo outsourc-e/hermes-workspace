@@ -1,9 +1,11 @@
 /** @vitest-environment jsdom */
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { describe, it, expect, afterEach } from 'vitest';
 import { HUDShell } from '../HUDShell';
 
 describe('HUDShell', () => {
+  afterEach(() => cleanup());
+
   const slots = {
     brief: <div data-testid="b">BRIEF</div>,
     bento: <div data-testid="bn">BENTO</div>,
@@ -20,17 +22,16 @@ describe('HUDShell', () => {
   it('renders all 5 named regions', () => {
     render(<HUDShell {...slots} />);
     ['brief','bento','timeline','mission-control','inbox'].forEach(label => {
-      const matches = screen.getAllByRole('region', { name: label });
-      expect(matches.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByRole('region', { name: label })).toBeTruthy();
     });
   });
 
   it('places provided children in correct slots', () => {
     render(<HUDShell {...slots} />);
-    expect(screen.queryAllByTestId('b').length).toBeGreaterThan(0);
-    expect(screen.queryAllByTestId('bn').length).toBeGreaterThan(0);
-    expect(screen.queryAllByTestId('t').length).toBeGreaterThan(0);
-    expect(screen.queryAllByTestId('m').length).toBeGreaterThan(0);
-    expect(screen.queryAllByTestId('i').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('b')).toBeTruthy();
+    expect(screen.getByTestId('bn')).toBeTruthy();
+    expect(screen.getByTestId('t')).toBeTruthy();
+    expect(screen.getByTestId('m')).toBeTruthy();
+    expect(screen.getByTestId('i')).toBeTruthy();
   });
 });
