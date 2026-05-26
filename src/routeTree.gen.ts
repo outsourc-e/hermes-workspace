@@ -165,6 +165,8 @@ import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/lis
 import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
 import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
 import { Route as ApiHudSnapshotRouteImport } from './routes/api/hud/snapshot'
+import { Route as ApiHudRegenBriefRouteImport } from './routes/api/hud/regen-brief'
+import { Route as ApiHudConfigRouteImport } from './routes/api/hud/config'
 import { Route as ApiHermesworldReservationsRouteImport } from './routes/api/hermesworld/reservations'
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
@@ -172,6 +174,7 @@ import { Route as ApiClinitrackHealthRouteImport } from './routes/api/clinitrack
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
+import { Route as ApiAuthRotatePasswordRouteImport } from './routes/api/auth/rotate-password'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
@@ -960,6 +963,16 @@ const ApiHudSnapshotRoute = ApiHudSnapshotRouteImport.update({
   path: '/api/hud/snapshot',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHudRegenBriefRoute = ApiHudRegenBriefRouteImport.update({
+  id: '/api/hud/regen-brief',
+  path: '/api/hud/regen-brief',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHudConfigRoute = ApiHudConfigRouteImport.update({
+  id: '/api/hud/config',
+  path: '/api/hud/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHermesworldReservationsRoute =
   ApiHermesworldReservationsRouteImport.update({
     id: '/api/hermesworld/reservations',
@@ -995,6 +1008,11 @@ const ApiClaudeJobsJobIdRoute = ApiClaudeJobsJobIdRouteImport.update({
   id: '/$jobId',
   path: '/$jobId',
   getParentRoute: () => ApiClaudeJobsRoute,
+} as any)
+const ApiAuthRotatePasswordRoute = ApiAuthRotatePasswordRouteImport.update({
+  id: '/rotate-password',
+  path: '/rotate-password',
+  getParentRoute: () => ApiAuthRoute,
 } as any)
 const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
   id: '/$artifactId',
@@ -1058,7 +1076,7 @@ export interface FileRoutesByFullPath {
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
-  '/api/auth': typeof ApiAuthRoute
+  '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
@@ -1145,6 +1163,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/uni/': typeof UniIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/rotate-password': typeof ApiAuthRotatePasswordRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1152,6 +1171,8 @@ export interface FileRoutesByFullPath {
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
+  '/api/hud/config': typeof ApiHudConfigRoute
+  '/api/hud/regen-brief': typeof ApiHudRegenBriefRoute
   '/api/hud/snapshot': typeof ApiHudSnapshotRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
@@ -1227,7 +1248,7 @@ export interface FileRoutesByTo {
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
-  '/api/auth': typeof ApiAuthRoute
+  '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
@@ -1314,6 +1335,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/uni': typeof UniIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/rotate-password': typeof ApiAuthRotatePasswordRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1321,6 +1343,8 @@ export interface FileRoutesByTo {
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
+  '/api/hud/config': typeof ApiHudConfigRoute
+  '/api/hud/regen-brief': typeof ApiHudRegenBriefRoute
   '/api/hud/snapshot': typeof ApiHudSnapshotRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
@@ -1399,7 +1423,7 @@ export interface FileRoutesById {
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
-  '/api/auth': typeof ApiAuthRoute
+  '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
@@ -1486,6 +1510,7 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/uni/': typeof UniIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/rotate-password': typeof ApiAuthRotatePasswordRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1493,6 +1518,8 @@ export interface FileRoutesById {
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
+  '/api/hud/config': typeof ApiHudConfigRoute
+  '/api/hud/regen-brief': typeof ApiHudRegenBriefRoute
   '/api/hud/snapshot': typeof ApiHudSnapshotRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
@@ -1659,6 +1686,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/uni/'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/rotate-password'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -1666,6 +1694,8 @@ export interface FileRouteTypes {
     | '/api/dashboard/overview'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
+    | '/api/hud/config'
+    | '/api/hud/regen-brief'
     | '/api/hud/snapshot'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
@@ -1828,6 +1858,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/uni'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/rotate-password'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -1835,6 +1866,8 @@ export interface FileRouteTypes {
     | '/api/dashboard/overview'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
+    | '/api/hud/config'
+    | '/api/hud/regen-brief'
     | '/api/hud/snapshot'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
@@ -1999,6 +2032,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/uni/'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/rotate-password'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -2006,6 +2040,8 @@ export interface FileRouteTypes {
     | '/api/dashboard/overview'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
+    | '/api/hud/config'
+    | '/api/hud/regen-brief'
     | '/api/hud/snapshot'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
@@ -2084,7 +2120,7 @@ export interface RootRouteChildren {
   VtCapitalRoute: typeof VtCapitalRoute
   WorldRoute: typeof WorldRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
-  ApiAuthRoute: typeof ApiAuthRoute
+  ApiAuthRoute: typeof ApiAuthRouteWithChildren
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiClaudeConfigRoute: typeof ApiClaudeConfigRoute
@@ -2170,6 +2206,8 @@ export interface RootRouteChildren {
   ApiClinitrackHealthRoute: typeof ApiClinitrackHealthRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
   ApiHermesworldReservationsRoute: typeof ApiHermesworldReservationsRouteWithChildren
+  ApiHudConfigRoute: typeof ApiHudConfigRoute
+  ApiHudRegenBriefRoute: typeof ApiHudRegenBriefRoute
   ApiHudSnapshotRoute: typeof ApiHudSnapshotRoute
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
@@ -3290,6 +3328,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHudSnapshotRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hud/regen-brief': {
+      id: '/api/hud/regen-brief'
+      path: '/api/hud/regen-brief'
+      fullPath: '/api/hud/regen-brief'
+      preLoaderRoute: typeof ApiHudRegenBriefRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hud/config': {
+      id: '/api/hud/config'
+      path: '/api/hud/config'
+      fullPath: '/api/hud/config'
+      preLoaderRoute: typeof ApiHudConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hermesworld/reservations': {
       id: '/api/hermesworld/reservations'
       path: '/api/hermesworld/reservations'
@@ -3338,6 +3390,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/claude-jobs/$jobId'
       preLoaderRoute: typeof ApiClaudeJobsJobIdRouteImport
       parentRoute: typeof ApiClaudeJobsRoute
+    }
+    '/api/auth/rotate-password': {
+      id: '/api/auth/rotate-password'
+      path: '/rotate-password'
+      fullPath: '/api/auth/rotate-password'
+      preLoaderRoute: typeof ApiAuthRotatePasswordRouteImport
+      parentRoute: typeof ApiAuthRoute
     }
     '/api/artifacts/$artifactId': {
       id: '/api/artifacts/$artifactId'
@@ -3432,6 +3491,17 @@ const ApiArtifactsRouteChildren: ApiArtifactsRouteChildren = {
 const ApiArtifactsRouteWithChildren = ApiArtifactsRoute._addFileChildren(
   ApiArtifactsRouteChildren,
 )
+
+interface ApiAuthRouteChildren {
+  ApiAuthRotatePasswordRoute: typeof ApiAuthRotatePasswordRoute
+}
+
+const ApiAuthRouteChildren: ApiAuthRouteChildren = {
+  ApiAuthRotatePasswordRoute: ApiAuthRotatePasswordRoute,
+}
+
+const ApiAuthRouteWithChildren =
+  ApiAuthRoute._addFileChildren(ApiAuthRouteChildren)
 
 interface ApiClaudeJobsRouteChildren {
   ApiClaudeJobsJobIdRoute: typeof ApiClaudeJobsJobIdRoute
@@ -3646,7 +3716,7 @@ const rootRouteChildren: RootRouteChildren = {
   VtCapitalRoute: VtCapitalRoute,
   WorldRoute: WorldRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
-  ApiAuthRoute: ApiAuthRoute,
+  ApiAuthRoute: ApiAuthRouteWithChildren,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiClaudeConfigRoute: ApiClaudeConfigRoute,
@@ -3732,6 +3802,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClinitrackHealthRoute: ApiClinitrackHealthRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
   ApiHermesworldReservationsRoute: ApiHermesworldReservationsRouteWithChildren,
+  ApiHudConfigRoute: ApiHudConfigRoute,
+  ApiHudRegenBriefRoute: ApiHudRegenBriefRoute,
   ApiHudSnapshotRoute: ApiHudSnapshotRoute,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,

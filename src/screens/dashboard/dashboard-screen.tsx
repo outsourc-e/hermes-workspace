@@ -39,11 +39,18 @@ import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { TopModelsCard } from './components/top-models-card'
 import { VelocityCard } from './components/velocity-card'
 import { WidgetShell } from './components/widget-shell'
+import { WhoopWidget } from './widgets/whoop-widget'
+import { ClinitrackWidget } from './widgets/clinitrack-widget'
+import { SwarmStatusWidget } from './widgets/swarm-status-widget'
+import { UptimeWidget } from './widgets/uptime-widget'
+import { SpotifyWidget } from './widgets/spotify-widget'
 import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
 import type { SessionRowData } from './components/sessions-intelligence-card'
 import type { AnalyticsPeriod } from './components/analytics-chart-card'
 import type { ReactNode } from 'react'
+import type { WhoopWidget } from './widgets/whoop-widget'
+import type { ClinitrackWidget } from './widgets/clinitrack-widget'
 import type { ClaudeSession } from '@/server/claude-api'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { getUnavailableReason } from '@/lib/feature-gates'
@@ -1162,14 +1169,24 @@ export function DashboardScreen() {
             </WidgetShell>
           ) : null}
         </div>
-        {/* Side rail. Achievements is now first (sits beside Top Models
-            visually since the rail is right of the chart row + sessions),
-            then Skills, then the rhythm card. Mix & rhythm is the unique
-            chart in this column — keeping it.
-            `min-h-full` + the trailing `flex-1` rhythm card together
-            stretch the rail to match Sessions Intelligence height so
-            we don't get the dangling gap Eric flagged in iter 007. */}
+        {/* Side rail. Health widgets first (Whoop + CliniTrack),
+            then Achievements, Skills, rhythm. */}
         <div className="flex min-h-full flex-col gap-3 lg:col-span-4">
+          <WidgetShell id="whoop" layout={layout}>
+            <WhoopWidget />
+          </WidgetShell>
+          <WidgetShell id="clinitrack" layout={layout}>
+            <ClinitrackWidget />
+          </WidgetShell>
+          <WidgetShell id="swarm_status" layout={layout}>
+            <SwarmStatusWidget />
+          </WidgetShell>
+          <WidgetShell id="uptime" layout={layout}>
+            <UptimeWidget />
+          </WidgetShell>
+          <WidgetShell id="spotify" layout={layout}>
+            <SpotifyWidget />
+          </WidgetShell>
           <WidgetShell id="achievements" layout={layout}>
             <AchievementsCard
               achievements={overview?.achievements ?? null}

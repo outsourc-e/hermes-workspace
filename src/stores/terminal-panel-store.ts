@@ -10,9 +10,12 @@ export type TerminalTab = {
   id: string
   title: string
   cwd: string
+  target: TerminalTargetId
   sessionId: string | null
   status: TerminalTabStatus
 }
+
+export type TerminalTargetId = 'vm' | 'home-pc' | 'macbook'
 
 type TerminalPanelState = {
   isPanelOpen: boolean
@@ -23,7 +26,7 @@ type TerminalPanelState = {
   setPanelOpen: (isOpen: boolean) => void
   togglePanel: () => void
   setPanelHeight: (height: number) => void
-  createTab: (cwd?: string) => string
+  createTab: (cwd?: string, target?: TerminalTargetId) => string
   closeTab: (tabId: string) => void
   closeAllTabs: () => void
   setActiveTab: (tabId: string) => void
@@ -32,11 +35,16 @@ type TerminalPanelState = {
   setTabStatus: (tabId: string, status: TerminalTabStatus) => void
 }
 
-function createDefaultTab(counter: number, cwd = '~'): TerminalTab {
+function createDefaultTab(
+  counter: number,
+  cwd = '~',
+  target: TerminalTargetId = 'vm',
+): TerminalTab {
   return {
     id: crypto.randomUUID(),
-    title: `Terminal ${counter}`,
+    title: target === 'vm' ? `VM ${counter}` : target === 'home-pc' ? 'Home PC' : 'MacBook',
     cwd,
+    target,
     sessionId: null,
     status: 'idle',
   }
@@ -60,10 +68,10 @@ export const useTerminalPanelStore = create<TerminalPanelState>()(
         const clamped = Math.max(MIN_PANEL_HEIGHT, Math.round(height))
         set({ panelHeight: clamped })
       },
-      createTab: function createTab(cwd = '~') {
+      createTab: function createTab(cwd = '~', target = 'vm') {
         const { terminalCounter } = get()
         const nextCounter = terminalCounter + 1
-        const tab = createDefaultTab(nextCounter, cwd)
+        const tab = createDefaultTab(nextCounter, cwd, target)
         set((state) => ({
           tabs: [...state.tabs, tab],
           activeTabId: tab.id,

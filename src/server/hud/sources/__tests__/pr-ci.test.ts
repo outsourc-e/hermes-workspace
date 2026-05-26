@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+// Reset HUD_TRACKED_REPOS so the mock works deterministically regardless of CI env
+beforeEach(() => { process.env.HUD_TRACKED_REPOS = 'test-org/test-repo'; });
 
 // Mock child_process at module-load time
 vi.mock('child_process', () => ({
