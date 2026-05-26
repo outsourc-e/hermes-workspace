@@ -5,6 +5,7 @@ import { HUDCache } from '../../../server/hud/cache';
 import '../../../server/hud/sources/vm-health';
 import '../../../server/hud/sources/errors';
 import '../../../server/hud/sources/jobs';
+import '../../../server/hud/sources/agents';
 
 const cache = new HUDCache();
 
