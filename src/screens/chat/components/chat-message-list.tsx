@@ -506,14 +506,56 @@ export function buildDisplayEntries(
     entries.push(entry)
   })
 
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
-    }
-  }
+  // Trailing tool-only assistant turns (and any tool-results that follow them)
+  // are deliberately not attached to the preceding assistant text entry —
+  // they belong to an in-progress / incomplete tool turn and should be
+  // surfaced separately via getTrailingToolOnlyTurnSummary, not folded
+  // back into a finished reply.
 
   return entries
+}
+
+export interface TrailingToolOnlyTurnSummary {
+  count: number
+  toolNames: Array<string>
+  hasFinalAssistantText: boolean
+}
+
+export function getTrailingToolOnlyTurnSummary(
+  messages: Array<ChatMessage>,
+): TrailingToolOnlyTurnSummary | null {
+  let firstTrailingIdx = messages.length
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    const isToolOnly = isAssistantToolCallOnlyMessage(m)
+    const isToolResult = m.role === 'tool' || m.role === 'toolResult'
+    if (isToolOnly || isToolResult) {
+      firstTrailingIdx = i
+      continue
+    }
+    break
+  }
+
+  const trailing = messages.slice(firstTrailingIdx)
+  if (trailing.length === 0) return null
+
+  const toolNames = Array.from(
+    new Set(
+      trailing
+        .filter(isAssistantToolCallOnlyMessage)
+        .flatMap((m) => getToolCallsFromMessage(m).map((tc) => tc.name)),
+    ),
+  )
+
+  const hasFinalAssistantText = messages
+    .slice(0, firstTrailingIdx)
+    .some((m) => m.role === 'assistant' && textFromMessage(m).trim().length > 0)
+
+  return {
+    count: trailing.length,
+    toolNames,
+    hasFinalAssistantText,
+  }
 }
 
 function escapeAttributeSelector(value: string): string {
