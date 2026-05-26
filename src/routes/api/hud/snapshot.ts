@@ -20,6 +20,7 @@ import '../../../server/hud/sources/sessions';
 import '../../../server/hud/sources/pr-ci';
 import '../../../server/hud/sources/uni-deadlines';
 import '../../../server/hud/sources/calendar-feeds-health';
+import '../../../server/hud/sources/tomorrow';
 
 const cache = new HUDCache();
 

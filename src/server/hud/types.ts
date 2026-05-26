@@ -2,7 +2,7 @@ export type WidgetState = 'loaded' | 'loading' | 'stale' | 'errored' | 'disabled
 
 export type WidgetId =
   | 'brief'
-  | 'up-next' | 'recovery' | 'next-deadline'
+  | 'up-next' | 'recovery' | 'next-deadline' | 'tomorrow'
   | 'timeline'
   | 'agents' | 'jobs' | 'sessions' | 'vm-health' | 'prs' | 'ci'
   | 'sms' | 'telegram' | 'plaud' | 'cliniko' | 'errors'

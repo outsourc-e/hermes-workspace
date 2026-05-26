@@ -102,11 +102,12 @@ function DashboardPage() {
           regenLoading={regen.isPending}
         />
       ) : null}
-      bento={(widgetEnabled('up-next') || widgetEnabled('recovery') || widgetEnabled('next-deadline')) ? (
+      bento={(widgetEnabled('up-next') || widgetEnabled('recovery') || widgetEnabled('next-deadline') || widgetEnabled('tomorrow')) ? (
         <BentoRow
           upNext={widgetEnabled('up-next') ? ((w['up-next']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER}
           recovery={widgetEnabled('recovery') ? ((w['recovery']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER}
           nextDeadline={widgetEnabled('next-deadline') ? ((w['next-deadline']?.data as any) ?? PLACEHOLDER) : PLACEHOLDER}
+          tomorrow={widgetEnabled('tomorrow') ? ((w['tomorrow']?.data as any) ?? PLACEHOLDER) : undefined}
         />
       ) : null}
       timeline={widgetEnabled('timeline') ? (
