@@ -12,6 +12,7 @@ import '../../../server/hud/sources/cliniko-today';
 import '../../../server/hud/sources/plaud';
 import '../../../server/hud/sources/google-calendar';
 import '../../../server/hud/sources/brief';
+import '../../../server/hud/sources/whoop';
 
 const cache = new HUDCache();
 
