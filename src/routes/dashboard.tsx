@@ -1,52 +1,74 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { HUDShell, Brief, BentoRow, Timeline, MissionControl, InboxRail } from '../components/hud';
-import type { WidgetSnapshot } from '../server/hud/types';
-
-const now = Date.now();
-const ok = <T,>(data: T): WidgetSnapshot<T> => ({ id: 'agents', state: 'loaded', data, fetchedAt: now, ttlMs: 60000 });
-
-const mockTiles = [
-  { id: 'agents', label: 'Agents', snapshot: ok({ value: '7', sub: '2 idle', tone: 'ok' as const }) },
-  { id: 'jobs', label: 'Jobs (24h)', snapshot: ok({ value: '12 ✓', sub: '1 fail', tone: 'info' as const }) },
-  { id: 'sessions', label: 'Sessions', snapshot: ok({ value: '4', sub: '3 hosts', tone: 'info' as const }) },
-  { id: 'vm-health', label: 'VM', snapshot: ok({ value: '15%', sub: 'mem', tone: 'ok' as const }) },
-  { id: 'prs', label: 'PRs', snapshot: ok({ value: '3', tone: 'info' as const }) },
-  { id: 'ci', label: 'CI', snapshot: ok({ value: 'green', tone: 'ok' as const }) },
-  { id: 'sms', label: 'SMS', snapshot: ok({ value: '2', tone: 'info' as const }) },
-  { id: 'telegram', label: 'Telegram', snapshot: ok({ value: '5', tone: 'info' as const }) },
-  { id: 'plaud', label: 'Plaud', snapshot: ok({ value: '1', tone: 'info' as const }) },
-  { id: 'cliniko', label: 'Cliniko', snapshot: ok({ value: '3', tone: 'info' as const }) },
-  { id: 'errors', label: 'Errors', snapshot: ok({ value: '0', tone: 'ok' as const }) },
-];
-
-const mockEvents = [
-  { id: 'g', startMin: 90, durationMin: 60, title: 'Gym', category: 'personal' as const },
-  { id: 'c', startMin: 300, durationMin: 60, title: 'TADC', category: 'clinic' as const },
-  { id: 'r', startMin: 510, durationMin: 60, title: 'Rod call', category: 'urgent' as const },
-  { id: 'u', startMin: 660, durationMin: 60, title: 'ANAT304 lab', category: 'uni' as const },
-];
-
-const mockInbox = [
-  { id: '1', severity: 'urgent' as const, tag: 'URGENT', body: 'Rod call in 47min', when: '14:30' },
-  { id: '2', severity: 'warn' as const, tag: 'UNI', body: 'ANAT304 due Fri', when: 'Fri' },
-  { id: '3', severity: 'ok' as const, tag: 'AGENT', body: 'qa: CliniTrack smoke ✓', when: '2m' },
-];
+import { HUDShell, Brief, BentoRow, Timeline, MissionControl, InboxRail, type InboxItemData } from '../components/hud';
+import { useHUDSnapshot } from '../components/hud/hooks/useHUDSnapshot';
 
 export const Route = createFileRoute('/dashboard')({ component: DashboardPage, ssr: false });
+
+const PLACEHOLDER = { label: '—', title: '—' };
+const PRETTY: Record<string, string> = {
+  'agents': 'Agents',
+  'jobs': 'Jobs (24h)',
+  'sessions': 'Sessions',
+  'vm-health': 'VM',
+  'prs': 'PRs',
+  'ci': 'CI',
+  'sms': 'SMS',
+  'telegram': 'Telegram',
+  'plaud': 'Plaud',
+  'cliniko': 'Cliniko',
+  'errors': 'Errors',
+};
+
 function DashboardPage() {
+  const { data, isLoading, error } = useHUDSnapshot();
+
+  if (isLoading && !data) {
+    return (
+      <HUDShell
+        brief={<div className="text-[#6e7681] text-xs">loading…</div>}
+        bento={null}
+        timeline={null}
+        missionControl={null}
+        inbox={null}
+      />
+    );
+  }
+  if (error || !data) {
+    return (
+      <HUDShell
+        brief={<div className="text-red-400 text-xs">snapshot failed: {String(error)}</div>}
+        bento={null}
+        timeline={null}
+        missionControl={null}
+        inbox={null}
+      />
+    );
+  }
+
+  const w = data.widgets as Record<string, any>;
   const d = new Date();
   const nowMin = (d.getHours() - 6) * 60 + d.getMinutes();
+
+  const tileIds = ['agents', 'jobs', 'sessions', 'vm-health', 'prs', 'ci', 'sms', 'telegram', 'plaud', 'cliniko', 'errors'];
+  const mcTiles = tileIds
+    .filter(id => w[id] && w[id].state !== 'disabled')
+    .map(id => ({ id, label: PRETTY[id] ?? id, snapshot: w[id] }));
+
+  const calData = w['timeline']?.data;
+  const events = calData?.timelineEvents ?? [];
+  const urgentInbox: InboxItemData[] = (calData?.urgentItems ?? []) as InboxItemData[];
+
   return (
     <HUDShell
-      brief={<Brief subtitle="FROM HERMES · 07:00 BRIEF" text="Recovery 58% — light day. Rod call in 47 min. ANAT304 due Fri." />}
+      brief={<Brief subtitle="FROM HERMES" text={(w['brief']?.data as any)?.text ?? 'Brief not wired yet (Task C.1).'} />}
       bento={<BentoRow
-        upNext={{ label: 'UP NEXT · 47 MIN', title: 'Rod call', sub: 'CliniTrack imaging' }}
-        recovery={{ label: 'RECOVERY', title: '58%', sub: '6.2h sleep' }}
-        nextDeadline={{ label: 'UNI · DUE FRI', title: 'ANAT304', sub: 'lab writeup · 4d untouched' }}
+        upNext={(w['up-next']?.data as any) ?? PLACEHOLDER}
+        recovery={(w['recovery']?.data as any) ?? PLACEHOLDER}
+        nextDeadline={(w['next-deadline']?.data as any) ?? PLACEHOLDER}
       />}
-      timeline={<Timeline events={mockEvents} nowMin={Math.max(0, Math.min(840, nowMin))} />}
-      missionControl={<MissionControl tiles={mockTiles} />}
-      inbox={<InboxRail items={mockInbox} />}
+      timeline={<Timeline events={events} nowMin={Math.max(0, Math.min(840, nowMin))} />}
+      missionControl={<MissionControl tiles={mcTiles} />}
+      inbox={<InboxRail items={urgentInbox} />}
     />
   );
 }
