@@ -3,6 +3,7 @@ import { runAggregator } from '../../../server/hud/aggregator';
 import { adapterRegistry } from '../../../server/hud/sources';
 import { HUDCache } from '../../../server/hud/cache';
 import '../../../server/hud/sources/vm-health';
+import '../../../server/hud/sources/errors';
 
 const cache = new HUDCache();
 
