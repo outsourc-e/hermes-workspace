@@ -50,6 +50,7 @@ import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiWhoopHealthRouteImport } from './routes/api/whoop-health'
 import { Route as ApiWhoopRouteImport } from './routes/api/whoop'
 import { Route as ApiVtCapitalRouteImport } from './routes/api/vt-capital'
+import { Route as ApiUniBrainRouteImport } from './routes/api/uni-brain'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
@@ -122,6 +123,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiShareIndexRouteImport } from './routes/api/share/index'
 import { Route as ApiWhoopHistoryRouteImport } from './routes/api/whoop/history'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
@@ -135,8 +137,10 @@ import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/unin
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
 import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
+import { Route as ApiShareIdRouteImport } from './routes/api/share/$id'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiProjectsWorktreesRouteImport } from './routes/api/projects/worktrees'
+import { Route as ApiProjectsListRouteImport } from './routes/api/projects/list'
 import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
 import { Route as ApiProfilesRenameRouteImport } from './routes/api/profiles/rename'
 import { Route as ApiProfilesReadRouteImport } from './routes/api/profiles/read'
@@ -385,6 +389,11 @@ const ApiWhoopRoute = ApiWhoopRouteImport.update({
 const ApiVtCapitalRoute = ApiVtCapitalRouteImport.update({
   id: '/api/vt-capital',
   path: '/api/vt-capital',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUniBrainRoute = ApiUniBrainRouteImport.update({
+  id: '/api/uni-brain',
+  path: '/api/uni-brain',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
@@ -748,6 +757,11 @@ const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   path: '/api/artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiShareIndexRoute = ApiShareIndexRouteImport.update({
+  id: '/api/share/',
+  path: '/api/share/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWhoopHistoryRoute = ApiWhoopHistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -813,6 +827,11 @@ const ApiSkillsHubSearchRoute = ApiSkillsHubSearchRouteImport.update({
   path: '/hub-search',
   getParentRoute: () => ApiSkillsRoute,
 } as any)
+const ApiShareIdRoute = ApiShareIdRouteImport.update({
+  id: '/api/share/$id',
+  path: '/api/share/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   id: '/send',
   path: '/send',
@@ -821,6 +840,11 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
 const ApiProjectsWorktreesRoute = ApiProjectsWorktreesRouteImport.update({
   id: '/api/projects/worktrees',
   path: '/api/projects/worktrees',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsListRoute = ApiProjectsListRouteImport.update({
+  id: '/api/projects/list',
+  path: '/api/projects/list',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
@@ -1147,6 +1171,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/uni-brain': typeof ApiUniBrainRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/whoop': typeof ApiWhoopRouteWithChildren
   '/api/whoop-health': typeof ApiWhoopHealthRoute
@@ -1201,8 +1226,10 @@ export interface FileRoutesByFullPath {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/list': typeof ApiProjectsListRoute
   '/api/projects/worktrees': typeof ApiProjectsWorktreesRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/share/$id': typeof ApiShareIdRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
@@ -1216,6 +1243,7 @@ export interface FileRoutesByFullPath {
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/whoop/history': typeof ApiWhoopHistoryRoute
+  '/api/share/': typeof ApiShareIndexRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1319,6 +1347,7 @@ export interface FileRoutesByTo {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/uni-brain': typeof ApiUniBrainRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/whoop': typeof ApiWhoopRouteWithChildren
   '/api/whoop-health': typeof ApiWhoopHealthRoute
@@ -1373,8 +1402,10 @@ export interface FileRoutesByTo {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/list': typeof ApiProjectsListRoute
   '/api/projects/worktrees': typeof ApiProjectsWorktreesRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/share/$id': typeof ApiShareIdRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
@@ -1388,6 +1419,7 @@ export interface FileRoutesByTo {
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/whoop/history': typeof ApiWhoopHistoryRoute
+  '/api/share': typeof ApiShareIndexRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1494,6 +1526,7 @@ export interface FileRoutesById {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/uni-brain': typeof ApiUniBrainRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/whoop': typeof ApiWhoopRouteWithChildren
   '/api/whoop-health': typeof ApiWhoopHealthRoute
@@ -1548,8 +1581,10 @@ export interface FileRoutesById {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/list': typeof ApiProjectsListRoute
   '/api/projects/worktrees': typeof ApiProjectsWorktreesRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/share/$id': typeof ApiShareIdRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
@@ -1563,6 +1598,7 @@ export interface FileRoutesById {
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/whoop/history': typeof ApiWhoopHistoryRoute
+  '/api/share/': typeof ApiShareIndexRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1670,6 +1706,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/uni-brain'
     | '/api/vt-capital'
     | '/api/whoop'
     | '/api/whoop-health'
@@ -1724,8 +1761,10 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/projects/list'
     | '/api/projects/worktrees'
     | '/api/sessions/send'
+    | '/api/share/$id'
     | '/api/skills/hub-search'
     | '/api/skills/install'
     | '/api/skills/toggle'
@@ -1739,6 +1778,7 @@ export interface FileRouteTypes {
     | '/api/update/status'
     | '/api/update/workspace'
     | '/api/whoop/history'
+    | '/api/share/'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -1842,6 +1882,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/uni-brain'
     | '/api/vt-capital'
     | '/api/whoop'
     | '/api/whoop-health'
@@ -1896,8 +1937,10 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/projects/list'
     | '/api/projects/worktrees'
     | '/api/sessions/send'
+    | '/api/share/$id'
     | '/api/skills/hub-search'
     | '/api/skills/install'
     | '/api/skills/toggle'
@@ -1911,6 +1954,7 @@ export interface FileRouteTypes {
     | '/api/update/status'
     | '/api/update/workspace'
     | '/api/whoop/history'
+    | '/api/share'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -2016,6 +2060,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/uni-brain'
     | '/api/vt-capital'
     | '/api/whoop'
     | '/api/whoop-health'
@@ -2070,8 +2115,10 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/projects/list'
     | '/api/projects/worktrees'
     | '/api/sessions/send'
+    | '/api/share/$id'
     | '/api/skills/hub-search'
     | '/api/skills/install'
     | '/api/skills/toggle'
@@ -2085,6 +2132,7 @@ export interface FileRouteTypes {
     | '/api/update/status'
     | '/api/update/workspace'
     | '/api/whoop/history'
+    | '/api/share/'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -2191,6 +2239,7 @@ export interface RootRouteChildren {
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  ApiUniBrainRoute: typeof ApiUniBrainRoute
   ApiVtCapitalRoute: typeof ApiVtCapitalRoute
   ApiWhoopRoute: typeof ApiWhoopRouteWithChildren
   ApiWhoopHealthRoute: typeof ApiWhoopHealthRoute
@@ -2225,13 +2274,16 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
+  ApiProjectsListRoute: typeof ApiProjectsListRoute
   ApiProjectsWorktreesRoute: typeof ApiProjectsWorktreesRoute
+  ApiShareIdRoute: typeof ApiShareIdRoute
   ApiSpotifyNowRoute: typeof ApiSpotifyNowRoute
   ApiUniChatRoute: typeof ApiUniChatRoute
   ApiUniContextRoute: typeof ApiUniContextRoute
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
+  ApiShareIndexRoute: typeof ApiShareIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2521,6 +2573,13 @@ declare module '@tanstack/react-router' {
       path: '/api/vt-capital'
       fullPath: '/api/vt-capital'
       preLoaderRoute: typeof ApiVtCapitalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/uni-brain': {
+      id: '/api/uni-brain'
+      path: '/api/uni-brain'
+      fullPath: '/api/uni-brain'
+      preLoaderRoute: typeof ApiUniBrainRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/transcribe': {
@@ -3027,6 +3086,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/share/': {
+      id: '/api/share/'
+      path: '/api/share'
+      fullPath: '/api/share/'
+      preLoaderRoute: typeof ApiShareIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/whoop/history': {
       id: '/api/whoop/history'
       path: '/history'
@@ -3118,6 +3184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSkillsHubSearchRouteImport
       parentRoute: typeof ApiSkillsRoute
     }
+    '/api/share/$id': {
+      id: '/api/share/$id'
+      path: '/api/share/$id'
+      fullPath: '/api/share/$id'
+      preLoaderRoute: typeof ApiShareIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sessions/send': {
       id: '/api/sessions/send'
       path: '/send'
@@ -3130,6 +3203,13 @@ declare module '@tanstack/react-router' {
       path: '/api/projects/worktrees'
       fullPath: '/api/projects/worktrees'
       preLoaderRoute: typeof ApiProjectsWorktreesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/list': {
+      id: '/api/projects/list'
+      path: '/api/projects/list'
+      fullPath: '/api/projects/list'
+      preLoaderRoute: typeof ApiProjectsListRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/profiles/update': {
@@ -3787,6 +3867,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  ApiUniBrainRoute: ApiUniBrainRoute,
   ApiVtCapitalRoute: ApiVtCapitalRoute,
   ApiWhoopRoute: ApiWhoopRouteWithChildren,
   ApiWhoopHealthRoute: ApiWhoopHealthRoute,
@@ -3821,13 +3902,16 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
+  ApiProjectsListRoute: ApiProjectsListRoute,
   ApiProjectsWorktreesRoute: ApiProjectsWorktreesRoute,
+  ApiShareIdRoute: ApiShareIdRoute,
   ApiSpotifyNowRoute: ApiSpotifyNowRoute,
   ApiUniChatRoute: ApiUniChatRoute,
   ApiUniContextRoute: ApiUniContextRoute,
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
+  ApiShareIndexRoute: ApiShareIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
