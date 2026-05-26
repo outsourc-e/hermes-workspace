@@ -11,6 +11,7 @@ import '../../../server/hud/sources/telegram';
 import '../../../server/hud/sources/cliniko-today';
 import '../../../server/hud/sources/plaud';
 import '../../../server/hud/sources/google-calendar';
+import '../../../server/hud/sources/brief';
 
 const cache = new HUDCache();
 
