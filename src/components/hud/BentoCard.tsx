@@ -7,10 +7,10 @@ const variants = {
 };
 export function BentoCard({ label, title, sub, variant = 'hero' }: BentoCardProps) {
   return (
-    <div className={`${variants[variant]} rounded-lg p-3 min-h-[70px]`}>
-      <div className="text-[8px] uppercase tracking-wider opacity-85">{label}</div>
-      <div className="text-lg font-bold leading-tight mt-1">{title}</div>
-      {sub && <div className="text-[9px] opacity-85 mt-1">{sub}</div>}
+    <div className={`${variants[variant]} rounded-lg p-4 min-h-[110px] flex flex-col justify-between`}>
+      <div className="text-[10px] uppercase tracking-[0.18em] opacity-80 font-semibold">{label}</div>
+      <div className="text-2xl font-bold leading-tight mt-2">{title}</div>
+      {sub && <div className="text-xs opacity-85 mt-2 leading-snug">{sub}</div>}
     </div>
   );
 }

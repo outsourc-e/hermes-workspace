@@ -82,16 +82,16 @@ function MissionControlImpl({ tiles }: MissionControlProps) {
   const hasHealthyCollapsed = !showHealthy && healthy.length > 0;
 
   return (
-    <div className="bg-[#0d1117] border border-[#21262d] rounded p-2.5">
-      <div className="text-[8px] text-[#8b949e] tracking-wider mb-2 flex justify-between items-center">
-        <span>MISSION CONTROL</span>
-        <span className="flex items-center gap-3">
-          <span>live</span>
+    <div className="bg-[#0d1117] border border-[#21262d] rounded-lg p-4">
+      <div className="text-xs text-[#8b949e] tracking-[0.15em] uppercase font-semibold mb-3 flex justify-between items-center">
+        <span>Mission Control</span>
+        <span className="flex items-center gap-4 text-[11px] font-normal normal-case tracking-normal">
+          <span className="text-[#3fb950]">● live</span>
           {healthy.length > 0 && (
             <button
               type="button"
               onClick={toggleHealthy}
-              className="text-[#58a6ff] hover:underline normal-case tracking-normal text-[9px]"
+              className="text-[#58a6ff] hover:underline"
               aria-expanded={showHealthy}
             >
               {showHealthy
@@ -106,20 +106,20 @@ function MissionControlImpl({ tiles }: MissionControlProps) {
         <button
           type="button"
           onClick={toggleHealthy}
-          className="w-full text-center py-3 text-[10px] text-[#3fb950] hover:text-white hover:bg-[#161b22] rounded transition-colors"
+          className="w-full text-center py-4 text-sm text-[#3fb950] hover:text-white hover:bg-[#161b22] rounded transition-colors"
         >
           ✓ All systems · {healthy.length} OK
         </button>
       )}
 
       {renderedTiles.length === 0 && !hasHealthyCollapsed && (
-        <div className="text-center py-3 text-[10px] text-[#6e7681]">
+        <div className="text-center py-4 text-sm text-[#6e7681]">
           No widgets to show
         </div>
       )}
 
       {renderedTiles.length > 0 && (
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {renderedTiles.map((t) => (
             <Tile
               key={t.id}

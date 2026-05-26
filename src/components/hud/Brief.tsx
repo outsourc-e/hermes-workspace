@@ -70,9 +70,9 @@ function BriefImpl({ text, subtitle, onRegen, regenLoading }: BriefProps) {
 
   return (
     <div>
-      <div className="text-[8px] text-[#8b949e] tracking-[2px] mb-1.5 flex justify-between items-center">
+      <div className="text-[11px] text-[#8b949e] tracking-[0.15em] uppercase font-semibold mb-3 flex justify-between items-center">
         <span>{subtitle}</span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 text-[11px] normal-case tracking-normal font-normal">
           <button
             type="button"
             onClick={toggle}
@@ -94,16 +94,16 @@ function BriefImpl({ text, subtitle, onRegen, regenLoading }: BriefProps) {
       </div>
       {expanded ? (
         // Heavy ReactMarkdown render only happens when the user opts in
-        <div className="font-serif text-[13px] leading-relaxed text-[#e6edf3] prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:my-1 [&>ul]:my-1 [&>ol]:my-1 [&>h1]:text-[15px] [&>h2]:text-[14px] [&>h3]:text-[13px] [&_strong]:text-[#c4b5fd]">
+        <div className="font-serif text-[15px] leading-relaxed text-[#e6edf3] prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:my-2 [&>ul]:my-2 [&>ol]:my-2 [&>h1]:text-[18px] [&>h2]:text-[16px] [&>h3]:text-[15px] [&_strong]:text-[#c4b5fd]">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
         </div>
       ) : (
         <button
           type="button"
           onClick={toggle}
-          className="block w-full text-left font-serif text-[13px] leading-relaxed text-[#e6edf3] hover:text-white"
+          className="block w-full text-left font-serif text-[15px] leading-relaxed text-[#e6edf3] hover:text-white"
         >
-          <span className="text-[#c4b5fd] font-semibold mr-1">First up:</span>
+          <span className="text-[#c4b5fd] font-semibold mr-1.5">First up:</span>
           {summary}
         </button>
       )}
