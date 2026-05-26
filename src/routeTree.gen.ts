@@ -27,6 +27,7 @@ import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MassageRouteImport } from './routes/massage'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as JarvisRouteImport } from './routes/jarvis'
 import { Route as HermesWorldRouteImport } from './routes/hermes-world'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EarlyAccessRouteImport } from './routes/early-access'
@@ -178,6 +179,10 @@ import { Route as ApiClinitrackHealthRouteImport } from './routes/api/clinitrack
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
+import { Route as ApiCalendarWeekRouteImport } from './routes/api/calendar/week'
+import { Route as ApiCalendarTodayRouteImport } from './routes/api/calendar/today'
+import { Route as ApiCalendarFeedStatusRouteImport } from './routes/api/calendar/feed-status'
+import { Route as ApiCalendarDeadlinesRouteImport } from './routes/api/calendar/deadlines'
 import { Route as ApiAuthRotatePasswordRouteImport } from './routes/api/auth/rotate-password'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
@@ -274,6 +279,11 @@ const MassageRoute = MassageRouteImport.update({
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JarvisRoute = JarvisRouteImport.update({
+  id: '/jarvis',
+  path: '/jarvis',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HermesWorldRoute = HermesWorldRouteImport.update({
@@ -1033,6 +1043,26 @@ const ApiClaudeJobsJobIdRoute = ApiClaudeJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiClaudeJobsRoute,
 } as any)
+const ApiCalendarWeekRoute = ApiCalendarWeekRouteImport.update({
+  id: '/api/calendar/week',
+  path: '/api/calendar/week',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarTodayRoute = ApiCalendarTodayRouteImport.update({
+  id: '/api/calendar/today',
+  path: '/api/calendar/today',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarFeedStatusRoute = ApiCalendarFeedStatusRouteImport.update({
+  id: '/api/calendar/feed-status',
+  path: '/api/calendar/feed-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarDeadlinesRoute = ApiCalendarDeadlinesRouteImport.update({
+  id: '/api/calendar/deadlines',
+  path: '/api/calendar/deadlines',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthRotatePasswordRoute = ApiAuthRotatePasswordRouteImport.update({
   id: '/rotate-password',
   path: '/rotate-password',
@@ -1081,6 +1111,7 @@ export interface FileRoutesByFullPath {
   '/early-access': typeof EarlyAccessRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
+  '/jarvis': typeof JarvisRoute
   '/jobs': typeof JobsRoute
   '/massage': typeof MassageRoute
   '/mcp': typeof McpRoute
@@ -1189,6 +1220,10 @@ export interface FileRoutesByFullPath {
   '/uni/': typeof UniIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/auth/rotate-password': typeof ApiAuthRotatePasswordRoute
+  '/api/calendar/deadlines': typeof ApiCalendarDeadlinesRoute
+  '/api/calendar/feed-status': typeof ApiCalendarFeedStatusRoute
+  '/api/calendar/today': typeof ApiCalendarTodayRoute
+  '/api/calendar/week': typeof ApiCalendarWeekRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1259,6 +1294,7 @@ export interface FileRoutesByTo {
   '/early-access': typeof EarlyAccessRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
+  '/jarvis': typeof JarvisRoute
   '/jobs': typeof JobsRoute
   '/massage': typeof MassageRoute
   '/mcp': typeof McpRoute
@@ -1365,6 +1401,10 @@ export interface FileRoutesByTo {
   '/uni': typeof UniIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/auth/rotate-password': typeof ApiAuthRotatePasswordRoute
+  '/api/calendar/deadlines': typeof ApiCalendarDeadlinesRoute
+  '/api/calendar/feed-status': typeof ApiCalendarFeedStatusRoute
+  '/api/calendar/today': typeof ApiCalendarTodayRoute
+  '/api/calendar/week': typeof ApiCalendarWeekRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1436,6 +1476,7 @@ export interface FileRoutesById {
   '/early-access': typeof EarlyAccessRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
+  '/jarvis': typeof JarvisRoute
   '/jobs': typeof JobsRoute
   '/massage': typeof MassageRoute
   '/mcp': typeof McpRoute
@@ -1544,6 +1585,10 @@ export interface FileRoutesById {
   '/uni/': typeof UniIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/auth/rotate-password': typeof ApiAuthRotatePasswordRoute
+  '/api/calendar/deadlines': typeof ApiCalendarDeadlinesRoute
+  '/api/calendar/feed-status': typeof ApiCalendarFeedStatusRoute
+  '/api/calendar/today': typeof ApiCalendarTodayRoute
+  '/api/calendar/week': typeof ApiCalendarWeekRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1616,6 +1661,7 @@ export interface FileRouteTypes {
     | '/early-access'
     | '/files'
     | '/hermes-world'
+    | '/jarvis'
     | '/jobs'
     | '/massage'
     | '/mcp'
@@ -1724,6 +1770,10 @@ export interface FileRouteTypes {
     | '/uni/'
     | '/api/artifacts/$artifactId'
     | '/api/auth/rotate-password'
+    | '/api/calendar/deadlines'
+    | '/api/calendar/feed-status'
+    | '/api/calendar/today'
+    | '/api/calendar/week'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -1794,6 +1844,7 @@ export interface FileRouteTypes {
     | '/early-access'
     | '/files'
     | '/hermes-world'
+    | '/jarvis'
     | '/jobs'
     | '/massage'
     | '/mcp'
@@ -1900,6 +1951,10 @@ export interface FileRouteTypes {
     | '/uni'
     | '/api/artifacts/$artifactId'
     | '/api/auth/rotate-password'
+    | '/api/calendar/deadlines'
+    | '/api/calendar/feed-status'
+    | '/api/calendar/today'
+    | '/api/calendar/week'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -1970,6 +2025,7 @@ export interface FileRouteTypes {
     | '/early-access'
     | '/files'
     | '/hermes-world'
+    | '/jarvis'
     | '/jobs'
     | '/massage'
     | '/mcp'
@@ -2078,6 +2134,10 @@ export interface FileRouteTypes {
     | '/uni/'
     | '/api/artifacts/$artifactId'
     | '/api/auth/rotate-password'
+    | '/api/calendar/deadlines'
+    | '/api/calendar/feed-status'
+    | '/api/calendar/today'
+    | '/api/calendar/week'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -2149,6 +2209,7 @@ export interface RootRouteChildren {
   EarlyAccessRoute: typeof EarlyAccessRoute
   FilesRoute: typeof FilesRoute
   HermesWorldRoute: typeof HermesWorldRoute
+  JarvisRoute: typeof JarvisRoute
   JobsRoute: typeof JobsRoute
   MassageRoute: typeof MassageRoute
   McpRoute: typeof McpRoute
@@ -2251,6 +2312,10 @@ export interface RootRouteChildren {
   UniObsidianRoute: typeof UniObsidianRoute
   ChatIndexRoute: typeof ChatIndexRoute
   UniIndexRoute: typeof UniIndexRoute
+  ApiCalendarDeadlinesRoute: typeof ApiCalendarDeadlinesRoute
+  ApiCalendarFeedStatusRoute: typeof ApiCalendarFeedStatusRoute
+  ApiCalendarTodayRoute: typeof ApiCalendarTodayRoute
+  ApiCalendarWeekRoute: typeof ApiCalendarWeekRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
   ApiClinitrackHealthRoute: typeof ApiClinitrackHealthRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
@@ -2412,6 +2477,13 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/jobs'
       preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/jarvis': {
+      id: '/jarvis'
+      path: '/jarvis'
+      fullPath: '/jarvis'
+      preLoaderRoute: typeof JarvisRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hermes-world': {
@@ -3471,6 +3543,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiClaudeJobsJobIdRouteImport
       parentRoute: typeof ApiClaudeJobsRoute
     }
+    '/api/calendar/week': {
+      id: '/api/calendar/week'
+      path: '/api/calendar/week'
+      fullPath: '/api/calendar/week'
+      preLoaderRoute: typeof ApiCalendarWeekRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/today': {
+      id: '/api/calendar/today'
+      path: '/api/calendar/today'
+      fullPath: '/api/calendar/today'
+      preLoaderRoute: typeof ApiCalendarTodayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/feed-status': {
+      id: '/api/calendar/feed-status'
+      path: '/api/calendar/feed-status'
+      fullPath: '/api/calendar/feed-status'
+      preLoaderRoute: typeof ApiCalendarFeedStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/deadlines': {
+      id: '/api/calendar/deadlines'
+      path: '/api/calendar/deadlines'
+      fullPath: '/api/calendar/deadlines'
+      preLoaderRoute: typeof ApiCalendarDeadlinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/rotate-password': {
       id: '/api/auth/rotate-password'
       path: '/rotate-password'
@@ -3777,6 +3877,7 @@ const rootRouteChildren: RootRouteChildren = {
   EarlyAccessRoute: EarlyAccessRoute,
   FilesRoute: FilesRoute,
   HermesWorldRoute: HermesWorldRoute,
+  JarvisRoute: JarvisRoute,
   JobsRoute: JobsRoute,
   MassageRoute: MassageRoute,
   McpRoute: McpRoute,
@@ -3879,6 +3980,10 @@ const rootRouteChildren: RootRouteChildren = {
   UniObsidianRoute: UniObsidianRoute,
   ChatIndexRoute: ChatIndexRoute,
   UniIndexRoute: UniIndexRoute,
+  ApiCalendarDeadlinesRoute: ApiCalendarDeadlinesRoute,
+  ApiCalendarFeedStatusRoute: ApiCalendarFeedStatusRoute,
+  ApiCalendarTodayRoute: ApiCalendarTodayRoute,
+  ApiCalendarWeekRoute: ApiCalendarWeekRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
   ApiClinitrackHealthRoute: ApiClinitrackHealthRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
