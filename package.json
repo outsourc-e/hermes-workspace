@@ -1,7 +1,7 @@
 {
   "name": "hermes-workspace",
   "version": "2.3.0",
-  "description": "Desktop workspace for Hermes Agent — chat, orchestration, and multi-agent coding pipelines",
+  "description": "Desktop workspace for Hermes Agent \u2014 chat, orchestration, and multi-agent coding pipelines",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
   "private": true,
@@ -24,7 +24,8 @@
     "electron:build": "pnpm build && pnpm electron:bundle-server && electron-builder --config electron-builder.config.cjs",
     "electron:build:mac": "pnpm build && pnpm electron:bundle-server && electron-builder --mac --config electron-builder.config.cjs",
     "electron:build:win": "pnpm build && pnpm electron:bundle-server && electron-builder --win --config electron-builder.config.cjs",
-    "electron:bundle-server": "esbuild dist/server/server.js --bundle --platform=node --format=cjs --outfile=electron/server-bundle.cjs"
+    "electron:bundle-server": "esbuild dist/server/server.js --bundle --platform=node --format=cjs --outfile=electron/server-bundle.cjs",
+    "test:e2e": "playwright test tests/e2e/hud.spec.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
@@ -82,6 +83,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tanstack/eslint-config": "0.3.4",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
