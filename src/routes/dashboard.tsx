@@ -76,6 +76,12 @@ interface InboxItemData {
   href?: string
 }
 
+interface SimpleWidget {
+  value?: string
+  sub?: string
+  tone?: 'ok' | 'warn' | 'err' | 'info'
+}
+
 // ── Theme ─────────────────────────────────────────────────────────────────
 
 const ACCENT = '#7A5CFF'
@@ -612,6 +618,124 @@ function StatusTile({
   )
 }
 
+// ── Telemetry tile (System / Work / Calendar feeds) ──────────────────────
+// Smaller than Body tiles. Each tile carries an `id` so anchor links land
+// on it (e.g. /dashboard#system, /dashboard#work, /dashboard#calendar).
+
+function TelemetryTile({
+  id,
+  label,
+  value,
+  sub,
+  tone = 'neutral',
+  href,
+}: {
+  id: string
+  label: string
+  value?: string
+  sub?: string
+  tone?: 'ok' | 'warn' | 'err' | 'info' | 'neutral'
+  href?: string
+}) {
+  const toneClass =
+    tone === 'err'
+      ? 'text-rose-300'
+      : tone === 'warn'
+        ? 'text-amber-300'
+        : tone === 'ok'
+          ? 'text-emerald-300'
+          : 'text-slate-100'
+  const borderClass =
+    tone === 'err'
+      ? 'border-rose-500/40'
+      : tone === 'warn'
+        ? 'border-amber-500/30'
+        : 'border-slate-800/80'
+  const content = (
+    <>
+      <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400 font-semibold">
+        {label}
+      </div>
+      <div
+        className={`mt-2 text-xl font-semibold tabular-nums leading-none ${toneClass}`}
+        style={{ fontFamily: MONO_STACK }}
+      >
+        {value ?? '—'}
+      </div>
+      {sub && (
+        <div className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+          {sub}
+        </div>
+      )}
+    </>
+  )
+  const className = `rounded-xl border bg-slate-900/30 px-4 py-3 scroll-mt-16 transition-colors ${borderClass}`
+  if (href) {
+    const isExternal = href.startsWith('http')
+    return (
+      <a
+        id={id}
+        href={href}
+        target={isExternal ? '_blank' : undefined}
+        rel={isExternal ? 'noopener noreferrer' : undefined}
+        className={`${className} hover:bg-slate-900/50 block group/tile`}
+        title={`Open ${label.toLowerCase()}`}
+      >
+        {content}
+      </a>
+    )
+  }
+  return (
+    <div id={id} className={className}>
+      {content}
+    </div>
+  )
+}
+
+function Telemetry({
+  vm,
+  cliniko,
+  feeds,
+}: {
+  vm: SimpleWidget | undefined
+  cliniko: SimpleWidget | undefined
+  feeds: SimpleWidget | undefined
+}) {
+  // Always render so #system / #work / #calendar anchors exist as soon
+  // as the dashboard mounts — even if data is still loading.
+  return (
+    <Section title="Telemetry">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <TelemetryTile
+          id="system"
+          label="VM health"
+          value={vm?.value}
+          sub={vm?.sub}
+          tone={vm?.tone === 'info' ? 'ok' : (vm?.tone ?? 'neutral')}
+        />
+        <TelemetryTile
+          id="work"
+          label="Work today"
+          value={cliniko?.value}
+          sub={
+            cliniko?.value
+              ? `${cliniko.value === '1' ? 'appointment' : 'appointments'} on Cliniko`
+              : 'No data'
+          }
+          tone="neutral"
+        />
+        <TelemetryTile
+          id="calendar"
+          label="Calendar feeds"
+          value={feeds?.value}
+          sub={feeds?.sub}
+          tone={feeds?.tone === 'info' ? 'ok' : (feeds?.tone ?? 'neutral')}
+        />
+      </div>
+    </Section>
+  )
+}
+
 function BodyStatus({ recovery }: { recovery: RecoveryData }) {
   const d = recovery.details
   if (!d) return null
@@ -879,12 +1003,27 @@ function DashboardPage() {
   const inboxItems = (widgets['inbox']?.data ?? []) as InboxItemData[]
   const briefText = (widgets['brief']?.data as { text?: string } | undefined)
     ?.text
+  const vm = widgets['vm-health']?.data as SimpleWidget | undefined
+  const cliniko = widgets['cliniko']?.data as SimpleWidget | undefined
+  const feeds = widgets['calendar-feeds']?.data as SimpleWidget | undefined
 
   // Tick once every 30s so the now-line and countdown stay current.
   const [now, setNow] = useState<Date>(() => new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(id)
+  }, [])
+
+  // SSR is off, so the browser's native hash-scroll fires before the
+  // anchor elements exist. Replay it once on mount.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.location.hash) return
+    const id = window.location.hash.slice(1)
+    requestAnimationFrame(() => {
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }, [])
 
   const greeting = getGreeting(now)
@@ -1001,6 +1140,9 @@ function DashboardPage() {
 
         {/* Body — labelled, separated tiles */}
         {recovery && <BodyStatus recovery={recovery} />}
+
+        {/* Telemetry — VM, Cliniko, Calendar feed health */}
+        <Telemetry vm={vm} cliniko={cliniko} feeds={feeds} />
 
         {/* Tomorrow */}
         <Section

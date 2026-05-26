@@ -522,26 +522,51 @@ export async function getWeekEvents(): Promise<{
   }
 }
 
+const ADELAIDE_TZ = 'Australia/Adelaide'
+const adelaideDateKeyFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ADELAIDE_TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+function adelaideDateKey(d: Date): string {
+  return adelaideDateKeyFmt.format(d)
+}
+
 export async function getTodayEvents(): Promise<{
   events: CalendarEvent[]
   feed_statuses: Record<string, FeedStatus>
   last_updated: number
 }> {
   const now = new Date()
+  // Server may be in UTC while clients live in Adelaide. Widen the fetch
+  // window to ±1 day so Adelaide-today is always covered, then filter
+  // strictly by Adelaide-local date key.
   const start = new Date(now)
+  start.setDate(start.getDate() - 1)
   start.setHours(0, 0, 0, 0)
   const end = new Date(now)
+  end.setDate(end.getDate() + 1)
   end.setHours(23, 59, 59, 999)
 
   const results = await fetchAllFeeds(start, end)
 
-  const allEvents: CalendarEvent[] = []
+  let allEvents: CalendarEvent[] = []
   const feedStatuses: Record<string, FeedStatus> = {}
 
   for (const r of results) {
     allEvents.push(...r.events)
     feedStatuses[r.feed_id] = r.status
   }
+
+  // Strict filter: an event counts as "today" iff its start, end, or any
+  // moment in between lands on Adelaide-today.
+  const todayKey = adelaideDateKey(now)
+  allEvents = allEvents.filter((e) => {
+    const sKey = adelaideDateKey(new Date(e.start))
+    const eKey = adelaideDateKey(new Date(e.end))
+    return sKey <= todayKey && eKey >= todayKey
+  })
 
   allEvents.sort((a, b) => a.start.localeCompare(b.start))
 

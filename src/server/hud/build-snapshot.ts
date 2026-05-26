@@ -103,6 +103,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'JOB',
       body: (jobs.data as any).sub + ' in last 24h',
       when: 'today',
+      href: '/operations',
     });
   }
 
@@ -132,6 +133,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'CLINIC',
       body: `${clinikoCount} appointment${clinikoCount === 1 ? '' : 's'} today`,
       when: 'today',
+      href: '/dashboard#work',
     });
   }
 
@@ -159,7 +161,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       body: `VM degraded: ${(vm.data as any).value} mem · ${(vm.data as any).sub}`,
       when: 'now',
       // TODO: dedicated VM-status section on /dashboard alongside agents/jobs.
-      href: '/dashboard',
+      href: '/dashboard#system',
     });
   } else if (vm?.state === 'loaded' && (vm.data as any)?.tone === 'warn') {
     items.push({
@@ -168,7 +170,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'VM',
       body: `VM under pressure: ${(vm.data as any).value} mem · ${(vm.data as any).sub}`,
       when: 'now',
-      href: '/dashboard',
+      href: '/dashboard#system',
     });
   }
 
@@ -182,6 +184,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'CAL',
       body: `Calendar feeds: ${(calFeeds.data as any).value} healthy · ${(calFeeds.data as any).sub}`,
       when: 'now',
+      href: '/dashboard#calendar',
     });
   }
 
