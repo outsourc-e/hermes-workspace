@@ -1,13 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { DashboardScreen } from '@/screens/dashboard/dashboard-screen'
+import { HUDShell } from '../components/hud/HUDShell'
 
 export const Route = createFileRoute('/dashboard')({
   ssr: false,
-  component: DashboardRoute,
+  component: DashboardPage,
 })
 
-function DashboardRoute() {
-  usePageTitle('Dashboard')
-  return <DashboardScreen />
+function DashboardPage() {
+  return <HUDShell />
 }
