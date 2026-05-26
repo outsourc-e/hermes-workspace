@@ -18,7 +18,7 @@ export const sessionsAdapter: SourceAdapter<SessionsData> = {
   id: 'sessions',
   ttlMs: 15 * 60_000,
   async fetch() {
-    const raw = await fs.readFile('/root/.hermes/hud-cache/sessions.json', 'utf8');
+    const raw = await fs.readFile('/root/.hermes/hud-cache/sessions-sidecar.json', 'utf8');
     return computeSessionsStat(JSON.parse(raw));
   },
 };
