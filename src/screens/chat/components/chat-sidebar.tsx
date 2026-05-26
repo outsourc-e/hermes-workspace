@@ -363,6 +363,7 @@ function SectionLabel({
   expanded,
   onToggle,
   navigateTo,
+  isFirst = false,
 }: {
   label: string
   isCollapsed: boolean
@@ -371,8 +372,22 @@ function SectionLabel({
   expanded?: boolean
   onToggle?: () => void
   navigateTo?: string
+  /** When true, skip the divider that separates this section from the previous
+   * one in collapsed mode (used for the topmost section of the sidebar). */
+  isFirst?: boolean
 }) {
-  if (isCollapsed) return null
+  if (isCollapsed) {
+    // Collapsed sidebar hides section headers; show a thin horizontal divider
+    // instead so the eye can still parse Work / Personal / University / Agents
+    // as distinct groups when only icons are visible.
+    if (isFirst) return null
+    return (
+      <div
+        aria-hidden="true"
+        className="mx-2 my-1.5 h-px bg-primary-300/40 dark:bg-primary-700/40"
+      />
+    )
+  }
 
   const labelContent = (
     <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 select-none">
@@ -1145,6 +1160,7 @@ function ChatSidebarComponent({
             expanded={workExpanded}
             onToggle={toggleWork}
             navigateTo={workNav}
+            isFirst
           />
           <CollapsibleSection
             expanded={workExpanded || isCollapsed}
