@@ -19,6 +19,7 @@ import '../../../server/hud/sources/whoop';
 import '../../../server/hud/sources/sessions';
 import '../../../server/hud/sources/pr-ci';
 import '../../../server/hud/sources/uni-deadlines';
+import '../../../server/hud/sources/calendar-feeds-health';
 
 const cache = new HUDCache();
 

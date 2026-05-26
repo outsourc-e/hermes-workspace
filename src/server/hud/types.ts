@@ -6,6 +6,7 @@ export type WidgetId =
   | 'timeline'
   | 'agents' | 'jobs' | 'sessions' | 'vm-health' | 'prs' | 'ci'
   | 'sms' | 'telegram' | 'plaud' | 'cliniko' | 'errors'
+  | 'calendar-feeds'
   | 'inbox';
 
 export interface WidgetSnapshot<T = unknown> {

@@ -19,6 +19,7 @@ const PRETTY: Record<string, string> = {
   'plaud': 'Plaud',
   'cliniko': 'Cliniko',
   'errors': 'Errors',
+  'calendar-feeds': 'Calendars',
 };
 
 function DashboardPage() {
@@ -79,7 +80,7 @@ function DashboardPage() {
   const nowMin = (d.getHours() - 6) * 60 + d.getMinutes();
   const widgetEnabled = (id: string) => cfg?.widgets?.[id] !== false;
 
-  const tileIds = ['agents', 'jobs', 'sessions', 'vm-health', 'prs', 'ci', 'sms', 'telegram', 'plaud', 'cliniko', 'errors'];
+  const tileIds = ['agents', 'jobs', 'sessions', 'vm-health', 'prs', 'ci', 'sms', 'telegram', 'plaud', 'cliniko', 'errors', 'calendar-feeds'];
   const mcTiles = tileIds
     .filter(id => widgetEnabled(id))
     .filter(id => w[id] && w[id].state !== 'disabled')
