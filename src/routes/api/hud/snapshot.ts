@@ -4,6 +4,7 @@ import { adapterRegistry } from '../../../server/hud/sources';
 import { HUDCache } from '../../../server/hud/cache';
 import '../../../server/hud/sources/vm-health';
 import '../../../server/hud/sources/errors';
+import '../../../server/hud/sources/jobs';
 
 const cache = new HUDCache();
 
