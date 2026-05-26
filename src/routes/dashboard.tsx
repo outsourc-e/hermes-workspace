@@ -56,7 +56,7 @@ function DashboardPage() {
 
   const calData = w['timeline']?.data;
   const events = calData?.timelineEvents ?? [];
-  const urgentInbox: InboxItemData[] = (calData?.urgentItems ?? []) as InboxItemData[];
+  const inboxItems: InboxItemData[] = (w['inbox']?.data ?? []) as InboxItemData[];
 
   return (
     <HUDShell
@@ -68,7 +68,7 @@ function DashboardPage() {
       />}
       timeline={<Timeline events={events} nowMin={Math.max(0, Math.min(840, nowMin))} />}
       missionControl={<MissionControl tiles={mcTiles} />}
-      inbox={<InboxRail items={urgentInbox} />}
+      inbox={<InboxRail items={inboxItems} />}
     />
   );
 }
