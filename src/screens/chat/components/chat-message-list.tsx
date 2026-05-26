@@ -558,6 +558,45 @@ export function getTrailingToolOnlyTurnSummary(
   }
 }
 
+function TrailingToolTurnIndicator({
+  summary,
+}: {
+  summary: TrailingToolOnlyTurnSummary
+}) {
+  const toolLabel =
+    summary.toolNames.length === 0
+      ? null
+      : summary.toolNames.length <= 3
+        ? summary.toolNames.join(', ')
+        : `${summary.toolNames.slice(0, 2).join(', ')} +${summary.toolNames.length - 2}`
+
+  const countLabel =
+    summary.count === 1 ? '1 tool action' : `${summary.count} tool actions`
+
+  const lead = summary.hasFinalAssistantText
+    ? 'After this reply:'
+    : 'Tool turn in progress:'
+
+  return (
+    <div
+      className="flex items-center gap-2 px-2 py-1.5 text-xs text-primary-500 dark:text-primary-400 animate-in fade-in duration-300"
+      role="status"
+      aria-live="polite"
+      data-testid="trailing-tool-turn-indicator"
+    >
+      <span
+        className="inline-block size-1.5 rounded-full bg-current opacity-60"
+        aria-hidden="true"
+      />
+      <span className="truncate">
+        <span className="opacity-70">{lead}</span>{' '}
+        <span className="font-medium">{countLabel}</span>
+        {toolLabel ? <span className="opacity-70"> · {toolLabel}</span> : null}
+      </span>
+    </div>
+  )
+}
+
 function escapeAttributeSelector(value: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
     return CSS.escape(value)
@@ -816,6 +855,16 @@ function ChatMessageListComponent({
 
   const displayEntries = useMemo<Array<DisplayEntry>>(
     () => buildDisplayEntries(displayMessages),
+    [displayMessages],
+  )
+
+  // Trailing tool-only assistant turns are deliberately not folded into the
+  // prior reply by buildDisplayEntries — surface them here as a small footer
+  // so a session ending mid-tool-turn doesn't render as a silently-cut
+  // conversation. Suppressed during live streaming because the bottom
+  // ThinkingBubble + TuiActivityCard already cover that state more richly.
+  const trailingToolSummary = useMemo(
+    () => getTrailingToolOnlyTurnSummary(displayMessages),
     [displayMessages],
   )
 
@@ -1840,6 +1889,14 @@ function ChatMessageListComponent({
                 ) : null}
               </>
             )}
+            {trailingToolSummary &&
+            !isStreaming &&
+            !waitingForResponse &&
+            !sending &&
+            activeToolCalls.length === 0 &&
+            liveToolActivity.length === 0 ? (
+              <TrailingToolTurnIndicator summary={trailingToolSummary} />
+            ) : null}
             {/* Bottom shimmer + branch TUI card. Hide as soon as the
                 streaming text starts arriving — the per-message TUI card
                 above the assistant bubble takes over from there to avoid
