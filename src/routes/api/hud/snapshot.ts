@@ -18,6 +18,7 @@ import '../../../server/hud/sources/brief';
 import '../../../server/hud/sources/whoop';
 import '../../../server/hud/sources/sessions';
 import '../../../server/hud/sources/pr-ci';
+import '../../../server/hud/sources/uni-deadlines';
 
 const cache = new HUDCache();
 
@@ -80,6 +81,19 @@ export async function snapshotHandler(): Promise<Response> {
       tag: 'JOB',
       body: (jobs.data as any).sub + ' in last 24h',
       when: 'today',
+    });
+  }
+
+  // Uni deadlines -> urgent/warn inbox item
+  const uniWidget = snap.widgets['next-deadline'];
+  if (uniWidget?.state === 'loaded' && uniWidget.data) {
+    const u = uniWidget.data as any;
+    items.push({
+      id: 'uni-' + u.title,
+      severity: u.label.includes('TOMORROW') ? 'urgent' : 'warn',
+      tag: 'UNI',
+      body: u.title + ' ' + u.sub,
+      when: u.label.replace('UNI · ', ''),
     });
   }
 
