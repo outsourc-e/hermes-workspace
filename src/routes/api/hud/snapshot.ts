@@ -52,12 +52,13 @@ export async function snapshotHandler(): Promise<Response> {
 
   // PLAUD untranscribed -> info item if > 0
   const plaud = snap.widgets['plaud'];
-  if (plaud?.state === 'loaded' && Number((plaud.data as any)?.value) > 0) {
+  const plaudCount = Number((plaud?.data as any)?.value);
+  if (plaud?.state === 'loaded' && plaudCount > 0) {
     items.push({
       id: 'plaud-untranscribed',
-      severity: 'info',
+      severity: plaudCount >= 10 ? 'warn' : 'info',
       tag: 'PLAUD',
-      body: (plaud.data as any).value + ' untranscribed recordings',
+      body: `${plaudCount} untranscribed recording${plaudCount === 1 ? '' : 's'}`,
       when: 'now',
     });
   }
@@ -83,6 +84,78 @@ export async function snapshotHandler(): Promise<Response> {
       tag: 'JOB',
       body: (jobs.data as any).sub + ' in last 24h',
       when: 'today',
+    });
+  }
+
+  // Recent errors (last 1h) -> urgent
+  const errors = snap.widgets['errors'];
+  const errorCount = Number((errors?.data as any)?.value);
+  if (errors?.state === 'loaded' && errorCount > 0) {
+    items.push({
+      id: 'errors-recent',
+      severity: errorCount >= 5 ? 'urgent' : 'warn',
+      tag: 'ERROR',
+      body: `${errorCount} error${errorCount === 1 ? '' : 's'} in the last hour`,
+      when: 'now',
+    });
+  }
+
+  // Cliniko appointments today -> info (urgent if next one is soon)
+  const cliniko = snap.widgets['cliniko'];
+  const clinikoCount = Number((cliniko?.data as any)?.value);
+  if (cliniko?.state === 'loaded' && clinikoCount > 0) {
+    items.push({
+      id: 'cliniko-today',
+      severity: 'info',
+      tag: 'CLINIC',
+      body: `${clinikoCount} appointment${clinikoCount === 1 ? '' : 's'} today`,
+      when: 'today',
+    });
+  }
+
+  // CI failures -> warn (separate from jobs which can be the cron suite)
+  const ci = snap.widgets['ci'];
+  const ciSub = String((ci?.data as any)?.sub ?? '');
+  if (ci?.state === 'loaded' && /fail/i.test(ciSub)) {
+    items.push({
+      id: 'ci-failing',
+      severity: 'warn',
+      tag: 'CI',
+      body: ciSub,
+      when: 'now',
+    });
+  }
+
+  // VM health degradation -> urgent
+  const vm = snap.widgets['vm-health'];
+  if (vm?.state === 'loaded' && (vm.data as any)?.tone === 'err') {
+    items.push({
+      id: 'vm-degraded',
+      severity: 'urgent',
+      tag: 'VM',
+      body: `VM degraded: ${(vm.data as any).value} mem · ${(vm.data as any).sub}`,
+      when: 'now',
+    });
+  } else if (vm?.state === 'loaded' && (vm.data as any)?.tone === 'warn') {
+    items.push({
+      id: 'vm-warn',
+      severity: 'warn',
+      tag: 'VM',
+      body: `VM under pressure: ${(vm.data as any).value} mem · ${(vm.data as any).sub}`,
+      when: 'now',
+    });
+  }
+
+  // Calendar feed health -> warn if any feed is erroring/stale
+  const calFeeds = snap.widgets['calendar-feeds'];
+  const calFeedsTone = String((calFeeds?.data as any)?.tone ?? '');
+  if (calFeeds?.state === 'loaded' && (calFeedsTone === 'err' || calFeedsTone === 'warn')) {
+    items.push({
+      id: 'calendar-feeds-degraded',
+      severity: calFeedsTone === 'err' ? 'warn' : 'info',
+      tag: 'CAL',
+      body: `Calendar feeds: ${(calFeeds.data as any).value} healthy · ${(calFeeds.data as any).sub}`,
+      when: 'now',
     });
   }
 
