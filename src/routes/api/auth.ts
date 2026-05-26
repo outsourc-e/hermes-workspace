@@ -7,6 +7,7 @@ import {
   isPasswordProtectionEnabled,
   storeSessionToken,
   verifyPassword,
+  verifyTailnetPin,
 } from '../../server/auth-middleware'
 import {
   getClientIp,
@@ -53,8 +54,8 @@ export const Route = createFileRoute('/api/auth')({
 
           const { password } = parsed.data
 
-          // Verify password
-          const valid = verifyPassword(password)
+          // Verify password OR (4-digit PIN if request is from local/tailnet)
+          const valid = verifyPassword(password) || verifyTailnetPin(password, request)
 
           if (!valid) {
             // Add small delay to prevent brute force

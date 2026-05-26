@@ -276,6 +276,38 @@ export function requireLocalOrAuth(request: Request): boolean {
   return isAuthenticated(request)
 }
 
+
+/**
+ * Resolve the configured tailnet PIN (low-friction auth for trusted local
+ * networks). Returns empty string if not configured.
+ */
+function getConfiguredTailnetPin(): string {
+  return (process.env.HERMES_TAILNET_PIN || '').trim()
+}
+
+export function isTailnetPinEnabled(): boolean {
+  return getConfiguredTailnetPin().length > 0
+}
+
+/**
+ * Verify a 4-digit PIN against HERMES_TAILNET_PIN, but ONLY when the request
+ * originates from a trusted local network (loopback, Tailscale 100.x, LAN).
+ * Always returns false for non-local requests, even with a correct PIN.
+ */
+export function verifyTailnetPin(password: string, request: Request): boolean {
+  if (!isLocalRequest(request)) return false
+  const pin = getConfiguredTailnetPin()
+  if (!pin) return false
+  const passwordBuf = Buffer.from(password, 'utf8')
+  const pinBuf = Buffer.from(pin, 'utf8')
+  if (passwordBuf.length !== pinBuf.length) return false
+  try {
+    return timingSafeEqual(passwordBuf, pinBuf)
+  } catch {
+    return false
+  }
+}
+
 /**
  * Whether session cookies should set the `Secure` attribute.
  *
