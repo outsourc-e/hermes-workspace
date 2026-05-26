@@ -14,7 +14,18 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
-import * as ical from 'node-ical'
+import nodeIcal from 'node-ical'
+
+// Pull off named members via the default export — `import * as ical from 'node-ical'`
+// resolves to an interop namespace whose runtime shape varies between vite-bundled
+// SSR and plain Node ESM (tsx), where `parseICS` lands on `default` rather than
+// the namespace itself. Bind via the default to work in both.
+const parseICS = nodeIcal.parseICS ?? (nodeIcal as { default?: typeof nodeIcal }).default?.parseICS
+const expandRecurringEvent =
+  (nodeIcal as unknown as { expandRecurringEvent?: typeof nodeIcal.expandRecurringEvent })
+    .expandRecurringEvent ??
+  ((nodeIcal as { default?: { expandRecurringEvent?: typeof nodeIcal.expandRecurringEvent } })
+    .default?.expandRecurringEvent)
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -228,6 +239,51 @@ async function fetchHttpIcalFeed(
 
 // ── ICS parsing ──────────────────────────────────────────────────────────
 
+function buildCalendarEvent(
+  feed: FeedConfig,
+  vevent: { uid?: string; summary?: string; location?: string; description?: string },
+  instanceStart: Date,
+  instanceEnd: Date,
+  isFullDay: boolean,
+  // Recurring-event instances need an instance-suffix on the id so each
+  // expansion is unique; single-occurrence events keep the bare uid.
+  isRecurringInstance: boolean,
+): CalendarEvent {
+  const startIso = isFullDay
+    ? instanceStart.toISOString().split('T')[0]
+    : instanceStart.toISOString()
+  const endIso = isFullDay
+    ? instanceEnd.toISOString().split('T')[0]
+    : instanceEnd.toISOString()
+
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date()
+  todayEnd.setHours(23, 59, 59, 999)
+  const isToday = instanceStart <= todayEnd && instanceEnd >= todayStart
+
+  const id = vevent.uid
+    ? isRecurringInstance
+      ? `${vevent.uid}@${instanceStart.toISOString()}`
+      : vevent.uid
+    : `${feed.id}-${instanceStart.toISOString()}`
+
+  return {
+    id,
+    summary: vevent.summary ?? '(No title)',
+    start: startIso,
+    end: endIso,
+    location: vevent.location,
+    description: vevent.description,
+    category: feed.category,
+    feed_id: feed.id,
+    feed_name: feed.name,
+    feed_color: feed.color,
+    is_today: isToday,
+    is_all_day: isFullDay,
+  }
+}
+
 export function parseIcsData(
   icsArray: string[],
   feed: FeedConfig,
@@ -238,54 +294,78 @@ export function parseIcsData(
 
   for (const icsText of icsArray) {
     try {
-      const parsed = ical.parseICS(icsText)
+      const parsed = parseICS(icsText)
       for (const [_key, obj] of Object.entries(parsed)) {
         if (obj.type !== 'VEVENT') continue
+        const ev = obj as {
+          uid?: string
+          summary?: string
+          location?: string
+          description?: string
+          start?: Date
+          end?: Date
+          dateType?: string
+          rrule?: unknown
+        }
 
-        const ev = obj as any
+        const detectFullDay = (s: Date, e: Date | undefined): boolean => {
+          if (ev.dateType === 'date') return true
+          if (!e) return false
+          const dur = e.getTime() - s.getTime()
+          return dur === 86400000 && s.getHours() === 0 && s.getMinutes() === 0
+        }
 
+        // Recurring event — expand all instances within the [start, end] window
+        // (node-ical handles RRULE / EXDATE / RECURRENCE-ID overrides).
+        if (ev.rrule) {
+          try {
+            if (!expandRecurringEvent) {
+              // Older node-ical without RRULE expansion — fall back to
+              // single-occurrence handling below.
+              throw new Error('expandRecurringEvent unavailable')
+            }
+            const instances = expandRecurringEvent(ev as Parameters<typeof expandRecurringEvent>[0], {
+              from: start,
+              to: end,
+              expandOngoing: true,
+            }) as Array<{ start: Date; end: Date; isFullDay: boolean }>
+            for (const inst of instances) {
+              events.push(
+                buildCalendarEvent(
+                  feed,
+                  ev,
+                  inst.start,
+                  inst.end ?? inst.start,
+                  inst.isFullDay,
+                  true,
+                ),
+              )
+            }
+            continue
+          } catch (expandErr) {
+            console.error(
+              `[calendar-feeds] expandRecurringEvent failed for ${feed.id} uid=${ev.uid}:`,
+              expandErr,
+            )
+            // Fall through to single-occurrence handling below
+          }
+        }
+
+        // Single-occurrence event
         const startDate = ev.start ?? ev.end
         const endDate = ev.end ?? ev.start
         if (!startDate) continue
-
-        // Filter to time range
-        if (startDate > end || endDate < start) continue
-
-        const startStr = ev.start?.toISOString() ?? ''
-
-        const isAllDayReliable =
-          ev.dateType === 'date' ||
-          (ev.start && ev.end &&
-            ev.end.getTime() - ev.start.getTime() === 86400000 &&
-            ev.start.getHours() === 0 && ev.start.getMinutes() === 0)
-
-        const startIso = isAllDayReliable
-          ? ev.start.toISOString().split('T')[0]
-          : ev.start.toISOString()
-        const endIso = isAllDayReliable
-          ? (ev.end?.toISOString()?.split('T')[0] ?? startIso)
-          : (ev.end?.toISOString() ?? startIso)
-
-        const todayStart = new Date()
-        todayStart.setHours(0, 0, 0, 0)
-        const todayEnd = new Date()
-        todayEnd.setHours(23, 59, 59, 999)
-        const isToday = startDate <= todayEnd && endDate >= todayStart
-
-        events.push({
-          id: ev.uid ?? `${feed.id}-${startStr}`,
-          summary: ev.summary ?? '(No title)',
-          start: startIso,
-          end: endIso,
-          location: ev.location,
-          description: ev.description,
-          category: feed.category,
-          feed_id: feed.id,
-          feed_name: feed.name,
-          feed_color: feed.color,
-          is_today: isToday,
-          is_all_day: isAllDayReliable,
-        })
+        if (startDate > end || (endDate ?? startDate) < start) continue
+        events.push(
+          buildCalendarEvent(
+            feed,
+            ev,
+            startDate,
+            endDate ?? startDate,
+            detectFullDay(startDate, endDate),
+            false,
+          ),
+        )
       }
     } catch (parseErr: unknown) {
       console.error(`[calendar-feeds] Failed to parse ICS for ${feed.id}:`, parseErr)

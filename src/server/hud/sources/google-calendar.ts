@@ -1,5 +1,5 @@
-import { promises as fs } from 'fs';
 import { registerAdapter, type SourceAdapter } from './index';
+import { getWeekEvents } from '../../calendar-feeds';
 
 interface RawCalEvent {
   id: string;
@@ -103,15 +103,27 @@ export function deriveCalendarData(raw: RawCalEvent[], now: Date = new Date()): 
   return { upNext, timelineEvents, urgentItems, nextUniEvent };
 }
 
-interface RawFile { generatedAt?: string; events?: RawCalEvent[]; error?: string; }
-
 export const googleCalendarAdapter: SourceAdapter<CalendarData> = {
   id: 'timeline',
   ttlMs: 60_000,
   async fetch() {
-    const raw = await fs.readFile('/root/.hermes/hud-cache/google-events-today.json', 'utf8');
-    const file = JSON.parse(raw) as RawFile;
-    return deriveCalendarData(file.events ?? []);
+    // Multi-source pipeline (Google iCal exports + iCloud CalDAV) — replaces
+    // the old single-feed /root/.hermes/hud-cache/google-events-today.json
+    // file cache so today's HUD timeline / up-next reflect every enabled
+    // feed in ~/.hermes/calendar/feeds.json, not just one.
+    //
+    // 7-day window so deriveCalendarData has enough horizon to populate
+    // upNext (next event, even if it's tomorrow) and nextUniEvent (days out).
+    // timelineEvents filters back down to strictly today inside the derive.
+    const { events } = await getWeekEvents();
+    const raw: RawCalEvent[] = events.map((e) => ({
+      id: e.id,
+      summary: e.summary,
+      start: e.start,
+      end: e.end,
+      calendarName: e.feed_name,
+    }));
+    return deriveCalendarData(raw);
   },
 };
 
