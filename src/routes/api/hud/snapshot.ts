@@ -7,6 +7,7 @@ import '../../../server/hud/sources/errors';
 import '../../../server/hud/sources/jobs';
 import '../../../server/hud/sources/agents';
 import '../../../server/hud/sources/sms';
+import '../../../server/hud/sources/telegram';
 
 const cache = new HUDCache();
 
