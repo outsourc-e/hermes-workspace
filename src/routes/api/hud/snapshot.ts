@@ -14,6 +14,7 @@ import '../../../server/hud/sources/google-calendar';
 import '../../../server/hud/sources/brief';
 import '../../../server/hud/sources/whoop';
 import '../../../server/hud/sources/sessions';
+import '../../../server/hud/sources/pr-ci';
 
 const cache = new HUDCache();
 
