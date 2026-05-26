@@ -234,7 +234,7 @@ export function getRequestIp(request: Request): string {
   return (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
 }
 
-function isLocalRequest(request: Request): boolean {
+export function isLocalRequest(request: Request): boolean {
   const ip = getRequestIp(request)
   const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1']
   if (localIPs.includes(ip)) return true
