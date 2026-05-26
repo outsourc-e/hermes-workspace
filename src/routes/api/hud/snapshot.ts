@@ -8,6 +8,8 @@ import '../../../server/hud/sources/jobs';
 import '../../../server/hud/sources/agents';
 import '../../../server/hud/sources/sms';
 import '../../../server/hud/sources/telegram';
+import '../../../server/hud/sources/cliniko-today';
+import '../../../server/hud/sources/plaud';
 
 const cache = new HUDCache();
 
