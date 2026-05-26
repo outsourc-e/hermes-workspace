@@ -54,6 +54,14 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
   // Build inbox feed from contributing sources
   const items: InboxItemData[] = [];
 
+  // Derive GitHub URLs for PR / CI inbox items from the same env the
+  // pr-ci adapter reads. Defaults match pr-ci.ts.
+  const firstRepo = (process.env.HUD_TRACKED_REPOS || 'SPACEMAN1898/CliniTrack-Suite')
+    .split(',')[0]
+    .trim();
+  const prsHref = `https://github.com/${firstRepo}/pulls?q=is%3Aopen+is%3Apr+review-requested%3A%40me`;
+  const ciHref = `https://github.com/${firstRepo}/actions?query=is%3Afailure`;
+
   // Calendar urgents
   const cal = snap.widgets['timeline'];
   const urgents = (cal?.data as any)?.urgentItems ?? [];
@@ -82,6 +90,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'PR',
       body: (prs.data as any).sub,
       when: 'now',
+      href: prsHref,
     });
   }
 
@@ -107,6 +116,9 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'ERROR',
       body: `${errorCount} error${errorCount === 1 ? '' : 's'} in the last hour`,
       when: 'now',
+      // TODO: replace with an agent-spawn flow that opens a Claude window
+      // with the error context + fix suggestions. For now route to /files.
+      href: '/files',
     });
   }
 
@@ -133,6 +145,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'CI',
       body: ciSub,
       when: 'now',
+      href: ciHref,
     });
   }
 
@@ -145,6 +158,8 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'VM',
       body: `VM degraded: ${(vm.data as any).value} mem · ${(vm.data as any).sub}`,
       when: 'now',
+      // TODO: dedicated VM-status section on /dashboard alongside agents/jobs.
+      href: '/dashboard',
     });
   } else if (vm?.state === 'loaded' && (vm.data as any)?.tone === 'warn') {
     items.push({
@@ -153,6 +168,7 @@ export async function buildHUDSnapshot(): Promise<HUDSnapshot> {
       tag: 'VM',
       body: `VM under pressure: ${(vm.data as any).value} mem · ${(vm.data as any).sub}`,
       when: 'now',
+      href: '/dashboard',
     });
   }
 
