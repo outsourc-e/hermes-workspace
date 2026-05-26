@@ -34,15 +34,29 @@ export const defaultHUDConfig: HUDConfig = {
   mobile_tiles: ['agents', 'jobs', 'prs', 'sms', 'telegram', 'plaud'],
 };
 
+/**
+ * Parse a YAML string into a HUDConfig, merging with defaults.
+ *
+ * Merge semantics:
+ *   - Top-level scalars/arrays (mc_tile_order, mobile_tiles,
+ *     inbox_severity_overrides, dismissed_inbox_items): REPLACE — user value
+ *     wholly replaces the default. Arrays are not appended; callers set their
+ *     preferred order/set directly.
+ *   - widgets: KEY-MERGE — user toggles are overlaid onto the full default
+ *     widget map so unknown/new widgets keep their default visibility.
+ *
+ * The returned object is always a deep clone; mutating it never affects
+ * defaultHUDConfig or any other previously returned config object.
+ */
 export function parseHUDConfig(yamlStr: string): HUDConfig {
   if (!yamlStr.trim()) return structuredClone(defaultHUDConfig);
   const parsed = YAML.parse(yamlStr) as Partial<HUDConfig> | null;
   if (!parsed) return structuredClone(defaultHUDConfig);
-  return {
+  return structuredClone({
     ...defaultHUDConfig,
     ...parsed,
     widgets: { ...defaultHUDConfig.widgets, ...(parsed.widgets ?? {}) },
-  };
+  });
 }
 
 export async function loadHUDConfig(): Promise<HUDConfig> {
