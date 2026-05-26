@@ -59,13 +59,16 @@ export type FeedFetchResult = {
 
 // ── Config loading ───────────────────────────────────────────────────────
 
-const HERMES_HOME =
-  process.env.HERMES_HOME ??
-  process.env.CLAUDE_HOME ??
-  join(homedir(), '.hermes')
+function hermesHome(): string {
+  return (
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    join(homedir(), '.hermes')
+  )
+}
 
 function loadFeedsConfig(): FeedConfig[] {
-  const cfgPath = join(HERMES_HOME, 'calendar', 'feeds.json')
+  const cfgPath = join(hermesHome(), 'calendar', 'feeds.json')
   if (!existsSync(cfgPath)) return []
   try {
     const raw = readFileSync(cfgPath, 'utf8')
@@ -82,7 +85,7 @@ function loadEnvVar(varName: string): string | null {
   if (process.env[varName]) return process.env[varName] ?? null
 
   // Then try ~/.hermes/calendar/.env
-  const envPath = join(HERMES_HOME, 'calendar', '.env')
+  const envPath = join(hermesHome(), 'calendar', '.env')
   if (!existsSync(envPath)) return null
   try {
     const raw = readFileSync(envPath, 'utf8')
@@ -225,7 +228,7 @@ async function fetchHttpIcalFeed(
 
 // ── ICS parsing ──────────────────────────────────────────────────────────
 
-function parseIcsData(
+export function parseIcsData(
   icsArray: string[],
   feed: FeedConfig,
   start: Date,
@@ -528,7 +531,7 @@ export async function getDeadlines(): Promise<{
   }>
   semester_name: string
 }> {
-  const deadlinesPath = join(HERMES_HOME, 'calendar', 'uni-deadlines.json')
+  const deadlinesPath = join(hermesHome(), 'calendar', 'uni-deadlines.json')
   if (!existsSync(deadlinesPath)) {
     return { deadlines: [], semester_name: 'Unknown' }
   }
@@ -583,8 +586,9 @@ function scheduleRefresh() {
   fetchAllFeeds(start, end).catch(() => {})
 }
 
-// Initial warm-up
-scheduleRefresh()
-
-// Refresh every 5 minutes
-setInterval(scheduleRefresh, 5 * 60 * 1000)
+// Skip the warm-up + interval when running under vitest so tests don't kick
+// off real network fetches or leave timers running past the test process.
+if (!process.env.VITEST) {
+  scheduleRefresh()
+  setInterval(scheduleRefresh, 5 * 60 * 1000)
+}
