@@ -13,6 +13,7 @@ import '../../../server/hud/sources/plaud';
 import '../../../server/hud/sources/google-calendar';
 import '../../../server/hud/sources/brief';
 import '../../../server/hud/sources/whoop';
+import '../../../server/hud/sources/sessions';
 
 const cache = new HUDCache();
 
