@@ -84,16 +84,37 @@ export async function snapshotHandler(): Promise<Response> {
     });
   }
 
-  // Uni deadlines -> urgent/warn inbox item
+  // Uni deadlines -> urgent/warn inbox item.
+  // Fallback: if Obsidian source is empty/null, derive from next event in calendar's Uni+Study calendar.
   const uniWidget = snap.widgets['next-deadline'];
+  const calDataAny = cal?.data as any;
+  let uniData: any = null;
   if (uniWidget?.state === 'loaded' && uniWidget.data) {
-    const u = uniWidget.data as any;
+    uniData = uniWidget.data;
+  } else if (calDataAny?.nextUniEvent) {
+    const ne = calDataAny.nextUniEvent;
+    const labelTime = ne.daysOut <= 0 ? 'TODAY' : ne.daysOut === 1 ? 'TOMORROW' : ne.daysOut + 'D';
+    uniData = {
+      label: 'UNI · ' + labelTime,
+      title: ne.title,
+      sub: ne.calendarName || 'uni',
+    };
+    // Also publish synthesized data into the next-deadline widget so the Bento card shows it
+    snap.widgets['next-deadline'] = {
+      id: 'next-deadline',
+      state: 'loaded',
+      data: uniData,
+      fetchedAt: cal!.fetchedAt,
+      ttlMs: cal!.ttlMs,
+    };
+  }
+  if (uniData) {
     items.push({
-      id: 'uni-' + u.title,
-      severity: u.label.includes('TOMORROW') ? 'urgent' : 'warn',
+      id: 'uni-' + uniData.title,
+      severity: uniData.label.includes('TODAY') || uniData.label.includes('TOMORROW') ? 'urgent' : 'warn',
       tag: 'UNI',
-      body: u.title + ' ' + u.sub,
-      when: u.label.replace('UNI · ', ''),
+      body: uniData.title + ' ' + uniData.sub,
+      when: uniData.label.replace('UNI · ', ''),
     });
   }
 

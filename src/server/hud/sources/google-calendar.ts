@@ -11,28 +11,38 @@ interface RawCalEvent {
 
 interface TimelineEvent {
   id: string;
-  startMin: number;       // minutes since 6am (display window)
+  startMin: number;
   durationMin: number;
   title: string;
   category: 'work' | 'uni' | 'clinic' | 'personal' | 'urgent';
 }
 
 interface UpNext { label: string; title: string; sub?: string; }
-
 interface UrgentItem { id: string; tag: string; body: string; when: string; severity: 'urgent'; }
 
 export interface CalendarData {
   upNext: UpNext | null;
   timelineEvents: TimelineEvent[];
   urgentItems: UrgentItem[];
+  nextUniEvent: { title: string; daysOut: number; calendarName?: string } | null;
 }
 
 function categorise(name?: string): TimelineEvent['category'] {
   const n = (name ?? '').toLowerCase();
   if (n.includes('tadc') || n.includes('hcc') || n.includes('clinic')) return 'clinic';
-  if (n.includes('uni') || n.includes('lect') || n.includes('lab')) return 'uni';
-  if (n.includes('work') || n.includes('praxentis')) return 'work';
+  if (n.includes('uni') || n.includes('lect') || n.includes('lab') || n.includes('study')) return 'uni';
+  if (n.includes('work') || n.includes('praxentis') || n.includes('project')) return 'work';
+  if (n.includes('critical')) return 'urgent';
   return 'personal';
+}
+
+function formatUntil(deltaMs: number): string {
+  const min = Math.round(deltaMs / 60000);
+  if (min < 60) return `${Math.max(0, min)} MIN`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}H`;
+  const d = Math.round(hr / 24);
+  return d === 1 ? 'TOMORROW' : `${d}D`;
 }
 
 export function deriveCalendarData(raw: RawCalEvent[], now: Date = new Date()): CalendarData {
@@ -51,7 +61,7 @@ export function deriveCalendarData(raw: RawCalEvent[], now: Date = new Date()): 
 
   const next = upcoming[0];
   const upNext: UpNext | null = next ? {
-    label: `UP NEXT · ${Math.max(0, Math.round((next.startDate.getTime() - now.getTime()) / 60000))} MIN`,
+    label: `UP NEXT · ${formatUntil(next.startDate.getTime() - now.getTime())}`,
     title: next.summary,
     sub: next.calendarName,
   } : null;
@@ -66,7 +76,7 @@ export function deriveCalendarData(raw: RawCalEvent[], now: Date = new Date()): 
       title: e.summary,
       category: categorise(e.calendarName),
     }))
-    .filter(e => e.startMin >= 0 && e.startMin < 840);  // 6am → 8pm window
+    .filter(e => e.startMin >= 0 && e.startMin < 840);
 
   const urgentItems: UrgentItem[] = upcoming
     .filter(e => (e.startDate.getTime() - now.getTime()) < 3600_000 && (e.startDate.getTime() - now.getTime()) > 0)
@@ -78,13 +88,25 @@ export function deriveCalendarData(raw: RawCalEvent[], now: Date = new Date()): 
       severity: 'urgent' as const,
     }));
 
-  return { upNext, timelineEvents, urgentItems };
+  // Next uni event derived from any calendar with "uni" or "study" in its name
+  const uniUpcoming = upcoming.filter(e => {
+    const cat = categorise(e.calendarName);
+    return cat === 'uni';
+  });
+  const nextUni = uniUpcoming[0];
+  const nextUniEvent = nextUni ? {
+    title: nextUni.summary,
+    daysOut: Math.max(0, Math.ceil((nextUni.startDate.getTime() - now.getTime()) / 86400_000)),
+    calendarName: nextUni.calendarName,
+  } : null;
+
+  return { upNext, timelineEvents, urgentItems, nextUniEvent };
 }
 
 interface RawFile { generatedAt?: string; events?: RawCalEvent[]; error?: string; }
 
 export const googleCalendarAdapter: SourceAdapter<CalendarData> = {
-  id: 'timeline',  // primary widget id; up-next post-processed in snapshot route
+  id: 'timeline',
   ttlMs: 60_000,
   async fetch() {
     const raw = await fs.readFile('/root/.hermes/hud-cache/google-events-today.json', 'utf8');
