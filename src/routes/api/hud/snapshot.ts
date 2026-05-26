@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { runAggregator } from '../../../server/hud/aggregator';
 import { adapterRegistry } from '../../../server/hud/sources';
 import { HUDCache } from '../../../server/hud/cache';
+import '../../../server/hud/sources/vm-health';
 
 const cache = new HUDCache();
 
