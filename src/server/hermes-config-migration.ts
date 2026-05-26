@@ -232,7 +232,7 @@ export function normalizeHermesConfigState(input: NormalizeHermesConfigInput): H
       configured,
       authenticated,
       available,
-      isDefault: defaultModel?.provider === def.id,
+      isDefault: (defaultModel?.provider || "").toLowerCase() === def.id.toLowerCase(),
       authSource,
       envKeys: def.envKeys,
       maskedCredentials,
