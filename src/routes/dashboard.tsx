@@ -1,99 +1,106 @@
-import { useMemo } from 'react';
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
-import { useHUDSnapshot } from '../components/hud/hooks/useHUDSnapshot';
-import { useHUDConfig, useHUDConfigPatch } from '../components/hud/hooks/useHUDConfig';
+import { useEffect, useMemo, useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { useHUDSnapshot } from '../components/hud/hooks/useHUDSnapshot'
+import {
+  useHUDConfig,
+  useHUDConfigPatch,
+} from '../components/hud/hooks/useHUDConfig'
 
-export const Route = createFileRoute('/dashboard')({ component: DashboardPage, ssr: false });
+export const Route = createFileRoute('/dashboard')({
+  component: DashboardPage,
+  ssr: false,
+})
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-type WidgetMap = Record<string, { data?: unknown; state?: string }>;
+type WidgetMap = Record<string, { data?: unknown; state?: string }>
 
 interface CalendarEventLite {
-  id: string;
-  summary: string;
-  start: string;
-  end: string;
-  location?: string;
-  feed_name: string;
-  category: string;
-  is_all_day: boolean;
+  id: string
+  summary: string
+  start: string
+  end: string
+  location?: string
+  description?: string
+  feed_name: string
+  category: string
+  is_all_day: boolean
 }
 
-interface TodayResponse { events: CalendarEventLite[] }
-interface WeekResponse { events: CalendarEventLite[] }
+interface TodayResponse {
+  events: CalendarEventLite[]
+}
+interface WeekResponse {
+  events: CalendarEventLite[]
+}
 
 interface Deadline {
-  id: string;
-  assessment: string;
-  unit: string;
-  unit_name: string;
-  date: string;
-  type: string;
-  is_hurdle: boolean;
-  weight: string;
-  days_away: number;
+  id: string
+  assessment: string
+  unit: string
+  unit_name: string
+  date: string
+  type: string
+  is_hurdle: boolean
+  weight: string
+  days_away: number
 }
 
-interface DeadlinesResponse { deadlines: Deadline[]; semester_name: string }
+interface DeadlinesResponse {
+  deadlines: Deadline[]
+  semester_name: string
+}
 
 interface RecoveryData {
-  label?: string;
-  title?: string;
-  sub?: string;
+  label?: string
+  title?: string
+  sub?: string
   details?: {
-    recovery_pct: number;
-    hrv_ms: number;
-    resting_hr_bpm: number;
-    sleep_hours: number;
-    sleep_performance_pct: number;
-    day_strain: number;
-  };
-  recommendation?: { activity: string; reason: string };
+    recovery_pct: number
+    hrv_ms: number
+    resting_hr_bpm: number
+    sleep_hours: number
+    sleep_performance_pct: number
+    day_strain: number
+  }
+  recommendation?: { activity: string; reason: string }
 }
 
 interface InboxItemData {
-  id: string;
-  severity: 'urgent' | 'warn' | 'ok' | 'info' | 'dim';
-  tag: string;
-  body: string;
-  when: string;
-  href?: string;
+  id: string
+  severity: 'urgent' | 'warn' | 'ok' | 'info' | 'dim'
+  tag: string
+  body: string
+  when: string
+  href?: string
 }
 
-// ── Theme tokens ──────────────────────────────────────────────────────────
-//
-// Praxentis brand: deep navy + purple. ONE accent (purple) is reserved for
-// "Hermes is talking to you" — interactive UI, key headings, the brand chip.
-// Everything else lives on the slate scale.
+// ── Theme ─────────────────────────────────────────────────────────────────
 
-const ACCENT = '#7A5CFF'; // Praxentis purple
-const ACCENT_LIGHT = '#B191FF';
-const FONT_STACK = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const ACCENT = '#7A5CFF'
+const ACCENT_LIGHT = '#B191FF'
+const FONT_STACK =
+  "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+const MONO_STACK = "'JetBrains Mono', ui-monospace, monospace"
 
-const TZ = 'Australia/Adelaide';
+const TZ = 'Australia/Adelaide'
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── Time helpers ──────────────────────────────────────────────────────────
 
 function getGreeting(now: Date): string {
   const hour = Number(
-    new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hour: '2-digit', hour12: false }).format(now),
-  );
-  if (hour < 5) return 'Late night';
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  if (hour < 21) return 'Good evening';
-  return 'Night shift';
-}
-
-function formatDate(now: Date): string {
-  return new Intl.DateTimeFormat('en-AU', {
-    timeZone: TZ,
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(now);
+    new Intl.DateTimeFormat('en-AU', {
+      timeZone: TZ,
+      hour: '2-digit',
+      hour12: false,
+    }).format(now),
+  )
+  if (hour < 5) return 'Late night'
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  if (hour < 21) return 'Good evening'
+  return 'Night shift'
 }
 
 function formatTime(iso: string): string {
@@ -102,181 +109,659 @@ function formatTime(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  });
+  })
 }
 
-function firstActionFromBrief(briefText: string | undefined): string | null {
-  if (!briefText) return null;
-  const lines = briefText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const firstAction = lines.findIndex((l) => /^\*?\*?first action/i.test(l));
-  if (firstAction >= 0 && firstAction + 1 < lines.length) {
-    return lines[firstAction + 1].replace(/^[-*]\s+/, '').replace(/[*_`]/g, '').trim();
-  }
-  return null;
+function formatClock(now: Date): string {
+  return new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now)
 }
 
-/** Map every feed category to a single-letter glyph. The eye doesn't need
- * to learn 5 colour codes — one letter + neutral slate is faster to scan. */
-function categoryGlyph(category: string): { letter: string; full: string } {
-  const c = category.toLowerCase();
-  if (c === 'uni' || c === 'university' || c === 'study') return { letter: 'U', full: 'University' };
-  if (c === 'clinic' || c === 'tadc' || c === 'hcc') return { letter: 'C', full: 'Clinic' };
-  if (c === 'family') return { letter: 'F', full: 'Family' };
-  if (c === 'work' || c === 'project' || c === 'projects' || c === 'praxentis') return { letter: 'W', full: 'Work' };
-  return { letter: 'L', full: 'Life' };
-}
-
-function isToday(iso: string, now: Date): boolean {
-  const d = new Date(iso);
-  const localDate = new Intl.DateTimeFormat('en-AU', {
-    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
-  });
-  return localDate.format(d) === localDate.format(now);
+function formatDateLong(now: Date): string {
+  return new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ,
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(now)
 }
 
 function isTomorrow(iso: string, now: Date): boolean {
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const d = new Date(iso);
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  const d = new Date(iso)
   const localDate = new Intl.DateTimeFormat('en-AU', {
-    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
-  });
-  return localDate.format(d) === localDate.format(tomorrow);
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  return localDate.format(d) === localDate.format(tomorrow)
 }
 
-// ── Primitives ────────────────────────────────────────────────────────────
+function formatCountdown(target: Date, now: Date): string {
+  const diffMs = target.getTime() - now.getTime()
+  if (diffMs <= 0) return 'NOW'
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'STARTING'
+  if (diffMin < 60) return `IN ${diffMin} MIN`
+  const hours = Math.floor(diffMin / 60)
+  const mins = diffMin % 60
+  if (hours < 6 && mins > 0) return `IN ${hours}H ${mins}M`
+  return `IN ${hours}H`
+}
 
-function Card({
-  title,
-  children,
-  className = '',
-  action,
-  emphasis = false,
+function firstActionFromBrief(briefText: string | undefined): string | null {
+  if (!briefText) return null
+  const lines = briefText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  const firstAction = lines.findIndex((l) => /^\*?\*?first action/i.test(l))
+  if (firstAction >= 0 && firstAction + 1 < lines.length) {
+    return lines[firstAction + 1]
+      .replace(/^[-*]\s+/, '')
+      .replace(/[*_`]/g, '')
+      .trim()
+  }
+  return null
+}
+
+function categoryGlyph(category: string): { letter: string; full: string } {
+  const c = category.toLowerCase()
+  if (c === 'uni' || c === 'university' || c === 'study')
+    return { letter: 'U', full: 'University' }
+  if (c === 'clinic' || c === 'tadc' || c === 'hcc')
+    return { letter: 'C', full: 'Clinic' }
+  if (c === 'family') return { letter: 'F', full: 'Family' }
+  if (
+    c === 'work' ||
+    c === 'project' ||
+    c === 'projects' ||
+    c === 'praxentis'
+  )
+    return { letter: 'W', full: 'Work' }
+  return { letter: 'L', full: 'Life' }
+}
+
+// ── Day timeline strip ────────────────────────────────────────────────────
+// 06:00 → 21:00 axis. Events plotted at their start time. Current time as a
+// soft purple vertical line. Past events dim, the next event glows. Click a
+// glyph to open in Google Calendar.
+
+const TIMELINE_START_H = 6
+const TIMELINE_END_H = 21
+const TIMELINE_TOTAL_MIN = (TIMELINE_END_H - TIMELINE_START_H) * 60
+
+function minutesIntoTimeline(iso: string): number {
+  const parts = new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso))
+  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
+  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
+  return (h - TIMELINE_START_H) * 60 + m
+}
+
+function minutesNowInTimeline(now: Date): number {
+  const parts = new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
+  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
+  return (h - TIMELINE_START_H) * 60 + m
+}
+
+function pctFromHour(h: number): number {
+  return ((h - TIMELINE_START_H) / (TIMELINE_END_H - TIMELINE_START_H)) * 100
+}
+
+function DayTimeline({
+  events,
+  now,
+  nextEventId,
 }: {
-  title?: string;
-  children: React.ReactNode;
-  className?: string;
-  action?: React.ReactNode;
-  emphasis?: boolean;
+  events: CalendarEventLite[]
+  now: Date
+  nextEventId: string | null
 }) {
-  const borderColor = emphasis ? `rgba(122,92,255,0.35)` : 'rgba(122,92,255,0.12)';
-  return (
-    <section
-      className={`rounded-xl border bg-[#0a0f1d]/80 backdrop-blur-sm ${className}`}
-      style={{ borderColor }}
-    >
-      {title && (
-        <header
-          className="flex items-center justify-between px-5 pt-4 pb-3 border-b"
-          style={{ borderColor: 'rgba(122,92,255,0.10)' }}
-        >
-          <h2 className="text-[11px] uppercase tracking-[0.18em] font-semibold text-slate-300">
-            {title}
-          </h2>
-          {action}
-        </header>
-      )}
-      <div className="p-5">{children}</div>
-    </section>
-  );
-}
+  const nowMin = minutesNowInTimeline(now)
+  const nowPct = (nowMin / TIMELINE_TOTAL_MIN) * 100
+  const nowOnAxis = nowMin >= 0 && nowMin <= TIMELINE_TOTAL_MIN
 
-function CategoryGlyph({ category }: { category: string }) {
-  const g = categoryGlyph(category);
-  return (
-    <span
-      title={g.full}
-      className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold tabular-nums bg-slate-800/60 border border-slate-700/60 text-slate-300"
-    >
-      {g.letter}
-    </span>
-  );
-}
+  const placeable = events
+    .filter((e) => !e.is_all_day)
+    .map((e) => ({ ev: e, min: minutesIntoTimeline(e.start) }))
+    .filter((p) => p.min >= 0 && p.min <= TIMELINE_TOTAL_MIN)
 
-function EventRow({ ev }: { ev: CalendarEventLite }) {
+  const outOfRange = events
+    .filter((e) => !e.is_all_day)
+    .map((e) => ({ ev: e, min: minutesIntoTimeline(e.start) }))
+    .filter((p) => p.min < 0 || p.min > TIMELINE_TOTAL_MIN)
+
+  const allDay = events.filter((e) => e.is_all_day)
+
+  const ticks = [6, 9, 12, 15, 18, 21]
+
   return (
-    <li className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-900/40 transition-colors">
-      <div className="flex-shrink-0 w-14 text-right">
-        <div className="text-sm font-semibold tabular-nums" style={{ color: ACCENT_LIGHT, fontFamily: "'JetBrains Mono', monospace" }}>
-          {ev.is_all_day ? 'ALL' : formatTime(ev.start)}
+    <div className="space-y-3">
+      {(allDay.length > 0 || outOfRange.length > 0) && (
+        <div className="flex flex-wrap gap-2 text-[10px] text-slate-500">
+          {allDay.map((e) => (
+            <span
+              key={e.id}
+              className="px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-800/80"
+            >
+              <span className="text-slate-600 mr-1">ALL DAY</span>
+              {e.summary}
+            </span>
+          ))}
+          {outOfRange.map(({ ev }) => (
+            <span
+              key={ev.id}
+              className="px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-800/80"
+            >
+              <span
+                className="text-slate-600 mr-1 tabular-nums"
+                style={{ fontFamily: MONO_STACK }}
+              >
+                {formatTime(ev.start)}
+              </span>
+              {ev.summary}
+            </span>
+          ))}
         </div>
-        {!ev.is_all_day && (
-          <div className="text-[10px] text-slate-500 tabular-nums" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            → {formatTime(ev.end)}
+      )}
+
+      <div
+        className="relative h-16 select-none"
+        aria-label="Today's events timeline"
+      >
+        {/* axis */}
+        <div className="absolute inset-x-0 top-9 h-px bg-slate-800/80" />
+
+        {/* tick marks */}
+        {ticks.map((h) => (
+          <div
+            key={`t-${h}`}
+            className="absolute top-9 h-1.5 w-px bg-slate-700/70 -translate-x-1/2"
+            style={{ left: `${pctFromHour(h)}%` }}
+          />
+        ))}
+
+        {/* tick labels */}
+        {ticks.map((h) => (
+          <div
+            key={`l-${h}`}
+            className="absolute top-11 -translate-x-1/2 text-[10px] tabular-nums text-slate-600 font-medium"
+            style={{ left: `${pctFromHour(h)}%`, fontFamily: MONO_STACK }}
+          >
+            {String(h).padStart(2, '0')}
+          </div>
+        ))}
+
+        {/* events */}
+        {placeable.map(({ ev, min }) => {
+          const pct = (min / TIMELINE_TOTAL_MIN) * 100
+          const past = min < nowMin
+          const isNext = ev.id === nextEventId
+          const g = categoryGlyph(ev.category)
+          const tooltip = `${formatTime(ev.start)} · ${ev.summary}${
+            ev.location ? ' · ' + ev.location : ''
+          }`
+          return (
+            <a
+              key={ev.id}
+              href={`https://calendar.google.com/calendar/event?id=${ev.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={tooltip}
+              className="absolute top-0 -translate-x-1/2 flex flex-col items-center group"
+              style={{ left: `${pct}%` }}
+            >
+              <span
+                className={
+                  past
+                    ? 'inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold bg-slate-900/60 border border-slate-800 text-slate-600 transition-colors'
+                    : isNext
+                      ? 'inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold text-slate-50 border transition-colors'
+                      : 'inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold bg-slate-800/80 border border-slate-700/80 text-slate-200 group-hover:text-slate-50 group-hover:border-slate-600 transition-colors'
+                }
+                style={
+                  isNext
+                    ? {
+                        backgroundColor: 'rgba(122,92,255,0.22)',
+                        borderColor: ACCENT,
+                        boxShadow: `0 0 14px rgba(122,92,255,0.55)`,
+                      }
+                    : undefined
+                }
+              >
+                {g.letter}
+              </span>
+              <span
+                className={`w-px mt-0 ${past ? 'bg-slate-800/60' : 'bg-slate-700/80'}`}
+                style={{ height: '12px' }}
+              />
+            </a>
+          )
+        })}
+
+        {/* now line */}
+        {nowOnAxis && (
+          <>
+            <div
+              className="absolute top-0"
+              style={{
+                left: `${nowPct}%`,
+                bottom: '0.5rem',
+                width: '1px',
+                backgroundColor: ACCENT,
+                boxShadow: `0 0 10px rgba(122,92,255,0.7), 0 0 22px rgba(122,92,255,0.32)`,
+                transform: 'translateX(-0.5px)',
+              }}
+              aria-hidden="true"
+            />
+            <div
+              className="absolute -translate-x-1/2 text-[9px] uppercase tracking-[0.22em] font-bold"
+              style={{
+                top: '-12px',
+                left: `${nowPct}%`,
+                color: ACCENT_LIGHT,
+                fontFamily: MONO_STACK,
+              }}
+            >
+              Now
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Section primitive ─────────────────────────────────────────────────────
+// Heading + content, NO card chrome. Replaces the old <Card>.
+
+function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="space-y-3">
+      <header className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[10px] uppercase tracking-[0.24em] font-semibold text-slate-400">
+          {title}
+        </h2>
+        {action}
+      </header>
+      <div>{children}</div>
+    </section>
+  )
+}
+
+// ── Next up ───────────────────────────────────────────────────────────────
+
+function NextUp({
+  next,
+  now,
+}: {
+  next: { kind: 'today' | 'tomorrow'; ev: CalendarEventLite } | null
+  now: Date
+}) {
+  if (!next) {
+    return (
+      <div className="py-1">
+        <div className="text-[10px] uppercase tracking-[0.24em] font-bold text-slate-500 mb-2">
+          Up next
+        </div>
+        <p className="text-xl text-slate-400 font-medium">Day clear.</p>
+      </div>
+    )
+  }
+
+  const target = new Date(next.ev.start)
+  const meta =
+    next.kind === 'today'
+      ? formatCountdown(target, now)
+      : `TOMORROW · ${formatTime(next.ev.start)}`
+  const g = categoryGlyph(next.ev.category)
+
+  return (
+    <div className="py-1">
+      <div
+        className="text-[10px] uppercase tracking-[0.28em] font-bold tabular-nums mb-2"
+        style={{ color: ACCENT_LIGHT, fontFamily: MONO_STACK }}
+      >
+        {meta}
+      </div>
+      <a
+        href={`https://calendar.google.com/calendar/event?id=${next.ev.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block group"
+        title="Open in Google Calendar"
+      >
+        <h3 className="text-2xl md:text-[28px] font-semibold tracking-tight text-slate-50 leading-tight group-hover:text-white">
+          {next.ev.summary}
+        </h3>
+        <div className="mt-2 text-sm text-slate-400 flex items-center gap-2.5">
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-slate-800/80 border border-slate-700 text-slate-300">
+            {g.letter}
+          </span>
+          <span className="tabular-nums" style={{ fontFamily: MONO_STACK }}>
+            {next.kind === 'today'
+              ? `${formatTime(next.ev.start)}–${formatTime(next.ev.end)}`
+              : formatTime(next.ev.start)}
+          </span>
+          {next.ev.location && (
+            <span className="text-slate-500 truncate">
+              · {next.ev.location}
+            </span>
+          )}
+        </div>
+      </a>
+    </div>
+  )
+}
+
+// ── First action hero ─────────────────────────────────────────────────────
+// The one drenched panel on the page. Composes First action + Body says.
+
+function Hero({
+  firstAction,
+  rec,
+}: {
+  firstAction: string | null
+  rec?: { activity: string; reason: string }
+}) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl px-7 py-6 md:px-8 md:py-7 border"
+      style={{
+        background:
+          'linear-gradient(135deg, rgba(122,92,255,0.16) 0%, rgba(122,92,255,0.04) 60%, rgba(10,15,29,0.5) 100%)',
+        borderColor: 'rgba(122,92,255,0.32)',
+      }}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 md:gap-10 items-start">
+        <div className="min-w-0">
+          <div
+            className="text-[10px] uppercase tracking-[0.28em] font-bold mb-3"
+            style={{ color: ACCENT_LIGHT }}
+          >
+            First action
+          </div>
+          {firstAction ? (
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(firstAction).catch(() => {})
+              }}
+              className="text-left cursor-pointer block group w-full"
+              title="Copy to clipboard"
+            >
+              <p className="text-2xl md:text-[30px] leading-[1.2] text-slate-50 font-medium tracking-tight group-hover:text-white">
+                {firstAction}
+              </p>
+              <span className="text-[10px] uppercase tracking-[0.22em] text-slate-600 mt-3 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
+                Tap to copy
+              </span>
+            </button>
+          ) : (
+            <p className="text-base text-slate-500 italic">
+              No brief yet. Regen the morning brief to set today&apos;s lead
+              action.
+            </p>
+          )}
+        </div>
+
+        {rec && (
+          <div className="md:max-w-[220px] md:text-right border-t md:border-t-0 md:border-l border-slate-700/40 pt-4 md:pt-0 md:pl-6">
+            <div className="text-[10px] uppercase tracking-[0.24em] font-semibold text-slate-400 mb-2">
+              Body says
+            </div>
+            <div className="text-base font-semibold text-slate-100">
+              {rec.activity}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1 leading-snug">
+              {rec.reason}
+            </div>
           </div>
         )}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 mb-0.5">
-          <CategoryGlyph category={ev.category} />
-          <span className="text-sm font-medium text-slate-100 truncate">{ev.summary}</span>
-        </div>
-        {ev.location && <div className="text-[11px] text-slate-500 truncate pl-7">{ev.location}</div>}
-      </div>
-    </li>
-  );
+    </div>
+  )
 }
 
-function DeadlineRow({ d }: { d: Deadline }) {
-  let pillClass: string;
-  let pillText: string;
-  if (d.days_away < 0) {
-    pillClass = 'text-slate-500 border-slate-700/50 bg-slate-800/30';
-    pillText = 'PASSED';
-  } else if (d.days_away === 0) {
-    pillClass = 'text-rose-200 border-rose-500/50 bg-rose-500/15';
-    pillText = 'TODAY';
+// ── Status numeric strip ──────────────────────────────────────────────────
+
+function StatusStrip({ recovery }: { recovery: RecoveryData }) {
+  const d = recovery.details
+  if (!d) return null
+  const recoveryColor =
+    d.recovery_pct >= 67
+      ? 'text-emerald-300'
+      : d.recovery_pct >= 34
+        ? 'text-amber-300'
+        : 'text-rose-300'
+  const items: Array<{
+    label: string
+    value: string
+    valueClass: string
+    sub?: string
+  }> = [
+    {
+      label: 'Recovery',
+      value: `${Math.round(d.recovery_pct)}%`,
+      valueClass: recoveryColor,
+      sub: `HRV ${Math.round(d.hrv_ms)} · RHR ${Math.round(d.resting_hr_bpm)}`,
+    },
+    {
+      label: 'Strain',
+      value: d.day_strain.toFixed(1),
+      valueClass: 'text-slate-100',
+      sub: 'yesterday',
+    },
+    {
+      label: 'Sleep',
+      value: `${d.sleep_hours.toFixed(1)}h`,
+      valueClass: 'text-slate-100',
+      sub: `${Math.round(d.sleep_performance_pct)}% perf`,
+    },
+  ]
+  return (
+    <div className="flex items-baseline flex-wrap gap-x-8 gap-y-3 py-1">
+      {items.map((it, i) => (
+        <div key={it.label} className="flex items-baseline gap-3">
+          <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold">
+            {it.label}
+          </span>
+          <span
+            className={`text-2xl font-semibold tabular-nums leading-none ${it.valueClass}`}
+            style={{ fontFamily: MONO_STACK }}
+          >
+            {it.value}
+          </span>
+          {it.sub && (
+            <span className="text-[10px] text-slate-500 hidden md:inline">
+              {it.sub}
+            </span>
+          )}
+          {i < items.length - 1 && (
+            <span className="text-slate-800 hidden md:inline">·</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Tomorrow row (typographic, no card) ───────────────────────────────────
+
+function TomorrowRow({ ev }: { ev: CalendarEventLite }) {
+  const g = categoryGlyph(ev.category)
+  return (
+    <li>
+      <a
+        href={`https://calendar.google.com/calendar/event?id=${ev.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={ev.location ? `${ev.summary} · ${ev.location}` : ev.summary}
+        className="flex items-center gap-4 py-2 group hover:bg-slate-900/40 rounded-md -mx-2 px-2 transition-colors"
+      >
+        <span
+          className="w-12 text-right text-sm font-semibold tabular-nums text-slate-300"
+          style={{ fontFamily: MONO_STACK }}
+        >
+          {ev.is_all_day ? 'ALL' : formatTime(ev.start)}
+        </span>
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-slate-800/80 border border-slate-700 text-slate-300">
+          {g.letter}
+        </span>
+        <span className="text-sm text-slate-100 truncate flex-1 min-w-0">
+          {ev.summary}
+          {ev.location && (
+            <span className="text-slate-500 ml-2 text-[11px]">
+              {ev.location}
+            </span>
+          )}
+        </span>
+      </a>
+    </li>
+  )
+}
+
+// ── Deadline row ──────────────────────────────────────────────────────────
+
+function DeadlineRow({
+  d,
+  onConfirm,
+}: {
+  d: Deadline
+  onConfirm?: (id: string, status: string) => void
+}) {
+  let pillClass: string
+  let pillText: string
+  const isPast = d.days_away < 0
+  if (d.days_away === 0) {
+    pillClass = 'text-rose-200 border-rose-500/50 bg-rose-500/15'
+    pillText = 'TODAY'
   } else if (d.days_away === 1) {
-    pillClass = 'text-amber-200 border-amber-500/50 bg-amber-500/15';
-    pillText = 'TOMORROW';
+    pillClass = 'text-amber-200 border-amber-500/50 bg-amber-500/15'
+    pillText = 'TOMORROW'
   } else if (d.days_away <= 7) {
-    pillClass = 'text-amber-200 border-amber-500/30 bg-amber-500/10';
-    pillText = `${d.days_away} DAYS`;
+    pillClass = 'text-amber-200 border-amber-500/30 bg-amber-500/10'
+    pillText = `${d.days_away} DAYS`
+  } else if (isPast) {
+    pillClass = 'text-slate-500 border-slate-700/50 bg-slate-800/30'
+    pillText = 'PAST'
   } else {
-    pillClass = 'text-slate-300 border-slate-600/30 bg-slate-700/20';
-    pillText = `${d.days_away} DAYS`;
+    pillClass = 'text-slate-300 border-slate-700/40 bg-slate-800/30'
+    pillText = `${d.days_away} DAYS`
   }
 
   return (
-    <li className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-900/40 transition-colors">
+    <li className="flex items-start justify-between gap-3 py-2">
       <div className="min-w-0 flex-1">
         <div className="text-sm text-slate-100 truncate">
-          <span className="font-semibold mr-1.5" style={{ color: ACCENT_LIGHT }}>{d.unit}</span>
+          <span
+            className="font-semibold mr-1.5"
+            style={{ color: ACCENT_LIGHT }}
+          >
+            {d.unit}
+          </span>
           {d.assessment}
         </div>
         <div className="text-[11px] text-slate-500 mt-0.5">
           {d.type}
           {d.is_hurdle && <span className="ml-2 text-rose-300">· Hurdle</span>}
-          {!d.is_hurdle && d.weight && <span className="ml-2">· {d.weight}</span>}
+          {!d.is_hurdle && d.weight && (
+            <span className="ml-2">· {d.weight}</span>
+          )}
         </div>
+        {isPast && onConfirm && (
+          <div className="flex items-center gap-1.5 mt-1.5">
+            {(['passed', 'failed', 'postponed'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => onConfirm(d.id, s)}
+                className="text-[10px] px-2 py-0.5 rounded border border-slate-700/50 bg-slate-800/40 text-slate-500 hover:text-emerald-300 hover:border-emerald-500/40 transition-colors capitalize"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      <span className={`flex-shrink-0 text-[10px] font-bold tracking-wider px-2 py-1 rounded border uppercase ${pillClass}`}>
+      <span
+        className={`flex-shrink-0 text-[11px] font-bold tracking-[0.12em] px-2 py-1 rounded border uppercase ${pillClass}`}
+      >
         {pillText}
       </span>
     </li>
-  );
+  )
 }
+
+// ── Mission Objective row (full-row tint, NO side-stripe) ─────────────────
 
 function MissionObjectiveRow({
   item,
   onDismiss,
   dismissPending,
 }: {
-  item: InboxItemData;
-  onDismiss: (id: string) => void;
-  dismissPending: boolean;
+  item: InboxItemData
+  onDismiss: (id: string) => void
+  dismissPending: boolean
 }) {
-  const tone =
-    item.severity === 'urgent' ? 'border-l-rose-400' :
-    item.severity === 'warn' ? 'border-l-amber-400' :
-    item.severity === 'info' ? 'border-l-[#B191FF]' :
-    'border-l-slate-600';
+  const fill =
+    item.severity === 'urgent'
+      ? 'bg-rose-500/10 hover:bg-rose-500/15'
+      : item.severity === 'warn'
+        ? 'bg-amber-500/[0.07] hover:bg-amber-500/10'
+        : item.severity === 'info'
+          ? 'bg-[#7A5CFF]/[0.08] hover:bg-[#7A5CFF]/[0.12]'
+          : 'bg-slate-900/40 hover:bg-slate-900/60'
+  const dotColor =
+    item.severity === 'urgent'
+      ? '#FB7185'
+      : item.severity === 'warn'
+        ? '#FBBF24'
+        : item.severity === 'info'
+          ? ACCENT_LIGHT
+          : '#475569'
   return (
-    <li className={`group flex items-center gap-3 pl-3 pr-2 py-2.5 border-l-2 ${tone} bg-slate-900/30 rounded-r-lg`}>
+    <li
+      className={`group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${fill}`}
+    >
+      <span
+        aria-hidden="true"
+        className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+        style={{ backgroundColor: dotColor, boxShadow: `0 0 6px ${dotColor}88` }}
+      />
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">{item.tag}</div>
+        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mb-0.5 font-semibold">
+          {item.tag}
+        </div>
         <div className="text-sm text-slate-100">{item.body}</div>
       </div>
-      <div className="text-[10px] text-slate-500 whitespace-nowrap mr-1">{item.when}</div>
+      <div className="text-[10px] text-slate-500 whitespace-nowrap mr-1">
+        {item.when}
+      </div>
       <button
         type="button"
         onClick={() => onDismiss(item.id)}
@@ -288,268 +773,240 @@ function MissionObjectiveRow({
         ✓
       </button>
     </li>
-  );
-}
-
-function StatTile({
-  label, value, sub, tone = 'neutral',
-}: {
-  label: string; value: string; sub?: string; tone?: 'good' | 'warn' | 'bad' | 'neutral';
-}) {
-  const valueColor =
-    tone === 'good' ? 'text-emerald-300' :
-    tone === 'warn' ? 'text-amber-300' :
-    tone === 'bad' ? 'text-rose-300' :
-    'text-slate-100';
-  return (
-    <div className="rounded-lg border bg-slate-900/40 px-4 py-3" style={{ borderColor: 'rgba(122,92,255,0.10)' }}>
-      <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold">{label}</div>
-      <div className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueColor}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-        {value}
-      </div>
-      {sub && <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
-function QuickAction({ href, icon, label }: { href: string; icon: string; label: string }) {
-  return (
-    <Link
-      to={href}
-      className="flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-lg border bg-slate-900/40 hover:bg-slate-800/60 transition-colors"
-      style={{ borderColor: 'rgba(122,92,255,0.12)' }}
-    >
-      <span className="text-xl">{icon}</span>
-      <span className="text-[11px] font-medium text-slate-300 tracking-wide">{label}</span>
-    </Link>
-  );
+  )
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 function DashboardPage() {
-  const { data: snapshot } = useHUDSnapshot();
-  const { data: cfg } = useHUDConfig();
-  const patchConfig = useHUDConfigPatch();
+  const { data: snapshot } = useHUDSnapshot()
+  const { data: cfg } = useHUDConfig()
+  const patchConfig = useHUDConfigPatch()
 
   const todayQuery = useQuery<TodayResponse>({
     queryKey: ['calendar', 'today'],
     queryFn: async () => {
-      const res = await fetch('/api/calendar/today');
-      if (!res.ok) throw new Error('today fetch failed');
-      return res.json();
+      const res = await fetch('/api/calendar/today')
+      if (!res.ok) throw new Error('today fetch failed')
+      return res.json()
     },
     refetchInterval: 60_000,
     staleTime: 55_000,
-  });
+  })
   const weekQuery = useQuery<WeekResponse>({
     queryKey: ['calendar', 'week'],
     queryFn: async () => {
-      const res = await fetch('/api/calendar/week');
-      if (!res.ok) throw new Error('week fetch failed');
-      return res.json();
+      const res = await fetch('/api/calendar/week')
+      if (!res.ok) throw new Error('week fetch failed')
+      return res.json()
     },
     refetchInterval: 5 * 60_000,
     staleTime: 4 * 60_000,
-  });
+  })
   const deadlinesQuery = useQuery<DeadlinesResponse>({
     queryKey: ['calendar', 'deadlines'],
     queryFn: async () => {
-      const res = await fetch('/api/calendar/deadlines');
-      if (!res.ok) throw new Error('deadlines fetch failed');
-      return res.json();
+      const res = await fetch('/api/calendar/deadlines')
+      if (!res.ok) throw new Error('deadlines fetch failed')
+      return res.json()
     },
     refetchInterval: 5 * 60_000,
     staleTime: 4 * 60_000,
-  });
+  })
 
-  const widgets = (snapshot?.widgets ?? {}) as WidgetMap;
-  const recovery = widgets['recovery']?.data as RecoveryData | undefined;
-  const inboxItems = (widgets['inbox']?.data ?? []) as InboxItemData[];
-  const briefText = (widgets['brief']?.data as { text?: string } | undefined)?.text;
+  const widgets = (snapshot?.widgets ?? {}) as WidgetMap
+  const recovery = widgets['recovery']?.data as RecoveryData | undefined
+  const inboxItems = (widgets['inbox']?.data ?? []) as InboxItemData[]
+  const briefText = (widgets['brief']?.data as { text?: string } | undefined)
+    ?.text
 
-  const now = useMemo(() => new Date(), [Math.floor(Date.now() / 60_000)]);
-  const greeting = getGreeting(now);
-  const dateLabel = formatDate(now);
-  const firstAction = useMemo(() => firstActionFromBrief(briefText), [briefText]);
+  // Tick once every 30s so the now-line and countdown stay current.
+  const [now, setNow] = useState<Date>(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const greeting = getGreeting(now)
+  const dateLong = formatDateLong(now)
+  const clockStr = formatClock(now)
+  const firstAction = useMemo(
+    () => firstActionFromBrief(briefText),
+    [briefText],
+  )
 
   const todayEvents = useMemo(() => {
-    const evs = todayQuery.data?.events ?? [];
-    return [...evs].sort((a, b) => a.start.localeCompare(b.start));
-  }, [todayQuery.data]);
+    const evs = todayQuery.data?.events ?? []
+    return [...evs].sort((a, b) => a.start.localeCompare(b.start))
+  }, [todayQuery.data])
 
-  // Tomorrow events derived from the week list — saves a separate endpoint
-  // and gives us the full ranked list (the snapshot's tomorrow widget is
-  // single-line summary only).
   const tomorrowEvents = useMemo(() => {
-    const evs = weekQuery.data?.events ?? [];
-    return evs.filter((e) => isTomorrow(e.start, now))
-      .sort((a, b) => a.start.localeCompare(b.start));
-  }, [weekQuery.data, now]);
+    const evs = weekQuery.data?.events ?? []
+    return evs
+      .filter((e) => isTomorrow(e.start, now))
+      .sort((a, b) => a.start.localeCompare(b.start))
+  }, [weekQuery.data, now])
 
-  const deadlines = useMemo(() => (deadlinesQuery.data?.deadlines ?? []).slice(0, 5), [deadlinesQuery.data]);
+  const deadlines = useMemo(
+    () => (deadlinesQuery.data?.deadlines ?? []).slice(0, 5),
+    [deadlinesQuery.data],
+  )
 
-  const recoveryPct = recovery?.details?.recovery_pct ?? 0;
-  const recoveryTone: 'good' | 'warn' | 'bad' = recoveryPct >= 67 ? 'good' : recoveryPct >= 34 ? 'warn' : 'bad';
-  const rec = recovery?.recommendation;
+  const nextUp = useMemo<{
+    kind: 'today' | 'tomorrow'
+    ev: CalendarEventLite
+  } | null>(() => {
+    const future = todayEvents.filter(
+      (e) => !e.is_all_day && new Date(e.start) > now,
+    )
+    if (future.length > 0) return { kind: 'today', ev: future[0] }
+    if (tomorrowEvents.length > 0)
+      return { kind: 'tomorrow', ev: tomorrowEvents[0] }
+    return null
+  }, [todayEvents, tomorrowEvents, now])
+
+  const nextEventId = nextUp?.kind === 'today' ? nextUp.ev.id : null
+
+  const rec = recovery?.recommendation
 
   const handleDismiss = (id: string) => {
-    const next = { ...(cfg?.dismissed_inbox_items ?? {}), [id]: Date.now() + ONE_DAY_MS };
-    patchConfig.mutate({ dismissed_inbox_items: next });
-  };
+    const next = {
+      ...(cfg?.dismissed_inbox_items ?? {}),
+      [id]: Date.now() + ONE_DAY_MS,
+    }
+    patchConfig.mutate({ dismissed_inbox_items: next })
+  }
+  const handleDeadlineConfirm = (id: string, status: string) => {
+    const next = {
+      ...(cfg?.deadline_attendance ?? {}),
+      [id]: { status, updated_at: Date.now() },
+    }
+    patchConfig.mutate({ deadline_attendance: next })
+  }
 
-  const hour = formatTime(now.toISOString());
-
-  // Show only first 3 tomorrow events with "+N more" link
-  const TOMORROW_CAP = 3;
-  const tomorrowVisible = tomorrowEvents.slice(0, TOMORROW_CAP);
-  const tomorrowOverflow = Math.max(0, tomorrowEvents.length - TOMORROW_CAP);
+  const TOMORROW_CAP = 4
+  const tomorrowVisible = tomorrowEvents.slice(0, TOMORROW_CAP)
+  const tomorrowOverflow = Math.max(0, tomorrowEvents.length - TOMORROW_CAP)
 
   return (
     <div
       className="min-h-screen text-slate-100"
-      style={{
-        fontFamily: FONT_STACK,
-        background: '#050810',
-      }}
+      style={{ fontFamily: FONT_STACK, background: '#050810' }}
     >
-      {/* One static purple wash at the top — no animations */}
+      {/* Soft top wash — single static decorative element. */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0"
         style={{
-          background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(122,92,255,0.10) 0%, transparent 65%)',
+          background:
+            'radial-gradient(ellipse 80% 55% at 50% 0%, rgba(122,92,255,0.10) 0%, transparent 60%)',
         }}
       />
 
-      <main className="relative max-w-4xl mx-auto px-6 py-8 space-y-5">
-        {/* Slim header strip — brand on left, clock on right */}
-        <header className="flex items-center justify-between text-[11px] tracking-[0.18em] uppercase text-slate-500 pb-2">
-          <span className="font-semibold" style={{ color: ACCENT_LIGHT }}>Hermes Workspace</span>
-          <span className="tabular-nums" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {dateLabel.toUpperCase()} · {hour} ACST
-          </span>
+      <main className="relative max-w-5xl mx-auto px-6 md:px-10 pt-10 pb-16 space-y-10">
+        {/* Header: tiny greeting (left) + anchored clock+date (right) */}
+        <header className="flex items-start justify-between gap-6">
+          <div className="text-[10px] uppercase tracking-[0.28em] text-slate-500 font-semibold pt-3">
+            {greeting}, Nick
+          </div>
+          <div className="text-right">
+            <div
+              className="text-3xl md:text-[40px] font-semibold tabular-nums leading-none tracking-tight text-slate-50"
+              style={{ fontFamily: MONO_STACK }}
+            >
+              {clockStr}
+            </div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-medium mt-2">
+              {dateLong}
+            </div>
+          </div>
         </header>
 
-        {/* Greeting — smaller, secondary now */}
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-100">
-            {greeting}, Nick
-          </h1>
-        </div>
+        {/* Day timeline strip — spatial view of today */}
+        <DayTimeline
+          events={todayEvents}
+          now={now}
+          nextEventId={nextEventId}
+        />
 
-        {/* HERO: First action + Body recommendation — the prescriptive zone */}
-        <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
-          {firstAction ? (
-            <Card emphasis>
-              <div className="text-[10px] uppercase tracking-[0.22em] font-semibold mb-2" style={{ color: ACCENT_LIGHT }}>
-                First action
-              </div>
-              <p className="text-lg leading-snug text-slate-50 font-medium">{firstAction}</p>
-            </Card>
-          ) : (
-            <Card>
-              <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold mb-2">First action</div>
-              <p className="text-sm text-slate-500">No brief available yet — regen the morning brief to set today's lead action.</p>
-            </Card>
-          )}
-          {rec ? (
-            <Card emphasis>
-              <div className="text-[10px] uppercase tracking-[0.22em] font-semibold mb-2" style={{ color: ACCENT_LIGHT }}>
-                Body says
-              </div>
-              <p className="text-lg font-semibold text-slate-50">{rec.activity}</p>
-              <p className="text-[12px] text-slate-400 mt-1">{rec.reason}</p>
-            </Card>
-          ) : (
-            <Card>
-              <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold mb-2">Body says</div>
-              <p className="text-sm text-slate-500">No WHOOP data yet today.</p>
-            </Card>
-          )}
-        </div>
+        {/* Next up — the imminent thing */}
+        <NextUp next={nextUp} now={now} />
 
-        {/* Today */}
-        <Card
-          title="Today"
-          action={<span className="text-[10px] text-slate-500">{todayEvents.length} event{todayEvents.length === 1 ? '' : 's'}</span>}
-        >
-          {todayQuery.isLoading && <div className="text-sm text-slate-500 py-2">Loading calendar…</div>}
-          {!todayQuery.isLoading && todayEvents.length === 0 && (
-            <div className="text-sm text-slate-500 py-4 text-center">No events scheduled today</div>
-          )}
-          <ul className="space-y-0.5">
-            {todayEvents.map((ev) => <EventRow key={ev.id} ev={ev} />)}
-          </ul>
-        </Card>
+        {/* First action hero — drenched panel, composes Body says */}
+        <Hero firstAction={firstAction} rec={rec} />
 
-        {/* Tomorrow — same EventRow as Today, capped */}
-        <Card
+        {/* Inline numeric status strip */}
+        {recovery && <StatusStrip recovery={recovery} />}
+
+        {/* Tomorrow */}
+        <Section
           title="Tomorrow"
-          action={<span className="text-[10px] text-slate-500">{tomorrowEvents.length} event{tomorrowEvents.length === 1 ? '' : 's'}</span>}
+          action={
+            <span
+              className="text-[10px] text-slate-500 tabular-nums"
+              style={{ fontFamily: MONO_STACK }}
+            >
+              {tomorrowEvents.length} event
+              {tomorrowEvents.length === 1 ? '' : 's'}
+            </span>
+          }
         >
-          {weekQuery.isLoading && <div className="text-sm text-slate-500 py-2">Loading…</div>}
-          {!weekQuery.isLoading && tomorrowVisible.length === 0 && (
-            <div className="text-sm text-slate-500 py-4 text-center">Nothing scheduled</div>
+          {weekQuery.isLoading && (
+            <div className="text-sm text-slate-500">Loading…</div>
           )}
-          <ul className="space-y-0.5">
-            {tomorrowVisible.map((ev) => <EventRow key={ev.id} ev={ev} />)}
+          {!weekQuery.isLoading && tomorrowVisible.length === 0 && (
+            <div className="text-sm text-slate-500">Nothing scheduled.</div>
+          )}
+          <ul>
+            {tomorrowVisible.map((ev) => (
+              <TomorrowRow key={ev.id} ev={ev} />
+            ))}
           </ul>
           {tomorrowOverflow > 0 && (
-            <div className="pt-2 pl-3 text-[11px] text-slate-500">
+            <div className="text-[11px] text-slate-600 mt-1 pl-14">
               + {tomorrowOverflow} more
             </div>
           )}
-        </Card>
+        </Section>
 
         {/* Deadlines */}
         {deadlines.length > 0 && (
-          <Card
+          <Section
             title="Deadlines"
-            action={<span className="text-[10px] text-slate-500">{deadlinesQuery.data?.semester_name}</span>}
+            action={
+              <span className="text-[10px] text-slate-500">
+                {deadlinesQuery.data?.semester_name}
+              </span>
+            }
           >
-            <ul className="space-y-0.5">
-              {deadlines.map((d) => <DeadlineRow key={d.id} d={d} />)}
+            <ul className="divide-y divide-slate-900/70">
+              {deadlines.map((d) => (
+                <DeadlineRow
+                  key={d.id}
+                  d={d}
+                  onConfirm={handleDeadlineConfirm}
+                />
+              ))}
             </ul>
-          </Card>
+          </Section>
         )}
 
-        {/* Status — 3 numeric tiles (recommended moved up to hero) */}
-        <Card title="Status">
-          <div className="grid grid-cols-3 gap-3">
-            <StatTile
-              label="Recovery"
-              value={`${Math.round(recoveryPct)}%`}
-              sub={recovery?.details ? `HRV ${Math.round(recovery.details.hrv_ms)} · RHR ${Math.round(recovery.details.resting_hr_bpm)}` : undefined}
-              tone={recoveryTone}
-            />
-            <StatTile
-              label="Day Strain"
-              value={recovery?.details?.day_strain.toFixed(1) ?? '—'}
-              sub="Yesterday"
-            />
-            <StatTile
-              label="Sleep"
-              value={recovery?.details?.sleep_hours ? `${recovery.details.sleep_hours.toFixed(1)}h` : '—'}
-              sub={recovery?.details?.sleep_performance_pct ? `${Math.round(recovery.details.sleep_performance_pct)}% performance` : undefined}
-            />
-          </div>
-        </Card>
-
-        {/* Mission Objectives — interactive: ✓ done dismisses for 24h */}
+        {/* Mission Objectives */}
         {inboxItems.length > 0 && (
-          <Card
+          <Section
             title="Mission Objectives"
             action={
               <span className="text-[10px] text-slate-500">
                 {inboxItems.length} active
-                {patchConfig.isPending && <span className="ml-2 text-slate-400">· saving…</span>}
+                {patchConfig.isPending && (
+                  <span className="ml-2 text-slate-400">· saving…</span>
+                )}
               </span>
             }
           >
-            <ul className="space-y-2">
+            <ul className="space-y-1.5">
               {inboxItems.map((item) => (
                 <MissionObjectiveRow
                   key={item.id}
@@ -559,23 +1016,32 @@ function DashboardPage() {
                 />
               ))}
             </ul>
-          </Card>
+          </Section>
         )}
 
-        {/* Quick Access */}
-        <Card title="Quick Access">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <QuickAction href="/chat" icon="💬" label="Chat" />
-            <QuickAction href="/files" icon="📁" label="Files" />
-            <QuickAction href="/uni/obsidian" icon="📚" label="Obsidian" />
-            <QuickAction href="/uni/calendar" icon="🗓️" label="Calendar" />
-          </div>
-        </Card>
-
-        <footer className="text-center text-[10px] text-slate-700 tracking-[0.2em] uppercase pt-4 pb-2">
-          Powered by Hermes
-        </footer>
+        {/* Quick Access — typographic inline row, no emoji cards */}
+        <nav
+          className="pt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] uppercase tracking-[0.22em] text-slate-500 font-medium border-t border-slate-900/80"
+          aria-label="Quick access"
+        >
+          {[
+            { href: '/chat', label: 'Chat' },
+            { href: '/files', label: 'Files' },
+            { href: '/uni/obsidian', label: 'Obsidian' },
+            { href: '/uni/calendar', label: 'Calendar' },
+          ].map((q, i, arr) => (
+            <span key={q.href} className="flex items-center gap-x-5">
+              <Link
+                to={q.href}
+                className="hover:text-slate-200 hover:underline underline-offset-4 transition-colors"
+              >
+                {q.label}
+              </Link>
+              {i < arr.length - 1 && <span className="text-slate-800">·</span>}
+            </span>
+          ))}
+        </nav>
       </main>
     </div>
-  );
+  )
 }
