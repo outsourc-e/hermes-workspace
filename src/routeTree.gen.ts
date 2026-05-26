@@ -169,6 +169,7 @@ import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/rea
 import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
 import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
 import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
+import { Route as ApiHudStreamRouteImport } from './routes/api/hud/stream'
 import { Route as ApiHudSnapshotRouteImport } from './routes/api/hud/snapshot'
 import { Route as ApiHudRegenBriefRouteImport } from './routes/api/hud/regen-brief'
 import { Route as ApiHudConfigRouteImport } from './routes/api/hud/config'
@@ -992,6 +993,11 @@ const ApiKnowledgeConfigRoute = ApiKnowledgeConfigRouteImport.update({
   path: '/api/knowledge/config',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHudStreamRoute = ApiHudStreamRouteImport.update({
+  id: '/api/hud/stream',
+  path: '/api/hud/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHudSnapshotRoute = ApiHudSnapshotRouteImport.update({
   id: '/api/hud/snapshot',
   path: '/api/hud/snapshot',
@@ -1234,6 +1240,7 @@ export interface FileRoutesByFullPath {
   '/api/hud/config': typeof ApiHudConfigRoute
   '/api/hud/regen-brief': typeof ApiHudRegenBriefRoute
   '/api/hud/snapshot': typeof ApiHudSnapshotRoute
+  '/api/hud/stream': typeof ApiHudStreamRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
@@ -1415,6 +1422,7 @@ export interface FileRoutesByTo {
   '/api/hud/config': typeof ApiHudConfigRoute
   '/api/hud/regen-brief': typeof ApiHudRegenBriefRoute
   '/api/hud/snapshot': typeof ApiHudSnapshotRoute
+  '/api/hud/stream': typeof ApiHudStreamRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
@@ -1599,6 +1607,7 @@ export interface FileRoutesById {
   '/api/hud/config': typeof ApiHudConfigRoute
   '/api/hud/regen-brief': typeof ApiHudRegenBriefRoute
   '/api/hud/snapshot': typeof ApiHudSnapshotRoute
+  '/api/hud/stream': typeof ApiHudStreamRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
@@ -1784,6 +1793,7 @@ export interface FileRouteTypes {
     | '/api/hud/config'
     | '/api/hud/regen-brief'
     | '/api/hud/snapshot'
+    | '/api/hud/stream'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
@@ -1965,6 +1975,7 @@ export interface FileRouteTypes {
     | '/api/hud/config'
     | '/api/hud/regen-brief'
     | '/api/hud/snapshot'
+    | '/api/hud/stream'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
@@ -2148,6 +2159,7 @@ export interface FileRouteTypes {
     | '/api/hud/config'
     | '/api/hud/regen-brief'
     | '/api/hud/snapshot'
+    | '/api/hud/stream'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
@@ -2323,6 +2335,7 @@ export interface RootRouteChildren {
   ApiHudConfigRoute: typeof ApiHudConfigRoute
   ApiHudRegenBriefRoute: typeof ApiHudRegenBriefRoute
   ApiHudSnapshotRoute: typeof ApiHudSnapshotRoute
+  ApiHudStreamRoute: typeof ApiHudStreamRoute
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
   ApiKnowledgeListRoute: typeof ApiKnowledgeListRoute
@@ -3473,6 +3486,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKnowledgeConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hud/stream': {
+      id: '/api/hud/stream'
+      path: '/api/hud/stream'
+      fullPath: '/api/hud/stream'
+      preLoaderRoute: typeof ApiHudStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hud/snapshot': {
       id: '/api/hud/snapshot'
       path: '/api/hud/snapshot'
@@ -3991,6 +4011,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHudConfigRoute: ApiHudConfigRoute,
   ApiHudRegenBriefRoute: ApiHudRegenBriefRoute,
   ApiHudSnapshotRoute: ApiHudSnapshotRoute,
+  ApiHudStreamRoute: ApiHudStreamRoute,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
   ApiKnowledgeListRoute: ApiKnowledgeListRoute,
