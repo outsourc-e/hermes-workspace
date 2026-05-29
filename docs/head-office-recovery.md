@@ -42,3 +42,25 @@ OK: Head Office is operational
 3. Confirm Workspace dev server is running in tmux target `ui`.
 4. Run `scripts/head-office-health.sh`.
 5. Only restart the gateway if health on `:8642` fails. Preserve Telegram as the working control channel whenever possible.
+
+
+## Autopilot Watchdog
+
+The VPS runs a cron watchdog every 5 minutes:
+
+```bash
+cd /root/hermes-workspace
+scripts/head-office-watchdog.sh
+```
+
+Logs are written to:
+
+```text
+/root/.hermes/logs/head-office-watchdog.log
+```
+
+The watchdog runs `scripts/head-office-health.sh`. If health fails, it restarts only the affected runtime:
+
+- Gateway failures restart the `gateway` tmux session with `hermes gateway run`.
+- Workspace UI failures restart the `ui` tmux session with `pnpm dev`.
+- If gateway is healthy but end-to-end Workspace chat fails, it restarts Workspace UI first to preserve Telegram as the control channel.
