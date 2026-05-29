@@ -78,3 +78,40 @@ The watchdog usually runs cheap HTTP/login checks. Deep checks run `scripts/head
 ## Cadence Review
 
 The current recommended cadence is cheap light checks every 5 minutes and deep model-backed checks daily plus after failures. If the system remains stable for a week, switch the scheduled deep check to weekly to reduce subscription usage further.
+
+
+## Model Routing
+
+Current cost-control routing:
+
+- Main Atlas/Hermes model remains `gpt-5.5` through `openai-codex` with `model.openai_runtime: codex_app_server`.
+- Lightweight auxiliary tasks use GitHub Copilot `gpt-4o-mini`:
+  - compression
+  - skills_hub
+  - approval
+  - mcp
+  - title_generation
+  - triage_specifier
+  - kanban_decomposer
+  - profile_describer
+  - curator
+- Fallback chain includes Copilot `gpt-4o-mini` after the main Codex route.
+
+This reduces ChatGPT/Codex usage for side tasks while keeping Codex/5.5 as the primary reasoning/coding route. Vision and web extraction remain `auto` until dedicated provider keys are configured.
+
+Verify auxiliary routing without changing config:
+
+```bash
+cd /usr/local/lib/hermes-agent
+/usr/local/lib/hermes-agent/venv/bin/python - <<'PYCHECK'
+from agent.auxiliary_client import get_text_auxiliary_client
+client, model = get_text_auxiliary_client("title_generation")
+print(model)
+PYCHECK
+```
+
+Expected model:
+
+```text
+gpt-4o-mini
+```
