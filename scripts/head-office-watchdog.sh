@@ -6,15 +6,25 @@ HERMES_HOME="${HERMES_HOME:-/root/.hermes}"
 LOG_DIR="$HERMES_HOME/logs"
 LOCK_FILE="/tmp/hermes-head-office-watchdog.lock"
 HEALTH_SCRIPT="$ROOT/scripts/head-office-health.sh"
+MODE="${1:-light}"
 mkdir -p "$LOG_DIR"
 
 log() {
   printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
 
-run_health() {
+run_deep_health() {
   cd "$ROOT"
   "$HEALTH_SCRIPT"
+}
+
+run_light_health() {
+  curl -fsS http://127.0.0.1:8642/health >/dev/null
+  curl -fsS http://127.0.0.1:3000/chat >/dev/null
+  command -v codex >/dev/null
+  local codex_status
+  codex_status="$(codex login status 2>&1)"
+  echo "$codex_status" | grep -q "Logged in using ChatGPT"
 }
 
 ensure_tmux_session() {
@@ -48,13 +58,23 @@ with_lock() {
 
   local health_out
   health_out="$(mktemp)"
-  if run_health >"$health_out" 2>&1; then
-    log "healthy: Head Office operational"
-    rm -f "$health_out"
-    exit 0
+
+  if [ "$MODE" = "deep" ]; then
+    if run_deep_health >"$health_out" 2>&1; then
+      log "healthy: deep Head Office health passed"
+      rm -f "$health_out"
+      exit 0
+    fi
+    log "unhealthy: deep health check failed"
+  else
+    if run_light_health >"$health_out" 2>&1; then
+      log "healthy: light checks passed"
+      rm -f "$health_out"
+      exit 0
+    fi
+    log "unhealthy: light checks failed; starting recovery"
   fi
 
-  log "unhealthy: initial health check failed"
   sed 's/^/[health] /' "$health_out"
 
   local gateway_ok=0
@@ -77,28 +97,24 @@ with_lock() {
     sleep 15
   fi
 
-  # If both ports were up but the end-to-end health failed, prefer restarting
-  # Workspace first. Gateway/Telegram is the primary control channel, so touch
-  # it only when its own health endpoint or completion route fails.
-  if [ "$gateway_ok" -eq 1 ] && [ "$workspace_ok" -eq 1 ]; then
-    local token
-    token="$(grep '^HERMES_API_TOKEN=' "$ROOT/.env" 2>/dev/null | cut -d= -f2- || true)"
-    if [ -n "$token" ] && timeout 45s curl -fsS -X POST http://127.0.0.1:8642/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer $token" \
-      --data '{"model":"hermes-agent","messages":[{"role":"user","content":"reply exactly WATCHDOG_OK"}],"stream":false}' | grep -q WATCHDOG_OK; then
-      restart_workspace_ui
-      sleep 15
-    else
-      restart_gateway
-      sleep 25
-    fi
-  fi
-
-  if run_health >"$health_out" 2>&1; then
-    log "recovered: Head Office operational"
+  # Only spend model usage after a failure/recovery attempt, to verify the
+  # full path is truly back. Normal 5-minute checks are cheap HTTP checks.
+  if run_deep_health >"$health_out" 2>&1; then
+    log "recovered: deep Head Office health passed"
     rm -f "$health_out"
     exit 0
+  fi
+
+  # If ports were up but deep health failed, restart Workspace first to preserve
+  # Telegram as the control channel, then verify once more.
+  if [ "$gateway_ok" -eq 1 ] && [ "$workspace_ok" -eq 1 ]; then
+    restart_workspace_ui
+    sleep 15
+    if run_deep_health >"$health_out" 2>&1; then
+      log "recovered: Workspace restart restored deep health"
+      rm -f "$health_out"
+      exit 0
+    fi
   fi
 
   log "failed: recovery attempted but health still fails"

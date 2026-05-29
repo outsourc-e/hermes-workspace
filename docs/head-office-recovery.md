@@ -46,11 +46,20 @@ OK: Head Office is operational
 
 ## Autopilot Watchdog
 
-The VPS runs a cron watchdog every 5 minutes:
+The VPS runs a cheap cron watchdog every 5 minutes:
 
 ```bash
 cd /root/hermes-workspace
-scripts/head-office-watchdog.sh
+scripts/head-office-watchdog.sh light
+```
+
+The light check does not call the model. It verifies gateway health, Workspace HTTP availability, and Codex login status.
+
+A deep model-backed health check runs once per day and after recovery attempts:
+
+```bash
+cd /root/hermes-workspace
+scripts/head-office-watchdog.sh deep
 ```
 
 Logs are written to:
@@ -59,7 +68,7 @@ Logs are written to:
 /root/.hermes/logs/head-office-watchdog.log
 ```
 
-The watchdog runs `scripts/head-office-health.sh`. If health fails, it restarts only the affected runtime:
+The watchdog usually runs cheap HTTP/login checks. Deep checks run `scripts/head-office-health.sh` once per day or after failures. If health fails, it restarts only the affected runtime:
 
 - Gateway failures restart the `gateway` tmux session with `hermes gateway run`.
 - Workspace UI failures restart the `ui` tmux session with `pnpm dev`.
