@@ -73,3 +73,8 @@ The watchdog usually runs cheap HTTP/login checks. Deep checks run `scripts/head
 - Gateway failures restart the `gateway` tmux session with `hermes gateway run`.
 - Workspace UI failures restart the `ui` tmux session with `pnpm dev`.
 - If gateway is healthy but end-to-end Workspace chat fails, it restarts Workspace UI first to preserve Telegram as the control channel.
+
+
+## Cadence Review
+
+The current recommended cadence is cheap light checks every 5 minutes and deep model-backed checks daily plus after failures. If the system remains stable for a week, switch the scheduled deep check to weekly to reduce subscription usage further.
