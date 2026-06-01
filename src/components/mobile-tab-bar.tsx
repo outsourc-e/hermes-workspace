@@ -79,6 +79,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     match: (p) => p.startsWith('/jobs'),
   },
   {
+    id: 'agent-os',
+    label: 'Agent OS',
+    icon: DashboardSquare01Icon,
+    to: '/agent-os',
+    match: (p) => p.startsWith('/agent-os'),
+  },
+  {
     id: 'swarm',
     label: 'Swarm',
     icon: UserGroupIcon,

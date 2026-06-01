@@ -68,6 +68,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/operations'),
   },
   {
+    id: 'agent-os',
+    label: 'Agent OS',
+    icon: Rocket01Icon,
+    to: '/agent-os',
+    match: (p: string) => p.startsWith('/agent-os'),
+  },
+  {
     id: 'swarm',
     label: 'Swarm',
     icon: UserGroupIcon,

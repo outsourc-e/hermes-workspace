@@ -761,6 +761,7 @@ function ChatSidebarComponent({
   }
 
   const isDashboardActive = pathname === '/dashboard'
+  const isAgentOsActive = pathname === '/agent-os'
 
   const mainItems: Array<NavItemDef> = [
     {
@@ -818,6 +819,13 @@ function ChatSidebarComponent({
       icon: UserMultipleIcon,
       label: 'Operations',
       active: isOperationsActive,
+    },
+    {
+      kind: 'link',
+      to: '/agent-os',
+      icon: Rocket01Icon,
+      label: 'Agent OS',
+      active: isAgentOsActive,
     },
     {
       kind: 'link',

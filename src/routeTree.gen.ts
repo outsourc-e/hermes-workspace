@@ -22,6 +22,8 @@ import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
+import { Route as AgentOsRouteImport } from './routes/agent-os'
+import { Route as AgentCommandCenterRouteImport } from './routes/agent-command-center'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
@@ -71,6 +73,7 @@ import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
 import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiHermesPushRouteImport } from './routes/api/hermes-push'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
@@ -89,6 +92,8 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiAgentCommandCenterRouteImport } from './routes/api/agent-command-center'
+import { Route as ApiAgentOsIndexRouteImport } from './routes/api/agent-os/index'
 import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
@@ -121,8 +126,15 @@ import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-ta
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
+import { Route as ApiAgentOsWorkflowsRouteImport } from './routes/api/agent-os/workflows'
+import { Route as ApiAgentOsN8nHealthRouteImport } from './routes/api/agent-os/n8n-health'
+import { Route as ApiAgentOsDispatchRouteImport } from './routes/api/agent-os/dispatch'
+import { Route as ApiAgentCommandCenterGithubReposRouteImport } from './routes/api/agent-command-center/github-repos'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiAgentOsTasksTaskIdRouteImport } from './routes/api/agent-os/tasks.$taskId'
+import { Route as ApiAgentOsApprovalsApprovalIdRouteImport } from './routes/api/agent-os/approvals.$approvalId'
+import { Route as ApiAgentCommandCenterApprovalsIdRouteImport } from './routes/api/agent-command-center/approvals.$id'
 
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
@@ -187,6 +199,16 @@ const DashboardRoute = DashboardRouteImport.update({
 const ConductorRoute = ConductorRouteImport.update({
   id: '/conductor',
   path: '/conductor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentOsRoute = AgentOsRouteImport.update({
+  id: '/agent-os',
+  path: '/agent-os',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentCommandCenterRoute = AgentCommandCenterRouteImport.update({
+  id: '/agent-command-center',
+  path: '/agent-command-center',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -435,6 +457,11 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
   path: '/api/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHermesPushRoute = ApiHermesPushRouteImport.update({
+  id: '/api/hermes-push',
+  path: '/api/hermes-push',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   id: '/api/gateway-status',
   path: '/api/gateway-status',
@@ -523,6 +550,16 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
 const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   id: '/api/artifacts',
   path: '/api/artifacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentCommandCenterRoute = ApiAgentCommandCenterRouteImport.update({
+  id: '/api/agent-command-center',
+  path: '/api/agent-command-center',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentOsIndexRoute = ApiAgentOsIndexRouteImport.update({
+  id: '/api/agent-os/',
+  path: '/api/agent-os/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmMemorySearchRoute = ApiSwarmMemorySearchRouteImport.update({
@@ -685,6 +722,27 @@ const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
   path: '/$artifactId',
   getParentRoute: () => ApiArtifactsRoute,
 } as any)
+const ApiAgentOsWorkflowsRoute = ApiAgentOsWorkflowsRouteImport.update({
+  id: '/api/agent-os/workflows',
+  path: '/api/agent-os/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentOsN8nHealthRoute = ApiAgentOsN8nHealthRouteImport.update({
+  id: '/api/agent-os/n8n-health',
+  path: '/api/agent-os/n8n-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentOsDispatchRoute = ApiAgentOsDispatchRouteImport.update({
+  id: '/api/agent-os/dispatch',
+  path: '/api/agent-os/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentCommandCenterGithubReposRoute =
+  ApiAgentCommandCenterGithubReposRouteImport.update({
+    id: '/github-repos',
+    path: '/github-repos',
+    getParentRoute: () => ApiAgentCommandCenterRoute,
+  } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -697,10 +755,29 @@ const ApiSessionsSessionKeyActiveRunRoute =
     path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiAgentOsTasksTaskIdRoute = ApiAgentOsTasksTaskIdRouteImport.update({
+  id: '/api/agent-os/tasks/$taskId',
+  path: '/api/agent-os/tasks/$taskId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentOsApprovalsApprovalIdRoute =
+  ApiAgentOsApprovalsApprovalIdRouteImport.update({
+    id: '/api/agent-os/approvals/$approvalId',
+    path: '/api/agent-os/approvals/$approvalId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAgentCommandCenterApprovalsIdRoute =
+  ApiAgentCommandCenterApprovalsIdRouteImport.update({
+    id: '/approvals/$id',
+    path: '/approvals/$id',
+    getParentRoute: () => ApiAgentCommandCenterRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/agent-command-center': typeof AgentCommandCenterRoute
+  '/agent-os': typeof AgentOsRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
@@ -714,6 +791,7 @@ export interface FileRoutesByFullPath {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/agent-command-center': typeof ApiAgentCommandCenterRouteWithChildren
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -732,6 +810,7 @@ export interface FileRoutesByFullPath {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/hermes-push': typeof ApiHermesPushRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
@@ -779,6 +858,10 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/agent-command-center/github-repos': typeof ApiAgentCommandCenterGithubReposRoute
+  '/api/agent-os/dispatch': typeof ApiAgentOsDispatchRoute
+  '/api/agent-os/n8n-health': typeof ApiAgentOsN8nHealthRoute
+  '/api/agent-os/workflows': typeof ApiAgentOsWorkflowsRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
@@ -811,12 +894,18 @@ export interface FileRoutesByFullPath {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/agent-os/': typeof ApiAgentOsIndexRoute
+  '/api/agent-command-center/approvals/$id': typeof ApiAgentCommandCenterApprovalsIdRoute
+  '/api/agent-os/approvals/$approvalId': typeof ApiAgentOsApprovalsApprovalIdRoute
+  '/api/agent-os/tasks/$taskId': typeof ApiAgentOsTasksTaskIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/agent-command-center': typeof AgentCommandCenterRoute
+  '/agent-os': typeof AgentOsRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
@@ -829,6 +918,7 @@ export interface FileRoutesByTo {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/agent-command-center': typeof ApiAgentCommandCenterRouteWithChildren
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -847,6 +937,7 @@ export interface FileRoutesByTo {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/hermes-push': typeof ApiHermesPushRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
@@ -894,6 +985,10 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/agent-command-center/github-repos': typeof ApiAgentCommandCenterGithubReposRoute
+  '/api/agent-os/dispatch': typeof ApiAgentOsDispatchRoute
+  '/api/agent-os/n8n-health': typeof ApiAgentOsN8nHealthRoute
+  '/api/agent-os/workflows': typeof ApiAgentOsWorkflowsRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
@@ -926,6 +1021,10 @@ export interface FileRoutesByTo {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/agent-os': typeof ApiAgentOsIndexRoute
+  '/api/agent-command-center/approvals/$id': typeof ApiAgentCommandCenterApprovalsIdRoute
+  '/api/agent-os/approvals/$approvalId': typeof ApiAgentOsApprovalsApprovalIdRoute
+  '/api/agent-os/tasks/$taskId': typeof ApiAgentOsTasksTaskIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -933,6 +1032,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/agent-command-center': typeof AgentCommandCenterRoute
+  '/agent-os': typeof AgentOsRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
@@ -946,6 +1047,7 @@ export interface FileRoutesById {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/agent-command-center': typeof ApiAgentCommandCenterRouteWithChildren
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -964,6 +1066,7 @@ export interface FileRoutesById {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/hermes-push': typeof ApiHermesPushRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
@@ -1011,6 +1114,10 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/agent-command-center/github-repos': typeof ApiAgentCommandCenterGithubReposRoute
+  '/api/agent-os/dispatch': typeof ApiAgentOsDispatchRoute
+  '/api/agent-os/n8n-health': typeof ApiAgentOsN8nHealthRoute
+  '/api/agent-os/workflows': typeof ApiAgentOsWorkflowsRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
@@ -1043,6 +1150,10 @@ export interface FileRoutesById {
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
+  '/api/agent-os/': typeof ApiAgentOsIndexRoute
+  '/api/agent-command-center/approvals/$id': typeof ApiAgentCommandCenterApprovalsIdRoute
+  '/api/agent-os/approvals/$approvalId': typeof ApiAgentOsApprovalsApprovalIdRoute
+  '/api/agent-os/tasks/$taskId': typeof ApiAgentOsTasksTaskIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
 }
@@ -1051,6 +1162,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
+    | '/agent-command-center'
+    | '/agent-os'
     | '/conductor'
     | '/dashboard'
     | '/files'
@@ -1064,6 +1177,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/api/agent-command-center'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1082,6 +1196,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
+    | '/api/hermes-push'
     | '/api/history'
     | '/api/integrations'
     | '/api/local-providers'
@@ -1129,6 +1244,10 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/agent-command-center/github-repos'
+    | '/api/agent-os/dispatch'
+    | '/api/agent-os/n8n-health'
+    | '/api/agent-os/workflows'
     | '/api/artifacts/$artifactId'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
@@ -1161,12 +1280,18 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/agent-os/'
+    | '/api/agent-command-center/approvals/$id'
+    | '/api/agent-os/approvals/$approvalId'
+    | '/api/agent-os/tasks/$taskId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$'
+    | '/agent-command-center'
+    | '/agent-os'
     | '/conductor'
     | '/dashboard'
     | '/files'
@@ -1179,6 +1304,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/api/agent-command-center'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1197,6 +1323,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
+    | '/api/hermes-push'
     | '/api/history'
     | '/api/integrations'
     | '/api/local-providers'
@@ -1244,6 +1371,10 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat'
     | '/settings'
+    | '/api/agent-command-center/github-repos'
+    | '/api/agent-os/dispatch'
+    | '/api/agent-os/n8n-health'
+    | '/api/agent-os/workflows'
     | '/api/artifacts/$artifactId'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
@@ -1276,12 +1407,18 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/agent-os'
+    | '/api/agent-command-center/approvals/$id'
+    | '/api/agent-os/approvals/$approvalId'
+    | '/api/agent-os/tasks/$taskId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   id:
     | '__root__'
     | '/'
     | '/$'
+    | '/agent-command-center'
+    | '/agent-os'
     | '/conductor'
     | '/dashboard'
     | '/files'
@@ -1295,6 +1432,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/api/agent-command-center'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1313,6 +1451,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/gateway-status'
+    | '/api/hermes-push'
     | '/api/history'
     | '/api/integrations'
     | '/api/local-providers'
@@ -1360,6 +1499,10 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/agent-command-center/github-repos'
+    | '/api/agent-os/dispatch'
+    | '/api/agent-os/n8n-health'
+    | '/api/agent-os/workflows'
     | '/api/artifacts/$artifactId'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
@@ -1392,6 +1535,10 @@ export interface FileRouteTypes {
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
+    | '/api/agent-os/'
+    | '/api/agent-command-center/approvals/$id'
+    | '/api/agent-os/approvals/$approvalId'
+    | '/api/agent-os/tasks/$taskId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
   fileRoutesById: FileRoutesById
@@ -1399,6 +1546,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
+  AgentCommandCenterRoute: typeof AgentCommandCenterRoute
+  AgentOsRoute: typeof AgentOsRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
   FilesRoute: typeof FilesRoute
@@ -1412,6 +1561,7 @@ export interface RootRouteChildren {
   Swarm2Route: typeof Swarm2Route
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
+  ApiAgentCommandCenterRoute: typeof ApiAgentCommandCenterRouteWithChildren
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
@@ -1430,6 +1580,7 @@ export interface RootRouteChildren {
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
+  ApiHermesPushRoute: typeof ApiHermesPushRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiIntegrationsRoute: typeof ApiIntegrationsRoute
   ApiLocalProvidersRoute: typeof ApiLocalProvidersRoute
@@ -1474,6 +1625,9 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiAgentOsDispatchRoute: typeof ApiAgentOsDispatchRoute
+  ApiAgentOsN8nHealthRoute: typeof ApiAgentOsN8nHealthRoute
+  ApiAgentOsWorkflowsRoute: typeof ApiAgentOsWorkflowsRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
@@ -1493,6 +1647,9 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
+  ApiAgentOsIndexRoute: typeof ApiAgentOsIndexRoute
+  ApiAgentOsApprovalsApprovalIdRoute: typeof ApiAgentOsApprovalsApprovalIdRoute
+  ApiAgentOsTasksTaskIdRoute: typeof ApiAgentOsTasksTaskIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1586,6 +1743,20 @@ declare module '@tanstack/react-router' {
       path: '/conductor'
       fullPath: '/conductor'
       preLoaderRoute: typeof ConductorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent-os': {
+      id: '/agent-os'
+      path: '/agent-os'
+      fullPath: '/agent-os'
+      preLoaderRoute: typeof AgentOsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent-command-center': {
+      id: '/agent-command-center'
+      path: '/agent-command-center'
+      fullPath: '/agent-command-center'
+      preLoaderRoute: typeof AgentCommandCenterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -1931,6 +2102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hermes-push': {
+      id: '/api/hermes-push'
+      path: '/api/hermes-push'
+      fullPath: '/api/hermes-push'
+      preLoaderRoute: typeof ApiHermesPushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gateway-status': {
       id: '/api/gateway-status'
       path: '/api/gateway-status'
@@ -2055,6 +2233,20 @@ declare module '@tanstack/react-router' {
       path: '/api/artifacts'
       fullPath: '/api/artifacts'
       preLoaderRoute: typeof ApiArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-command-center': {
+      id: '/api/agent-command-center'
+      path: '/api/agent-command-center'
+      fullPath: '/api/agent-command-center'
+      preLoaderRoute: typeof ApiAgentCommandCenterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-os/': {
+      id: '/api/agent-os/'
+      path: '/api/agent-os'
+      fullPath: '/api/agent-os/'
+      preLoaderRoute: typeof ApiAgentOsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-memory/search': {
@@ -2281,6 +2473,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsArtifactIdRouteImport
       parentRoute: typeof ApiArtifactsRoute
     }
+    '/api/agent-os/workflows': {
+      id: '/api/agent-os/workflows'
+      path: '/api/agent-os/workflows'
+      fullPath: '/api/agent-os/workflows'
+      preLoaderRoute: typeof ApiAgentOsWorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-os/n8n-health': {
+      id: '/api/agent-os/n8n-health'
+      path: '/api/agent-os/n8n-health'
+      fullPath: '/api/agent-os/n8n-health'
+      preLoaderRoute: typeof ApiAgentOsN8nHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-os/dispatch': {
+      id: '/api/agent-os/dispatch'
+      path: '/api/agent-os/dispatch'
+      fullPath: '/api/agent-os/dispatch'
+      preLoaderRoute: typeof ApiAgentOsDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-command-center/github-repos': {
+      id: '/api/agent-command-center/github-repos'
+      path: '/github-repos'
+      fullPath: '/api/agent-command-center/github-repos'
+      preLoaderRoute: typeof ApiAgentCommandCenterGithubReposRouteImport
+      parentRoute: typeof ApiAgentCommandCenterRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -2294,6 +2514,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sessions/$sessionKey/active-run'
       preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/agent-os/tasks/$taskId': {
+      id: '/api/agent-os/tasks/$taskId'
+      path: '/api/agent-os/tasks/$taskId'
+      fullPath: '/api/agent-os/tasks/$taskId'
+      preLoaderRoute: typeof ApiAgentOsTasksTaskIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-os/approvals/$approvalId': {
+      id: '/api/agent-os/approvals/$approvalId'
+      path: '/api/agent-os/approvals/$approvalId'
+      fullPath: '/api/agent-os/approvals/$approvalId'
+      preLoaderRoute: typeof ApiAgentOsApprovalsApprovalIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-command-center/approvals/$id': {
+      id: '/api/agent-command-center/approvals/$id'
+      path: '/approvals/$id'
+      fullPath: '/api/agent-command-center/approvals/$id'
+      preLoaderRoute: typeof ApiAgentCommandCenterApprovalsIdRouteImport
+      parentRoute: typeof ApiAgentCommandCenterRoute
     }
   }
 }
@@ -2313,6 +2554,21 @@ const SettingsRouteChildren: SettingsRouteChildren = {
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
+
+interface ApiAgentCommandCenterRouteChildren {
+  ApiAgentCommandCenterGithubReposRoute: typeof ApiAgentCommandCenterGithubReposRoute
+  ApiAgentCommandCenterApprovalsIdRoute: typeof ApiAgentCommandCenterApprovalsIdRoute
+}
+
+const ApiAgentCommandCenterRouteChildren: ApiAgentCommandCenterRouteChildren = {
+  ApiAgentCommandCenterGithubReposRoute: ApiAgentCommandCenterGithubReposRoute,
+  ApiAgentCommandCenterApprovalsIdRoute: ApiAgentCommandCenterApprovalsIdRoute,
+}
+
+const ApiAgentCommandCenterRouteWithChildren =
+  ApiAgentCommandCenterRoute._addFileChildren(
+    ApiAgentCommandCenterRouteChildren,
+  )
 
 interface ApiArtifactsRouteChildren {
   ApiArtifactsArtifactIdRoute: typeof ApiArtifactsArtifactIdRoute
@@ -2417,6 +2673,8 @@ const ApiSwarmMemoryRouteWithChildren = ApiSwarmMemoryRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  AgentCommandCenterRoute: AgentCommandCenterRoute,
+  AgentOsRoute: AgentOsRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
   FilesRoute: FilesRoute,
@@ -2430,6 +2688,7 @@ const rootRouteChildren: RootRouteChildren = {
   Swarm2Route: Swarm2Route,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
+  ApiAgentCommandCenterRoute: ApiAgentCommandCenterRouteWithChildren,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
@@ -2448,6 +2707,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
+  ApiHermesPushRoute: ApiHermesPushRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiIntegrationsRoute: ApiIntegrationsRoute,
   ApiLocalProvidersRoute: ApiLocalProvidersRoute,
@@ -2492,6 +2752,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiAgentOsDispatchRoute: ApiAgentOsDispatchRoute,
+  ApiAgentOsN8nHealthRoute: ApiAgentOsN8nHealthRoute,
+  ApiAgentOsWorkflowsRoute: ApiAgentOsWorkflowsRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
@@ -2511,6 +2774,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
+  ApiAgentOsIndexRoute: ApiAgentOsIndexRoute,
+  ApiAgentOsApprovalsApprovalIdRoute: ApiAgentOsApprovalsApprovalIdRoute,
+  ApiAgentOsTasksTaskIdRoute: ApiAgentOsTasksTaskIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
