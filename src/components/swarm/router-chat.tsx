@@ -178,6 +178,7 @@ export function RouterChat({
           prompt: prompt.trim(),
           workers: eligibleWorkers,
         }),
+        signal: AbortSignal.timeout(120_000),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -241,9 +242,9 @@ export function RouterChat({
         body: JSON.stringify({
           assignments: plan,
           timeoutSeconds: 300,
-          waitForCheckpoint: true,
-          checkpointPollSeconds: 90,
+          waitForCheckpoint: false,
         }),
+        signal: AbortSignal.timeout(60_000),
       })
       if (!res.ok) {
         const text = await res.text()

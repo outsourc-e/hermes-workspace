@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { BEARER_TOKEN, ensureGatewayProbed, getResolvedUrls } from '../../server/gateway-capabilities'
+import { ensureGatewayProbed, getResolvedUrls } from '../../server/gateway-capabilities'
+import { getBearerToken } from '../../server/openai-compat-api'
 
 type DecomposeRequest = {
   prompt?: unknown
@@ -68,7 +69,8 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
   }
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (BEARER_TOKEN) headers.Authorization = `Bearer ${BEARER_TOKEN}`
+  const bearer = getBearerToken()
+  if (bearer) headers.Authorization = `Bearer ${bearer}`
 
   const { gateway } = getResolvedUrls()
   const res = await fetch(`${gateway}/v1/chat/completions`, {
