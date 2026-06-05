@@ -427,6 +427,25 @@ function SettingsRoute() {
                   </div>
                 </div>
               </SettingsSection>
+
+              <SettingsSection
+                title="Labs (experimental)"
+                description="Early/unfinished features. May change or be removed. Off by default."
+                icon={Settings02Icon}
+              >
+                <SettingsRow
+                  label="Echo Studio"
+                  description="Show the Echo Studio dashboard builder (scaffold) in the nav. Experimental."
+                >
+                  <Switch
+                    checked={settings.experimentalEchoStudio}
+                    onCheckedChange={(checked) =>
+                      updateSettings({ experimentalEchoStudio: checked })
+                    }
+                    aria-label="Enable Echo Studio (experimental)"
+                  />
+                </SettingsRow>
+              </SettingsSection>
             </>
           )}
 

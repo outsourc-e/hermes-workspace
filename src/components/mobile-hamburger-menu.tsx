@@ -26,6 +26,7 @@ import {
   selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
+import { useSettingsStore } from '@/hooks/use-settings'
 
 export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
@@ -166,6 +167,12 @@ export function MobileHamburgerMenu() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
+  const echoStudioEnabled = useSettingsStore(
+    (state) => state.settings.experimentalEchoStudio,
+  )
+  const visibleNavItems = MOBILE_HAMBURGER_NAV_ITEMS.filter(
+    (item) => item.id !== 'echo-studio' || echoStudioEnabled,
+  )
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
@@ -253,7 +260,7 @@ export function MobileHamburgerMenu() {
 
         {/* Nav items */}
         <nav className="flex flex-col gap-1 px-3 pt-4 flex-1">
-          {MOBILE_HAMBURGER_NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = item.match(pathname)
             return (
               <button

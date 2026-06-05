@@ -28,6 +28,8 @@ export type StudioSettings = {
   interfaceDensity: InterfaceDensity
   /** Mobile chat nav mode: 'dock' = iMessage (no nav in chat), 'integrated' = chat input in nav pill, 'scroll-hide' = nav shows on scroll up */
   mobileChatNavMode: 'dock' | 'integrated' | 'scroll-hide'
+  /** Hidden experimental: show Echo Studio (dashboard builder scaffold) in nav. Off by default. */
+  experimentalEchoStudio: boolean
 }
 
 type SettingsState = {
@@ -54,6 +56,7 @@ export const defaultStudioSettings: StudioSettings = {
   interfaceFont: 'system',
   interfaceDensity: 'comfortable',
   mobileChatNavMode: 'dock',
+  experimentalEchoStudio: false,
 }
 
 export const useSettingsStore = create<SettingsState>()(
