@@ -100,6 +100,7 @@ import { Route as ApiConnectionSettingsRouteImport } from './routes/api/connecti
 import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
 import { Route as ApiConductorStopRouteImport } from './routes/api/conductor-stop'
 import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-spawn'
+import { Route as ApiCommandsRouteImport } from './routes/api/commands'
 import { Route as ApiClaudeUpdateRouteImport } from './routes/api/claude-update'
 import { Route as ApiClaudeTasksAssigneesRouteImport } from './routes/api/claude-tasks-assignees'
 import { Route as ApiClaudeTasksRouteImport } from './routes/api/claude-tasks'
@@ -109,6 +110,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiAgentBusRouteImport } from './routes/api/agent-bus'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
@@ -617,6 +619,11 @@ const ApiConductorSpawnRoute = ApiConductorSpawnRouteImport.update({
   path: '/api/conductor-spawn',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCommandsRoute = ApiCommandsRouteImport.update({
+  id: '/api/commands',
+  path: '/api/commands',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiClaudeUpdateRoute = ApiClaudeUpdateRouteImport.update({
   id: '/api/claude-update',
   path: '/api/claude-update',
@@ -660,6 +667,11 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
 const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   id: '/api/artifacts',
   path: '/api/artifacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentBusRoute = ApiAgentBusRouteImport.update({
+  id: '/api/agent-bus',
+  path: '/api/agent-bus',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
@@ -947,6 +959,7 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
+  '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -956,6 +969,7 @@ export interface FileRoutesByFullPath {
   '/api/claude-tasks': typeof ApiClaudeTasksRouteWithChildren
   '/api/claude-tasks-assignees': typeof ApiClaudeTasksAssigneesRoute
   '/api/claude-update': typeof ApiClaudeUpdateRoute
+  '/api/commands': typeof ApiCommandsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
@@ -1099,6 +1113,7 @@ export interface FileRoutesByTo {
   '/terminal': typeof TerminalRoute
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
+  '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1108,6 +1123,7 @@ export interface FileRoutesByTo {
   '/api/claude-tasks': typeof ApiClaudeTasksRouteWithChildren
   '/api/claude-tasks-assignees': typeof ApiClaudeTasksAssigneesRoute
   '/api/claude-update': typeof ApiClaudeUpdateRoute
+  '/api/commands': typeof ApiCommandsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
@@ -1253,6 +1269,7 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
+  '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1262,6 +1279,7 @@ export interface FileRoutesById {
   '/api/claude-tasks': typeof ApiClaudeTasksRouteWithChildren
   '/api/claude-tasks-assignees': typeof ApiClaudeTasksAssigneesRoute
   '/api/claude-update': typeof ApiClaudeUpdateRoute
+  '/api/commands': typeof ApiCommandsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
@@ -1408,6 +1426,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/vt-capital'
     | '/world'
+    | '/api/agent-bus'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1417,6 +1436,7 @@ export interface FileRouteTypes {
     | '/api/claude-tasks'
     | '/api/claude-tasks-assignees'
     | '/api/claude-update'
+    | '/api/commands'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
     | '/api/config-patch'
@@ -1560,6 +1580,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/vt-capital'
     | '/world'
+    | '/api/agent-bus'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1569,6 +1590,7 @@ export interface FileRouteTypes {
     | '/api/claude-tasks'
     | '/api/claude-tasks-assignees'
     | '/api/claude-update'
+    | '/api/commands'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
     | '/api/config-patch'
@@ -1713,6 +1735,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/vt-capital'
     | '/world'
+    | '/api/agent-bus'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1722,6 +1745,7 @@ export interface FileRouteTypes {
     | '/api/claude-tasks'
     | '/api/claude-tasks-assignees'
     | '/api/claude-update'
+    | '/api/commands'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
     | '/api/config-patch'
@@ -1867,6 +1891,7 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   VtCapitalRoute: typeof VtCapitalRoute
   WorldRoute: typeof WorldRoute
+  ApiAgentBusRoute: typeof ApiAgentBusRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
@@ -1876,6 +1901,7 @@ export interface RootRouteChildren {
   ApiClaudeTasksRoute: typeof ApiClaudeTasksRouteWithChildren
   ApiClaudeTasksAssigneesRoute: typeof ApiClaudeTasksAssigneesRoute
   ApiClaudeUpdateRoute: typeof ApiClaudeUpdateRoute
+  ApiCommandsRoute: typeof ApiCommandsRoute
   ApiConductorSpawnRoute: typeof ApiConductorSpawnRoute
   ApiConductorStopRoute: typeof ApiConductorStopRoute
   ApiConfigPatchRoute: typeof ApiConfigPatchRoute
@@ -2606,6 +2632,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiConductorSpawnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/commands': {
+      id: '/api/commands'
+      path: '/api/commands'
+      fullPath: '/api/commands'
+      preLoaderRoute: typeof ApiCommandsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/claude-update': {
       id: '/api/claude-update'
       path: '/api/claude-update'
@@ -2667,6 +2700,13 @@ declare module '@tanstack/react-router' {
       path: '/api/artifacts'
       fullPath: '/api/artifacts'
       preLoaderRoute: typeof ApiArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-bus': {
+      id: '/api/agent-bus'
+      path: '/api/agent-bus'
+      fullPath: '/api/agent-bus'
+      preLoaderRoute: typeof ApiAgentBusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/update/workspace': {
@@ -3263,6 +3303,7 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   VtCapitalRoute: VtCapitalRoute,
   WorldRoute: WorldRoute,
+  ApiAgentBusRoute: ApiAgentBusRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
@@ -3272,6 +3313,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClaudeTasksRoute: ApiClaudeTasksRouteWithChildren,
   ApiClaudeTasksAssigneesRoute: ApiClaudeTasksAssigneesRoute,
   ApiClaudeUpdateRoute: ApiClaudeUpdateRoute,
+  ApiCommandsRoute: ApiCommandsRoute,
   ApiConductorSpawnRoute: ApiConductorSpawnRoute,
   ApiConductorStopRoute: ApiConductorStopRoute,
   ApiConfigPatchRoute: ApiConfigPatchRoute,
