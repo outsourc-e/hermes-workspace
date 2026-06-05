@@ -1671,10 +1671,26 @@ function ChatComposerComponent({
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
     : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
+  const [serverCommands, setServerCommands] = useState<SlashCommandDefinition[]>([])
+
+  useEffect(() => {
+    fetch('/api/commands')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data: { commands?: Array<{ command: string; description: string }> }) => {
+        setServerCommands(data.commands ?? [])
+      })
+      .catch(() => {
+        // fall back to DEFAULT_SLASH_COMMANDS only
+      })
+  }, [])
+
   const slashCommands = useMemo(
     () =>
       mergeSlashCommands(
-        DEFAULT_SLASH_COMMANDS,
+        mergeSlashCommands(DEFAULT_SLASH_COMMANDS, serverCommands),
         (installedSkillsQuery.data ?? [])
           .filter((skill) => skill.installed && skill.enabled)
           .map((skill) => ({
@@ -1682,7 +1698,7 @@ function ChatComposerComponent({
             description: skill.description || `Run ${skill.name}`,
           })),
       ),
-    [installedSkillsQuery.data],
+    [serverCommands, installedSkillsQuery.data],
   )
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
