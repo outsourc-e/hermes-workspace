@@ -722,7 +722,11 @@ function ChatMessageListComponent({
     const wasScrollingUp = metrics.scrollTop < lastScrollTopRef.current - 5
     lastScrollTopRef.current = metrics.scrollTop
 
-    if (wasScrollingUp && !nearBottom) {
+    // Bug #552: any user-initiated upward scroll releases stick-to-bottom
+    // (previously required >200px from bottom, which let streaming yank the
+    // viewport back down during near-bottom reading). Re-stick only when the
+    // user lands back at the bottom.
+    if (wasScrollingUp) {
       stickToBottomRef.current = false
       isNearBottomRef.current = false
     } else if (nearBottom) {
