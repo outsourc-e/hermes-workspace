@@ -20,7 +20,7 @@ import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { UpdateCenterNotifier } from '@/components/update-center-notifier'
-import { initializeSettingsAppearance, useSettings } from '@/hooks/use-settings'
+import { applyInterfacePreferences, initializeSettingsAppearance, useSettings } from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import {
   ClaudeOnboarding,
@@ -273,6 +273,10 @@ function RootLayout() {
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
   const [mounted, setMounted] = useState(false)
   useApplyChatWidth()
+
+  useEffect(() => {
+    applyInterfacePreferences(settings)
+  }, [settings])
 
   useEffect(() => {
     setMounted(true)

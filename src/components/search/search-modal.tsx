@@ -72,7 +72,10 @@ export function SearchModal() {
   const deferredQuery = useDeferredValue(debouncedQuery)
 
   // Real data (Phase 3.2)
-  const { sessions, files, skills } = useSearchData(scope)
+  const { sessions, sessionSearchResults, files, skills } = useSearchData(
+    scope,
+    deferredQuery,
+  )
   const searchableFiles = useMemo(
     () => files.filter((entry) => entry.type === 'file'),
     [files],
@@ -182,12 +185,17 @@ export function SearchModal() {
 
     // Real sessions data — search across friendlyId, key, derived title,
     // and preview so user queries match chat content (#291).
-    const chats = filterResults(
-      sessions,
-      normalized,
-      ['friendlyId', 'key', 'title', 'preview'],
-      RESULT_LIMITS.chats,
-    ).map<SearchResultItemData>((entry) => ({
+    const chatCandidates =
+      sessionSearchResults.length > 0
+        ? sessionSearchResults
+        : filterResults(
+            sessions,
+            normalized,
+            ['friendlyId', 'key', 'title', 'preview'],
+            RESULT_LIMITS.chats,
+          )
+
+    const chats = chatCandidates.slice(0, RESULT_LIMITS.chats).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'chats',
       icon: <HugeiconsIcon icon={Chat01Icon} size={20} strokeWidth={1.5} />,
@@ -292,6 +300,7 @@ export function SearchModal() {
     quickActions,
     scope,
     searchableFiles,
+    sessionSearchResults,
     sessions,
     skills,
   ])

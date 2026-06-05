@@ -205,6 +205,17 @@ pnpm dev                   # Starts on http://localhost:3000
 
 > **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes Agent APIs, advanced features appear automatically.
 
+#### Run without an open terminal
+
+After `pnpm build`, install Workspace as a user-level launchd/systemd service:
+
+```bash
+chmod +x scripts/install-dashboard-service.sh
+scripts/install-dashboard-service.sh
+```
+
+See [`docs/dashboard-service.md`](docs/dashboard-service.md) for macOS launchd, Linux systemd, logs, overrides, and uninstall steps.
+
 #### Environment Variables
 
 ```env

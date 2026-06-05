@@ -19,6 +19,12 @@ type SwarmKanbanCard = {
   createdBy: string
   createdAt: number
   updatedAt: number
+  tags?: Array<string>
+  latestRun?: {
+    summary?: string | null
+    outcome?: string | null
+    status?: string | null
+  } | null
 }
 
 type KanbanWorker = {
@@ -158,6 +164,7 @@ async function createKanbanCard(input: {
   reviewer: string | null
   status: KanbanLane
   missionId: string | null
+  tags: Array<string>
 }): Promise<SwarmKanbanCard> {
   const res = await fetch('/api/swarm-kanban', {
     method: 'POST',
@@ -187,6 +194,50 @@ function splitCriteria(value: string): Array<string> {
     .filter(Boolean)
 }
 
+function splitTags(value: string): Array<string> {
+  return value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+}
+
+type ParsedTaskLabel = { tier1: string; tier2?: string; color: string }
+
+const LABEL_COLORS = [
+  'border-sky-400/50 bg-sky-500/10 text-sky-700',
+  'border-violet-400/50 bg-violet-500/10 text-violet-700',
+  'border-emerald-400/50 bg-emerald-500/10 text-emerald-700',
+  'border-amber-400/50 bg-amber-500/10 text-amber-700',
+  'border-rose-400/50 bg-rose-500/10 text-rose-700',
+  'border-cyan-400/50 bg-cyan-500/10 text-cyan-700',
+]
+
+function labelColor(tier1: string): string {
+  let hash = 0
+  for (const char of tier1) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return LABEL_COLORS[hash % LABEL_COLORS.length] ?? LABEL_COLORS[0]
+}
+
+function parseTaskLabel(tag: string): ParsedTaskLabel | null {
+  const raw = tag.trim()
+  if (!raw.toLowerCase().startsWith('label:')) return null
+  const body = raw.slice('label:'.length).trim()
+  if (!body) return null
+  const [tier1, ...rest] = body.split('/').map((part) => part.trim()).filter(Boolean)
+  if (!tier1) return null
+  return { tier1, tier2: rest.join(' / ') || undefined, color: labelColor(tier1) }
+}
+
+function formatElapsedSince(timestamp: number): string {
+  const ageMs = Math.max(0, Date.now() - timestamp)
+  const minutes = Math.floor(ageMs / 60_000)
+  if (minutes < 1) return '<1m'
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+}
+
 function workerLabel(workers: Array<KanbanWorker>, workerId: string | null): string {
   if (!workerId) return 'Unassigned'
   const worker = workers.find((item) => item.id === workerId)
@@ -209,6 +260,8 @@ export function Swarm2KanbanBoard({
   const [draftWorker, setDraftWorker] = useState(selectedWorkerId ?? '')
   const [draftReviewer, setDraftReviewer] = useState('')
   const [draftStatus, setDraftStatus] = useState<KanbanLane>('backlog')
+  const [draftLabels, setDraftLabels] = useState('')
+  const [activeLabelFilter, setActiveLabelFilter] = useState<string | null>(null)
   const [linkLatestMission, setLinkLatestMission] = useState(Boolean(latestMission))
   const [backendToast, setBackendToast] = useState<KanbanBackendPresentation | null>(null)
   const lastToastedBackendKey = useRef<string | null>(null)
@@ -255,6 +308,7 @@ export function Swarm2KanbanBoard({
       reviewer: draftReviewer || null,
       status: draftStatus,
       missionId: linkLatestMission ? latestMission?.id ?? null : null,
+      tags: splitTags(draftLabels),
     }),
     onSuccess: async () => {
       setDraftTitle('')
@@ -263,6 +317,7 @@ export function Swarm2KanbanBoard({
       setDraftWorker(selectedWorkerId ?? '')
       setDraftReviewer('')
       setDraftStatus('backlog')
+      setDraftLabels('')
       setComposerOpen(false)
       await queryClient.invalidateQueries({ queryKey: ['swarm2', 'kanban'] })
     },
@@ -275,15 +330,38 @@ export function Swarm2KanbanBoard({
     },
   })
 
+  const labelOptions = useMemo(() => {
+    const labels = new Map<string, ParsedTaskLabel>()
+    for (const card of query.data?.cards ?? []) {
+      for (const tag of card.tags ?? []) {
+        const parsed = parseTaskLabel(tag)
+        if (parsed) labels.set(`${parsed.tier1}${parsed.tier2 ? `/${parsed.tier2}` : ''}`, parsed)
+      }
+    }
+    return [...labels.entries()].map(([key, label]) => ({ key, label }))
+  }, [query.data])
+
+  const visibleCards = useMemo(() => {
+    const cards = query.data?.cards ?? []
+    if (!activeLabelFilter) return cards
+    return cards.filter((card) =>
+      (card.tags ?? []).some((tag) => {
+        const parsed = parseTaskLabel(tag)
+        const key = parsed ? `${parsed.tier1}${parsed.tier2 ? `/${parsed.tier2}` : ''}` : ''
+        return key === activeLabelFilter || parsed?.tier1 === activeLabelFilter
+      }),
+    )
+  }, [activeLabelFilter, query.data])
+
   const cardsByLane = useMemo(() => {
     const map = new Map<KanbanLane, Array<SwarmKanbanCard>>()
     for (const lane of LANES) map.set(lane.id, [])
-    for (const card of query.data?.cards ?? []) {
+    for (const card of visibleCards) {
       const bucket = map.get(card.status) ?? map.get('backlog')!
       bucket.push(card)
     }
     return map
-  }, [query.data])
+  }, [visibleCards])
 
   const total = query.data?.cards.length ?? 0
   const reviewCount = cardsByLane.get('review')?.length ?? 0
@@ -365,6 +443,39 @@ export function Swarm2KanbanBoard({
         </div>
       </div>
 
+      {labelOptions.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveLabelFilter(null)}
+            className={cn(
+              'rounded-full border px-2.5 py-1 font-semibold transition-colors',
+              !activeLabelFilter
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+                : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
+            )}
+          >
+            All labels
+          </button>
+          {labelOptions.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveLabelFilter(key)}
+              className={cn(
+                'rounded-full border px-2.5 py-1 font-semibold transition-colors',
+                label.color,
+                activeLabelFilter === key ? 'ring-2 ring-[var(--theme-accent)]' : '',
+              )}
+              title={label.tier2 ? `${label.tier1} → ${label.tier2}` : label.tier1}
+            >
+              {label.tier1}
+              {label.tier2 ? <span className="ml-1 opacity-70">/{label.tier2}</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {backendToast ? (
         <div className="fixed right-4 top-4 z-50 max-w-sm rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-sm text-[var(--theme-text)] shadow-[0_18px_60px_var(--theme-shadow)]" role="status" aria-live="polite">
           <div className="flex items-start gap-3">
@@ -425,6 +536,11 @@ export function Swarm2KanbanBoard({
                   {LANES.map((lane) => <option key={lane.id} value={lane.id}>{lane.label}</option>)}
                 </select>
               </label>
+              <label className="block text-xs md:col-span-2">
+                <span className="mb-1 block font-semibold text-[var(--theme-muted)]">Labels</span>
+                <input value={draftLabels} onChange={(event) => setDraftLabels(event.target.value)} placeholder="label:Hermes/Workspace, priority:high" className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none" />
+                <span className="mt-1 block text-[10px] text-[var(--theme-muted)]">Use label:Business/Sub-scope for the two-tier board filter.</span>
+              </label>
               <label className="flex items-center gap-2 self-end rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-xs text-[var(--theme-muted)]">
                 <input type="checkbox" checked={linkLatestMission} disabled={!latestMission} onChange={(event) => setLinkLatestMission(event.target.checked)} />
                 Link latest mission{latestMission ? `: ${latestMission.title}` : ''}
@@ -475,6 +591,27 @@ export function Swarm2KanbanBoard({
                         {card.acceptanceCriteria.slice(0, 3).map((item, index) => <li key={`${card.id}-ac-${index}`}>✓ {item}</li>)}
                         {card.acceptanceCriteria.length > 3 ? <li>+{card.acceptanceCriteria.length - 3} more</li> : null}
                       </ul>
+                    ) : null}
+                    {card.tags?.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {card.tags.slice(0, 4).map((tag) => {
+                          const parsed = parseTaskLabel(tag)
+                          return parsed ? (
+                            <span key={tag} className={cn('rounded-full border px-1.5 py-0.5 text-[9px] font-semibold', parsed.color)}>
+                              {parsed.tier1}{parsed.tier2 ? <span className="opacity-70">/{parsed.tier2}</span> : null}
+                            </span>
+                          ) : (
+                            <span key={tag} className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5 text-[9px] text-[var(--theme-muted)]">{tag}</span>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                    {card.status === 'running' || card.latestRun ? (
+                      <div className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-700">
+                        <div className="font-semibold">{card.status === 'running' ? `Running for ${formatElapsedSince(card.updatedAt)}` : 'Latest run'}</div>
+                        {card.latestRun?.summary ? <div className="mt-0.5 line-clamp-2">{card.latestRun.summary}</div> : null}
+                        {card.latestRun && (card.latestRun.status || card.latestRun.outcome) ? <div className="mt-0.5 opacity-75">{[card.latestRun.status, card.latestRun.outcome].filter(Boolean).join(' · ')}</div> : null}
+                      </div>
                     ) : null}
                     <div className="mt-3 space-y-1 text-[10px] text-[var(--theme-muted)]">
                       <div>Owner: <span className="font-semibold text-[var(--theme-text)]">{workerLabel(workers, card.assignedWorker)}</span></div>

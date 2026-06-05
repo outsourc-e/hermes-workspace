@@ -14,6 +14,7 @@ const FILES_STALE_TIME_MS = 2 * 60_000
 const SKILLS_STALE_TIME_MS = 2 * 60_000
 const SEARCH_QUERY_GC_TIME_MS = 10 * 60_000
 const MAX_SEARCH_FILES = 2_500
+const SESSION_FTS_STALE_TIME_MS = 15_000
 
 export type SearchSession = {
   id: string
@@ -22,6 +23,7 @@ export type SearchSession = {
   title?: string
   preview?: string
   updatedAt?: number
+  source?: string | null
 }
 
 export type SearchFile = {
@@ -58,6 +60,11 @@ type FilesApiResponse = {
 type SkillsApiResponse = {
   ok?: boolean
   skills?: Array<Record<string, unknown>>
+}
+
+type SessionSearchApiResponse = {
+  ok?: boolean
+  results?: Array<Record<string, unknown>>
 }
 
 type SearchQueryScope =
@@ -201,6 +208,38 @@ async function fetchFiles(
   return flattenFileTree(entries, MAX_SEARCH_FILES)
 }
 
+async function fetchSessionSearch(
+  query: string,
+  querySignal?: AbortSignal,
+): Promise<Array<SearchSession>> {
+  const normalized = query.trim()
+  if (!normalized) return []
+  const data = await fetchJsonWithTimeout<SessionSearchApiResponse>(
+    `/api/sessions/search?q=${encodeURIComponent(normalized)}&limit=24`,
+    querySignal,
+  )
+  if (!data || data.ok === false) return []
+  const results = Array.isArray(data.results) ? data.results : []
+  return results.map((entry, index) => {
+    const key = String(entry.key || entry.session_id || entry.id || '')
+    const friendlyId = String(entry.friendlyId || key || 'unknown')
+    return {
+      id: String(entry.id || `${key}:${index}`),
+      key,
+      friendlyId,
+      title: String(entry.title || friendlyId || 'Untitled'),
+      preview: String(entry.snippet || entry.preview || ''),
+      updatedAt:
+        typeof entry.updatedAt === 'number'
+          ? entry.updatedAt
+          : typeof entry.session_started === 'number'
+            ? entry.session_started
+            : undefined,
+      source: typeof entry.source === 'string' ? entry.source : null,
+    }
+  })
+}
+
 async function fetchSkills(
   querySignal?: AbortSignal,
 ): Promise<Array<SearchSkill>> {
@@ -223,9 +262,10 @@ async function fetchSkills(
   })
 }
 
-export function useSearchData(scope: SearchQueryScope) {
+export function useSearchData(scope: SearchQueryScope, query = '') {
   const sessionsAvailable = useFeatureAvailable('sessions')
   const skillsAvailable = useFeatureAvailable('skills')
+  const trimmedQuery = query.trim()
 
   // Sessions
   const sessionsQuery = useQuery({
@@ -233,6 +273,20 @@ export function useSearchData(scope: SearchQueryScope) {
     queryFn: ({ signal }) => fetchSessions(signal),
     enabled: sessionsAvailable && (scope === 'all' || scope === 'chats'),
     staleTime: SESSIONS_STALE_TIME_MS,
+    gcTime: SEARCH_QUERY_GC_TIME_MS,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
+  const sessionSearchQuery = useQuery({
+    queryKey: ['search', 'sessions-fts', trimmedQuery],
+    queryFn: ({ signal }) => fetchSessionSearch(trimmedQuery, signal),
+    enabled:
+      sessionsAvailable &&
+      trimmedQuery.length >= 2 &&
+      (scope === 'all' || scope === 'chats'),
+    staleTime: SESSION_FTS_STALE_TIME_MS,
     gcTime: SEARCH_QUERY_GC_TIME_MS,
     retry: false,
     refetchOnWindowFocus: false,
@@ -268,11 +322,15 @@ export function useSearchData(scope: SearchQueryScope) {
 
   return {
     sessions: sessionsQuery.data || [],
+    sessionSearchResults: sessionSearchQuery.data || [],
     files: filesQuery.data || [],
     skills: skillsQuery.data || [],
     activity: activityResults,
     isLoading:
-      sessionsQuery.isLoading || filesQuery.isLoading || skillsQuery.isLoading,
+      sessionsQuery.isLoading ||
+      sessionSearchQuery.isLoading ||
+      filesQuery.isLoading ||
+      skillsQuery.isLoading,
   }
 }
 

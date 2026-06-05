@@ -5,6 +5,8 @@ import { getTheme, setTheme } from '@/lib/theme'
 
 export type SettingsThemeMode = 'system' | 'light' | 'dark'
 export type AccentColor = 'orange' | 'purple' | 'blue' | 'green'
+export type InterfaceFont = 'system' | 'inter' | 'serif' | 'mono'
+export type InterfaceDensity = 'compact' | 'comfortable' | 'spacious'
 
 export type StudioSettings = {
   claudeUrl: string
@@ -22,6 +24,8 @@ export type StudioSettings = {
   preferredPremiumModel: string
   onlySuggestCheaper: boolean
   showSystemMetricsFooter: boolean
+  interfaceFont: InterfaceFont
+  interfaceDensity: InterfaceDensity
   /** Mobile chat nav mode: 'dock' = iMessage (no nav in chat), 'integrated' = chat input in nav pill, 'scroll-hide' = nav shows on scroll up */
   mobileChatNavMode: 'dock' | 'integrated' | 'scroll-hide'
 }
@@ -47,6 +51,8 @@ export const defaultStudioSettings: StudioSettings = {
   preferredPremiumModel: '',
   onlySuggestCheaper: false,
   showSystemMetricsFooter: false,
+  interfaceFont: 'system',
+  interfaceDensity: 'comfortable',
   mobileChatNavMode: 'dock',
 }
 
@@ -102,12 +108,20 @@ export function resolveTheme(theme: SettingsThemeMode): 'light' | 'dark' {
     : 'light'
 }
 
+export function applyInterfacePreferences(settings: Partial<StudioSettings>) {
+  if (typeof document === 'undefined') return
+  document.documentElement.dataset.interfaceFont = settings.interfaceFont ?? 'system'
+  document.documentElement.dataset.interfaceDensity = settings.interfaceDensity ?? 'comfortable'
+}
+
 export function applyTheme(_theme?: SettingsThemeMode) {
   setTheme(getTheme())
   document.documentElement.setAttribute('data-accent', 'orange')
+  applyInterfacePreferences(useSettingsStore.getState().settings)
 }
 
 export function initializeSettingsAppearance() {
   setTheme(getTheme())
   document.documentElement.setAttribute('data-accent', 'orange')
+  applyInterfacePreferences(useSettingsStore.getState().settings)
 }

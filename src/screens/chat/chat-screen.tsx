@@ -65,6 +65,11 @@ import {
   CHAT_OPEN_SETTINGS_EVENT,
   CHAT_PENDING_COMMAND_STORAGE_KEY,
   CHAT_RUN_COMMAND_EVENT,
+  CHAT_SUBMIT_SELECTION_EVENT,
+} from './chat-events'
+import type {
+  ChatRunCommandDetail,
+  ChatSubmitSelectionDetail,
 } from './chat-events'
 import type {ResponseWaitSnapshot} from './chat-screen-utils';
 import type {
@@ -75,7 +80,6 @@ import type {
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
-import type { ChatRunCommandDetail } from './chat-events'
 import type {AgentActivity} from '@/stores/chat-activity-store';
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
@@ -2566,6 +2570,23 @@ export function ChatScreen({
       window.removeEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
     }
   }, [runPaletteSlashCommand])
+
+  useEffect(() => {
+    function handleSubmitSelection(event: Event) {
+      const detail = (event as CustomEvent<ChatSubmitSelectionDetail>).detail
+      const text = detail?.text?.trim()
+      if (!text) return
+      send(text, [], false, commandHelpers)
+    }
+
+    window.addEventListener(CHAT_SUBMIT_SELECTION_EVENT, handleSubmitSelection)
+    return () => {
+      window.removeEventListener(
+        CHAT_SUBMIT_SELECTION_EVENT,
+        handleSubmitSelection,
+      )
+    }
+  }, [commandHelpers, send])
 
   useEffect(() => {
     const pendingCommand = window.sessionStorage.getItem(
