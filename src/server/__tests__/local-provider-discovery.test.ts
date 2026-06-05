@@ -22,6 +22,7 @@ vi.mock('node:fs', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  delete process.env.HERMES_HOME
   delete process.env.CLAUDE_HOME
 })
 

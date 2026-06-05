@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { newestCheckpointFromMessages, parseSwarmCheckpoint, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
-import { createOrUpdateMission, markMissionAssignmentDispatched, recordMissionCheckpoint } from '../../server/swarm-missions'
+import { createOrUpdateMission, getSwarmMission, markMissionAssignmentDispatched, recordMissionAssignmentBlocked, recordMissionCheckpoint } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/swarm-memory'
 import { rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
@@ -502,6 +502,33 @@ function markDispatchResult(workerId: string, result: WorkerResult): void {
   })
 }
 
+export function dispatchBlockReason(result: Pick<WorkerResult, 'ok' | 'error' | 'output' | 'checkpointStatus'>): string | null {
+  if (!result.ok) return result.error?.trim() || result.output?.trim() || 'Dispatch failed before a worker checkpoint was recorded.'
+  if (result.checkpointStatus === 'timeout') return 'No fresh checkpoint before poll timeout.'
+  return null
+}
+
+function recordDispatchBlock(workerId: string, assignment: AssignmentRequest, result: WorkerResult, options?: { missionId?: string | null }): void {
+  const reason = dispatchBlockReason(result)
+  if (!reason) return
+  recordMissionAssignmentBlocked({
+    missionId: options?.missionId,
+    assignmentId: assignment.assignmentId ?? null,
+    workerId,
+    reason,
+    source: 'swarm-dispatch',
+  })
+  writeRuntimePatch(workerId, {
+    state: 'blocked',
+    phase: 'blocked',
+    checkpointStatus: 'blocked',
+    blockedReason: reason,
+    lastDispatchResult: reason,
+    lastCheckIn: new Date().toISOString(),
+    lastOutputAt: Date.now(),
+  })
+}
+
 function markCheckpointResult(workerId: string, checkpoint: ParsedSwarmCheckpoint, notifySessionKey?: string | null): void {
   // When the checkpoint reaches any terminal status (anything other than
   // 'in_progress' — i.e. done/blocked/needs_input/handoff) the worker is no
@@ -757,6 +784,14 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   }
 }
 
+export function buildHermesChatQueryArgs(prompt: string): string[] {
+  // `hermes chat -q` requires the query as the *immediate* next argv item.
+  // Keeping the prompt adjacent to -q prevents argparse from interpreting
+  // following flags (for example -Q) as a missing query and failing with:
+  // "argument -q/--query: expected one argument".
+  return ['chat', '-q', prompt, '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
+}
+
 function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: SwarmRosterWorker | undefined, options?: { waitForCheckpoint?: boolean; checkpointPollMs?: number; missionId?: string | null; notifySessionKey?: string | null }): Promise<WorkerResult> {
   return new Promise(async (resolve) => {
     const workerId = assignment.workerId
@@ -866,6 +901,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
       } else {
         liveResult.checkpointStatus = 'not-requested'
       }
+      recordDispatchBlock(workerId, assignment, liveResult, options)
       resolve(liveResult)
       return
     }
@@ -881,15 +917,14 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
         delivery: 'oneshot',
       }
       markDispatchResult(workerId, result)
+      recordDispatchBlock(workerId, assignment, result, options)
       resolve(result)
       return
     }
 
     const useWrapper = existsSync(wrapperPath)
     const cmd = useWrapper ? wrapperPath : resolveHermesBin()
-    const args = useWrapper
-      ? ['chat', '-q', '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch', prompt]
-      : ['chat', '-q', '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
+    const args = buildHermesChatQueryArgs(prompt)
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       HERMES_HOME: profilePath,
@@ -909,7 +944,6 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
         timeout: timeoutMs,
         maxBuffer: MAX_OUTPUT_CHARS,
         killSignal: 'SIGTERM',
-        input: prompt,
       },
       (error, stdout, stderr) => {
         const durationMs = Date.now() - startedAt
@@ -929,6 +963,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
             delivery: 'oneshot',
           }
           markDispatchResult(workerId, result)
+          recordDispatchBlock(workerId, assignment, result, options)
           resolve(result)
           return
         }
@@ -985,6 +1020,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           result.checkpointStatus = 'not-requested'
         }
         markDispatchResult(workerId, result)
+        recordDispatchBlock(workerId, assignment, result, options)
         resolve(result)
       },
     )
@@ -1000,6 +1036,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
         delivery: 'oneshot',
       }
       markDispatchResult(workerId, result)
+      recordDispatchBlock(workerId, assignment, result, options)
       resolve(result)
     })
   })
@@ -1094,11 +1131,13 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     { waitForCheckpoint, checkpointPollMs: checkpointPollSeconds * 1000, missionId: mission.id, notifySessionKey },
   )))
 
+  const latestMission = getSwarmMission(mission.id) ?? mission
+
   return {
     dispatchedAt,
     completedAt: Date.now(),
     missionId: mission.id,
-    mission,
+    mission: latestMission,
     prompt: assignments.length === 1 ? assignments[0].task : `${assignments.length} assigned tasks`,
     assignments,
     timeoutSeconds,

@@ -27,7 +27,26 @@ export type ThinkingContent = {
   thinkingSignature?: string
 }
 
-export type MessageContent = TextContent | ToolCallContent | ThinkingContent
+export type SelectionCardContent = {
+  type: 'selectionCard'
+  id?: string
+  title?: string
+  body?: string
+  mode?: 'single' | 'multi' | 'confirm'
+  options?: Array<{
+    id?: string
+    label: string
+    value?: string
+    description?: string
+  }>
+  submitLabel?: string
+}
+
+export type MessageContent =
+  | TextContent
+  | ToolCallContent
+  | ThinkingContent
+  | SelectionCardContent
 
 export type ChatAttachment = {
   id?: string

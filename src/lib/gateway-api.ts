@@ -203,11 +203,25 @@ export async function sendToSession(
 }
 
 export async function fetchSessions(): Promise<GatewaySessionsResponse> {
-  const response = await fetch(makeEndpoint('/api/sessions'))
+  const response = await fetch(makeEndpoint('/api/sessions'), {
+    headers: { accept: 'application/json' },
+  })
   if (!response.ok) {
     throw new Error(await readError(response))
   }
-  return (await response.json()) as GatewaySessionsResponse
+
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.toLowerCase().includes('application/json')) {
+    throw new Error(
+      'Session API returned non-JSON content. Your auth/proxy may have intercepted /api/sessions.',
+    )
+  }
+
+  const payload = (await response.json()) as GatewaySessionsResponse
+  if (!Array.isArray(payload.sessions)) {
+    throw new Error('Session API returned an unexpected response shape')
+  }
+  return payload
 }
 
 export async function fetchSessionStatus(

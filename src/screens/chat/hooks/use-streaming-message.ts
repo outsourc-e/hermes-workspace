@@ -241,6 +241,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         error: message,
       }))
       onError?.(message)
+      useChatStore.getState().setHeartbeatActivity(null)
     },
     [
       clearHandoffTimer,
@@ -429,6 +430,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
 
       onComplete?.(message)
+      useChatStore.getState().setHeartbeatActivity(null)
     },
     [clearHandoffTimer, onComplete, stopFrame, unregisterSendStreamRun],
   )
@@ -444,7 +446,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         typeof window !== 'undefined' &&
         window.localStorage?.getItem('hermes:debug:sse') === '1'
       ) {
-        // eslint-disable-next-line no-console
+         
         console.log(
           '[hermes-sse]',
           event,
@@ -754,6 +756,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'heartbeat': {
           markActivity()
+          const activity = (payload as { activity?: string | null }).activity ?? null
+          useChatStore.getState().setHeartbeatActivity(activity)
           break
         }
         case 'close': {
@@ -851,6 +855,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         streamingText: '',
         error: null,
       })
+      useChatStore.getState().setHeartbeatActivity(null)
 
       try {
         const response = await fetch('/api/send-stream', {

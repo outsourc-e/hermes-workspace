@@ -587,6 +587,9 @@ function ChatSidebarComponent({
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
+  const echoStudioEnabled = useSettingsStore(
+    (state) => state.settings.experimentalEchoStudio,
+  )
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
@@ -845,6 +848,17 @@ function ChatSidebarComponent({
       label: 'Swarm',
       active: isSwarmActive,
     },
+    ...(echoStudioEnabled
+      ? [
+          {
+            kind: 'link' as const,
+            to: '/echo-studio',
+            icon: DashboardSquare01Icon,
+            label: 'Echo Studio',
+            active: pathname.startsWith('/echo-studio'),
+          },
+        ]
+      : []),
 
   ]
 

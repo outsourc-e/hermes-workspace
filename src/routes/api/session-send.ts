@@ -41,7 +41,15 @@ export const Route = createFileRoute('/api/session-send')({
           }
           // Fire-and-forget: kick off the stream, then return. Operations
           // chat panel polls /api/session-history for new assistant turns.
-          const url = new URL('/api/send-stream', request.url)
+          //
+          // Use loopback rather than `request.url` so the internal hop never
+          // leaves the host. Going back through a public hostname + reverse
+          // proxy can drop the session cookie (SameSite / forbidden-header
+          // handling differs across Node fetch implementations), which causes
+          // the downstream /api/send-stream call to 401 silently and the user
+          // never sees their assistant reply. See #XXX.
+          const internalPort = process.env.PORT || '3000'
+          const url = new URL('/api/send-stream', `http://127.0.0.1:${internalPort}`)
           const cookie = request.headers.get('cookie') || ''
           fetch(url, {
             method: 'POST',

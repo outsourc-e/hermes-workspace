@@ -88,6 +88,15 @@ async function isClaudeAgentHealthy(port = 8642): Promise<boolean> {
 
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  // Bridge loadEnv into process.env for server-side SSR runtime code that
+  // reads env vars directly from process.env (e.g. getBearerToken() in
+  // openai-compat-api.ts reads process.env.HERMES_API_TOKEN). Without this,
+  // Vite's loadEnv only populates the local `env` object — not process.env.
+  for (const key of Object.keys(env)) {
+    if (!(key in process.env)) {
+      process.env[key] = env[key]
+    }
+  }
   const claudeApiUrl = env.CLAUDE_API_URL?.trim() || 'http://127.0.0.1:8642'
   // /api/connection-status is handled by the real route file at
   // src/routes/api/connection-status.ts; the dev server no longer
@@ -635,14 +644,18 @@ const config = defineConfig(({ mode, command }) => {
             }
           })
 
-          // Auto-start hermes-agent when dev server launches
-          if (command === 'serve') {
+          // Auto-start hermes-agent when dev server launches.
+          // Skip when launchd manages the gateway (HERMES_WORKSPACE_AUTO_START_AGENT=false)
+          // to avoid SIGTERM cycle on close that nukes the launchd-managed process.
+          const autoStartAgent =
+            process.env.HERMES_WORKSPACE_AUTO_START_AGENT !== 'false'
+          if (command === 'serve' && autoStartAgent) {
             void startClaudeAgent()
           }
 
-          // Shutdown hermes-agent when dev server stops
+          // Shutdown hermes-agent when dev server stops — only if we spawned it.
           server.httpServer?.on('close', () => {
-            if (claudeAgentChild) {
+            if (claudeAgentChild && autoStartAgent) {
               console.log('[hermes-agent] Stopping...')
               claudeAgentChild.kill('SIGTERM')
               claudeAgentChild = null

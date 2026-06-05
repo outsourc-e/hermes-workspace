@@ -36,8 +36,8 @@ import type {
 } from '@/components/slash-command-menu'
 import {
   DEFAULT_SLASH_COMMANDS,
-  mergeSlashCommands,
   SlashCommandMenu,
+  mergeSlashCommands,
 } from '@/components/slash-command-menu'
 import {
   PromptInput,
@@ -61,6 +61,7 @@ import {
   emitSearchModalEvent,
 } from '@/hooks/use-search-modal'
 import { setLocalModelOverride } from '@/screens/chat/local-model-override'
+import { formatModelName } from '@/lib/format-model-name'
 
 type ChatComposerAttachment = {
   id: string
@@ -72,7 +73,7 @@ type ChatComposerAttachment = {
   kind?: 'image' | 'file' | 'audio'
 }
 
-type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
+type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'adaptive'
 
 type ChatComposerProps = {
   onSubmit: (
@@ -563,6 +564,43 @@ function getResolvedModelKey(model: string, provider?: string): string {
   if (normalizedModel.startsWith(`${normalizedProvider}/`))
     return normalizedModel
   return `${normalizedProvider}/${normalizedModel}`
+}
+
+/**
+ * Checks whether a model entry matches the current model string.
+ *
+ * The current model can arrive in several formats depending on the source:
+ *   - "provider/model-id"  (from session-status API, persisted session model)
+ *   - "model-id"           (bare ID from config or old data)
+ *
+ * The entry always has { id, provider } from the models catalog.
+ *
+ * We match if:
+ *   1. The current model equals the entry ID exactly (bare match), or
+ *   2. The current model ends with "/<entry.id>" (provider-prefixed match), or
+ *   3. The resolved key from entry (provider/id) equals the current model.
+ */
+function isCurrentModel(
+  currentModel: string,
+  entryId: string,
+  entryProvider: string,
+): boolean {
+  const cm = currentModel.trim()
+  const eid = entryId.trim()
+  const eprov = entryProvider.trim()
+  if (!cm || !eid) return false
+
+  // Exact match (bare ID)
+  if (cm === eid) return true
+
+  // Current model is "something/<entryId>"
+  if (cm.endsWith(`/${eid}`)) return true
+
+  // Resolved entry key matches current model exactly
+  const resolved = eprov ? `${eprov}/${eid}` : eid
+  if (resolved === cm) return true
+
+  return false
 }
 
 function isCanvasSupported(): boolean {
@@ -1671,10 +1709,26 @@ function ChatComposerComponent({
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
     : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
+  const [serverCommands, setServerCommands] = useState<Array<SlashCommandDefinition>>([])
+
+  useEffect(() => {
+    fetch('/api/commands')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data: { commands?: Array<{ command: string; description: string }> }) => {
+        setServerCommands(data.commands ?? [])
+      })
+      .catch(() => {
+        // fall back to DEFAULT_SLASH_COMMANDS only
+      })
+  }, [])
+
   const slashCommands = useMemo(
     () =>
       mergeSlashCommands(
-        DEFAULT_SLASH_COMMANDS,
+        mergeSlashCommands(DEFAULT_SLASH_COMMANDS, serverCommands),
         (installedSkillsQuery.data ?? [])
           .filter((skill) => skill.installed && skill.enabled)
           .map((skill) => ({
@@ -1682,7 +1736,7 @@ function ChatComposerComponent({
             description: skill.description || `Run ${skill.name}`,
           })),
       ),
-    [installedSkillsQuery.data],
+    [serverCommands, installedSkillsQuery.data],
   )
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
@@ -2550,9 +2604,11 @@ function ChatComposerComponent({
                             unpinnedGroups.set(entry.provider, group)
                           }
                           const renderEntry = (entry: (typeof parsed)[0]) => {
-                            const isActive =
-                              entry.id === currentModel ||
-                              `${defaultProvider}/${entry.id}` === currentModel
+                            const isActive = isCurrentModel(
+                              persistedSessionModel || currentModel,
+                              entry.id,
+                              entry.provider,
+                            )
                             return (
                               <div
                                 key={entry.id}
@@ -2741,9 +2797,9 @@ function ChatComposerComponent({
                         setIsThinkingMenuOpen(false)
                         setIsModelMenuOpen(false)
                       }}
-                      className="inline-flex h-8 items-center gap-1 rounded-full bg-primary-100/70 px-2 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
-                      title="Chat controls"
-                      aria-label="Chat controls"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                      title={`Chat controls · ${modelButtonLabel}`}
+                      aria-label={`Chat controls, current model: ${modelButtonLabel}`}
                     >
                       <svg
                         width="13"
@@ -2763,6 +2819,7 @@ function ChatComposerComponent({
                         <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
                         <circle cx="11" cy="18" r="2" fill="currentColor" stroke="none" />
                       </svg>
+                      <span className="max-w-[5rem] truncate sm:max-w-[8rem] md:max-w-[10rem]">{formatModelName(modelButtonLabel)}</span>
                       <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
                     </button>
                     {isControlsMenuOpen ? (
@@ -2930,7 +2987,11 @@ function ChatComposerComponent({
                                         unpinnedGroups.set(entry.provider, group)
                                       }
                                       const renderEntry = (entry: (typeof parsed)[0]) => {
-                                        const isActive = entry.id === currentModel || `${defaultProvider}/${entry.id}` === currentModel
+                                        const isActive = isCurrentModel(
+                                          persistedSessionModel || currentModel,
+                                          entry.id,
+                                          entry.provider,
+                                        )
                                         return (
                                           <div key={entry.id} className="group relative flex items-center">
                                             <button

@@ -110,23 +110,53 @@ export function getLocalMessages(sessionId: string): Array<LocalMessage> {
   return store.messages[sessionId] ?? []
 }
 
+export function searchLocalSessions(
+  query: string,
+  limit = 20,
+): Array<LocalSession & { snippet: string }> {
+  const normalized = query.trim().toLowerCase()
+  if (!normalized) return []
+
+  const results: Array<LocalSession & { snippet: string }> = []
+  const sessions = listLocalSessions()
+
+  for (const session of sessions) {
+    const title = session.title || ''
+    const messages = store.messages[session.id] ?? []
+    const matchingMessage = messages.find((message) =>
+      message.content.toLowerCase().includes(normalized),
+    )
+    if (!title.toLowerCase().includes(normalized) && !matchingMessage) {
+      continue
+    }
+
+    const content = matchingMessage?.content || title || session.id
+    const lowerContent = content.toLowerCase()
+    const matchIndex = lowerContent.indexOf(normalized)
+    const start = matchIndex >= 0 ? Math.max(0, matchIndex - 80) : 0
+    const snippet = content.slice(start, start + 220).trim()
+    results.push({ ...session, snippet })
+    if (results.length >= limit) break
+  }
+
+  return results
+}
+
 export function appendLocalMessage(
   sessionId: string,
   message: LocalMessage,
 ): void {
-  ensureLocalSession(sessionId)
-  if (!store.messages[sessionId]) store.messages[sessionId] = []
-  store.messages[sessionId].push(message)
+  const session = ensureLocalSession(sessionId)
+  const messages = store.messages[sessionId] ?? []
+  store.messages[sessionId] = messages
+  messages.push(message)
   if (store.messages[sessionId].length > MAX_MESSAGES_PER_SESSION) {
     store.messages[sessionId] = store.messages[sessionId].slice(
       -MAX_MESSAGES_PER_SESSION,
     )
   }
-  const session = store.sessions[sessionId]
-  if (session) {
-    session.messageCount = store.messages[sessionId].length
-    session.updatedAt = Date.now()
-  }
+  session.messageCount = store.messages[sessionId].length
+  session.updatedAt = Date.now()
   scheduleSave()
 }
 

@@ -1,8 +1,5 @@
 // Module-level local model override — set by composer when user picks a local model
 // Avoids prop threading. Reset when switching back to cloud models.
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) { _localModelOverride = model }
-
 import {
   useCallback,
   useEffect,
@@ -21,12 +18,12 @@ import {
   textFromMessage,
 } from './utils'
 import {
+  
   advanceStickyStreamingText,
-  createResponseWaitSnapshot,
   createOptimisticMessage,
+  createResponseWaitSnapshot,
   isTerminalActiveRunStatus,
-  shouldClearWaitingForAssistantMessage,
-  type ResponseWaitSnapshot,
+  shouldClearWaitingForAssistantMessage
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
@@ -43,21 +40,20 @@ import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
 import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
+  clearPendingSendForSession,
   consumePendingSend,
   hasPendingGeneration,
   hasPendingSend,
   isRecentSession,
   resetPendingSend,
   setPendingGeneration,
-  clearPendingSendForSession,
 } from './pending-send'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
+import { snapshotOptimisticUserMessages } from './hooks/optimistic-message-reinject'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useStreamingMessage } from './hooks/use-streaming-message'
-import { playChatComplete } from '@/lib/sounds'
-import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { useActiveRunCheck } from './hooks/use-active-run-check'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
@@ -69,7 +65,13 @@ import {
   CHAT_OPEN_SETTINGS_EVENT,
   CHAT_PENDING_COMMAND_STORAGE_KEY,
   CHAT_RUN_COMMAND_EVENT,
+  CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
+import type {
+  ChatRunCommandDetail,
+  ChatSubmitSelectionDetail,
+} from './chat-events'
+import type {ResponseWaitSnapshot} from './chat-screen-utils';
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
@@ -78,7 +80,9 @@ import type {
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
-import type { ChatRunCommandDetail } from './chat-events'
+import type {AgentActivity} from '@/stores/chat-activity-store';
+import { useChatSettingsStore } from '@/hooks/use-chat-settings'
+import { playChatComplete } from '@/lib/sounds'
 import {
   addApproval,
   loadApprovals,
@@ -101,12 +105,16 @@ import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
-import { useChatStore, persistRecoveryMessage } from '@/stores/chat-store'
+import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
+import { useSessionModelStore } from '@/stores/session-model-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
-import { useChatActivityStore, type AgentActivity } from '@/stores/chat-activity-store'
+import {  useChatActivityStore } from '@/stores/chat-activity-store'
+
+export let _localModelOverride = ''
+export function setLocalModelOverride(model: string) { _localModelOverride = model }
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -481,45 +489,6 @@ export function ChatScreen({
   const portableChatFriendlyId = isPortableMode ? 'main' : activeFriendlyId
   // --- Issue #43 fix: lift waitingForResponse into persistent Zustand store ---
   // The store survives component unmount, so navigating away mid-stream
-  // doesn't lose the "waiting" flag. sessionStorage backup handles reloads.
-  const storeWaiting = useChatStore((s) => s.waitingSessionKeys)
-  // resolvedSessionKey isn't available yet (defined below), so we track it via
-  // a ref that's updated once it resolves. The memo/callback read the ref.
-  const sessionKeyForWaiting = useRef<string | undefined>(undefined)
-  const [activeRunCheckDone, setActiveRunCheckDone] = useState(false)
-
-  // Track stale-restored sessions that need API verification before showing thinking.
-  // On page reload, sessionStorage may contain stale "waiting" flags from a
-  // previous session. We must not show the thinking indicator until the
-  // active-run API check confirms the run is genuinely active. (Issue #449)
-  const pendingVerifySessionKeyRef = useRef<string | undefined>(undefined)
-  const waitingForResponse = useMemo(() => {
-    const key = sessionKeyForWaiting.current
-    if (!key) return hasPendingSend() || hasPendingGeneration()
-
-    // If we restored waiting state from sessionStorage but haven't verified
-    // with the API yet, don't show thinking — it might be stale (Issue #449).
-    if (
-      storeWaiting.has(key) &&
-      pendingVerifySessionKeyRef.current === key &&
-      !activeRunCheckDone
-    ) {
-      return false
-    }
-
-    return storeWaiting.has(key)
-  }, [storeWaiting, activeRunCheckDone])
-
-  const setWaitingForResponse = useCallback((waiting: boolean) => {
-    const store = useChatStore.getState()
-    const key = sessionKeyForWaiting.current
-    if (!key) return
-    if (waiting) {
-      store.setSessionWaiting(key)
-    } else {
-      store.clearSessionWaiting(key)
-    }
-  }, [])
   const [liveToolActivity, setLiveToolActivity] = useState<
     Array<{ name: string; timestamp: number }>
   >([])
@@ -540,10 +509,18 @@ export function ChatScreen({
     if (typeof window === 'undefined') return 'low'
     const key = `claude-thinking-${activeFriendlyId || 'new'}`
     const stored = window.sessionStorage.getItem(key)
-    if (stored === 'off' || stored === 'low' || stored === 'adaptive')
+    if (stored === 'off' || stored === 'low' || stored === 'medium' || stored === 'high' || stored === 'adaptive')
       return stored
     return 'low'
   })
+  // Tracks whether the user has explicitly picked a thinking level for this session.
+  // A missing/absent sessionStorage key means we should fall back to the Hermes config default.
+  const thinkingInitializedByUserRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const key = `claude-thinking-${activeFriendlyId || 'new'}`
+    thinkingInitializedByUserRef.current = window.sessionStorage.getItem(key) !== null
+  }, [activeFriendlyId])
   const { alertOpen, alertThreshold, alertPercent, dismissAlert } =
     useContextAlert()
 
@@ -611,10 +588,61 @@ export function ChatScreen({
     portableMode: isPortableMode,
   })
 
+  // --- Waiting state management (Issue #43 + #449) ---
+  // resolvedSessionKey is now available (defined above from useChatHistory).
+  const storeWaiting = useChatStore((s) => s.waitingSessionKeys)
+  const sessionKeyForWaiting = useRef<string | undefined>(undefined)
+  const pendingVerifySessionKeyRef = useRef<string | undefined>(undefined)
+
   // Keep the waiting-state ref in sync with the resolved session key
   sessionKeyForWaiting.current = resolvedSessionKey
 
-  // Detect stale restored waiting state from sessionStorage — we need API
+  // Synchronously detect stale waiting state from sessionStorage.
+  // This runs during render (not in an effect) so the guard in
+  // waitingForResponse is active on the very first render, preventing
+  // a flash of the "Thinking" indicator when reopening an old session.
+  const needsStaleCheck =
+    resolvedSessionKey &&
+    !isNewChat &&
+    storeWaiting.has(resolvedSessionKey) &&
+    pendingVerifySessionKeyRef.current !== resolvedSessionKey
+
+  if (needsStaleCheck) {
+    pendingVerifySessionKeyRef.current = resolvedSessionKey
+  }
+
+  // Track whether the active-run API check has completed.
+  // Initialize to false when we detect stale state (needs verification),
+  // true otherwise. This prevents showing "Thinking" until the API confirms.
+  const [activeRunCheckDone, setActiveRunCheckDone] = useState(!needsStaleCheck)
+
+  const waitingForResponse = useMemo(() => {
+    const key = sessionKeyForWaiting.current
+    if (!key) return hasPendingSend() || hasPendingGeneration()
+
+    // If we restored waiting state from sessionStorage but haven't verified
+    // with the API yet, don't show thinking — it might be stale (Issue #449).
+    if (
+      storeWaiting.has(key) &&
+      pendingVerifySessionKeyRef.current === key &&
+      !activeRunCheckDone
+    ) {
+      return false
+    }
+
+    return storeWaiting.has(key)
+  }, [storeWaiting, activeRunCheckDone])
+
+  const setWaitingForResponse = useCallback((waiting: boolean) => {
+    const store = useChatStore.getState()
+    const key = sessionKeyForWaiting.current
+    if (!key) return
+    if (waiting) {
+      store.setSessionWaiting(key)
+    } else {
+      store.clearSessionWaiting(key)
+    }
+  }, [])
   // verification before showing thinking (Issue #449).
   useEffect(() => {
     const currentSessionKey = resolvedSessionKey
@@ -868,13 +896,12 @@ export function ChatScreen({
 
   const streamStart = useCallback(() => {
     if (!activeFriendlyId || isNewChat) return
-    // Bug #3 fix: no more 350ms polling loop — SSE handles realtime updates.
-    // Single delayed fetch as fallback to catch the initial response.
-    if (streamTimer.current) window.clearTimeout(streamTimer.current)
-    streamTimer.current = window.setTimeout(() => {
-      if (activeRealtimeStreamingRef.current) return
-      refreshHistoryRef.current()
-    }, 2000)
+    // No aggressive delayed refetch here — it wipes optimistic user messages
+    // from the cache before the server has echoed them, causing the user's
+    // message to disappear until the agent completes. The existing failsafes
+    // (5s + 10s timeouts at lines below, active-run polling) handle the case
+    // where SSE misses the done event.
+    void activeFriendlyId // keep dep for eslint
   }, [activeFriendlyId, isNewChat])
 
   refreshHistoryRef.current = function refreshHistory() {
@@ -883,37 +910,21 @@ export function ChatScreen({
     // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
     // The refetch replaces the query cache with server data — if the server
     // hasn't processed the user's POST yet, the optimistic message vanishes.
-    const currentMessages = (historyQuery.data as any)?.messages as
-      | Array<ChatMessage>
-      | undefined
-    const pendingOptimistic = (currentMessages ?? []).filter((msg) => {
-      const raw = msg as Record<string, unknown>
-      return (
-        msg.role === 'user' &&
-        (normalizeMessageValue(raw.__optimisticId).startsWith('opt-') ||
-          normalizeMessageValue(raw.status) === 'sending')
-      )
-    })
+    const historySessionKey = isPortableMode
+      ? 'main'
+      : activeSessionKey ||
+        sessionKeyForHistory ||
+        resolvedSessionKey ||
+        'main'
+    const reInjectOptimistic = snapshotOptimisticUserMessages(
+      queryClient,
+      portableChatFriendlyId,
+      historySessionKey,
+    )
 
     void historyQuery.refetch().then(() => {
       // Re-inject optimistic messages that weren't in the server response
-      if (pendingOptimistic.length === 0) return
-      const historySessionKey = isPortableMode
-        ? 'main'
-        : activeSessionKey ||
-          sessionKeyForHistory ||
-          resolvedSessionKey ||
-          'main'
-      if (!portableChatFriendlyId || !historySessionKey) return
-
-      for (const optimistic of pendingOptimistic) {
-        appendHistoryMessage(
-          queryClient,
-          portableChatFriendlyId,
-          historySessionKey,
-          optimistic,
-        )
-      }
+      reInjectOptimistic()
     })
   }
 
@@ -1018,6 +1029,29 @@ export function ChatScreen({
     retry: false,
   })
 
+  // Fetch the configured reasoning effort so the Chat Controls default matches
+  // what Hermes actually uses instead of hardcoding 'low'.
+  const reasoningEffortQuery = useQuery({
+    queryKey: ['hermes-config', 'reasoning-effort'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/hermes-config')
+        if (!res.ok) return 'low'
+        const data = await res.json() as { config?: Record<string, unknown> }
+        const agentSection = data?.config?.agent
+        if (agentSection && typeof agentSection === 'object' && !Array.isArray(agentSection)) {
+          const effort = (agentSection as Record<string, unknown>).reasoning_effort
+          if (effort === 'off' || effort === 'low' || effort === 'medium' || effort === 'high') return effort
+        }
+        return 'low'
+      } catch {
+        return 'low'
+      }
+    },
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  })
+
   const availableModelIds = useMemo(() => {
     const models = modelsQuery.data?.models || []
     return models.map((m: any) => m.id).filter((id: string) => id)
@@ -1053,6 +1087,16 @@ export function ChatScreen({
       }
     }
   }, [currentModel, activeFriendlyId])
+
+  // If no per-session thinking level override exists, inherit from Hermes config
+  useEffect(() => {
+    if (thinkingInitializedByUserRef.current) return
+    const configEffort = reasoningEffortQuery.data
+    if (!configEffort) return
+    if (configEffort === 'off' || configEffort === 'low' || configEffort === 'medium' || configEffort === 'high') {
+      setThinkingLevel(configEffort)
+    }
+  }, [reasoningEffortQuery.data])
 
   // Persist thinking level changes to sessionStorage
   const handleThinkingLevelChange = useCallback(
@@ -1378,7 +1422,7 @@ export function ChatScreen({
       return deduped
     }
 
-    const nextMessages = [...deduped]
+    let nextMessages = [...deduped]
     const streamToolCalls = activeToolCalls.map((toolCall) => ({
       ...toolCall,
       phase: toolCall.phase,
@@ -1394,6 +1438,42 @@ export function ChatScreen({
       __streamToolCalls: streamToolCalls,
     } as ChatMessage
 
+    // Check if the server has already returned a completed assistant message
+    // that overlaps with the streaming text. If so, drop the streaming
+    // placeholder to avoid showing the same response twice.
+    const streamingText = stableActiveStreamingText.trim()
+    const hasServerAssistantVersion = nextMessages.some((msg) => {
+      if (msg.role !== 'assistant') return false
+      if (msg.__streamingStatus === 'streaming') return false
+      // Any non-streaming assistant message that appears after the last user
+      // message is potentially the same response — match by text overlap
+      if (streamingText.length > 0) {
+        const msgText = textFromMessage(msg).trim()
+        if (msgText.length > 0 && (
+          msgText === streamingText ||
+          msgText.startsWith(streamingText) ||
+          streamingText.startsWith(msgText)
+        )) {
+          return true
+        }
+      }
+      // Also match by tool calls: if the server message has the same tool
+      // calls as the streaming placeholder, it's the same response
+      if (streamToolCalls.length > 0) {
+        const msgContent = Array.isArray(msg.content) ? msg.content : []
+        const msgToolCalls = msgContent.filter((p: any) => p.type === 'toolCall')
+        if (msgToolCalls.length > 0 && msgToolCalls.length === streamToolCalls.length) {
+          return streamToolCalls.every((stc: any) =>
+            msgToolCalls.some((mtc: any) => mtc.name === stc.name)
+          )
+        }
+      }
+      return false
+    })
+    if (hasServerAssistantVersion) {
+      return nextMessages
+    }
+
     const existingStreamIdx = nextMessages.findIndex(
       (message) => message.__streamingStatus === 'streaming',
     )
@@ -1403,6 +1483,13 @@ export function ChatScreen({
         ...nextMessages[existingStreamIdx],
         ...streamingMsg,
       }
+      // Remove any other streaming messages (e.g. from mergeHistoryMessages
+      // appending a realtime message after finalDisplayMessages already
+      // injected a placeholder). Keep only one streaming placeholder.
+      const keepIdx = existingStreamIdx
+      nextMessages = nextMessages.filter(
+        (m, i) => i === keepIdx || m.__streamingStatus !== 'streaming',
+      )
       return nextMessages
     }
 
@@ -2483,6 +2570,23 @@ export function ChatScreen({
       window.removeEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
     }
   }, [runPaletteSlashCommand])
+
+  useEffect(() => {
+    function handleSubmitSelection(event: Event) {
+      const detail = (event as CustomEvent<ChatSubmitSelectionDetail>).detail
+      const text = detail?.text?.trim()
+      if (!text) return
+      send(text, [], false, commandHelpers)
+    }
+
+    window.addEventListener(CHAT_SUBMIT_SELECTION_EVENT, handleSubmitSelection)
+    return () => {
+      window.removeEventListener(
+        CHAT_SUBMIT_SELECTION_EVENT,
+        handleSubmitSelection,
+      )
+    }
+  }, [commandHelpers, send])
 
   useEffect(() => {
     const pendingCommand = window.sessionStorage.getItem(

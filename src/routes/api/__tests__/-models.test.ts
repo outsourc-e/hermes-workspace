@@ -54,6 +54,7 @@ vi.mock('../../../server/local-provider-discovery', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  delete process.env.HERMES_HOME
   delete process.env.CLAUDE_HOME
 })
 

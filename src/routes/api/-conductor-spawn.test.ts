@@ -14,20 +14,29 @@ describe('native Conductor fallback', () => {
       supervised: false,
     })
 
-    expect(assignments.map((assignment) => assignment.workerId)).toEqual(['swarm2', 'swarm5', 'swarm6', 'swarm11'])
+    expect(assignments.map((assignment) => assignment.workerId)).toEqual(['ops-watch', 'builder', 'reviewer', 'qa'])
     expect(assignments[0].task).toContain('Conductor mission: Fix conductor')
     expect(assignments.every((assignment) => assignment.direct === true)).toBe(true)
     expect(assignments.every((assignment) => assignment.reviewRequired === false)).toBe(true)
   })
 
-  it('uses Scribe when the mission asks for documentation even with a smaller lane count', () => {
+  it('uses KM Agent when the mission asks for documentation even with a smaller lane count', () => {
     const assignments = buildNativeConductorAssignments('Write docs and handoff for the release', {
       maxParallel: 3,
       supervised: true,
     })
 
-    expect(assignments.map((assignment) => assignment.workerId)).toContain('swarm7')
+    expect(assignments.map((assignment) => assignment.workerId)).toContain('km-agent')
     expect(assignments.some((assignment) => assignment.task.includes('Supervised mode'))).toBe(true)
+  })
+
+  it('does not collapse generic two-lane missions to a single worker', () => {
+    const assignments = buildNativeConductorAssignments('Create a small UI prototype', {
+      maxParallel: 2,
+      supervised: false,
+    })
+
+    expect(assignments.map((assignment) => assignment.workerId)).toEqual(['builder', 'reviewer'])
   })
 
   it('normalizes native swarm missions into the Conductor mission status contract', () => {
@@ -40,9 +49,9 @@ describe('native Conductor fallback', () => {
       assignments: [
         {
           id: 'a1',
-          workerId: 'swarm2',
+          workerId: 'builder',
           task: 'Run smoke',
-          rationale: 'Foundation',
+          rationale: 'Builder',
           dependsOn: [],
           reviewRequired: false,
           state: 'dispatched',
@@ -64,6 +73,6 @@ describe('native Conductor fallback', () => {
     expect(record.nativeSwarm).toBe(true)
     expect(record.modeOfficialOotb).toBe(true)
     expect(record.modeNote).toBe(NATIVE_CONDUCTOR_MODE_NOTE)
-    expect(record.lines.join('\n')).toContain('swarm2 dispatched')
+    expect(record.lines.join('\n')).toContain('builder dispatched')
   })
 })

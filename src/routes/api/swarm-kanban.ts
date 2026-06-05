@@ -17,6 +17,20 @@ const AcceptanceCriteriaSchema = z.preprocess(
   z.array(z.string().trim().min(1).max(5000)).default([]),
 )
 
+const TagsSchema = z.preprocess(
+  (value) => {
+    if (Array.isArray(value)) return value
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    }
+    return []
+  },
+  z.array(z.string().trim().min(1).max(120)).default([]),
+)
+
 const CreateCardSchema = z.object({
   title: z.string().trim().min(1).max(200),
   spec: z.string().trim().max(5000).optional().default(''),
@@ -28,6 +42,7 @@ const CreateCardSchema = z.object({
   reportPath: z.string().trim().max(500).optional().nullable(),
   createdBy: z.string().trim().max(120).optional().default('aurora'),
   parents: z.array(z.string().trim().min(1).max(200)).optional().default([]),
+  tags: TagsSchema,
   idempotencyKey: z.string().trim().max(500).optional().nullable(),
 })
 
@@ -58,7 +73,7 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         }
         const data = parsed.data
         const card = await createKanbanCard({
-          title: data.title ?? '',
+          title: data.title,
           spec: data.spec,
           acceptanceCriteria: data.acceptanceCriteria,
           assignedWorker: data.assignedWorker,
@@ -68,6 +83,7 @@ export const Route = createFileRoute('/api/swarm-kanban')({
           reportPath: data.reportPath,
           createdBy: data.createdBy,
           parents: data.parents,
+          tags: data.tags,
           idempotencyKey: data.idempotencyKey,
         })
         return json({ ok: true, card, backend: getKanbanBackendMeta() })

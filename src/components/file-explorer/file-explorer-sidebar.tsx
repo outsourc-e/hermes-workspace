@@ -41,6 +41,12 @@ type FileExplorerSidebarProps = {
   collapsed: boolean
   onToggle: () => void
   onInsertReference: (reference: string) => void
+  // When provided, clicking a file calls this instead of opening the built-in
+  // modal preview — lets parents (e.g. the /files route) render the file in
+  // their own side editor.
+  onOpenFile?: (entry: FileEntry) => void
+  // Path of the currently-open file, used to highlight the row.
+  activePath?: string | null
   hidden?: boolean
   className?: string
 }
@@ -118,6 +124,8 @@ export function FileExplorerSidebar({
   collapsed,
   onToggle,
   onInsertReference,
+  onOpenFile,
+  activePath = null,
   hidden = false,
   className,
 }: FileExplorerSidebarProps) {
@@ -310,9 +318,13 @@ export function FileExplorerSidebar({
         return
       }
       onInsertReference(buildReference(entry.path))
-      setPreviewPath(entry.path)
+      if (onOpenFile) {
+        onOpenFile(entry)
+      } else {
+        setPreviewPath(entry.path)
+      }
     },
-    [onInsertReference, toggleFolder],
+    [onInsertReference, onOpenFile, toggleFolder],
   )
 
   const renderEntry = useCallback(
@@ -337,6 +349,9 @@ export function FileExplorerSidebar({
             className={cn(
               'group flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm text-primary-900',
               'hover:bg-primary-200',
+              activePath === entry.path &&
+                entry.type === 'file' &&
+                'bg-accent-100 font-medium text-accent-800 hover:bg-accent-100',
             )}
             style={{ paddingLeft: padding }}
           >
@@ -363,7 +378,7 @@ export function FileExplorerSidebar({
         </div>
       )
     },
-    [expanded, handleFileClick, isSearchActive, setContextMenu],
+    [activePath, expanded, handleFileClick, isSearchActive, setContextMenu],
   )
 
   if (hidden) return null

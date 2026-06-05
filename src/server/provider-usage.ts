@@ -978,6 +978,84 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
   }
 }
 
+// ── Gemini (Google AI Studio) ────────────────────────────────────────────────
+
+export async function fetchGeminiUsage(): Promise<ProviderUsageResult> {
+  const now = Date.now()
+  const apiKey = process.env.GOOGLE_API_KEY?.trim()
+
+  if (!apiKey) {
+    return {
+      provider: 'gemini',
+      displayName: 'Gemini',
+      status: 'missing_credentials',
+      message: 'Missing GOOGLE_API_KEY',
+      lines: [],
+      updatedAt: now,
+    }
+  }
+
+  // Google AI Studio does not expose a programmatic usage/billing endpoint.
+  // Validate the key with a lightweight models list request instead.
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=1`,
+    )
+
+    if (res.status === 400 || res.status === 401 || res.status === 403) {
+      return {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        status: 'auth_expired',
+        message: 'Invalid or expired GOOGLE_API_KEY',
+        lines: [],
+        updatedAt: now,
+      }
+    }
+
+    if (!res.ok) {
+      return {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        status: 'error',
+        message: `HTTP ${res.status}`,
+        lines: [],
+        updatedAt: now,
+      }
+    }
+
+    return {
+      provider: 'gemini',
+      displayName: 'Gemini',
+      status: 'ok',
+      lines: [
+        {
+          type: 'badge',
+          label: 'Status',
+          value: 'API key active',
+          color: '#10b981',
+        },
+        {
+          type: 'badge',
+          label: 'Usage data',
+          value: 'Not available via API',
+          color: '#a3a3a3',
+        },
+      ],
+      updatedAt: now,
+    }
+  } catch (e) {
+    return {
+      provider: 'gemini',
+      displayName: 'Gemini',
+      status: 'error',
+      message: e instanceof Error ? e.message : String(e),
+      lines: [],
+      updatedAt: now,
+    }
+  }
+}
+
 // ── Aggregate ────────────────────────────────────────────────────────────────
 
 const CACHE_TTL_MS = 30_000
@@ -996,12 +1074,13 @@ export async function getProviderUsage(
     fetchCodexUsage(),
     fetchOpenAIUsage(),
     fetchOpenRouterUsage(),
+    fetchGeminiUsage(),
   ])
 
   const providers: ProviderUsageResult[] = results.map((r, i) => {
     if (r.status === 'fulfilled') return r.value
-    const names = ['Claude (OAuth)', 'Codex', 'OpenAI', 'OpenRouter']
-    const ids = ['claude', 'codex', 'openai', 'openrouter']
+    const names = ['Claude (OAuth)', 'Codex', 'OpenAI', 'OpenRouter', 'Gemini']
+    const ids = ['claude', 'codex', 'openai', 'openrouter', 'gemini']
     return {
       provider: ids[i],
       displayName: names[i],

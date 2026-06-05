@@ -386,7 +386,65 @@ function SettingsRoute() {
                     </p>
                   </div>
                   <WorkspaceThemePicker />
+                  <div className="grid gap-3 pt-3 md:grid-cols-2">
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium text-primary-900">
+                        Interface font
+                      </span>
+                      <select
+                        value={settings.interfaceFont}
+                        onChange={(event) =>
+                          updateSettings({
+                            interfaceFont: event.target.value as typeof settings.interfaceFont,
+                          })
+                        }
+                        className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-900 outline-none"
+                      >
+                        <option value="system">System sans</option>
+                        <option value="inter">Inter-style sans</option>
+                        <option value="serif">Serif</option>
+                        <option value="mono">Monospace</option>
+                      </select>
+                    </label>
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium text-primary-900">
+                        Spacing density
+                      </span>
+                      <select
+                        value={settings.interfaceDensity}
+                        onChange={(event) =>
+                          updateSettings({
+                            interfaceDensity: event.target.value as typeof settings.interfaceDensity,
+                          })
+                        }
+                        className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-900 outline-none"
+                      >
+                        <option value="compact">Compact</option>
+                        <option value="comfortable">Comfortable</option>
+                        <option value="spacious">Spacious</option>
+                      </select>
+                    </label>
+                  </div>
                 </div>
+              </SettingsSection>
+
+              <SettingsSection
+                title="Labs (experimental)"
+                description="Early/unfinished features. May change or be removed. Off by default."
+                icon={Settings02Icon}
+              >
+                <SettingsRow
+                  label="Echo Studio"
+                  description="Show the Echo Studio dashboard builder (scaffold) in the nav. Experimental."
+                >
+                  <Switch
+                    checked={settings.experimentalEchoStudio}
+                    onCheckedChange={(checked) =>
+                      updateSettings({ experimentalEchoStudio: checked })
+                    }
+                    aria-label="Enable Echo Studio (experimental)"
+                  />
+                </SettingsRow>
               </SettingsSection>
             </>
           )}

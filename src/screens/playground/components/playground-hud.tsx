@@ -164,7 +164,6 @@ export function PlaygroundHud({
               <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: HUD.parchment }}>
                 {playerProfile.displayName || 'Builder'}
               </div>
-              </div>
               <div className="mt-1 max-w-[126px] truncate text-[9px] uppercase tracking-[0.18em]" style={{ color: HUD.stone }}>{title}</div>
               <div className="mt-2 flex items-center gap-2">
                 <div className="h-1.5 w-[88px] overflow-hidden rounded-full" style={{ background: 'rgba(244,233,211,.12)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.45)' }}>

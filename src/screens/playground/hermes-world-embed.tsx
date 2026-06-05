@@ -1,14 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { WaveChatPanelsShowcase } from './components/wave-chat-panels-showcase'
 
 const HERMES_WORLD_ORIGIN = 'https://hermes-world.ai'
 
 export function HermesWorldEmbed() {
-  const [loaded, setLoaded] = useState(false)
   const showPanelShowcase = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('panels') === 'wave-chat'
-  const src = useMemo(() => {
+  const playUrl = useMemo(() => {
     const url = new URL('/play/', HERMES_WORLD_ORIGIN)
-    url.searchParams.set('embed', 'workspace')
     url.searchParams.set('source', 'hermes-workspace')
     return url.toString()
   }, [])
@@ -18,32 +16,40 @@ export function HermesWorldEmbed() {
   }
 
   return (
-    <main className="relative h-full min-h-0 overflow-hidden bg-[#050015] text-white">
-      {!loaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_50%_35%,rgba(168,85,247,.24),transparent_48%),#050015]">
-          <div className="rounded-3xl border border-white/12 bg-black/35 px-6 py-5 text-center shadow-2xl backdrop-blur-xl">
-            <div className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-200/70">Hermes Workspace</div>
-            <div className="mt-2 text-2xl font-black tracking-tight">Opening HermesWorld…</div>
-            <div className="mt-2 text-sm text-white/58">Runtime hosted by hermes-world.ai</div>
-          </div>
+    <main className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[#050015] px-4 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(168,85,247,.24),transparent_48%),#050015]" />
+      <div className="relative max-w-xl rounded-3xl border border-white/12 bg-black/45 px-6 py-6 text-center shadow-2xl backdrop-blur-xl">
+        <div className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-200/70">
+          Hermes Workspace
         </div>
-      )}
-      <iframe
-        title="HermesWorld"
-        src={src}
-        className="h-full w-full border-0 bg-[#050015]"
-        allow="fullscreen; clipboard-read; clipboard-write; gamepad"
-        referrerPolicy="strict-origin-when-cross-origin"
-        onLoad={() => setLoaded(true)}
-      />
-      <a
-        href={`${HERMES_WORLD_ORIGIN}/play/`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute right-3 top-3 z-10 rounded-full border border-white/15 bg-black/45 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-white/70 backdrop-blur transition hover:border-cyan-200/40 hover:text-white"
-      >
-        Open full
-      </a>
+        <h1 className="mt-2 text-3xl font-black tracking-tight">
+          Open HermesWorld in a full tab
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-white/65">
+          HermesWorld currently refuses iframe embedding, so Workspace no longer
+          loads it in an iframe that fails with “refused to connect”. The hosted
+          build should be opened directly while the game deployment fixes its
+          stale asset/MIME issue for <code className="rounded bg-white/10 px-1">/assets/styles-*.css</code>.
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <a
+            href={playUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full bg-cyan-300 px-5 py-2 text-sm font-black uppercase tracking-[0.14em] text-slate-950 transition hover:bg-white"
+          >
+            Open full
+          </a>
+          <a
+            href={`${HERMES_WORLD_ORIGIN}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full border border-white/15 bg-white/8 px-5 py-2 text-sm font-bold uppercase tracking-[0.14em] text-white/75 transition hover:border-cyan-200/40 hover:text-white"
+          >
+            Site root
+          </a>
+        </div>
+      </div>
     </main>
   )
 }
