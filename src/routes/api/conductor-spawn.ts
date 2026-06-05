@@ -7,13 +7,12 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
-import { getSwarmMission } from '../../server/swarm-missions'
-import { dispatchSwarmAssignments, readRuntimeCheckpointSnapshot, checkpointFromRuntimeSnapshot, runtimeCheckpointSignature } from './swarm-dispatch'
-import type { SwarmMission } from '../../server/swarm-missions'
-import { recordMissionCheckpoint } from '../../server/swarm-missions'
+import { getSwarmMission, recordMissionCheckpoint  } from '../../server/swarm-missions'
 import { getSwarmProfilePath } from '../../server/swarm-foundation'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { newestCheckpointFromMessages } from '../../server/swarm-checkpoints'
+import { checkpointFromRuntimeSnapshot, dispatchSwarmAssignments, readRuntimeCheckpointSnapshot, runtimeCheckpointSignature } from './swarm-dispatch'
+import type { SwarmMission } from '../../server/swarm-missions'
 
 let cachedSkill: string | null = null
 
@@ -148,96 +147,115 @@ function clipText(value: string, max = 8000): string {
 export function buildNativeConductorAssignments(goal: string, options: { maxParallel: number; supervised: boolean }): Array<NativeConductorAssignment> {
   const maxParallel = Math.min(5, Math.max(1, options.maxParallel || 1))
   const normalizedGoal = goal.toLowerCase()
-  const wantsProduction = /production|ready|harden|audit|clean|fix|bug|test|build|release|deploy|operational/.test(normalizedGoal)
-  const wantsDocs = /doc|handoff|readme|spec|plan|summary/.test(normalizedGoal)
+  const wantsOps = /production|ready|harden|audit|clean|fix|bug|test|build|release|deploy|operational|runtime|gateway|tmux|service|health/.test(normalizedGoal)
+  const wantsDocs = /doc|handoff|readme|spec|plan|summary|knowledge|note/.test(normalizedGoal)
   const assignments: Array<NativeConductorAssignment> = []
 
-  assignments.push({
-    workerId: wantsProduction ? 'swarm2' : 'swarm5',
-    rationale: wantsProduction ? 'Foundation owns runtime contracts and production blockers.' : 'Builder owns the primary implementation lane.',
+  const pushUnique = (assignment: NativeConductorAssignment) => {
+    if (!assignments.some((existing) => existing.workerId === assignment.workerId)) assignments.push(assignment)
+  }
+
+  pushUnique({
+    workerId: wantsOps ? 'ops-watch' : 'builder',
+    rationale: wantsOps ? 'Ops Watch owns runtime health, service quality, and production blockers.' : 'Builder owns scoped implementation and concrete progress.',
     reviewRequired: false,
     direct: true,
     task: [
       `Conductor mission: ${goal}`,
       '',
-      'Lane: Foundation / primary implementation.',
-      'Find the smallest safe execution plan, make concrete progress, and produce a checkpoint. If code changes are required, keep them scoped and testable.',
+      wantsOps ? 'Lane: Ops Watch / runtime quality.' : 'Lane: Builder / primary implementation.',
+      wantsOps
+        ? 'Diagnose the runtime path, make the smallest safe operational improvement, and return proof. Avoid destructive changes unless explicitly approved.'
+        : 'Find the smallest safe execution plan, make concrete progress, and produce a checkpoint. If code changes are required, keep them scoped and testable.',
       options.supervised ? 'Supervised mode: stop before destructive writes or commits and report the exact approval needed.' : 'Do not ask for confirmation unless blocked; start immediately.',
     ].join('\n'),
   })
 
   if (maxParallel >= 2) {
-    assignments.push({
-      workerId: 'swarm5',
-      rationale: 'Builder executes implementation or patch work in parallel with foundation analysis.',
+    pushUnique({
+      workerId: wantsOps ? 'builder' : 'reviewer',
+      rationale: wantsOps
+        ? 'Builder executes implementation or patch work in parallel with runtime analysis.'
+        : 'Reviewer provides the second-lane quality gate for implementation work.',
       reviewRequired: false,
       direct: true,
       task: [
         `Conductor mission: ${goal}`,
         '',
-        'Lane: Builder.',
-        'Implement or prototype the concrete fix/feature path. Avoid broad refactors. Report files changed, tests run, and remaining risks.',
+        wantsOps ? 'Lane: Builder.' : 'Lane: Reviewer / quality gate.',
+        wantsOps
+          ? 'Implement or prototype the concrete fix/feature path. Avoid broad refactors. Report files changed, tests run, and remaining risks.'
+          : 'Review the execution path and any changes. Look for regressions, missing tests, unsafe assumptions, and production-readiness gaps.',
         options.supervised ? 'Supervised mode: prepare patches but stop before destructive writes or commits if approval is needed.' : 'Proceed without asking unless blocked.',
       ].join('\n'),
     })
   }
 
   if (maxParallel >= 3) {
-    assignments.push({
-      workerId: 'swarm6',
-      rationale: 'Reviewer independently checks correctness, regressions, and merge risk.',
+    pushUnique({
+      workerId: wantsOps ? 'reviewer' : 'qa',
+      rationale: wantsOps
+        ? 'Reviewer independently checks correctness, regressions, and merge risk.'
+        : 'QA validates user-visible behavior with focused smoke checks.',
       reviewRequired: false,
       direct: true,
       task: [
         `Conductor mission: ${goal}`,
         '',
-        'Lane: Reviewer / merge gate.',
-        'Review the implementation plan and any changes from Foundation/Builder. Look for regressions, missing tests, unsafe assumptions, and production-readiness gaps. Do not make broad edits unless needed to unblock correctness.',
+        wantsOps ? 'Lane: Reviewer / quality gate.' : 'Lane: QA.',
+        wantsOps
+          ? 'Review the implementation plan and any changes from Ops/Builder. Look for regressions, missing tests, unsafe assumptions, and production-readiness gaps. Do not make broad edits unless needed to unblock correctness.'
+          : 'Run or design focused verification. Prefer targeted tests/build/smoke checks. Report exact commands and results. If tests are missing, identify the minimal regression coverage needed.',
       ].join('\n'),
     })
   }
 
   if (maxParallel >= 4) {
-    assignments.push({
-      workerId: 'swarm11',
-      rationale: 'QA validates behavior with targeted tests and smoke checks.',
+    pushUnique({
+      workerId: wantsOps ? 'qa' : 'ops-watch',
+      rationale: wantsOps
+        ? 'QA validates behavior with targeted tests and smoke checks.'
+        : 'Ops Watch checks runtime/service risks for implementation missions.',
       reviewRequired: false,
       direct: true,
       task: [
         `Conductor mission: ${goal}`,
         '',
-        'Lane: QA.',
-        'Run or design focused verification. Prefer targeted tests/build/smoke checks. Report exact commands and results. If tests are missing, identify the minimal regression coverage needed.',
+        wantsOps ? 'Lane: QA.' : 'Lane: Ops Watch / runtime quality.',
+        wantsOps
+          ? 'Run or design focused verification. Prefer targeted tests/build/smoke checks. Report exact commands and results. If tests are missing, identify the minimal regression coverage needed.'
+          : 'Check runtime, service, deployment, and operational risk. Report only concrete blockers, verification gaps, and safe next actions.',
       ].join('\n'),
     })
   }
 
   if (maxParallel >= 5 || wantsDocs) {
-    assignments.push({
-      workerId: 'swarm7',
-      rationale: 'Scribe captures handoff, docs, and operational notes.',
+    pushUnique({
+      workerId: 'km-agent',
+      rationale: 'KM Agent captures handoff, docs, and durable knowledge notes without leaking secrets.',
       reviewRequired: false,
       direct: true,
       task: [
         `Conductor mission: ${goal}`,
         '',
-        'Lane: Scribe.',
+        'Lane: KM Agent / handoff and knowledge hygiene.',
         'Create a concise handoff/status note: what changed, how to operate it, verification, caveats, and next actions. Do not expose secrets.',
+        options.supervised ? 'Supervised mode: stop before destructive writes or commits and report the exact approval needed.' : 'Proceed without asking unless blocked.',
       ].join('\n'),
     })
   }
 
   const selected = assignments.slice(0, maxParallel)
-  if (wantsDocs && !selected.some((assignment) => assignment.workerId === 'swarm7')) {
+  if (wantsDocs && !selected.some((assignment) => assignment.workerId === 'km-agent')) {
     selected[selected.length - 1] = {
-      workerId: 'swarm7',
-      rationale: 'Scribe captures handoff, docs, and operational notes.',
+      workerId: 'km-agent',
+      rationale: 'KM Agent captures handoff, docs, and durable knowledge notes without leaking secrets.',
       reviewRequired: false,
       direct: true,
       task: [
         `Conductor mission: ${goal}`,
         '',
-        'Lane: Scribe.',
+        'Lane: KM Agent / handoff and knowledge hygiene.',
         'Create a concise handoff/status note: what changed, how to operate it, verification, caveats, and next actions. Do not expose secrets.',
         options.supervised ? 'Supervised mode: stop before destructive writes or commits and report the exact approval needed.' : 'Proceed without asking unless blocked.',
       ].join('\n'),

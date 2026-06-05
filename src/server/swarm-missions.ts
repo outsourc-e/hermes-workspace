@@ -126,6 +126,13 @@ function deriveMissionState(assignments: Array<SwarmMissionAssignment>): SwarmMi
   return 'planning'
 }
 
+function inferReviewRequired(task: string, rationale?: string | null): boolean {
+  // Match intent-bearing task terms only. The previous loose alternation matched
+  // substrings such as "patch" inside "dispatch" and left simple smoke runs in
+  // review forever.
+  return /\b(code|patch(?:es|ed|ing)?|implement(?:ation|ed|ing)?|pr|benchmarks?)\b/i.test(`${task} ${rationale ?? ''}`)
+}
+
 const TERMINAL_ASSIGNMENT_STATES = new Set<SwarmMissionAssignmentState>(['done', 'cancelled'])
 
 function isTerminalAssignment(assignment: SwarmMissionAssignment): boolean {
@@ -197,7 +204,7 @@ export function createOrUpdateMission(input: {
       task: assignment.task,
       rationale: assignment.rationale ?? null,
       dependsOn: assignment.dependsOn ?? [],
-      reviewRequired: assignment.reviewRequired ?? /code|patch|implement|pr|benchmark/i.test(`${assignment.task} ${assignment.rationale ?? ''}`),
+      reviewRequired: assignment.reviewRequired ?? inferReviewRequired(assignment.task, assignment.rationale),
       state: 'queued',
       dispatchedAt: null,
       completedAt: null,
@@ -295,6 +302,63 @@ export function recordMissionCheckpoint(input: {
   const completed = mission.state === 'complete' && previousState !== 'complete'
   writeStore(store)
   return Object.assign(mission, { _completed: completed })
+}
+
+export function recordMissionAssignmentBlocked(input: {
+  missionId?: string | null
+  assignmentId?: string | null
+  workerId: string
+  reason?: string | null
+  source?: string | null
+}): { mission: SwarmMission; assignment: SwarmMissionAssignment; changed: boolean } | null {
+  if (!input.missionId) return null
+  const store = readStore()
+  const mission = store.missions.find((item) => item.id === input.missionId)
+  if (!mission) return null
+  if (mission.state === 'cancelled' || mission.state === 'complete') return null
+  const assignment = (input.assignmentId
+    ? mission.assignments.find((item) => item.id === input.assignmentId)
+    : null)
+    ?? [...mission.assignments].reverse().find((item) => item.workerId === input.workerId && !isTerminalAssignment(item))
+    ?? [...mission.assignments].reverse().find((item) => item.workerId === input.workerId)
+  if (!assignment) return null
+  if (assignment.state === 'cancelled' || assignment.state === 'done') return { mission, assignment, changed: false }
+
+  const reason = input.reason?.trim() || 'Dispatch failed before a worker checkpoint was recorded.'
+  const blockedAt = now()
+  const checkpoint: ParsedSwarmCheckpoint = {
+    stateLabel: 'BLOCKED',
+    runtimeState: 'blocked',
+    checkpointStatus: 'blocked',
+    filesChanged: 'none',
+    commandsRun: 'none',
+    result: null,
+    blocker: reason,
+    nextAction: 'Fix blocker and retry dispatch.',
+    raw: `STATE: BLOCKED\nFILES_CHANGED: none\nCOMMANDS_RUN: none\nRESULT: none\nBLOCKER: ${reason}\nNEXT_ACTION: Fix blocker and retry dispatch.`,
+  }
+  const changed = assignment.state !== 'blocked' || assignment.checkpoint?.raw !== checkpoint.raw
+  assignment.state = 'blocked'
+  assignment.completedAt = blockedAt
+  assignment.checkpoint = checkpoint
+  const report = reportFromCheckpoint({
+    missionId: mission.id,
+    assignmentId: assignment.id,
+    workerId: input.workerId,
+    checkpoint,
+    source: input.source,
+  })
+  if (changed) {
+    mission.events.push(event('blocked', `${input.workerId} blocked: ${reason}`, {
+      workerId: input.workerId,
+      assignmentId: assignment.id,
+      data: report,
+    }))
+  }
+  mission.updatedAt = blockedAt
+  mission.state = deriveMissionState(mission.assignments)
+  writeStore(store)
+  return { mission, assignment, changed }
 }
 
 export function appendMissionContinuation(input: {

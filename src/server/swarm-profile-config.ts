@@ -14,7 +14,7 @@
  * matches, so re-running on a healthy profile is free.
  */
 
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
@@ -28,6 +28,7 @@ export type ProfileBootstrapResult = {
   configCreated: boolean
   envLinked: boolean
   authLinked: boolean
+  mcpTokensLinked: number
   error?: string
 }
 
@@ -42,6 +43,24 @@ export type SwarmWorkerIdentity = {
   capabilities?: Array<string>
 }
 
+function linkSharedFile(source: string, target: string): boolean {
+  if (!existsSync(source)) return false
+  if (existsSync(target)) {
+    try {
+      const stat = lstatSync(target)
+      if (stat.isSymbolicLink()) {
+        unlinkSync(target)
+      } else {
+        renameSync(target, `${target}.profile-local.bak-${Date.now()}`)
+      }
+    } catch {
+      return false
+    }
+  }
+  symlinkSync(source, target)
+  return true
+}
+
 /**
  * Ensure a worker HERMES_HOME has enough runtime config to boot Hermes.
  *
@@ -52,7 +71,7 @@ export type SwarmWorkerIdentity = {
  * The config is copied (not symlinked) because per-worker model sync edits it.
  */
 export function ensureSwarmProfileConfig(profilePath: string): ProfileBootstrapResult {
-  const result: ProfileBootstrapResult = { ok: true, configCreated: false, envLinked: false, authLinked: false }
+  const result: ProfileBootstrapResult = { ok: true, configCreated: false, envLinked: false, authLinked: false, mcpTokensLinked: 0 }
   try {
     mkdirSync(profilePath, { recursive: true })
 
@@ -98,6 +117,18 @@ export function ensureSwarmProfileConfig(profilePath: string): ProfileBootstrapR
       if (shouldLink) {
         symlinkSync(sourceAuth, authPath)
         result.authLinked = true
+      }
+    }
+
+    const mcpTokensDir = join(profilePath, 'mcp-tokens')
+    const sourceMcpTokensDir = join(homedir(), '.hermes', 'mcp-tokens')
+    if (existsSync(sourceMcpTokensDir)) {
+      mkdirSync(mcpTokensDir, { recursive: true })
+      for (const name of readdirSync(sourceMcpTokensDir)) {
+        if (!name.endsWith('.json')) continue
+        if (linkSharedFile(join(sourceMcpTokensDir, name), join(mcpTokensDir, name))) {
+          result.mcpTokensLinked += 1
+        }
       }
     }
 

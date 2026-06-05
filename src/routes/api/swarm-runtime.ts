@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
@@ -94,19 +95,22 @@ function lastLogTail(
   }
 }
 
+function resolveTmuxBin(): string {
+  const override = process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN
+  if (override) return override
+  const local = join(homedir(), '.local', 'bin', 'tmux')
+  return existsSync(local) ? local : 'tmux'
+}
+
 function tmuxHasSession(name: string): Promise<boolean> {
   return new Promise((resolve) => {
-    execFile('tmux', ['has-session', '-t', name], (error) => resolve(!error))
+    execFile(resolveTmuxBin(), ['has-session', '-t', name], (error) => resolve(!error))
   })
 }
 
 function tmuxIsInstalled(): Promise<boolean> {
-  // Honour HERMES_TMUX_BIN so a custom-path install isn't reported as
-  // 'tmux not installed' just because PATH doesn't include it. See #244.
-  const bin =
-    process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN || 'tmux'
   return new Promise((resolve) => {
-    execFile(bin, ['-V'], (error) => resolve(!error))
+    execFile(resolveTmuxBin(), ['-V'], (error) => resolve(!error))
   })
 }
 
