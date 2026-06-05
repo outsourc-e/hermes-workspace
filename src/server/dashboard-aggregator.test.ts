@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildDashboardOverview,
-  type DashboardFetcher,
-} from './dashboard-aggregator'
+import { buildDashboardOverview } from './dashboard-aggregator'
+import type { DashboardFetcher } from './dashboard-aggregator'
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -31,6 +29,7 @@ describe('buildDashboardOverview', () => {
     expect(overview.status).toBeNull()
     expect(overview.platforms).toEqual([])
     expect(overview.cron).toBeNull()
+    expect(overview.kanban).toBeNull()
     expect(overview.achievements).toBeNull()
     expect(overview.modelInfo).toBeNull()
     expect(overview.analytics).toBeNull()
@@ -131,9 +130,7 @@ describe('buildDashboardOverview', () => {
       name: 'Daily roll-up',
       lastError: 'connection refused',
     })
-    const cronIncident = overview.incidents.find(
-      (i) => i.id === 'cron-fail-a',
-    )
+    const cronIncident = overview.incidents.find((i) => i.id === 'cron-fail-a')
     expect(cronIncident?.severity).toBe('error')
     expect(cronIncident?.detail).toBe('connection refused')
   })
@@ -396,6 +393,75 @@ describe('buildDashboardOverview', () => {
     ])
   })
 
+  it('summarises dashboard kanban board state and blocked cards', async () => {
+    const fetcher = makeFetcher({
+      '/api/plugins/kanban/board': {
+        columns: [
+          {
+            name: 'todo',
+            tasks: [
+              {
+                id: 't_1',
+                title: 'Draft plan',
+                status: 'todo',
+                assignee: 'planner',
+              },
+              { id: 't_2', title: 'Queued follow-up', status: 'queued' },
+            ],
+          },
+          {
+            name: 'ready',
+            tasks: [{ id: 't_3', title: 'Implement UI' }],
+          },
+          {
+            name: 'running',
+            tasks: [{ id: 't_4', title: 'Worker active', status: 'claimed' }],
+          },
+          {
+            name: 'blocked',
+            tasks: [
+              { id: 't_5', title: 'Needs credentials', assignee: 'ops' },
+              { id: 't_6', title: 'Needs review' },
+            ],
+          },
+          {
+            name: 'done',
+            tasks: [{ id: 't_7', title: 'Ship it', status: 'completed' }],
+          },
+          {
+            name: 'custom',
+            tasks: [{ id: 't_8', title: 'Unknown state' }],
+          },
+        ],
+      },
+    })
+    const overview = await buildDashboardOverview({ fetcher })
+    expect(overview.kanban).toEqual({
+      total: 8,
+      triage: 0,
+      todo: 2,
+      ready: 1,
+      running: 1,
+      blocked: 2,
+      done: 1,
+      other: 1,
+      topBlocked: [
+        { id: 't_5', title: 'Needs credentials', assignee: 'ops' },
+        { id: 't_6', title: 'Needs review', assignee: null },
+      ],
+    })
+    expect(
+      overview.insights.some((i) => i.text.includes('2 blocked kanban tasks')),
+    ).toBe(false)
+    expect(
+      overview.incidents.find((i) => i.id === 'kanban-blocked'),
+    ).toMatchObject({
+      severity: 'warn',
+      label: '2 kanban tasks blocked',
+      href: '/swarm2',
+    })
+  })
+
   it('parses log tail with error/warn detection', async () => {
     const fetcher = makeFetcher({
       '/api/logs': {
@@ -441,6 +507,7 @@ describe('buildDashboardOverview', () => {
     expect(overview.status?.version).toBeNull()
     expect(overview.status?.configVersion).toBeNull()
     expect(overview.cron?.total).toBe(1)
+    expect(overview.kanban).toBeNull()
     expect(overview.achievements).toBeNull()
     expect(overview.modelInfo).toBeNull()
     expect(overview.analytics).toBeNull()

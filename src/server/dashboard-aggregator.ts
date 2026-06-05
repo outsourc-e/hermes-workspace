@@ -20,6 +20,7 @@ export type DashboardOverview = {
   status: DashboardStatusSection | null
   platforms: Array<DashboardPlatformEntry>
   cron: DashboardCronSection | null
+  kanban: DashboardKanbanSection | null
   achievements: DashboardAchievementsSection | null
   modelInfo: DashboardModelInfoSection | null
   analytics: DashboardAnalyticsSection | null
@@ -53,7 +54,7 @@ export type DashboardInsight = {
 export type DashboardIncident = {
   id: string
   severity: 'info' | 'warn' | 'error'
-  source: 'cron' | 'platform' | 'log' | 'config' | 'gateway'
+  source: 'cron' | 'kanban' | 'platform' | 'log' | 'config' | 'gateway'
   label: string
   detail: string
   href: string | null
@@ -78,7 +79,7 @@ export type DashboardStatusSection = {
   activeSessions: number
   /**
    * Canonical "currently running" number from gateway runtime status
-   * (​`/health/detailed` -> `active_agents`). Falls back to legacy
+   * (`/health/detailed` -> `active_agents`). Falls back to legacy
    * `active_sessions` when `/health/detailed` is unreachable.
    */
   activeAgents: number
@@ -117,6 +118,22 @@ export type DashboardCronSection = {
     name: string
     lastError: string | null
     lastRunAt: string | null
+  }>
+}
+
+export type DashboardKanbanSection = {
+  total: number
+  triage: number
+  todo: number
+  ready: number
+  running: number
+  blocked: number
+  done: number
+  other: number
+  topBlocked: Array<{
+    id: string
+    title: string
+    assignee: string | null
   }>
 }
 
@@ -349,7 +366,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.last_error === 'string'
         ? j.last_error
         : typeof j.last_delivery_error === 'string'
-          ? (j.last_delivery_error as string)
+          ? (j.last_delivery_error)
           : null
     const isFailure =
       lastStatus === 'failed' ||
@@ -367,9 +384,9 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.next_run_at === 'string' ? Date.parse(j.next_run_at) : NaN,
       typeof j.next_run === 'string' ? Date.parse(j.next_run) : NaN,
       typeof j.next_run_at === 'number'
-        ? (j.next_run_at as number) * 1000
+        ? (j.next_run_at) * 1000
         : NaN,
-    ].filter((v) => Number.isFinite(v)) as Array<number>
+    ].filter((v) => Number.isFinite(v))
     for (const ts of candidates) {
       if (nextRunMs === null || ts < nextRunMs) nextRunMs = ts
     }
@@ -382,6 +399,62 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
     nextRunAt: nextRunMs ? new Date(nextRunMs).toISOString() : null,
     recentFailures: recentFailures.slice(0, 5),
   }
+}
+
+function normalizeKanban(raw: unknown): DashboardKanbanSection | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const columnsRaw = Array.isArray(r.columns) ? r.columns : null
+  if (!columnsRaw) return null
+
+  const out: DashboardKanbanSection = {
+    total: 0,
+    triage: 0,
+    todo: 0,
+    ready: 0,
+    running: 0,
+    blocked: 0,
+    done: 0,
+    other: 0,
+    topBlocked: [],
+  }
+
+  const bucketFor = (status: string): keyof Pick<
+    DashboardKanbanSection,
+    'triage' | 'todo' | 'ready' | 'running' | 'blocked' | 'done' | 'other'
+  > => {
+    const s = status.toLowerCase()
+    if (s === 'triage') return 'triage'
+    if (s === 'todo' || s === 'queued') return 'todo'
+    if (s === 'ready') return 'ready'
+    if (s === 'running' || s === 'claimed' || s === 'in_progress') return 'running'
+    if (s === 'blocked') return 'blocked'
+    if (s === 'done' || s === 'completed' || s === 'complete') return 'done'
+    return 'other'
+  }
+
+  for (const column of columnsRaw) {
+    if (!column || typeof column !== 'object') continue
+    const c = column as Record<string, unknown>
+    const columnName = readString(c.name || c.id || c.status)
+    const tasks = Array.isArray(c.tasks) ? c.tasks : []
+    for (const task of tasks) {
+      if (!task || typeof task !== 'object') continue
+      const t = task as Record<string, unknown>
+      const bucket = bucketFor(readString(t.status) || columnName)
+      out.total += 1
+      out[bucket] += 1
+      if (bucket === 'blocked' && out.topBlocked.length < 5) {
+        out.topBlocked.push({
+          id: readString(t.id) || 'unknown',
+          title: readString(t.title) || readString(t.name) || 'Untitled task',
+          assignee: readOptionalString(t.assignee),
+        })
+      }
+    }
+  }
+
+  return out
 }
 
 function normalizeAchievementUnlock(
@@ -400,7 +473,7 @@ function normalizeAchievementUnlock(
     icon: readString(r.icon) || 'Star',
     tier: typeof r.tier === 'string' ? r.tier : null,
     unlockedAt:
-      typeof r.unlocked_at === 'number' ? (r.unlocked_at as number) : null,
+      typeof r.unlocked_at === 'number' ? (r.unlocked_at) : null,
   }
 }
 
@@ -475,7 +548,7 @@ function normalizeSkillsUsage(
         percentage: readNumber(e.percentage),
         lastUsedAt:
           typeof e.last_used_at === 'number'
-            ? (e.last_used_at as number)
+            ? (e.last_used_at)
             : null,
       }
     })
@@ -718,7 +791,7 @@ function formatTokensCompact(n: number): string {
  */
 function shortSkillName(raw: string): string {
   if (!raw) return raw
-  const segments = raw.split(/[:\/]/)
+  const segments = raw.split(/[:/]/)
   return segments[segments.length - 1] || raw
 }
 
@@ -743,6 +816,7 @@ function computeInsights(
   cron: DashboardCronSection | null,
   status: DashboardStatusSection | null,
   skills: DashboardSkillsUsageSection | null,
+  kanban: DashboardKanbanSection | null,
 ): Array<DashboardInsight> {
   const out: Array<DashboardInsight> = []
   if (!analytics || analytics.source !== 'analytics') return out
@@ -761,8 +835,10 @@ function computeInsights(
       }
     }
     if (peakVal > 0) {
-      const top = analytics.topModels[0]
-      const driver = top ? `, driven by ${shortModelName(top.id)}` : ''
+      const driver =
+        analytics.topModels.length > 0
+          ? `, driven by ${shortModelName(analytics.topModels[0].id)}`
+          : ''
       const peakDay = analytics.daily[peakIdx].day
       const todayIso = new Date().toISOString().slice(0, 10)
       peakIsToday = peakDay === todayIso
@@ -818,6 +894,11 @@ function computeInsights(
     ops.push('no active runs')
   }
   if (status?.restartRequested) ops.push('restart pending')
+  if (kanban && kanban.blocked > 0) {
+    ops.push(
+      `${kanban.blocked} blocked kanban task${kanban.blocked === 1 ? '' : 's'}`,
+    )
+  }
   if (ops.length > 0) {
     out.push({
       tone: ops.length >= 2 ? 'warn' : 'info',
@@ -845,6 +926,7 @@ function computeIncidents(
   platforms: Array<DashboardPlatformEntry>,
   cron: DashboardCronSection | null,
   logs: DashboardLogsSection | null,
+  kanban: DashboardKanbanSection | null,
 ): Array<DashboardIncident> {
   const out: Array<DashboardIncident> = []
   // Cron failures
@@ -886,6 +968,17 @@ function computeIncidents(
         href: '/jobs',
       })
     }
+  }
+  // Kanban blockers
+  if (kanban && kanban.blocked > 0) {
+    out.push({
+      id: 'kanban-blocked',
+      severity: 'warn',
+      source: 'kanban',
+      label: `${kanban.blocked} kanban task${kanban.blocked === 1 ? '' : 's'} blocked`,
+      detail: kanban.topBlocked.map((t) => t.title).join(' · ') || 'blocked cards need attention',
+      href: '/swarm2',
+    })
   }
   // Platform errors
   for (const p of platforms) {
@@ -1008,6 +1101,7 @@ export async function buildDashboardOverview(
     achAllRaw,
     modelInfoRaw,
     analyticsRaw,
+    kanbanRaw,
     logsRaw,
   ] = await Promise.all([
     safeJson<unknown>(fetcher, '/api/status'),
@@ -1025,6 +1119,7 @@ export async function buildDashboardOverview(
       fetcher,
       `/api/analytics/usage?days=${analyticsWindowDays}`,
     ),
+    safeJson<unknown>(fetcher, '/api/plugins/kanban/board'),
     safeJson<unknown>(fetcher, `/api/logs?lines=${logsLimit}`),
   ])
 
@@ -1032,15 +1127,17 @@ export async function buildDashboardOverview(
   const platforms = normalizePlatforms(statusRaw)
   const cron = normalizeCron(cronRaw)
   const analytics = normalizeAnalytics(analyticsRaw, analyticsWindowDays)
+  const kanban = normalizeKanban(kanbanRaw)
   const logs = normalizeLogs(logsRaw, logsLimit)
   const skillsUsage = normalizeSkillsUsage(analyticsRaw)
-  const insights = computeInsights(analytics, cron, status, skillsUsage)
-  const incidents = computeIncidents(status, platforms, cron, logs)
+  const insights = computeInsights(analytics, cron, status, skillsUsage, kanban)
+  const incidents = computeIncidents(status, platforms, cron, logs, kanban)
 
   return {
     status,
     platforms,
     cron,
+    kanban,
     achievements: normalizeAchievements(
       achRecentRaw,
       achAllRaw,

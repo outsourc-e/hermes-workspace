@@ -1032,6 +1032,7 @@ export function DashboardScreen() {
       <OpsStrip
         status={overview?.status ?? null}
         cron={overview?.cron ?? null}
+        kanban={overview?.kanban ?? null}
         platforms={overview?.platforms ?? []}
       />
 
