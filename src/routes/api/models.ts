@@ -111,6 +111,20 @@ function readClaudeModelsJson(): Array<ModelEntry> {
 
 const DEFAULT_ACCEPTED_TIMEOUT_S = 120
 const DEFAULT_HANDOFF_TIMEOUT_S = 300
+const LIVE_MODEL_CACHE_TTL_MS = 60_000
+
+type LiveModelEndpoint = {
+  provider: string
+  baseUrl: string
+  apiKey?: string
+}
+
+type LiveModelCacheEntry = {
+  expiresAt: number
+  models: Array<ModelEntry>
+}
+
+const liveModelCache = new Map<string, LiveModelCacheEntry>()
 
 function readStreamTimeouts(): { streamAcceptedTimeoutMs: number; streamHandoffTimeoutMs: number } {
   let acceptedS = DEFAULT_ACCEPTED_TIMEOUT_S
@@ -174,6 +188,127 @@ function readClaudeDefaultModel(): ModelEntry | null {
  * from ~/.hermes/config.yaml so the picker reflects the user's full Hermes
  * catalog, not just /v1/models + models.json + local discovery. Fix for #569.
  */
+function resolveConfiguredSecret(value: unknown): string {
+  const raw = readString(value)
+  if (!raw) return ''
+  const envMatch = raw.match(/^\$\{?([A-Z0-9_]+)\}?$/i)
+  if (envMatch) return process.env[envMatch[1]] ?? ''
+  return raw
+}
+
+function normalizeConfiguredBaseUrl(value: unknown): string {
+  const raw = readString(value)
+  if (!raw) return ''
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
+    url.hash = ''
+    url.search = ''
+    return url.toString().replace(/\/+$/, '')
+  } catch {
+    return ''
+  }
+}
+
+function modelsUrlForBase(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, '')
+  return trimmed.endsWith('/v1') ? `${trimmed}/models` : `${trimmed}/v1/models`
+}
+
+function readConfiguredLiveModelEndpoints(): Array<LiveModelEndpoint> {
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) return []
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
+    const parsed = YAML.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return []
+    const config = parsed as Record<string, unknown>
+    const endpoints: Array<LiveModelEndpoint> = []
+    const seen = new Set<string>()
+
+    const pushEndpoint = (provider: string, block: Record<string, unknown>) => {
+      const baseUrl =
+        normalizeConfiguredBaseUrl(block.base_url) ||
+        normalizeConfiguredBaseUrl(block.baseUrl) ||
+        normalizeConfiguredBaseUrl(block.api_base) ||
+        normalizeConfiguredBaseUrl(block.apiBase)
+      if (!baseUrl) return
+      const apiKey =
+        resolveConfiguredSecret(block.api_key) ||
+        resolveConfiguredSecret(block.apiKey) ||
+        resolveConfiguredSecret(block.token) ||
+        resolveConfiguredSecret(block.api_key_env ? process.env[readString(block.api_key_env)] : '')
+      const key = `${provider}\u0000${baseUrl}`
+      if (seen.has(key)) return
+      seen.add(key)
+      endpoints.push({ provider, baseUrl, apiKey: apiKey || undefined })
+    }
+
+    const modelBlock = asRecord(config.model)
+    pushEndpoint(readString(modelBlock.provider) || readString(config.provider) || 'configured', modelBlock)
+
+    const providers = asRecord(config.providers)
+    for (const [providerId, value] of Object.entries(providers)) {
+      pushEndpoint(providerId, asRecord(value))
+    }
+
+    return endpoints
+  } catch {
+    return []
+  }
+}
+
+async function fetchConfiguredLiveModels(): Promise<Array<ModelEntry>> {
+  const endpoints = readConfiguredLiveModelEndpoints()
+  if (endpoints.length === 0) return []
+
+  const all: Array<ModelEntry> = []
+  for (const endpoint of endpoints) {
+    const cacheKey = `${endpoint.provider}\u0000${endpoint.baseUrl}`
+    const cached = liveModelCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+      all.push(...cached.models)
+      continue
+    }
+
+    let models: Array<ModelEntry> = []
+    try {
+      const headers: Record<string, string> = { accept: 'application/json' }
+      if (endpoint.apiKey) headers.authorization = `Bearer ${endpoint.apiKey}`
+      const response = await fetch(modelsUrlForBase(endpoint.baseUrl), {
+        headers,
+        signal: AbortSignal.timeout(3_000),
+      })
+      const contentType = response.headers.get('content-type') ?? ''
+      if (response.ok && contentType.toLowerCase().includes('application/json')) {
+        const payload = asRecord(await response.json())
+        const rawModels = Array.isArray(payload.data)
+          ? payload.data
+          : Array.isArray(payload.models)
+            ? payload.models
+            : []
+        models = rawModels
+          .map(normalizeModel)
+          .filter((entry): entry is ModelEntry => entry !== null)
+          .map((entry) => ({
+            ...entry,
+            provider: readString(entry.provider) || endpoint.provider,
+            source: 'live-proxy',
+          }))
+      }
+    } catch {
+      models = []
+    }
+
+    liveModelCache.set(cacheKey, {
+      expiresAt: Date.now() + LIVE_MODEL_CACHE_TTL_MS,
+      models,
+    })
+    all.push(...models)
+  }
+
+  return all
+}
+
 function readClaudeConfigCatalog(): Array<ModelEntry> {
   try {
     if (!fs.existsSync(CONFIG_PATH)) return []
@@ -312,6 +447,16 @@ export const Route = createFileRoute('/api/models')({
             const hermesModels = await fetchClaudeModels()
             models = mergeModelEntries(models, hermesModels)
             source = source === 'models.json' ? 'models.json+hermes-agent' : 'hermes-agent'
+          }
+
+          // Merge live OpenAI-compatible catalogs from base_url entries that
+          // already exist in config.yaml. This keeps API keys and proxy URLs on
+          // the server while restoring dynamic model discovery for configured
+          // upstream proxies. Fix for #473.
+          const liveProxyModels = await fetchConfiguredLiveModels()
+          if (liveProxyModels.length > 0) {
+            models = mergeModelEntries(models, liveProxyModels)
+            source = `${source}+live-proxy`
           }
 
           // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)
