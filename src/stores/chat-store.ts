@@ -140,6 +140,11 @@ type ChatState = {
   clearSessionWaiting: (sessionKey: string) => void
   /** Check if a session is waiting for a response */
   isSessionWaiting: (sessionKey: string) => boolean
+
+  /** Last activity description forwarded via heartbeat — used by ThinkingBubble
+   *  to show meaningful progress during long reasoning stretches */
+  heartbeatActivity: string | null
+  setHeartbeatActivity: (activity: string | null) => void
 }
 
 const createEmptyStreamingState = (): StreamingState => ({
@@ -641,6 +646,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendStreamRunIds: new Set(),
   waitingSessionKeys: _restoredWaiting.keys,
   waitingSessionMeta: _restoredWaiting.meta,
+  heartbeatActivity: null,
 
   setConnectionState: (connectionState, error) => {
     set({ connectionState, lastError: error ?? null })
@@ -685,6 +691,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   isSessionWaiting: (sessionKey) => {
     return get().waitingSessionKeys.has(sessionKey)
+  },
+
+  setHeartbeatActivity: (activity) => {
+    set({ heartbeatActivity: activity })
   },
 
   processEvent: (event) => {
@@ -893,6 +903,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         if (duplicateIndex === -1) {
+          // Multiple message.started events from the agent create distinct
+          // realtime entries with empty content. Replace the previous empty
+          // assistant message instead of appending — prevents "3 individual
+          // messages then one final" bug where each tool phase looks like a
+          // separate assistant bubble.
+          if (
+            incomingMessage.role === 'assistant' &&
+            newPlainText.length === 0 &&
+            sessionMessages.length > 0
+          ) {
+            const prevEmptyIdx = sessionMessages.findLastIndex(
+              (m) =>
+                m.role === 'assistant' &&
+                extractMessageText(m).length === 0,
+            )
+            if (prevEmptyIdx >= 0) {
+              sessionMessages[prevEmptyIdx] = incomingMessage
+              messages.set(
+                sessionKey,
+                sortMessagesChronologically(sessionMessages),
+              )
+              set({ realtimeMessages: messages, lastEventAt: now })
+              break
+            }
+          }
           sessionMessages.push(incomingMessage)
           messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
           set({ realtimeMessages: messages, lastEventAt: now })
@@ -1209,6 +1244,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (histMsg.role === rtMsg.role && rtText) {
         const histText = extractMessageText(histMsg)
         if (histText === rtText) return true
+        // Streaming realtime text is a prefix of the final server text.
+        // Match either direction to prevent duplicates when the server
+        // returns the complete message after the realtime buffer had a
+        // partial version.
+        if (rtText.length > 0 && histText.length > 0) {
+          if (histText.startsWith(rtText) || rtText.startsWith(histText)) return true
+        }
       }
 
       const histRaw = histMsg as Record<string, unknown>

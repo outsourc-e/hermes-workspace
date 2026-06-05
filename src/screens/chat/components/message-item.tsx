@@ -7,6 +7,11 @@ import {
   textFromMessage,
 } from '../utils'
 import { MessageActionsBar } from './message-actions-bar'
+import {
+  buildHermesActivitySummary,
+  shouldAutoExpandHermesActivityCard,
+} from './streaming-activity-ui'
+import { TuiActivityCard } from './tui-activity-card'
 import type { ChatAttachment, ChatMessage, ToolCallContent } from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
@@ -31,11 +36,6 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
-import {
-  buildHermesActivitySummary,
-  shouldAutoExpandHermesActivityCard,
-} from './streaming-activity-ui'
-import { TuiActivityCard } from './tui-activity-card'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -2503,21 +2503,29 @@ function MessageItemComponent({
       {/* Grouped tool card above the assistant bubble. Only show once there
           is real assistant text in the bubble. While streaming with no text,
           the legacy ThinkingBubble in chat-message-list owns the visual and
-          renders its own branched TuiActivityCard so we don't double up. */}
+          renders its own branched TuiActivityCard so we don't double up.
+          When done streaming, show a compact tool-count chip instead of
+          the full expandable card. */}
       {!isUser &&
       finalToolSections.length > 0 &&
       (hasText || !effectiveIsStreaming) ? (
         <div className="w-full max-w-[var(--chat-content-max-width)] flex">
           <div className="w-6 shrink-0" aria-hidden />
           <div className="min-w-0 flex-1">
-            <TuiActivityCard
-              toolSections={finalToolSections}
-              thinking={null}
-              isStreaming={effectiveIsStreaming}
-              expandAll={expandAllToolSections}
-              formatLabel={formatToolDisplayLabel}
-              formatArg={keyArgLabel}
-            />
+            {effectiveIsStreaming ? (
+              <TuiActivityCard
+                toolSections={finalToolSections}
+                thinking={null}
+                isStreaming={effectiveIsStreaming}
+                expandAll={expandAllToolSections}
+                formatLabel={formatToolDisplayLabel}
+                formatArg={keyArgLabel}
+              />
+            ) : (
+              <span className="inline-block text-[11px] text-primary-400 dark:text-primary-500 py-0.5 opacity-60">
+                {finalToolSections.length} tool{finalToolSections.length !== 1 ? 's' : ''} used
+              </span>
+            )}
           </div>
         </div>
       ) : null}

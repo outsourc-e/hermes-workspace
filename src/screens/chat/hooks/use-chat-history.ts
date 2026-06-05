@@ -702,11 +702,19 @@ function mergeOptimisticHistoryMessages(
     }
 
     // Preserve unconfirmed optimistic messages regardless of age.
+    // Also preserve confirmed-sent messages that have a clientId but no
+    // server id yet — they were acknowledged by SSE (onStarted) but
+    // haven't been echoed by the server. Periodic refetches will drop
+    // them otherwise (the "user message disappears" bug).
     const isSending =
       optimisticMessage.status === 'sending' ||
       Boolean(optimisticMessage.__optimisticId)
+    const isSentButUnechoed =
+      optimisticMessage.status === 'sent' &&
+      Boolean(getMessageClientId(optimisticMessage)) &&
+      !optimisticMessage.id
 
-    if (isSending) {
+    if (isSending || isSentButUnechoed) {
       merged.push(optimisticMessage)
     }
   }
