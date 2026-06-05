@@ -38,11 +38,11 @@ type AgentBusPayload = {
     checked_at?: string
     registry_last_updated?: string
     summary?: AgentBusSummary
-    agents?: AgentBusAgent[]
+    agents?: Array<AgentBusAgent>
   }
   events?: Array<Record<string, unknown>>
-  missions?: AgentBusMission[]
-  issues?: AgentBusAgent[]
+  missions?: Array<AgentBusMission>
+  issues?: Array<AgentBusAgent>
   reportPreview?: string
 }
 
