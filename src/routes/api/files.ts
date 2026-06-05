@@ -355,8 +355,9 @@ export const Route = createFileRoute('/api/files')({
             )
             const isDir = (await fs.stat(resolvedTarget)).isDirectory()
             const destination = isDir
-              ? path.join(resolvedTarget, file.name)
+              ? path.join(resolvedTarget, path.basename(file.name))
               : resolvedTarget
+            ensureWorkspacePath(destination, workspaceRoot)
             await fs.mkdir(path.dirname(destination), { recursive: true })
             const buffer = Buffer.from(await file.arrayBuffer())
             await fs.writeFile(destination, buffer)
