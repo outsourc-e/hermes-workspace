@@ -12,8 +12,8 @@ import {
 import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
 import {
   ensureDiscovery,
-  getDiscoveredModels,
   ensureProviderInConfig,
+  getDiscoveredModels,
 } from '../../server/local-provider-discovery'
 
 const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
@@ -170,6 +170,87 @@ function readClaudeDefaultModel(): ModelEntry | null {
 }
 
 /**
+ * Read providers.*.models (+ provider default model) and model_aliases
+ * from ~/.hermes/config.yaml so the picker reflects the user's full Hermes
+ * catalog, not just /v1/models + models.json + local discovery. Fix for #569.
+ */
+function readClaudeConfigCatalog(): Array<ModelEntry> {
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) return []
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
+    const parsed = YAML.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return []
+    const config = parsed as Record<string, unknown>
+    const out: Array<ModelEntry> = []
+    const seen = new Set<string>()
+
+    const pushEntry = (entry: ModelEntry) => {
+      if (!entry.id || seen.has(entry.id)) return
+      out.push(entry)
+      seen.add(entry.id)
+    }
+
+    const providers = asRecord(config.providers)
+    for (const [providerId, value] of Object.entries(providers)) {
+      const providerBlock = asRecord(value)
+      const providerModels = providerBlock.models
+      if (Array.isArray(providerModels)) {
+        for (const modelEntry of providerModels) {
+          if (typeof modelEntry === 'string') {
+            const id = modelEntry.trim()
+            if (!id) continue
+            pushEntry({ id, name: id, provider: providerId })
+          } else {
+            const record = asRecord(modelEntry)
+            const id =
+              readString(record.id) ||
+              readString(record.model) ||
+              readString(record.name)
+            if (!id) continue
+            pushEntry({
+              id,
+              name: readString(record.name) || id,
+              provider: readString(record.provider) || providerId,
+            })
+          }
+        }
+      }
+      const providerDefault =
+        readString(providerBlock.model) || readString(providerBlock.default)
+      if (providerDefault) {
+        pushEntry({
+          id: providerDefault,
+          name: providerDefault,
+          provider: providerId,
+        })
+      }
+    }
+
+    const aliases = asRecord(config.model_aliases)
+    for (const [alias, target] of Object.entries(aliases)) {
+      const aliasId = alias.trim()
+      if (!aliasId) continue
+      const targetStr = typeof target === 'string' ? target.trim() : ''
+      const provider =
+        targetStr && targetStr.includes('/')
+          ? targetStr.split('/')[0]
+          : 'alias'
+      pushEntry({
+        id: aliasId,
+        name: targetStr ? `${aliasId} → ${targetStr}` : aliasId,
+        provider,
+        alias: true,
+        target: targetStr || undefined,
+      })
+    }
+
+    return out
+  } catch {
+    return []
+  }
+}
+
+/**
  * Fallback: fetch models from the hermes-agent /v1/models endpoint.
  */
 async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
@@ -208,6 +289,19 @@ export const Route = createFileRoute('/api/models')({
           if (defaultModel) {
             models = models.filter((m) => m.id !== defaultModel.id)
             models.unshift(defaultModel)
+          }
+
+          // Merge providers.*.models + provider defaults + model_aliases
+          // from ~/.hermes/config.yaml so the picker reflects the user's full
+          // Hermes catalog, not just /v1/models + models.json + local discovery.
+          // Fix for #569.
+          const configModels = readClaudeConfigCatalog()
+          if (configModels.length > 0) {
+            models = mergeModelEntries(models, configModels)
+            source =
+              source === 'models.json'
+                ? 'models.json+config.yaml'
+                : `${source}+config.yaml`
           }
 
           // Merge the authoritative Hermes model catalog whenever it is
