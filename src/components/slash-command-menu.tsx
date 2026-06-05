@@ -57,7 +57,7 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   // Tools & skills
   { command: '/skills', description: 'Browse and manage skills' },
   { command: '/skill <name>', description: 'Load a skill into session' },
-  { command: '/plugins', description: 'List installed plugins' },
+  { command: '/plugins', description: 'List installed plugins and their status' },
   { command: '/mcp', description: 'Manage MCP servers' },
   { command: '/cron', description: 'Manage cron jobs' },
   { command: '/kanban', description: 'Kanban collaboration board' },
