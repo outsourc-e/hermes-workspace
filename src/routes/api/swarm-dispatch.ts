@@ -888,8 +888,8 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     const useWrapper = existsSync(wrapperPath)
     const cmd = useWrapper ? wrapperPath : resolveHermesBin()
     const args = useWrapper
-      ? ['chat', '-q', '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch', prompt]
-      : ['chat', '-q', '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
+      ? ['chat', '-Q', '-q', prompt, '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
+      : ['chat', '-Q', '-q', prompt, '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       HERMES_HOME: profilePath,

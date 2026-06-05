@@ -81,6 +81,8 @@ export function resolveClaudeAgentDir(
 /** Find the `claude` CLI binary installed by Nous's installer (or on PATH). */
 export function resolveClaudeBinary(): string | null {
   const candidates = [
+    resolve(homedir(), '.local', 'bin', 'hermes'),
+    resolve(homedir(), '.hermes', 'bin', 'hermes'),
     resolve(homedir(), '.claude', 'bin', 'claude'),
     resolve(homedir(), '.local', 'bin', 'claude'),
   ]
