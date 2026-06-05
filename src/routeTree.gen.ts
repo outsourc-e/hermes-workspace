@@ -123,6 +123,8 @@ import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiRunsActiveRouteImport } from './routes/api/runs/active'
 import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
+import { Route as ApiProfilesToggleSkillRouteImport } from './routes/api/profiles/toggle-skill'
+import { Route as ApiProfilesSkillsRouteImport } from './routes/api/profiles/skills'
 import { Route as ApiProfilesRenameRouteImport } from './routes/api/profiles/rename'
 import { Route as ApiProfilesReadRouteImport } from './routes/api/profiles/read'
 import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
@@ -734,6 +736,16 @@ const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
   path: '/api/profiles/update',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProfilesToggleSkillRoute = ApiProfilesToggleSkillRouteImport.update({
+  id: '/api/profiles/toggle-skill',
+  path: '/api/profiles/toggle-skill',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfilesSkillsRoute = ApiProfilesSkillsRouteImport.update({
+  id: '/api/profiles/skills',
+  path: '/api/profiles/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProfilesRenameRoute = ApiProfilesRenameRouteImport.update({
   id: '/api/profiles/rename',
   path: '/api/profiles/rename',
@@ -1071,6 +1083,8 @@ export interface FileRoutesByFullPath {
   '/api/profiles/list': typeof ApiProfilesListRoute
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
+  '/api/profiles/skills': typeof ApiProfilesSkillsRoute
+  '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
@@ -1225,6 +1239,8 @@ export interface FileRoutesByTo {
   '/api/profiles/list': typeof ApiProfilesListRoute
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
+  '/api/profiles/skills': typeof ApiProfilesSkillsRoute
+  '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
@@ -1381,6 +1397,8 @@ export interface FileRoutesById {
   '/api/profiles/list': typeof ApiProfilesListRoute
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
+  '/api/profiles/skills': typeof ApiProfilesSkillsRoute
+  '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
@@ -1538,6 +1556,8 @@ export interface FileRouteTypes {
     | '/api/profiles/list'
     | '/api/profiles/read'
     | '/api/profiles/rename'
+    | '/api/profiles/skills'
+    | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
     | '/api/runs/active'
     | '/api/sessions/send'
@@ -1692,6 +1712,8 @@ export interface FileRouteTypes {
     | '/api/profiles/list'
     | '/api/profiles/read'
     | '/api/profiles/rename'
+    | '/api/profiles/skills'
+    | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
     | '/api/runs/active'
     | '/api/sessions/send'
@@ -1847,6 +1869,8 @@ export interface FileRouteTypes {
     | '/api/profiles/list'
     | '/api/profiles/read'
     | '/api/profiles/rename'
+    | '/api/profiles/skills'
+    | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
     | '/api/runs/active'
     | '/api/sessions/send'
@@ -1985,6 +2009,8 @@ export interface RootRouteChildren {
   ApiProfilesListRoute: typeof ApiProfilesListRoute
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
+  ApiProfilesSkillsRoute: typeof ApiProfilesSkillsRoute
+  ApiProfilesToggleSkillRoute: typeof ApiProfilesToggleSkillRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
   ApiRunsActiveRoute: typeof ApiRunsActiveRoute
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
@@ -2793,6 +2819,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProfilesUpdateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/profiles/toggle-skill': {
+      id: '/api/profiles/toggle-skill'
+      path: '/api/profiles/toggle-skill'
+      fullPath: '/api/profiles/toggle-skill'
+      preLoaderRoute: typeof ApiProfilesToggleSkillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/skills': {
+      id: '/api/profiles/skills'
+      path: '/api/profiles/skills'
+      fullPath: '/api/profiles/skills'
+      preLoaderRoute: typeof ApiProfilesSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/profiles/rename': {
       id: '/api/profiles/rename'
       path: '/api/profiles/rename'
@@ -3397,6 +3437,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesListRoute: ApiProfilesListRoute,
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
+  ApiProfilesSkillsRoute: ApiProfilesSkillsRoute,
+  ApiProfilesToggleSkillRoute: ApiProfilesToggleSkillRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
   ApiRunsActiveRoute: ApiRunsActiveRoute,
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
