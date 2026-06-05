@@ -679,6 +679,7 @@ function logCapabilities(next: GatewayCapabilities): void {
   const core: Array<string> = []
   const enhanced: Array<string> = []
   const missing: Array<string> = []
+  const optionalMissing: Array<string> = []
 
   const coreKeys: Array<keyof CoreCapabilities> = [
     'health',
@@ -698,16 +699,20 @@ function logCapabilities(next: GatewayCapabilities): void {
   ]
 
   for (const key of coreKeys) {
-    ;(next[key] ? core : missing).push(key)
+    if (next[key]) core.push(key)
+    else if (OPTIONAL_APIS.has(key)) optionalMissing.push(key)
+    else missing.push(key)
   }
   for (const key of enhancedKeys) {
-    ;(next[key] ? enhanced : missing).push(key)
+    if (next[key]) enhanced.push(key)
+    else if (OPTIONAL_APIS.has(key)) optionalMissing.push(key)
+    else missing.push(key)
   }
   if (next.dashboard.available) core.push('dashboard')
-  else missing.push('dashboard')
+  else optionalMissing.push('dashboard')
 
   const mode = getGatewayMode()
-  const summary = `[gateway] gateway=${CLAUDE_API} dashboard=${next.dashboard.url} mode=${mode} core=[${core.join(', ')}] enhanced=[${enhanced.join(', ')}] missing=[${missing.join(', ')}]`
+  const summary = `[gateway] gateway=${CLAUDE_API} dashboard=${next.dashboard.url} mode=${mode} core=[${core.join(', ')}] enhanced=[${enhanced.join(', ')}] missing=[${missing.join(', ')}] optional=[${optionalMissing.join(', ')}]`
   if (summary === lastLoggedSummary) return
   lastLoggedSummary = summary
   console.log(summary)
