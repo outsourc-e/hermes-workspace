@@ -1,5 +1,5 @@
-import { execFile, execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { execFile, execFileSync, spawn, type ChildProcess } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, statSync, appendFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
@@ -141,15 +141,82 @@ export function getSwarmLifecycleStatus(workerId: string, policy = DEFAULT_POLIC
   }
 }
 
-function tmuxBin(): string {
+// ═══════════════════════════════════════════════════════════════
+// Cross-platform worker process management
+// Replaces tmux with native child_process.spawn so workers run on Windows.
+// On Linux/macOS with tmux available, falls back to the tmux path.
+// ═══════════════════════════════════════════════════════════════
+
+// Active worker processes keyed by workerId
+const workerProcesses = new Map<string, ChildProcess>()
+
+function isWindows(): boolean {
+  return process.platform === 'win32'
+}
+
+function workerLogPath(workerId: string): string {
+  const dir = join(getProfilesDir(), workerId, 'logs')
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  return join(dir, 'worker.log')
+}
+
+function appendWorkerLog(workerId: string, text: string): void {
+  try {
+    appendFileSync(workerLogPath(workerId), text + '\n', 'utf8')
+  } catch {
+    // best-effort logging
+  }
+}
+
+function tmuxBin(): string | null {
+  if (isWindows()) return null
   const local = join(homedir(), '.local', 'bin', 'tmux')
   return existsSync(local) ? local : 'tmux'
+}
+
+function hasTmux(): boolean {
+  if (isWindows()) return false
+  try {
+    execFileSync(tmuxBin()!, ['list-sessions'], { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Use native process spawn on Windows, tmux on Linux/macOS when available
+function useNativeProcess(): boolean {
+  return isWindows() || !hasTmux()
+}
+
+/** Send a prompt to a worker's stdin (native) or tmux pane (Unix fallback) */
+export function sendToWorker(workerId: string, prompt: string): Promise<{ ok: boolean; error?: string }> {
+  if (useNativeProcess()) {
+    return sendToWorkerProcess(workerId, prompt)
+  }
+  return sendTmux(workerId, prompt)
+}
+
+function sendToWorkerProcess(workerId: string, prompt: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const proc = workerProcesses.get(workerId)
+    if (!proc || !proc.stdin?.writable) {
+      resolve({ ok: false, error: `Worker ${workerId} process not running or stdin not writable` })
+      return
+    }
+    appendWorkerLog(workerId, `[dispatch] ${prompt}`)
+    proc.stdin.write(prompt + '\n', (err) => {
+      if (err) resolve({ ok: false, error: err.message })
+      else resolve({ ok: true })
+    })
+  })
 }
 
 function sendTmux(workerId: string, prompt: string): Promise<{ ok: boolean; error?: string }> {
   const session = `swarm-${workerId}`
   return new Promise((resolve) => {
     const tmux = tmuxBin()
+    if (!tmux) return resolve({ ok: false, error: 'tmux not available on this platform' })
     const child = execFile(tmux, ['load-buffer', '-b', `swarm-lifecycle-${workerId}`, '-'], (loadErr, _stdout, stderr) => {
       if (loadErr) return resolve({ ok: false, error: stderr?.toString() || loadErr.message })
       execFile(tmux, ['send-keys', '-t', session, 'C-u'], () => {
@@ -164,6 +231,95 @@ function sendTmux(workerId: string, prompt: string): Promise<{ ok: boolean; erro
     })
     child.stdin?.end(prompt)
   })
+}
+
+async function killWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
+  const proc = workerProcesses.get(workerId)
+  if (!proc) return { ok: false, error: 'No active process' }
+  return new Promise((resolve) => {
+    proc.kill('SIGTERM')
+    const timeout = setTimeout(() => {
+      try { proc.kill('SIGKILL') } catch { /* */ }
+      workerProcesses.delete(workerId)
+      resolve({ ok: true })
+    }, 2000)
+    proc.on('exit', () => {
+      clearTimeout(timeout)
+      workerProcesses.delete(workerId)
+      resolve({ ok: true })
+    })
+  })
+}
+
+async function startWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
+  if (useNativeProcess()) {
+    return startWorkerProcessNative(workerId)
+  }
+  return tmuxStart(workerId)
+}
+
+async function stopWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
+  if (useNativeProcess()) {
+    return killWorkerProcess(workerId)
+  }
+  return tmuxKill(workerId)
+}
+
+function startWorkerProcessNative(workerId: string): { ok: boolean; error?: string } {
+  if (workerProcesses.has(workerId)) {
+    return { ok: false, error: `Worker ${workerId} already has an active process` }
+  }
+  
+  const profilesDir = getProfilesDir()
+  const profilePath = join(profilesDir, workerId)
+  if (!existsSync(profilePath)) {
+    return { ok: false, error: `Profile not found: ${profilePath}` }
+  }
+
+  // Build wrapper command: use hermes-agent CLI with the worker profile
+  const hermesCmd = process.env.HERMES_CLI_PATH || 'hermes'
+  const args = ['--tui', '--profile', workerId]
+  
+  const logPath = workerLogPath(workerId)
+  const logDir = join(profilePath, 'logs')
+  if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true })
+
+  const proc = spawn(hermesCmd, args, {
+    cwd: profilePath,
+    env: {
+      ...process.env,
+      HERMES_PROFILE: workerId,
+    },
+    detached: isWindows(), // Windows needs detached for independent process tree
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: isWindows(), // Don't show terminal window on Windows
+  })
+
+  if (!proc.pid) {
+    return { ok: false, error: 'Failed to spawn worker process' }
+  }
+
+  workerProcesses.set(workerId, proc)
+
+  // Log stdout/stderr
+  proc.stdout?.on('data', (data: Buffer) => {
+    appendWorkerLog(workerId, `[stdout] ${data.toString().trimEnd()}`)
+  })
+  proc.stderr?.on('data', (data: Buffer) => {
+    appendWorkerLog(workerId, `[stderr] ${data.toString().trimEnd()}`)
+  })
+
+  proc.on('exit', (code, signal) => {
+    appendWorkerLog(workerId, `[exit] code=${code} signal=${signal}`)
+    workerProcesses.delete(workerId)
+  })
+
+  proc.on('error', (err) => {
+    appendWorkerLog(workerId, `[error] ${err.message}`)
+    workerProcesses.delete(workerId)
+  })
+
+  return { ok: true }
 }
 
 function readRuntimeMissionContext(workerId: string): { missionId: string | null; assignmentId: string | null } {
@@ -184,8 +340,8 @@ export async function requestWorkerHandoff(workerId: string): Promise<{ ok: bool
   const hp = handoffPath(workerId)
   mkdirSync(dirname(hp), { recursive: true })
   const localHandoff = join(getProfilesDir(), workerId, 'memory', 'handoffs', 'latest.md')
-  const prompt = `CONTEXT_HANDOFF_REQUIRED. Stop current work and write a durable handoff.\n\nWrite the handoff to BOTH of these exact paths:\n${localHandoff}\n${hp}\n\nUse this template (fill it in, do not just copy):\n# Handoff — ${workerId} — <missionId>\n\nGenerated: <ISO timestamp>\n\n## Current state\n## Objective\n## Completed\n## In progress\n## Files touched\n## Commands run\n## Blockers\n## Next exact action\n## Resume prompt\nWhen this worker restarts, load this handoff and continue from \"Next exact action\".\n\nThen reply in the required checkpoint format:\nSTATE: HANDOFF\nFILES_CHANGED: exact files or none\nCOMMANDS_RUN: exact commands or none\nRESULT: concise current state and what landed\nBLOCKER: blocker or none\nNEXT_ACTION: exact next action after /new or restart\n\nDo not continue implementation until renewed.`
-  const sent = await sendTmux(workerId, prompt)
+  const prompt = `CONTEXT_HANDOFF_REQUIRED. Stop current work and write a durable handoff.\n\nWrite the handoff to BOTH of these exact paths:\n${localHandoff}\n${hp}\n\nUse this template (fill it in, do not just copy):\n# Handoff — ${workerId} — <missionId>\n\nGenerated: <ISO timestamp>\n\n## Current state\n## Objective\n## Completed\n## In progress\n## Files touched\n## Commands run\n## Blockers\n## Next exact action\n## Resume prompt\nWhen this worker restarts, load this handoff and continue from "Next exact action".\n\nThen reply in the required checkpoint format:\nSTATE: HANDOFF\nFILES_CHANGED: exact files or none\nCOMMANDS_RUN: exact commands or none\nRESULT: concise current state and what landed\nBLOCKER: blocker or none\nNEXT_ACTION: exact next action after /new or restart\n\nDo not continue implementation until renewed.`
+  const sent = await sendToWorker(workerId, prompt)
   const ctx = readRuntimeMissionContext(workerId)
   try {
     appendSwarmMemoryEvent({
@@ -245,17 +401,17 @@ export async function renewWorker(workerId: string): Promise<{ ok: boolean; rest
   if (!existsSync(hp)) {
     return { ok: false, restarted: false, resumeSent: false, error: 'Handoff missing; request handoff first', handoffPath: hp }
   }
-  const killed = await tmuxKill(workerId)
+  const killed = await stopWorkerProcess(workerId)
   if (!killed.ok) {
-    // Session may already be gone; continue.
+    // Process may already be gone; continue.
   }
   await new Promise((resolve) => setTimeout(resolve, 600))
-  const started = await tmuxStart(workerId)
+  const started = await startWorkerProcess(workerId)
   if (!started.ok) return { ok: false, restarted: false, resumeSent: false, error: started.error, handoffPath: hp }
   // Wait for shell prompt to appear before sending the resume message.
   await new Promise((resolve) => setTimeout(resolve, 1500))
   const resumePrompt = `RESUME_AFTER_HANDOFF. Read your latest handoff at ${hp} and the local copy under ~/.hermes/profiles/${workerId}/memory/handoffs/, plus your runtime.json, then continue from "Next exact action". Reply with a fresh checkpoint when you have re-grounded.`
-  const sent = await sendTmux(workerId, resumePrompt)
+  const sent = await sendToWorker(workerId, resumePrompt)
   const ctx = readRuntimeMissionContext(workerId)
   try {
     appendSwarmMemoryEvent({
