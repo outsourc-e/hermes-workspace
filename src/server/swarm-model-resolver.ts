@@ -58,6 +58,9 @@ export function resolveSwarmModelLabel(
   }
 
   // MiniMax
+  if (/^minimax(?:\s*m)?\s*3$|^minimax m?3$/.test(normalized)) {
+    return { provider: 'minimax', default: 'MiniMax-M3' }
+  }
   if (/^minimax(?:\s*m)?\s*2\.7$|^minimax m?2\.7$/.test(normalized)) {
     return { provider: 'minimax', default: 'MiniMax-M2.7' }
   }
