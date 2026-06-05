@@ -97,4 +97,45 @@ describe('listProfiles', () => {
     updateProfileConfig('builder', { description: null })
     expect(readProfile('builder').description).toBe('')
   })
+
+  it('surfaces system prompt from config or SOUL.md in profile summaries', () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const profilesRoot = path.join(hermesRoot, 'profiles')
+    const soulProfileRoot = path.join(profilesRoot, 'leelo')
+    const configProfileRoot = path.join(profilesRoot, 'ops')
+
+    fs.mkdirSync(soulProfileRoot, { recursive: true })
+    fs.mkdirSync(configProfileRoot, { recursive: true })
+
+    fs.writeFileSync(path.join(hermesRoot, 'config.yaml'), 'model: root-model\n', 'utf-8')
+    fs.writeFileSync(path.join(soulProfileRoot, 'config.yaml'), 'model: named-model\n', 'utf-8')
+    fs.writeFileSync(
+      path.join(soulProfileRoot, 'SOUL.md'),
+      'You are Leelo, executive assistant.',
+      'utf-8',
+    )
+    fs.writeFileSync(
+      path.join(configProfileRoot, 'config.yaml'),
+      'model: named-model\nsystem_prompt: Config prompt wins\n',
+      'utf-8',
+    )
+    fs.writeFileSync(
+      path.join(configProfileRoot, 'SOUL.md'),
+      'This should not override config',
+      'utf-8',
+    )
+
+    const profiles = listProfiles()
+
+    expect(profiles.find((profile) => profile.name === 'leelo')?.systemPrompt).toBe(
+      'You are Leelo, executive assistant.',
+    )
+    expect(profiles.find((profile) => profile.name === 'ops')?.systemPrompt).toBe(
+      'Config prompt wins',
+    )
+    expect(readProfile('leelo').systemPrompt).toBe(
+      'You are Leelo, executive assistant.',
+    )
+    expect(readProfile('ops').systemPrompt).toBe('Config prompt wins')
+  })
 })
