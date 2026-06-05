@@ -153,6 +153,9 @@ import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/gr
 import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
 import { Route as ApiHermesworldReservationsRouteImport } from './routes/api/hermesworld/reservations'
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
+import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
+import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
+import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
@@ -887,6 +890,23 @@ const ApiHermesTasksTaskIdRoute = ApiHermesTasksTaskIdRouteImport.update({
   path: '/$taskId',
   getParentRoute: () => ApiHermesTasksRoute,
 } as any)
+const ApiExternalMemorySearchRoute = ApiExternalMemorySearchRouteImport.update({
+  id: '/api/external-memory/search',
+  path: '/api/external-memory/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExternalMemoryProvidersRoute =
+  ApiExternalMemoryProvidersRouteImport.update({
+    id: '/api/external-memory/providers',
+    path: '/api/external-memory/providers',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiExternalMemoryCandidatesRoute =
+  ApiExternalMemoryCandidatesRouteImport.update({
+    id: '/api/external-memory/candidates',
+    path: '/api/external-memory/candidates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   id: '/api/dashboard/overview',
   path: '/api/dashboard/overview',
@@ -1055,6 +1075,9 @@ export interface FileRoutesByFullPath {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
+  '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
+  '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
@@ -1211,6 +1234,9 @@ export interface FileRoutesByTo {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
+  '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
+  '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
@@ -1369,6 +1395,9 @@ export interface FileRoutesById {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
+  '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
+  '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
@@ -1528,6 +1557,9 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/external-memory/candidates'
+    | '/api/external-memory/providers'
+    | '/api/external-memory/search'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
     | '/api/knowledge/config'
@@ -1684,6 +1716,9 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/external-memory/candidates'
+    | '/api/external-memory/providers'
+    | '/api/external-memory/search'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
     | '/api/knowledge/config'
@@ -1841,6 +1876,9 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/external-memory/candidates'
+    | '/api/external-memory/providers'
+    | '/api/external-memory/search'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
     | '/api/knowledge/config'
@@ -1993,6 +2031,9 @@ export interface RootRouteChildren {
   ChatIndexRoute: typeof ChatIndexRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
+  ApiExternalMemoryCandidatesRoute: typeof ApiExternalMemoryCandidatesRoute
+  ApiExternalMemoryProvidersRoute: typeof ApiExternalMemoryProvidersRoute
+  ApiExternalMemorySearchRoute: typeof ApiExternalMemorySearchRoute
   ApiHermesworldReservationsRoute: typeof ApiHermesworldReservationsRouteWithChildren
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
@@ -3029,6 +3070,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesTasksTaskIdRouteImport
       parentRoute: typeof ApiHermesTasksRoute
     }
+    '/api/external-memory/search': {
+      id: '/api/external-memory/search'
+      path: '/api/external-memory/search'
+      fullPath: '/api/external-memory/search'
+      preLoaderRoute: typeof ApiExternalMemorySearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/external-memory/providers': {
+      id: '/api/external-memory/providers'
+      path: '/api/external-memory/providers'
+      fullPath: '/api/external-memory/providers'
+      preLoaderRoute: typeof ApiExternalMemoryProvidersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/external-memory/candidates': {
+      id: '/api/external-memory/candidates'
+      path: '/api/external-memory/candidates'
+      fullPath: '/api/external-memory/candidates'
+      preLoaderRoute: typeof ApiExternalMemoryCandidatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dashboard/overview': {
       id: '/api/dashboard/overview'
       path: '/api/dashboard/overview'
@@ -3421,6 +3483,9 @@ const rootRouteChildren: RootRouteChildren = {
   ChatIndexRoute: ChatIndexRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
+  ApiExternalMemoryCandidatesRoute: ApiExternalMemoryCandidatesRoute,
+  ApiExternalMemoryProvidersRoute: ApiExternalMemoryProvidersRoute,
+  ApiExternalMemorySearchRoute: ApiExternalMemorySearchRoute,
   ApiHermesworldReservationsRoute: ApiHermesworldReservationsRouteWithChildren,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
