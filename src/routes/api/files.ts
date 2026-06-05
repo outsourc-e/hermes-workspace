@@ -236,6 +236,26 @@ function getMimeType(filePath: string) {
       return 'image/webp'
     case '.svg':
       return 'image/svg+xml'
+    case '.pdf':
+      return 'application/pdf'
+    case '.md':
+    case '.markdown':
+      return 'text/markdown; charset=utf-8'
+    case '.txt':
+    case '.log':
+      return 'text/plain; charset=utf-8'
+    case '.json':
+      return 'application/json; charset=utf-8'
+    case '.html':
+    case '.htm':
+      return 'text/html; charset=utf-8'
+    case '.css':
+      return 'text/css; charset=utf-8'
+    case '.js':
+    case '.mjs':
+      return 'text/javascript; charset=utf-8'
+    case '.csv':
+      return 'text/csv; charset=utf-8'
     default:
       return 'application/octet-stream'
   }
@@ -295,16 +315,20 @@ export const Route = createFileRoute('/api/files')({
             })
           }
 
-          if (action === 'download') {
+          if (action === 'download' || action === 'view') {
             const buffer = await fs.readFile(resolvedPath)
-            return new Response(buffer, {
-              headers: {
-                'Content-Type': getMimeType(resolvedPath),
-                'Content-Disposition': `attachment; filename="${path.basename(
-                  resolvedPath,
-                )}"`,
-              },
-            })
+            const mime = getMimeType(resolvedPath)
+            const headers: Record<string, string> = {
+              'Content-Type':
+                action === 'view' && mime === 'application/octet-stream'
+                  ? 'text/plain; charset=utf-8'
+                  : mime,
+            }
+            if (action === 'download') {
+              headers['Content-Disposition'] =
+                `attachment; filename="${path.basename(resolvedPath)}"`
+            }
+            return new Response(buffer, { headers })
           }
 
           const tree = await readDirectory(resolvedPath, 0, {
