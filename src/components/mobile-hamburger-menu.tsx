@@ -84,6 +84,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     to: '/swarm',
     match: (p: string) => p === '/swarm' || p.startsWith('/swarm2'),
   },
+  {
+    id: 'echo-studio',
+    label: 'Echo Studio',
+    icon: Rocket01Icon,
+    to: '/echo-studio',
+    match: (p: string) => p.startsWith('/echo-studio'),
+  },
 
   {
     id: 'memory',

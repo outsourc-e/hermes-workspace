@@ -845,6 +845,13 @@ function ChatSidebarComponent({
       label: 'Swarm',
       active: isSwarmActive,
     },
+    {
+      kind: 'link',
+      to: '/echo-studio',
+      icon: DashboardSquare01Icon,
+      label: 'Echo Studio',
+      active: pathname.startsWith('/echo-studio'),
+    },
 
   ]
 
