@@ -211,29 +211,60 @@ export async function markRunStatus(
   }))
 }
 
+// A run that hasn't been touched in this long is considered orphaned (e.g.
+// the agent process crashed, the network dropped silently, or the user
+// navigated away during a `handoff` that never resolved). Treating these as
+// "active" makes every chat re-open show a phantom "Thinking…" indicator
+// until the 120s client-side failsafe clears it.
+const STALE_RUN_THRESHOLD_MS = 5 * 60 * 1000
+
+async function readRunsInDir(dir: string): Promise<Array<PersistedRunState>> {
+  const files = (await readdir(dir)).filter((name) => name.endsWith('.json'))
+  if (files.length === 0) return []
+  const runs = await Promise.all(
+    files.map(async (name) => {
+      try {
+        const raw = await readFile(path.join(dir, name), 'utf8')
+        return JSON.parse(raw) as PersistedRunState
+      } catch {
+        return null
+      }
+    }),
+  )
+  return runs.filter((run): run is PersistedRunState => Boolean(run))
+}
+
 export async function getActiveRunForSession(
   sessionKey: string,
 ): Promise<PersistedRunState | null> {
   try {
-    const dir = sessionDir(sessionKey)
-    const files = (await readdir(dir)).filter((name) => name.endsWith('.json'))
-    if (files.length === 0) return null
-    const runs = await Promise.all(
-      files.map(async (name) => {
-        try {
-          const raw = await readFile(path.join(dir, name), 'utf8')
-          return JSON.parse(raw) as PersistedRunState
-        } catch {
-          return null
-        }
-      }),
-    )
+    const runs = await readRunsInDir(sessionDir(sessionKey))
+    const now = Date.now()
     const candidates = runs
-      .filter((run): run is PersistedRunState => Boolean(run))
       .filter((run) => !['complete', 'error'].includes(run.status))
+      .filter((run) => now - run.updatedAt < STALE_RUN_THRESHOLD_MS)
       .sort((a, b) => b.updatedAt - a.updatedAt)
     return candidates[0] ?? null
   } catch {
     return null
+  }
+}
+
+// Lists every non-complete/error run across all sessions, regardless of
+// staleness. Powers the "Background runs" panel so users can inspect and
+// abandon orphans that the staleness filter hides from the chat UI.
+export async function listAllActiveRuns(): Promise<Array<PersistedRunState>> {
+  try {
+    const entries = await readdir(RUNS_ROOT, { withFileTypes: true })
+    const sessionDirs = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(RUNS_ROOT, entry.name))
+    const runsBySession = await Promise.all(sessionDirs.map(readRunsInDir))
+    return runsBySession
+      .flat()
+      .filter((run) => !['complete', 'error'].includes(run.status))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+  } catch {
+    return []
   }
 }

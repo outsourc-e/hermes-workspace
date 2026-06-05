@@ -13,6 +13,7 @@ import {
   useReducedMotion,
 } from 'motion/react'
 import { AgentCard } from './agent-card'
+import { BackgroundRunsSection } from './background-runs-section'
 import { useAgentSpawn } from './hooks/use-agent-spawn'
 import type {
   AgentNode,
@@ -1142,6 +1143,8 @@ export function AgentViewPanel() {
                     )}
                   </LayoutGroup>
                 </section>}
+
+                <BackgroundRunsSection />
 
                 {(cliAgentsQuery.isLoading || visibleCliAgents.length > 0) ? (
                   <section className="rounded-2xl bg-primary-200/15 p-2">
