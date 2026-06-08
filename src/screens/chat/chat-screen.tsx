@@ -563,9 +563,9 @@ export function ChatScreen({
     activeSessionKey,
     activeTitle,
     sessionsError,
-    sessionsLoading: _sessionsLoading,
+    sessionsLoading,
     sessionsFetching: _sessionsFetching,
-    refetchSessions: _refetchSessions,
+    refetchSessions,
   } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
   const {
     historyQuery,
@@ -2946,6 +2946,9 @@ export function ChatScreen({
           onClose={() => setSessionsOpen(false)}
           sessions={sessions}
           activeFriendlyId={activeFriendlyId}
+          sessionsLoading={sessionsLoading}
+          sessionsError={sessionsError}
+          onRetrySessions={refetchSessions}
           onSelectSession={(friendlyId) => {
             setSessionsOpen(false)
             void navigate({

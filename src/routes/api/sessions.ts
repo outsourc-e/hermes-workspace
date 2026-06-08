@@ -13,13 +13,13 @@ import {
   toSessionSummary,
   updateSession,
 } from '../../server/claude-api'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import {
   deleteLocalSession,
   getLocalSession,
   listLocalSessions,
   updateLocalSessionTitle,
 } from '../../server/local-session-store'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -31,6 +31,27 @@ export const Route = createFileRoute('/api/sessions')({
         }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.sessions) {
+          // Gateway doesn't support session listing, but still surface local
+          // portable sessions so mobile/remote clients aren't stuck with an
+          // empty list when the gateway is vanilla hermes-agent (zero-fork).
+          const localOnly = listLocalSessions()
+          if (localOnly.length > 0) {
+            return json({
+              sessions: localOnly.map((ls) => ({
+                key: ls.id,
+                id: ls.id,
+                friendlyId: ls.id,
+                title: ls.title || 'Local Chat',
+                label: ls.title || 'Local Chat',
+                derivedTitle: ls.title || 'Local Chat',
+                startedAt: ls.createdAt,
+                updatedAt: ls.updatedAt,
+                message_count: ls.messageCount,
+                model: ls.model,
+                source: 'local' as const,
+              })),
+            })
+          }
           return json({
             ok: true,
             sessions: [],
@@ -45,7 +66,9 @@ export const Route = createFileRoute('/api/sessions')({
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
           const localSessions = listLocalSessions()
-          const gatewayIds = new Set(gatewaySessions.map((s: any) => s.key || s.id))
+          const gatewayIds = new Set(
+            gatewaySessions.map((s: any) => s.key || s.id),
+          )
           for (const ls of localSessions) {
             if (!gatewayIds.has(ls.id)) {
               gatewaySessions.push({
