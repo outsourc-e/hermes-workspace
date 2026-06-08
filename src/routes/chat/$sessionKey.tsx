@@ -1,11 +1,16 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { z } from 'zod'
 import {
   moveHistoryMessages,
   reconcileSessionDraft,
 } from '../../screens/chat/chat-queries'
 import { ErrorBoundary } from '@/components/error-boundary'
+
+const searchSchema = z.object({
+  fresh: z.number().optional(),
+})
 
 const ChatScreen = lazy(async () => {
   const module = await import('../../screens/chat/chat-screen')
@@ -16,6 +21,7 @@ export const Route = createFileRoute('/chat/$sessionKey')({
   component: ChatRoute,
   // Disable SSR to prevent hydration mismatches from async data
   ssr: false,
+  validateSearch: searchSchema,
   errorComponent: function ChatError({ error, reset }) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
@@ -66,6 +72,7 @@ function ChatRoute() {
     sessionKey: string
   } | null>(null)
   const params = Route.useParams()
+  const { fresh } = Route.useSearch()
   const activeFriendlyId =
     typeof params.sessionKey === 'string' ? params.sessionKey : 'main'
   const isNewChat = activeFriendlyId === 'new'
@@ -74,12 +81,16 @@ function ChatRoute() {
       ? forcedSession.sessionKey
       : undefined
 
-  // Clear history cache when navigating to new chat
+  // Clear history cache and forcedSession when navigating to new chat.
+  // `fresh` changes every time the user taps "New Chat", even when already on
+  // /chat/new — this avoids TanStack Router's same-route no-op and ensures
+  // the reset runs even when isNewChat was already true.
   useEffect(() => {
     if (isNewChat) {
+      setForcedSession(null)
       queryClient.removeQueries({ queryKey: ['chat', 'history', 'new', 'new'] })
     }
-  }, [isNewChat, queryClient])
+  }, [isNewChat, fresh, queryClient])
 
   const handleSessionResolved = useCallback(
     function handleSessionResolved(payload: {
@@ -138,6 +149,7 @@ function ChatRoute() {
         }
       >
         <ChatScreen
+          key={isNewChat ? `new-${fresh ?? 0}` : activeFriendlyId}
           activeFriendlyId={activeFriendlyId}
           isNewChat={isNewChat}
           forcedSessionKey={forcedSessionKey}
