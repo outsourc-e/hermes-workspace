@@ -2360,7 +2360,11 @@ export function ChatScreen({
         // The /chat index route redirects to the last-active session via
         // localStorage, so navigating to '/chat' would land in the previous
         // chat instead of opening a fresh one. See #300.
-        navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
+        navigate({
+          to: '/chat/$sessionKey',
+          params: { sessionKey: 'new' },
+          search: { fresh: Date.now() },
+        })
         return true
       }
 

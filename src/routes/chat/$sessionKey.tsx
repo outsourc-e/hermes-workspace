@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import {
@@ -7,6 +7,7 @@ import {
   reconcileSessionDraft,
 } from '../../screens/chat/chat-queries'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { useChatStore } from '@/stores/chat-store'
 
 const searchSchema = z.object({
   fresh: z.number().optional(),
@@ -67,10 +68,16 @@ function ChatRoute() {
 
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const clearChatStoreSession = useChatStore(
+    (s) => s.clearSession,
+  )
   const [forcedSession, setForcedSession] = useState<{
     friendlyId: string
     sessionKey: string
   } | null>(null)
+  // Track the outgoing session key so we can evict its Zustand bucket on New Chat.
+  // useRef avoids adding forcedSession to the reset-effect deps (avoids infinite loops).
+  const forcedSessionRef = useRef<typeof forcedSession>(null)
   const params = Route.useParams()
   const { fresh } = Route.useSearch()
   const activeFriendlyId =
@@ -81,16 +88,32 @@ function ChatRoute() {
       ? forcedSession.sessionKey
       : undefined
 
-  // Clear history cache and forcedSession when navigating to new chat.
-  // `fresh` changes every time the user taps "New Chat", even when already on
-  // /chat/new — this avoids TanStack Router's same-route no-op and ensures
-  // the reset runs even when isNewChat was already true.
+  // Keep ref in sync so the new-chat reset effect can read it without a dependency.
+  forcedSessionRef.current = forcedSession
+
+  // Clear history cache, forcedSession, and Zustand realtime bucket when navigating
+  // to a new chat. `fresh` changes every time the user taps "New Chat", even when
+  // already on /chat/new — this avoids TanStack Router's same-route no-op and
+  // ensures the reset runs even when isNewChat was already true.
   useEffect(() => {
     if (isNewChat) {
+      // Evict the previous session's Zustand realtimeMessages bucket so it cannot
+      // bleed into the new chat via mergeHistoryMessages (chat-store.ts:1184).
+      const outgoingKey = forcedSessionRef.current?.sessionKey
+      if (outgoingKey && outgoingKey !== 'new') {
+        clearChatStoreSession(outgoingKey)
+      }
       setForcedSession(null)
       queryClient.removeQueries({ queryKey: ['chat', 'history', 'new', 'new'] })
+      // Reset the last-session pointer so a PWA cold-start via /chat index also
+      // lands on a new chat instead of the previous conversation (manifest
+      // start_url="/chat/new" is the primary fix; this is a belt-and-suspenders
+      // guard for browser-URL reloads that hit /chat directly).
+      try {
+        localStorage.setItem('claude-last-session', 'new')
+      } catch {}
     }
-  }, [isNewChat, fresh, queryClient])
+  }, [isNewChat, fresh, queryClient, clearChatStoreSession])
 
   const handleSessionResolved = useCallback(
     function handleSessionResolved(payload: {
