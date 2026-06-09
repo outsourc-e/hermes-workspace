@@ -18,12 +18,10 @@ function jsonResponse(data: unknown, status = 200) {
 
 function isTaskColumn(value: unknown): value is TaskColumn {
   return (
-    value === 'backlog' ||
-    value === 'todo' ||
-    value === 'in_progress' ||
-    value === 'review' ||
-    value === 'blocked' ||
-    value === 'done'
+    value === 'backlog' || value === 'refinement' || value === 'ready' ||
+    value === 'inprogress' || value === 'review' || value === 'readytest' ||
+    value === 'testing' || value === 'readydeploy' || value === 'done' ||
+    value === 'todo' || value === 'in_progress' || value === 'blocked'
   )
 }
 
