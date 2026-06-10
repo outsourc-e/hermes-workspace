@@ -241,7 +241,7 @@ export function TaskDialog({
                   type="submit"
                   size="sm"
                   disabled={isSubmitting || !title.trim()}
-                  style={{ background: 'var(--theme-accent)', color: 'white' }}
+                  style={{ background: 'var(--theme-accent)', color: 'black' }}
                 >
                   {isSubmitting
                     ? 'Saving...'
