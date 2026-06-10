@@ -98,6 +98,7 @@ export type ClaudeTask = {
   id: string
   title: string
   description: string
+  result?: string
   column: TaskColumn
   priority: TaskPriority
   assignee: string | null
@@ -113,6 +114,7 @@ export type ClaudeTask = {
 export type CreateTaskInput = {
   title: string
   description?: string
+  result?: string
   column?: TaskColumn
   priority?: TaskPriority
   assignee?: string | null
