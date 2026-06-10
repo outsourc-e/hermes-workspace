@@ -2,14 +2,16 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
-  Building01Icon,
   Chat01Icon,
+  CheckListIcon,
   Clock01Icon,
   CommandLineIcon,
   DashboardSquare01Icon,
   File01Icon,
   McpServerIcon,
+  MoreHorizontalIcon,
   PuzzleIcon,
+  Rocket01Icon,
   Settings01Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
@@ -24,10 +26,6 @@ import type { TouchEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { useSettings } from '@/hooks/use-settings'
-import {
-  buildChatCardNavigation,
-  useWorkspaceStore,
-} from '@/stores/workspace-store'
 
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
 export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
@@ -38,6 +36,8 @@ export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
  *   z-50  — chat composer input area
  *   z-60  — quick menus, modal sheets, overlays
  *   z-70  — composer wrapper (fixed on mobile)
+ *   z-80  — tab bar pill
+ *   z-90  — More bottom sheet overlay
  */
 
 type TabItem = {
@@ -60,16 +60,15 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
-    to: '/chat/new',
+    to: '/chat/main',
     match: (p) => p.startsWith('/chat') || p === '/new',
   },
-
   {
-    id: 'files',
-    label: 'Files',
-    icon: File01Icon,
-    to: '/files',
-    match: (p) => p.startsWith('/files'),
+    id: 'tasks',
+    label: 'Tasks',
+    icon: CheckListIcon,
+    to: '/tasks',
+    match: (p) => p.startsWith('/tasks'),
   },
   {
     id: 'terminal',
@@ -77,6 +76,20 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     icon: CommandLineIcon,
     to: '/terminal',
     match: (p) => p.startsWith('/terminal'),
+  },
+  {
+    id: 'playground',
+    label: 'Play',
+    icon: Rocket01Icon,
+    to: '/playground',
+    match: (p) => p.startsWith('/playground'),
+  },
+  {
+    id: 'files',
+    label: 'Files',
+    icon: File01Icon,
+    to: '/files',
+    match: (p) => p.startsWith('/files'),
   },
   {
     id: 'jobs',
@@ -92,7 +105,6 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     to: '/swarm',
     match: (p) => p === '/swarm' || p.startsWith('/swarm2'),
   },
-
   {
     id: 'memory',
     label: 'Memory',
@@ -130,11 +142,20 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
   },
 ]
 
+// First 4 tabs always visible in the pill
+const PRIMARY_TAB_IDS = ['dashboard', 'chat', 'tasks', 'terminal']
+const PRIMARY_TABS = MOBILE_NAV_TABS.filter((t) =>
+  PRIMARY_TAB_IDS.includes(t.id),
+)
+const MORE_TABS = MOBILE_NAV_TABS.filter(
+  (t) => !PRIMARY_TAB_IDS.includes(t.id),
+)
+
 export function MobileTabBar() {
   const navigate = useNavigate()
-  const activeChatCardId = useWorkspaceStore((state) => state.activeChatCardId)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navRef = useRef<HTMLElement>(null)
+  const [showMore, setShowMore] = useState(false)
 
   // Drag-to-switch state
   const dragStartXRef = useRef<number | null>(null)
@@ -149,11 +170,14 @@ export function MobileTabBar() {
   // Always hide tab bar on chat routes — iMessage/Telegram pattern
   const isChatRoute = isOnChat
 
+  // Close More sheet when navigating
+  useEffect(() => {
+    setShowMore(false)
+  }, [pathname])
+
   // Drag-to-switch: horizontal swipe across pill switches tabs
   const handlePillTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
-    const touch = event.touches[0]
-    if (!touch) return
-    dragStartXRef.current = touch.clientX
+    dragStartXRef.current = event.touches[0].clientX
     dragStartTimeRef.current = Date.now()
     setIsDragging(false)
   }, [])
@@ -171,9 +195,7 @@ export function MobileTabBar() {
       setIsDragging(false)
 
       if (startX === null) return
-      const touch = event.changedTouches[0]
-      if (!touch) return
-      const endX = touch.clientX
+      const endX = event.changedTouches[0].clientX
       const delta = endX - startX
       const elapsed = Date.now() - (dragStartTimeRef.current ?? Date.now())
       const pillWidth = navRef.current?.getBoundingClientRect().width ?? 200
@@ -194,15 +216,10 @@ export function MobileTabBar() {
         nextIdx < MOBILE_NAV_TABS.length
       ) {
         hapticTap()
-        const nextTab = MOBILE_NAV_TABS[nextIdx]
-        if (nextTab?.id === 'chat') {
-          void navigate(buildChatCardNavigation(activeChatCardId))
-        } else if (nextTab) {
-          void navigate({ to: nextTab.to })
-        }
+        void navigate({ to: MOBILE_NAV_TABS[nextIdx].to })
       }
     },
-    [activeChatCardId, navigate, pathname],
+    [navigate, pathname],
   )
 
   // Measure pill for --tabbar-h (~80px total = pill + bottom offset)
@@ -255,8 +272,69 @@ export function MobileTabBar() {
     }
   }, [isChatRoute])
 
+  const isMoreActive = MORE_TABS.some((t) => t.match(pathname))
+
   return (
     <>
+      {/* More sheet backdrop */}
+      {showMore && (
+        <div
+          className="fixed inset-0 z-[85] bg-black/40 md:hidden"
+          onClick={() => setShowMore(false)}
+        />
+      )}
+
+      {/* More bottom sheet */}
+      {showMore && (
+        <div
+          className={cn(
+            'fixed bottom-0 left-0 right-0 z-[90] md:hidden',
+            'bg-surface/98 backdrop-blur supports-[backdrop-filter]:bg-surface/95',
+            'border-t border-primary-200/40 rounded-t-2xl',
+            'pb-[max(env(safe-area-inset-bottom,8px),16px)]',
+            'px-4 pt-4',
+          )}
+        >
+          <div className="w-10 h-1 bg-primary-300/60 rounded-full mx-auto mb-4" />
+          <div className="grid grid-cols-4 gap-2">
+            {MORE_TABS.map((tab) => {
+              const isActive = tab.match(pathname)
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    hapticTap()
+                    setShowMore(false)
+                    void navigate({ to: tab.to })
+                  }}
+                  aria-label={tab.label}
+                  className={cn(
+                    'flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl',
+                    'transition-all duration-150 active:scale-95',
+                    'select-none touch-manipulation',
+                    'outline-none focus:outline-none',
+                    isActive
+                      ? 'bg-accent-500/15 text-accent-500'
+                      : 'text-primary-500',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex items-center justify-center rounded-full size-10',
+                      isActive ? 'bg-accent-500 text-white' : 'text-primary-400',
+                    )}
+                  >
+                    <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={isActive ? 2 : 1.6} />
+                  </span>
+                  <span className="text-[11px] font-medium leading-tight">{tab.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <nav
         ref={navRef}
         className={cn(
@@ -283,7 +361,7 @@ export function MobileTabBar() {
         onTouchEnd={handlePillTouchEnd}
       >
         <div className="flex items-center gap-1">
-          {MOBILE_NAV_TABS.map((tab, idx) => {
+          {PRIMARY_TABS.map((tab, idx) => {
             const isActive = tab.match(pathname)
             const isCenter = tab.id === 'chat'
             const circleSize =
@@ -294,20 +372,14 @@ export function MobileTabBar() {
                 key={tab.id}
                 type="button"
                 onClick={() => {
-                  // Don't fire navigate if this was a drag swipe
                   if (!isDragging) {
                     hapticTap()
-                    if (tab.id === 'chat') {
-                      void navigate(buildChatCardNavigation(activeChatCardId))
-                    } else {
-                      void navigate({ to: tab.to })
-                    }
+                    void navigate({ to: tab.to })
                   }
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={tab.label}
                 className={cn(
-                  // 40x40 touch target (slightly smaller to fit 5 tabs)
                   'flex items-center justify-center',
                   'size-10 rounded-full',
                   'transition-all duration-200 active:scale-90',
@@ -334,6 +406,37 @@ export function MobileTabBar() {
               </button>
             )
           })}
+
+          {/* More button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (!isDragging) {
+                hapticTap()
+                setShowMore((v) => !v)
+              }
+            }}
+            aria-label="More"
+            aria-expanded={showMore}
+            className={cn(
+              'flex items-center justify-center',
+              'size-10 rounded-full',
+              'transition-all duration-200 active:scale-90',
+              'select-none touch-manipulation',
+              'outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0',
+            )}
+          >
+            <span
+              className={cn(
+                'flex items-center justify-center rounded-full transition-all duration-200 size-10',
+                showMore || isMoreActive
+                  ? 'bg-accent-500 text-white shadow-sm'
+                  : 'text-primary-500',
+              )}
+            >
+              <HugeiconsIcon icon={MoreHorizontalIcon} size={18} strokeWidth={showMore || isMoreActive ? 2 : 1.6} />
+            </span>
+          </button>
         </div>
       </nav>
     </>
