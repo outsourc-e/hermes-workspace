@@ -31,7 +31,7 @@ let _resolving: Promise<BackendResolution> | null = null
 
 async function probeBackend(base: string): Promise<number> {
   try {
-    const res = await fetch(base, { signal: AbortSignal.timeout(3000) })
+    const res = await fetch(`${base}?include_done=true`, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return 0
     // Guard against HTML catch-all responses (route not found returns 200 HTML)
     const contentType = res.headers.get('content-type') ?? ''
