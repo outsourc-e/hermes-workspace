@@ -9,6 +9,8 @@ export type GatewayModelInfoFallbackCapabilities = {
   enhancedChat?: boolean
   config?: boolean
   sessions?: boolean
+  /** Gateway honors per-request `model` in chat completions (#D1). */
+  runtimeModelSwitch?: boolean
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -39,8 +41,22 @@ export function deriveFallbackModelInfoFromGateway(
   gatewayMode: string | null | undefined,
   capabilities: GatewayModelInfoFallbackCapabilities | null | undefined,
 ): NormalizedModelInfo {
+  // Vanilla gateway that advertises per-request model switching (#D1):
+  // the agent stays vanilla, but the composer's model picker must not be
+  // blocked — the API server validates the requested model server-side.
+  if (capabilities?.runtimeModelSwitch) {
+    return {
+      supportsRuntimeSwitching: true,
+      vanillaAgent: true,
+      mode: 'vanilla',
+      raw: null,
+    }
+  }
+
   const hasEnhancedRuntime = Boolean(
-    capabilities?.enhancedChat || capabilities?.config || capabilities?.sessions,
+    capabilities?.enhancedChat ||
+    capabilities?.config ||
+    capabilities?.sessions,
   )
 
   if (hasEnhancedRuntime || gatewayMode === 'enhanced-fork') {
@@ -60,7 +76,9 @@ export function deriveFallbackModelInfoFromGateway(
   }
 }
 
-export function normalizeModelInfoResponse(value: unknown): NormalizedModelInfo {
+export function normalizeModelInfoResponse(
+  value: unknown,
+): NormalizedModelInfo {
   const record = asRecord(value)
   if (!record) {
     return {

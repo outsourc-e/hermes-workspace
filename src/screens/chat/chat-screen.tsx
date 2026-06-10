@@ -1650,7 +1650,15 @@ export function ChatScreen({
     refetchOnReconnect: true,
     refetchOnMount: true,
     staleTime: 30_000,
-    refetchInterval: 60_000, // Re-check every 60s to clear stale errors
+    // Poll fast (8s) while the gateway looks unhealthy so a recovered backend
+    // clears the error banner quickly instead of leaving it stuck for up to a
+    // minute; back off to 60s once healthy to keep idle cost low.
+    refetchInterval: (query) => {
+      const data = query.state.data
+      const unhealthy =
+        query.state.status === 'error' || (data != null && !data.ok)
+      return unhealthy ? 8_000 : 60_000
+    },
   })
   // Don't show errors for new chats or when SSE is connected
   const statusError =
@@ -1980,12 +1988,17 @@ export function ChatScreen({
         clientId: optimisticClientId,
       }
 
-      // Failsafe: clear waitingForResponse after 120s no matter what
-      // Prevents infinite spinner if SSE/idle detection both fail
+      // Failsafe: clear waitingForResponse after 120s no matter what.
+      // Prevents an infinite spinner if SSE/idle detection both fail — but
+      // tell the user explicitly instead of silently dropping the spinner,
+      // so a stalled run reads as "timed out, resend" rather than "done".
       if (failsafeTimerRef.current) {
         window.clearTimeout(failsafeTimerRef.current)
       }
       failsafeTimerRef.current = window.setTimeout(() => {
+        showErrorToast(
+          '応答が返ってきませんでした。少し待ってからもう一度送信してください。',
+        )
         streamFinish()
       }, 120_000)
 

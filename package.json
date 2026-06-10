@@ -18,6 +18,7 @@
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",
     "electron:dev": "electron .",
