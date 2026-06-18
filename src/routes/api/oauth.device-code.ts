@@ -1,9 +1,43 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
+import { dashboardFetch } from '../../server/gateway-capabilities'
+import {
+  type DashboardOAuthStartResponse,
+  mapDashboardOAuthStart,
+  readOAuthError,
+} from './-oauth-device-code-utils'
+
+async function startDashboardOAuth(provider: string) {
+  const res = await dashboardFetch(
+    `/api/providers/oauth/${encodeURIComponent(provider)}/start`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+  )
+  const data = (await res.json().catch(() => ({}))) as DashboardOAuthStartResponse
+
+  if (!res.ok) {
+    return json(
+      { error: readOAuthError(data, 'Device code request failed') },
+      { status: res.status },
+    )
+  }
+
+  const mapped = mapDashboardOAuthStart(data)
+  if (!mapped.device_code) {
+    return json(
+      { error: readOAuthError(data, 'Device code response missing session id') },
+      { status: 502 },
+    )
+  }
+  return json(mapped)
+}
+
 
 const BodySchema = z.object({
-  provider: z.string().min(1),
+  provider: z.string().trim().min(1),
 })
 
 export const Route = createFileRoute('/api/oauth/device-code')({
@@ -52,12 +86,7 @@ export const Route = createFileRoute('/api/oauth/device-code')({
           }
         }
 
-        return json(
-          {
-            error: `OAuth device flow not supported for provider: ${provider}`,
-          },
-          { status: 400 },
-        )
+        return startDashboardOAuth(provider)
       },
     },
   },
