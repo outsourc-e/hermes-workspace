@@ -126,6 +126,20 @@ export function estimateContextTokensFromCacheRead(
   return Math.ceil((Math.max(0, Number(cacheReadTokens) || 0) / assistantTurns) * 1.2)
 }
 
+export function estimateContextTokensFromSessionUsage(
+  inputTokens: number,
+  cacheReadTokens: number,
+  cacheWriteTokens: number,
+  apiCallCount: number,
+): number {
+  const calls = Math.max(1, Number(apiCallCount) || 0)
+  const totalInput =
+    (Number(inputTokens) || 0) +
+    (Number(cacheReadTokens) || 0) +
+    (Number(cacheWriteTokens) || 0)
+  return Math.ceil(totalInput / calls)
+}
+
 function getContextWindow(model: string): number {
   if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model]
   for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
@@ -483,12 +497,22 @@ export async function readContextUsage(
     const model = String(sessionData.model || '')
     const maxTokens = configuredModelContext?.maxTokens || getContextWindow(model)
     const cacheReadTokens = Number(sessionData.cache_read_tokens) || 0
+    const cacheWriteTokens = Number(sessionData.cache_write_tokens) || 0
+    const inputTokens = Number(sessionData.input_tokens) || 0
     const messageCount = Number(sessionData.message_count) || 0
+    const apiCallCount = Number(sessionData.api_call_count) || 0
 
     let usedTokens = 0
     const assistantTurns = Math.max(1, Math.ceil(messageCount / 2))
 
-    if (cacheReadTokens > 0 && assistantTurns > 0) {
+    if (apiCallCount > 0) {
+      usedTokens = estimateContextTokensFromSessionUsage(
+        inputTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
+        apiCallCount,
+      )
+    } else if (cacheReadTokens > 0 && assistantTurns > 0) {
       usedTokens = estimateContextTokensFromCacheRead(cacheReadTokens, messageCount)
     } else if (messageCount > 0) {
       try {

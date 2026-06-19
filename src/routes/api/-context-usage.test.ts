@@ -27,6 +27,7 @@ import { getLocalMessages, getLocalSession } from '../../server/local-session-st
 import {
   estimateContextTokensFromCacheRead,
   estimateContextTokensFromMessages,
+  estimateContextTokensFromSessionUsage,
   readContextUsage,
 } from '../../server/context-usage'
 
@@ -337,5 +338,62 @@ describe('context usage estimation', () => {
     expect(messageEstimate).toBeLessThan(cacheEstimate)
     expect(messageEstimate).toBeGreaterThan(1000)
     expect(messageEstimate).toBeLessThan(1200)
+  })
+
+  it('estimates context from average input tokens per API call', () => {
+    const estimate = estimateContextTokensFromSessionUsage(
+      21019,
+      31360,
+      0,
+      9,
+    )
+
+    expect(estimate).toBe(5820)
+  })
+
+  it('sums input, cache_read, and cache_write before averaging', () => {
+    const estimate = estimateContextTokensFromSessionUsage(
+      5000,
+      3000,
+      2000,
+      5,
+    )
+
+    expect(estimate).toBe(2000)
+  })
+
+  it('handles zero API calls by treating as a single call', () => {
+    const estimate = estimateContextTokensFromSessionUsage(
+      10000,
+      0,
+      0,
+      0,
+    )
+
+    expect(estimate).toBe(10000)
+  })
+
+  it('handles missing or NaN token fields as zero', () => {
+    const estimate = estimateContextTokensFromSessionUsage(
+      NaN,
+      NaN,
+      NaN,
+      5,
+    )
+
+    expect(estimate).toBe(0)
+  })
+
+  it('returns near-accurate context for a session with many internal API calls but few user messages', () => {
+    const cacheEstimate = estimateContextTokensFromCacheRead(3881216, 119)
+    const usageEstimate = estimateContextTokensFromSessionUsage(
+      203530,
+      3881216,
+      0,
+      59,
+    )
+
+    expect(usageEstimate).toBeLessThan(cacheEstimate)
+    expect(usageEstimate).toBe(69233)
   })
 })
