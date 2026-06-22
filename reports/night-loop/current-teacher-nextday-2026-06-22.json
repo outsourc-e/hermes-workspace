@@ -1,0 +1,15 @@
+{
+  "status": "found",
+  "target_date": "2026-06-22",
+  "source_path": "/Users/zondrius/hermes-workspace/projects/ge-lernwerkstatt/reports/teacher-nextday-2026-06-21.md",
+  "source_file": "teacher-nextday-2026-06-21.md",
+  "fuer_morgen": "2026-06-22",
+  "summary": {
+    "kurzfazit": "Bester Kern fuer morgen ist eine kleine reale Handlung mit Kommunikation: Gartenpost zustellen: eine Karte/Notiz aufnehmen, passenden Zielort wählen, ablegen/übergeben und Fertig anzeigen. Das bleibt eng, datensparsam und vermeidet geparkte Muster wie Fuenferfeld und S-Kiste. Rueckmeldung: lokale Feedback-/Proof-Dateien gelesen; reale Nützlichkeit nur übernehmen, wenn dort ausdrücklich getestet_useful steht.",
+    "sofort_machen": "1 sichtbare Gartenpost-Karte, zwei Zielorte und eine Fertig-Kiste fuer den Tisch bereitlegen.",
+    "nicht_tun": "Fuenferfeld oder S-Kiste als Ersatzkern wieder aufnehmen.",
+    "naechste_kleinste_aktion": "Zwei Zielschalen beschriften und die Fertig-Kiste rechts daneben stellen.",
+    "proof_befehl": "Nach der Stunde nur markieren: untested / tested_useful / tested_not_useful / parked; keine Erfolgsgeschichte erfinden."
+  },
+  "generated_at": "2026-06-22T12:25:57.569659+02:00"
+}
