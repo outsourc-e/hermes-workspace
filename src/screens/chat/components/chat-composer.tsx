@@ -1138,11 +1138,38 @@ function ChatComposerComponent({
       }
       setModelNotice(null)
       const resolved = getResolvedModelKey(model, provider)
-      // Per-session, browser-local persistence. No global config write —
-      // picking a model here only affects this chat. The actual model is
-      // passed on each request via the chat-completion `model` field.
+      // Model choice belongs to the session. Persist it through /api/sessions
+      // and keep a local cache only so the picker/send path updates instantly.
       if (normalizedSessionKey) {
+        // Persist to the backend session so reloads, browser changes, and
+        // other clients hydrate from the chat itself. The local Zustand store
+        // is only an immediate UI/send-path cache, never the source of truth.
         setPersistedSessionModel(normalizedSessionKey, resolved)
+        void fetch('/api/sessions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionKey: normalizedSessionKey,
+            model: resolved,
+          }),
+        })
+          .then(async (response) => {
+            if (!response.ok) throw new Error(await readResponseError(response))
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] }),
+              queryClient.invalidateQueries({
+                queryKey: ['claude', 'session-status-model'],
+              }),
+            ])
+          })
+          .catch((error: unknown) => {
+            toast(
+              `Model saved for this browser, but session persistence failed: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+              { type: 'error' },
+            )
+          })
       }
       setIsModelMenuOpen(false)
     },
@@ -1150,6 +1177,7 @@ function ChatComposerComponent({
       gatewayModeQuery.data,
       sessionKey,
       setPersistedSessionModel,
+      queryClient,
       zeroForkModelInfoFlags,
     ],
   )

@@ -22,6 +22,7 @@ import {
   getSessionMessages as getDashboardSessionMessages,
   listSessions as listDashboardSessions,
   searchSessions as searchDashboardSessions,
+  setSessionModel as setDashboardSessionModel,
   updateSession as updateDashboardSession,
 } from './claude-dashboard-api'
 
@@ -172,11 +173,28 @@ export async function createSession(opts?: {
 
 export async function updateSession(
   sessionId: string,
-  updates: { title?: string },
+  updates: { title?: string; model?: string | null },
 ): Promise<ClaudeSession> {
   if (getCapabilities().dashboard.available) {
-    const resp = await updateDashboardSession(sessionId, updates)
-    return resp.session as ClaudeSession
+    let session: ClaudeSession | null = null
+    if (typeof updates.title === 'string') {
+      const resp = await updateDashboardSession(sessionId, { title: updates.title })
+      session = resp.session as ClaudeSession
+    }
+    if (typeof updates.model === 'string') {
+      const modelValue = updates.model.trim()
+      if (modelValue) {
+        const slashIndex = modelValue.indexOf('/')
+        const provider = slashIndex > 0 ? modelValue.slice(0, slashIndex) : undefined
+        const model = slashIndex > 0 ? modelValue.slice(slashIndex + 1) : modelValue
+        const resp = await setDashboardSessionModel(sessionId, {
+          model,
+          ...(provider ? { provider } : {}),
+        })
+        session = (resp.session as ClaudeSession | undefined) ?? session
+      }
+    }
+    return session ?? getSession(sessionId)
   }
   const resp = await claudePatch<{ session: ClaudeSession }>(
     `/api/sessions/${sessionId}`,

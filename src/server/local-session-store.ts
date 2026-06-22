@@ -95,6 +95,18 @@ export function updateLocalSessionTitle(
   }
 }
 
+export function updateLocalSessionModel(
+  sessionId: string,
+  model: string | null,
+): void {
+  const session = store.sessions[sessionId]
+  if (session) {
+    session.model = model && model.trim().length > 0 ? model.trim() : null
+    session.updatedAt = Date.now()
+    saveToDisk()
+  }
+}
+
 export function touchLocalSession(sessionId: string): void {
   const session = store.sessions[sessionId]
   if (session) session.updatedAt = Date.now()

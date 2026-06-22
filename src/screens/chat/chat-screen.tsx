@@ -67,6 +67,7 @@ import {
   CHAT_RUN_COMMAND_EVENT,
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
+import { _localModelOverride } from './local-model-override'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
@@ -112,9 +113,6 @@ import { useResearchCard } from '@/hooks/use-research-card'
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
 import {  useChatActivityStore } from '@/stores/chat-activity-store'
-
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) { _localModelOverride = model }
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -1057,8 +1055,14 @@ export function ChatScreen({
     return models.map((m: any) => m.id).filter((id: string) => id)
   }, [modelsQuery.data])
 
+  const modelSessionKey = isNewChat
+    ? undefined
+    : forcedSessionKey || resolvedSessionKey || activeCanonicalKey || activeSessionKey
+  const persistedSessionModel = useSessionModelStore((s) =>
+    s.getModel(modelSessionKey),
+  )
   const gatewayModel = currentModelQuery.data || ''
-  const currentModel = _localModelOverride || gatewayModel
+  const currentModel = _localModelOverride || persistedSessionModel || gatewayModel
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)

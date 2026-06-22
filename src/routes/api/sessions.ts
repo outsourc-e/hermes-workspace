@@ -13,13 +13,14 @@ import {
   toSessionSummary,
   updateSession,
 } from '../../server/claude-api'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import {
   deleteLocalSession,
   getLocalSession,
   listLocalSessions,
+  updateLocalSessionModel,
   updateLocalSessionTitle,
 } from '../../server/local-session-store'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -192,6 +193,8 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
           const label =
             typeof body.label === 'string' ? body.label.trim() : undefined
+          const model =
+            typeof body.model === 'string' ? body.model.trim() : undefined
           const sessionKey = rawSessionKey || rawFriendlyId
 
           if (!sessionKey) {
@@ -204,6 +207,8 @@ export const Route = createFileRoute('/api/sessions')({
           const localSession = getLocalSession(sessionKey)
           if (localSession) {
             if (label) updateLocalSessionTitle(sessionKey, label)
+            if (model !== undefined) updateLocalSessionModel(sessionKey, model)
+            const updatedLocalSession = getLocalSession(sessionKey) ?? localSession
             return json({
               ok: true,
               sessionKey,
@@ -214,10 +219,10 @@ export const Route = createFileRoute('/api/sessions')({
                 title: label || sessionKey,
                 label: label || sessionKey,
                 derivedTitle: label || sessionKey,
-                startedAt: localSession.createdAt,
+                startedAt: updatedLocalSession.createdAt,
                 updatedAt: Date.now(),
-                message_count: localSession.messageCount,
-                model: localSession.model,
+                message_count: updatedLocalSession.messageCount,
+                model: updatedLocalSession.model,
                 source: 'local',
               },
               updated: true,
@@ -236,13 +241,16 @@ export const Route = createFileRoute('/api/sessions')({
                 label: label || sessionKey,
                 derivedTitle: label || sessionKey,
                 updatedAt: Date.now(),
+                model: model || undefined,
               },
               updated: false,
+              modelApplied: Boolean(model),
             })
           }
 
           const session = await updateSession(sessionKey, {
             title: label,
+            ...(model !== undefined ? { model } : {}),
           })
 
           return json({

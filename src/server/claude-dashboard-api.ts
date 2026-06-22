@@ -169,6 +169,17 @@ export async function updateSession(
   })
 }
 
+export async function setSessionModel(
+  id: string,
+  body: { model: string; provider?: string },
+): Promise<{ session?: DashboardSession; ok?: boolean }> {
+  return dashboardJson(`/api/hermes/sessions/${encodeURIComponent(id)}/model`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 export async function forkSession(
   id: string,
 ): Promise<{ session: DashboardSession; forked_from: string }> {
