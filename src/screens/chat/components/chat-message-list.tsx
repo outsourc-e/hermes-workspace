@@ -506,14 +506,61 @@ export function buildDisplayEntries(
     entries.push(entry)
   })
 
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
+  // Trailing tool-only assistant messages (with no subsequent assistant text
+  // reply to attach to) are intentionally dropped — they represent an
+  // in-progress/abandoned tool turn, not content to splice onto the prior
+  // reply. Use getTrailingToolOnlyTurnSummary to surface them separately.
+
+  return entries
+}
+
+export type TrailingToolOnlyTurnSummary = {
+  count: number
+  toolNames: Array<string>
+  hasFinalAssistantText: boolean
+}
+
+/**
+ * Inspect the tail of a message thread for a trailing run of tool-only
+ * assistant messages and their tool results that appear after the final
+ * assistant text reply. Returns null when the thread already ends with an
+ * assistant text message (i.e. there is nothing trailing to summarize).
+ */
+export function getTrailingToolOnlyTurnSummary(
+  messages: Array<ChatMessage>,
+): TrailingToolOnlyTurnSummary | null {
+  if (messages.length === 0) return null
+
+  const isToolOnlyTurnMessage = (message: ChatMessage): boolean => {
+    if (message.role === 'tool' || message.role === 'toolResult') return true
+    return isAssistantToolCallOnlyMessage(message)
+  }
+
+  let endIndex = messages.length - 1
+  while (endIndex >= 0 && isToolOnlyTurnMessage(messages[endIndex])) {
+    endIndex -= 1
+  }
+
+  const trailing = messages.slice(endIndex + 1)
+  if (trailing.length === 0) return null
+
+  const toolNamesSet = new Set<string>()
+  for (const message of trailing) {
+    if (isAssistantToolCallOnlyMessage(message)) {
+      for (const call of getToolCallsFromMessage(message)) {
+        if (call.name) toolNamesSet.add(call.name)
+      }
     }
   }
 
-  return entries
+  const hasFinalAssistantText =
+    endIndex >= 0 && messages[endIndex].role === 'assistant'
+
+  return {
+    count: trailing.length,
+    toolNames: Array.from(toolNamesSet),
+    hasFinalAssistantText,
+  }
 }
 
 function escapeAttributeSelector(value: string): string {

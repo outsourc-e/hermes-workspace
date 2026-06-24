@@ -3,7 +3,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SHORTCUTS, shouldToggleKeyboardHelp } from './keyboard-shortcuts-overlay'
 import { DEFAULT_HERMESWORLD_SETTINGS, loadHermesWorldSettings, saveHermesWorldSettings } from './hermesworld-settings'
 
+// Node 22+ ships a built-in global `localStorage` that is a non-functional
+// stub (no clear/getItem/setItem) when `--localstorage-file` has no valid path.
+// jsdom 27 delegates `window.localStorage` to this broken Node global, so the
+// tests below see an empty object. When that happens, install a real in-memory
+// Storage so save/load round-trips behave exactly as in a browser.
+function ensureWorkingLocalStorage() {
+  const existing = window.localStorage
+  if (existing && typeof existing.getItem === 'function' && typeof existing.setItem === 'function') {
+    return
+  }
+  const store = new Map<string, string>()
+  const shim: Storage = {
+    get length() {
+      return store.size
+    },
+    clear: () => store.clear(),
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => {
+      store.set(k, String(v))
+    },
+    removeItem: (k: string) => {
+      store.delete(k)
+    },
+    key: (i: number) => Array.from(store.keys())[i] ?? null,
+  }
+  Object.defineProperty(window, 'localStorage', { value: shim, configurable: true, writable: true })
+}
+
 beforeEach(() => {
+  ensureWorkingLocalStorage()
   window.localStorage.clear()
   document.documentElement.style.removeProperty('--hermesworld-ui-scale')
   document.documentElement.style.removeProperty('--hermesworld-hud-opacity')
