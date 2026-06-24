@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 PUPPETEER_SKIP_DOWNLOAD=1 pnpm install --no-frozen-lockfile",
+  "buildCommand": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm build && node scripts/vercel-build.mjs"
+}
