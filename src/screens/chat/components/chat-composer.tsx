@@ -2894,6 +2894,87 @@ function ChatComposerComponent({
 
                           <div
                             className="relative flex min-w-0 items-center"
+                            ref={workspaceMenuRef}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsWorkspaceMenuOpen((open) => !open)
+                                setIsProfileMenuOpen(false)
+                                setIsThinkingMenuOpen(false)
+                                setIsModelMenuOpen(false)
+                              }}
+                              disabled={disabled || workspaceSelectMutation.isPending}
+                              className="inline-flex h-8 max-w-[10rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary-800/60"
+                              title={workspaceButtonLabel}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z" />
+                              </svg>
+                              <span className="truncate">{workspaceButtonLabel}</span>
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                            </button>
+                            {isWorkspaceMenuOpen && (
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                                  Workspace context
+                                </div>
+                                {workspaceEntries.map((workspace) => (
+                                  <button
+                                    key={workspace.path}
+                                    type="button"
+                                    onClick={() => {
+                                      if (activeWorkspace?.path === workspace.path) {
+                                        setIsWorkspaceMenuOpen(false)
+                                        return
+                                      }
+                                      workspaceSelectMutation.mutate({ path: workspace.path, name: workspace.name })
+                                    }}
+                                    className={cn(
+                                      'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                      activeWorkspace?.path === workspace.path
+                                        ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                        : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                    )}
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <span className="truncate font-medium">{workspace.name}</span>
+                                      {activeWorkspace?.path === workspace.path ? <span className="text-[10px] text-accent-500">active</span> : null}
+                                    </span>
+                                    <span className="mt-0.5 max-w-[12rem] truncate text-[11px] text-neutral-500">{workspace.path}</span>
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={handleOpenWorkspaceManager}
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 20h9" />
+                                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                  </svg>
+                                  <span>Manage workspaces</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    emitSearchModalEvent(SEARCH_MODAL_EVENTS.TOGGLE_FILE_EXPLORER)
+                                    setIsWorkspaceMenuOpen(false)
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                  </svg>
+                                  <span>Open file explorer</span>
+                                </button>
+                                {workspaceContextQuery.isError ? <div className="px-3 py-2 text-xs text-red-500">Failed to load workspaces</div> : null}
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            className="relative flex min-w-0 items-center"
                             ref={thinkingMenuRef}
                           >
                             <button
