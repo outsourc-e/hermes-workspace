@@ -44,6 +44,14 @@ await rm(out, { recursive: true, force: true })
 await mkdir(out, { recursive: true })
 await cp(clientDir, path.join(out, 'static'), { recursive: true })
 
+// Serve the one-liner installer at <domain>/install.sh so
+// `curl -fsSL https://<domain>/install.sh | bash` works from the deployed site.
+const installer = path.join(root, 'install.sh')
+if (existsSync(installer)) {
+  await cp(installer, path.join(out, 'static', 'install.sh'))
+  console.log('[vercel-build] served install.sh at /install.sh')
+}
+
 // 2) SSR serverless function — wraps server.fetch.
 await mkdir(fnDir, { recursive: true })
 await cp(path.join(dist, 'server'), path.join(fnDir, 'dist', 'server'), {
