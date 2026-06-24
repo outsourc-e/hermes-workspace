@@ -100,14 +100,15 @@ function Dashboard({ observations, setView, setActiveId, addExample, startNew })
   const transferOpen = observations.filter(o=>o.transfer === 'noch nicht geprüft').slice(0,3);
   const developments = competencyAreas.map(a => ({area:a, list:observations.filter(o=>o.lernbereich===a.id), trend:trendFor(observations.filter(o=>o.lernbereich===a.id))})).filter(x=>x.list.length).slice(0,4);
   const handleQuickOpen = (event, targetView) => { event.preventDefault(); event.stopPropagation(); setView(targetView); };
+  const openChildStart = (event, targetView) => { event.preventDefault(); event.stopPropagation(); setView(targetView); };
   return <main className="grid two dashboardGrid dashboardBeta">
     <section className="beta3Launcher full">
       <div className="beta3NavIcons" aria-label="Lernbereiche">
-        <button type="button" aria-label="Start" onClick={()=>setView('dashboard')}>🏠</button>
-        <button type="button" aria-label="Deutsch und Kommunikation" onClick={()=>setView('student-beta')}>📖</button>
-        <button type="button" aria-label="Mathe und Mengen" onClick={()=>setView('mengen-bis-5')}>🧮</button>
-        <button type="button" aria-label="Sachunterricht und Alltag" onClick={()=>setView('student-beta')}>🌍</button>
-        <button type="button" aria-label="Spiele für alle" onClick={()=>setView('uebungen')}>🎮</button>
+        <button type="button" aria-label="Start" onPointerUp={(e)=>openChildStart(e, 'dashboard')} onClick={(e)=>openChildStart(e, 'dashboard')}>🏠</button>
+        <button type="button" aria-label="Deutsch und Kommunikation" onPointerUp={(e)=>openChildStart(e, 'student-beta')} onClick={(e)=>openChildStart(e, 'student-beta')}>📖</button>
+        <button type="button" aria-label="Mathe und Mengen" onPointerUp={(e)=>openChildStart(e, 'mengen-bis-5')} onClick={(e)=>openChildStart(e, 'mengen-bis-5')}>🧮</button>
+        <button type="button" aria-label="Sachunterricht und Alltag" onPointerUp={(e)=>openChildStart(e, 'student-beta')} onClick={(e)=>openChildStart(e, 'student-beta')}>🌍</button>
+        <button type="button" aria-label="Spiele für alle" onPointerUp={(e)=>openChildStart(e, 'uebungen')} onClick={(e)=>openChildStart(e, 'uebungen')}>🎮</button>
       </div>
       <div className="beta3Scene" aria-hidden="true">
         <span>🌸</span><span>🌼</span><span>🦋</span><span>🌿</span><span>🍃</span>
@@ -119,20 +120,17 @@ function Dashboard({ observations, setView, setActiveId, addExample, startNew })
       </div>
       <p className="beta3Or">oder</p>
       <div className="beta3PlayGrid">
-        {betaPlayTiles.map(tile => <button type="button" key={tile.id} className="beta3PlayTile" onClick={()=>setView(tile.id)}>
+        {betaPlayTiles.map(tile => <button type="button" key={tile.id} className="beta3PlayTile" onPointerUp={(e)=>openChildStart(e, tile.id)} onClick={(e)=>openChildStart(e, tile.id)}>
           <span className="beta3PlayIcon">{tile.icon}</span>
           <span className="eyebrow">{tile.area}</span>
           <strong>{tile.title}</strong>
           <small>{tile.hint}</small>
         </button>)}
       </div>
-      <div className="teacherShortcut">
-        <span>Lehrkraftbereich</span>
-        <button type="button" onClick={startNew}>Neue Beobachtung</button>
-        <button type="button" onClick={()=>setView('auswertung')}>Auswertung</button>
-        <button type="button" onClick={()=>setView('kompetenzraster')}>Kompetenzraster</button>
-      </div>
     </section>
+    <details className="teacherDashboardDrawer full">
+      <summary>Für Lehrkräfte: Arbeitsübersicht öffnen</summary>
+      <div className="teacherDashboardGrid">
     <section className="card hero">
       <p className="eyebrow">Arbeitsübersicht</p>
       <h2>Heute im Blick</h2>
@@ -170,6 +168,8 @@ function Dashboard({ observations, setView, setActiveId, addExample, startNew })
       <h2><ShieldCheck size={20}/> Lokal, pseudonym, ohne Diagnosen</h2>
       <ul><li>Nur Kürzel/Farben nutzen, keine echten Namen.</li><li>1–10 ist eine pädagogische Einschätzung, keine Note.</li><li>Kontext, Hilfeform, Transfer und Tagesform immer mitlesen.</li><li>Die Fachkraft entscheidet; die App bewertet nicht automatisch.</li></ul>
     </section>
+      </div>
+    </details>
   </main>;
 }
 function ObservationForm({ form, setForm, stations, sensitiveWarning, editingId, onSubmit, onCancel }) {
@@ -641,7 +641,7 @@ function MengenBis5({ setView }) {
   return <main className="studentMode quantityMode quantityPlaySpace">
     <section className="quantityGameHeader"><div><p className="eyebrow">Kinder-Spielraum · keine Punkte · kein Timer</p><h1>Mengen legen</h1><p>{data.instruction}</p></div><button type="button" className="quietExit" onClick={()=>setView('uebungen')}>Zurück</button></section>
     <section className="quantityLevelBar" aria-label="Niveau wählen">{Object.keys(MENGE_LEVELS).map(k=><button key={k} type="button" className={level===k?'active quantityLevel':'quantityLevel'} onClick={()=>reset(k)}>{k}<span>{MENGE_LEVELS[k].title.replace(`${k} · `,'')}</span></button>)}</section>
-    <section className="quantityGameBoard"><section className="quantityFocus card"><p className="eyebrow">Menge-Matte</p><div className="quantityMat" aria-label={`${count} gelegte Steine`}>{laid.length ? laid.map((_,i)=><span key={i} className="stone">●</span>) : <span className="emptyMat">Steine hier legen</span>}</div><div className="student-step-actions quantityActions"><button type="button" className="large" onClick={()=>setCount(Math.max(0,count-1))}>Wegnehmen</button><button type="button" className="primary large" onClick={()=>setCount(Math.min(5,count+1))}>Stein legen</button><button type="button" className="large" onClick={repeat}>Nochmal</button></div></section><section className="quantityChoice card"><h2>Welche Menge passt?</h2><div className="quantityChoiceGrid">{data.choices.map(n=><button type="button" key={n} className={choice===n?'quantityNumber selectedTile':'quantityNumber'} onClick={()=>chooseAmount(n)}>{n}</button>)}</div><p className="symbolFeedback" aria-live="polite">{feedback}</p></section></section>
+    <section className="quantityGameBoard"><section className="quantityFocus card"><p className="eyebrow">Menge-Matte</p><div className="quantityMat" aria-label={`${count} gelegte Steine`}>{laid.length ? laid.map((_,i)=><span key={i} className="stone">●</span>) : <span className="emptyMat">Steine hier legen</span>}</div><div className="student-step-actions quantityActions"><button type="button" className="large" onClick={()=>setCount(current=>Math.max(0,current-1))}>Wegnehmen</button><button type="button" className="primary large" onClick={()=>setCount(current=>Math.min(5,current+1))}>Stein legen</button><button type="button" className="large" onClick={repeat}>Nochmal</button></div></section><section className="quantityChoice card"><h2>Welche Menge passt?</h2><div className="quantityChoiceGrid">{data.choices.map(n=><button type="button" key={n} className={choice===n?'quantityNumber selectedTile':'quantityNumber'} onClick={()=>chooseAmount(n)}>{n}</button>)}</div><p className="symbolFeedback" aria-live="polite">{feedback}</p></section></section>
     <section className="quantitySupportBar"><button type="button" onClick={()=>{setHelp('Vormachen');setFeedback('Hilfe ist da: Erst vormachen, dann gemeinsam legen.')}}>Hilfe</button><button type="button" onClick={()=>{setHelp('Material reduzieren');setFeedback('Weniger Auswahl ist okay.')}}>Weniger Auswahl</button><button type="button" onClick={()=>{setHelp('Pause');setFeedback('Pause ist okay.')}}>Pause</button><button type="button" onClick={repeat}>Nochmal</button><button type="button" onClick={()=>setView('dashboard')}>Lehrkraft-App</button></section>
     <details className="quantityTeacherDrawer"><summary>Lehrkraft-Hinweis</summary><p>{data.help}</p><p><strong>Aktuelle Hilfe:</strong> {help}</p><p><strong>Beobachten:</strong> Erkennt die lernende Person Menge über Sehen, Legen, Mitsprechen oder Modell? Welche Hilfe bleibt nötig?</p><p><strong>Nächster kleiner Schritt:</strong> {data.next}</p><p className="warning soft">Keine Namen, keine Speicherung, keine Bewertung. 1–10 erst später in der Beobachtungsmaske einschätzen.</p></details>
   </main>;

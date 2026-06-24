@@ -353,6 +353,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: #fffdf9;
 }
 
+.teacherDashboardDrawer {
+  border: 1px solid #d7ded0;
+  border-radius: 22px;
+  background: rgba(255,255,255,.78);
+  overflow: hidden;
+}
+
+.teacherDashboardDrawer > summary {
+  padding: 16px 20px;
+  color: #405246;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.teacherDashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid #d7ded0;
+  background: #f8f6f1;
+}
+
+.teacherDashboardGrid .card {
+  min-height: 180px;
+}
+
 .privacy h2 { display: flex; gap: 8px; align-items: center; }
 .privacy li { margin: .5rem 0; }
 
@@ -985,6 +1012,13 @@ summary { cursor: pointer; font-weight: 750; }
   background: #f8f6f1;
 }
 
+.teacherDrawer:not([open]) > :not(summary),
+.teacherDashboardDrawer:not([open]) > :not(summary),
+.ukTeacherDrawer:not([open]) > :not(summary),
+.quantityTeacherDrawer:not([open]) > :not(summary) {
+  display: none;
+}
+
 .dashboardBeta > .card:not(.beta3Launcher) {
   opacity: .72;
 }
@@ -996,6 +1030,7 @@ summary { cursor: pointer; font-weight: 750; }
 @media (max-width: 760px) {
   .studentTopNav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .studentTopNav button { min-height: 62px; }
+  .teacherDashboardGrid { grid-template-columns: 1fr; }
 }
 
 /* Mengen legen: reduzierter GE-Spielraum */
