@@ -33,6 +33,7 @@ import { LogsTailCard } from './components/logs-tail-card'
 import { OperatorTipCard } from './components/operator-tip-card'
 import { OpsStrip } from './components/ops-strip'
 import { ProviderMixCard } from './components/provider-mix-card'
+import { ReadonlyWorkerStatusCard } from './components/readonly-worker-status-card'
 import { SessionsIntelligenceCard } from './components/sessions-intelligence-card'
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
@@ -1182,6 +1183,9 @@ export function DashboardScreen() {
               installedCount={skillsInstalled}
               onOpen={() => navigate({ to: '/skills' })}
             />
+          </WidgetShell>
+          <WidgetShell id="readonly_worker_status" layout={layout}>
+            <ReadonlyWorkerStatusCard />
           </WidgetShell>
           {/* `flex-1` here pushes the rhythm card to consume any
               remaining vertical space so the rail's bottom aligns
