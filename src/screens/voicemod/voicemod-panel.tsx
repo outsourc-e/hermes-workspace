@@ -28,8 +28,12 @@ const controlBase =
   'h-9 w-full rounded-lg border border-primary-200 bg-transparent px-3 text-sm text-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-950'
 
 export function VoiceModPanel({ profile, className }: VoiceModPanelProps) {
-  const { voices, state, loading, busy, error, enroll, save, reset } =
+  const { voices, state, loading, busy, error, enroll, save, reset, setDefault } =
     useVoiceMod(profile)
+
+  // branded reference (core kit present) => protected default + revert only.
+  // custom profile (no core) => offer "Set as default" to lock their build.
+  const isBranded = state?.hasCoreKit ?? false
 
   const [engine, setEngine] = useState<VoiceEngine>('cosy')
   const [voice, setVoice] = useState<string>('')
@@ -55,7 +59,22 @@ export function VoiceModPanel({ profile, className }: VoiceModPanelProps) {
             Voice identity for <span className="font-medium">{profile}</span> — sits under the SOUL.
           </p>
         </div>
-        {loading && <span className="text-xs text-primary-400">loading…</span>}
+        <div className="flex items-center gap-2">
+          {state &&
+            (isBranded ? (
+              <span
+                className="rounded-full border border-primary-300 px-2 py-0.5 text-xs text-primary-600"
+                title="Branded reference voice — protected; edits go to a reversible overlay, never the reference."
+              >
+                🛡 protected default
+              </span>
+            ) : (
+              <span className="rounded-full border border-amber-300 px-2 py-0.5 text-xs text-amber-700">
+                custom profile
+              </span>
+            ))}
+          {loading && <span className="text-xs text-primary-400">loading…</span>}
+        </div>
       </header>
 
       {/* engine + voice */}
@@ -168,10 +187,26 @@ export function VoiceModPanel({ profile, className }: VoiceModPanelProps) {
           size="sm"
           disabled={busy}
           onClick={() => reset()}
-          title="Remove the overlay → revert to the broker's built-in default voice"
+          title={
+            isBranded
+              ? "Drop the overlay → restore this profile's protected branded default"
+              : "Drop the overlay → restore this profile's saved default"
+          }
         >
-          Reset to default
+          Revert to default
         </Button>
+        {/* custom profiles only: lock the current build in as this profile's default */}
+        {state && !isBranded && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || !voice}
+            onClick={() => setDefault()}
+            title="Lock the current build in as this custom profile's default (revert restores it)"
+          >
+            Set as default
+          </Button>
+        )}
       </div>
 
       {/* status */}

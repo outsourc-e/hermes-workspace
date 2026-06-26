@@ -25,12 +25,13 @@ import {
   getProfileVoice,
   listVoices,
   resetVoice,
+  setDefaultVoice,
   type VoiceEngine,
   type VoiceOverlay,
 } from '../../server/voicemod'
 
 interface VoiceModPost {
-  action?: 'alter' | 'reset' | 'save'
+  action?: 'alter' | 'reset' | 'save' | 'set-default'
   profile?: string
   voice?: string
   engine?: VoiceEngine
@@ -83,6 +84,11 @@ export const Route = createFileRoute('/api/voicemod')({
           if (action === 'reset') {
             await resetVoice(profile)
             return json({ ok: true, profile: await getProfileVoice(profile) })
+          }
+
+          if (action === 'set-default') {
+            const result = await setDefaultVoice(profile)
+            return json({ ok: true, enroll: result, profile: await getProfileVoice(profile) })
           }
 
           if (action === 'alter' || action === 'save') {

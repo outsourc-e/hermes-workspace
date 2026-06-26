@@ -59,6 +59,14 @@ export interface ProfileVoiceState {
   seed: number | null
   /** true once a custom kit overlay exists for this profile (seed released/editable) */
   hasCustomKit: boolean
+  /**
+   * true => this profile has a PROTECTED branded reference default (read-only
+   * core kit). Reference voices are never overwritten; edits land in the custom
+   * overlay and "revert to default" restores the branded core.
+   * false => a custom profile with no branded default yet: show "Set as default"
+   * so the user can lock their build in as this profile's default.
+   */
+  hasCoreKit: boolean
   mood: string | null
   palette: Array<string>
   flair: string | null
@@ -153,6 +161,10 @@ function hasCustomKit(profile: string): boolean {
   return fs.existsSync(path.join(VOICE_KITS_DIR, 'custom', `${profile}.json`))
 }
 
+function hasCoreKit(profile: string): boolean {
+  return fs.existsSync(path.join(VOICE_KITS_DIR, 'core', `${profile}.json`))
+}
+
 export async function getProfileVoice(profile: string): Promise<ProfileVoiceState> {
   assertProfile(profile)
   const [kit] = await Promise.all([readKit(profile)])
@@ -161,6 +173,7 @@ export async function getProfileVoice(profile: string): Promise<ProfileVoiceStat
     overlay: readOverlay(profile),
     seed: kit.seed,
     hasCustomKit: hasCustomKit(profile),
+    hasCoreKit: hasCoreKit(profile),
     mood: kit.mood,
     palette: kit.palette,
     flair: kit.flair,
@@ -188,6 +201,35 @@ export async function alterVoice(
 export async function resetVoice(profile: string): Promise<void> {
   assertProfile(profile)
   await pexecFile(VOICEMOD_BIN, ['reset', profile], { timeout: 20_000 })
+}
+
+/**
+ * "Set as default" — for a CUSTOM profile (no protected branded core), lock the
+ * current build in as this profile's default so "revert to default" restores it.
+ * Refuses on branded profiles: their default is the protected reference core,
+ * which is never overwritten.
+ *
+ * Persists by writing the profile's baseline kit (voice/engine/flair + pinned
+ * seed) — that's the voice_kit writer landing in step #2. Reports honestly until
+ * then rather than writing a malformed kit into the read-only core store.
+ */
+export async function setDefaultVoice(profile: string): Promise<EnrollResult> {
+  assertProfile(profile)
+  if (hasCoreKit(profile)) {
+    return {
+      ok: false,
+      output:
+        `${profile} has a protected branded reference default — it cannot be ` +
+        `overwritten. Use "revert to default" to restore it.`,
+    }
+  }
+  return {
+    ok: false,
+    output:
+      `Set-default backend not built yet (step #2): writes core/${profile}.json ` +
+      `(voice/engine/flair + pinned seed) via the voice_kit writer to lock this ` +
+      `custom profile's baseline. Until then the build is saved as a reversible overlay.`,
+  }
 }
 
 /**

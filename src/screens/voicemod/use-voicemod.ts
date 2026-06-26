@@ -18,6 +18,8 @@ export interface ProfileVoiceState {
   overlay: { voice?: string; engine?: VoiceEngine; flair?: string } | null
   seed: number | null
   hasCustomKit: boolean
+  /** true => protected branded reference default; false => custom (offer "Set as default") */
+  hasCoreKit: boolean
   mood: string | null
   palette: Array<string>
   flair: string | null
@@ -103,5 +105,7 @@ export function useVoiceMod(profile: string | null) {
 
   const reset = useCallback(() => post({ action: 'reset' }), [post])
 
-  return { voices, state, loading, busy, error, enroll, refresh, save, reset }
+  const setDefault = useCallback(() => post({ action: 'set-default' }), [post])
+
+  return { voices, state, loading, busy, error, enroll, refresh, save, reset, setDefault }
 }
